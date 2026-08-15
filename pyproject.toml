@@ -1,0 +1,29 @@
+[project]
+name = "composition"
+version = "0.1.0"
+description = "A terminal-based note-taking app with Markdown support, SQLite storage, and Meilisearch search"
+readme = "README.md"
+authors = [
+    { name = "Darrien Rushing", email = "drushing.dev@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=0.60",
+    "meilisearch>=0.31",
+]
+
+[project.scripts]
+composition = "composition.app:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[build-system]
+requires = ["uv_build>=0.11.7,<0.12.0"]
+build-backend = "uv_build"
