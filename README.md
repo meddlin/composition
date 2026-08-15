@@ -4,7 +4,9 @@ A terminal-based note-taking app with Markdown support, SQLite storage, and Meil
 
 ## What it is
 
-Composition is a terminal user interface (TUI) note-taking application built with [Textual](https://textual.textualize.io/). It's for anyone who wants to write and organize notes without leaving the terminal.
+Composition is a terminal user interface (TUI) note-taking application built with
+[Textual](https://textual.textualize.io/). It's for anyone who wants to write and organize notes
+without leaving the terminal.
 
 ## What it does
 
