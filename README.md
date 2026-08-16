@@ -52,6 +52,12 @@ Press `q` to quit.
 ## Development
 
 - Install dev dependencies with `uv sync`
+- Run tests with [pytest](https://docs.pytest.org/):
+
+```bash
+uv run pytest
+```
+
 - Lint and format with [ruff](https://docs.astral.sh/ruff/):
 
 ```bash

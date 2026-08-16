@@ -72,6 +72,10 @@ class NotesStore:
         )
         self._connection.commit()
 
+    def delete_note(self, note_id: int) -> None:
+        self._connection.execute("DELETE FROM notes WHERE id = ?", (note_id,))
+        self._connection.commit()
+
     def close(self) -> None:
         self._connection.close()
 
