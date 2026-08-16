@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from textual import events
 from textual.app import ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Markdown
 
+from composition.screens.delete_note_modal import ConfirmDeleteModal
 from composition.screens.editor_screen import EditorScreen
 from composition.storage import Note, NotesStore
 
@@ -34,6 +38,8 @@ class MainScreen(Screen):
         padding: 1 2;
     }
     """
+
+    BINDINGS: ClassVar = [Binding("ctrl+d", "delete_note", "Delete Note")]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -86,3 +92,19 @@ class MainScreen(Screen):
         note = self._notes_by_id.get(note_id) if note_id is not None else None
         if note is not None:
             self.app.push_screen(EditorScreen(note))
+
+    def action_delete_note(self) -> None:
+        list_view = self.query_one("#notes-list", ListView)
+        note_id = self._highlighted_note_id(list_view)
+        if note_id is None:
+            return
+
+        note = self._notes_by_id[note_id]
+
+        def handle_result(confirmed: bool | None) -> None:
+            if confirmed:
+                store: NotesStore = self.app.notes_store  # type: ignore[attr-defined]
+                store.delete_note(note_id)
+                self._refresh_notes()
+
+        self.app.push_screen(ConfirmDeleteModal(note.title), handle_result)
