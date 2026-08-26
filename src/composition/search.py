@@ -332,7 +332,7 @@ class SearchIndex:
         if not parsed.text:
             opts["sort"] = ["updated_at_ts:desc"]
         result = self._client.index(self._index_uid).search(parsed.text, opts)
-        return [hit["id"] for hit in result["hits"]]
+        return list(dict.fromkeys(hit["id"] for hit in result["hits"]))
 
     def _wait(self, task_uid: int) -> None:
         task = self._client.wait_for_task(task_uid)
