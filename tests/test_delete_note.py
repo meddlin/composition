@@ -1,4 +1,5 @@
 import pytest
+from _doubles import FakeSearchIndex
 
 from composition.app import CompositionApp
 from composition.screens.delete_note_modal import ConfirmDeleteModal
@@ -9,8 +10,12 @@ from composition.storage import NotesStore
 @pytest.fixture
 def app(tmp_path, monkeypatch):
     db_path = tmp_path / "composition.db"
-    monkeypatch.setattr("composition.app.NotesStore", lambda: NotesStore(db_path))
-    return CompositionApp()
+    fake_search = FakeSearchIndex()
+    monkeypatch.setattr(
+        "composition.app.NotesStore",
+        lambda **kwargs: NotesStore(db_path, **kwargs),
+    )
+    return CompositionApp(search_index=fake_search)
 
 
 async def test_ctrl_d_shows_confirmation_modal(app):

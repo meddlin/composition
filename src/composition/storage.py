@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
+import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Protocol
 
 DEFAULT_DB_PATH = Path.home() / ".composition" / "composition.db"
 
@@ -14,6 +16,7 @@ CREATE TABLE IF NOT EXISTS notes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     content TEXT NOT NULL DEFAULT '',
+    tags TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -27,18 +30,40 @@ class Note:
     content: str
     created_at: str
     updated_at: str
+    tags: str = ""
+
+
+class SearchIndexProtocol(Protocol):
+    """What NotesStore needs from a search index, without depending on meilisearch."""
+
+    def index_note(self, note: Note) -> None: ...
+
+    def delete_note(self, note_id: int) -> None: ...
+
+
+def _ensure_tags_column(connection: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(notes)")}
+    if "tags" not in columns:
+        connection.execute("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        connection.commit()
 
 
 class NotesStore:
     """Thin synchronous data-access layer over a single SQLite file."""
 
-    def __init__(self, db_path: Path = DEFAULT_DB_PATH) -> None:
+    def __init__(
+        self,
+        db_path: Path = DEFAULT_DB_PATH,
+        search_index: SearchIndexProtocol | None = None,
+    ) -> None:
         self._db_path = db_path
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._connection = sqlite3.connect(self._db_path)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute(_SCHEMA)
         self._connection.commit()
+        _ensure_tags_column(self._connection)
+        self._search_index = search_index
 
     def list_notes(self) -> list[Note]:
         """All notes, most-recently-edited first."""
@@ -53,16 +78,17 @@ class NotesStore:
         ).fetchone()
         return Note(**row) if row is not None else None
 
-    def create_note(self, title: str) -> Note:
+    def create_note(self, title: str, tags: str = "") -> Note:
         now = _now()
         cursor = self._connection.execute(
-            "INSERT INTO notes (title, content, created_at, updated_at) "
-            "VALUES (?, '', ?, ?)",
-            (title, now, now),
+            "INSERT INTO notes (title, content, tags, created_at, updated_at) "
+            "VALUES (?, '', ?, ?, ?)",
+            (title, tags, now, now),
         )
         self._connection.commit()
         note = self.get_note(cursor.lastrowid)
         assert note is not None
+        self._index(note)
         return note
 
     def update_note_content(self, note_id: int, content: str) -> None:
@@ -71,13 +97,29 @@ class NotesStore:
             (content, _now(), note_id),
         )
         self._connection.commit()
+        note = self.get_note(note_id)
+        if note is not None:
+            self._index(note)
 
     def delete_note(self, note_id: int) -> None:
         self._connection.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         self._connection.commit()
+        if self._search_index is not None:
+            try:
+                self._search_index.delete_note(note_id)
+            except Exception as exc:  # noqa: BLE001 - indexing must never break storage
+                print(f"search index delete failed: {exc}", file=sys.stderr)
 
     def close(self) -> None:
         self._connection.close()
+
+    def _index(self, note: Note) -> None:
+        if self._search_index is None:
+            return
+        try:
+            self._search_index.index_note(note)
+        except Exception as exc:  # noqa: BLE001 - indexing must never break storage
+            print(f"search index update failed: {exc}", file=sys.stderr)
 
 
 def _now() -> str:
