@@ -2,12 +2,15 @@
 
 Landing place for documentation.
 
+See [architecture.md](architecture.md) for how the app is put together and how data
+flows through it.
+
 
 ## Features
 
 - [x] Create note
 - [x] Delete note
-- [] Search across notes
+- [x] Search across notes
 - [] Metadata support via front-matter
     - [] Support tags on notes, allow searching for notes via tags
 - [] Support note groups

@@ -12,6 +12,7 @@ from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Footer, Header, Input, Label, ListItem, ListView, Markdown
 
+from composition import frontmatter
 from composition.screens.delete_note_modal import ConfirmDeleteModal
 from composition.screens.editor_screen import EditorScreen
 from composition.storage import Note, NotesStore
@@ -138,7 +139,7 @@ class MainScreen(Screen):
         note_id = getattr(event.item, "note_id", None)
         note = self._notes_by_id.get(note_id) if note_id is not None else None
         preview = self.query_one("#preview", Markdown)
-        preview.update(note.content if note else "")
+        preview.update(frontmatter.strip(note.content) if note else "")
 
     def on_list_view_selected(self, event: ListView.Selected) -> None:
         note_id = getattr(event.item, "note_id", None)
