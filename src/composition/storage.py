@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
+from composition import frontmatter
+
 DEFAULT_DB_PATH = Path.home() / ".composition" / "composition.db"
 
 _SCHEMA = """
@@ -17,6 +19,7 @@ CREATE TABLE IF NOT EXISTS notes (
     title TEXT NOT NULL,
     content TEXT NOT NULL DEFAULT '',
     tags TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -31,6 +34,7 @@ class Note:
     created_at: str
     updated_at: str
     tags: str = ""
+    description: str = ""
 
 
 class SearchIndexProtocol(Protocol):
@@ -45,6 +49,15 @@ def _ensure_tags_column(connection: sqlite3.Connection) -> None:
     columns = {row["name"] for row in connection.execute("PRAGMA table_info(notes)")}
     if "tags" not in columns:
         connection.execute("ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''")
+        connection.commit()
+
+
+def _ensure_description_column(connection: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(notes)")}
+    if "description" not in columns:
+        connection.execute(
+            "ALTER TABLE notes ADD COLUMN description TEXT NOT NULL DEFAULT ''"
+        )
         connection.commit()
 
 
@@ -63,6 +76,7 @@ class NotesStore:
         self._connection.execute(_SCHEMA)
         self._connection.commit()
         _ensure_tags_column(self._connection)
+        _ensure_description_column(self._connection)
         self._search_index = search_index
 
     def list_notes(self) -> list[Note]:
@@ -79,11 +93,17 @@ class NotesStore:
         return Note(**row) if row is not None else None
 
     def create_note(self, title: str, tags: str = "") -> Note:
-        now = _now()
+        now = now_iso()
+        content = frontmatter.generate(
+            title,
+            created_at=now,
+            updated_at=now,
+            tags=frontmatter.tags_from_string(tags),
+        )
         cursor = self._connection.execute(
-            "INSERT INTO notes (title, content, tags, created_at, updated_at) "
-            "VALUES (?, '', ?, ?, ?)",
-            (title, tags, now, now),
+            "INSERT INTO notes (title, content, tags, description, created_at, updated_at) "
+            "VALUES (?, ?, ?, '', ?, ?)",
+            (title, content, tags, now, now),
         )
         self._connection.commit()
         note = self.get_note(cursor.lastrowid)
@@ -92,9 +112,27 @@ class NotesStore:
         return note
 
     def update_note_content(self, note_id: int, content: str) -> None:
+        """Persist content only, without syncing title/tags/description.
+
+        Fallback path for content with missing or malformed frontmatter.
+        """
         self._connection.execute(
             "UPDATE notes SET content = ?, updated_at = ? WHERE id = ?",
-            (content, _now(), note_id),
+            (content, now_iso(), note_id),
+        )
+        self._connection.commit()
+        note = self.get_note(note_id)
+        if note is not None:
+            self._index(note)
+
+    def update_note(
+        self, note_id: int, content: str, *, title: str, tags: str, description: str
+    ) -> None:
+        """Persist content plus the DB columns synced from parsed frontmatter."""
+        self._connection.execute(
+            "UPDATE notes SET content = ?, title = ?, tags = ?, description = ?, "
+            "updated_at = ? WHERE id = ?",
+            (content, title, tags, description, now_iso(), note_id),
         )
         self._connection.commit()
         note = self.get_note(note_id)
@@ -122,5 +160,5 @@ class NotesStore:
             print(f"search index update failed: {exc}", file=sys.stderr)
 
 
-def _now() -> str:
+def now_iso() -> str:
     return datetime.now(UTC).isoformat()

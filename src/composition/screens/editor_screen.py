@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import ClassVar
 
 from textual.app import ComposeResult
@@ -10,7 +11,8 @@ from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Footer, Header, TextArea
 
-from composition.storage import Note, NotesStore
+from composition import frontmatter
+from composition.storage import Note, NotesStore, now_iso
 
 AUTOSAVE_DELAY = 0.5  # seconds
 
@@ -54,8 +56,30 @@ class EditorScreen(Screen):
     def _save(self) -> None:
         content = self.query_one(TextArea).text
         store: NotesStore = self.app.notes_store  # type: ignore[attr-defined]
-        store.update_note_content(self._note.id, content)
-        self._note.content = content
+
+        parsed, body = frontmatter.parse(content)
+        if parsed is None:
+            # Missing or malformed frontmatter mid-edit — persist raw text,
+            # leave title/tags/description untouched rather than guessing.
+            store.update_note_content(self._note.id, content)
+            self._note.content = content
+        else:
+            title = parsed.title.strip() or self._note.title
+            created_at = parsed.created_at.strip() or self._note.created_at
+            reconciled = replace(
+                parsed, title=title, created_at=created_at, updated_at=now_iso()
+            )
+            reconciled_content = frontmatter.render(reconciled, body)
+            store.update_note(
+                self._note.id,
+                reconciled_content,
+                title=title,
+                tags=frontmatter.tags_to_string(parsed.tags),
+                description=parsed.description,
+            )
+            self._note.title = title
+            self._note.content = reconciled_content
+
         self.sub_title = f"{self._note.title} — saved"
         self._save_timer = None
 

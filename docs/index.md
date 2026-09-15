@@ -7,7 +7,7 @@ Landing place for documentation.
 
 - [x] Create note
 - [x] Delete note
-- [] Search across notes
+- [x] Search across notes
 - [] Metadata support via front-matter
     - [] Support tags on notes, allow searching for notes via tags
 - [] Support note groups
