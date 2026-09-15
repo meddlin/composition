@@ -2,6 +2,9 @@
 
 Landing place for documentation.
 
+See [architecture.md](architecture.md) for how the app is put together and how data
+flows through it.
+
 
 ## Features
 
