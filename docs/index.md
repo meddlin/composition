@@ -11,7 +11,7 @@ flows through it.
 - [x] Create note
 - [x] Delete note
 - [x] Search across notes
-- [] Metadata support via front-matter
+- [x] Metadata support via front-matter
     - [] Support tags on notes, allow searching for notes via tags
 - [] Support note groups
     - [] Support filtering the list of notes by groups
@@ -33,10 +33,10 @@ flows through it.
 
 ### SDLC + Engineering Standards
 
-- GitHub actions to run unit tests on each PR
-- Dependabot automation
+- [] GitHub actions to run unit tests on each PR
+- [x] Dependabot automation
 
-### Deployment 
+### Deployment
 
 Should this be deployed via PyPi? a full desktop app?
 
