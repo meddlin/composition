@@ -211,7 +211,7 @@ dev = [
 requires-dist = [
     { name = "meilisearch", specifier = ">=0.31" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "textual", extras = ["syntax"], specifier = ">=8.0" },
+    { name = "textual", extras = ["syntax"], specifier = ">=8.2.8" },
 ]
 
 [package.metadata.requires-dev]
