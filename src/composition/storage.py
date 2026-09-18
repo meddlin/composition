@@ -25,6 +25,16 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 """
 
+_GROUPS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    parent_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
 
 @dataclass
 class Note:
@@ -35,6 +45,20 @@ class Note:
     updated_at: str
     tags: str = ""
     description: str = ""
+    group_id: int | None = None
+
+
+@dataclass
+class Group:
+    id: int
+    name: str
+    parent_id: int | None
+    created_at: str
+    updated_at: str
+
+
+class GroupNotEmptyError(Exception):
+    """Raised when deleting a group that still has sub-groups or notes in it."""
 
 
 class SearchIndexProtocol(Protocol):
@@ -61,6 +85,13 @@ def _ensure_description_column(connection: sqlite3.Connection) -> None:
         connection.commit()
 
 
+def _ensure_group_id_column(connection: sqlite3.Connection) -> None:
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(notes)")}
+    if "group_id" not in columns:
+        connection.execute("ALTER TABLE notes ADD COLUMN group_id INTEGER")
+        connection.commit()
+
+
 class NotesStore:
     """Thin synchronous data-access layer over a single SQLite file."""
 
@@ -74,9 +105,11 @@ class NotesStore:
         self._connection = sqlite3.connect(self._db_path)
         self._connection.row_factory = sqlite3.Row
         self._connection.execute(_SCHEMA)
+        self._connection.execute(_GROUPS_SCHEMA)
         self._connection.commit()
         _ensure_tags_column(self._connection)
         _ensure_description_column(self._connection)
+        _ensure_group_id_column(self._connection)
         self._search_index = search_index
 
     def list_notes(self) -> list[Note]:
@@ -92,7 +125,9 @@ class NotesStore:
         ).fetchone()
         return Note(**row) if row is not None else None
 
-    def create_note(self, title: str, tags: str = "") -> Note:
+    def create_note(
+        self, title: str, tags: str = "", group_id: int | None = None
+    ) -> Note:
         now = now_iso()
         content = frontmatter.generate(
             title,
@@ -101,9 +136,10 @@ class NotesStore:
             tags=frontmatter.tags_from_string(tags),
         )
         cursor = self._connection.execute(
-            "INSERT INTO notes (title, content, tags, description, created_at, updated_at) "
-            "VALUES (?, ?, ?, '', ?, ?)",
-            (title, content, tags, now, now),
+            "INSERT INTO notes "
+            "(title, content, tags, description, created_at, updated_at, group_id) "
+            "VALUES (?, ?, ?, '', ?, ?, ?)",
+            (title, content, tags, now, now, group_id),
         )
         self._connection.commit()
         note = self.get_note(cursor.lastrowid)
@@ -147,6 +183,69 @@ class NotesStore:
                 self._search_index.delete_note(note_id)
             except Exception as exc:  # noqa: BLE001 - indexing must never break storage
                 print(f"search index delete failed: {exc}", file=sys.stderr)
+
+    def set_note_group(self, note_id: int, group_id: int | None) -> None:
+        """Move a note to a different group (or None to ungroup it).
+
+        Does not bump updated_at - a move isn't a content edit, and bumping it
+        would reorder the note to the top of list_notes() just from moving it.
+        """
+        self._connection.execute(
+            "UPDATE notes SET group_id = ? WHERE id = ?", (group_id, note_id)
+        )
+        self._connection.commit()
+        note = self.get_note(note_id)
+        if note is not None:
+            self._index(note)
+
+    def list_groups(self) -> list[Group]:
+        rows = self._connection.execute("SELECT * FROM groups ORDER BY name").fetchall()
+        return [Group(**row) for row in rows]
+
+    def get_group(self, group_id: int) -> Group | None:
+        row = self._connection.execute(
+            "SELECT * FROM groups WHERE id = ?", (group_id,)
+        ).fetchone()
+        return Group(**row) if row is not None else None
+
+    def create_group(self, name: str, parent_id: int | None = None) -> Group:
+        now = now_iso()
+        cursor = self._connection.execute(
+            "INSERT INTO groups (name, parent_id, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?)",
+            (name, parent_id, now, now),
+        )
+        self._connection.commit()
+        group = self.get_group(cursor.lastrowid)
+        assert group is not None
+        return group
+
+    def rename_group(self, group_id: int, name: str) -> None:
+        self._connection.execute(
+            "UPDATE groups SET name = ?, updated_at = ? WHERE id = ?",
+            (name, now_iso(), group_id),
+        )
+        self._connection.commit()
+
+    def group_is_empty(self, group_id: int) -> bool:
+        """Whether a group has no sub-groups and no notes directly in it."""
+        (child_group_count,) = self._connection.execute(
+            "SELECT COUNT(*) FROM groups WHERE parent_id = ?", (group_id,)
+        ).fetchone()
+        (note_count,) = self._connection.execute(
+            "SELECT COUNT(*) FROM notes WHERE group_id = ?", (group_id,)
+        ).fetchone()
+        return not child_group_count and not note_count
+
+    def delete_group(self, group_id: int) -> None:
+        """Delete a group, refusing if it still has sub-groups or notes in it."""
+        if not self.group_is_empty(group_id):
+            raise GroupNotEmptyError(
+                f"Group {group_id} still has sub-groups or notes; "
+                "empty it before deleting."
+            )
+        self._connection.execute("DELETE FROM groups WHERE id = ?", (group_id,))
+        self._connection.commit()
 
     def close(self) -> None:
         self._connection.close()

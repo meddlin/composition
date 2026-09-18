@@ -48,7 +48,11 @@ class CompositionApp(App):
             if note is not None:
                 self.push_screen(EditorScreen(note))
 
-        self.push_screen(NewNoteModal(), handle_result)
+        group_id = None
+        if isinstance(self.screen, MainScreen):
+            group_id = self.screen.highlighted_group_id()
+
+        self.push_screen(NewNoteModal(group_id), handle_result)
 
     def on_unmount(self) -> None:
         self.notes_store.close()
