@@ -78,8 +78,13 @@ simple at the cost of losing manual collapses on the next rebuild.
 | Key | Action |
 |---|---|
 | `ctrl+g` | New group (`NewGroupModal`), nested under the highlighted group if any |
+| `r` | Rename the highlighted group (`RenameGroupModal`), pre-filled with its current name |
 | `m` | Move the highlighted note to a different group (`SelectGroupModal`) |
 | `ctrl+d` | Delete the highlighted note or (if empty) group |
+
+`r` is a no-op unless a real group node is highlighted — it does nothing on a note leaf
+or on the synthetic "Ungrouped" bucket, the same guard `ctrl+d` and `ctrl+g` use for
+telling a real group (`data["id"] is not None`) from that pseudo-node.
 
 See [screen-navigation.md](screen-navigation.md) for the full key-binding table.
 

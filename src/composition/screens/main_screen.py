@@ -17,6 +17,7 @@ from composition import frontmatter
 from composition.screens.delete_note_modal import ConfirmDeleteModal
 from composition.screens.editor_screen import EditorScreen
 from composition.screens.new_group_modal import NewGroupModal
+from composition.screens.rename_group_modal import RenameGroupModal
 from composition.screens.select_group_modal import GroupSelection, SelectGroupModal
 from composition.storage import Group, GroupNotEmptyError, Note, NotesStore
 
@@ -46,6 +47,7 @@ class MainScreen(Screen):
         Binding("ctrl+d", "delete_note", "Delete"),
         Binding("ctrl+g", "new_group", "New Group"),
         Binding("m", "move_note", "Move Note"),
+        Binding("r", "rename_group", "Rename Group"),
         Binding("ctrl+space", "focus_search", "Search"),
     ]
 
@@ -229,6 +231,26 @@ class MainScreen(Screen):
                 self._refresh_notes()
 
         self.app.push_screen(NewGroupModal(self.highlighted_group_id()), handle_result)
+
+    def action_rename_group(self) -> None:
+        tree = self.query_one("#notes-tree", Tree)
+        node = tree.cursor_node
+        if node is None or node.data is None or node.data["type"] != "group":
+            return
+        group_id = node.data["id"]
+        if group_id is None:
+            return  # the "Ungrouped" bucket isn't a real, renamable group
+
+        store: NotesStore = self.app.notes_store  # type: ignore[attr-defined]
+        group = store.get_group(group_id)
+        if group is None:
+            return
+
+        def handle_result(renamed: Group | None) -> None:
+            if renamed is not None:
+                self._refresh_notes()
+
+        self.app.push_screen(RenameGroupModal(group), handle_result)
 
     def action_move_note(self) -> None:
         tree = self.query_one("#notes-tree", Tree)

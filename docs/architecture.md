@@ -43,6 +43,7 @@ flowchart TB
         editor["editor_screen.py<br/>EditorScreen"]
         newmodal["new_note_modal.py<br/>NewNoteModal"]
         newgroupmodal["new_group_modal.py<br/>NewGroupModal"]
+        renamegroupmodal["rename_group_modal.py<br/>RenameGroupModal"]
         selectgroupmodal["select_group_modal.py<br/>SelectGroupModal"]
         delmodal["delete_note_modal.py<br/>ConfirmDeleteModal"]
     end
@@ -62,6 +63,7 @@ flowchart TB
     main --> editor
     main --> newmodal
     main --> newgroupmodal
+    main --> renamegroupmodal
     main --> selectgroupmodal
     main --> delmodal
     main --> storage
@@ -72,6 +74,7 @@ flowchart TB
 
     newmodal --> storage
     newgroupmodal --> storage
+    renamegroupmodal --> storage
     selectgroupmodal --> storage
 
     storage --> fm
@@ -95,6 +98,7 @@ it never imports Meilisearch types directly, so storage tests can inject a fake 
 | `src/composition/screens/editor_screen.py` | `EditorScreen`: full-screen Markdown editor with debounced autosave. |
 | `src/composition/screens/new_note_modal.py` | `NewNoteModal`: title prompt that creates a note. |
 | `src/composition/screens/new_group_modal.py` | `NewGroupModal`: name prompt that creates a group. |
+| `src/composition/screens/rename_group_modal.py` | `RenameGroupModal`: name prompt, pre-filled, that renames a group. |
 | `src/composition/screens/select_group_modal.py` | `SelectGroupModal`: picker for moving a note to a different group. |
 | `src/composition/screens/delete_note_modal.py` | `ConfirmDeleteModal`: yes/no confirmation before deleting a note or group. |
 

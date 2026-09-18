@@ -5,6 +5,7 @@ Source: [`app.py`](../../src/composition/app.py),
 [`screens/editor_screen.py`](../../src/composition/screens/editor_screen.py),
 [`screens/new_note_modal.py`](../../src/composition/screens/new_note_modal.py),
 [`screens/new_group_modal.py`](../../src/composition/screens/new_group_modal.py),
+[`screens/rename_group_modal.py`](../../src/composition/screens/rename_group_modal.py),
 [`screens/select_group_modal.py`](../../src/composition/screens/select_group_modal.py),
 [`screens/delete_note_modal.py`](../../src/composition/screens/delete_note_modal.py)
 
@@ -29,6 +30,10 @@ flowchart TD
     NewGroupModal -- "submit name<br/>(creates group)" --> Main
     NewGroupModal -- "escape<br/>(dismiss None)" --> Main
 
+    Main -- "r<br/>(rename highlighted group)" --> RenameGroupModal["RenameGroupModal"]
+    RenameGroupModal -- "submit name<br/>(renames group)" --> Main
+    RenameGroupModal -- "escape<br/>(dismiss None)" --> Main
+
     Main -- "m<br/>(move highlighted note)" --> SelectGroupModal["SelectGroupModal"]
     SelectGroupModal -- "select a group<br/>(moves note)" --> Main
     SelectGroupModal -- "escape<br/>(dismiss None)" --> Main
@@ -51,6 +56,7 @@ the editor and `on_screen_resume` re-syncs it.
 | `CompositionApp` (global) | `q` | Quit |
 | `MainScreen` | `ctrl+d` | Delete the highlighted note, or an empty highlighted group → `ConfirmDeleteModal` |
 | `MainScreen` | `ctrl+g` | New group → `NewGroupModal`, nested under the highlighted group |
+| `MainScreen` | `r` | Rename the highlighted group → `RenameGroupModal` |
 | `MainScreen` | `m` | Move the highlighted note to a different group → `SelectGroupModal` |
 | `MainScreen` | `ctrl+space` | Focus the search input |
 | `EditorScreen` | `escape` | Flush pending autosave, back to `MainScreen` |
@@ -58,6 +64,8 @@ the editor and `on_screen_resume` re-syncs it.
 | `NewNoteModal` | `escape` | Cancel, dismiss with `None` |
 | `NewGroupModal` | `enter` (on name input) | Create group, dismiss with the new `Group` |
 | `NewGroupModal` | `escape` | Cancel, dismiss with `None` |
+| `RenameGroupModal` | `enter` (on name input, pre-filled) | Rename group, dismiss with the updated `Group` |
+| `RenameGroupModal` | `escape` | Cancel, dismiss with `None` |
 | `SelectGroupModal` | `enter` (on a group) | Move the note there, dismiss with `GroupSelection` |
 | `SelectGroupModal` | `escape` | Cancel, dismiss with `None` |
 | `ConfirmDeleteModal` | `y` / Delete button | Confirm, dismiss `True` |
