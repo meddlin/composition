@@ -27,15 +27,29 @@ CREATE TABLE notes (
     tags TEXT NOT NULL DEFAULT '',
     description TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    group_id INTEGER
+);
+
+CREATE TABLE groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    parent_id INTEGER,
+    created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
 ```
 
-`tags` and `description` were added after the table's original creation. Rather than a
-migration-file system, `NotesStore.__init__` runs `_ensure_tags_column` and
-`_ensure_description_column` on every startup, each checking `PRAGMA table_info(notes)`
-and issuing an additive `ALTER TABLE ... ADD COLUMN` only if the column is missing —
-safe to run against both a brand-new and a pre-existing database.
+`tags`, `description`, and `group_id` were all added after the `notes` table's original
+creation. Rather than a migration-file system, `NotesStore.__init__` runs
+`_ensure_tags_column`, `_ensure_description_column`, and `_ensure_group_id_column` on
+every startup, each checking `PRAGMA table_info(notes)` and issuing an additive
+`ALTER TABLE ... ADD COLUMN` only if the column is missing — safe to run against both a
+brand-new and a pre-existing database. `groups` itself is a `CREATE TABLE IF NOT EXISTS`
+run alongside the `notes` schema, for the same reason.
+
+See [groups.md](groups.md) for how `notes.group_id` and `groups.parent_id` relate to
+each other and how they're rendered as a tree.
 
 ## Two representations of the same metadata
 
@@ -70,6 +84,10 @@ classDiagram
   never persisted on its own, only serialized into `Note.content`.
 - `frontmatter.tags_to_string` / `tags_from_string` are the two converters that keep
   the flat-string and list representations in sync.
+
+Unlike `tags`/`description`/`title`, `group_id` has **no** frontmatter representation —
+group membership is database-only and never round-trips through the YAML block. See
+[groups.md](groups.md) for why.
 
 ## On-disk note content format
 

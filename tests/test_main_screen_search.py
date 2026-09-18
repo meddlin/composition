@@ -17,11 +17,19 @@ def app(tmp_path, monkeypatch):
 
 
 def _titles(app) -> list[str]:
-    from textual.widgets import ListView
+    from textual.widgets import Tree
 
-    list_view = app.screen.query_one("#notes-list", ListView)
-    notes_by_id = app.screen._notes_by_id
-    return [notes_by_id[item.note_id].title for item in list_view.children]
+    tree = app.screen.query_one("#notes-tree", Tree)
+    titles: list[str] = []
+
+    def walk(node) -> None:
+        for child in node.children:
+            if child.data and child.data.get("type") == "note":
+                titles.append(str(child.label))
+            walk(child)
+
+    walk(tree.root)
+    return titles
 
 
 async def test_typing_filters_list_after_debounce(app):
@@ -101,8 +109,6 @@ async def test_search_input_keeps_focus_until_tab(app):
 
 
 async def test_returning_from_editor_reapplies_active_search(app):
-    from textual.widgets import ListView
-
     app.notes_store.create_note("Roadmap Draft")
     app.notes_store.create_note("Grocery List")
 
@@ -116,11 +122,8 @@ async def test_returning_from_editor_reapplies_active_search(app):
         assert len(_titles(app)) == 1
 
         # Focus stays on the search input after searching; Tab is required
-        # to move it to the list before a note can be opened via Enter.
+        # to move it to the tree before a note can be opened via Enter.
         await pilot.press("tab")
-        await pilot.pause()
-        list_view = app.screen.query_one("#notes-list", ListView)
-        list_view.index = 0
         await pilot.pause()
         await pilot.press("enter")
         await pilot.pause()

@@ -1,4 +1,4 @@
-"""Modal for creating a new note."""
+"""Modal for creating a new group."""
 
 from __future__ import annotations
 
@@ -11,17 +11,17 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Input, Label
 
-from composition.storage import Note, NotesStore
+from composition.storage import Group, NotesStore
 
 
-class NewNoteModal(ModalScreen[Note | None]):
-    """Prompt for a note title; create it and hand back the new Note."""
+class NewGroupModal(ModalScreen[Group | None]):
+    """Prompt for a group name; create it and hand back the new Group."""
 
     DEFAULT_CSS = """
-    NewNoteModal {
+    NewGroupModal {
         align: center middle;
     }
-    NewNoteModal > Vertical {
+    NewGroupModal > Vertical {
         width: 60;
         height: auto;
         border: thick $primary;
@@ -32,24 +32,24 @@ class NewNoteModal(ModalScreen[Note | None]):
 
     BINDINGS: ClassVar = [Binding("escape", "cancel", "Cancel", show=False)]
 
-    def __init__(self, group_id: int | None = None) -> None:
+    def __init__(self, parent_id: int | None = None) -> None:
         super().__init__()
-        self._group_id = group_id
+        self._parent_id = parent_id
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Label("New note title")
-            yield Input(placeholder="Untitled", id="title-input")
+            yield Label("New group name")
+            yield Input(placeholder="Untitled Group", id="name-input")
 
     def on_mount(self) -> None:
-        self.query_one("#title-input", Input).focus()
+        self.query_one("#name-input", Input).focus()
 
-    @on(Input.Submitted, "#title-input")
-    def create_note(self, event: Input.Submitted) -> None:
-        title = event.value.strip() or "Untitled"
+    @on(Input.Submitted, "#name-input")
+    def create_group(self, event: Input.Submitted) -> None:
+        name = event.value.strip() or "Untitled Group"
         store: NotesStore = self.app.notes_store  # type: ignore[attr-defined]
-        note = store.create_note(title, group_id=self._group_id)
-        self.dismiss(note)
+        group = store.create_group(name, parent_id=self._parent_id)
+        self.dismiss(group)
 
     def action_cancel(self) -> None:
         self.dismiss(None)

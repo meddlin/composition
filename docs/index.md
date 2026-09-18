@@ -13,8 +13,8 @@ flows through it.
 - [x] Search across notes
 - [x] Metadata support via front-matter
     - [] Support tags on notes, allow searching for notes via tags
-- [] Support note groups
-    - [] Support filtering the list of notes by groups
+- [x] Support note groups
+    - [] Support filtering the list of notes by groups (a dedicated `group:` search token)
 - [] Image display support in Markdown content
     - Allow users to "upload" images directly into a note
     - Show the image in a rendered version of the note
