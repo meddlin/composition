@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from composition.settings import AppSettings, load_settings, save_settings
 
 
@@ -11,18 +9,20 @@ def test_load_settings_defaults_when_file_missing(tmp_path):
 
 def test_save_then_load_round_trips_values(tmp_path):
     path = tmp_path / "settings.yaml"
-    original = AppSettings(db_path=tmp_path / "notes.db")
+    original = AppSettings(app_data_dir=tmp_path / "data")
 
     save_settings(original, path)
     loaded = load_settings(path)
 
     assert loaded == original
+    assert "app_data_dir:" in path.read_text()
+    assert "db_path:" not in path.read_text()
 
 
 def test_save_settings_creates_parent_directory(tmp_path):
     path = tmp_path / "nested" / "settings.yaml"
 
-    save_settings(AppSettings(db_path=Path("/tmp/db")), path)
+    save_settings(AppSettings(app_data_dir=tmp_path / "data"), path)
 
     assert path.exists()
 
@@ -38,7 +38,7 @@ def test_theme_round_trips(tmp_path):
     path = tmp_path / "settings.yaml"
 
     save_settings(
-        AppSettings(db_path=tmp_path / "notes.db", theme="composition-forest"), path
+        AppSettings(app_data_dir=tmp_path / "data", theme="composition-forest"), path
     )
 
     assert load_settings(path).theme == "composition-forest"

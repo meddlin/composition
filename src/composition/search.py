@@ -21,11 +21,13 @@ from pathlib import Path
 import meilisearch
 from meilisearch.errors import MeilisearchApiError, MeilisearchCommunicationError
 
+from composition.paths import DEFAULT_APP_DATA_DIR, ApplicationPaths
 from composition.storage import Note
 
-DEFAULT_MEILI_DATA_DIR = Path.home() / ".composition" / "meili_data"
-DEFAULT_MEILI_LOG_PATH = Path.home() / ".composition" / "meili.log"
-DEFAULT_MEILI_KEY_PATH = Path.home() / ".composition" / "meili_master_key"
+_DEFAULT_PATHS = ApplicationPaths(DEFAULT_APP_DATA_DIR)
+DEFAULT_MEILI_DATA_DIR = _DEFAULT_PATHS.meili_data
+DEFAULT_MEILI_LOG_PATH = _DEFAULT_PATHS.meili_log
+DEFAULT_MEILI_KEY_PATH = _DEFAULT_PATHS.meili_master_key
 DEFAULT_INDEX_UID = "notes"
 
 _FILTER_TOKEN_RE = re.compile(

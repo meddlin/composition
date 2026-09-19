@@ -10,8 +10,9 @@ from pathlib import Path
 from typing import Protocol
 
 from composition import frontmatter
+from composition.paths import DEFAULT_APP_DATA_DIR, ApplicationPaths
 
-DEFAULT_DB_PATH = Path.home() / ".composition" / "composition.db"
+DEFAULT_DB_PATH = ApplicationPaths(DEFAULT_APP_DATA_DIR).database
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS notes (

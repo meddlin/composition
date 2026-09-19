@@ -14,6 +14,7 @@ without leaving the terminal.
 - Store notes locally in a SQLite database
 - Search across all notes with full-text search powered by [Meilisearch](https://www.meilisearch.com/)
 - Navigate a fast, keyboard-driven TUI
+- Move all application data to a directory of your choice from Settings
 
 ## Requirements
 

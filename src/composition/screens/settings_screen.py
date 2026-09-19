@@ -1,4 +1,4 @@
-"""Settings page: view/edit the database location and color scheme."""
+"""Settings page: view/edit application data location and color scheme."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, Input, Label, RadioButton, RadioSet
 
-from composition.settings import AppSettings, save_settings
+from composition.settings import ApplicationDataMoveError, AppSettings, save_settings
 from composition.themes import THEME_CHOICES
 
 
@@ -36,8 +36,8 @@ class SettingsScreen(Screen):
         settings: AppSettings = self.app.settings  # type: ignore[attr-defined]
         yield Header()
         with Vertical():
-            yield Label("Database location")
-            yield Input(value=str(settings.db_path), id="db-path-input")
+            yield Label("Application data location")
+            yield Input(value=str(settings.app_data_dir), id="app-data-path-input")
             yield Label("Color scheme")
             with RadioSet(id="theme-set"):
                 for label, name in THEME_CHOICES:
@@ -46,7 +46,7 @@ class SettingsScreen(Screen):
 
     def on_mount(self) -> None:
         self.sub_title = "Settings"
-        self.query_one("#db-path-input", Input).focus()
+        self.query_one("#app-data-path-input", Input).focus()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         self._save()
@@ -57,29 +57,31 @@ class SettingsScreen(Screen):
         if name is None or name == settings.theme:
             return
         self.app.theme = name
-        # Replace only the theme so an unsubmitted database path edit isn't saved.
+        # Replace only the theme so an unsubmitted data-path edit isn't saved.
         new_settings = replace(settings, theme=name)
         save_settings(new_settings)
         self.app.settings = new_settings  # type: ignore[attr-defined]
 
     def _save(self) -> None:
         settings: AppSettings = self.app.settings  # type: ignore[attr-defined]
-        db_path_raw = self.query_one("#db-path-input", Input).value.strip()
+        location = self.query_one("#app-data-path-input", Input).value.strip()
+        if not location:
+            self.notify("Application data location cannot be empty.", severity="error")
+            return
 
-        new_db_path = Path(db_path_raw).expanduser()
-        db_path_changed = new_db_path != settings.db_path
-
-        new_settings = replace(settings, db_path=new_db_path)
-        save_settings(new_settings)
-        self.app.settings = new_settings  # type: ignore[attr-defined]
-
-        if db_path_changed:
-            self.notify(
-                "Saved. Restart Composition for the new database location "
-                "to take effect."
-            )
-        else:
+        new_location = Path(location).expanduser().absolute()
+        if new_location == settings.app_data_dir.absolute():
+            save_settings(settings)
             self.notify("Settings saved.")
+            return
+
+        try:
+            self.app.move_application_data(new_location)  # type: ignore[attr-defined]
+        except ApplicationDataMoveError as exc:
+            self.notify(str(exc), severity="error")
+            return
+
+        self.notify(f"Application data moved to {new_location}.")
 
     def action_back(self) -> None:
         self.app.pop_screen()
