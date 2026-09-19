@@ -7,8 +7,9 @@ locally-spawned search engine, all running on the user's machine.
 - **UI**: [Textual](https://textual.textualize.io/), a Python TUI framework built on an
   async event loop, reactive widgets, and a screen stack (push/pop navigation, similar
   to a mobile app).
-- **Persistence**: SQLite, a single file at `~/.composition/composition.db`. This is the
-  source of truth for every note.
+- **Persistence**: SQLite, a single `composition.db` file in the configured application
+  data directory (by default `~/.composition`). This is the source of truth for every
+  note.
 - **Search**: [Meilisearch](https://www.meilisearch.com/), run as a local subprocess that
   Composition starts, health-checks, and stops itself. It holds a derived, fully
   rebuildable full-text index — SQLite can always regenerate it from scratch.
@@ -51,7 +52,7 @@ flowchart TB
     storage["storage.py<br/>NotesStore, Note, Group"]
     fm["frontmatter.py<br/>parse / render / generate"]
     search["search.py<br/>SearchIndex, MeiliProcessManager"]
-    sqlite[("SQLite file<br/>~/.composition/composition.db")]
+    sqlite[("SQLite file<br/>&lt;app data&gt;/composition.db")]
     meili[("Meilisearch subprocess<br/>(local HTTP)")]
 
     app --> main

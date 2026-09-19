@@ -14,7 +14,7 @@ def app(tmp_path, monkeypatch):
     fake_search = FakeSearchIndex()
     monkeypatch.setattr(
         "composition.app.load_settings",
-        lambda: AppSettings(db_path=db_path),
+        lambda: AppSettings(app_data_dir=db_path.parent),
     )
     return CompositionApp(search_index=fake_search)
 

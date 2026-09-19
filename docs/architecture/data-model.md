@@ -6,16 +6,22 @@ Source: [`storage.py`](../../src/composition/storage.py),
 ## Storage location
 
 Notes are **not** stored as individual files on disk. Everything lives in one SQLite
-database file:
+database file inside the configured application data directory:
 
 ```
-~/.composition/composition.db
+<application data>/composition.db
 ```
 
 A note's Markdown content — including its embedded YAML frontmatter — is a single
-`TEXT` column in that database. Search's Meilisearch data directory
-(`~/.composition/meili_data/`) and its log/master-key files live alongside it, but
-they're a derived index, not a second copy of the notes.
+`TEXT` column in that database. The Meilisearch data directory (`meili_data/`), its
+log/master-key files, and `settings.yaml` live alongside it. The search index is
+derived data, not a second source of truth for the notes.
+
+The directory defaults to `~/.composition`. Changing **Application data location**
+in Settings stops SQLite and Meilisearch, moves every managed artifact to the new
+directory, and reopens the running app there. The well-known default settings path is
+left only as a symlink to the moved `settings.yaml`, allowing the next launch to find
+the configured directory without leaving application data behind.
 
 ## Schema
 
