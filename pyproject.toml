@@ -18,7 +18,7 @@ composition = "composition.app:main"
 
 [dependency-groups]
 dev = [
-    "ruff>=0.6",
+    "ruff>=0.16.6",
     "pytest>=8.0",
     "pytest-asyncio>=0.24",
 ]
