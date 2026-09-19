@@ -7,6 +7,7 @@ from composition.screens.new_group_modal import NewGroupModal
 from composition.screens.new_note_modal import NewNoteModal
 from composition.screens.rename_group_modal import RenameGroupModal
 from composition.screens.select_group_modal import GroupSelection, SelectGroupModal
+from composition.screens.settings_screen import SettingsScreen
 
 __all__ = [
     "ConfirmDeleteModal",
@@ -17,4 +18,5 @@ __all__ = [
     "NewNoteModal",
     "RenameGroupModal",
     "SelectGroupModal",
+    "SettingsScreen",
 ]

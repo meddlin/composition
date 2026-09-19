@@ -13,7 +13,9 @@ from composition.search import (
     MeiliProcessManager,
     SearchIndex,
 )
+from composition.settings import AppSettings, load_settings
 from composition.storage import Note, NotesStore
+from composition.themes import CUSTOM_THEMES
 
 
 class CompositionApp(App):
@@ -27,6 +29,10 @@ class CompositionApp(App):
 
     def __init__(self, search_index: SearchIndex | None = None) -> None:
         super().__init__()
+        self.settings: AppSettings = load_settings()
+        for theme in CUSTOM_THEMES:
+            self.register_theme(theme)
+        self.theme = self.settings.theme
         self._meili_manager: MeiliProcessManager | None = None
         owns_process = search_index is None
         if search_index is None:
@@ -36,7 +42,9 @@ class CompositionApp(App):
             search_index.ensure_index()
 
         self.search_index = search_index
-        self.notes_store = NotesStore(search_index=self.search_index)
+        self.notes_store = NotesStore(
+            db_path=self.settings.db_path, search_index=self.search_index
+        )
         if owns_process:
             self.search_index.reindex_all(self.notes_store.list_notes())
 
