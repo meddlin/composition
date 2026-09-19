@@ -19,6 +19,7 @@ from composition.screens.editor_screen import EditorScreen
 from composition.screens.new_group_modal import NewGroupModal
 from composition.screens.rename_group_modal import RenameGroupModal
 from composition.screens.select_group_modal import GroupSelection, SelectGroupModal
+from composition.screens.settings_screen import SettingsScreen
 from composition.storage import Group, GroupNotEmptyError, Note, NotesStore
 
 SEARCH_DEBOUNCE = 0.35  # seconds
@@ -169,6 +170,8 @@ class MainScreen(Screen):
                 "*No notes yet — press Ctrl+N.*"
             )
 
+        tree.root.add_leaf("⚙ Settings", data={"type": "settings", "id": None})
+
         target = nodes_by_key.get(previous_key) if previous_key else None
         if target is None:
             # Prefer landing on a note over a group header, matching the old
@@ -219,7 +222,12 @@ class MainScreen(Screen):
 
     def on_tree_node_selected(self, event: Tree.NodeSelected) -> None:
         data = event.node.data
-        if not data or data["type"] != "note":
+        if not data:
+            return
+        if data["type"] == "settings":
+            self.app.push_screen(SettingsScreen())
+            return
+        if data["type"] != "note":
             return
         note = self._notes_by_id.get(data["id"])
         if note is not None:

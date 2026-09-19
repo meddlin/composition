@@ -21,6 +21,16 @@ flows through it.
 - [] Support cross-linking between files
     - I want to be able to link in one note file, to another one within the database
 
+### Admin Features
+
+- [] Support data backup & restore
+    - [] Full database backup
+    - [] Full notes backup to JSON files
+- [x] Settings page for application configurations:
+    - [x] Database location
+    - [] Notes storage location (if different from the database?)
+    - [x] Color scheme
+
 ### Editing
 
 - [] Generate a table of contents, at the top of the file

@@ -4,7 +4,7 @@ from _doubles import FakeSearchIndex
 from composition.app import CompositionApp
 from composition.screens.delete_note_modal import ConfirmDeleteModal
 from composition.screens.main_screen import MainScreen
-from composition.storage import NotesStore
+from composition.settings import AppSettings
 
 
 @pytest.fixture
@@ -12,8 +12,8 @@ def app(tmp_path, monkeypatch):
     db_path = tmp_path / "composition.db"
     fake_search = FakeSearchIndex()
     monkeypatch.setattr(
-        "composition.app.NotesStore",
-        lambda **kwargs: NotesStore(db_path, **kwargs),
+        "composition.app.load_settings",
+        lambda: AppSettings(db_path=db_path),
     )
     return CompositionApp(search_index=fake_search)
 
