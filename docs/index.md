@@ -26,8 +26,8 @@ flows through it.
 - [] Support data backup & restore
     - [] Full database backup
     - [] Full notes backup to JSON files
-- [] Settings page for application configurations:
-    - [] Database location
+- [x] Settings page for application configurations:
+    - [x] Database location
     - [] Notes storage location (if different from the database?)
     - [x] Color scheme
 
