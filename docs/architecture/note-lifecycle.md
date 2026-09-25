@@ -1,9 +1,9 @@
 # Note lifecycle: create, edit, autosave
 
-Source: [`storage.py`](../../src/composition/storage.py),
-[`frontmatter.py`](../../src/composition/frontmatter.py),
-[`screens/editor_screen.py`](../../src/composition/screens/editor_screen.py),
-[`screens/new_note_modal.py`](../../src/composition/screens/new_note_modal.py)
+Source: [`storage.py`](../../apps/cli/src/composition/storage.py),
+[`frontmatter.py`](../../apps/cli/src/composition/frontmatter.py),
+[`screens/editor_screen.py`](../../apps/cli/src/composition/screens/editor_screen.py),
+[`screens/new_note_modal.py`](../../apps/cli/src/composition/screens/new_note_modal.py)
 
 This is the most intricate flow in the app: every keystroke in the editor can, after a
 debounce, round-trip through the YAML frontmatter parser before it reaches the
@@ -67,7 +67,7 @@ were and only persists the raw text — metadata resyncs automatically as soon a
 frontmatter becomes valid YAML again. This contract is pinned by
 `test_update_note_syncs_title_tags_description_and_reindexes` and
 `test_update_note_content_does_not_touch_title_tags_description` in
-[`tests/test_storage.py`](../../tests/test_storage.py).
+[`apps/cli/tests/test_storage.py`](../../apps/cli/tests/test_storage.py).
 
 Pressing `escape` (`action_back`) flushes any pending debounced save immediately
 before popping back to `MainScreen`, so navigating away never drops the last few
