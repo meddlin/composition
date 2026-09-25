@@ -1,7 +1,14 @@
 version: 2
 updates:
   - package-ecosystem: "uv"
-    directory: "/"
+    directory: "/apps/cli"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: "npm"
+    directory: "/apps/web"
     schedule:
       interval: "weekly"
     cooldown:

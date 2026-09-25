@@ -1,6 +1,6 @@
 # Startup & shutdown
 
-Source: [`src/composition/app.py`](../../src/composition/app.py)
+Source: [`apps/cli/src/composition/app.py`](../../apps/cli/src/composition/app.py)
 
 Composition is a single process. Starting it means: load the configured application
 data directory, find a free port, launch a local Meilisearch server using that
@@ -42,7 +42,7 @@ timeout, or the `meilisearch` binary isn't on `PATH`, `__init__` raises
 error to stderr, and exits with status 1 — the TUI never starts.
 
 Tests can skip all of this by constructing `CompositionApp(search_index=...)` directly
-with a fake index (see `tests/_doubles.py`); in that case the app never owns a
+with a fake index (see `apps/cli/tests/_doubles.py`); in that case the app never owns a
 Meilisearch subprocess and won't try to stop one on shutdown.
 
 Settings written by older versions contain a standalone `db_path`. On the first

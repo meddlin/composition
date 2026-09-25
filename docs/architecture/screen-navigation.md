@@ -1,13 +1,13 @@
 # Screen navigation
 
-Source: [`app.py`](../../src/composition/app.py),
-[`screens/main_screen.py`](../../src/composition/screens/main_screen.py),
-[`screens/editor_screen.py`](../../src/composition/screens/editor_screen.py),
-[`screens/new_note_modal.py`](../../src/composition/screens/new_note_modal.py),
-[`screens/new_group_modal.py`](../../src/composition/screens/new_group_modal.py),
-[`screens/rename_group_modal.py`](../../src/composition/screens/rename_group_modal.py),
-[`screens/select_group_modal.py`](../../src/composition/screens/select_group_modal.py),
-[`screens/delete_note_modal.py`](../../src/composition/screens/delete_note_modal.py)
+Source: [`app.py`](../../apps/cli/src/composition/app.py),
+[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
+[`screens/editor_screen.py`](../../apps/cli/src/composition/screens/editor_screen.py),
+[`screens/new_note_modal.py`](../../apps/cli/src/composition/screens/new_note_modal.py),
+[`screens/new_group_modal.py`](../../apps/cli/src/composition/screens/new_group_modal.py),
+[`screens/rename_group_modal.py`](../../apps/cli/src/composition/screens/rename_group_modal.py),
+[`screens/select_group_modal.py`](../../apps/cli/src/composition/screens/select_group_modal.py),
+[`screens/delete_note_modal.py`](../../apps/cli/src/composition/screens/delete_note_modal.py)
 
 Composition uses Textual's screen stack (`push_screen`/`pop_screen`) rather than a
 static route table. `MainScreen` is the only screen that's ever the base of the stack;

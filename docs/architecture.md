@@ -91,17 +91,17 @@ it never imports Meilisearch types directly, so storage tests can inject a fake 
 
 | File | Purpose |
 |---|---|
-| `src/composition/app.py` | `CompositionApp` (Textual `App` shell): wires storage, search, and the Meilisearch subprocess together; the `main()` CLI entry point. |
-| `src/composition/storage.py` | `NotesStore`: SQLite-backed CRUD for notes and groups; the `Note`/`Group` dataclasses; the `SearchIndexProtocol` storage depends on. |
-| `src/composition/search.py` | Meilisearch integration: query-string parsing, subprocess lifecycle (`MeiliProcessManager`), and the `SearchIndex` client wrapper. |
-| `src/composition/frontmatter.py` | Pure parse/render/generate for the YAML frontmatter block embedded in note content. |
-| `src/composition/screens/main_screen.py` | `MainScreen`: notes/groups tree + live preview + search bar; the app's home screen. |
-| `src/composition/screens/editor_screen.py` | `EditorScreen`: full-screen Markdown editor with debounced autosave. |
-| `src/composition/screens/new_note_modal.py` | `NewNoteModal`: title prompt that creates a note. |
-| `src/composition/screens/new_group_modal.py` | `NewGroupModal`: name prompt that creates a group. |
-| `src/composition/screens/rename_group_modal.py` | `RenameGroupModal`: name prompt, pre-filled, that renames a group. |
-| `src/composition/screens/select_group_modal.py` | `SelectGroupModal`: picker for moving a note to a different group. |
-| `src/composition/screens/delete_note_modal.py` | `ConfirmDeleteModal`: yes/no confirmation before deleting a note or group. |
+| `apps/cli/src/composition/app.py` | `CompositionApp` (Textual `App` shell): wires storage, search, and the Meilisearch subprocess together; the `main()` CLI entry point. |
+| `apps/cli/src/composition/storage.py` | `NotesStore`: SQLite-backed CRUD for notes and groups; the `Note`/`Group` dataclasses; the `SearchIndexProtocol` storage depends on. |
+| `apps/cli/src/composition/search.py` | Meilisearch integration: query-string parsing, subprocess lifecycle (`MeiliProcessManager`), and the `SearchIndex` client wrapper. |
+| `apps/cli/src/composition/frontmatter.py` | Pure parse/render/generate for the YAML frontmatter block embedded in note content. |
+| `apps/cli/src/composition/screens/main_screen.py` | `MainScreen`: notes/groups tree + live preview + search bar; the app's home screen. |
+| `apps/cli/src/composition/screens/editor_screen.py` | `EditorScreen`: full-screen Markdown editor with debounced autosave. |
+| `apps/cli/src/composition/screens/new_note_modal.py` | `NewNoteModal`: title prompt that creates a note. |
+| `apps/cli/src/composition/screens/new_group_modal.py` | `NewGroupModal`: name prompt that creates a group. |
+| `apps/cli/src/composition/screens/rename_group_modal.py` | `RenameGroupModal`: name prompt, pre-filled, that renames a group. |
+| `apps/cli/src/composition/screens/select_group_modal.py` | `SelectGroupModal`: picker for moving a note to a different group. |
+| `apps/cli/src/composition/screens/delete_note_modal.py` | `ConfirmDeleteModal`: yes/no confirmation before deleting a note or group. |
 
 ## Process flows
 

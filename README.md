@@ -1,67 +1,32 @@
 # Composition
 
-A terminal-based note-taking app with Markdown support, SQLite storage, and Meilisearch search.
+A note-taking system with Markdown support. This is a polyglot monorepo; each app has its own toolchain.
 
-## What it is
+## Layout
 
-Composition is a terminal user interface (TUI) note-taking application built with
-[Textual](https://textual.textualize.io/). It's for anyone who wants to write and organize notes
-without leaving the terminal.
+| Path | What | Stack |
+| --- | --- | --- |
+| [apps/cli](apps/cli) | Terminal note-taking app (TUI) with SQLite storage and Meilisearch search | Python, [uv](https://docs.astral.sh/uv/), Textual |
+| [apps/web](apps/web) | Web app | Next.js, TypeScript, pnpm |
+| [docs](docs) | Architecture and product docs | Markdown |
 
-## What it does
+## Getting started
 
-- Write and edit notes in Markdown, directly in the terminal
-- Store notes locally in a SQLite database
-- Search across all notes with full-text search powered by [Meilisearch](https://www.meilisearch.com/)
-- Navigate a fast, keyboard-driven TUI
-- Move all application data to a directory of your choice from Settings
-
-## Requirements
-
-- Python >= 3.11
-
-## Installation
-
-This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+CLI:
 
 ```bash
+cd apps/cli
 uv sync
-```
-
-## Usage
-
-Launch the app with:
-
-```bash
 uv run composition
-```
-
-Alternatively, once installed, you can run it as:
-
-```bash
-composition
-```
-
-or:
-
-```bash
-python -m composition
-```
-
-Press `q` to quit.
-
-## Development
-
-- Install dev dependencies with `uv sync`
-- Run tests with [pytest](https://docs.pytest.org/):
-
-```bash
 uv run pytest
 ```
 
-- Lint and format with [ruff](https://docs.astral.sh/ruff/):
+Web:
 
 ```bash
-uv run ruff check .
-uv run ruff format .
+cd apps/web
+pnpm install
+pnpm dev
 ```
+
+See each app's README for details.

@@ -1,9 +1,9 @@
 # Groups
 
-Source: [`storage.py`](../../src/composition/storage.py),
-[`screens/main_screen.py`](../../src/composition/screens/main_screen.py),
-[`screens/new_group_modal.py`](../../src/composition/screens/new_group_modal.py),
-[`screens/select_group_modal.py`](../../src/composition/screens/select_group_modal.py)
+Source: [`storage.py`](../../apps/cli/src/composition/storage.py),
+[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
+[`screens/new_group_modal.py`](../../apps/cli/src/composition/screens/new_group_modal.py),
+[`screens/select_group_modal.py`](../../apps/cli/src/composition/screens/select_group_modal.py)
 
 Groups let a note be organized under a folder-like name in the UI. A note belongs to
 at most one group; groups themselves can nest.
@@ -53,7 +53,7 @@ to show a warning notification instead of the delete-confirmation modal.
 
 `MainScreen` renders a Textual `Tree` (`#notes-tree`) instead of a flat list, since
 groups nest arbitrarily. `_populate_tree` in
-[`main_screen.py`](../../src/composition/screens/main_screen.py):
+[`main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py):
 
 1. Loads the full group hierarchy via `store.list_groups()` and buckets it by
    `parent_id`, so the entire group structure — including empty groups — is always

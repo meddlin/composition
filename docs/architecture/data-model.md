@@ -1,7 +1,7 @@
 # Data model
 
-Source: [`storage.py`](../../src/composition/storage.py),
-[`frontmatter.py`](../../src/composition/frontmatter.py)
+Source: [`storage.py`](../../apps/cli/src/composition/storage.py),
+[`frontmatter.py`](../../apps/cli/src/composition/frontmatter.py)
 
 ## Storage location
 
@@ -116,7 +116,7 @@ Markdown-frontmatter convention, even though the Python side uses snake_case
 (`created_at`, `updated_at`) — `frontmatter._serialize`/`parse` are the only places
 that translate between the two. Key order is fixed
 (`title`, `description`, `tags`, `createdAt`, `updatedAt`) and pinned by
-[`tests/test_frontmatter.py`](../../tests/test_frontmatter.py).
+[`apps/cli/tests/test_frontmatter.py`](../../apps/cli/tests/test_frontmatter.py).
 
 `frontmatter.parse` is designed to never raise: a note with no leading `---` block, a
 non-mapping YAML document, or invalid YAML simply parses to `(None, original_content)`.

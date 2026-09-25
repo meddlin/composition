@@ -1,8 +1,8 @@
 # Search
 
-Source: [`search.py`](../../src/composition/search.py),
-[`screens/main_screen.py`](../../src/composition/screens/main_screen.py),
-[`storage.py`](../../src/composition/storage.py)
+Source: [`search.py`](../../apps/cli/src/composition/search.py),
+[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
+[`storage.py`](../../apps/cli/src/composition/storage.py)
 
 Search is fuzzy full-text search over titles and content, plus structured filter
 tokens (`tag:`, `title:`, `createdOn:`), served by a local Meilisearch index that
@@ -77,5 +77,5 @@ sequenceDiagram
 
 Because the index is fully derived, `SearchIndex.reindex_all(notes)` can blow it away
 and rebuild it from the SQLite rows at any time — this runs once at startup (see
-[startup.md](startup.md)) and is the same mechanism `scripts/search_playground.py`
+[startup.md](startup.md)) and is the same mechanism `apps/cli/scripts/search_playground.py`
 uses to exercise search against a throwaway index.
