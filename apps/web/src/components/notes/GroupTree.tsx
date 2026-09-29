@@ -73,7 +73,7 @@ export function GroupTree({
       <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, null)}>
         <div
           style={{ paddingLeft: "8px" }}
-          className="rounded-md py-1.5 text-sm font-medium text-foreground/50"
+          className="rounded-md py-1.5 text-sm font-bold text-foreground/50"
         >
           Ungrouped
         </div>
@@ -121,6 +121,8 @@ function GroupNode({
 }: SharedProps & { group: Group; depth: number }) {
   const [renaming, setRenaming] = useState(false);
   const [addingSubgroup, setAddingSubgroup] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const isTopLevel = depth === 0;
   const empty = isGroupEmpty(group.id);
   const childGroups = childGroupsByParent.get(group.id) ?? [];
   const childNotes = notesByGroup.get(group.id) ?? [];
@@ -140,16 +142,39 @@ function GroupNode({
       ) : (
         <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, group.id)}>
           <div
-            className="group/row flex items-center gap-1 rounded-md py-1.5 pr-2 text-sm"
+            className="group/row flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-sm"
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             onDoubleClick={() => setRenaming(true)}
           >
-            <span className="flex-1 truncate font-medium text-foreground/80">
-              {group.name}
+            <button
+              type="button"
+              onClick={() => setCollapsed((c) => !c)}
+              onDoubleClick={(e) => e.stopPropagation()}
+              aria-expanded={!collapsed}
+              aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.name}`}
+              title={collapsed ? "Expand" : "Collapse"}
+              className="rounded p-0.5 text-foreground/50 hover:bg-foreground/10 hover:text-foreground"
+            >
+              <ChevronIcon expanded={!collapsed} />
+            </button>
+            <FolderIcon />
+            <span
+              className={`min-w-0 flex-1 truncate ${
+                isTopLevel
+                  ? "font-bold text-foreground"
+                  : "font-medium text-foreground/80"
+              }`}
+            >
+              <span className="underline decoration-foreground/30 decoration-1 underline-offset-4">
+                {group.name}
+              </span>
             </span>
             <button
               type="button"
-              onClick={() => setAddingSubgroup(true)}
+              onClick={() => {
+                setCollapsed(false);
+                setAddingSubgroup(true);
+              }}
               aria-label={`New group inside ${group.name}`}
               title="New sub-group"
               className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
@@ -161,7 +186,9 @@ function GroupNode({
               onClick={() => onDeleteGroup(group.id)}
               disabled={!empty}
               aria-label={`Delete ${group.name}`}
-              title={empty ? "Delete group" : "Empty this group before deleting"}
+              title={
+                empty ? "Delete group" : "Empty this group before deleting"
+              }
               className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100! disabled:pointer-events-none disabled:opacity-0"
             >
               ✕
@@ -182,35 +209,78 @@ function GroupNode({
         />
       )}
 
-      {childGroups.map((child) => (
-        <GroupNode
-          key={child.id}
-          group={child}
-          depth={depth + 1}
-          childGroupsByParent={childGroupsByParent}
-          notesByGroup={notesByGroup}
-          activeId={activeId}
-          isGroupEmpty={isGroupEmpty}
-          onSelectNote={onSelectNote}
-          onDeleteNote={onDeleteNote}
-          onCreateGroup={onCreateGroup}
-          onRenameGroup={onRenameGroup}
-          onDeleteGroup={onDeleteGroup}
-          onMoveNoteToGroup={onMoveNoteToGroup}
-        />
-      ))}
+      {!collapsed && (
+        <div className="relative">
+          <span
+            aria-hidden
+            className="absolute bottom-0 top-0 w-px bg-foreground/10"
+            style={{ left: `${depth * 16 + 12}px` }}
+          />
+          {childGroups.map((child) => (
+            <GroupNode
+              key={child.id}
+              group={child}
+              depth={depth + 1}
+              childGroupsByParent={childGroupsByParent}
+              notesByGroup={notesByGroup}
+              activeId={activeId}
+              isGroupEmpty={isGroupEmpty}
+              onSelectNote={onSelectNote}
+              onDeleteNote={onDeleteNote}
+              onCreateGroup={onCreateGroup}
+              onRenameGroup={onRenameGroup}
+              onDeleteGroup={onDeleteGroup}
+              onMoveNoteToGroup={onMoveNoteToGroup}
+            />
+          ))}
 
-      {childNotes.map((note) => (
-        <NoteRow
-          key={note.id}
-          note={note}
-          depth={depth + 1}
-          active={note.id === activeId}
-          onSelect={() => onSelectNote(note.id)}
-          onDelete={() => onDeleteNote(note.id)}
-        />
-      ))}
+          {childNotes.map((note) => (
+            <NoteRow
+              key={note.id}
+              note={note}
+              depth={depth + 1}
+              active={note.id === activeId}
+              onSelect={() => onSelectNote(note.id)}
+              onDelete={() => onDeleteNote(note.id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function ChevronIcon({ expanded }: { expanded: boolean }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+    >
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
+
+function FolderIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      fill="#F3D58A"
+      stroke="#C9A24B"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5 shrink-0"
+    >
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
   );
 }
 
