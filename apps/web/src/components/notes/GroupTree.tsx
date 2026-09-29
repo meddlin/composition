@@ -1,0 +1,335 @@
+"use client";
+
+import { useState, type ReactNode } from "react";
+import { noteTitle, type Group, type Note } from "./types";
+
+// Custom MIME type so drop targets can tell a dragged note apart from any
+// other draggable content a browser might offer.
+const NOTE_DRAG_TYPE = "application/x-composition-note-id";
+
+type TreeProps = {
+  groups: Group[];
+  notes: Note[];
+  activeId: number | null;
+  onSelectNote: (id: number) => void;
+  onDeleteNote: (id: number) => void;
+  onCreateGroup: (name: string, parentId: number | null) => void;
+  onRenameGroup: (id: number, name: string) => void;
+  onDeleteGroup: (id: number) => void;
+  onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+};
+
+export function GroupTree({
+  groups,
+  notes,
+  activeId,
+  onSelectNote,
+  onDeleteNote,
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveNoteToGroup,
+}: TreeProps) {
+  const childGroupsByParent = new Map<number | null, Group[]>();
+  for (const group of groups) {
+    const list = childGroupsByParent.get(group.parentId) ?? [];
+    list.push(group);
+    childGroupsByParent.set(group.parentId, list);
+  }
+
+  const notesByGroup = new Map<number | null, Note[]>();
+  for (const note of notes) {
+    const list = notesByGroup.get(note.groupId) ?? [];
+    list.push(note);
+    notesByGroup.set(note.groupId, list);
+  }
+
+  function isGroupEmpty(id: number): boolean {
+    return (
+      (childGroupsByParent.get(id)?.length ?? 0) === 0 &&
+      (notesByGroup.get(id)?.length ?? 0) === 0
+    );
+  }
+
+  const shared: SharedProps = {
+    childGroupsByParent,
+    notesByGroup,
+    activeId,
+    isGroupEmpty,
+    onSelectNote,
+    onDeleteNote,
+    onCreateGroup,
+    onRenameGroup,
+    onDeleteGroup,
+    onMoveNoteToGroup,
+  };
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {(childGroupsByParent.get(null) ?? []).map((group) => (
+        <GroupNode key={group.id} group={group} depth={0} {...shared} />
+      ))}
+
+      <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, null)}>
+        <div
+          style={{ paddingLeft: "8px" }}
+          className="rounded-md py-1.5 text-sm font-medium text-foreground/50"
+        >
+          Ungrouped
+        </div>
+      </DropZone>
+      {(notesByGroup.get(null) ?? []).map((note) => (
+        <NoteRow
+          key={note.id}
+          note={note}
+          depth={1}
+          active={note.id === activeId}
+          onSelect={() => onSelectNote(note.id)}
+          onDelete={() => onDeleteNote(note.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+type SharedProps = {
+  childGroupsByParent: Map<number | null, Group[]>;
+  notesByGroup: Map<number | null, Note[]>;
+  activeId: number | null;
+  isGroupEmpty: (id: number) => boolean;
+  onSelectNote: (id: number) => void;
+  onDeleteNote: (id: number) => void;
+  onCreateGroup: (name: string, parentId: number | null) => void;
+  onRenameGroup: (id: number, name: string) => void;
+  onDeleteGroup: (id: number) => void;
+  onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+};
+
+function GroupNode({
+  group,
+  depth,
+  childGroupsByParent,
+  notesByGroup,
+  activeId,
+  isGroupEmpty,
+  onSelectNote,
+  onDeleteNote,
+  onCreateGroup,
+  onRenameGroup,
+  onDeleteGroup,
+  onMoveNoteToGroup,
+}: SharedProps & { group: Group; depth: number }) {
+  const [renaming, setRenaming] = useState(false);
+  const [addingSubgroup, setAddingSubgroup] = useState(false);
+  const empty = isGroupEmpty(group.id);
+  const childGroups = childGroupsByParent.get(group.id) ?? [];
+  const childNotes = notesByGroup.get(group.id) ?? [];
+
+  return (
+    <div>
+      {renaming ? (
+        <InlineTextInput
+          initialValue={group.name}
+          depth={depth}
+          onSubmit={(name) => {
+            onRenameGroup(group.id, name);
+            setRenaming(false);
+          }}
+          onCancel={() => setRenaming(false)}
+        />
+      ) : (
+        <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, group.id)}>
+          <div
+            className="group/row flex items-center gap-1 rounded-md py-1.5 pr-2 text-sm"
+            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            onDoubleClick={() => setRenaming(true)}
+          >
+            <span className="flex-1 truncate font-medium text-foreground/80">
+              {group.name}
+            </span>
+            <button
+              type="button"
+              onClick={() => setAddingSubgroup(true)}
+              aria-label={`New group inside ${group.name}`}
+              title="New sub-group"
+              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
+            >
+              +
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeleteGroup(group.id)}
+              disabled={!empty}
+              aria-label={`Delete ${group.name}`}
+              title={empty ? "Delete group" : "Empty this group before deleting"}
+              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100! disabled:pointer-events-none disabled:opacity-0"
+            >
+              ✕
+            </button>
+          </div>
+        </DropZone>
+      )}
+
+      {addingSubgroup && (
+        <InlineTextInput
+          depth={depth + 1}
+          placeholder="Group name"
+          onSubmit={(name) => {
+            onCreateGroup(name, group.id);
+            setAddingSubgroup(false);
+          }}
+          onCancel={() => setAddingSubgroup(false)}
+        />
+      )}
+
+      {childGroups.map((child) => (
+        <GroupNode
+          key={child.id}
+          group={child}
+          depth={depth + 1}
+          childGroupsByParent={childGroupsByParent}
+          notesByGroup={notesByGroup}
+          activeId={activeId}
+          isGroupEmpty={isGroupEmpty}
+          onSelectNote={onSelectNote}
+          onDeleteNote={onDeleteNote}
+          onCreateGroup={onCreateGroup}
+          onRenameGroup={onRenameGroup}
+          onDeleteGroup={onDeleteGroup}
+          onMoveNoteToGroup={onMoveNoteToGroup}
+        />
+      ))}
+
+      {childNotes.map((note) => (
+        <NoteRow
+          key={note.id}
+          note={note}
+          depth={depth + 1}
+          active={note.id === activeId}
+          onSelect={() => onSelectNote(note.id)}
+          onDelete={() => onDeleteNote(note.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function NoteRow({
+  note,
+  depth,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  note: Note;
+  depth: number;
+  active: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="group/row relative">
+      <button
+        type="button"
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData(NOTE_DRAG_TYPE, String(note.id));
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onClick={onSelect}
+        aria-current={active ? "true" : undefined}
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
+        className={`w-full truncate rounded-md py-1.5 pr-9 text-left text-sm ${
+          active ? "bg-foreground/10 font-medium" : "hover:bg-foreground/5"
+        }`}
+      >
+        {noteTitle(note)}
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        aria-label={`Delete ${noteTitle(note)}`}
+        className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs opacity-0 hover:bg-foreground/10 focus:opacity-100 group-hover/row:opacity-60 group-hover/row:hover:opacity-100"
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/** Wraps its children as an HTML5 drop target for a dragged note id. */
+function DropZone({
+  onDrop,
+  children,
+}: {
+  onDrop: (noteId: number) => void;
+  children: ReactNode;
+}) {
+  const [dragOver, setDragOver] = useState(false);
+
+  return (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const id = Number(e.dataTransfer.getData(NOTE_DRAG_TYPE));
+        if (!Number.isNaN(id)) onDrop(id);
+      }}
+      className={`rounded-md ${dragOver ? "bg-foreground/10" : ""}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function InlineTextInput({
+  initialValue = "",
+  depth,
+  placeholder,
+  onSubmit,
+  onCancel,
+}: {
+  initialValue?: string;
+  depth: number;
+  placeholder?: string;
+  onSubmit: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const [value, setValue] = useState(initialValue);
+
+  function submit() {
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      onCancel();
+      return;
+    }
+    onSubmit(trimmed);
+  }
+
+  return (
+    <input
+      type="text"
+      autoFocus
+      value={value}
+      placeholder={placeholder}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={submit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          submit();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onCancel();
+        }
+      }}
+      style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      className="w-full rounded-md border border-foreground/20 bg-transparent py-1.5 pr-2 text-sm outline-none focus:border-foreground/40"
+    />
+  );
+}

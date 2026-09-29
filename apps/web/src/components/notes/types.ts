@@ -1,11 +1,8 @@
-export type Note = {
-  id: string;
-  content: string;
-  updatedAt: number;
-};
+export type { Group } from "@/lib/composition/groupsRepo";
+export type { Note } from "@/lib/composition/notesRepo";
+
+import type { Note } from "@/lib/composition/notesRepo";
 
 export function noteTitle(note: Note): string {
-  const firstLine = note.content.split("\n").find((line) => line.trim() !== "");
-  const title = firstLine?.replace(/^#+\s*/, "").trim();
-  return title || "Untitled";
+  return note.title.trim() || "Untitled";
 }
