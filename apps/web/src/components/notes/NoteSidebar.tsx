@@ -46,7 +46,7 @@ export function NoteSidebar({
       style={{ width }}
       className="flex shrink-0 flex-col bg-surface"
     >
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
+      <div className="flex-1 overflow-y-auto pb-2 pl-2 pr-[7px]">
         <GroupTree
           groups={groups}
           notes={notes}

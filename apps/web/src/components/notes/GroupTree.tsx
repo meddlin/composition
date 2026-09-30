@@ -157,7 +157,7 @@ function GroupNode({
       ) : (
         <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, group.id)}>
           <div
-            className="group/row flex items-center gap-1.5 rounded-md py-1.5 pr-2 text-sm"
+            className="group/row relative flex items-center gap-1.5 rounded-md py-1.5 text-sm"
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             onDoubleClick={() => setRenaming(true)}
           >
@@ -194,42 +194,45 @@ function GroupNode({
                 {group.name}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCollapsed(false);
-                onCreateNote(group.id);
-              }}
-              aria-label={`New note in ${group.name}`}
-              title="New note"
-              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
-            >
-              + note
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setCollapsed(false);
-                setAddingSubgroup(true);
-              }}
-              aria-label={`New sub-group inside ${group.name}`}
-              title="New sub-group"
-              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
-            >
-              + group
-            </button>
-            <button
-              type="button"
-              onClick={() => onDeleteGroup(group.id)}
-              disabled={!empty}
-              aria-label={`Delete ${group.name}`}
-              title={
-                empty ? "Delete group" : "Empty this group before deleting"
-              }
-              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100! disabled:pointer-events-none disabled:opacity-0"
-            >
-              ✕
-            </button>
+            {/* Overlays the row instead of reserving space, so names can run right up to the edge. */}
+            <div className="pointer-events-none absolute right-0 top-1/2 flex -translate-y-1/2 items-center rounded-md bg-surface opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/row:pointer-events-auto group-hover/row:opacity-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setCollapsed(false);
+                  onCreateNote(group.id);
+                }}
+                aria-label={`New note in ${group.name}`}
+                title="New note"
+                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100"
+              >
+                + note
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCollapsed(false);
+                  setAddingSubgroup(true);
+                }}
+                aria-label={`New sub-group inside ${group.name}`}
+                title="New sub-group"
+                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100"
+              >
+                + group
+              </button>
+              <button
+                type="button"
+                onClick={() => onDeleteGroup(group.id)}
+                disabled={!empty}
+                aria-label={`Delete ${group.name}`}
+                title={
+                  empty ? "Delete group" : "Empty this group before deleting"
+                }
+                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100 disabled:pointer-events-none disabled:opacity-0"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </DropZone>
       )}
@@ -350,7 +353,7 @@ function NoteRow({
         onClick={onSelect}
         aria-current={active ? "true" : undefined}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        className={`w-full truncate rounded-md py-1.5 pr-9 text-left text-sm ${
+        className={`w-full truncate rounded-md py-1.5 text-left text-sm ${
           active ? "bg-foreground/10 font-medium" : "hover:bg-foreground/5"
         }`}
       >
@@ -360,7 +363,7 @@ function NoteRow({
         type="button"
         onClick={onDelete}
         aria-label={`Delete ${noteTitle(note)}`}
-        className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs opacity-0 hover:bg-foreground/10 focus:opacity-100 group-hover/row:opacity-60 group-hover/row:hover:opacity-100"
+        className="absolute right-0 top-1/2 -translate-y-1/2 rounded bg-surface px-2 py-1 text-xs opacity-0 hover:bg-foreground/10 focus:opacity-100 group-hover/row:opacity-60 group-hover/row:hover:opacity-100"
       >
         ✕
       </button>
