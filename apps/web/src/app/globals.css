@@ -22,6 +22,14 @@
   --success: #4ebf71;
   /* Text-safe variants for small text on --background (contrast). */
   --link: #4aa3e8;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #8b949e;
+  --syntax-keyword: #ff7b72;
+  --syntax-string: #a5d6ff;
+  --syntax-number: #79c0ff;
+  --syntax-function: #d2a8ff;
+  --syntax-type: #ffa657;
+  --syntax-attr: #7ee787;
 }
 
 [data-theme="light"] {
@@ -37,6 +45,14 @@
   --error: #c4314b;
   --success: #1a7f4b;
   --link: #0b62d6;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #5c6670;
+  --syntax-keyword: #cf222e;
+  --syntax-string: #0a3069;
+  --syntax-number: #0550ae;
+  --syntax-function: #7442d1;
+  --syntax-type: #953800;
+  --syntax-attr: #116329;
 }
 
 [data-theme="forest"] {
@@ -52,6 +68,14 @@
   --error: #d9596b;
   --success: #7bd88f;
   --link: #3fb876;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #84a08d;
+  --syntax-keyword: #f08fa0;
+  --syntax-string: #a8d98a;
+  --syntax-number: #e3b341;
+  --syntax-function: #7cc7e8;
+  --syntax-type: #e0a066;
+  --syntax-attr: #7bd88f;
 }
 
 /* Warm paper look: cream backgrounds, brown ink, terracotta accents. Web only. */
@@ -68,6 +92,14 @@
   --error: #b23a48;
   --success: #4f7a3a;
   --link: #8a4b1e;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #6b5c46;
+  --syntax-keyword: #a8341f;
+  --syntax-string: #3f6b2c;
+  --syntax-number: #8a5608;
+  --syntax-function: #7a3e9d;
+  --syntax-type: #9a4a1f;
+  --syntax-attr: #22627a;
 }
 
 /* `dark:` utilities follow the selected scheme, not the OS setting. */
@@ -106,6 +138,56 @@
   --tw-prose-pre-bg: var(--surface);
   --tw-prose-th-borders: color-mix(in srgb, var(--foreground) 25%, transparent);
   --tw-prose-td-borders: color-mix(in srgb, var(--foreground) 15%, transparent);
+}
+
+/* Code block token colors (highlight.js scopes, emitted by rehype-highlight). */
+.prose pre code .hljs-comment,
+.prose pre code .hljs-quote {
+  color: var(--syntax-comment);
+  font-style: italic;
+}
+.prose pre code .hljs-keyword,
+.prose pre code .hljs-selector-tag,
+.prose pre code .hljs-doctag,
+.prose pre code .hljs-name,
+.prose pre code .hljs-meta,
+.prose pre code .hljs-deletion {
+  color: var(--syntax-keyword);
+}
+.prose pre code .hljs-string,
+.prose pre code .hljs-regexp {
+  color: var(--syntax-string);
+}
+.prose pre code .hljs-number,
+.prose pre code .hljs-literal,
+.prose pre code .hljs-symbol,
+.prose pre code .hljs-bullet {
+  color: var(--syntax-number);
+}
+.prose pre code .hljs-title,
+.prose pre code .hljs-section {
+  color: var(--syntax-function);
+}
+.prose pre code .hljs-type,
+.prose pre code .hljs-built_in,
+.prose pre code .hljs-title.class_ {
+  color: var(--syntax-type);
+}
+.prose pre code .hljs-attr,
+.prose pre code .hljs-attribute,
+.prose pre code .hljs-variable,
+.prose pre code .hljs-template-variable,
+.prose pre code .hljs-property,
+.prose pre code .hljs-selector-class,
+.prose pre code .hljs-selector-id,
+.prose pre code .hljs-addition {
+  color: var(--syntax-attr);
+}
+.prose pre code .hljs-emphasis {
+  font-style: italic;
+}
+.prose pre code .hljs-strong {
+  font-weight: 700;
 }
 
 body {
