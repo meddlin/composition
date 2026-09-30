@@ -121,7 +121,7 @@ research doc.
 
 ### Phase 2: Transport seam in `apps/web` (M, no Electron)
 
-**Status: done. `api.ts` (contract), `service.ts` (framework-free implementation), `actions.ts` (thin Server Action wrappers), `client.ts` (what components import). Web tests 124 -> 141, web build and routes unchanged.**
+**Status: done. `api.ts` (contract), `service.ts` (framework-free implementation), `actions.ts` (thin Server Action wrappers), `client.ts` (what components import). 17 new web tests, web build and routes unchanged.**
 
 Behavior-preserving refactor of the web app. Independent of Phase 1.
 
@@ -265,9 +265,9 @@ a license before publishing binaries on GitHub Releases.
 
 | Area | State |
 |---|---|
-| Web app on the new seam | Done; 141 web tests, `next build` routes unchanged |
+| Web app on the new seam | Done; web suite green, `next build` routes unchanged |
 | Desktop static renderer | Done; same UI, Tailwind and themes as the web app |
-| Electron shell, IPC, protocol, CSP | Done; 79 desktop unit tests |
+| Electron shell, IPC, protocol, CSP | Done; 83 desktop unit tests |
 | Bundled Meilisearch lifecycle | Done (start, health, stop, orphan cleanup, unexpected-exit message) |
 | Unsigned packaged app | Verified end to end with `pnpm package && SMOKE_EXECUTABLE=... pnpm smoke` |
 | Code signing + notarization | **Blocked on Apple Developer credentials** |

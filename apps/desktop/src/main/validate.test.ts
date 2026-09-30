@@ -11,6 +11,8 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.saveNoteContent([3, "text"])).toEqual([3, "text"]);
     expect(VALIDATORS.moveNoteToGroup([3, null])).toEqual([3, null]);
     expect(VALIDATORS.createGroup(["Work", 2])).toEqual(["Work", 2]);
+    expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
+    expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
   });
 
   it("defaults createNote's group to null when omitted", () => {
@@ -41,6 +43,9 @@ describe("VALIDATORS", () => {
     ["moveNoteToGroup", [1, undefined]],
     ["moveNoteToGroup", [1, "7"]],
     ["createGroup", [{}, null]],
+    ["moveGroup", ["4", null]],
+    ["moveGroup", [4, undefined]],
+    ["moveGroup", [4, "2"]],
     ["searchNotes", [null]],
     ["saveLayout", [null]],
     ["saveLayout", [[1, 2]]],

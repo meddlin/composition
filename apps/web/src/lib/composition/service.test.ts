@@ -179,6 +179,33 @@ describe("groups", () => {
     expect((await service.loadWorkspace()).groups).toEqual([]);
   });
 
+  it("reparents a group, returns it to the top level, and refuses to create a loop", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    const b = await service.createGroup("B", null);
+    const c = await service.createGroup("C", b.id);
+
+    const nested = await service.moveGroup(b.id, a.id);
+    expect(nested.group).toMatchObject({ id: b.id, parentId: a.id });
+
+    const back = await service.moveGroup(b.id, null);
+    expect(back.group).toMatchObject({ id: b.id, parentId: null });
+
+    // Into itself, and into its own descendant: refused with a message, nothing changed.
+    expect(await service.moveGroup(b.id, b.id)).toEqual({ error: expect.any(String) });
+    expect(await service.moveGroup(b.id, c.id)).toEqual({ error: expect.any(String) });
+    const { groups } = await service.loadWorkspace();
+    expect(groups.find((g) => g.id === b.id)?.parentId).toBeNull();
+  });
+
+  it("reports a missing group on a move instead of throwing", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+
+    expect(await service.moveGroup(a.id, 999)).toEqual({ error: expect.any(String) });
+    expect(await service.moveGroup(999, null)).toEqual({ error: expect.any(String) });
+  });
+
   it("moves a note between groups without re-ordering it", async () => {
     const service = await import("./service");
     const group = await service.createGroup("Ideas", null);

@@ -40,6 +40,9 @@ export type SettingsSnapshot = {
   dbExists: boolean;
 };
 
+/** A refused move (into itself or a descendant, or a group that's gone) comes back as `error`. */
+export type MoveGroupResult = { group?: Group; error?: string };
+
 export type SaveSettingsInput = { appDataDir: string; dbPath: string };
 
 export type SaveSettingsResult = {
@@ -63,6 +66,7 @@ export interface CompositionApi {
   createGroup(name: string, parentId: number | null): Promise<Group>;
   renameGroup(id: number, name: string): Promise<Group>;
   deleteGroup(id: number): Promise<{ error?: string }>;
+  moveGroup(id: number, parentId: number | null): Promise<MoveGroupResult>;
 
   saveLayout(layout: Layout): Promise<void>;
   saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult>;
@@ -85,6 +89,7 @@ export const API_METHODS = [
   "createGroup",
   "renameGroup",
   "deleteGroup",
+  "moveGroup",
   "saveLayout",
   "saveSettings",
   "saveTheme",

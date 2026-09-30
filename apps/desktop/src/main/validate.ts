@@ -59,6 +59,10 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     text("renameGroup", name, "name"),
   ],
   deleteGroup: ([groupId]) => [id("deleteGroup", groupId, "id")],
+  moveGroup: ([groupId, parentId]) => [
+    id("moveGroup", groupId, "id"),
+    nullableId("moveGroup", parentId, "parentId"),
+  ],
   saveLayout: ([layout]) => {
     const value = record("saveLayout", layout, "layout");
     return [

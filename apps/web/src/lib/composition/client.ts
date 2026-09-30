@@ -17,6 +17,7 @@ export {
   deleteNote,
   loadSettings,
   loadWorkspace,
+  moveGroup,
   moveNoteToGroup,
   renameGroup,
   saveLayout,
@@ -26,6 +27,7 @@ export {
   searchNotes,
 } from "./actions";
 export type {
+  MoveGroupResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,

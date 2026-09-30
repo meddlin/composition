@@ -25,6 +25,8 @@ export const createNote: CompositionApi["createNote"] = (title, groupId) =>
 export const saveNoteContent: CompositionApi["saveNoteContent"] = (noteId, content) =>
   bridge().saveNoteContent(noteId, content);
 export const deleteNote: CompositionApi["deleteNote"] = (id) => bridge().deleteNote(id);
+export const moveGroup: CompositionApi["moveGroup"] = (id, parentId) =>
+  bridge().moveGroup(id, parentId);
 export const moveNoteToGroup: CompositionApi["moveNoteToGroup"] = (noteId, groupId) =>
   bridge().moveNoteToGroup(noteId, groupId);
 export const createGroup: CompositionApi["createGroup"] = (name, parentId) =>
@@ -38,6 +40,7 @@ export const saveSettings: CompositionApi["saveSettings"] = (input) =>
 export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTheme(theme);
 
 export type {
+  MoveGroupResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -58,6 +61,7 @@ const _implementsApi: CompositionApi = {
   createGroup,
   renameGroup,
   deleteGroup,
+  moveGroup,
   saveLayout,
   saveSettings,
   saveTheme,

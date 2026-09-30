@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type {
   CompositionApi,
+  MoveGroupResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -12,7 +13,7 @@ import type {
 import { closeDb } from "./db";
 import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
-import { GroupNotEmptyError } from "./groupsRepo";
+import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
@@ -174,6 +175,28 @@ export async function deleteGroup(id: number): Promise<{ error?: string }> {
   return {};
 }
 
+/**
+ * Returns an error message instead of throwing on an invalid move (into itself
+ * or a descendant, or a group another window deleted), so the UI can roll back
+ * its optimistic update with inline feedback.
+ */
+export async function moveGroup(
+  id: number,
+  parentId: number | null,
+): Promise<MoveGroupResult> {
+  try {
+    groupsRepo.moveGroup(id, parentId);
+  } catch (error) {
+    if (error instanceof InvalidGroupMoveError) {
+      return { error: "That group can't be moved there." };
+    }
+    throw error;
+  }
+  const group = groupsRepo.getGroup(id);
+  if (!group) throw new Error(`Group ${id} not found`);
+  return { group };
+}
+
 export async function moveNoteToGroup(
   noteId: number,
   groupId: number | null,
@@ -251,6 +274,7 @@ const _implementsApi: CompositionApi = {
   createGroup,
   renameGroup,
   deleteGroup,
+  moveGroup,
   saveLayout,
   saveSettings,
   saveTheme,

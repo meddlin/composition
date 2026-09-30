@@ -86,7 +86,7 @@ try {
   }));
   check("window.composition is exposed", posture.bridge === "object");
   check("Node is not reachable from the page", posture.hasRequire === "undefined" && posture.hasProcess === "undefined");
-  check("the bridge exposes only the API (+ initial, platform)", posture.methods.length === 15, posture.methods.join(","));
+  check("the bridge exposes only the API (+ initial, platform)", posture.methods.length === 16, posture.methods.join(","));
   check("the initial theme is applied before paint", posture.theme === "dark", posture.theme);
 
   // ---- Navigation: desktop has no Docs viewer
@@ -116,6 +116,17 @@ try {
   await page.getByPlaceholder("Group name").press("Enter");
   await waitFor(async () => (await page.evaluate(() => window.composition.loadWorkspace())).groups.length === 1);
   check("a group can be created", true);
+
+  // moveGroup (nesting groups) over the real IPC path, including the refusal of a loop.
+  const moved = await page.evaluate(async () => {
+    const parent = await window.composition.createGroup("Parent", null);
+    const child = await window.composition.createGroup("Child", null);
+    const nested = await window.composition.moveGroup(child.id, parent.id);
+    const loop = await window.composition.moveGroup(parent.id, child.id);
+    return { parentId: parent.id, nested, loop };
+  });
+  check("moving a group over IPC reparents it", moved.nested.group?.parentId === moved.parentId);
+  check("a move that would create a loop is refused, not thrown", typeof moved.loop.error === "string" && !moved.loop.group);
 
   // ---- Search through the managed Meilisearch
   const searchResult = await waitFor(

@@ -20,6 +20,7 @@ type Props = {
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
+  onMoveGroup: (id: number, parentId: number | null) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
 };
 
@@ -37,6 +38,7 @@ export function NoteSidebar({
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
+  onMoveGroup,
   onMoveNoteToGroup,
 }: Props) {
   const [addingGroup, setAddingGroup] = useState(false);
@@ -60,6 +62,7 @@ export function NoteSidebar({
           onCreateGroup={onCreateGroup}
           onRenameGroup={onRenameGroup}
           onDeleteGroup={onDeleteGroup}
+          onMoveGroup={onMoveGroup}
           onMoveNoteToGroup={onMoveNoteToGroup}
         />
       </div>

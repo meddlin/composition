@@ -90,9 +90,9 @@ See [screen-navigation.md](screen-navigation.md) for the full key-binding table.
 
 ## Follow-ups (not implemented)
 
-- **Reparenting an existing group** to a different parent. Doing this safely needs
-  cycle prevention (a group can't become its own descendant), which the current
-  create-only flow doesn't need to worry about.
+- **Reparenting an existing group in the CLI.** The web app supports it (drag a group
+  onto another; see [web-groups.md](../ui/web-groups.md)), with cycle prevention: a
+  group can't become its own descendant. `NotesStore` has no equivalent yet.
 - **A `group:` search-bar filter token**, mirroring `tag:`. Today, group membership is
   already reflected correctly in the tree during a search (a note only appears under
   its real group), but there's no dedicated syntax to filter the search itself down to

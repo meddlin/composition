@@ -26,9 +26,28 @@ Left to right: expand/collapse chevron, folder icon, group name, `+ note`, `⋯`
 | `+ note` | Creates a note directly in this group. |
 | `⋯` | Opens the group's action menu (below). |
 | Drop a dragged note on the row | Moves the note into the group. |
+| Drag the row onto another group | Nests it inside that group, sub-groups and notes included. |
 
 `+ note` and `⋯` appear on hover, and whenever they have keyboard focus or the menu is
 open.
+
+### Nesting groups by drag-and-drop
+
+Drag a group row onto another group to make it a sub-group. While a group is being
+dragged:
+
+- Rows that would be invalid targets — the group itself and everything beneath it, or
+  its current parent — don't highlight and show the browser's "not allowed" cursor.
+  A group can never end up inside its own descendants; the server re-checks this
+  ([`groupMove.ts`](../../apps/web/src/lib/composition/groupMove.ts)) and refuses the
+  move if another tab changed the tree in the meantime.
+- If the group is nested, a **Drop here to move to top level** strip appears above the
+  tree; dropping on it makes the group top-level again.
+
+The move is optimistic, like renaming: the tree updates immediately and rolls back,
+with an error under the tree, if the server refuses. A group's notes and sub-groups
+travel with it, since they reference it by id. The destination stays collapsed if it
+was collapsed, so expand it to see the moved group.
 
 ### The `⋯` menu
 

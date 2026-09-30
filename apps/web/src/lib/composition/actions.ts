@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import type {
+  MoveGroupResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchResult,
@@ -69,6 +70,15 @@ export async function renameGroup(id: number, name: string): Promise<Group> {
 export async function deleteGroup(id: number): Promise<{ error?: string }> {
   const result = await service.deleteGroup(id);
   if (!result.error) revalidatePath("/");
+  return result;
+}
+
+export async function moveGroup(
+  id: number,
+  parentId: number | null,
+): Promise<MoveGroupResult> {
+  const result = await service.moveGroup(id, parentId);
+  if (result.group) revalidatePath("/");
   return result;
 }
 
