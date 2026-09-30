@@ -2,9 +2,11 @@
 
 An Electron build of the web app, in `apps/desktop`. Evidence and sources are in
 [desktop-app-research.md](desktop-app-research.md); this page is the decisions and the order
-of work. Status: **scope confirmed 2026-09-30; nothing built yet.** The four scoping
-decisions are recorded under [Confirmed scope](#confirmed-scope); the data-storage split
-between products is in [product-builds.md](product-builds.md).
+of work. Status: **built and verified in development and as an unsigned packaged app
+(2026-09-30); signing, notarization and the release workflow are not done** (they need Apple
+credentials). See [Build status](#build-status). The four scoping decisions are recorded under
+[Confirmed scope](#confirmed-scope); the data-storage split between products is in
+[product-builds.md](product-builds.md).
 
 ## Goal
 
@@ -33,7 +35,7 @@ Store, a universal binary.
 | D2 | Where desktop code lives | **`apps/desktop`**, own `package.json` + lockfile | Matches the "each app keeps its own toolchain" convention. | Low |
 | D3 | Sharing code with `apps/web` | Desktop main **bundles `apps/web/src/lib/composition/*`** through one entry file; no root workspace yet | Avoids restructuring lockfiles, CI and Dependabot for a single consumer. | Low (mechanical move to `packages/core` later) |
 | D4 | Packager | **electron-builder** | Native modules unpacked automatically, Hardened Runtime on by default, declarative notarize + GitHub publish. Forge is an equally valid first-party alternative. | Low |
-| D5 | Native module | **Land Dependabot PR #26 first** (better-sqlite3 13, N-API) | One install serves web and Electron; no `@electron/rebuild` dance. | n/a |
+| D5 | Native module | **Desktop uses better-sqlite3 13** (N-API); **the web app stays on 12 for now**. Do not merge Dependabot PR #26 until every place the web app runs has Node >= 22.14 | v13 needs Node >= 22.14 (it segfaults on older Node; upstream #1514) though it advertises `>=22`. Electron 44's Node 24.21 is fine, so desktop needs no `@electron/rebuild`. | n/a |
 | D6 | Search | **Bundle Meilisearch (community binary), managed by the main process** (confirmed) | It is the product's stated differentiator. SQLite FTS5 is the fallback if size hurts. | Medium |
 | D7 | Data location | Default **`~/.composition`** (shared with CLI and web, for now); desktop keeps its **own settings file and its own Meilisearch data dir** (confirmed) | Local-first continuity. The index is derived and rebuilt from SQLite, which is how web/CLI already behave. See [product-builds.md](product-builds.md) for the later split. | Low |
 | D8 | First platform | **macOS**, per-arch (arm64, x64) builds (confirmed; Windows and Linux later) | Only platform named in product-positioning. | Low |
@@ -74,7 +76,12 @@ directories and can run in parallel.
 
 ### Phase 0: Prerequisites (S)
 
-- Merge Dependabot PR #26 (better-sqlite3 13.0.3). Run `pnpm test` and a manual web smoke.
+**Status: partly done. Meilisearch 1.53.1 is pinned with GitHub's SHA-256 digests; the Next docs were read. Apple Developer enrollment is yours to do and still pending.**
+
+- **Do not merge** Dependabot PR #26 (better-sqlite3 13.0.3) yet: v13 crashes on Node < 22.14
+  (found on this machine's 22.13.1; see [the research](desktop-app-research.md#better-sqlite3-in-electron)).
+  Upgrade local Node to >= 22.14 first, or close the PR and let Dependabot re-propose later.
+  The desktop app is unaffected: it carries its own v13, loaded only by Electron's Node 24.
 - **Enroll in the Apple Developer Program ($99/yr)** and create a Developer ID Application
   certificate and an App Store Connect API key. This is an account action only you can do, and
   it gates signed builds, so start it now.
@@ -85,9 +92,11 @@ directories and can run in parallel.
 - Install deps in `apps/web` and read `node_modules/next/dist/docs/` before touching Next
   code, as `apps/web/AGENTS.md` requires.
 
-**Exit:** PR #26 merged; Apple credentials exist; Meilisearch version pinned.
+**Exit:** Apple credentials exist; Meilisearch version pinned (done: `apps/desktop/meilisearch.lock.json`).
 
 ### Phase 1: Walking skeleton (M, riskiest phase)
+
+**Status: built, except what needs Apple credentials. An unsigned `pnpm package` build passes the full end-to-end smoke test (`pnpm smoke`): ASAR, unpacked N-API better-sqlite3, bundled Meilisearch spawned from Resources, clean shutdown. **Not done:** signing, notarization, the Meilisearch crate license list, and running `pnpm fetch:meilisearch` (downloads about 116 MiB per architecture; the test used Homebrew's identical version as a stand-in).**
 
 Scaffold `apps/desktop` and make a **placeholder app** go all the way to a notarized DMG
 before any real UI work, so packaging risk surfaces first.
@@ -112,6 +121,8 @@ research doc.
 
 ### Phase 2: Transport seam in `apps/web` (M, no Electron)
 
+**Status: done. `api.ts` (contract), `service.ts` (framework-free implementation), `actions.ts` (thin Server Action wrappers), `client.ts` (what components import). Web tests 124 -> 141, web build and routes unchanged.**
+
 Behavior-preserving refactor of the web app. Independent of Phase 1.
 
 - Move the logic out of `lib/composition/actions.ts` and `app/settings/actions.ts` into
@@ -134,6 +145,8 @@ in `service.ts` or anything it imports.
 
 ### Phase 3: Static-exportable renderer (M)
 
+**Status: done. The same components build as a static export with `COMPOSITION_TARGET=desktop`. Mechanism: sibling `*.desktop.*` files, picked by `pageExtensions` (route files) and Turbopack `resolveExtensions` (everything else); see `apps/web/next.config.ts`. The desktop build has `/` and `/settings` only.**
+
 Make `apps/web` able to build with `output: 'export'` when `COMPOSITION_TARGET=desktop`
 (web builds unchanged).
 
@@ -151,6 +164,8 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 
 ### Phase 4: Real shell and IPC (M)
 
+**Status: done apart from window-state persistence and a native Settings menu item. Sender-checked, argument-validated IPC; single-instance lock; `pnpm dev` hot-reload loop.**
+
 - `main/ipc.ts`: one `ipcMain.handle` per `CompositionApi` method, generated from a single
   list so the contract can't drift; **reject messages whose sender isn't the `app://` frame**;
   validate argument types (the web actions currently trust TypeScript's types).
@@ -166,6 +181,8 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 
 ### Phase 5: CI and release (M)
 
+**Status: partly done. Desktop typecheck and unit tests run in `unit-tests.yml`; Dependabot watches `apps/desktop`. **Not done:** the tag-triggered release workflow (needs the signing secrets).**
+
 - Extend `.github/workflows/unit-tests.yml`: install `apps/desktop`, run `test:desktop`,
   update `cache-dependency-path`.
 - New workflow on a `desktop-v*` tag, macOS runner: build per-arch, sign, notarize, attach to
@@ -179,6 +196,8 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 **Exit:** pushing a tag produces a draft release with notarized, downloadable DMGs.
 
 ### Phase 6: Hardening and polish (S-M)
+
+**Status: partly done. Sandbox, context isolation, a CSP on `app://`, navigation and window-open guards, and a hardened Meilisearch (master key in the environment, production mode, no analytics) are in. **Not done:** fuses, automatic Meilisearch restart (it degrades to a clear message instead), the app icon, and a final app name and bundle identifier.**
 
 Sandbox and context isolation confirmed on; CSP set on `app://` responses; `will-navigate` and
 window-open restricted; fuses set at package time; crash/restart handling for Meilisearch;
@@ -242,8 +261,33 @@ Separate from Meilisearch: this repo has no `LICENSE` file, so the app's own lic
 undefined. MIT does not impose anything on the app that bundles it, but you will want to pick
 a license before publishing binaries on GitHub Releases.
 
+## Build status
+
+| Area | State |
+|---|---|
+| Web app on the new seam | Done; 141 web tests, `next build` routes unchanged |
+| Desktop static renderer | Done; same UI, Tailwind and themes as the web app |
+| Electron shell, IPC, protocol, CSP | Done; 79 desktop unit tests |
+| Bundled Meilisearch lifecycle | Done (start, health, stop, orphan cleanup, unexpected-exit message) |
+| Unsigned packaged app | Verified end to end with `pnpm package && SMOKE_EXECUTABLE=... pnpm smoke` |
+| Code signing + notarization | **Blocked on Apple Developer credentials** |
+| Release workflow (tag -> draft GitHub Release) | Not started; needs the signing secrets |
+| Meilisearch Rust-crate license list | Not generated; release blocker |
+| App identifier, name, icon | Provisional: `com.meddlin.composition`, default Electron icon |
+
 ## Still open
 
-- **App name and bundle identifier** (for example `com.example.composition`). Needed in Phase 1
-  for the electron-builder config and code signing, and awkward to change once installs exist.
-- Third-party notices tooling for Meilisearch's crates (Phase 1).
+- **App name and bundle identifier.** `com.meddlin.composition` is a placeholder in
+  `apps/desktop/electron-builder.yml`. It becomes part of the code signature and of where macOS
+  stores app data, so settle it before the first public build.
+- **Apple Developer Program enrollment and a Developer ID certificate** (Phase 0).
+- **Meilisearch third-party notices.** Generate the license list for the Rust crates in the
+  pinned version's `Cargo.lock` into `apps/desktop/licenses/meilisearch-third-party.txt`;
+  `collect-licenses.mjs` warns until it exists.
+- **Running `pnpm fetch:meilisearch`** for the real, checksum-verified release binaries
+  (about 116 MiB per architecture) before the first packaged release.
+- **The UI component library: decided, nothing to do now.** The web UI is Tailwind v4 with
+  hand-written components, not shadcn/ui, and it stays that way for now. The desktop app reuses
+  it unchanged, so the two look identical. shadcn/ui can be adopted later as a change to
+  `apps/web` that the desktop build then inherits (its tokens would need mapping onto the
+  existing theme so the look doesn't change).

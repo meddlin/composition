@@ -10,33 +10,37 @@ the gap is written down instead of remembered.
 |---|---|---|---|
 | CLI | `apps/cli` | Python, Textual | Undecided (see the PyPI question in [index.md](index.md)) |
 | Web | `apps/web` | Next.js | Undecided |
-| Desktop | `apps/desktop` (planned) | Electron | **GitHub Releases, manual download, macOS only for now** ([plan](desktop-app-plan.md)) |
+| Desktop | `apps/desktop` | Electron | **GitHub Releases, manual download, macOS only for now** ([plan](desktop-app-plan.md)) |
 
 ## Data storage: today
 
 **Everything shares one database, `~/.composition/composition.db`.** That is the CLI's
 default, the web app's default (`DEFAULT_APP_DATA_DIR` in `apps/web/src/lib/composition/paths.ts`),
-and the desktop app's planned default.
+and the desktop app's default.
 
 Shared: the SQLite file.
 Not shared, on purpose: each product's settings file and each product's Meilisearch index.
 The index is derived data that any product rebuilds from SQLite ([search.md](architecture/search.md)).
 
-| | CLI | Web | Desktop (planned) |
+| | CLI | Web | Desktop |
 |---|---|---|---|
 | Database | `~/.composition/composition.db` | same | same |
-| Settings | `~/.composition/settings.yaml` | `~/.composition-web/settings.json` | its own file |
-| Meilisearch data | `~/.composition/meili_data` | `~/.composition-web/meili_data` | its own directory |
-| Meilisearch process | Spawned by the CLI, random port | Started by hand (`pnpm meili`), port 7700 | Spawned by the app, random port |
+| Settings | `~/.composition/settings.yaml` | `~/.composition-web/settings.json` | `~/Library/Application Support/Composition/settings.json` |
+| Meilisearch data | `~/.composition/meili_data` | `~/.composition-web/meili_data` | `~/Library/Application Support/Composition/search/meili_data` |
+| Meilisearch process | Spawned by the CLI, random port | Started by hand (`pnpm meili`), port 7700 | Spawned by the app (bundled binary), random port, own master key |
 
-Desktop must **not** point its Meilisearch at the CLI's `meili_data`: two server processes on
-one index directory would collide whenever both apps are open.
+The desktop app deliberately does **not** use the CLI's `meili_data`: two server processes on
+one index directory would collide whenever both apps are open. The consequence is that an edit
+made in the CLI while the desktop app is closed is missing from the desktop index until the app
+next starts, when it rebuilds its index from SQLite (as it also does after the data location is
+changed in Settings). An edit made in the CLI *while the desktop app is open* does not appear in
+desktop search until the next launch.
 
 ### What sharing costs right now
 
 - **Several writers on one file.** SQLite WAL mode is set by the web app's `db.ts` and is
-  stored in the file header, so it covers the other writers too. The desktop app should also
-  hold a single-instance lock.
+  stored in the file header, so it covers the other writers too. The desktop app holds a
+  single-instance lock, so there is never more than one desktop writer.
 - **Schema changes land twice.** Column migrations are additive `ALTER TABLE` checks
   implemented separately in Python (`storage.py`, `_ensure_*_column`) and TypeScript
   (`db.ts`, `ensureColumn`). While the file is shared, any schema change must be made in both,

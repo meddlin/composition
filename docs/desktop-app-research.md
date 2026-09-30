@@ -118,6 +118,12 @@ is an exposure A simply does not have.
 - **ASAR.** Native `.node` files need unpacking; and of the `child_process` APIs only
   `execFile` can run a binary inside an ASAR, so any bundled executable must live outside it
   or be unpacked [11].
+- **Electron 44 has no install script**; the binary downloads on first use (`require("electron")`
+  or the `electron` CLI), so pnpm's build-script allow-list needs no entry for it. (Observed.)
+- **License files are not copied into a macOS app by electron-builder.** Electron's own
+  distribution has `LICENSE` and `LICENSES.chromium.html` next to the binary, but the packaged
+  `.app` contained neither (only better-sqlite3's LICENSE). The desktop build now assembles
+  them into `Resources/licenses` (`apps/desktop/scripts/collect-licenses.mjs`). (Observed.)
 - **Fuses** are flipped at package time (`RunAsNode`, `EnableNodeCliInspectArguments`,
   `EnableEmbeddedAsarIntegrityValidation`, `OnlyLoadAppFromAsar`, and others) [7].
   **Inference:** worth setting for a shipped app, and none of them should affect spawning a
@@ -131,16 +137,26 @@ is an exposure A simply does not have.
   prebuilt assets each (e.g. 98 for v12.11.1, 105 for v12.12.0) via `prebuild-install` [13].
   Using them means a per-Electron-version binary, and a `node_modules` that can't be shared
   between "run tests under Node" and "run inside Electron".
-- **v13 changes this.** v13.0.0 is "the first version of `better-sqlite3` to run on the
-  N-API", so "prebuilt binaries should theoretically work across different versions of
+- **v13 changes this, with a catch.** v13.0.0 is "the first version of `better-sqlite3` to run
+  on the N-API", so "prebuilt binaries should theoretically work across different versions of
   Node.js and Electron"; `prebuild-install` is removed and binaries ship inside the npm
   package [14]. I verified the 13.0.3 tarball contains `prebuilds/` for darwin-arm64,
-  darwin-x64, linux-x64/arm64 (glibc and musl) and win32-x64/arm64. v13 requires Node >= 22 [14].
-  **Inference:** one install serves web (Node) and desktop (Electron), and `@electron/rebuild`
-  becomes unnecessary in principle (the word "theoretically" in the release note means this
-  needs a smoke test, which is a spike item).
-- **Dependabot PR #26 already proposes 12.11.1 -> 13.0.3.** Landing it first removes a whole
-  class of packaging problems.
+  darwin-x64, linux-x64/arm64 (glibc and musl) and win32-x64/arm64.
+  **The catch (found by building it): v13 needs Node >= 22.14, not the advertised `>=22`.**
+  v13 is compiled with `NAPI_VERSION=10`, which Node only supports from 22.14.0; on older
+  Node, `new Database()` segfaults (exit 139) after `require()` succeeds. Upstream tracks this
+  as issue #1514, open, with that diagnosis [27]. I reproduced it on Node 22.13.1 (darwin-arm64,
+  both `:memory:` and a file) while v12.11.1 works on the same Node.
+  **Verified:** v13.0.3 runs correctly under Electron 44.5.1's Node 24.21.0 (ABI 149), both from
+  source and inside the packaged, ASAR-unpacked app. So desktop gets the benefit (no
+  `@electron/rebuild`, `npmRebuild: false`), while the web app should stay on v12 until every
+  place it runs has Node >= 22.14.
+- **Dependabot PR #26 (12.11.1 -> 13.0.3) is therefore not safe to merge blindly.** On a machine
+  with Node < 22.14 every test that opens a database would crash. CI passes only because
+  `setup-node` with `node-version: 22` resolves to a newer 22.x. A separate report on Node 24.19.0
+  (an `ObjectWrap` teardown abort during garbage collection, caused by a Node regression
+  tracked as nodejs/node#65446, hit better-sqlite3 11 and 12 as well) is a reason to avoid
+  Electron releases bundling that exact Node; Electron 44.5.1 bundles 24.21.0 [27][9].
 - From 12.12.0: Electron 43+ Linux binaries need glibc >= 2.41 [14]. Only relevant if Linux is
   ever a target.
 - better-sqlite3's own guidance: synchronous calls on the main thread are fine for most
@@ -272,15 +288,28 @@ What this does **not** settle:
   file, so it should hold a single-instance lock and reuse the same idempotent
   `ensureColumn` migrations.
 
-## Things no source could settle (spike these)
+## Questions the build has answered, and what is still open
 
-- Does N-API better-sqlite3 13.x load under Electron 44 inside a packaged, signed app?
-- Installed and compressed size with a pinned Meilisearch; idle memory and cold-start time;
-  behavior with a few thousand notes.
-- Whether the Meilisearch macOS binary passes notarization when placed in `Resources`.
-- `next/font/google` in a static export, with no network at runtime (Next's docs don't say;
-  **Inference:** fonts are fetched at build time, but verify).
-- Theme flash on load once `data-theme` can no longer be set by a server-rendered `<html>`.
+Answered by building and running it (macOS arm64, Electron 44.5.1):
+
+- **N-API better-sqlite3 13 in a packaged Electron app: works.** ASAR, native module unpacked,
+  real DB read/write. It does **not** work on Node < 22.14 (see above).
+- **Next font loading in a static export: self-hosted, offline-safe.** Next's docs: "CSS and
+  font files are downloaded at build time and self-hosted with the rest of your static assets.
+  No requests are sent to Google by the browser" [28]. The export contains the `.woff2` files.
+- **Theme flash: avoided.** The preload fetches a synchronous `{ theme, layout }` snapshot and
+  an inline script in `<head>` applies it before first paint.
+- **Bundled Meilisearch from `Resources`:** spawned from outside the ASAR, healthy, searchable,
+  no orphan after quit (stop -> SIGTERM -> SIGKILL; a pid file reaps one left by a crash).
+- **Measured sizes** (unsigned `--dir` build, Meilisearch 1.53.1 from Homebrew as a stand-in):
+  422 MB unpacked app = Electron Framework 286 MB + Meilisearch 128 MB + ~7 MB app code and
+  native module. Compressed DMG size is not measured yet.
+
+Still open (needs Apple credentials or more measurement):
+
+- Whether the Meilisearch binary passes notarization when placed in `Resources`.
+- Compressed installer size; idle memory and cold-start time; behavior with a few thousand notes.
+- The license list for the Rust crates inside the Meilisearch binary (see [Licensing](#licensing)).
 
 ## Sources
 
@@ -310,6 +339,8 @@ What this does **not** settle:
 24. `meilisearch/meilisearch` [`.github/workflows/publish-release-assets.yml`](https://github.com/meilisearch/meilisearch/blob/main/.github/workflows/publish-release-assets.yml): `edition: [community, enterprise]` matrix, `--features enterprise`, `meilisearch-<edition-suffix><platform>` asset names.
 25. `meilisearch/meilisearch` [`crates/meilisearch/Cargo.toml`](https://github.com/meilisearch/meilisearch/blob/main/crates/meilisearch/Cargo.toml): the `enterprise` feature definition.
 26. Meilisearch docs, [Enterprise and Community editions](https://www.meilisearch.com/docs/resources/self_hosting/enterprise_edition).
+27. `WiseLibs/better-sqlite3` [issue #1514](https://github.com/WiseLibs/better-sqlite3/issues/1514) (v13.0.3 segfaults on Node < 22.14, cause `NAPI_VERSION=10`) and [issue #1515](https://github.com/WiseLibs/better-sqlite3/issues/1515) (Node 24.19.0 GC abort, nodejs/node#65446); reproduced locally.
+28. Next.js docs shipped with 16.3.6 (`node_modules/next/dist/docs/01-app/03-api-reference/02-components/font.md`): Google fonts are self-hosted at build time.
 
 **Not retrievable:** Apple's notarization documentation page and the electron-builder docs site
 returned no content (client-rendered); electron-builder claims are read from its source.

@@ -4,10 +4,11 @@
   "description": "Root task runner for the composition monorepo. Each app keeps its own toolchain.",
   "scripts": {
     "lint:actions": "node scripts/lint-github-actions.mjs",
-    "test": "pnpm run test:scripts && pnpm run test:cli && pnpm run test:web",
+    "test": "pnpm run test:scripts && pnpm run test:cli && pnpm run test:web && pnpm run test:desktop",
     "test:scripts": "node --test \"scripts/*.test.mjs\"",
     "test:cli": "cd apps/cli && uv run pytest",
-    "test:web": "pnpm --dir apps/web test"
+    "test:web": "pnpm --dir apps/web test",
+    "test:desktop": "pnpm --dir apps/desktop run typecheck && pnpm --dir apps/desktop test"
   },
   "packageManager": "pnpm@11.0.3"
 }
