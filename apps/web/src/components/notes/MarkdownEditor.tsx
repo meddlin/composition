@@ -3,6 +3,7 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { parse } from "@/lib/composition/frontmatter";
 import { FrontmatterCard } from "./FrontmatterCard";
+import { useCodeHighlighting } from "./useCodeHighlighting";
 
 type Props = {
   value: string;
@@ -16,6 +17,7 @@ export function MarkdownEditor({ value, onChange }: Props) {
   // The raw text (frontmatter included) stays in the editor; the preview shows
   // the frontmatter as a metadata card rather than as Markdown content.
   const [fm, body] = useMemo(() => parse(value), [value]);
+  const rehypePlugins = useCodeHighlighting(body);
 
   return (
     <div className="grid min-w-0 flex-1 grid-cols-1 grid-rows-2 md:grid-cols-2 md:grid-rows-1">
@@ -34,7 +36,9 @@ export function MarkdownEditor({ value, onChange }: Props) {
         <h2 className={paneHeader}>Preview</h2>
         <div className="prose max-w-none flex-1 overflow-y-auto p-4">
           {fm && <FrontmatterCard fm={fm} />}
-          <Markdown remarkPlugins={[remarkGfm]}>{body}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins}>
+            {body}
+          </Markdown>
         </div>
       </section>
     </div>
