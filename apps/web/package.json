@@ -8,6 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "meili": "meilisearch --http-addr 127.0.0.1:7700 --master-key \"$(cat $HOME/.composition/meili_master_key)\" --db-path $HOME/.composition-web/meili_data --no-analytics"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/react": "^16.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^20",
@@ -31,8 +34,10 @@
     "concurrently": "^10.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "jsdom": "^30.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.2"
   },
   "packageManager": "pnpm@11.0.3"
 }

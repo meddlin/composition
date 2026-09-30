@@ -1,0 +1,45 @@
+name: Unit tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Lint GitHub Actions pinning
+        run: node scripts/lint-github-actions.mjs
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: apps/cli/uv.lock
+
+      - name: Install CLI dependencies
+        run: uv sync --frozen --project apps/cli
+
+      - name: Install web dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: Run unit tests (CLI + web)
+        run: pnpm test
