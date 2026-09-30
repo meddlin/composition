@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { saveNoteContent } from "@/lib/composition/actions";
+import { saveLayout, saveNoteContent } from "@/lib/composition/actions";
+import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
 
@@ -12,6 +13,7 @@ vi.mock("@/lib/composition/actions", () => ({
   deleteNote: vi.fn(),
   moveNoteToGroup: vi.fn(),
   renameGroup: vi.fn(),
+  saveLayout: vi.fn(),
   saveNoteContent: vi.fn(),
   searchNotes: vi.fn(async () => ({ hits: [] })),
 }));
@@ -38,7 +40,7 @@ const canonical = (content: string): Note => ({
 });
 
 function renderEditor() {
-  render(<NotesApp initialNotes={[note]} initialGroups={[]} />);
+  render(<NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
   return screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
 }
 
@@ -102,5 +104,60 @@ describe("NotesApp autosave", () => {
     await act(async () => finishFirstSave(canonical(first)));
 
     expect(editor.value).toBe(second);
+  });
+});
+
+describe("NotesApp column resizing", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const sidebar = () => screen.getByRole("navigation", { name: "Notes" });
+  const handle = () => screen.getByRole("separator", { name: "Resize sidebar" });
+
+  function drag(from: number, to: number) {
+    fireEvent.pointerDown(handle(), { pointerId: 1, button: 0, clientX: from });
+    fireEvent.pointerMove(handle(), { pointerId: 1, clientX: to });
+  }
+
+  it("starts at the saved sidebar width", () => {
+    render(
+      <NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={{ ...DEFAULT_LAYOUT, sidebarWidth: 300 }} />,
+    );
+
+    expect(sidebar().style.width).toBe("300px");
+  });
+
+  it("resizes the sidebar live and saves once when the drag ends", () => {
+    renderEditor();
+
+    drag(100, 160);
+    expect(sidebar().style.width).toBe(`${DEFAULT_LAYOUT.sidebarWidth + 60}px`);
+    expect(saveLayout).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(handle(), { pointerId: 1 });
+    expect(saveLayout).toHaveBeenCalledTimes(1);
+    expect(saveLayout).toHaveBeenCalledWith({
+      sidebarWidth: DEFAULT_LAYOUT.sidebarWidth + 60,
+      editorRatio: DEFAULT_LAYOUT.editorRatio,
+    });
+  });
+
+  it("clamps the sidebar to its min and max", () => {
+    renderEditor();
+
+    drag(500, 0);
+    expect(sidebar().style.width).toBe(`${MIN_SIDEBAR_WIDTH}px`);
+
+    fireEvent.pointerMove(handle(), { pointerId: 1, clientX: 5000 });
+    expect(sidebar().style.width).toBe(`${MAX_SIDEBAR_WIDTH}px`);
+  });
+
+  it("keeps the sidebar handle when no note is open", () => {
+    render(<NotesApp initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+
+    drag(100, 140);
+    expect(sidebar().style.width).toBe(`${DEFAULT_LAYOUT.sidebarWidth + 40}px`);
   });
 });

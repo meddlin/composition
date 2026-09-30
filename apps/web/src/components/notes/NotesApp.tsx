@@ -10,27 +10,32 @@ import {
   renameGroup as renameGroupAction,
   saveNoteContent,
 } from "@/lib/composition/actions";
+import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteSidebar } from "./NoteSidebar";
+import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
 import { applySavedNote, type Group, type Note } from "./types";
+import { useLayout } from "./useLayout";
 
 const AUTOSAVE_DELAY_MS = 500;
 
 type Props = {
   initialNotes: Note[];
   initialGroups: Group[];
+  initialLayout: Layout;
 };
 
-export function NotesApp({ initialNotes, initialGroups }: Props) {
-  return <Workspace initialNotes={initialNotes} initialGroups={initialGroups} />;
+export function NotesApp(props: Props) {
+  return <Workspace {...props} />;
 }
 
-function Workspace({ initialNotes, initialGroups }: Props) {
+function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [groups, setGroups] = useState<Group[]>(initialGroups);
   const [activeId, setActiveId] = useState<number | null>(initialNotes[0]?.id ?? null);
   const [groupError, setGroupError] = useState<string | null>(null);
+  const layout = useLayout(initialLayout);
 
   const pendingSave = useRef<{ noteId: number; content: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,6 +138,7 @@ function Workspace({ initialNotes, initialGroups }: Props) {
           notes={notes}
           groups={groups}
           activeId={activeId}
+          width={layout.sidebarWidth}
           groupError={groupError}
           onSelect={selectNote}
           onCreate={create}
@@ -142,8 +148,21 @@ function Workspace({ initialNotes, initialGroups }: Props) {
           onDeleteGroup={deleteGroup}
           onMoveNoteToGroup={moveNoteToGroup}
         />
+        <ResizeHandle
+          label="Resize sidebar"
+          valueNow={layout.sidebarWidth}
+          valueMin={MIN_SIDEBAR_WIDTH}
+          valueMax={MAX_SIDEBAR_WIDTH}
+          {...layout.sidebarResize}
+        />
         {active ? (
-          <MarkdownEditor value={active.content} onChange={update} />
+          <MarkdownEditor
+            value={active.content}
+            onChange={update}
+            ratio={layout.editorRatio}
+            onRatioChange={layout.setEditorRatio}
+            onRatioCommit={layout.commit}
+          />
         ) : (
           <EmptyState onCreate={create} />
         )}

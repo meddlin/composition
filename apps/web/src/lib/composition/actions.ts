@@ -5,9 +5,11 @@ import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
+import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
 import * as searchIndex from "./searchIndex";
+import { loadWebSettings, saveWebSettings } from "./webSettings";
 
 /**
  * Indexing is derived state (docs/architecture/search.md): a Meilisearch outage
@@ -140,4 +142,17 @@ export async function moveNoteToGroup(
   const note = notesRepo.getNote(noteId);
   if (!note) throw new Error(`Note ${noteId} not found`);
   return note;
+}
+
+/**
+ * Persists the dragged column sizes. Re-clamped here rather than trusting the
+ * client; merged into the stored settings so theme and data location survive.
+ */
+export async function saveLayout(layout: Layout): Promise<void> {
+  saveWebSettings({
+    ...loadWebSettings(),
+    sidebarWidth: clampSidebarWidth(layout.sidebarWidth),
+    editorRatio: clampEditorRatio(layout.editorRatio),
+  });
+  revalidatePath("/");
 }
