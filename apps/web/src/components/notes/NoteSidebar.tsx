@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { GroupTree, InlineTextInput } from "./GroupTree";
+import { NAV_LINKS } from "./navLinks";
 import type { Group, Note } from "./types";
 
 type Props = {
@@ -95,10 +96,7 @@ export function NoteSidebar({
         {groupError && <p className="text-xs text-error">{groupError}</p>}
       </div>
       <div className="flex flex-col gap-1 border-t border-foreground/10 p-3">
-        {[
-          { href: "/docs", label: "Docs" },
-          { href: "/settings", label: "Settings" },
-        ].map(({ href, label }) => (
+        {NAV_LINKS.map(({ href, label }) => (
           <Link
             key={href}
             href={href}

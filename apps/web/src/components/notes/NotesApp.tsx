@@ -10,7 +10,7 @@ import {
   moveNoteToGroup as moveNoteToGroupAction,
   renameGroup as renameGroupAction,
   saveNoteContent,
-} from "@/lib/composition/actions";
+} from "@/lib/composition/client";
 import { canMoveGroup } from "@/lib/composition/groupMove";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { GroupPage } from "./GroupPage";

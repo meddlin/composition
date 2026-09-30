@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The desktop build's static export (next.config.ts, COMPOSITION_TARGET=desktop).
+    ".next-desktop/**",
   ]),
 ]);
 

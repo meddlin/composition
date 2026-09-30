@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_EDITOR_RATIO } from "./layout";
 
-// WEB_SETTINGS_PATH is fixed from the home directory at import time, so point
+// The default settings path is fixed from the home directory at import time, so point
 // HOME at a temp dir and import a fresh copy of the module for every test.
 let home: string;
 
@@ -65,5 +65,19 @@ describe("web settings layout", () => {
     saveWebSettings(settings);
 
     expect(loadWebSettings()).toEqual(settings);
+  });
+});
+
+describe("settings file location", () => {
+  it("uses COMPOSITION_SETTINGS_PATH, read at call time, instead of the home default", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    const custom = path.join(home, "elsewhere", "desktop-settings.json");
+    vi.stubEnv("COMPOSITION_SETTINGS_PATH", custom);
+
+    saveWebSettings({ ...loadWebSettings(), theme: "light" });
+
+    expect(JSON.parse(fs.readFileSync(custom, "utf-8")).theme).toBe("light");
+    expect(fs.existsSync(path.join(home, ".composition-web", "settings.json"))).toBe(false);
+    expect(loadWebSettings().theme).toBe("light");
   });
 });

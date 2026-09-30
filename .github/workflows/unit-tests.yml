@@ -28,7 +28,9 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: apps/web/pnpm-lock.yaml
+          cache-dependency-path: |
+            apps/web/pnpm-lock.yaml
+            apps/desktop/pnpm-lock.yaml
 
       - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
         with:
@@ -41,5 +43,10 @@ jobs:
       - name: Install web dependencies
         run: pnpm --dir apps/web install --frozen-lockfile
 
-      - name: Run unit tests (CLI + web)
+      # The desktop app bundles code from apps/web, so web's dependencies
+      # must be installed first (above).
+      - name: Install desktop dependencies
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Run unit tests (CLI + web + desktop)
         run: pnpm test

@@ -1,5 +1,5 @@
 import { startTransition, useRef, useState } from "react";
-import { saveLayout } from "@/lib/composition/actions";
+import { saveLayout } from "@/lib/composition/client";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "@/lib/composition/layout";
 
 /**

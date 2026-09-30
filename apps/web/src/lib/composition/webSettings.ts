@@ -9,13 +9,18 @@ import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
  * Fixed, well-known location for the web app's own settings, deliberately
  * outside `appDataDir` so it survives a relocation of the very setting it
  * stores, and deliberately a different file from the CLI's own
- * `~/.composition/settings.yaml` (the two apps keep independent settings).
+ * `~/.composition/settings.yaml` (the apps keep independent settings).
  */
-export const WEB_SETTINGS_PATH = path.join(
-  os.homedir(),
-  ".composition-web",
-  "settings.json",
-);
+const DEFAULT_SETTINGS_PATH = path.join(os.homedir(), ".composition-web", "settings.json");
+
+/**
+ * `COMPOSITION_SETTINGS_PATH` lets another host of this code (the desktop app,
+ * which keeps its settings under Electron's per-app data folder) own its
+ * settings file. Read on every call so it can be set after import.
+ */
+export function settingsPath(): string {
+  return process.env.COMPOSITION_SETTINGS_PATH || DEFAULT_SETTINGS_PATH;
+}
 
 export type WebSettings = {
   appDataDir: string;
@@ -33,7 +38,7 @@ const DEFAULT_SETTINGS: WebSettings = {
 
 export function loadWebSettings(): WebSettings {
   try {
-    const raw = fs.readFileSync(WEB_SETTINGS_PATH, "utf-8");
+    const raw = fs.readFileSync(settingsPath(), "utf-8");
     const data = JSON.parse(raw);
     const hasAppDataDir = typeof data?.appDataDir === "string" && data.appDataDir !== "";
     const settings: WebSettings = {
@@ -52,11 +57,12 @@ export function loadWebSettings(): WebSettings {
 }
 
 export function saveWebSettings(settings: WebSettings): void {
-  const dir = path.dirname(WEB_SETTINGS_PATH);
+  const file = settingsPath();
+  const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
-  const temporaryPath = path.join(dir, `.${path.basename(WEB_SETTINGS_PATH)}.tmp`);
+  const temporaryPath = path.join(dir, `.${path.basename(file)}.tmp`);
   fs.writeFileSync(temporaryPath, JSON.stringify(settings, null, 2));
-  fs.renameSync(temporaryPath, WEB_SETTINGS_PATH);
+  fs.renameSync(temporaryPath, file);
 }
 
 export function resolvedDbPath(settings: WebSettings): string {

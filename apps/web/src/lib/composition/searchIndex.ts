@@ -15,7 +15,16 @@ const INDEX_UID = "notes";
 const DEFAULT_MEILI_URL = "http://127.0.0.1:7700";
 const SEARCH_LIMIT = 20;
 
+/**
+ * Set by a host that manages its own Meilisearch (the desktop app starts one on
+ * a random port with a generated key), taking precedence over the environment.
+ */
+let configured: { host: string; apiKey?: string } | null = null;
+/** Why search can't work at all (e.g. no Meilisearch binary), shown instead of the generic hint. */
+let unavailableReason: string | null = null;
+
 function masterKey(): string | undefined {
+  if (configured) return configured.apiKey;
   if (process.env.MEILI_MASTER_KEY) return process.env.MEILI_MASTER_KEY;
   try {
     return fs
@@ -30,7 +39,27 @@ let client: Meilisearch | null = null;
 let indexReady: Promise<void> | null = null;
 
 export function meiliHost(): string {
-  return process.env.MEILI_URL || DEFAULT_MEILI_URL;
+  return configured?.host ?? (process.env.MEILI_URL || DEFAULT_MEILI_URL);
+}
+
+/** Points search at a specific server, dropping any connection made to a previous one. */
+export function configureSearch(config: { host: string; apiKey?: string }): void {
+  configured = config;
+  unavailableReason = null;
+  client = null;
+  indexReady = null;
+}
+
+/** Marks search as unusable, with a message for the UI. `configureSearch` clears it. */
+export function disableSearch(reason: string): void {
+  configured = null;
+  unavailableReason = reason;
+  client = null;
+  indexReady = null;
+}
+
+export function unavailableMessage(): string {
+  return unavailableReason ?? `Search is unavailable. Is Meilisearch running at ${meiliHost()}?`;
 }
 
 function getClient(): Meilisearch {
@@ -106,6 +135,7 @@ export async function reindexAll(notes: Note[]): Promise<void> {
 export async function searchNoteIds(query: string): Promise<number[]> {
   const text = query.trim();
   if (text === "") return [];
+  if (unavailableReason) throw new Error(unavailableReason);
 
   await ensureIndex();
   const index = getClient().index(INDEX_UID);

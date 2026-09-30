@@ -2,7 +2,11 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
-import { saveSettingsAction, saveThemeAction, type SettingsFormState } from "./actions";
+import {
+  saveSettings,
+  saveTheme,
+  type SaveSettingsResult,
+} from "@/lib/composition/client";
 
 // Preview swatches (background, foreground, primary); must match the palettes in globals.css.
 const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
@@ -19,7 +23,14 @@ type Props = {
   derivedDbPathPlaceholder: string;
 };
 
-const initialState: SettingsFormState = {};
+const initialState: SaveSettingsResult = {};
+
+function saveSettingsFromForm(_previous: SaveSettingsResult, formData: FormData) {
+  return saveSettings({
+    appDataDir: String(formData.get("appDataDir") ?? ""),
+    dbPath: String(formData.get("dbPath") ?? ""),
+  });
+}
 
 export function SettingsForm({
   currentTheme,
@@ -27,7 +38,7 @@ export function SettingsForm({
   currentDbPath,
   derivedDbPathPlaceholder,
 }: Props) {
-  const [state, formAction, pending] = useActionState(saveSettingsAction, initialState);
+  const [state, formAction, pending] = useActionState(saveSettingsFromForm, initialState);
   const [theme, setTheme] = useState<ThemeName>(currentTheme);
   const [themeError, setThemeError] = useState<string>();
   const [, startThemeTransition] = useTransition();
@@ -44,7 +55,7 @@ export function SettingsForm({
     setTheme(next);
     setThemeError(undefined);
     startThemeTransition(async () => {
-      const result = await saveThemeAction(next);
+      const result = await saveTheme(next);
       if (result.error) {
         setTheme(previous);
         setThemeError(result.error);

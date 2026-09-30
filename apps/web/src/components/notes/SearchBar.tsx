@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { searchNotes, type SearchHit, type SearchResult } from "@/lib/composition/actions";
+import { searchNotes, type SearchHit, type SearchResult } from "@/lib/composition/client";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export const SEARCH_DEBOUNCE_MS = 350;

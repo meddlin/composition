@@ -1,0 +1,33 @@
+{
+  "name": "composition-desktop",
+  "productName": "Composition",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Composition desktop app (Electron)",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build-renderer.mjs && node scripts/build-main.mjs && node scripts/collect-licenses.mjs",
+    "build:main": "node scripts/build-main.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "node scripts/smoke.mjs",
+    "package": "pnpm build && electron-builder --dir -c.mac.identity=null",
+    "dist": "pnpm build && electron-builder",
+    "fetch:meilisearch": "node scripts/fetch-meilisearch.mjs"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.63.0",
+    "typescript": "^6",
+    "vitest": "^5.0.2"
+  },
+  "packageManager": "pnpm@11.0.3"
+}

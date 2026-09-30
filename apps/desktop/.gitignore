@@ -1,0 +1,10 @@
+node_modules/
+# esbuild output (main + preload) and the copied static renderer
+dist/
+# electron-builder output
+release/
+# Meilisearch binary fetched by `pnpm fetch:meilisearch`; never committed
+resources/meilisearch/
+# Assembled by scripts/collect-licenses.mjs
+resources/licenses/
+*.tsbuildinfo

@@ -8,6 +8,7 @@ A note-taking system with Markdown support. This is a polyglot monorepo; each ap
 | --- | --- | --- |
 | [apps/cli](apps/cli) | Terminal note-taking app (TUI) with SQLite storage and Meilisearch search | Python, [uv](https://docs.astral.sh/uv/), Textual |
 | [apps/web](apps/web) | Web app | Next.js, TypeScript, pnpm |
+| [apps/desktop](apps/desktop) | Desktop app (macOS): the web UI in Electron, with bundled search | Electron, TypeScript, pnpm |
 | [docs](docs) | Architecture and product docs | Markdown |
 
 ## Getting started
@@ -29,14 +30,24 @@ pnpm install
 pnpm dev
 ```
 
-## Testing
-
-Run from the repo root (requires [uv](https://docs.astral.sh/uv/) and pnpm, with each app's dependencies installed):
+Desktop (installs `apps/web` first, since the desktop app reuses its code and UI):
 
 ```bash
-pnpm test        # CLI (pytest) + web (vitest)
+(cd apps/web && pnpm install)
+cd apps/desktop
+pnpm install
+pnpm dev
+```
+
+## Testing
+
+Run from the repo root (requires [uv](https://docs.astral.sh/uv/) and pnpm, with each app's dependencies installed; desktop also needs web's):
+
+```bash
+pnpm test        # CLI (pytest) + web (vitest) + desktop (typecheck + vitest)
 pnpm test:cli
 pnpm test:web
+pnpm test:desktop
 ```
 
 The same `pnpm test` runs on every pull request via `.github/workflows/unit-tests.yml`.

@@ -1,0 +1,17 @@
+{
+  "$comment": "The Meilisearch binary bundled into the desktop app. Always a COMMUNITY (MIT) build: the asset names must not contain 'enterprise' (BUSL, not allowed in production). Digests come from the GitHub release assets. Change the version here, nowhere else; see docs/desktop-app-plan.md, Licensing Meilisearch.",
+  "repository": "meilisearch/meilisearch",
+  "version": "v1.53.1",
+  "assets": {
+    "mac-arm64": {
+      "name": "meilisearch-macos-apple-silicon",
+      "sha256": "0fc7bd9aa9369cd1c8fc748e10f0ec402c555d988f44746195e8e90e461dff35",
+      "size": 121899744
+    },
+    "mac-x64": {
+      "name": "meilisearch-macos-amd64",
+      "sha256": "e9cfcdb0ecc123391872fb05a3b7853ca3dfd07643eea0d71dc62b17ab12a639",
+      "size": 126137716
+    }
+  }
+}
