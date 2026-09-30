@@ -7,6 +7,45 @@ import { GroupNotEmptyError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
+import * as searchIndex from "./searchIndex";
+
+/**
+ * Indexing is derived state (docs/architecture/search.md): a Meilisearch outage
+ * must never fail or roll back a write, so errors are logged and swallowed.
+ */
+async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
+  try {
+    await work();
+  } catch (error) {
+    console.error("[search] indexing failed:", error);
+  }
+}
+
+export type SearchHit = { id: number; title: string; description: string };
+
+export type SearchResult = { hits: SearchHit[]; error?: string };
+
+/**
+ * Never throws: an unreachable Meilisearch comes back as `error` (no hits) so
+ * the UI can say "unavailable" instead of a misleading "No matches".
+ */
+export async function searchNotes(query: string): Promise<SearchResult> {
+  try {
+    const ids = await searchIndex.searchNoteIds(query);
+    const hits: SearchHit[] = [];
+    for (const id of ids) {
+      const note = notesRepo.getNote(id);
+      if (note) hits.push({ id: note.id, title: note.title, description: note.description });
+    }
+    return { hits };
+  } catch (error) {
+    console.error("[search] query failed:", error);
+    return {
+      hits: [],
+      error: `Search is unavailable. Is Meilisearch running at ${searchIndex.meiliHost()}?`,
+    };
+  }
+}
 
 /**
  * Mirrors EditorScreen._save() / docs/architecture/note-lifecycle.md: parse
@@ -40,18 +79,21 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
   revalidatePath("/");
   const note = notesRepo.getNote(noteId);
   if (!note) throw new Error(`Note ${noteId} not found`);
+  await bestEffortIndex(() => searchIndex.indexNote(note));
   return note;
 }
 
 export async function createNote(title: string): Promise<Note> {
   const note = notesRepo.createNote(title);
   revalidatePath("/");
+  await bestEffortIndex(() => searchIndex.indexNote(note));
   return note;
 }
 
 export async function deleteNote(id: number): Promise<void> {
   notesRepo.deleteNote(id);
   revalidatePath("/");
+  await bestEffortIndex(() => searchIndex.deleteNoteFromIndex(id));
 }
 
 export async function createGroup(

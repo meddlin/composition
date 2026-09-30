@@ -12,6 +12,7 @@ import {
 } from "@/lib/composition/actions";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteSidebar } from "./NoteSidebar";
+import { SearchBar } from "./SearchBar";
 import type { Group, Note } from "./types";
 
 const AUTOSAVE_DELAY_MS = 500;
@@ -123,25 +124,30 @@ function Workspace({ initialNotes, initialGroups }: Props) {
   }
 
   return (
-    <div className="flex h-screen">
-      <NoteSidebar
-        notes={notes}
-        groups={groups}
-        activeId={activeId}
-        groupError={groupError}
-        onSelect={selectNote}
-        onCreate={create}
-        onDelete={remove}
-        onCreateGroup={createGroup}
-        onRenameGroup={renameGroup}
-        onDeleteGroup={deleteGroup}
-        onMoveNoteToGroup={moveNoteToGroup}
-      />
-      {active ? (
-        <MarkdownEditor value={active.content} onChange={update} />
-      ) : (
-        <EmptyState onCreate={create} />
-      )}
+    <div className="flex h-screen flex-col">
+      <header className="shrink-0 border-b border-foreground/10 p-2">
+        <SearchBar onSelect={selectNote} />
+      </header>
+      <div className="flex min-h-0 flex-1">
+        <NoteSidebar
+          notes={notes}
+          groups={groups}
+          activeId={activeId}
+          groupError={groupError}
+          onSelect={selectNote}
+          onCreate={create}
+          onDelete={remove}
+          onCreateGroup={createGroup}
+          onRenameGroup={renameGroup}
+          onDeleteGroup={deleteGroup}
+          onMoveNoteToGroup={moveNoteToGroup}
+        />
+        {active ? (
+          <MarkdownEditor value={active.content} onChange={update} />
+        ) : (
+          <EmptyState onCreate={create} />
+        )}
+      </div>
     </div>
   );
 }
