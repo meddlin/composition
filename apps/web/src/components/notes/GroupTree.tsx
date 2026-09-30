@@ -192,11 +192,11 @@ function GroupNode({
                 setCollapsed(false);
                 setAddingSubgroup(true);
               }}
-              aria-label={`New group inside ${group.name}`}
+              aria-label={`New sub-group inside ${group.name}`}
               title="New sub-group"
               className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
             >
-              +
+              + group
             </button>
             <button
               type="button"
