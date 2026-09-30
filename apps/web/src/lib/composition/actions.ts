@@ -85,8 +85,11 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
   return note;
 }
 
-export async function createNote(title: string): Promise<Note> {
-  const note = notesRepo.createNote(title);
+export async function createNote(
+  title: string,
+  groupId: number | null = null,
+): Promise<Note> {
+  const note = notesRepo.createNote(title, "", groupId);
   revalidatePath("/");
   await bestEffortIndex(() => searchIndex.indexNote(note));
   return note;

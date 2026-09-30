@@ -14,7 +14,7 @@ type Props = {
   groupError: string | null;
   onSelect: (id: number) => void;
   onSelectGroup: (id: number) => void;
-  onCreate: () => void;
+  onCreate: (groupId: number | null) => void;
   onDelete: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
@@ -46,10 +46,26 @@ export function NoteSidebar({
       style={{ width }}
       className="flex shrink-0 flex-col bg-surface"
     >
-      <div className="flex flex-col gap-2 p-3">
+      <div className="flex-1 overflow-y-auto px-2 pb-2">
+        <GroupTree
+          groups={groups}
+          notes={notes}
+          activeId={activeId}
+          viewedGroupId={viewedGroupId}
+          onSelectNote={onSelect}
+          onSelectGroup={onSelectGroup}
+          onDeleteNote={onDelete}
+          onCreateNote={onCreate}
+          onCreateGroup={onCreateGroup}
+          onRenameGroup={onRenameGroup}
+          onDeleteGroup={onDeleteGroup}
+          onMoveNoteToGroup={onMoveNoteToGroup}
+        />
+      </div>
+      <div className="flex flex-col gap-2 border-t border-foreground/10 p-3">
         <button
           type="button"
-          onClick={onCreate}
+          onClick={() => onCreate(null)}
           className="w-full rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
         >
           + New note
@@ -74,21 +90,6 @@ export function NoteSidebar({
           </button>
         )}
         {groupError && <p className="text-xs text-error">{groupError}</p>}
-      </div>
-      <div className="flex-1 overflow-y-auto px-2 pb-2">
-        <GroupTree
-          groups={groups}
-          notes={notes}
-          activeId={activeId}
-          viewedGroupId={viewedGroupId}
-          onSelectNote={onSelect}
-          onSelectGroup={onSelectGroup}
-          onDeleteNote={onDelete}
-          onCreateGroup={onCreateGroup}
-          onRenameGroup={onRenameGroup}
-          onDeleteGroup={onDeleteGroup}
-          onMoveNoteToGroup={onMoveNoteToGroup}
-        />
       </div>
       <div className="border-t border-foreground/10 p-3">
         <Link

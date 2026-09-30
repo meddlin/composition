@@ -15,6 +15,7 @@ type TreeProps = {
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
+  onCreateNote: (groupId: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
@@ -29,6 +30,7 @@ export function GroupTree({
   onSelectNote,
   onSelectGroup,
   onDeleteNote,
+  onCreateNote,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
@@ -64,6 +66,7 @@ export function GroupTree({
     onSelectNote,
     onSelectGroup,
     onDeleteNote,
+    onCreateNote,
     onCreateGroup,
     onRenameGroup,
     onDeleteGroup,
@@ -107,6 +110,7 @@ type SharedProps = {
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
+  onCreateNote: (groupId: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
@@ -124,6 +128,7 @@ function GroupNode({
   onSelectNote,
   onSelectGroup,
   onDeleteNote,
+  onCreateNote,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
@@ -193,13 +198,25 @@ function GroupNode({
               type="button"
               onClick={() => {
                 setCollapsed(false);
+                onCreateNote(group.id);
+              }}
+              aria-label={`New note in ${group.name}`}
+              title="New note"
+              className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
+            >
+              + note
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCollapsed(false);
                 setAddingSubgroup(true);
               }}
-              aria-label={`New group inside ${group.name}`}
+              aria-label={`New sub-group inside ${group.name}`}
               title="New sub-group"
               className="rounded px-1.5 py-0.5 text-xs opacity-0 hover:bg-foreground/10 group-hover/row:opacity-60 hover:opacity-100!"
             >
-              +
+              + group
             </button>
             <button
               type="button"
@@ -249,6 +266,7 @@ function GroupNode({
               onSelectNote={onSelectNote}
               onSelectGroup={onSelectGroup}
               onDeleteNote={onDeleteNote}
+              onCreateNote={onCreateNote}
               onCreateGroup={onCreateGroup}
               onRenameGroup={onRenameGroup}
               onDeleteGroup={onDeleteGroup}

@@ -77,10 +77,10 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
     setViewedGroupId(id);
   }
 
-  function create() {
+  function create(groupId: number | null = null) {
     flushPendingSave();
     startTransition(async () => {
-      const note = await createNote("Untitled");
+      const note = await createNote("Untitled", groupId);
       setNotes((prev) => [note, ...prev]);
       setActiveId(note.id);
       setViewedGroupId(null);
