@@ -81,3 +81,39 @@ describe("settings file location", () => {
     expect(loadWebSettings().theme).toBe("light");
   });
 });
+
+describe("web settings location", () => {
+  const austin = {
+    name: "Austin, Texas, United States",
+    latitude: 30.26715,
+    longitude: -97.74306,
+    timezone: "America/Chicago",
+  };
+
+  it("has no location by default", async () => {
+    writeSettings({ appDataDir: "/data", theme: "auto" });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings()).not.toHaveProperty("location");
+  });
+
+  it("round-trips a saved location", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+
+    saveWebSettings({ ...loadWebSettings(), theme: "auto", location: austin });
+
+    expect(loadWebSettings()).toMatchObject({ theme: "auto", location: austin });
+  });
+
+  it.each([
+    ["a missing timezone", { ...austin, timezone: "" }],
+    ["a latitude off the globe", { ...austin, latitude: 91 }],
+    ["a longitude off the globe", { ...austin, longitude: "west" }],
+    ["a non-object", "Austin"],
+  ])("ignores a stored location with %s", async (_label, location) => {
+    writeSettings({ appDataDir: "/data", theme: "auto", location });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings()).not.toHaveProperty("location");
+  });
+});

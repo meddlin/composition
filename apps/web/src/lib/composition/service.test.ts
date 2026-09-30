@@ -103,6 +103,7 @@ describe("loadSettings", () => {
       derivedDbPath: path.join(home, ".composition", "composition.db"),
       dirWritable: false,
       dbExists: false,
+      city: "",
     });
   });
 
@@ -229,5 +230,111 @@ describe("searchNotes", () => {
 
     expect(result.hits).toEqual([]);
     expect(result.error).toMatch(/Search is unavailable/);
+  });
+});
+
+describe("saveLocation", () => {
+  const austin = {
+    name: "Austin, Texas, United States",
+    latitude: 30.26715,
+    longitude: -97.74306,
+    timezone: "America/Chicago",
+  };
+
+  // Answers the geocoding request with `results`, and the forecast request with no days.
+  function stubOpenMeteo(results: unknown[]) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: URL) => {
+        const body = String(url).includes("geocoding") ? { results } : { daily: {} };
+        return new Response(JSON.stringify(body));
+      }),
+    );
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("saves the matched city alongside the other settings", async () => {
+    stubOpenMeteo([
+      {
+        name: "Austin",
+        admin1: "Texas",
+        country: "United States",
+        latitude: austin.latitude,
+        longitude: austin.longitude,
+        timezone: austin.timezone,
+      },
+    ]);
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "auto" });
+    const { saveLocation } = await import("./service");
+
+    const result = await saveLocation(" Austin, TX ");
+
+    expect(result).toMatchObject({ saved: { name: austin.name } });
+    expect(loadWebSettings()).toMatchObject({ theme: "auto", location: austin });
+  });
+
+  it("reports an unknown city without touching the saved one", async () => {
+    stubOpenMeteo([]);
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), location: austin });
+    const { saveLocation } = await import("./service");
+
+    const result = await saveLocation("Nowhereville");
+
+    expect(result.error).toContain("Nowhereville");
+    expect(result.saved).toBeUndefined();
+    expect(loadWebSettings().location).toEqual(austin);
+  });
+
+  it("reports an unreachable lookup service", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
+    const { saveLocation } = await import("./service");
+
+    expect((await saveLocation("Austin")).error).toMatch(/connection/);
+  });
+
+  it("forgets the saved city when the field is emptied", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "auto", location: austin });
+    const { saveLocation } = await import("./service");
+
+    expect(await saveLocation("  ")).toEqual({});
+
+    const settings = loadWebSettings();
+    expect(settings.location).toBeUndefined();
+    expect(settings.theme).toBe("auto");
+  });
+
+  it("shows the saved city in the settings snapshot", async () => {
+    stubOpenMeteo([]);
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), location: austin });
+    const { loadSettings } = await import("./service");
+
+    expect(await loadSettings()).toMatchObject({ city: austin.name, sunTimes: {} });
+  });
+});
+
+describe("loadSunSchedule", () => {
+  it("is null unless the auto scheme is selected", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "forest" });
+    const { loadSunSchedule, initialSunTheme } = await import("./service");
+
+    expect(await loadSunSchedule()).toBeNull();
+    expect(initialSunTheme()).toBeUndefined();
+  });
+
+  it("uses stand-in times for the auto scheme when no city is saved", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "auto" });
+    const { loadSunSchedule, initialSunTheme } = await import("./service");
+
+    expect(await loadSunSchedule()).toMatchObject({ estimated: true, retry: false });
+    expect(initialSunTheme()).toMatchObject({ tone: expect.stringMatching(/^(light|dark)$/) });
   });
 });

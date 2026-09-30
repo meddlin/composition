@@ -82,4 +82,6 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     ];
   },
   saveTheme: ([theme]) => [text("saveTheme", theme, "theme")],
+  saveLocation: ([city]) => [text("saveLocation", city, "city")],
+  loadSunSchedule: none,
 };

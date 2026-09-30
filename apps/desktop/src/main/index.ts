@@ -1,6 +1,6 @@
 import path from "node:path";
 import { app, BrowserWindow, ipcMain } from "electron";
-import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi } from "./backend";
+import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
@@ -52,12 +52,15 @@ const api: CompositionApi = {
   },
 };
 
+const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
+
 function openMainWindow(): BrowserWindow {
   return createMainWindow({
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
-    theme: loadWebSettings().theme,
+    // "auto" opens as the dark or light end of its ramp, per the cached sun times.
+    theme: service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme),
   });
 }
 
@@ -83,7 +86,7 @@ async function main(): Promise<void> {
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, sidebarWidth, editorRatio } = loadWebSettings();
-      return { theme, layout: { sidebarWidth, editorRatio } };
+      return { theme, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
     },
   });
 

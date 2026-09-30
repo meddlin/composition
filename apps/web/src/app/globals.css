@@ -5,10 +5,16 @@
  * Color schemes, selected in Settings and applied as `data-theme` on <html>
  * (see app/layout.tsx). Palettes mirror the CLI's themes.py:
  * dark = textual-dark, light = composition-light, forest = composition-forest.
- * cream has no CLI counterpart.
+ * cream and auto have no CLI counterpart.
+ *
+ * auto ("Follow the sun") reuses the dark and light palettes: text and accent
+ * colors come from whichever one `data-tone` names, while the three surface
+ * colors cross-fade with `--auto-light` (see the block after cream). Both
+ * attributes are kept current by components/SunThemeSync.tsx.
  */
 :root,
-[data-theme="dark"] {
+[data-theme="dark"],
+[data-theme="auto"][data-tone="dark"] {
   color-scheme: dark;
   --background: #121212;
   --foreground: #e0e0e0;
@@ -32,7 +38,8 @@
   --syntax-attr: #7ee787;
 }
 
-[data-theme="light"] {
+[data-theme="light"],
+[data-theme="auto"][data-tone="light"] {
   color-scheme: light;
   --background: #f7f7f4;
   --foreground: #24292f;
@@ -102,8 +109,20 @@
   --syntax-attr: #22627a;
 }
 
+/*
+ * Follow the sun: only the surfaces blend smoothly. Text snaps to the tone's
+ * palette instead, since a blend of dark and light text vanishes against the
+ * half-way background. The endpoints below must match the dark and light
+ * palettes above (themes.test.ts checks this).
+ */
+[data-theme="auto"][data-tone] {
+  --background: color-mix(in srgb, #f7f7f4 var(--auto-light, 0%), #121212);
+  --surface: color-mix(in srgb, #edede8 var(--auto-light, 0%), #1e1e1e);
+  --panel: color-mix(in srgb, #e2e2db var(--auto-light, 0%), #1b2730);
+}
+
 /* `dark:` utilities follow the selected scheme, not the OS setting. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *, [data-theme="auto"][data-tone="dark"], [data-theme="auto"][data-tone="dark"] *));
 
 @theme inline {
   --color-background: var(--background);

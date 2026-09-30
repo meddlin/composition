@@ -38,9 +38,13 @@ export const saveLayout: CompositionApi["saveLayout"] = (layout) => bridge().sav
 export const saveSettings: CompositionApi["saveSettings"] = (input) =>
   bridge().saveSettings(input);
 export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTheme(theme);
+export const saveLocation: CompositionApi["saveLocation"] = (city) => bridge().saveLocation(city);
+export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
+  bridge().loadSunSchedule();
 
 export type {
   MoveGroupResult,
+  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -65,5 +69,7 @@ const _implementsApi: CompositionApi = {
   saveLayout,
   saveSettings,
   saveTheme,
+  saveLocation,
+  loadSunSchedule,
 };
 void _implementsApi;
