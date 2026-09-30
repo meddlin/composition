@@ -11,6 +11,7 @@ import {
   saveNoteContent,
 } from "@/lib/composition/actions";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
+import { GroupPage } from "./GroupPage";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteSidebar } from "./NoteSidebar";
 import { ResizeHandle } from "./ResizeHandle";
@@ -35,6 +36,8 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
   const [groups, setGroups] = useState<Group[]>(initialGroups);
   const [activeId, setActiveId] = useState<number | null>(initialNotes[0]?.id ?? null);
   const [groupError, setGroupError] = useState<string | null>(null);
+  // When set, the group's listing page replaces the editor.
+  const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
   const layout = useLayout(initialLayout);
 
   const pendingSave = useRef<{ noteId: number; content: string } | null>(null);
@@ -60,9 +63,18 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
 
   const active = notes.find((n) => n.id === activeId) ?? null;
 
+  // A group deleted while its page is open falls back to the editor.
+  const viewedGroup = groups.find((g) => g.id === viewedGroupId) ?? null;
+
   function selectNote(id: number) {
     flushPendingSave();
     setActiveId(id);
+    setViewedGroupId(null);
+  }
+
+  function selectGroup(id: number) {
+    flushPendingSave();
+    setViewedGroupId(id);
   }
 
   function create(groupId: number | null = null) {
@@ -71,6 +83,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
       const note = await createNote("Untitled", groupId);
       setNotes((prev) => [note, ...prev]);
       setActiveId(note.id);
+      setViewedGroupId(null);
     });
   }
 
@@ -137,10 +150,12 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
         <NoteSidebar
           notes={notes}
           groups={groups}
-          activeId={activeId}
+          activeId={viewedGroup ? null : activeId}
+          viewedGroupId={viewedGroup?.id ?? null}
           width={layout.sidebarWidth}
           groupError={groupError}
           onSelect={selectNote}
+          onSelectGroup={selectGroup}
           onCreate={create}
           onDelete={remove}
           onCreateGroup={createGroup}
@@ -155,7 +170,15 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
           valueMax={MAX_SIDEBAR_WIDTH}
           {...layout.sidebarResize}
         />
-        {active ? (
+        {viewedGroup ? (
+          <GroupPage
+            groupId={viewedGroup.id}
+            groups={groups}
+            notes={notes}
+            onSelectNote={selectNote}
+            onSelectGroup={selectGroup}
+          />
+        ) : active ? (
           <MarkdownEditor
             value={active.content}
             onChange={update}
