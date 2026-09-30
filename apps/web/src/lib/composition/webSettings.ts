@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
+import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
 
 /**
  * Fixed, well-known location for the web app's own settings, deliberately
@@ -18,18 +19,23 @@ export const WEB_SETTINGS_PATH = path.join(
 export type WebSettings = {
   appDataDir: string;
   dbPath?: string;
+  theme: ThemeName;
 };
 
-const DEFAULT_SETTINGS: WebSettings = { appDataDir: DEFAULT_APP_DATA_DIR };
+const DEFAULT_SETTINGS: WebSettings = {
+  appDataDir: DEFAULT_APP_DATA_DIR,
+  theme: DEFAULT_THEME,
+};
 
 export function loadWebSettings(): WebSettings {
   try {
     const raw = fs.readFileSync(WEB_SETTINGS_PATH, "utf-8");
     const data = JSON.parse(raw);
-    if (typeof data?.appDataDir !== "string" || data.appDataDir === "") {
-      return DEFAULT_SETTINGS;
-    }
-    const settings: WebSettings = { appDataDir: data.appDataDir };
+    const hasAppDataDir = typeof data?.appDataDir === "string" && data.appDataDir !== "";
+    const settings: WebSettings = {
+      appDataDir: hasAppDataDir ? data.appDataDir : DEFAULT_APP_DATA_DIR,
+      theme: isThemeName(data.theme) ? data.theme : DEFAULT_THEME,
+    };
     if (typeof data.dbPath === "string" && data.dbPath !== "") {
       settings.dbPath = data.dbPath;
     }

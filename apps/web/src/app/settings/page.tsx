@@ -50,7 +50,7 @@ export default function SettingsPage() {
           </div>
         </dl>
         {!dirWritable && (
-          <p className="mt-3 text-amber-600 dark:text-amber-400">
+          <p className="mt-3 text-warning">
             Warning: the application data directory doesn&apos;t exist yet or isn&apos;t
             writable. It will be created when you save.
           </p>
@@ -64,6 +64,7 @@ export default function SettingsPage() {
       </section>
 
       <SettingsForm
+        currentTheme={settings.theme}
         currentAppDataDir={settings.appDataDir}
         currentDbPath={settings.dbPath ?? ""}
         derivedDbPathPlaceholder={defaultDatabasePath(settings.appDataDir)}

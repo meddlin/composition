@@ -272,8 +272,9 @@ function FolderIcon() {
     <svg
       aria-hidden
       viewBox="0 0 24 24"
-      fill="#F3D58A"
-      stroke="#C9A24B"
+      fill="var(--accent)"
+      fillOpacity={0.35}
+      stroke="var(--accent)"
       strokeWidth={1.5}
       strokeLinecap="round"
       strokeLinejoin="round"
