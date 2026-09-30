@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { buildGroupListing, groupPath, type GroupListing } from "./groupListing";
 import { noteTitle, type Group, type Note } from "./types";
 
@@ -9,10 +10,14 @@ type Props = {
   notes: Note[];
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
+  onRenameGroup: (id: number, name: string) => void;
 };
 
-/** Read-only overview of a group: every sub-group and note beneath it, nested. */
-export function GroupPage({ groupId, groups, notes, onSelectNote, onSelectGroup }: Props) {
+/**
+ * Overview of a group: every sub-group and note beneath it, nested. The title
+ * is the one editable part — it renames the group.
+ */
+export function GroupPage({ groupId, groups, notes, onSelectNote, onSelectGroup, onRenameGroup }: Props) {
   const listing = buildGroupListing(groupId, groups, notes);
   if (!listing) return null;
 
@@ -34,7 +39,11 @@ export function GroupPage({ groupId, groups, notes, onSelectNote, onSelectGroup 
             ))}
           </nav>
         )}
-        <h1 className="text-2xl font-bold">{listing.group.name}</h1>
+        <GroupTitle
+          key={listing.group.id}
+          name={listing.group.name}
+          onRename={(name) => onRenameGroup(listing.group.id, name)}
+        />
         <p className="mt-1 text-sm text-foreground/60">
           {countLabel(listing.totalNotes, "note")}
           {listing.subgroups.length > 0 && `, ${countLabel(listing.subgroups.length, "sub-group")}`}
@@ -49,6 +58,67 @@ export function GroupPage({ groupId, groups, notes, onSelectNote, onSelectGroup 
         )}
       </div>
     </main>
+  );
+}
+
+function GroupTitle({ name, onRename }: { name: string; onRename: (name: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  // Enter/Escape unmount the input, which can fire a trailing blur; only the
+  // first way of leaving the field counts.
+  const settled = useRef(false);
+
+  function startEditing() {
+    settled.current = false;
+    setDraft(name);
+    setEditing(true);
+  }
+
+  function finish(commit: boolean) {
+    if (settled.current) return;
+    settled.current = true;
+    const trimmed = draft.trim();
+    if (commit && trimmed !== "" && trimmed !== name) onRename(trimmed);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <input
+        type="text"
+        autoFocus
+        aria-label="Group name"
+        value={draft}
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            finish(true);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            finish(false);
+          }
+        }}
+        className="w-full rounded-md border border-foreground/20 bg-transparent px-2 py-0.5 text-2xl font-bold outline-none focus:border-foreground/40"
+      />
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <h1 className="min-w-0 truncate text-2xl font-bold">{name}</h1>
+      <button
+        type="button"
+        onClick={startEditing}
+        aria-label={`Rename ${name}`}
+        title="Rename group"
+        className="rounded px-1.5 py-0.5 text-xs text-foreground/50 hover:bg-foreground/10 hover:text-foreground"
+      >
+        Rename
+      </button>
+    </div>
   );
 }
 

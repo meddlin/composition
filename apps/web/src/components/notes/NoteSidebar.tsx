@@ -91,13 +91,19 @@ export function NoteSidebar({
         )}
         {groupError && <p className="text-xs text-error">{groupError}</p>}
       </div>
-      <div className="border-t border-foreground/10 p-3">
-        <Link
-          href="/settings"
-          className="block rounded-md px-3 py-2 text-sm text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
-        >
-          Settings
-        </Link>
+      <div className="flex flex-col gap-1 border-t border-foreground/10 p-3">
+        {[
+          { href: "/docs", label: "Docs" },
+          { href: "/settings", label: "Settings" },
+        ].map(({ href, label }) => (
+          <Link
+            key={href}
+            href={href}
+            className="block rounded-md px-3 py-2 text-sm text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
+          >
+            {label}
+          </Link>
+        ))}
       </div>
     </nav>
   );

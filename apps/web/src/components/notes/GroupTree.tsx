@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { GroupMenu } from "./GroupMenu";
 import { noteTitle, type Group, type Note } from "./types";
 
 // Custom MIME type so drop targets can tell a dragged note apart from any
@@ -194,8 +195,9 @@ function GroupNode({
                 {group.name}
               </span>
             </button>
-            {/* Overlays the row instead of reserving space, so names can run right up to the edge. */}
-            <div className="pointer-events-none absolute right-0 top-1/2 flex -translate-y-1/2 items-center rounded-md bg-surface opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/row:pointer-events-auto group-hover/row:opacity-100">
+            {/* Overlays the row instead of reserving space, so names can run right up to the edge.
+                No transform here: it would become the containing block for GroupMenu's fixed popup. */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-md bg-surface opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/row:pointer-events-auto group-hover/row:opacity-100">
               <button
                 type="button"
                 onClick={() => {
@@ -208,30 +210,16 @@ function GroupNode({
               >
                 + note
               </button>
-              <button
-                type="button"
-                onClick={() => {
+              <GroupMenu
+                groupName={group.name}
+                canDelete={empty}
+                onRename={() => setRenaming(true)}
+                onCreateSubgroup={() => {
                   setCollapsed(false);
                   setAddingSubgroup(true);
                 }}
-                aria-label={`New sub-group inside ${group.name}`}
-                title="New sub-group"
-                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100"
-              >
-                + group
-              </button>
-              <button
-                type="button"
-                onClick={() => onDeleteGroup(group.id)}
-                disabled={!empty}
-                aria-label={`Delete ${group.name}`}
-                title={
-                  empty ? "Delete group" : "Empty this group before deleting"
-                }
-                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100 disabled:pointer-events-none disabled:opacity-0"
-              >
-                ✕
-              </button>
+                onDelete={() => onDeleteGroup(group.id)}
+              />
             </div>
           </div>
         </DropZone>

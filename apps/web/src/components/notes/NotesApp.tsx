@@ -177,6 +177,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
             notes={notes}
             onSelectNote={selectNote}
             onSelectGroup={selectGroup}
+            onRenameGroup={renameGroup}
           />
         ) : active ? (
           <MarkdownEditor
