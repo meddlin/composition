@@ -1,7 +1,5 @@
 import { NotesApp } from "@/components/notes/NotesApp";
-import { listGroups } from "@/lib/composition/groupsRepo";
-import { listNotes } from "@/lib/composition/notesRepo";
-import { loadWebSettings } from "@/lib/composition/webSettings";
+import { loadWorkspace } from "@/lib/composition/service";
 
 // Always render at request time: notes come from a local SQLite file that
 // Server Actions mutate directly, and better-sqlite3's native addon isn't
@@ -9,14 +7,6 @@ import { loadWebSettings } from "@/lib/composition/webSettings";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const notes = listNotes();
-  const groups = listGroups();
-  const { sidebarWidth, editorRatio } = loadWebSettings();
-  return (
-    <NotesApp
-      initialNotes={notes}
-      initialGroups={groups}
-      initialLayout={{ sidebarWidth, editorRatio }}
-    />
-  );
+  const { notes, groups, layout } = await loadWorkspace();
+  return <NotesApp initialNotes={notes} initialGroups={groups} initialLayout={layout} />;
 }

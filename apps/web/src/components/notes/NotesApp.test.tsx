@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createGroup, createNote, deleteGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/actions";
+import { createGroup, createNote, deleteGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/client";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
 
-vi.mock("@/lib/composition/actions", () => ({
+vi.mock("@/lib/composition/client", () => ({
   createGroup: vi.fn(),
   createNote: vi.fn(),
   deleteGroup: vi.fn(),
