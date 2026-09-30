@@ -9,6 +9,7 @@ type Props = {
   notes: Note[];
   groups: Group[];
   activeId: number | null;
+  width: number;
   groupError: string | null;
   onSelect: (id: number) => void;
   onCreate: () => void;
@@ -23,6 +24,7 @@ export function NoteSidebar({
   notes,
   groups,
   activeId,
+  width,
   groupError,
   onSelect,
   onCreate,
@@ -37,7 +39,8 @@ export function NoteSidebar({
   return (
     <nav
       aria-label="Notes"
-      className="flex w-64 shrink-0 flex-col border-r border-foreground/10 bg-surface"
+      style={{ width }}
+      className="flex shrink-0 flex-col bg-surface"
     >
       <div className="flex flex-col gap-2 p-3">
         <button

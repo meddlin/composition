@@ -7,7 +7,9 @@ import { MarkdownEditor } from "./MarkdownEditor";
 const LOAD_TIMEOUT_MS = 10_000;
 
 function renderPreview(value: string) {
-  return render(<MarkdownEditor value={value} onChange={vi.fn()} />);
+  return render(
+    <MarkdownEditor value={value} onChange={vi.fn()} ratio={0.5} onRatioChange={vi.fn()} onRatioCommit={vi.fn()} />,
+  );
 }
 
 const tokens = (el: Element) => el.querySelectorAll("[class*='hljs-']");

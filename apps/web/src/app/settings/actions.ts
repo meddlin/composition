@@ -44,8 +44,9 @@ export async function saveSettingsAction(
     return { error: `Could not create or write to that location: ${message}` };
   }
 
-  const { theme } = loadWebSettings();
-  const settings: WebSettings = dbPath ? { appDataDir, dbPath, theme } : { appDataDir, theme };
+  // Spread the stored settings so fields this form doesn't edit (theme, layout)
+  // survive; an undefined dbPath is dropped when the file is serialized.
+  const settings: WebSettings = { ...loadWebSettings(), appDataDir, dbPath };
   saveWebSettings(settings);
   closeDb();
 
