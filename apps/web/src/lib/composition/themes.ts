@@ -5,6 +5,7 @@
  *   dark   -> textual-dark (default)
  *   light  -> composition-light
  *   forest -> composition-forest
+ *   cream  -> web only (no CLI counterpart yet)
  * The palettes themselves live in `app/globals.css`, keyed by `data-theme`.
  */
 
@@ -12,6 +13,7 @@ export const THEME_CHOICES = [
   { name: "dark", label: "Dark" },
   { name: "light", label: "Light" },
   { name: "forest", label: "Forest (dark green)" },
+  { name: "cream", label: "Cream (warm light)" },
 ] as const;
 
 export type ThemeName = (typeof THEME_CHOICES)[number]["name"];

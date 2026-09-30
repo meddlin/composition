@@ -9,6 +9,7 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
   dark: ["#121212", "#e0e0e0", "#0178d4"],
   light: ["#f7f7f4", "#24292f", "#0b62d6"],
   forest: ["#0c1510", "#d5e5da", "#3fb876"],
+  cream: ["#f6f0e1", "#3b3226", "#9a4a1f"],
 };
 
 type Props = {

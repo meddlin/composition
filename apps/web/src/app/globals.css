@@ -5,6 +5,7 @@
  * Color schemes, selected in Settings and applied as `data-theme` on <html>
  * (see app/layout.tsx). Palettes mirror the CLI's themes.py:
  * dark = textual-dark, light = composition-light, forest = composition-forest.
+ * cream has no CLI counterpart.
  */
 :root,
 [data-theme="dark"] {
@@ -51,6 +52,22 @@
   --error: #d9596b;
   --success: #7bd88f;
   --link: #3fb876;
+}
+
+/* Warm paper look: cream backgrounds, brown ink, terracotta accents. Web only. */
+[data-theme="cream"] {
+  color-scheme: light;
+  --background: #f6f0e1;
+  --foreground: #3b3226;
+  --surface: #eee5d0;
+  --panel: #e4d9be;
+  --primary: #9a4a1f;
+  --secondary: #7a6a55;
+  --accent: #c2762b;
+  --warning: #96600c;
+  --error: #b23a48;
+  --success: #4f7a3a;
+  --link: #8a4b1e;
 }
 
 /* `dark:` utilities follow the selected scheme, not the OS setting. */
