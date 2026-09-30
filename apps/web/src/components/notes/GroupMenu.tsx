@@ -99,8 +99,8 @@ export function GroupMenu({ groupName, canDelete, onRename, onCreateSubgroup, on
         aria-haspopup="menu"
         aria-expanded={open}
         title="More actions"
-        className={`rounded px-1.5 py-0.5 text-xs hover:bg-foreground/10 hover:opacity-100! focus-visible:opacity-100 group-hover/row:opacity-60 ${
-          open ? "opacity-100" : "opacity-0"
+        className={`rounded px-1.5 py-0.5 text-xs hover:bg-foreground/10 hover:opacity-100 focus-visible:opacity-100 ${
+          open ? "opacity-100" : "opacity-60"
         }`}
       >
         ⋯
