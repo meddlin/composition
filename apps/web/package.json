@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.20",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.3.2",
     "lowlight": "^3.3.0",
     "meilisearch": "^0.62.0",
