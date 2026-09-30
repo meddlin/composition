@@ -15,8 +15,9 @@ describe("THEME_BACKGROUND", () => {
     );
 
     for (const [theme, color] of Object.entries(THEME_BACKGROUND)) {
-      // `dark` is also the :root default, so its block is `:root,\n[data-theme="dark"]`.
-      const block = new RegExp(`\\[data-theme="${theme}"\\]\\s*\\{([^}]*)\\}`).exec(css);
+      // Some blocks are selector lists: `dark` is also the :root default and, like
+      // `light`, is shared with the "auto" scheme's matching tone.
+      const block = new RegExp(`\\[data-theme="${theme}"\\](?:,\\s*\\[data-theme="\\w+"\\](?:\\[data-tone="\\w+"\\])?)*\\s*\\{([^}]*)\\}`).exec(css);
       expect(block, `no [data-theme="${theme}"] block in globals.css`).not.toBeNull();
       const background = /--background:\s*(#[0-9a-fA-F]{6})/.exec(block![1]);
       expect(background?.[1].toLowerCase(), theme).toBe(color);

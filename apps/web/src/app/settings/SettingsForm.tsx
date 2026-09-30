@@ -1,10 +1,13 @@
 "use client";
 
 import { useActionState, useEffect, useState, useTransition } from "react";
+import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
+  saveLocation,
   saveSettings,
   saveTheme,
+  type SaveLocationResult,
   type SaveSettingsResult,
 } from "@/lib/composition/client";
 
@@ -14,16 +17,44 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
   light: ["#f7f7f4", "#24292f", "#0b62d6"],
   forest: ["#0c1510", "#d5e5da", "#3fb876"],
   cream: ["#f6f0e1", "#3b3226", "#9a4a1f"],
+  // Shows the dark and light backgrounds it moves between.
+  auto: ["#121212", "#f7f7f4", "#0178d4"],
 };
 
 type Props = {
   currentTheme: ThemeName;
+  currentCity: string;
+  /** Today's times at the saved city, so the page can confirm the lookup worked. */
+  currentSunTimes?: { sunrise?: string; sunset?: string };
   currentAppDataDir: string;
   currentDbPath: string;
   derivedDbPathPlaceholder: string;
 };
 
 const initialState: SaveSettingsResult = {};
+
+/** The result of the last city save, plus what to show in the field afterwards. */
+type LocationState = SaveLocationResult & { query?: string };
+
+function formatSunTimes(times: { sunrise?: string; sunset?: string }): string {
+  const parts = [
+    times.sunrise && `sunrise ${times.sunrise}`,
+    times.sunset && `sunset ${times.sunset}`,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "the sun doesn't rise or set there today";
+}
+
+async function saveLocationFromForm(
+  _previous: LocationState,
+  formData: FormData,
+): Promise<LocationState> {
+  const city = String(formData.get("city") ?? "");
+  const result = await saveLocation(city);
+  // After an error keep what was typed; after a save, show the matched name.
+  const query = result.saved?.name ?? (result.error ? city : "");
+  if (!result.error) window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
+  return { ...result, query };
+}
 
 function saveSettingsFromForm(_previous: SaveSettingsResult, formData: FormData) {
   return saveSettings({
@@ -34,11 +65,17 @@ function saveSettingsFromForm(_previous: SaveSettingsResult, formData: FormData)
 
 export function SettingsForm({
   currentTheme,
+  currentCity,
+  currentSunTimes,
   currentAppDataDir,
   currentDbPath,
   derivedDbPathPlaceholder,
 }: Props) {
   const [state, formAction, pending] = useActionState(saveSettingsFromForm, initialState);
+  const [locationState, locationAction, locationPending] = useActionState(
+    saveLocationFromForm,
+    {} as LocationState,
+  );
   const [theme, setTheme] = useState<ThemeName>(currentTheme);
   const [themeError, setThemeError] = useState<string>();
   const [, startThemeTransition] = useTransition();
@@ -59,6 +96,9 @@ export function SettingsForm({
       if (result.error) {
         setTheme(previous);
         setThemeError(result.error);
+      } else {
+        // "auto" takes its starting point from the sun times; tell it to load them.
+        window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
       }
     });
   }
@@ -95,6 +135,51 @@ export function SettingsForm({
           </p>
         )}
       </fieldset>
+
+      <form action={locationAction} className="flex flex-col gap-2 text-sm">
+        <label className="flex flex-col gap-1">
+          <span className="font-medium">City</span>
+          <span className="text-xs text-foreground/50">
+            Sets the sunrise and sunset that &ldquo;Follow the sun&rdquo; tracks. Try{" "}
+            <span className="font-mono">Austin, TX</span>.
+          </span>
+          <input
+            type="text"
+            name="city"
+            defaultValue={locationState.query ?? currentCity}
+            placeholder="Austin, TX"
+            spellCheck={false}
+            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={locationPending}
+          className="w-fit rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/10 disabled:opacity-50"
+        >
+          {locationPending ? "Looking up…" : "Save city"}
+        </button>
+        {locationState.error && (
+          <p role="alert" className="text-error">
+            {locationState.error}
+          </p>
+        )}
+        {locationState.saved && (
+          <p role="status" className="text-success">
+            Using {locationState.saved.name}: {formatSunTimes(locationState.saved)}.
+          </p>
+        )}
+        {!locationState.saved && !locationState.error && currentCity && currentSunTimes && (
+          <p className="text-foreground/60">
+            Using {currentCity}: {formatSunTimes(currentSunTimes)}.
+          </p>
+        )}
+        {theme === "auto" && !currentCity && !locationState.saved && (
+          <p className="text-warning">
+            No city saved yet, so &ldquo;Follow the sun&rdquo; is using 6:30 AM and 6:30 PM.
+          </p>
+        )}
+      </form>
 
       <form action={formAction} className="flex flex-col gap-4 text-sm">
         <label className="flex flex-col gap-1">

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
+import type { SavedLocation } from "./sunTimes";
 import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
 
 /**
@@ -26,6 +27,8 @@ export type WebSettings = {
   appDataDir: string;
   dbPath?: string;
   theme: ThemeName;
+  /** City whose sunrise and sunset drive the "auto" color scheme. */
+  location?: SavedLocation;
   sidebarWidth: number;
   editorRatio: number;
 };
@@ -35,6 +38,28 @@ const DEFAULT_SETTINGS: WebSettings = {
   theme: DEFAULT_THEME,
   ...DEFAULT_LAYOUT,
 };
+
+function parseLocation(value: unknown): SavedLocation | undefined {
+  const data = value as Partial<Record<keyof SavedLocation, unknown>> | null;
+  if (
+    typeof data?.name !== "string" ||
+    data.name === "" ||
+    typeof data.timezone !== "string" ||
+    data.timezone === "" ||
+    typeof data.latitude !== "number" ||
+    !(Math.abs(data.latitude) <= 90) ||
+    typeof data.longitude !== "number" ||
+    !(Math.abs(data.longitude) <= 180)
+  ) {
+    return undefined;
+  }
+  return {
+    name: data.name,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    timezone: data.timezone,
+  };
+}
 
 export function loadWebSettings(): WebSettings {
   try {
@@ -50,6 +75,8 @@ export function loadWebSettings(): WebSettings {
     if (typeof data.dbPath === "string" && data.dbPath !== "") {
       settings.dbPath = data.dbPath;
     }
+    const location = parseLocation(data.location);
+    if (location) settings.location = location;
     return settings;
   } catch {
     return DEFAULT_SETTINGS;

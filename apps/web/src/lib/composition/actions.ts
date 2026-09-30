@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type {
   MoveGroupResult,
+  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchResult,
@@ -13,6 +14,7 @@ import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
 import * as service from "./service";
+import type { SunSchedule } from "./sunTimes";
 
 /**
  * The web app's transport for CompositionApi (see api.ts): Server Actions that
@@ -112,4 +114,17 @@ export async function saveTheme(theme: string): Promise<{ error?: string }> {
     revalidatePath("/");
   }
   return result;
+}
+
+export async function saveLocation(city: string): Promise<SaveLocationResult> {
+  const result = await service.saveLocation(city);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
+export async function loadSunSchedule(): Promise<SunSchedule | null> {
+  return service.loadSunSchedule();
 }

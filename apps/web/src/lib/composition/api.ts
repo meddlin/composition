@@ -1,6 +1,7 @@
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
+import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 
 /**
@@ -38,6 +39,18 @@ export type SettingsSnapshot = {
   derivedDbPath: string;
   dirWritable: boolean;
   dbExists: boolean;
+  /** The saved city for the "Follow the sun" scheme, or "". */
+  city: string;
+  /** Today's sunrise and sunset there, formatted in its own timezone (when a city is saved and reachable). */
+  sunTimes?: SunTimesToday;
+};
+
+export type SunTimesToday = { sunrise?: string; sunset?: string };
+
+/** `saved` is absent when the city was cleared or couldn't be saved (then `error` may say why). */
+export type SaveLocationResult = {
+  error?: string;
+  saved?: { name: string } & SunTimesToday;
 };
 
 /** A refused move (into itself or a descendant, or a group that's gone) comes back as `error`. */
@@ -71,6 +84,11 @@ export interface CompositionApi {
   saveLayout(layout: Layout): Promise<void>;
   saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult>;
   saveTheme(theme: string): Promise<{ error?: string }>;
+
+  /** Geocodes and saves the city that "Follow the sun" tracks; an empty string forgets it. */
+  saveLocation(city: string): Promise<SaveLocationResult>;
+  /** Sunrise/sunset events for the "auto" scheme, or null when another scheme is selected. */
+  loadSunSchedule(): Promise<SunSchedule | null>;
 }
 
 /**
@@ -93,6 +111,8 @@ export const API_METHODS = [
   "saveLayout",
   "saveSettings",
   "saveTheme",
+  "saveLocation",
+  "loadSunSchedule",
 ] as const satisfies readonly (keyof CompositionApi)[];
 
 export type ApiMethod = (typeof API_METHODS)[number];

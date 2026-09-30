@@ -16,11 +16,13 @@ export {
   deleteGroup,
   deleteNote,
   loadSettings,
+  loadSunSchedule,
   loadWorkspace,
   moveGroup,
   moveNoteToGroup,
   renameGroup,
   saveLayout,
+  saveLocation,
   saveNoteContent,
   saveSettings,
   saveTheme,
@@ -28,6 +30,7 @@ export {
 } from "./actions";
 export type {
   MoveGroupResult,
+  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,

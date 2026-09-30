@@ -8,7 +8,12 @@ import type { ThemeName } from "./themes";
  * page paints so the first frame already has the right color scheme.
  */
 export type DesktopBridge = CompositionApi & {
-  readonly initial: { theme: ThemeName; layout: Layout };
+  readonly initial: {
+    theme: ThemeName;
+    layout: Layout;
+    /** Present for the "auto" scheme: where on the sunrise/sunset ramp the first frame starts. */
+    sun?: { tone: "light" | "dark"; autoLight: string };
+  };
   readonly platform: string;
 };
 

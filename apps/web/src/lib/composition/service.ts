@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   CompositionApi,
   MoveGroupResult,
+  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -20,6 +21,15 @@ import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
 import { defaultDatabasePath, expandHome } from "./paths";
 import * as searchIndex from "./searchIndex";
+import {
+  cachedSunSchedule,
+  geocodeCity,
+  loadSunEvents,
+  resolveSunSchedule,
+  todaysSunTimes,
+  type SunSchedule,
+} from "./sunTimes";
+import { sunThemeAttributes } from "./sunSchedule";
 import { isThemeName } from "./themes";
 import { loadWebSettings, resolvedDbPath, saveWebSettings, type WebSettings } from "./webSettings";
 
@@ -62,6 +72,7 @@ function isWritableDir(dir: string): boolean {
 export async function loadSettings(): Promise<SettingsSnapshot> {
   const settings = loadWebSettings();
   const dbPath = resolvedDbPath(settings);
+  const { location } = settings;
   return {
     theme: settings.theme,
     appDataDir: settings.appDataDir,
@@ -70,6 +81,10 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     derivedDbPath: defaultDatabasePath(settings.appDataDir),
     dirWritable: isWritableDir(settings.appDataDir),
     dbExists: fs.existsSync(dbPath),
+    city: location?.name ?? "",
+    sunTimes: location
+      ? todaysSunTimes(await loadSunEvents(location), location.timezone)
+      : undefined,
   };
 }
 
@@ -262,6 +277,49 @@ export async function saveTheme(theme: string): Promise<{ error?: string }> {
   return {};
 }
 
+export async function saveLocation(city: string): Promise<SaveLocationResult> {
+  const query = city.trim();
+
+  if (query === "") {
+    // Forgetting the city leaves "auto" running on stand-in times.
+    const settings = loadWebSettings();
+    delete settings.location;
+    saveWebSettings(settings);
+    return {};
+  }
+
+  let location;
+  try {
+    location = await geocodeCity(query);
+  } catch {
+    return { error: "Couldn't reach the city lookup service. Check your connection and try again." };
+  }
+  if (!location) {
+    return {
+      error: `Couldn't find a city matching "${query}". Try "City, State" or "City, Country".`,
+    };
+  }
+
+  saveWebSettings({ ...loadWebSettings(), location });
+  const times = todaysSunTimes(await loadSunEvents(location), location.timezone);
+  return { saved: { name: location.name, ...times } };
+}
+
+export async function loadSunSchedule(): Promise<SunSchedule | null> {
+  const { theme, location } = loadWebSettings();
+  return theme === "auto" ? resolveSunSchedule(location) : null;
+}
+
+/**
+ * For the very first paint, which can't wait on the network: the "auto" scheme's
+ * attributes from whatever sun times are already cached, else stand-in times.
+ * Undefined when another scheme is selected.
+ */
+export function initialSunTheme(): { tone: "light" | "dark"; autoLight: string } | undefined {
+  const { theme, location } = loadWebSettings();
+  return theme === "auto" ? sunThemeAttributes(cachedSunSchedule(location).level) : undefined;
+}
+
 // Compile-time proof that this module implements the whole contract.
 const _implementsApi: CompositionApi = {
   loadWorkspace,
@@ -278,5 +336,7 @@ const _implementsApi: CompositionApi = {
   saveLayout,
   saveSettings,
   saveTheme,
+  saveLocation,
+  loadSunSchedule,
 };
 void _implementsApi;

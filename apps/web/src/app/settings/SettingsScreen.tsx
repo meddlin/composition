@@ -50,6 +50,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
 
       <SettingsForm
         currentTheme={snapshot.theme}
+        currentCity={snapshot.city}
+        currentSunTimes={snapshot.sunTimes}
         currentAppDataDir={snapshot.appDataDir}
         currentDbPath={snapshot.dbPathOverride}
         derivedDbPathPlaceholder={snapshot.derivedDbPath}

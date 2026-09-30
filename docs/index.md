@@ -13,6 +13,8 @@ See [desktop-app-plan.md](desktop-app-plan.md) for the proposed Electron desktop
 See [product-builds.md](product-builds.md) for which database each product (CLI, web,
 desktop) uses today and is meant to use later.
 
+See [ui/web-follow-the-sun.md](ui/web-follow-the-sun.md) for the sunrise/sunset color scheme.
+
 
 ## Features
 
@@ -37,6 +39,7 @@ desktop) uses today and is meant to use later.
 - [x] Settings page for application configurations:
     - [x] Application data location
     - [x] Color scheme
+        - [x] Web: "Follow the sun" scheme that tracks a saved city's sunrise and sunset
 
 ### Editing
 

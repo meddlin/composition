@@ -5,9 +5,10 @@ import { isAllowedOrigin } from "./origin";
 /**
  * Window background per color scheme, so the very first frame matches the UI
  * instead of flashing white. Mirrors `--background` in apps/web/src/app/globals.css
- * (window.test.ts fails if they drift apart).
+ * (window.test.ts fails if they drift apart). The "auto" scheme has no entry of
+ * its own: the window starts out as whichever of dark or light it begins in.
  */
-export const THEME_BACKGROUND: Record<ThemeName, string> = {
+export const THEME_BACKGROUND: Record<Exclude<ThemeName, "auto">, string> = {
   dark: "#121212",
   light: "#f7f7f4",
   forest: "#0c1510",
@@ -27,7 +28,7 @@ export function createMainWindow(options: {
   preloadPath: string;
   entryUrl: string;
   allowedOrigins: readonly string[];
-  theme: ThemeName;
+  theme: Exclude<ThemeName, "auto">;
 }): BrowserWindow {
   const { preloadPath, entryUrl, allowedOrigins, theme } = options;
 
