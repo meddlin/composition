@@ -48,3 +48,37 @@ describe("saveLayout", () => {
     });
   });
 });
+
+describe("moveGroup", () => {
+  it("reparents a group and lets it return to the top level", async () => {
+    const { createGroup, moveGroup } = await import("./actions");
+    const a = await createGroup("A", null);
+    const b = await createGroup("B", null);
+
+    const moved = await moveGroup(b.id, a.id);
+    expect(moved.group).toMatchObject({ id: b.id, parentId: a.id });
+
+    const back = await moveGroup(b.id, null);
+    expect(back.group).toMatchObject({ id: b.id, parentId: null });
+  });
+
+  it("refuses to move a group into itself or one of its descendants", async () => {
+    const { createGroup, moveGroup } = await import("./actions");
+    const { getGroup } = await import("./groupsRepo");
+    const a = await createGroup("A", null);
+    const b = await createGroup("B", a.id);
+    const c = await createGroup("C", b.id);
+
+    expect(await moveGroup(a.id, a.id)).toEqual({ error: expect.any(String) });
+    expect(await moveGroup(a.id, c.id)).toEqual({ error: expect.any(String) });
+    expect(getGroup(a.id)?.parentId).toBeNull();
+  });
+
+  it("reports a missing group instead of throwing", async () => {
+    const { createGroup, moveGroup } = await import("./actions");
+    const a = await createGroup("A", null);
+
+    expect(await moveGroup(a.id, 999)).toEqual({ error: expect.any(String) });
+    expect(await moveGroup(999, null)).toEqual({ error: expect.any(String) });
+  });
+});

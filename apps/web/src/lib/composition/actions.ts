@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
-import { GroupNotEmptyError } from "./groupsRepo";
+import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
@@ -134,6 +134,29 @@ export async function deleteGroup(id: number): Promise<{ error?: string }> {
   }
   revalidatePath("/");
   return {};
+}
+
+/**
+ * Returns an error message instead of throwing on an invalid move (into itself
+ * or a descendant, or a group another tab deleted), so the UI can roll back its
+ * optimistic update with inline feedback.
+ */
+export async function moveGroup(
+  id: number,
+  parentId: number | null,
+): Promise<{ group?: Group; error?: string }> {
+  try {
+    groupsRepo.moveGroup(id, parentId);
+  } catch (error) {
+    if (error instanceof InvalidGroupMoveError) {
+      return { error: "That group can't be moved there." };
+    }
+    throw error;
+  }
+  revalidatePath("/");
+  const group = groupsRepo.getGroup(id);
+  if (!group) throw new Error(`Group ${id} not found`);
+  return { group };
 }
 
 export async function moveNoteToGroup(

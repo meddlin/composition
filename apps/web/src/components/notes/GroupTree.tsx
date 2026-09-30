@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { canMoveGroup } from "@/lib/composition/groupMove";
 import { GroupMenu } from "./GroupMenu";
 import { noteTitle, type Group, type Note } from "./types";
 
 // Custom MIME type so drop targets can tell a dragged note apart from any
 // other draggable content a browser might offer.
 const NOTE_DRAG_TYPE = "application/x-composition-note-id";
+const GROUP_DRAG_TYPE = "application/x-composition-group-id";
 
 type TreeProps = {
   groups: Group[];
@@ -20,6 +22,7 @@ type TreeProps = {
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
+  onMoveGroup: (id: number, parentId: number | null) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
 };
 
@@ -35,8 +38,23 @@ export function GroupTree({
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
+  onMoveGroup,
   onMoveNoteToGroup,
 }: TreeProps) {
+  // Only one group is ever being dragged; tracked here (dragover can't read the
+  // payload) so each row can tell whether it is a legal place to drop it.
+  const [draggingGroupId, setDraggingGroupId] = useState<number | null>(null);
+
+  function canDropGroupOn(parentId: number | null): boolean {
+    return draggingGroupId !== null && canMoveGroup(groups, draggingGroupId, parentId);
+  }
+
+  function dropGroup(id: number, parentId: number | null) {
+    // The moved row remounts under its new parent, so its dragend never fires.
+    setDraggingGroupId(null);
+    onMoveGroup(id, parentId);
+  }
+
   const childGroupsByParent = new Map<number | null, Group[]>();
   for (const group of groups) {
     const list = childGroupsByParent.get(group.parentId) ?? [];
@@ -64,6 +82,11 @@ export function GroupTree({
     activeId,
     viewedGroupId,
     isGroupEmpty,
+    draggingGroupId,
+    canDropGroupOn,
+    onDragGroupStart: setDraggingGroupId,
+    onDragGroupEnd: () => setDraggingGroupId(null),
+    onDropGroup: dropGroup,
     onSelectNote,
     onSelectGroup,
     onDeleteNote,
@@ -76,11 +99,18 @@ export function GroupTree({
 
   return (
     <div className="flex flex-col gap-0.5">
+      {canDropGroupOn(null) && (
+        <DropZone onDropGroup={(groupId) => dropGroup(groupId, null)}>
+          <div className="rounded-md border border-dashed border-foreground/30 px-2 py-1.5 text-center text-xs text-foreground/60">
+            Drop here to move to top level
+          </div>
+        </DropZone>
+      )}
       {(childGroupsByParent.get(null) ?? []).map((group) => (
         <GroupNode key={group.id} group={group} depth={0} {...shared} />
       ))}
 
-      <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, null)}>
+      <DropZone onDropNote={(noteId) => onMoveNoteToGroup(noteId, null)}>
         <div
           style={{ paddingLeft: "8px" }}
           className="rounded-md py-1.5 text-sm font-bold text-foreground/50"
@@ -108,6 +138,11 @@ type SharedProps = {
   activeId: number | null;
   viewedGroupId: number | null;
   isGroupEmpty: (id: number) => boolean;
+  draggingGroupId: number | null;
+  canDropGroupOn: (parentId: number | null) => boolean;
+  onDragGroupStart: (id: number) => void;
+  onDragGroupEnd: () => void;
+  onDropGroup: (id: number, parentId: number | null) => void;
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
@@ -126,6 +161,11 @@ function GroupNode({
   activeId,
   viewedGroupId,
   isGroupEmpty,
+  draggingGroupId,
+  canDropGroupOn,
+  onDragGroupStart,
+  onDragGroupEnd,
+  onDropGroup,
   onSelectNote,
   onSelectGroup,
   onDeleteNote,
@@ -156,9 +196,25 @@ function GroupNode({
           onCancel={() => setRenaming(false)}
         />
       ) : (
-        <DropZone onDrop={(noteId) => onMoveNoteToGroup(noteId, group.id)}>
+        <DropZone
+          onDropNote={(noteId) => onMoveNoteToGroup(noteId, group.id)}
+          onDropGroup={
+            canDropGroupOn(group.id)
+              ? (groupId) => onDropGroup(groupId, group.id)
+              : undefined
+          }
+        >
           <div
-            className="group/row relative flex items-center gap-1.5 rounded-md py-1.5 text-sm"
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData(GROUP_DRAG_TYPE, String(group.id));
+              e.dataTransfer.effectAllowed = "move";
+              onDragGroupStart(group.id);
+            }}
+            onDragEnd={onDragGroupEnd}
+            className={`group/row relative flex items-center gap-1.5 rounded-md py-1.5 text-sm ${
+              draggingGroupId === group.id ? "opacity-50" : ""
+            }`}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             onDoubleClick={() => setRenaming(true)}
           >
@@ -254,6 +310,11 @@ function GroupNode({
               activeId={activeId}
               viewedGroupId={viewedGroupId}
               isGroupEmpty={isGroupEmpty}
+              draggingGroupId={draggingGroupId}
+              canDropGroupOn={canDropGroupOn}
+              onDragGroupStart={onDragGroupStart}
+              onDragGroupEnd={onDragGroupEnd}
+              onDropGroup={onDropGroup}
               onSelectNote={onSelectNote}
               onSelectGroup={onSelectGroup}
               onDeleteNote={onDeleteNote}
@@ -359,28 +420,51 @@ function NoteRow({
   );
 }
 
-/** Wraps its children as an HTML5 drop target for a dragged note id. */
+/**
+ * Wraps its children as an HTML5 drop target for a dragged note and, when
+ * `onDropGroup` is given, a dragged group. Omitting it leaves group drags
+ * unhandled, so the browser shows its "not allowed" cursor.
+ */
 function DropZone({
-  onDrop,
+  onDropNote,
+  onDropGroup,
   children,
 }: {
-  onDrop: (noteId: number) => void;
+  onDropNote?: (noteId: number) => void;
+  onDropGroup?: (groupId: number) => void;
   children: ReactNode;
 }) {
   const [dragOver, setDragOver] = useState(false);
 
+  function accepts(types: readonly string[]): "note" | "group" | null {
+    if (onDropNote && types.includes(NOTE_DRAG_TYPE)) return "note";
+    if (onDropGroup && types.includes(GROUP_DRAG_TYPE)) return "group";
+    return null;
+  }
+
   return (
     <div
       onDragOver={(e) => {
+        if (!accepts(Array.from(e.dataTransfer.types))) return;
         e.preventDefault();
         setDragOver(true);
       }}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => {
-        e.preventDefault();
+      onDragLeave={(e) => {
+        // Moving onto a child of the zone also fires dragleave; ignore it.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
         setDragOver(false);
-        const id = Number(e.dataTransfer.getData(NOTE_DRAG_TYPE));
-        if (!Number.isNaN(id)) onDrop(id);
+      }}
+      onDrop={(e) => {
+        setDragOver(false);
+        const kind = accepts(Array.from(e.dataTransfer.types));
+        if (!kind) return;
+        e.preventDefault();
+        const id = Number(
+          e.dataTransfer.getData(kind === "note" ? NOTE_DRAG_TYPE : GROUP_DRAG_TYPE),
+        );
+        if (Number.isNaN(id)) return;
+        if (kind === "note") onDropNote?.(id);
+        else onDropGroup?.(id);
       }}
       className={`rounded-md ${dragOver ? "bg-foreground/10" : ""}`}
     >
