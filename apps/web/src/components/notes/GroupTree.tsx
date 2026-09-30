@@ -11,7 +11,9 @@ type TreeProps = {
   groups: Group[];
   notes: Note[];
   activeId: number | null;
+  viewedGroupId: number | null;
   onSelectNote: (id: number) => void;
+  onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
@@ -23,7 +25,9 @@ export function GroupTree({
   groups,
   notes,
   activeId,
+  viewedGroupId,
   onSelectNote,
+  onSelectGroup,
   onDeleteNote,
   onCreateGroup,
   onRenameGroup,
@@ -55,8 +59,10 @@ export function GroupTree({
     childGroupsByParent,
     notesByGroup,
     activeId,
+    viewedGroupId,
     isGroupEmpty,
     onSelectNote,
+    onSelectGroup,
     onDeleteNote,
     onCreateGroup,
     onRenameGroup,
@@ -96,8 +102,10 @@ type SharedProps = {
   childGroupsByParent: Map<number | null, Group[]>;
   notesByGroup: Map<number | null, Note[]>;
   activeId: number | null;
+  viewedGroupId: number | null;
   isGroupEmpty: (id: number) => boolean;
   onSelectNote: (id: number) => void;
+  onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
@@ -111,8 +119,10 @@ function GroupNode({
   childGroupsByParent,
   notesByGroup,
   activeId,
+  viewedGroupId,
   isGroupEmpty,
   onSelectNote,
+  onSelectGroup,
   onDeleteNote,
   onCreateGroup,
   onRenameGroup,
@@ -158,17 +168,27 @@ function GroupNode({
               <ChevronIcon expanded={!collapsed} />
             </button>
             <FolderIcon />
-            <span
-              className={`min-w-0 flex-1 truncate ${
+            <button
+              type="button"
+              onClick={() => onSelectGroup(group.id)}
+              aria-current={viewedGroupId === group.id ? "page" : undefined}
+              title={`View all notes in ${group.name}`}
+              className={`min-w-0 flex-1 truncate text-left ${
                 isTopLevel
                   ? "font-bold text-foreground"
                   : "font-medium text-foreground/80"
               }`}
             >
-              <span className="underline decoration-foreground/30 decoration-1 underline-offset-4">
+              <span
+                className={`underline decoration-1 underline-offset-4 ${
+                  viewedGroupId === group.id
+                    ? "decoration-foreground"
+                    : "decoration-foreground/30 hover:decoration-foreground/60"
+                }`}
+              >
                 {group.name}
               </span>
-            </span>
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -224,8 +244,10 @@ function GroupNode({
               childGroupsByParent={childGroupsByParent}
               notesByGroup={notesByGroup}
               activeId={activeId}
+              viewedGroupId={viewedGroupId}
               isGroupEmpty={isGroupEmpty}
               onSelectNote={onSelectNote}
+              onSelectGroup={onSelectGroup}
               onDeleteNote={onDeleteNote}
               onCreateGroup={onCreateGroup}
               onRenameGroup={onRenameGroup}

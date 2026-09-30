@@ -9,9 +9,11 @@ type Props = {
   notes: Note[];
   groups: Group[];
   activeId: number | null;
+  viewedGroupId: number | null;
   width: number;
   groupError: string | null;
   onSelect: (id: number) => void;
+  onSelectGroup: (id: number) => void;
   onCreate: () => void;
   onDelete: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
@@ -24,9 +26,11 @@ export function NoteSidebar({
   notes,
   groups,
   activeId,
+  viewedGroupId,
   width,
   groupError,
   onSelect,
+  onSelectGroup,
   onCreate,
   onDelete,
   onCreateGroup,
@@ -76,7 +80,9 @@ export function NoteSidebar({
           groups={groups}
           notes={notes}
           activeId={activeId}
+          viewedGroupId={viewedGroupId}
           onSelectNote={onSelect}
+          onSelectGroup={onSelectGroup}
           onDeleteNote={onDelete}
           onCreateGroup={onCreateGroup}
           onRenameGroup={onRenameGroup}

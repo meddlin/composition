@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { saveLayout, saveNoteContent } from "@/lib/composition/actions";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
@@ -159,5 +159,60 @@ describe("NotesApp column resizing", () => {
 
     drag(100, 140);
     expect(sidebar().style.width).toBe(`${DEFAULT_LAYOUT.sidebarWidth + 40}px`);
+  });
+});
+
+describe("NotesApp group page", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const at = "2026-01-01T00:00:00.000Z";
+  const groups = [
+    { id: 1, name: "Software Dev Docs", parentId: null, createdAt: at, updatedAt: at },
+    { id: 2, name: "Backend", parentId: 1, createdAt: at, updatedAt: at },
+  ];
+  const notes: Note[] = [
+    { ...note, id: 1, title: "Top note", groupId: 1 },
+    { ...note, id: 2, title: "Nested note", groupId: 2 },
+    { ...note, id: 3, title: "Elsewhere", groupId: null },
+  ];
+
+  function renderApp() {
+    render(<NotesApp initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+  }
+
+  it("replaces the editor with a nested listing when a group name is clicked", () => {
+    renderApp();
+    expect(screen.queryByLabelText("Markdown editor")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Software Dev Docs" }));
+
+    expect(screen.queryByLabelText("Markdown editor")).toBeNull();
+    const page = screen.getByRole("main", { name: "Group Software Dev Docs" });
+    expect(page.textContent).toContain("Top note");
+    expect(page.textContent).toContain("Backend");
+    expect(page.textContent).toContain("Nested note");
+    expect(page.textContent).not.toContain("Elsewhere");
+  });
+
+  it("opens a note in the editor when it is picked from the listing", () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Software Dev Docs" }));
+
+    fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Nested note" }));
+
+    expect(screen.queryByRole("main", { name: /^Group / })).toBeNull();
+    expect(screen.getByLabelText("Markdown editor")).toBeTruthy();
+  });
+
+  it("navigates into a sub-group from the listing", () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Software Dev Docs" }));
+
+    fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: /Backend/ }));
+
+    expect(screen.getByRole("main", { name: "Group Backend" })).toBeTruthy();
   });
 });
