@@ -13,7 +13,7 @@ import {
 import { MarkdownEditor } from "./MarkdownEditor";
 import { NoteSidebar } from "./NoteSidebar";
 import { SearchBar } from "./SearchBar";
-import type { Group, Note } from "./types";
+import { applySavedNote, type Group, type Note } from "./types";
 
 const AUTOSAVE_DELAY_MS = 500;
 
@@ -45,7 +45,7 @@ function Workspace({ initialNotes, initialGroups }: Props) {
     pendingSave.current = null;
     startTransition(async () => {
       const saved = await saveNoteContent(pending.noteId, pending.content);
-      setNotes((prev) => prev.map((n) => (n.id === saved.id ? saved : n)));
+      setNotes((prev) => applySavedNote(prev, saved));
     });
   }
 
