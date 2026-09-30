@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createGroup, createNote, deleteGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/actions";
+import { createGroup, createNote, deleteGroup, moveGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/actions";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
@@ -11,6 +11,7 @@ vi.mock("@/lib/composition/actions", () => ({
   createNote: vi.fn(),
   deleteGroup: vi.fn(),
   deleteNote: vi.fn(),
+  moveGroup: vi.fn(),
   moveNoteToGroup: vi.fn(),
   renameGroup: vi.fn(),
   saveLayout: vi.fn(),
@@ -449,5 +450,123 @@ describe("NotesApp group row menu", () => {
     // Delete is disabled for Work, so the next step wraps back to Rename.
     fireEvent.keyDown(menu, { key: "ArrowDown" });
     expect(document.activeElement).toBe(rename);
+  });
+});
+
+describe("NotesApp group drag-and-drop nesting", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const at = "2026-01-01T00:00:00.000Z";
+  // Work ─ Projects ─ Alpha, plus a separate top-level Personal.
+  const groups = [
+    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
+    { id: 2, name: "Projects", parentId: 1, createdAt: at, updatedAt: at },
+    { id: 3, name: "Alpha", parentId: 2, createdAt: at, updatedAt: at },
+    { id: 4, name: "Personal", parentId: null, createdAt: at, updatedAt: at },
+  ];
+
+  function renderApp() {
+    render(<NotesApp initialNotes={[]} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+  }
+
+  /** A minimal DataTransfer stand-in: jsdom has none. */
+  function dataTransfer() {
+    const data = new Map<string, string>();
+    return {
+      setData: (type: string, value: string) => void data.set(type, value),
+      getData: (type: string) => data.get(type) ?? "",
+      get types() {
+        return [...data.keys()];
+      },
+      effectAllowed: "all",
+    };
+  }
+
+  function rowOf(name: string): HTMLElement {
+    const row = screen.getByTitle(`View all notes in ${name}`);
+    return row.closest("[draggable]") as HTMLElement;
+  }
+
+  /** Drags `from`'s row; returns the shared dataTransfer for subsequent drops. */
+  function startDrag(from: string) {
+    const dt = dataTransfer();
+    fireEvent.dragStart(rowOf(from), { dataTransfer: dt });
+    return dt;
+  }
+
+  function dropOn(target: HTMLElement, dt: ReturnType<typeof dataTransfer>) {
+    fireEvent.dragOver(target, { dataTransfer: dt });
+    fireEvent.drop(target, { dataTransfer: dt });
+  }
+
+  it("nests a group into another group optimistically and saves it", async () => {
+    vi.mocked(moveGroup).mockResolvedValue({ group: { ...groups[3], parentId: 1 } });
+    renderApp();
+
+    const dt = startDrag("Personal");
+    await act(async () => dropOn(rowOf("Work"), dt));
+
+    expect(moveGroup).toHaveBeenCalledWith(4, 1);
+    // Personal now sits inside Work's indented branch instead of at the top level.
+    expect(rowOf("Personal").style.paddingLeft).toBe("24px");
+  });
+
+  it("does not offer a drop onto the group itself or its descendants", () => {
+    renderApp();
+    const dt = startDrag("Work");
+
+    for (const name of ["Work", "Projects", "Alpha"]) {
+      const target = rowOf(name);
+      const notPrevented = fireEvent.dragOver(target, { dataTransfer: dt });
+      // fireEvent returns false when preventDefault() was called (drop allowed).
+      expect(notPrevented).toBe(true);
+      fireEvent.drop(target, { dataTransfer: dt });
+    }
+    expect(moveGroup).not.toHaveBeenCalled();
+  });
+
+  it("moves a nested group back to the top level via the top-level drop zone", async () => {
+    vi.mocked(moveGroup).mockResolvedValue({ group: { ...groups[2], parentId: null } });
+    renderApp();
+    expect(screen.queryByText("Drop here to move to top level")).toBeNull();
+
+    const dt = startDrag("Alpha");
+    const zone = screen.getByText("Drop here to move to top level");
+    await act(async () => dropOn(zone, dt));
+
+    expect(moveGroup).toHaveBeenCalledWith(3, null);
+    expect(screen.queryByText("Drop here to move to top level")).toBeNull();
+  });
+
+  it("does not show the top-level zone when dragging an already top-level group", () => {
+    renderApp();
+    startDrag("Personal");
+
+    expect(screen.queryByText("Drop here to move to top level")).toBeNull();
+  });
+
+  it("rolls back and shows the error when the server refuses the move", async () => {
+    vi.mocked(moveGroup).mockResolvedValue({ error: "That group can't be moved there." });
+    renderApp();
+
+    const dt = startDrag("Personal");
+    await act(async () => dropOn(rowOf("Work"), dt));
+
+    expect(screen.getByText("That group can't be moved there.")).toBeTruthy();
+    expect(rowOf("Personal").style.paddingLeft).toBe("8px");
+  });
+
+  it("does not accept a dragged note on the top-level zone", () => {
+    renderApp();
+    const dt = dataTransfer();
+    dt.setData("application/x-composition-note-id", "1");
+
+    fireEvent.dragStart(rowOf("Alpha"), { dataTransfer: dataTransfer() });
+    const zone = screen.getByText("Drop here to move to top level");
+    // true = default not prevented = drop refused.
+    expect(fireEvent.dragOver(zone, { dataTransfer: dt })).toBe(true);
   });
 });

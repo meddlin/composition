@@ -6,10 +6,12 @@ import {
   createNote,
   deleteGroup as deleteGroupAction,
   deleteNote,
+  moveGroup as moveGroupAction,
   moveNoteToGroup as moveNoteToGroupAction,
   renameGroup as renameGroupAction,
   saveNoteContent,
 } from "@/lib/composition/actions";
+import { canMoveGroup } from "@/lib/composition/groupMove";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { GroupPage } from "./GroupPage";
 import { MarkdownEditor } from "./MarkdownEditor";
@@ -133,6 +135,25 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
     });
   }
 
+  function moveGroup(id: number, parentId: number | null) {
+    if (!canMoveGroup(groups, id, parentId)) return;
+    setGroupError(null);
+    const previousParentId = groups.find((g) => g.id === id)?.parentId ?? null;
+    setGroups((prev) => prev.map((g) => (g.id === id ? { ...g, parentId } : g)));
+    startTransition(async () => {
+      const result = await moveGroupAction(id, parentId);
+      if (result.group) {
+        const saved = result.group;
+        setGroups((prev) => prev.map((g) => (g.id === saved.id ? saved : g)));
+        return;
+      }
+      setGroups((prev) =>
+        prev.map((g) => (g.id === id ? { ...g, parentId: previousParentId } : g)),
+      );
+      if (result.error) setGroupError(result.error);
+    });
+  }
+
   function moveNoteToGroup(noteId: number, groupId: number | null) {
     setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, groupId } : n)));
     startTransition(async () => {
@@ -161,6 +182,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
           onCreateGroup={createGroup}
           onRenameGroup={renameGroup}
           onDeleteGroup={deleteGroup}
+          onMoveGroup={moveGroup}
           onMoveNoteToGroup={moveNoteToGroup}
         />
         <ResizeHandle

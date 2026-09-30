@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { wouldCreateCycle } from "./groupMove";
 
 export type Group = {
   id: number;
@@ -17,6 +18,8 @@ type GroupRow = {
 };
 
 export class GroupNotEmptyError extends Error {}
+
+export class InvalidGroupMoveError extends Error {}
 
 function fromRow(row: GroupRow): Group {
   return {
@@ -60,6 +63,22 @@ export function renameGroup(id: number, name: string): void {
   getDb()
     .prepare("UPDATE groups SET name = ?, updated_at = ? WHERE id = ?")
     .run(name, nowIso(), id);
+}
+
+/** Reparents a group (`null` = top level); refuses to create a loop in the hierarchy. */
+export function moveGroup(id: number, parentId: number | null): void {
+  if (!getGroup(id)) throw new InvalidGroupMoveError(`Group ${id} not found.`);
+  if (parentId !== null && !getGroup(parentId)) {
+    throw new InvalidGroupMoveError(`Group ${parentId} not found.`);
+  }
+  if (wouldCreateCycle(listGroups(), id, parentId)) {
+    throw new InvalidGroupMoveError(
+      `Group ${id} cannot be moved into itself or one of its sub-groups.`,
+    );
+  }
+  getDb()
+    .prepare("UPDATE groups SET parent_id = ?, updated_at = ? WHERE id = ?")
+    .run(parentId, nowIso(), id);
 }
 
 /** Whether a group has no sub-groups and no notes directly in it. */
