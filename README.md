@@ -29,4 +29,16 @@ pnpm install
 pnpm dev
 ```
 
+## Testing
+
+Run from the repo root (requires [uv](https://docs.astral.sh/uv/) and pnpm, with each app's dependencies installed):
+
+```bash
+pnpm test        # CLI (pytest) + web (vitest)
+pnpm test:cli
+pnpm test:web
+```
+
+The same `pnpm test` runs on every pull request via `.github/workflows/unit-tests.yml`.
+
 See each app's README for details.
