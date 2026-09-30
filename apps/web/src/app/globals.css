@@ -1,23 +1,94 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * Color schemes, selected in Settings and applied as `data-theme` on <html>
+ * (see app/layout.tsx). Palettes mirror the CLI's themes.py:
+ * dark = textual-dark, light = composition-light, forest = composition-forest.
+ */
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #121212;
+  --foreground: #e0e0e0;
+  --surface: #1e1e1e;
+  --panel: #1b2730;
+  --primary: #0178d4;
+  --secondary: #004578;
+  --accent: #ffa62b;
+  --warning: #ffa62b;
+  --error: #ba3c5b;
+  --success: #4ebf71;
+  /* Text-safe variants for small text on --background (contrast). */
+  --link: #4aa3e8;
 }
+
+[data-theme="light"] {
+  color-scheme: light;
+  --background: #f7f7f4;
+  --foreground: #24292f;
+  --surface: #edede8;
+  --panel: #e2e2db;
+  --primary: #0b62d6;
+  --secondary: #5b6b7f;
+  --accent: #c2570c;
+  --warning: #b7791f;
+  --error: #c4314b;
+  --success: #1a7f4b;
+  --link: #0b62d6;
+}
+
+[data-theme="forest"] {
+  color-scheme: dark;
+  --background: #0c1510;
+  --foreground: #d5e5da;
+  --surface: #132019;
+  --panel: #1a2c22;
+  --primary: #3fb876;
+  --secondary: #2e7d57;
+  --accent: #e3b341;
+  --warning: #e0a030;
+  --error: #d9596b;
+  --success: #7bd88f;
+  --link: #3fb876;
+}
+
+/* `dark:` utilities follow the selected scheme, not the OS setting. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-panel: var(--panel);
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Rendered markdown follows the scheme instead of prose's fixed palettes. */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: color-mix(in srgb, var(--foreground) 70%, transparent);
+  --tw-prose-links: var(--link);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: color-mix(in srgb, var(--foreground) 60%, transparent);
+  --tw-prose-bullets: color-mix(in srgb, var(--foreground) 40%, transparent);
+  --tw-prose-hr: color-mix(in srgb, var(--foreground) 15%, transparent);
+  --tw-prose-quotes: var(--foreground);
+  --tw-prose-quote-borders: color-mix(in srgb, var(--foreground) 20%, transparent);
+  --tw-prose-captions: color-mix(in srgb, var(--foreground) 60%, transparent);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--surface);
+  --tw-prose-th-borders: color-mix(in srgb, var(--foreground) 25%, transparent);
+  --tw-prose-td-borders: color-mix(in srgb, var(--foreground) 15%, transparent);
 }
 
 body {

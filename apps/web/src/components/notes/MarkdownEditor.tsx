@@ -32,7 +32,7 @@ export function MarkdownEditor({ value, onChange }: Props) {
       </section>
       <section className="flex min-h-0 flex-col border-t border-foreground/10 md:border-t-0">
         <h2 className={paneHeader}>Preview</h2>
-        <div className="prose prose-zinc max-w-none flex-1 overflow-y-auto p-4 dark:prose-invert">
+        <div className="prose max-w-none flex-1 overflow-y-auto p-4">
           {fm && <FrontmatterCard fm={fm} />}
           <Markdown remarkPlugins={[remarkGfm]}>{body}</Markdown>
         </div>

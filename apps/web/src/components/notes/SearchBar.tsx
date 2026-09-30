@@ -95,7 +95,7 @@ export function SearchBar({ onSelect }: Props) {
           className="absolute left-0 right-0 top-full z-10 mt-1 max-h-96 overflow-y-auto rounded-md border border-foreground/10 bg-background py-1 shadow-lg"
         >
           {result.error ? (
-            <li className="px-3 py-2 text-sm text-red-600 dark:text-red-400">
+            <li className="px-3 py-2 text-sm text-error">
               {result.error}
             </li>
           ) : hits.length === 0 ? (

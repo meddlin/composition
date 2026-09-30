@@ -5,7 +5,13 @@ import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { closeDb } from "@/lib/composition/db";
 import { expandHome } from "@/lib/composition/paths";
-import { resolvedDbPath, saveWebSettings, type WebSettings } from "@/lib/composition/webSettings";
+import { isThemeName } from "@/lib/composition/themes";
+import {
+  loadWebSettings,
+  resolvedDbPath,
+  saveWebSettings,
+  type WebSettings,
+} from "@/lib/composition/webSettings";
 
 export type SettingsFormState = {
   error?: string;
@@ -38,7 +44,8 @@ export async function saveSettingsAction(
     return { error: `Could not create or write to that location: ${message}` };
   }
 
-  const settings: WebSettings = dbPath ? { appDataDir, dbPath } : { appDataDir };
+  const { theme } = loadWebSettings();
+  const settings: WebSettings = dbPath ? { appDataDir, dbPath, theme } : { appDataDir, theme };
   saveWebSettings(settings);
   closeDb();
 
@@ -50,4 +57,15 @@ export async function saveSettingsAction(
     appDataDir,
     dbPath: resolvedDbPath(settings),
   };
+}
+
+export async function saveThemeAction(theme: string): Promise<{ error?: string }> {
+  if (!isThemeName(theme)) {
+    return { error: "Unknown color scheme." };
+  }
+  // Replace only the theme so an unsaved data-location edit isn't persisted.
+  saveWebSettings({ ...loadWebSettings(), theme });
+  revalidatePath("/settings");
+  revalidatePath("/");
+  return {};
 }

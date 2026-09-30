@@ -37,7 +37,7 @@ export function NoteSidebar({
   return (
     <nav
       aria-label="Notes"
-      className="flex w-64 shrink-0 flex-col border-r border-foreground/10 bg-foreground/[.03]"
+      className="flex w-64 shrink-0 flex-col border-r border-foreground/10 bg-surface"
     >
       <div className="flex flex-col gap-2 p-3">
         <button
@@ -66,7 +66,7 @@ export function NoteSidebar({
             + New group
           </button>
         )}
-        {groupError && <p className="text-xs text-red-600 dark:text-red-400">{groupError}</p>}
+        {groupError && <p className="text-xs text-error">{groupError}</p>}
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-2">
         <GroupTree
