@@ -1,0 +1,9 @@
+# pnpm 11 refuses to run dependency build scripts unless they're decided here.
+# (Electron 44 has no install script: its binary downloads on first use.)
+allowBuilds:
+  # better-sqlite3 13 ships N-API prebuilds inside its package; never compile.
+  better-sqlite3: false
+  # Windows installer helper; this app is macOS-only for now.
+  electron-winstaller: false
+  # Optional speed-up only; esbuild works without its install script.
+  esbuild: false
