@@ -7,6 +7,12 @@ flows through it.
 
 See [ui/web-groups.md](ui/web-groups.md) for how groups are managed in the web app.
 
+See [desktop-app-plan.md](desktop-app-plan.md) for the proposed Electron desktop app, and
+[desktop-app-research.md](desktop-app-research.md) for the research behind it.
+
+See [product-builds.md](product-builds.md) for which database each product (CLI, web,
+desktop) uses today and is meant to use later.
+
 
 ## Features
 
