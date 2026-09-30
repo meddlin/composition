@@ -5,6 +5,9 @@ __pycache__/
 .ruff_cache/
 *.db
 
+# Meilisearch writes ./dumps relative to its working directory by default
+dumps/
+
 # Node / Next.js
 node_modules/
 .next/

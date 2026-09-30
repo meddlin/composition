@@ -198,7 +198,13 @@ class MeiliProcessManager:
                 "(e.g. 'brew install meilisearch' on macOS), then relaunch Composition."
             )
 
+        # Everything Meilisearch writes stays under the app data directory.
+        # By default it writes ./dumps (and snapshots) relative to its working
+        # directory, which would litter wherever Composition was launched from
+        # and fails outright (os error 30) when that directory is read-only.
+        state_dir = self._data_dir.parent
         self._data_dir.mkdir(parents=True, exist_ok=True)
+        state_dir.mkdir(parents=True, exist_ok=True)
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
         master_key = _load_or_create_master_key(self._key_path)
         port = _free_port()
@@ -212,10 +218,20 @@ class MeiliProcessManager:
                 str(self._data_dir),
                 "--http-addr",
                 f"127.0.0.1:{port}",
-                "--master-key",
-                master_key,
+                "--dump-dir",
+                str(state_dir / "dumps"),
+                "--snapshot-dir",
+                str(state_dir / "snapshots"),
                 "--no-analytics",
             ],
+            cwd=state_dir,
+            # The key goes in the environment, not argv, so it isn't visible in
+            # `ps`. Production mode also turns off the built-in web dashboard.
+            env={
+                **os.environ,
+                "MEILI_MASTER_KEY": master_key,
+                "MEILI_ENV": "production",
+            },
             stdout=self._log_fh,
             stderr=subprocess.STDOUT,
         )
