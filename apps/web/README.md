@@ -1,5 +1,31 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Search
+
+The search bar at the top of the UI queries a Meilisearch index (`notes`, the same
+index the CLI uses; see [docs/architecture/search.md](../../docs/architecture/search.md)).
+The web app does not start Meilisearch itself. One command runs both it and the dev server
+(Ctrl-C stops both):
+
+```bash
+pnpm dev:all
+```
+
+Or run them separately: `pnpm meili` (Meilisearch on 127.0.0.1:7700, data in
+`~/.composition-web/meili_data`) in one terminal and `pnpm dev` in another.
+
+No `.env` file is needed for that setup. To use a different instance, set these
+(e.g. in `.env.local`) and restart `pnpm dev`; starting Meilisearch after the app is
+already running needs no restart.
+
+| Variable | Default |
+|---|---|
+| `MEILI_URL` | `http://127.0.0.1:7700` |
+| `MEILI_MASTER_KEY` | contents of `~/.composition/meili_master_key` |
+
+The first search rebuilds the index from SQLite if it is empty. If Meilisearch is
+unreachable, the search dropdown says so and editing is unaffected.
+
 ## Getting Started
 
 First, run the development server:

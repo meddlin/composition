@@ -75,6 +75,25 @@ sequenceDiagram
     Store->>Idx: delete_note(note_id)
 ```
 
+## Web app
+
+The web app ([`searchIndex.ts`](../../apps/web/src/lib/composition/searchIndex.ts),
+[`SearchBar.tsx`](../../apps/web/src/components/notes/SearchBar.tsx)) uses the same
+`notes` index, document shape and settings. It connects to the Meilisearch at
+`MEILI_URL` (default `http://127.0.0.1:7700`) with `MEILI_MASTER_KEY` or the key file
+at `~/.composition/meili_master_key`. `pnpm meili` (in `apps/web`) starts one with its
+own data dir, `~/.composition-web/meili_data`; the CLI's subprocess uses a random port
+and `~/.composition/meili_data`, so the two do not share an index (each is rebuilt from
+SQLite).
+
+- The search bar debounces typing by 350 ms (same as the CLI), then calls the
+  `searchNotes` server action, which maps hit ids back to SQLite rows. An unreachable
+  Meilisearch comes back as an `error` the dropdown shows, not as "No matches".
+- `saveNoteContent`, `createNote` and `deleteNote` push to the index best-effort:
+  failures are logged and swallowed, like `NotesStore._index`.
+- If the index has no documents, the first search rebuilds it from SQLite.
+- Only free-text search is supported so far; `tag:` / `title:` / `createdOn:` are not.
+
 Because the index is fully derived, `SearchIndex.reindex_all(notes)` can blow it away
 and rebuild it from the SQLite rows at any time — this runs once at startup (see
 [startup.md](startup.md)) and is the same mechanism `apps/cli/scripts/search_playground.py`
