@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createNote, saveLayout, saveNoteContent } from "@/lib/composition/actions";
+import { createGroup, createNote, deleteGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/actions";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
@@ -238,5 +238,216 @@ describe("NotesApp group page", () => {
     fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: /Backend/ }));
 
     expect(screen.getByRole("main", { name: "Group Backend" })).toBeTruthy();
+  });
+  describe("renaming", () => {
+    function openRenameField() {
+      renderApp();
+      fireEvent.click(screen.getByRole("button", { name: "Software Dev Docs" }));
+      fireEvent.click(screen.getByRole("button", { name: "Rename Software Dev Docs" }));
+      return screen.getByLabelText<HTMLInputElement>("Group name");
+    }
+
+    beforeEach(() => {
+      vi.mocked(renameGroup).mockImplementation(async (id, name) => ({
+        ...groups.find((g) => g.id === id)!,
+        name,
+      }));
+    });
+
+    it("renames a group from its page and updates the sidebar", async () => {
+      const input = openRenameField();
+      expect(input.value).toBe("Software Dev Docs");
+
+      fireEvent.change(input, { target: { value: "  Engineering  " } });
+      await act(async () => {
+        fireEvent.keyDown(input, { key: "Enter" });
+      });
+
+      expect(renameGroup).toHaveBeenCalledTimes(1);
+      expect(renameGroup).toHaveBeenCalledWith(1, "Engineering");
+      expect(screen.getByRole("main", { name: "Group Engineering" })).toBeTruthy();
+      expect(
+        within(screen.getByRole("navigation", { name: "Notes" })).getByRole("button", {
+          name: "Engineering",
+        }),
+      ).toBeTruthy();
+    });
+
+    it("renames a sub-group from its own page", async () => {
+      renderApp();
+      fireEvent.click(screen.getByRole("button", { name: "Software Dev Docs" }));
+      fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: /Backend/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Rename Backend" }));
+
+      const input = screen.getByLabelText("Group name");
+      fireEvent.change(input, { target: { value: "Services" } });
+      await act(async () => {
+        fireEvent.keyDown(input, { key: "Enter" });
+      });
+
+      expect(renameGroup).toHaveBeenCalledWith(2, "Services");
+    });
+
+    it("discards the edit on Escape, even if the field then blurs", () => {
+      const input = openRenameField();
+      fireEvent.change(input, { target: { value: "Nope" } });
+      fireEvent.keyDown(input, { key: "Escape" });
+      fireEvent.blur(input);
+
+      expect(renameGroup).not.toHaveBeenCalled();
+      expect(screen.getByRole("heading", { name: "Software Dev Docs" })).toBeTruthy();
+    });
+
+    it.each([["blank", "   "], ["unchanged", "Software Dev Docs"]])(
+      "does not call the server for a %s name",
+      (_label, value) => {
+        const input = openRenameField();
+        fireEvent.change(input, { target: { value } });
+        fireEvent.keyDown(input, { key: "Enter" });
+
+        expect(renameGroup).not.toHaveBeenCalled();
+        expect(screen.getByRole("heading", { name: "Software Dev Docs" })).toBeTruthy();
+      },
+    );
+
+    it("saves on blur", async () => {
+      const input = openRenameField();
+      fireEvent.change(input, { target: { value: "Docs" } });
+      await act(async () => {
+        fireEvent.blur(input);
+      });
+
+      expect(renameGroup).toHaveBeenCalledWith(1, "Docs");
+    });
+  });
+});
+
+describe("NotesApp group row menu", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const at = "2026-01-01T00:00:00.000Z";
+  const groups = [
+    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
+    { id: 2, name: "Empty", parentId: null, createdAt: at, updatedAt: at },
+  ];
+  const notes: Note[] = [{ ...note, id: 1, groupId: 1 }];
+
+  function renderApp() {
+    render(<NotesApp initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+  }
+
+  function openMenu(name: string) {
+    fireEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+    return screen.getByRole("menu");
+  }
+
+  it("replaces the per-row + group and delete buttons with a single menu", () => {
+    renderApp();
+
+    expect(screen.queryByLabelText("New sub-group inside Work")).toBeNull();
+    expect(screen.queryByLabelText("Delete Work")).toBeNull();
+    expect(screen.getByLabelText("New note in Work")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Actions for Work" })).toBeTruthy();
+  });
+
+  it("still renames a group on double-click", async () => {
+    vi.mocked(renameGroup).mockResolvedValue({ ...groups[0], name: "Jobs" });
+    renderApp();
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Work" }));
+    const input = screen.getByDisplayValue("Work");
+    fireEvent.change(input, { target: { value: "Jobs" } });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: "Enter" });
+    });
+
+    expect(renameGroup).toHaveBeenCalledWith(1, "Jobs");
+  });
+
+  it("does not start a rename when the menu button is double-clicked", () => {
+    renderApp();
+
+    fireEvent.doubleClick(screen.getByRole("button", { name: "Actions for Work" }));
+
+    expect(screen.queryByDisplayValue("Work")).toBeNull();
+  });
+
+  it("renames from the menu", () => {
+    renderApp();
+
+    fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "Rename" }));
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(screen.getByDisplayValue("Work")).toBeTruthy();
+  });
+
+  it("creates a sub-group from the menu", async () => {
+    vi.mocked(createGroup).mockResolvedValue({ id: 3, name: "Sub", parentId: 1, createdAt: at, updatedAt: at });
+    renderApp();
+
+    fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "New sub-group" }));
+    const input = screen.getByPlaceholderText("Group name");
+    fireEvent.change(input, { target: { value: "Sub" } });
+    await act(async () => {
+      fireEvent.keyDown(input, { key: "Enter" });
+    });
+
+    expect(createGroup).toHaveBeenCalledWith("Sub", 1);
+  });
+
+  it("deletes an empty group from the menu", async () => {
+    vi.mocked(deleteGroup).mockResolvedValue({});
+    renderApp();
+
+    const item = within(openMenu("Empty")).getByRole("menuitem", { name: "Delete group" });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+
+    expect(deleteGroup).toHaveBeenCalledWith(2);
+  });
+
+  it("disables delete for a group that still has notes", () => {
+    renderApp();
+
+    const del = within(openMenu("Work")).getByRole("menuitem", { name: "Delete group" });
+    expect((del as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("closes on Escape, returning focus to the menu button", () => {
+    renderApp();
+    openMenu("Work");
+
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Actions for Work" }));
+  });
+
+  it("closes when clicking elsewhere", () => {
+    renderApp();
+    openMenu("Work");
+
+    fireEvent.pointerDown(document.body);
+
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("moves focus through items with the arrow keys", () => {
+    renderApp();
+    const menu = openMenu("Work");
+    const rename = within(menu).getByRole("menuitem", { name: "Rename" });
+    const newSub = within(menu).getByRole("menuitem", { name: "New sub-group" });
+    expect(document.activeElement).toBe(rename);
+
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(newSub);
+
+    // Delete is disabled for Work, so the next step wraps back to Rename.
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(rename);
   });
 });
