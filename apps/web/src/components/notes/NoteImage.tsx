@@ -21,7 +21,7 @@ export function NoteImage({ src, alt, title }: ComponentPropsWithoutRef<"img"> &
 
   if (failedSrc === resolved) {
     return (
-      <span role="img" aria-label={alt ?? ""} className="text-foreground/50 italic">
+      <span role="img" aria-label={alt ?? ""} className="text-muted-foreground italic">
         {`Image not found: ${alt || name || src}`}
       </span>
     );

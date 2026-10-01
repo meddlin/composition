@@ -2,6 +2,10 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
+import { Button } from "@/components/ui/button";
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
   saveLocation,
@@ -105,72 +109,62 @@ export function SettingsForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <fieldset className="flex flex-col gap-2 text-sm">
-        <legend className="mb-1 font-medium">Color scheme</legend>
-        {THEME_CHOICES.map(({ name, label }) => (
-          <label key={name} className="flex w-fit cursor-pointer items-center gap-3">
-            <input
-              type="radio"
-              name="theme"
-              value={name}
-              checked={theme === name}
-              onChange={() => selectTheme(name)}
-              className="accent-primary"
-            />
-            <span>{label}</span>
-            <span aria-hidden className="flex -space-x-1">
-              {THEME_SWATCHES[name].map((color, i) => (
-                <span
-                  key={i}
-                  className="size-4 rounded-full border border-foreground/20"
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </span>
-          </label>
-        ))}
-        {themeError && (
-          <p role="alert" className="text-error">
-            {themeError}
-          </p>
-        )}
-      </fieldset>
+      <FieldSet className="gap-2 text-sm">
+        <FieldLegend variant="label">Color scheme</FieldLegend>
+        <RadioGroup
+          value={theme}
+          onValueChange={(next) => selectTheme(next as ThemeName)}
+          aria-label="Color scheme"
+          className="gap-2"
+        >
+          {THEME_CHOICES.map(({ name, label }) => (
+            <Field key={name} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={name} id={`theme-${name}`} />
+              <FieldLabel htmlFor={`theme-${name}`} className="cursor-pointer gap-3 font-normal">
+                <span>{label}</span>
+                <span aria-hidden className="flex -space-x-1">
+                  {THEME_SWATCHES[name].map((color, i) => (
+                    <span
+                      key={i}
+                      className="size-4 rounded-full border border-foreground/20"
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </span>
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+        {themeError && <FieldError>{themeError}</FieldError>}
+      </FieldSet>
 
       <form action={locationAction} className="flex flex-col gap-2 text-sm">
-        <label className="flex flex-col gap-1">
-          <span className="font-medium">City</span>
-          <span className="text-xs text-foreground/50">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="city">City</FieldLabel>
+          <FieldDescription className="text-xs">
             Sets the sunrise and sunset that &ldquo;Follow the sun&rdquo; tracks. Try{" "}
             <span className="font-mono">Austin, TX</span>.
-          </span>
-          <input
+          </FieldDescription>
+          <Input
+            id="city"
             type="text"
             name="city"
             defaultValue={locationState.query ?? currentCity}
             placeholder="Austin, TX"
             spellCheck={false}
-            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 text-sm outline-none focus:border-foreground/40"
           />
-        </label>
-        <button
-          type="submit"
-          disabled={locationPending}
-          className="w-fit rounded-md border border-foreground/20 px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/10 disabled:opacity-50"
-        >
+        </Field>
+        <Button type="submit" variant="outline" size="lg" disabled={locationPending} className="w-fit px-4">
           {locationPending ? "Looking up…" : "Save city"}
-        </button>
-        {locationState.error && (
-          <p role="alert" className="text-error">
-            {locationState.error}
-          </p>
-        )}
+        </Button>
+        {locationState.error && <FieldError>{locationState.error}</FieldError>}
         {locationState.saved && (
           <p role="status" className="text-success">
             Using {locationState.saved.name}: {formatSunTimes(locationState.saved)}.
           </p>
         )}
         {!locationState.saved && !locationState.error && currentCity && currentSunTimes && (
-          <p className="text-foreground/60">
+          <p className="text-muted-foreground">
             Using {currentCity}: {formatSunTimes(currentSunTimes)}.
           </p>
         )}
@@ -182,52 +176,46 @@ export function SettingsForm({
       </form>
 
       <form action={formAction} className="flex flex-col gap-4 text-sm">
-        <label className="flex flex-col gap-1">
-          <span className="font-medium">Application data directory</span>
-          <input
+        <Field className="gap-1">
+          <FieldLabel htmlFor="appDataDir">Application data directory</FieldLabel>
+          <Input
+            id="appDataDir"
             type="text"
             name="appDataDir"
             defaultValue={state.appDataDir ?? currentAppDataDir}
             required
             spellCheck={false}
-            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-foreground/40"
+            className="font-mono"
           />
-        </label>
+        </Field>
 
-        <label className="flex flex-col gap-1">
-          <span className="font-medium">Database file location</span>
-          <span className="text-xs text-foreground/50">
+        <Field className="gap-1">
+          <FieldLabel htmlFor="dbPath">Database file location</FieldLabel>
+          <FieldDescription className="text-xs">
             Optional — leave blank to use{" "}
             <span className="font-mono">{derivedDbPathPlaceholder}</span>
-          </span>
-          <input
+          </FieldDescription>
+          <Input
+            id="dbPath"
             type="text"
             name="dbPath"
             defaultValue={state.dbPath ?? currentDbPath}
             placeholder={derivedDbPathPlaceholder}
             spellCheck={false}
-            className="rounded-md border border-foreground/15 bg-transparent px-3 py-2 font-mono text-sm outline-none focus:border-foreground/40"
+            className="font-mono"
           />
-        </label>
+        </Field>
 
-        {state.error && (
-          <p role="alert" className="text-error">
-            {state.error}
-          </p>
-        )}
+        {state.error && <FieldError>{state.error}</FieldError>}
         {state.success && (
           <p role="status" className="text-success">
             Saved. Now reading and writing at the location above.
           </p>
         )}
 
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-fit rounded-md bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80 disabled:opacity-50"
-        >
+        <Button type="submit" size="lg" disabled={pending} className="w-fit px-4">
           {pending ? "Saving…" : "Save"}
-        </button>
+        </Button>
       </form>
     </div>
   );

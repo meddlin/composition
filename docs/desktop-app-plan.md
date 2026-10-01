@@ -267,6 +267,7 @@ a license before publishing binaries on GitHub Releases.
 |---|---|
 | Web app on the new seam | Done; web suite green, `next build` routes unchanged |
 | Desktop static renderer | Done; same UI, Tailwind and themes as the web app |
+| UI components | Done; shadcn/ui (Radix) on Tailwind v4 in `apps/web`, inherited by the desktop build; see [ui/web-components.md](ui/web-components.md) |
 | Electron shell, IPC, protocol, CSP | Done; 83 desktop unit tests |
 | Bundled Meilisearch lifecycle | Done (start, health, stop, orphan cleanup, unexpected-exit message) |
 | Unsigned packaged app | Verified end to end with `pnpm package && SMOKE_EXECUTABLE=... pnpm smoke` |
@@ -286,8 +287,3 @@ a license before publishing binaries on GitHub Releases.
   `collect-licenses.mjs` warns until it exists.
 - **Running `pnpm fetch:meilisearch`** for the real, checksum-verified release binaries
   (about 116 MiB per architecture) before the first packaged release.
-- **The UI component library: decided, nothing to do now.** The web UI is Tailwind v4 with
-  hand-written components, not shadcn/ui, and it stays that way for now. The desktop app reuses
-  it unchanged, so the two look identical. shadcn/ui can be adopted later as a change to
-  `apps/web` that the desktop build then inherits (its tokens would need mapping onto the
-  existing theme so the look doesn't change).

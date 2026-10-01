@@ -183,7 +183,8 @@ describe("NotesApp group note creation", () => {
     vi.mocked(createNote).mockResolvedValue({ ...note, id: 2 });
     render(<NotesApp initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
 
-    const emptyState = screen.getByText("No notes yet.").parentElement as HTMLElement;
+    // Scoped to the empty state: the sidebar has a "+ New note" button of its own.
+    const emptyState = screen.getByText("No notes yet.").closest("[data-slot=empty]") as HTMLElement;
     await act(async () => {
       fireEvent.click(within(emptyState).getByText("+ New note"));
     });
@@ -354,10 +355,16 @@ describe("NotesApp group row menu", () => {
     render(<NotesApp initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
   }
 
+  const trigger = (name: string) => screen.getByRole("button", { name: `Actions for ${name}` });
+
+  /** Radix opens its menu on a left-button pointerdown, not on click. */
   function openMenu(name: string) {
-    fireEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+    fireEvent.pointerDown(trigger(name), { button: 0, ctrlKey: false });
     return screen.getByRole("menu");
   }
+
+  /** Lets timers Radix schedules on open and close (outside-click arming, focus return) run. */
+  const settle = () => act(() => new Promise<void>((resolve) => setTimeout(resolve, 0)));
 
   it("replaces the per-row + group and delete buttons with a single menu", () => {
     renderApp();
@@ -385,15 +392,26 @@ describe("NotesApp group row menu", () => {
   it("does not start a rename when the menu button is double-clicked", () => {
     renderApp();
 
-    fireEvent.doubleClick(screen.getByRole("button", { name: "Actions for Work" }));
+    fireEvent.doubleClick(trigger("Work"));
 
     expect(screen.queryByDisplayValue("Work")).toBeNull();
   });
 
-  it("renames from the menu", () => {
+  it("does not start a rename when a menu item is double-clicked", async () => {
+    renderApp();
+
+    // Disabled, so the double-click can't also act on the item; it must still not reach the row.
+    fireEvent.doubleClick(within(openMenu("Work")).getByRole("menuitem", { name: "Delete group" }));
+    await settle();
+
+    expect(screen.queryByDisplayValue("Work")).toBeNull();
+  });
+
+  it("renames from the menu", async () => {
     renderApp();
 
     fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "Rename" }));
+    await settle();
 
     expect(screen.queryByRole("menu")).toBeNull();
     expect(screen.getByDisplayValue("Work")).toBeTruthy();
@@ -413,6 +431,17 @@ describe("NotesApp group row menu", () => {
     expect(createGroup).toHaveBeenCalledWith("Sub", 1);
   });
 
+  it("leaves the new sub-group field focused once the menu has closed", async () => {
+    renderApp();
+
+    fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "New sub-group" }));
+    await settle();
+
+    // If focus went back to the menu button, the field would blur and cancel itself.
+    const input = screen.getByPlaceholderText("Group name");
+    expect(document.activeElement).toBe(input);
+  });
+
   it("deletes an empty group from the menu", async () => {
     vi.mocked(deleteGroup).mockResolvedValue({});
     renderApp();
@@ -425,44 +454,59 @@ describe("NotesApp group row menu", () => {
     expect(deleteGroup).toHaveBeenCalledWith(2);
   });
 
-  it("disables delete for a group that still has notes", () => {
+  it("disables delete for a group that still has notes", async () => {
     renderApp();
 
     const del = within(openMenu("Work")).getByRole("menuitem", { name: "Delete group" });
-    expect((del as HTMLButtonElement).disabled).toBe(true);
+    expect(del.getAttribute("aria-disabled")).toBe("true");
+
+    fireEvent.click(del);
+    await settle();
+    expect(deleteGroup).not.toHaveBeenCalled();
   });
 
-  it("closes on Escape, returning focus to the menu button", () => {
+  it("closes on Escape, returning focus to the menu button", async () => {
     renderApp();
     openMenu("Work");
 
     fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await settle();
 
     expect(screen.queryByRole("menu")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Actions for Work" }));
+    expect(document.activeElement).toBe(trigger("Work"));
   });
 
-  it("closes when clicking elsewhere", () => {
+  it("closes when clicking elsewhere", async () => {
     renderApp();
     openMenu("Work");
+    await settle();
 
     fireEvent.pointerDown(document.body);
+    await settle();
 
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("moves focus through items with the arrow keys", () => {
+  it("moves focus through items with the arrow keys, wrapping past the disabled one", async () => {
     renderApp();
     const menu = openMenu("Work");
+    await settle();
     const rename = within(menu).getByRole("menuitem", { name: "Rename" });
     const newSub = within(menu).getByRole("menuitem", { name: "New sub-group" });
+
+    // Opened by pointer, focus starts on the menu itself; the first arrow enters the items.
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    await settle();
     expect(document.activeElement).toBe(rename);
 
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    // Radix moves focus between items on a timer, hence the settling.
+    fireEvent.keyDown(rename, { key: "ArrowDown" });
+    await settle();
     expect(document.activeElement).toBe(newSub);
 
     // Delete is disabled for Work, so the next step wraps back to Rename.
-    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    fireEvent.keyDown(newSub, { key: "ArrowDown" });
+    await settle();
     expect(document.activeElement).toBe(rename);
   });
 });

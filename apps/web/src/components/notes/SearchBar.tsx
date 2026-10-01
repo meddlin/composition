@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { searchNotes, type SearchHit, type SearchResult } from "@/lib/composition/client";
+import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export const SEARCH_DEBOUNCE_MS = 350;
@@ -71,7 +73,7 @@ export function SearchBar({ onSelect }: Props) {
 
   return (
     <div ref={containerRef} className="relative mx-auto w-full max-w-xl">
-      <input
+      <Input
         type="search"
         value={query}
         onChange={(e) => {
@@ -86,20 +88,20 @@ export function SearchBar({ onSelect }: Props) {
         aria-expanded={showDropdown}
         aria-controls={listboxId}
         aria-autocomplete="list"
-        className="w-full rounded-md border border-foreground/15 bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-foreground/40 focus:border-foreground/40 focus:outline-none"
+        className="bg-background px-3"
       />
       {showDropdown && (
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-10 mt-1 max-h-96 overflow-y-auto rounded-md border border-foreground/10 bg-background py-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-10 mt-1 max-h-96 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
         >
           {result.error ? (
-            <li className="px-3 py-2 text-sm text-error">
+            <li className="px-3 py-2 text-sm text-destructive">
               {result.error}
             </li>
           ) : hits.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-foreground/60">No matches</li>
+            <li className="px-3 py-2 text-sm text-muted-foreground">No matches</li>
           ) : (
             hits.map((hit, i) => (
               <li
@@ -108,15 +110,16 @@ export function SearchBar({ onSelect }: Props) {
                 aria-selected={i === highlighted}
                 onMouseEnter={() => setHighlighted(i)}
                 onClick={() => choose(hit)}
-                className={`cursor-pointer px-3 py-2 text-sm ${
-                  i === highlighted ? "bg-foreground/6" : ""
-                }`}
+                className={cn(
+                  "cursor-pointer rounded-md px-3 py-2 text-sm",
+                  i === highlighted && "bg-accent text-accent-foreground",
+                )}
               >
-                <div className="truncate font-medium text-foreground">
+                <div className="truncate font-medium">
                   {hit.title || "Untitled"}
                 </div>
                 {hit.description && (
-                  <div className="truncate text-xs text-foreground/60">
+                  <div className="truncate text-xs text-muted-foreground">
                     {hit.description}
                   </div>
                 )}

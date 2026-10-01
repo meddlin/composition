@@ -1,9 +1,12 @@
+import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import remarkGfm from "remark-gfm";
+import { Button } from "@/components/ui/button";
 import { docHref, listDocs, readDoc, resolveDocLink } from "@/lib/composition/docs";
+import { cn } from "@/lib/utils";
 
 // Reads the docs directory from local disk on each request, so edits show up
 // without a rebuild (see the note in app/page.tsx).
@@ -18,31 +21,39 @@ export default async function DocsPage({ params }: { params: Promise<{ slug?: st
   return (
     <div className="flex min-h-screen">
       <nav aria-label="Docs" className="w-64 shrink-0 bg-surface p-4">
-        <Link href="/" className="text-sm text-foreground/60 hover:text-foreground">
-          ← Back to notes
-        </Link>
-        <h1 className="mt-4 mb-2 text-xs font-medium uppercase tracking-wide text-foreground/50">
+        <Button asChild variant="ghost" size="sm" className="-ml-2 text-muted-foreground hover:text-foreground">
+          <Link href="/">
+            <ArrowLeftIcon /> Back to notes
+          </Link>
+        </Button>
+        <h1 className="mt-4 mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Docs
         </h1>
         <ul className="flex flex-col gap-0.5">
-          {docs.map((entry) => (
-            <li key={entry.relPath}>
-              <Link
-                href={docHref(entry)}
-                aria-current={entry.relPath === doc.entry.relPath ? "page" : undefined}
-                className={`block rounded-md px-2 py-1.5 text-sm hover:bg-foreground/5 ${
-                  entry.relPath === doc.entry.relPath ? "bg-foreground/10 font-medium" : ""
-                }`}
-              >
-                {entry.title}
-                {entry.slug.length > 1 && (
-                  <span className="block text-xs font-normal text-foreground/50">
-                    {entry.slug.slice(0, -1).join(" / ")}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
+          {docs.map((entry) => {
+            const current = entry.relPath === doc.entry.relPath;
+            return (
+              <li key={entry.relPath}>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className={cn(
+                    "h-auto w-full flex-col items-start gap-0 px-2 py-1.5 text-left whitespace-normal",
+                    current && "bg-accent font-medium",
+                  )}
+                >
+                  <Link href={docHref(entry)} aria-current={current ? "page" : undefined}>
+                    {entry.title}
+                    {entry.slug.length > 1 && (
+                      <span className="block text-xs font-normal text-muted-foreground">
+                        {entry.slug.slice(0, -1).join(" / ")}
+                      </span>
+                    )}
+                  </Link>
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       </nav>
       <main className="min-w-0 flex-1 overflow-y-auto p-8">

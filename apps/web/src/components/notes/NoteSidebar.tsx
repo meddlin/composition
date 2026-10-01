@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { GroupTree, InlineTextInput } from "./GroupTree";
 import { NAV_LINKS } from "./navLinks";
 import type { Group, Note } from "./types";
@@ -66,14 +69,11 @@ export function NoteSidebar({
           onMoveNoteToGroup={onMoveNoteToGroup}
         />
       </div>
-      <div className="flex flex-col gap-2 border-t border-foreground/10 p-3">
-        <button
-          type="button"
-          onClick={() => onCreate(null)}
-          className="w-full rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
-        >
+      <Separator />
+      <div className="flex flex-col gap-2 p-3">
+        <Button size="lg" className="w-full" onClick={() => onCreate(null)}>
           + New note
-        </button>
+        </Button>
         {addingGroup ? (
           <InlineTextInput
             depth={0}
@@ -85,25 +85,28 @@ export function NoteSidebar({
             onCancel={() => setAddingGroup(false)}
           />
         ) : (
-          <button
-            type="button"
-            onClick={() => setAddingGroup(true)}
-            className="w-full rounded-md border border-foreground/15 px-3 py-2 text-sm font-medium text-foreground/70 transition-colors hover:bg-foreground/5"
-          >
+          <Button variant="outline" size="lg" className="w-full" onClick={() => setAddingGroup(true)}>
             + New group
-          </button>
+          </Button>
         )}
-        {groupError && <p className="text-xs text-error">{groupError}</p>}
+        {groupError && (
+          <Alert variant="destructive">
+            <AlertDescription className="text-xs text-destructive">{groupError}</AlertDescription>
+          </Alert>
+        )}
       </div>
-      <div className="flex flex-col gap-1 border-t border-foreground/10 p-3">
+      <Separator />
+      <div className="flex flex-col gap-1 p-3">
         {NAV_LINKS.map(({ href, label }) => (
-          <Link
+          <Button
             key={href}
-            href={href}
-            className="block rounded-md px-3 py-2 text-sm text-foreground/60 hover:bg-foreground/5 hover:text-foreground"
+            asChild
+            variant="ghost"
+            size="lg"
+            className="justify-start px-3 text-muted-foreground hover:text-foreground"
           >
-            {label}
-          </Link>
+            <Link href={href}>{label}</Link>
+          </Button>
         ))}
       </div>
     </nav>

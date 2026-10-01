@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 
 // Full class names, so Tailwind can see them at build time.
+// `brand`, not `primary`: shadcn's `primary` is the inverted foreground, and the scheme's blue is `brand`.
 const tones = {
-  info: { box: "border-primary/30 bg-primary/10", icon: "text-primary" },
+  info: { box: "border-brand/30 bg-brand/10", icon: "text-brand" },
   warning: { box: "border-warning/40 bg-warning/10", icon: "text-warning" },
 } as const;
 
