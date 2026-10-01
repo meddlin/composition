@@ -79,7 +79,7 @@ async function main(): Promise<void> {
 
   await app.whenReady();
 
-  registerAppProtocol(path.join(__dirname, "renderer"));
+  registerAppProtocol(path.join(__dirname, "renderer"), service.readImage);
   registerIpc({
     ipcMain,
     api,

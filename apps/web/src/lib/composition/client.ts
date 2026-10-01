@@ -21,6 +21,7 @@ export {
   moveGroup,
   moveNoteToGroup,
   renameGroup,
+  saveImage,
   saveLayout,
   saveLocation,
   saveNoteContent,
@@ -30,6 +31,8 @@ export {
 } from "./actions";
 export type {
   MoveGroupResult,
+  SaveImageInput,
+  SaveImageResult,
   SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,

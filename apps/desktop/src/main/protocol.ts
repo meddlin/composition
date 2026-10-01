@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import { protocol } from "electron";
+import { IMAGE_DIR_NAME, imageNameFromRef } from "../../../web/src/lib/composition/imageRefs";
+import { IMAGE_RESPONSE_HEADERS, type StoredImage } from "../../../web/src/lib/composition/images";
 import { mimeTypeFor, resolveRendererFile } from "./rendererFiles";
 
 export const APP_SCHEME = "app";
@@ -38,8 +40,16 @@ export function registerSchemePrivileges(): void {
   ]);
 }
 
-/** Serves the exported renderer from `rendererRoot` at app://composition/. */
-export function registerAppProtocol(rendererRoot: string): void {
+/**
+ * Serves the exported renderer from `rendererRoot` at app://composition/, and
+ * images pasted into notes at app://composition/app_data/<name> (what a note's
+ * `![](app_data/<name>)` resolves to; see imageUrl.desktop.ts). `readImage`
+ * looks in whichever application data directory is configured at the time.
+ */
+export function registerAppProtocol(
+  rendererRoot: string,
+  readImage: (name: string) => Promise<StoredImage | null>,
+): void {
   const isFile = (file: string) => {
     try {
       return fs.statSync(file).isFile();
@@ -58,6 +68,16 @@ export function registerAppProtocol(rendererRoot: string): void {
       return new Response("Method not allowed", { status: 405 });
     }
     const url = new URL(request.url);
+
+    if (url.host === APP_HOST && url.pathname.startsWith(`/${IMAGE_DIR_NAME}/`)) {
+      const name = imageNameFromRef(url.pathname.slice(1));
+      const image = name ? await readImage(name) : null;
+      if (!image) return new Response("Not found", { status: 404 });
+      return new Response(new Uint8Array(image.data), {
+        headers: { "content-type": image.contentType, ...IMAGE_RESPONSE_HEADERS },
+      });
+    }
+
     const file = url.host === APP_HOST ? resolveRendererFile(rendererRoot, url.pathname, isFile) : null;
 
     if (!file) {

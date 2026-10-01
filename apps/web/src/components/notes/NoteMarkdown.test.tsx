@@ -69,7 +69,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],
@@ -92,5 +92,32 @@ describe("NoteMarkdown", () => {
 
     expect(screen.queryByRole("alert")).toBeNull();
     expect(screen.getByRole("note", { name: "Info" }).textContent).toBe("finished");
+  });
+
+  it("renders <Image> like Markdown's image syntax, resolving app_data paths", () => {
+    renderNote('<Image src="app_data/trip-map-0123456789ab.png" alt="Route map" />');
+
+    const img = screen.getByAltText("Route map");
+    expect(img.getAttribute("src")).toBe("/app_data/trip-map-0123456789ab.png");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("renders <Image> inline with text, and an external src as written", () => {
+    renderNote('See <Image src="https://example.com/a.png" alt="logo" /> here.');
+
+    expect(screen.getByAltText("logo").getAttribute("src")).toBe("https://example.com/a.png");
+  });
+
+  it("still renders Markdown images in a note that also uses components", () => {
+    renderNote("<Info>\n\nfyi\n\n</Info>\n\n![shot](app_data/a-0123456789ab.png)");
+
+    expect(screen.getByAltText("shot").getAttribute("src")).toBe("/app_data/a-0123456789ab.png");
+    expect(screen.getByRole("note", { name: "Info" })).toBeDefined();
+  });
+
+  it("rejects an <Image> whose src is an expression, like any other prop", () => {
+    renderNote("<Image src={url} alt='x' />");
+
+    expect(screen.getByRole("alert").textContent).toMatch(/expressions/);
   });
 });

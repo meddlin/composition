@@ -3,7 +3,7 @@
 Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.tsx),
 [`mdx/`](../../apps/web/src/components/notes/mdx/)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer.
 
 ## `<Info>`
@@ -38,6 +38,18 @@ This **deletes** every note in the group.
 ```
 
 Its colors come from the active theme's `--warning`.
+
+## `<Image>`
+
+An image, as a tag instead of Markdown's `![alt](src)`. Both render the same way, and pasting an
+image into the editor inserts the Markdown form:
+
+```mdx
+<Image src="app_data/trip-plan-route-map-3f9c2a71b0de.png" alt="Route map" />
+```
+
+`src` and `alt` are plain strings (an `{expression}` is rejected, like for any component).
+See [images.md](../architecture/images.md) for where pasted images live and how `app_data/` paths resolve.
 
 ## How it renders
 

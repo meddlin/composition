@@ -4,11 +4,15 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
+import { markdownComponents } from "./NoteImage";
 
 type Props = {
   body: string;
   rehypePlugins: NonNullable<Options["rehypePlugins"]>;
 };
+
+// Markdown's own elements that get a custom rendering (images), kept alongside the MDX tags.
+const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 
 const mdxRemarkPlugins: NonNullable<Options["remarkPlugins"]> = [
   remarkGfm,
@@ -23,11 +27,15 @@ const mdxRehypeOptions: NonNullable<Options["remarkRehypeOptions"]> = {
 };
 
 /**
- * A note's rendered preview: Markdown, plus the MDX components in
- * `mdxComponents` for notes that use any of them.
+ * A note's rendered preview: Markdown (with images shown by `NoteImage`), plus
+ * the MDX components in `mdxComponents` for notes that use any of them.
  */
 export function NoteMarkdown({ body, rehypePlugins }: Props) {
-  const plain = <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins}>{body}</Markdown>;
+  const plain = (
+    <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins} components={markdownComponents}>
+      {body}
+    </Markdown>
+  );
   if (!usesMdxComponent(body)) return plain;
 
   return (
@@ -36,7 +44,7 @@ export function NoteMarkdown({ body, rehypePlugins }: Props) {
         remarkPlugins={mdxRemarkPlugins}
         remarkRehypeOptions={mdxRehypeOptions}
         rehypePlugins={rehypePlugins}
-        components={mdxComponentsByKey}
+        components={noteComponents}
       >
         {body}
       </Markdown>

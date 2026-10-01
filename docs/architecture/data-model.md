@@ -13,7 +13,9 @@ database file inside the configured application data directory:
 ```
 
 A note's Markdown content — including its embedded YAML frontmatter — is a single
-`TEXT` column in that database. The Meilisearch data directory (`meili_data/`), its
+`TEXT` column in that database. Images pasted into a note in the web and desktop apps
+are the exception: they are files in an `app_data/` folder beside the database, and the
+note's Markdown refers to them by path (see [images.md](images.md)). The Meilisearch data directory (`meili_data/`), its
 log/master-key files, and `settings.yaml` live alongside it. The search index is
 derived data, not a second source of truth for the notes.
 

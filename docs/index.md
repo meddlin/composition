@@ -30,9 +30,10 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
     - [] Support tags on notes, allow searching for notes via tags
 - [x] Support note groups
     - [] Support filtering the list of notes by groups (a dedicated `group:` search token)
-- [] Image display support in Markdown content
-    - Allow users to "upload" images directly into a note
-    - Show the image in a rendered version of the note
+- [x] Image display support in Markdown content (web and desktop; see [architecture/images.md](architecture/images.md))
+    - [x] Allow users to "upload" images directly into a note (paste)
+    - [x] Show the image in a rendered version of the note
+    - [] CLI support
 - [] Support cross-linking between files
     - I want to be able to link in one note file, to another one within the database
 

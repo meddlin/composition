@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Components } from "react-markdown";
+import { Image } from "./Image";
 import { Info } from "./Info";
 import { renderKey } from "./remarkRestrictMdx";
 import { Warning } from "./Warning";
@@ -9,7 +10,10 @@ import { Warning } from "./Warning";
  * allowlist: any other tag is rejected (see remarkRestrictMdx), so adding a
  * component here is all it takes to make it available in a note.
  */
-export const mdxComponents: Record<string, ComponentType<{ children?: ReactNode }>> = { Info, Warning };
+export const mdxComponents: Record<
+  string,
+  ComponentType<{ children?: ReactNode; src?: string; alt?: string; title?: string }>
+> = { Info, Warning, Image };
 
 const names = Object.keys(mdxComponents);
 
