@@ -279,6 +279,7 @@ describe("MarkdownEditor component completion", () => {
       expect.stringContaining("<Info>"),
       expect.stringContaining("<Warning>"),
       expect.stringContaining("<Image>"),
+      expect.stringContaining("<Toc>"),
     ]);
   });
 
@@ -344,8 +345,8 @@ describe("MarkdownEditor component completion", () => {
     key("ArrowUp");
     key("Enter");
 
-    expect(editor().value).toBe('<Image src="" alt="" />');
-    expect(editor().selectionStart).toBe('<Image src="'.length);
+    expect(editor().value).toBe("<Toc />");
+    expect(editor().selectionStart).toBe("<Toc />".length);
   });
 
   it("inserts a component picked with the mouse", () => {

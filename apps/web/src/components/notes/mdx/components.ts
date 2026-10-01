@@ -3,6 +3,7 @@ import type { Components } from "react-markdown";
 import { Image } from "./Image";
 import { Info } from "./Info";
 import { renderKey } from "./remarkRestrictMdx";
+import { Toc } from "./Toc";
 import { Warning } from "./Warning";
 
 /**
@@ -12,8 +13,15 @@ import { Warning } from "./Warning";
  */
 export const mdxComponents: Record<
   string,
-  ComponentType<{ children?: ReactNode; src?: string; alt?: string; title?: string }>
-> = { Info, Warning, Image };
+  ComponentType<{
+    children?: ReactNode;
+    src?: string;
+    alt?: string;
+    title?: string;
+    headings?: string;
+    maxDepth?: string;
+  }>
+> = { Info, Warning, Image, Toc };
 
 const names = Object.keys(mdxComponents);
 
