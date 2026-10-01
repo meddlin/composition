@@ -18,6 +18,8 @@ See [desktop-build-and-release.md](desktop-build-and-release.md) for the step-by
 See [product-builds.md](product-builds.md) for which database each product (CLI, web,
 desktop) uses today and is meant to use later.
 
+See [feature-matrix.md](feature-matrix.md) for where the CLI, web and desktop apps differ.
+
 See [ui/web-follow-the-sun.md](ui/web-follow-the-sun.md) for the sunrise/sunset color scheme.
 
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
