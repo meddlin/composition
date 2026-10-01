@@ -21,6 +21,7 @@ export {
   moveGroup,
   moveNoteToGroup,
   renameGroup,
+  saveFavorites,
   saveImage,
   saveLayout,
   saveLocation,

@@ -47,7 +47,18 @@ describe("saveSettings", () => {
       theme: "forest",
       sidebarWidth: 320,
       editorRatio: 0.3,
+      favorites: [],
     });
+  });
+
+  it("keeps the favorites when the data location is saved", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), favorites: [{ type: "group", id: 3 }] });
+    const { saveSettings } = await import("./service");
+
+    await saveSettings({ appDataDir: path.join(home, "notes"), dbPath: "" });
+
+    expect(loadWebSettings().favorites).toEqual([{ type: "group", id: 3 }]);
   });
 
   it("drops a previously stored dbPath when the field is cleared", async () => {
@@ -66,6 +77,33 @@ describe("saveSettings", () => {
     const result = await saveSettings({ appDataDir: "   ", dbPath: "" });
 
     expect(result).toEqual({ error: "Application data directory is required." });
+  });
+});
+
+describe("saveFavorites", () => {
+  it("stores the pinned list, leaves other settings alone and hands it back with the workspace", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "forest" });
+    const { saveFavorites, loadWorkspace } = await import("./service");
+
+    await saveFavorites([
+      { type: "note", id: 2 },
+      { type: "group", id: 1 },
+    ]);
+
+    expect(loadWebSettings().theme).toBe("forest");
+    expect((await loadWorkspace()).favorites).toEqual([
+      { type: "note", id: 2 },
+      { type: "group", id: 1 },
+    ]);
+  });
+
+  it("discards malformed entries rather than trusting the caller", async () => {
+    const { saveFavorites, loadWorkspace } = await import("./service");
+
+    await saveFavorites([{ type: "note", id: 2 }, { type: "bogus", id: 1 }] as never);
+
+    expect((await loadWorkspace()).favorites).toEqual([{ type: "note", id: 2 }]);
   });
 });
 

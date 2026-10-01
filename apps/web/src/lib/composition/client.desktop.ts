@@ -36,6 +36,8 @@ export const renameGroup: CompositionApi["renameGroup"] = (id, name) =>
   bridge().renameGroup(id, name);
 export const deleteGroup: CompositionApi["deleteGroup"] = (id) => bridge().deleteGroup(id);
 export const saveLayout: CompositionApi["saveLayout"] = (layout) => bridge().saveLayout(layout);
+export const saveFavorites: CompositionApi["saveFavorites"] = (favorites) =>
+  bridge().saveFavorites(favorites);
 export const saveSettings: CompositionApi["saveSettings"] = (input) =>
   bridge().saveSettings(input);
 export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTheme(theme);
@@ -71,6 +73,7 @@ const _implementsApi: CompositionApi = {
   deleteGroup,
   moveGroup,
   saveLayout,
+  saveFavorites,
   saveSettings,
   saveTheme,
   saveLocation,

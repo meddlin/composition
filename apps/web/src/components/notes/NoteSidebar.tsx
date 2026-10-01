@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import type { Favorites, FavoriteType } from "@/lib/composition/favorites";
 import { Separator } from "@/components/ui/separator";
 import { GroupTree, InlineTextInput } from "./GroupTree";
 import { NAV_LINKS } from "./navLinks";
@@ -16,6 +17,8 @@ type Props = {
   viewedGroupId: number | null;
   width: number;
   groupError: string | null;
+  favorites: Favorites;
+  onToggleFavorite: (type: FavoriteType, id: number) => void;
   onSelect: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onCreate: (groupId: number | null) => void;
@@ -34,6 +37,8 @@ export function NoteSidebar({
   viewedGroupId,
   width,
   groupError,
+  favorites,
+  onToggleFavorite,
   onSelect,
   onSelectGroup,
   onCreate,
@@ -58,6 +63,8 @@ export function NoteSidebar({
           notes={notes}
           activeId={activeId}
           viewedGroupId={viewedGroupId}
+          favorites={favorites}
+          onToggleFavorite={onToggleFavorite}
           onSelectNote={onSelect}
           onSelectGroup={onSelectGroup}
           onDeleteNote={onDelete}

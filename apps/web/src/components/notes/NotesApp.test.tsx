@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createGroup, createNote, deleteGroup, moveGroup, renameGroup, saveLayout, saveNoteContent } from "@/lib/composition/client";
+import { createGroup, createNote, deleteGroup, deleteNote, moveGroup, renameGroup, saveFavorites, saveLayout, saveNoteContent } from "@/lib/composition/client";
+import type { Favorites } from "@/lib/composition/favorites";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
@@ -14,6 +15,7 @@ vi.mock("@/lib/composition/client", () => ({
   moveGroup: vi.fn(),
   moveNoteToGroup: vi.fn(),
   renameGroup: vi.fn(),
+  saveFavorites: vi.fn(),
   saveLayout: vi.fn(),
   saveNoteContent: vi.fn(),
   searchNotes: vi.fn(async () => ({ hits: [] })),
@@ -493,6 +495,7 @@ describe("NotesApp group row menu", () => {
     await settle();
     const rename = within(menu).getByRole("menuitem", { name: "Rename" });
     const newSub = within(menu).getByRole("menuitem", { name: "New sub-group" });
+    const favorite = within(menu).getByRole("menuitem", { name: "Add to favorites" });
 
     // Opened by pointer, focus starts on the menu itself; the first arrow enters the items.
     fireEvent.keyDown(menu, { key: "ArrowDown" });
@@ -504,8 +507,12 @@ describe("NotesApp group row menu", () => {
     await settle();
     expect(document.activeElement).toBe(newSub);
 
-    // Delete is disabled for Work, so the next step wraps back to Rename.
     fireEvent.keyDown(newSub, { key: "ArrowDown" });
+    await settle();
+    expect(document.activeElement).toBe(favorite);
+
+    // Delete is disabled for Work, so the next step wraps back to Rename.
+    fireEvent.keyDown(favorite, { key: "ArrowDown" });
     await settle();
     expect(document.activeElement).toBe(rename);
   });
@@ -626,5 +633,202 @@ describe("NotesApp group drag-and-drop nesting", () => {
     const zone = screen.getByText("Drop here to move to top level");
     // true = default not prevented = drop refused.
     expect(fireEvent.dragOver(zone, { dataTransfer: dt })).toBe(true);
+  });
+});
+
+describe("NotesApp favorites", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const at = "2026-01-01T00:00:00.000Z";
+  const groups = [
+    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
+    { id: 2, name: "Home", parentId: null, createdAt: at, updatedAt: at },
+  ];
+  const notes: Note[] = [
+    { ...note, id: 1, title: "Plan", groupId: 1 },
+    { ...note, id: 2, title: "Groceries", groupId: null },
+  ];
+
+  function renderApp(initialFavorites?: Favorites, initialNotes = notes) {
+    render(
+      <NotesApp
+        initialNotes={initialNotes}
+        initialGroups={groups}
+        initialLayout={DEFAULT_LAYOUT}
+        initialFavorites={initialFavorites}
+      />,
+    );
+  }
+
+  const favoritesSection = () => screen.queryByRole("group", { name: "Favorites" });
+
+  /**
+   * Radix opens its menu on a left-button pointerdown; the click that picks an item may save.
+   * A pinned item also shows in the tree, so `scope` says which copy's menu to use.
+   */
+  async function chooseAction(trigger: string, item: string, scope: HTMLElement = document.body) {
+    fireEvent.pointerDown(within(scope).getByRole("button", { name: `Actions for ${trigger}` }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    const menuItem = within(screen.getByRole("menu")).getByRole("menuitem", { name: item });
+    await act(async () => {
+      fireEvent.click(menuItem);
+    });
+  }
+
+  it("has no Favorites section until something is pinned", () => {
+    renderApp();
+
+    expect(favoritesSection()).toBeNull();
+  });
+
+  it("pins a group from its menu and offers to remove it afterwards", async () => {
+    renderApp();
+
+    await chooseAction("Work", "Add to favorites");
+
+    expect(within(favoritesSection()!).getByText("Work")).toBeTruthy();
+    expect(saveFavorites).toHaveBeenCalledWith([{ type: "group", id: 1 }]);
+
+    // The pinned copy sits above the tree's.
+    const [pinnedCopy] = screen.getAllByRole("button", { name: "Actions for Work" });
+    fireEvent.pointerDown(pinnedCopy, { button: 0, ctrlKey: false });
+    expect(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Remove from favorites" })).toBeTruthy();
+  });
+
+  it("pins a note from its own menu", async () => {
+    renderApp();
+
+    await chooseAction("Groceries", "Add to favorites");
+
+    expect(within(favoritesSection()!).getByText("Groceries")).toBeTruthy();
+    expect(saveFavorites).toHaveBeenCalledWith([{ type: "note", id: 2 }]);
+  });
+
+  it("lists favorites in the order they were pinned, above the tree", async () => {
+    renderApp();
+
+    await chooseAction("Groceries", "Add to favorites");
+    await chooseAction("Home", "Add to favorites");
+
+    const section = favoritesSection()!;
+    const names = within(section)
+      .getAllByRole("button")
+      .map((b) => b.textContent)
+      .filter((name) => name && name !== "+ note");
+    expect(names).toEqual(["Groceries", "Home"]);
+    expect(section.compareDocumentPosition(screen.getByText("Ungrouped")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("unpins from a favorite's menu and drops the section when it was the last", async () => {
+    renderApp([{ type: "group", id: 1 }]);
+
+    await chooseAction("Work", "Remove from favorites", favoritesSection()!);
+
+    expect(favoritesSection()).toBeNull();
+    expect(saveFavorites).toHaveBeenCalledWith([]);
+    // Still in the tree: pinning is a shortcut, not a move.
+    expect(screen.getByRole("button", { name: "Actions for Work" })).toBeTruthy();
+  });
+
+  it("opens a favorite group's page and a favorite note from the section", async () => {
+    renderApp([
+      { type: "group", id: 2 },
+      { type: "note", id: 2 },
+    ]);
+    const section = favoritesSection()!;
+
+    fireEvent.click(within(section).getByText("Home"));
+    expect(screen.getByRole("heading", { name: "Home" })).toBeTruthy();
+
+    fireEvent.click(within(section).getByText("Groceries"));
+    expect(screen.getByLabelText("Markdown editor")).toBeTruthy();
+  });
+
+  it("lets a pinned group be expanded to its sub-groups and notes", () => {
+    const lawn = [
+      { id: 1, name: "Lawn Care", parentId: null, createdAt: at, updatedAt: at },
+      { id: 2, name: "Mowing", parentId: 1, createdAt: at, updatedAt: at },
+    ];
+    const lawnNotes: Note[] = [
+      { ...note, id: 1, title: "Fertilizer schedule", groupId: 1 },
+      { ...note, id: 2, title: "Blade sharpening", groupId: 2 },
+    ];
+    render(
+      <NotesApp
+        initialNotes={lawnNotes}
+        initialGroups={lawn}
+        initialLayout={DEFAULT_LAYOUT}
+        initialFavorites={[{ type: "group", id: 1 }]}
+      />,
+    );
+    const section = favoritesSection()!;
+
+    // Starts collapsed: just the group, not everything under it.
+    expect(within(section).queryByText("Fertilizer schedule")).toBeNull();
+    expect(within(section).queryByText("Mowing")).toBeNull();
+
+    fireEvent.click(within(section).getByRole("button", { name: "Expand Lawn Care" }));
+    expect(within(section).getByText("Fertilizer schedule")).toBeTruthy();
+    fireEvent.click(within(section).getByText("Fertilizer schedule"));
+    expect(screen.getByLabelText("Markdown editor")).toBeTruthy();
+
+    fireEvent.click(within(section).getByRole("button", { name: "Collapse Mowing" }));
+    expect(within(section).queryByText("Blade sharpening")).toBeNull();
+    fireEvent.click(within(section).getByRole("button", { name: "Expand Mowing" }));
+    expect(within(section).getByText("Blade sharpening")).toBeTruthy();
+  });
+
+  it("skips favorites whose group or note no longer exists", () => {
+    renderApp([
+      { type: "note", id: 99 },
+      { type: "group", id: 98 },
+    ]);
+
+    expect(favoritesSection()).toBeNull();
+  });
+
+  it("never offers to delete a note from the Favorites section", () => {
+    renderApp([
+      { type: "note", id: 2 },
+      { type: "group", id: 1 },
+    ]);
+    const section = favoritesSection()!;
+    fireEvent.click(within(section).getByRole("button", { name: "Expand Work" }));
+
+    // Neither the pinned note nor the note inside the expanded pinned group...
+    expect(within(section).getByText("Groceries")).toBeTruthy();
+    expect(within(section).getByText("Plan")).toBeTruthy();
+    expect(within(section).queryByLabelText(/^Delete /)).toBeNull();
+    // ...while the tree below still can.
+    expect(screen.getAllByLabelText(/^Delete /).length).toBeGreaterThan(0);
+  });
+
+  it("unpins a note when it is deleted", async () => {
+    renderApp([
+      { type: "note", id: 2 },
+      { type: "group", id: 1 },
+    ]);
+
+    // The only Delete button for Groceries is the tree's.
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Delete Groceries"));
+    });
+
+    expect(deleteNote).toHaveBeenCalledWith(2);
+    expect(saveFavorites).toHaveBeenLastCalledWith([{ type: "group", id: 1 }]);
+  });
+
+  it("unpins a group when it is deleted", async () => {
+    vi.mocked(deleteGroup).mockResolvedValue({});
+    renderApp([{ type: "group", id: 2 }], []);
+
+    await chooseAction("Home", "Delete group", favoritesSection()!);
+
+    expect(saveFavorites).toHaveBeenLastCalledWith([]);
   });
 });

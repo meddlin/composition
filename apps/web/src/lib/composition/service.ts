@@ -14,6 +14,7 @@ import type {
   Workspace,
 } from "./api";
 import { closeDb } from "./db";
+import { parseFavorites, type Favorites } from "./favorites";
 import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
@@ -55,11 +56,12 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const { sidebarWidth, editorRatio } = loadWebSettings();
+  const { sidebarWidth, editorRatio, favorites } = loadWebSettings();
   return {
     notes: notesRepo.listNotes(),
     groups: groupsRepo.listGroups(),
     layout: { sidebarWidth, editorRatio },
+    favorites,
   };
 }
 
@@ -257,6 +259,11 @@ export async function saveLayout(layout: Layout): Promise<void> {
   });
 }
 
+/** Re-validated here rather than trusting the client; merged so the other settings survive. */
+export async function saveFavorites(favorites: Favorites): Promise<void> {
+  saveWebSettings({ ...loadWebSettings(), favorites: parseFavorites(favorites) });
+}
+
 export async function saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult> {
   const rawAppDataDir = input.appDataDir.trim();
   const rawDbPath = input.dbPath.trim();
@@ -358,6 +365,7 @@ const _implementsApi: CompositionApi = {
   deleteGroup,
   moveGroup,
   saveLayout,
+  saveFavorites,
   saveSettings,
   saveTheme,
   saveLocation,

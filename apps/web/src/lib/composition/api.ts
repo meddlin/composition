@@ -1,3 +1,4 @@
+import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
@@ -25,6 +26,7 @@ export type Workspace = {
   notes: Note[];
   groups: Group[];
   layout: Layout;
+  favorites: Favorites;
 };
 
 /** What the Settings screen shows; computed where the files actually are. */
@@ -90,6 +92,8 @@ export interface CompositionApi {
   moveGroup(id: number, parentId: number | null): Promise<MoveGroupResult>;
 
   saveLayout(layout: Layout): Promise<void>;
+  /** Replaces the pinned list (the sidebar's Favorites section). */
+  saveFavorites(favorites: Favorites): Promise<void>;
   saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult>;
   saveTheme(theme: string): Promise<{ error?: string }>;
 
@@ -118,6 +122,7 @@ export const API_METHODS = [
   "deleteGroup",
   "moveGroup",
   "saveLayout",
+  "saveFavorites",
   "saveSettings",
   "saveTheme",
   "saveLocation",
