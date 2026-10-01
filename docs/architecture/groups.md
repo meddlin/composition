@@ -81,6 +81,11 @@ favorites" from the same menu (also available on the pinned rows themselves). Pi
 shortcut, not a move — the item stays where it is in the tree. Favorites appear in the
 order they were pinned, and the section is hidden while nothing is pinned.
 
+A pinned group is the same expandable node the tree uses, so its sub-groups and notes can
+be browsed from the Favorites section; it starts collapsed. Notes can never be deleted
+from the section — pinned notes and notes inside a pinned group have no delete button —
+only from the tree below it.
+
 The pinned list (`{ type: "group" | "note", id }[]`, see
 [`favorites.ts`](../../apps/web/src/lib/composition/favorites.ts)) lives in the web
 settings file next to the column layout, not in the database. The CLI builds its `Note`

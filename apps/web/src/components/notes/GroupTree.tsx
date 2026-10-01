@@ -105,6 +105,7 @@ export function GroupTree({
     onDropGroup: dropGroup,
     onSelectNote,
     onSelectGroup,
+    canDeleteNotes: true,
     onDeleteNote,
     onCreateNote,
     onCreateGroup,
@@ -118,17 +119,7 @@ export function GroupTree({
 
   return (
     <div className="flex flex-col gap-0.5">
-      <FavoritesSection
-        favorites={favorites}
-        groupsById={groupsById}
-        notesById={notesById}
-        activeId={activeId}
-        viewedGroupId={viewedGroupId}
-        onToggleFavorite={onToggleFavorite}
-        onSelectNote={onSelectNote}
-        onSelectGroup={onSelectGroup}
-        onDeleteNote={onDeleteNote}
-      />
+      <FavoritesSection shared={shared} groupsById={groupsById} notesById={notesById} />
       {canDropGroupOn(null) && (
         <DropZone onDropGroup={(groupId) => dropGroup(groupId, null)}>
           <div className="rounded-md border border-dashed border-muted-foreground/40 px-2 py-1.5 text-center text-xs text-muted-foreground">
@@ -168,30 +159,24 @@ type FavoriteRow = { key: string; group: Group } | { key: string; note: Note };
 
 /**
  * The pinned groups and notes, in the order they were pinned, above the tree.
- * Absent when nothing is pinned. An entry whose group or note no longer exists
- * is skipped rather than shown.
+ * A pinned group is the same expandable node the tree uses, so its sub-groups and
+ * notes can be browsed from here; it starts collapsed so a big group doesn't push
+ * the rest of the sidebar out of view. Absent when nothing is pinned. An entry
+ * whose group or note no longer exists is skipped rather than shown.
  */
 function FavoritesSection({
-  favorites,
+  shared,
   groupsById,
   notesById,
-  activeId,
-  viewedGroupId,
-  onToggleFavorite,
-  onSelectNote,
-  onSelectGroup,
-  onDeleteNote,
 }: {
-  favorites: Favorites;
+  shared: SharedProps;
   groupsById: Map<number, Group>;
   notesById: Map<number, Note>;
-  activeId: number | null;
-  viewedGroupId: number | null;
-  onToggleFavorite: (type: FavoriteType, id: number) => void;
-  onSelectNote: (id: number) => void;
-  onSelectGroup: (id: number) => void;
-  onDeleteNote: (id: number) => void;
 }) {
+  const { favorites, activeId, onSelectNote, onToggleFavorite } = shared;
+  // Notes are never deleted from here, including those inside a pinned group: the Favorites
+  // section is for getting to things, and a stray click there shouldn't destroy a note.
+  const favoritesShared: SharedProps = { ...shared, canDeleteNotes: false };
   const rows = favorites.flatMap((favorite): FavoriteRow[] => {
     if (favorite.type === "group") {
       const group = groupsById.get(favorite.id);
@@ -213,13 +198,7 @@ function FavoritesSection({
       </div>
       {rows.map((row) =>
         "group" in row ? (
-          <FavoriteGroupRow
-            key={row.key}
-            group={row.group}
-            viewed={viewedGroupId === row.group.id}
-            onSelect={() => onSelectGroup(row.group.id)}
-            onRemove={() => onToggleFavorite("group", row.group.id)}
-          />
+          <GroupNode key={row.key} group={row.group} depth={0} defaultCollapsed {...favoritesShared} />
         ) : (
           <NoteRow
             key={row.key}
@@ -227,53 +206,11 @@ function FavoritesSection({
             depth={1}
             active={row.note.id === activeId}
             favorite
-            // The same note is usually in the tree too; keep its menu trigger distinguishable.
-            menuLabel={`favorite ${noteTitle(row.note)}`}
             onSelect={() => onSelectNote(row.note.id)}
-            onDelete={() => onDeleteNote(row.note.id)}
             onToggleFavorite={() => onToggleFavorite("note", row.note.id)}
           />
         ),
       )}
-    </div>
-  );
-}
-
-function FavoriteGroupRow({
-  group,
-  viewed,
-  onSelect,
-  onRemove,
-}: {
-  group: Group;
-  viewed: boolean;
-  onSelect: () => void;
-  onRemove: () => void;
-}) {
-  return (
-    <div className="group/row relative flex items-center gap-1.5 rounded-md py-0.5 pl-6 text-sm">
-      <FolderIcon />
-      <Button
-        variant="ghost"
-        onClick={onSelect}
-        aria-current={viewed ? "page" : undefined}
-        title={`View all notes in ${group.name}`}
-        className="h-auto min-w-0 flex-1 justify-start border-0 px-1 py-1 font-bold text-foreground hover:bg-transparent dark:hover:bg-transparent"
-      >
-        <span
-          className={cn(
-            "truncate underline decoration-1 underline-offset-4",
-            viewed
-              ? "decoration-foreground"
-              : "decoration-foreground/30 group-hover/button:decoration-foreground/60",
-          )}
-        >
-          {group.name}
-        </span>
-      </Button>
-      <div className={ROW_ACTIONS_CLASS}>
-        <FavoriteMenu label={`favorite ${group.name}`} favorite onToggleFavorite={onRemove} />
-      </div>
     </div>
   );
 }
@@ -293,6 +230,8 @@ type SharedProps = {
   onDropGroup: (id: number, parentId: number | null) => void;
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
+  /** Whether note rows show a delete button; off inside the Favorites section. */
+  canDeleteNotes: boolean;
   onDeleteNote: (id: number) => void;
   onCreateNote: (groupId: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
@@ -318,16 +257,18 @@ function GroupNode({
   onDropGroup,
   onSelectNote,
   onSelectGroup,
+  canDeleteNotes,
   onDeleteNote,
   onCreateNote,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
   onMoveNoteToGroup,
-}: SharedProps & { group: Group; depth: number }) {
+  defaultCollapsed = false,
+}: SharedProps & { group: Group; depth: number; defaultCollapsed?: boolean }) {
   const [renaming, setRenaming] = useState(false);
   const [addingSubgroup, setAddingSubgroup] = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const isTopLevel = depth === 0;
   const empty = isGroupEmpty(group.id);
   const childGroups = childGroupsByParent.get(group.id) ?? [];
@@ -475,6 +416,7 @@ function GroupNode({
             onDropGroup={onDropGroup}
             onSelectNote={onSelectNote}
             onSelectGroup={onSelectGroup}
+            canDeleteNotes={canDeleteNotes}
             onDeleteNote={onDeleteNote}
             onCreateNote={onCreateNote}
             onCreateGroup={onCreateGroup}
@@ -492,7 +434,7 @@ function GroupNode({
             active={note.id === activeId}
             favorite={isFavorite(favorites, "note", note.id)}
             onSelect={() => onSelectNote(note.id)}
-            onDelete={() => onDeleteNote(note.id)}
+            onDelete={canDeleteNotes ? () => onDeleteNote(note.id) : undefined}
             onToggleFavorite={() => onToggleFavorite("note", note.id)}
           />
         ))}
@@ -506,7 +448,6 @@ function NoteRow({
   depth,
   active,
   favorite,
-  menuLabel = noteTitle(note),
   onSelect,
   onDelete,
   onToggleFavorite,
@@ -515,10 +456,9 @@ function NoteRow({
   depth: number;
   active: boolean;
   favorite: boolean;
-  /** Names the "⋯" menu's trigger; defaults to the note's title. */
-  menuLabel?: string;
   onSelect: () => void;
-  onDelete: () => void;
+  /** Omitted where notes mustn't be deleted from the row (the Favorites section): no delete button. */
+  onDelete?: () => void;
   onToggleFavorite: () => void;
 }) {
   return (
@@ -541,16 +481,18 @@ function NoteRow({
         <span className="truncate">{noteTitle(note)}</span>
       </Button>
       <div className={ROW_ACTIONS_CLASS}>
-        <FavoriteMenu label={menuLabel} favorite={favorite} onToggleFavorite={onToggleFavorite} />
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={onDelete}
-          aria-label={`Delete ${noteTitle(note)}`}
-          className="opacity-60 hover:opacity-100"
-        >
-          <XIcon />
-        </Button>
+        <FavoriteMenu label={noteTitle(note)} favorite={favorite} onToggleFavorite={onToggleFavorite} />
+        {onDelete && (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onDelete}
+            aria-label={`Delete ${noteTitle(note)}`}
+            className="opacity-60 hover:opacity-100"
+          >
+            <XIcon />
+          </Button>
+        )}
       </div>
     </div>
   );
