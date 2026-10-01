@@ -1,6 +1,7 @@
 import { useMemo, useRef, type CSSProperties } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Textarea } from "@/components/ui/textarea";
 import { parse } from "@/lib/composition/frontmatter";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { FrontmatterCard } from "./FrontmatterCard";
@@ -16,8 +17,7 @@ type Props = {
   onRatioCommit: () => void;
 };
 
-const paneHeader =
-  "border-b border-foreground/10 px-4 py-2 text-xs font-medium uppercase tracking-wide text-foreground/50";
+const paneHeader = "border-b px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
 export function MarkdownEditor({ value, onChange, ratio, onRatioChange, onRatioCommit }: Props) {
   // The raw text (frontmatter included) stays in the editor; the preview shows
@@ -37,13 +37,14 @@ export function MarkdownEditor({ value, onChange, ratio, onRatioChange, onRatioC
     >
       <section className="flex min-h-0 flex-col">
         <h2 className={paneHeader}>Markdown</h2>
-        <textarea
+        {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
+        <Textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           spellCheck={false}
           aria-label="Markdown editor"
           placeholder="Start writing in Markdown…"
-          className="flex-1 resize-none bg-transparent p-4 font-mono text-sm leading-6 outline-none"
+          className="min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent"
         />
       </section>
       <ResizeHandle
@@ -58,7 +59,7 @@ export function MarkdownEditor({ value, onChange, ratio, onRatioChange, onRatioC
         onResize={(dx) => onRatioChange(dragRatio(dragStart.current.ratio, dx, dragStart.current.width))}
         onResizeEnd={onRatioCommit}
       />
-      <section className="flex min-h-0 flex-col border-t border-foreground/10 md:border-t-0">
+      <section className="flex min-h-0 flex-col border-t md:border-t-0">
         <h2 className={paneHeader}>Preview</h2>
         <div className="prose max-w-none flex-1 overflow-y-auto p-4">
           {fm && <FrontmatterCard fm={fm} />}

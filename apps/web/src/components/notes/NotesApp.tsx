@@ -1,6 +1,8 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import {
   createGroup as createGroupAction,
   createNote,
@@ -164,7 +166,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="shrink-0 border-b border-foreground/10 p-2">
+      <header className="shrink-0 border-b p-2">
         <SearchBar onSelect={selectNote} />
       </header>
       <div className="flex min-h-0 flex-1">
@@ -219,15 +221,13 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 text-foreground/60">
-      <p className="text-sm">No notes yet.</p>
-      <button
-        type="button"
-        onClick={onCreate}
-        className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
-      >
+    <Empty>
+      <EmptyHeader>
+        <EmptyDescription>No notes yet.</EmptyDescription>
+      </EmptyHeader>
+      <Button size="lg" onClick={onCreate}>
         + New note
-      </button>
-    </div>
+      </Button>
+    </Empty>
   );
 }

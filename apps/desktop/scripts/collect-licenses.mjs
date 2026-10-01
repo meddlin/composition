@@ -92,6 +92,12 @@ const packages = new Map([
     "remark-gfm",
     "rehype-highlight",
     "lowlight",
+    // shadcn/ui's runtime (apps/web/src/components/ui) and the animation CSS compiled into the stylesheet.
+    "radix-ui",
+    "lucide-react",
+    "class-variance-authority",
+    "cn",
+    "tw-animate-css",
     "next",
     "meilisearch",
     "js-yaml",

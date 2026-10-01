@@ -1,7 +1,7 @@
 # Composition desktop app
 
 The Composition web UI in Electron, for macOS. It is the same notes workspace, the same
-Tailwind styling and the same color schemes as `apps/web`, with no server to run and a bundled
+shadcn/ui components, Tailwind styling and color schemes as `apps/web`, with no server to run and a bundled
 Meilisearch for search. Plan, decisions and status: [docs/desktop-app-plan.md](../../docs/desktop-app-plan.md).
 
 ## How it fits together

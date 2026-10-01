@@ -7,6 +7,8 @@ flows through it.
 
 See [ui/web-groups.md](ui/web-groups.md) for how groups are managed in the web app.
 
+See [ui/web-components.md](ui/web-components.md) for the shadcn/ui component setup and how its tokens map onto the color schemes.
+
 See [desktop-app-plan.md](desktop-app-plan.md) for the proposed Electron desktop app, and
 [desktop-app-research.md](desktop-app-research.md) for the research behind it.
 

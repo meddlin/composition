@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import type { Frontmatter } from "@/lib/composition/frontmatter";
 
 // Fixed-format (UTC) so server and client render the same text — a locale- or
@@ -13,25 +14,24 @@ export function FrontmatterCard({ fm }: { fm: Frontmatter }) {
   const updated = formatDate(fm.updatedAt);
 
   return (
-    <header className="not-prose mb-6 border-b border-foreground/10 pb-4">
+    <header className="not-prose mb-6 border-b pb-4">
       <h1 className="text-2xl font-semibold tracking-tight">{fm.title.trim() || "Untitled"}</h1>
       {fm.description.trim() && (
-        <p className="mt-2 text-sm text-foreground/70">{fm.description}</p>
+        <p className="mt-2 text-sm text-muted-foreground">{fm.description}</p>
       )}
       {fm.tags.length > 0 && (
         <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tags">
           {fm.tags.map((tag) => (
-            <li
-              key={tag}
-              className="rounded-full border border-foreground/15 px-2 py-0.5 text-xs text-foreground/70"
-            >
-              {tag}
+            <li key={tag}>
+              <Badge variant="outline" className="text-muted-foreground">
+                {tag}
+              </Badge>
             </li>
           ))}
         </ul>
       )}
       {(created || updated) && (
-        <p className="mt-3 text-xs text-foreground/50">
+        <p className="mt-3 text-xs text-muted-foreground">
           {[created && `Created ${created}`, updated && `Updated ${updated}`]
             .filter(Boolean)
             .join(" · ")}

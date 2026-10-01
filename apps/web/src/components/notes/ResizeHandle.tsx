@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { cn } from "@/lib/utils";
 
 const KEY_STEP_PX = 16;
 
@@ -97,9 +98,11 @@ export function ResizeHandle({
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
       // The 1px line is the divider; the ::before widens the grab area onto the panes beside it.
-      className={`relative w-px shrink-0 cursor-col-resize touch-none select-none outline-none transition-colors before:absolute before:inset-y-0 before:-inset-x-1 hover:bg-primary/60 focus-visible:bg-primary ${
-        dragging ? "bg-primary" : "bg-foreground/10"
-      } ${className}`}
+      className={cn(
+        "relative w-px shrink-0 cursor-col-resize touch-none select-none outline-none transition-colors before:absolute before:inset-y-0 before:-inset-x-1 hover:bg-brand/60 focus-visible:bg-brand",
+        dragging ? "bg-brand" : "bg-border",
+        className,
+      )}
     />
   );
 }

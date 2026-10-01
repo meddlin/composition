@@ -1,7 +1,13 @@
 "use client";
 
+import { ChevronRightIcon, XIcon } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
 import { canMoveGroup } from "@/lib/composition/groupMove";
+import { cn } from "@/lib/utils";
+import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
 import { noteTitle, type Group, type Note } from "./types";
 
@@ -101,7 +107,7 @@ export function GroupTree({
     <div className="flex flex-col gap-0.5">
       {canDropGroupOn(null) && (
         <DropZone onDropGroup={(groupId) => dropGroup(groupId, null)}>
-          <div className="rounded-md border border-dashed border-foreground/30 px-2 py-1.5 text-center text-xs text-foreground/60">
+          <div className="rounded-md border border-dashed border-muted-foreground/40 px-2 py-1.5 text-center text-xs text-muted-foreground">
             Drop here to move to top level
           </div>
         </DropZone>
@@ -113,7 +119,7 @@ export function GroupTree({
       <DropZone onDropNote={(noteId) => onMoveNoteToGroup(noteId, null)}>
         <div
           style={{ paddingLeft: "8px" }}
-          className="rounded-md py-1.5 text-sm font-bold text-foreground/50"
+          className="rounded-md py-1.5 text-sm font-bold text-muted-foreground"
         >
           Ungrouped
         </div>
@@ -184,7 +190,7 @@ function GroupNode({
   const childNotes = notesByGroup.get(group.id) ?? [];
 
   return (
-    <div>
+    <Collapsible open={!collapsed} onOpenChange={(open) => setCollapsed(!open)}>
       {renaming ? (
         <InlineTextInput
           initialValue={group.name}
@@ -212,60 +218,68 @@ function GroupNode({
               onDragGroupStart(group.id);
             }}
             onDragEnd={onDragGroupEnd}
-            className={`group/row relative flex items-center gap-1.5 rounded-md py-1.5 text-sm ${
-              draggingGroupId === group.id ? "opacity-50" : ""
-            }`}
+            className={cn(
+              "group/row relative flex items-center gap-1.5 rounded-md py-0.5 text-sm",
+              draggingGroupId === group.id && "opacity-50",
+            )}
             style={{ paddingLeft: `${depth * 16 + 8}px` }}
             onDoubleClick={() => setRenaming(true)}
           >
-            <button
-              type="button"
-              onClick={() => setCollapsed((c) => !c)}
-              onDoubleClick={(e) => e.stopPropagation()}
-              aria-expanded={!collapsed}
-              aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.name}`}
-              title={collapsed ? "Expand" : "Collapse"}
-              className="rounded p-0.5 text-foreground/50 hover:bg-foreground/10 hover:text-foreground"
-            >
-              <ChevronIcon expanded={!collapsed} />
-            </button>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                onDoubleClick={(e) => e.stopPropagation()}
+                aria-label={`${collapsed ? "Expand" : "Collapse"} ${group.name}`}
+                title={collapsed ? "Expand" : "Collapse"}
+                // Ghost buttons stay filled while aria-expanded; this one is open for most of its life.
+                className="size-5 text-muted-foreground hover:text-foreground aria-expanded:bg-transparent aria-expanded:hover:bg-muted"
+              >
+                <ChevronRightIcon
+                  strokeWidth={2.5}
+                  className={cn("size-3 transition-transform", !collapsed && "rotate-90")}
+                />
+              </Button>
+            </CollapsibleTrigger>
             <FolderIcon />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
               onClick={() => onSelectGroup(group.id)}
               aria-current={viewedGroupId === group.id ? "page" : undefined}
               title={`View all notes in ${group.name}`}
-              className={`min-w-0 flex-1 truncate text-left ${
-                isTopLevel
-                  ? "font-bold text-foreground"
-                  : "font-medium text-foreground/80"
-              }`}
+              className={cn(
+                "h-auto min-w-0 flex-1 justify-start border-0 px-1 py-1 hover:bg-transparent dark:hover:bg-transparent",
+                isTopLevel ? "font-bold text-foreground" : "font-medium text-foreground/80",
+              )}
             >
               <span
-                className={`underline decoration-1 underline-offset-4 ${
+                className={cn(
+                  "truncate underline decoration-1 underline-offset-4",
                   viewedGroupId === group.id
                     ? "decoration-foreground"
-                    : "decoration-foreground/30 hover:decoration-foreground/60"
-                }`}
+                    : "decoration-foreground/30 group-hover/button:decoration-foreground/60",
+                )}
               >
                 {group.name}
               </span>
-            </button>
+            </Button>
             {/* Overlays the row instead of reserving space, so names can run right up to the edge.
-                No transform here: it would become the containing block for GroupMenu's fixed popup. */}
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-md bg-surface opacity-0 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/row:pointer-events-auto group-hover/row:opacity-100">
-              <button
-                type="button"
+                Stays visible while the menu is open: its popup is portaled out, so the row is no
+                longer hovered or focused. */}
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-md bg-surface opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-data-[state=open]:pointer-events-auto has-data-[state=open]:opacity-100">
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => {
                   setCollapsed(false);
                   onCreateNote(group.id);
                 }}
                 aria-label={`New note in ${group.name}`}
                 title="New note"
-                className="rounded px-1.5 py-0.5 text-xs opacity-60 hover:bg-foreground/10 hover:opacity-100"
+                className="text-muted-foreground hover:text-foreground"
               >
                 + note
-              </button>
+              </Button>
               <GroupMenu
                 groupName={group.name}
                 canDelete={empty}
@@ -293,87 +307,50 @@ function GroupNode({
         />
       )}
 
-      {!collapsed && (
-        <div className="relative">
-          <span
-            aria-hidden
-            className="absolute bottom-0 top-0 w-px bg-foreground/10"
-            style={{ left: `${depth * 16 + 12}px` }}
+      <CollapsibleContent className="relative">
+        <span
+          aria-hidden
+          className="absolute bottom-0 top-0 w-px bg-border"
+          style={{ left: `${depth * 16 + 12}px` }}
+        />
+        {childGroups.map((child) => (
+          <GroupNode
+            key={child.id}
+            group={child}
+            depth={depth + 1}
+            childGroupsByParent={childGroupsByParent}
+            notesByGroup={notesByGroup}
+            activeId={activeId}
+            viewedGroupId={viewedGroupId}
+            isGroupEmpty={isGroupEmpty}
+            draggingGroupId={draggingGroupId}
+            canDropGroupOn={canDropGroupOn}
+            onDragGroupStart={onDragGroupStart}
+            onDragGroupEnd={onDragGroupEnd}
+            onDropGroup={onDropGroup}
+            onSelectNote={onSelectNote}
+            onSelectGroup={onSelectGroup}
+            onDeleteNote={onDeleteNote}
+            onCreateNote={onCreateNote}
+            onCreateGroup={onCreateGroup}
+            onRenameGroup={onRenameGroup}
+            onDeleteGroup={onDeleteGroup}
+            onMoveNoteToGroup={onMoveNoteToGroup}
           />
-          {childGroups.map((child) => (
-            <GroupNode
-              key={child.id}
-              group={child}
-              depth={depth + 1}
-              childGroupsByParent={childGroupsByParent}
-              notesByGroup={notesByGroup}
-              activeId={activeId}
-              viewedGroupId={viewedGroupId}
-              isGroupEmpty={isGroupEmpty}
-              draggingGroupId={draggingGroupId}
-              canDropGroupOn={canDropGroupOn}
-              onDragGroupStart={onDragGroupStart}
-              onDragGroupEnd={onDragGroupEnd}
-              onDropGroup={onDropGroup}
-              onSelectNote={onSelectNote}
-              onSelectGroup={onSelectGroup}
-              onDeleteNote={onDeleteNote}
-              onCreateNote={onCreateNote}
-              onCreateGroup={onCreateGroup}
-              onRenameGroup={onRenameGroup}
-              onDeleteGroup={onDeleteGroup}
-              onMoveNoteToGroup={onMoveNoteToGroup}
-            />
-          ))}
+        ))}
 
-          {childNotes.map((note) => (
-            <NoteRow
-              key={note.id}
-              note={note}
-              depth={depth + 1}
-              active={note.id === activeId}
-              onSelect={() => onSelectNote(note.id)}
-              onDelete={() => onDeleteNote(note.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ChevronIcon({ expanded }: { expanded: boolean }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
-    >
-      <path d="m9 6 6 6-6 6" />
-    </svg>
-  );
-}
-
-function FolderIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      fill="var(--accent)"
-      fillOpacity={0.35}
-      stroke="var(--accent)"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5 shrink-0"
-    >
-      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-    </svg>
+        {childNotes.map((note) => (
+          <NoteRow
+            key={note.id}
+            note={note}
+            depth={depth + 1}
+            active={note.id === activeId}
+            onSelect={() => onSelectNote(note.id)}
+            onDelete={() => onDeleteNote(note.id)}
+          />
+        ))}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -392,8 +369,8 @@ function NoteRow({
 }) {
   return (
     <div className="group/row relative">
-      <button
-        type="button"
+      <Button
+        variant="ghost"
         draggable
         onDragStart={(e) => {
           e.dataTransfer.setData(NOTE_DRAG_TYPE, String(note.id));
@@ -402,20 +379,22 @@ function NoteRow({
         onClick={onSelect}
         aria-current={active ? "true" : undefined}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        className={`w-full truncate rounded-md py-1.5 text-left text-sm ${
-          active ? "bg-foreground/10 font-medium" : "hover:bg-foreground/5"
-        }`}
+        className={cn(
+          "h-auto w-full justify-start rounded-md border-0 py-1.5 pr-2",
+          active && "bg-accent font-medium",
+        )}
       >
-        {noteTitle(note)}
-      </button>
-      <button
-        type="button"
+        <span className="truncate">{noteTitle(note)}</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon-xs"
         onClick={onDelete}
         aria-label={`Delete ${noteTitle(note)}`}
-        className="absolute right-0 top-1/2 -translate-y-1/2 rounded bg-surface px-2 py-1 text-xs opacity-0 hover:bg-foreground/10 focus:opacity-100 group-hover/row:opacity-60 group-hover/row:hover:opacity-100"
+        className="absolute right-0 top-1/2 -translate-y-1/2 bg-surface opacity-0 focus-visible:opacity-100 group-hover/row:opacity-60 group-hover/row:hover:opacity-100"
       >
-        ✕
-      </button>
+        <XIcon />
+      </Button>
     </div>
   );
 }
@@ -466,7 +445,7 @@ function DropZone({
         if (kind === "note") onDropNote?.(id);
         else onDropGroup?.(id);
       }}
-      className={`rounded-md ${dragOver ? "bg-foreground/10" : ""}`}
+      className={cn("rounded-md", dragOver && "bg-accent")}
     >
       {children}
     </div>
@@ -498,7 +477,7 @@ export function InlineTextInput({
   }
 
   return (
-    <input
+    <Input
       type="text"
       autoFocus
       value={value}
@@ -515,7 +494,7 @@ export function InlineTextInput({
         }
       }}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      className="w-full rounded-md border border-foreground/20 bg-transparent py-1.5 pr-2 text-sm outline-none focus:border-foreground/40"
+      className="pr-2"
     />
   );
 }

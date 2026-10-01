@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
 /*
@@ -6,6 +7,9 @@
  * (see app/layout.tsx). Palettes mirror the CLI's themes.py:
  * dark = textual-dark, light = composition-light, forest = composition-forest.
  * cream and auto have no CLI counterpart.
+ *
+ * Textual's primary, secondary and accent are --brand, --brand-dim and --highlight
+ * here: shadcn/ui owns those three names (see the semantic tokens below).
  *
  * auto ("Follow the sun") reuses the dark and light palettes: text and accent
  * colors come from whichever one `data-tone` names, while the three surface
@@ -20,9 +24,9 @@
   --foreground: #e0e0e0;
   --surface: #1e1e1e;
   --panel: #1b2730;
-  --primary: #0178d4;
-  --secondary: #004578;
-  --accent: #ffa62b;
+  --brand: #0178d4;
+  --brand-dim: #004578;
+  --highlight: #ffa62b;
   --warning: #ffa62b;
   --error: #ba3c5b;
   --success: #4ebf71;
@@ -45,9 +49,9 @@
   --foreground: #24292f;
   --surface: #edede8;
   --panel: #e2e2db;
-  --primary: #0b62d6;
-  --secondary: #5b6b7f;
-  --accent: #c2570c;
+  --brand: #0b62d6;
+  --brand-dim: #5b6b7f;
+  --highlight: #c2570c;
   --warning: #b7791f;
   --error: #c4314b;
   --success: #1a7f4b;
@@ -68,9 +72,9 @@
   --foreground: #d5e5da;
   --surface: #132019;
   --panel: #1a2c22;
-  --primary: #3fb876;
-  --secondary: #2e7d57;
-  --accent: #e3b341;
+  --brand: #3fb876;
+  --brand-dim: #2e7d57;
+  --highlight: #e3b341;
   --warning: #e0a030;
   --error: #d9596b;
   --success: #7bd88f;
@@ -92,9 +96,9 @@
   --foreground: #3b3226;
   --surface: #eee5d0;
   --panel: #e4d9be;
-  --primary: #9a4a1f;
-  --secondary: #7a6a55;
-  --accent: #c2762b;
+  --brand: #9a4a1f;
+  --brand-dim: #7a6a55;
+  --highlight: #c2762b;
   --warning: #96600c;
   --error: #b23a48;
   --success: #4f7a3a;
@@ -124,19 +128,139 @@
 /* `dark:` utilities follow the selected scheme, not the OS setting. */
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *, [data-theme="auto"][data-tone="dark"], [data-theme="auto"][data-tone="dark"] *));
 
+/*
+ * shadcn/ui's custom variants, which the generated components in components/ui are written
+ * against (`data-open:`, `data-checked:`, ...). Radix reports state as `data-state`; these
+ * match that and the bare `data-*` attributes other component bases use. Taken from
+ * shadcn's tailwind.css (`shadcn eject`), which also has accordion keyframes and the
+ * no-scrollbar, scroll-fade and shimmer utilities. No component here uses those, so they
+ * are left out; copy them over if one needs them.
+ */
+@custom-variant data-open {
+  &:where([data-state="open"]),
+  &:where([data-open]:not([data-open="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-closed {
+  &:where([data-state="closed"]),
+  &:where([data-closed]:not([data-closed="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-checked {
+  &:where([data-state="checked"]),
+  &:where([data-checked]:not([data-checked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-unchecked {
+  &:where([data-state="unchecked"]),
+  &:where([data-unchecked]:not([data-unchecked="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-selected {
+  &:where([data-selected="true"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-disabled {
+  &:where([data-disabled="true"]),
+  &:where([data-disabled]:not([data-disabled="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-active {
+  &:where([data-state="active"]),
+  &:where([data-active]:not([data-active="false"])) {
+    @slot;
+  }
+}
+
+@custom-variant data-horizontal {
+  &:where([data-orientation="horizontal"]) {
+    @slot;
+  }
+}
+
+@custom-variant data-vertical {
+  &:where([data-orientation="vertical"]) {
+    @slot;
+  }
+}
+
+/*
+ * shadcn/ui's semantic tokens, derived from the palette so every color scheme (and
+ * the sun blend) restyles the components with no per-scheme copies. They sit on :root,
+ * the element `data-theme` is set on, so each var() resolves against the active palette.
+ *
+ * The look is shadcn's neutral one: the primary action is foreground on background,
+ * inverted, and hover fills and borders are translucent foreground so they read on
+ * --background, --surface and --panel alike. --brand only tints focus rings.
+ */
+:root {
+  --radius: 0.5rem;
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--foreground);
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
+  --secondary: var(--panel);
+  --secondary-foreground: var(--foreground);
+  --muted: color-mix(in srgb, var(--foreground) 8%, transparent);
+  --muted-foreground: color-mix(in srgb, var(--foreground) 60%, transparent);
+  --accent: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --accent-foreground: var(--foreground);
+  --destructive: var(--error);
+  --border: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --input: color-mix(in srgb, var(--foreground) 15%, transparent);
+  --ring: var(--brand);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --color-surface: var(--surface);
   --color-panel: var(--panel);
-  --color-primary: var(--primary);
-  --color-secondary: var(--secondary);
-  --color-accent: var(--accent);
+  --color-brand: var(--brand);
+  --color-highlight: var(--highlight);
   --color-warning: var(--warning);
   --color-error: var(--error);
   --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
+  --font-heading: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* Rendered markdown follows the scheme instead of prose's fixed palettes. */
@@ -209,8 +333,12 @@
   font-weight: 700;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
 }
