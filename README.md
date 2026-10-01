@@ -50,6 +50,6 @@ pnpm test:web
 pnpm test:desktop
 ```
 
-The same `pnpm test` runs on every pull request via `.github/workflows/unit-tests.yml`.
+The same `pnpm test` runs on every pull request via `.github/workflows/unit-tests.yml`. Builds of the CLI (`build-cli.yml`), web and desktop apps (`build-apps.yml`) also run on every pull request.
 
 See each app's README for details.
