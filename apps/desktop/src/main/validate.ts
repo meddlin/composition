@@ -86,6 +86,16 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
       },
     ];
   },
+  saveFavorites: ([favorites]) => {
+    if (!Array.isArray(favorites)) fail("saveFavorites", "favorites");
+    return [
+      favorites.map((entry) => {
+        const value = record("saveFavorites", entry, "favorite");
+        if (value.type !== "group" && value.type !== "note") fail("saveFavorites", "type");
+        return { type: value.type, id: id("saveFavorites", value.id, "id") };
+      }),
+    ];
+  },
   saveSettings: ([input]) => {
     const value = record("saveSettings", input, "settings");
     return [

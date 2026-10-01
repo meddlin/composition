@@ -12,6 +12,7 @@ import type {
   SettingsSnapshot,
   Workspace,
 } from "./api";
+import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
@@ -104,6 +105,12 @@ export async function moveNoteToGroup(
 export async function saveLayout(layout: Layout): Promise<void> {
   await service.saveLayout(layout);
   revalidatePath("/");
+}
+
+// No revalidatePath: the workspace keeps its own copy of the pins, same as the layout's
+// optimistic updates, and re-renders from it.
+export async function saveFavorites(favorites: Favorites): Promise<void> {
+  await service.saveFavorites(favorites);
 }
 
 export async function saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult> {

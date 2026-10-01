@@ -73,6 +73,22 @@ Every group node is expanded on each rebuild (`expand=True`); collapsed state is
 persisted across a refresh (a search, a create, a delete), keeping the implementation
 simple at the cost of losing manual collapses on the next rebuild.
 
+## Favorites (web and desktop)
+
+The web and desktop sidebar can pin a group or a note to a **Favorites** section above the
+tree: "Add to favorites" in the `⋯` menu on a group row or a note row, "Remove from
+favorites" from the same menu (also available on the pinned rows themselves). Pinning is a
+shortcut, not a move — the item stays where it is in the tree. Favorites appear in the
+order they were pinned, and the section is hidden while nothing is pinned.
+
+The pinned list (`{ type: "group" | "note", id }[]`, see
+[`favorites.ts`](../../apps/web/src/lib/composition/favorites.ts)) lives in the web
+settings file next to the column layout, not in the database. The CLI builds its `Note`
+and `Group` models straight from `SELECT *` rows, so an extra column would break it. The
+trade-off: pins belong to the settings file, so pointing the app at a different database
+keeps the same list; entries whose group or note no longer exists are skipped when
+rendering, and deleting a pinned note or group removes its entry. The CLI has no favorites.
+
 ## Key bindings
 
 | Key | Action |

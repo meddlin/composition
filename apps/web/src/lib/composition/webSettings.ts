@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { NO_FAVORITES, parseFavorites, type Favorites } from "./favorites";
 import { clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import type { SavedLocation } from "./sunTimes";
@@ -31,12 +32,15 @@ export type WebSettings = {
   location?: SavedLocation;
   sidebarWidth: number;
   editorRatio: number;
+  /** Pinned groups and notes, in pin order. */
+  favorites: Favorites;
 };
 
 const DEFAULT_SETTINGS: WebSettings = {
   appDataDir: DEFAULT_APP_DATA_DIR,
   theme: DEFAULT_THEME,
   ...DEFAULT_LAYOUT,
+  favorites: NO_FAVORITES,
 };
 
 function parseLocation(value: unknown): SavedLocation | undefined {
@@ -71,6 +75,7 @@ export function loadWebSettings(): WebSettings {
       theme: isThemeName(data.theme) ? data.theme : DEFAULT_THEME,
       sidebarWidth: clampSidebarWidth(data.sidebarWidth),
       editorRatio: clampEditorRatio(data.editorRatio),
+      favorites: parseFavorites(data.favorites),
     };
     if (typeof data.dbPath === "string" && data.dbPath !== "") {
       settings.dbPath = data.dbPath;

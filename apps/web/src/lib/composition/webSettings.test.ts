@@ -36,7 +36,12 @@ describe("web settings layout", () => {
     writeSettings({ appDataDir: "/data", theme: "forest" });
     const { loadWebSettings } = await import("./webSettings");
 
-    expect(loadWebSettings()).toEqual({ appDataDir: "/data", theme: "forest", ...DEFAULT_LAYOUT });
+    expect(loadWebSettings()).toEqual({
+      appDataDir: "/data",
+      theme: "forest",
+      ...DEFAULT_LAYOUT,
+      favorites: [],
+    });
   });
 
   it("loads a saved layout", async () => {
@@ -61,6 +66,30 @@ describe("web settings layout", () => {
   it("round-trips through save and load", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
     const settings = { ...loadWebSettings(), sidebarWidth: 300, editorRatio: 0.4 };
+
+    saveWebSettings(settings);
+
+    expect(loadWebSettings()).toEqual(settings);
+  });
+});
+
+describe("web settings favorites", () => {
+  it("loads saved favorites and drops malformed entries", async () => {
+    writeSettings({
+      appDataDir: "/data",
+      favorites: [{ type: "group", id: 2 }, { type: "note", id: "x" }, null, { type: "note", id: 9 }],
+    });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings().favorites).toEqual([
+      { type: "group", id: 2 },
+      { type: "note", id: 9 },
+    ]);
+  });
+
+  it("round-trips through save and load", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    const settings = { ...loadWebSettings(), favorites: [{ type: "note" as const, id: 4 }] };
 
     saveWebSettings(settings);
 

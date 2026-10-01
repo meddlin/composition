@@ -27,6 +27,15 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.createNote(["Untitled", 4])).toEqual(["Untitled", 4]);
   });
 
+  it("keeps only the known fields of each favorite", () => {
+    expect(VALIDATORS.saveFavorites([[{ type: "note", id: 3, extra: 1 }, { type: "group", id: 1 }]])).toEqual([
+      [
+        { type: "note", id: 3 },
+        { type: "group", id: 1 },
+      ],
+    ]);
+  });
+
   it("drops arguments the method doesn't take", () => {
     expect(VALIDATORS.deleteNote([5, "extra", {}])).toEqual([5]);
     expect(VALIDATORS.loadWorkspace(["surprise"])).toEqual([]);
@@ -58,6 +67,11 @@ describe("VALIDATORS", () => {
     ["saveLayout", [[1, 2]]],
     ["saveLayout", [{ sidebarWidth: "wide", editorRatio: 0.5 }]],
     ["saveLayout", [{ sidebarWidth: Number.POSITIVE_INFINITY, editorRatio: 0.5 }]],
+    ["saveFavorites", [null]],
+    ["saveFavorites", [{ type: "note", id: 1 }]],
+    ["saveFavorites", [[null]]],
+    ["saveFavorites", [[{ type: "folder", id: 1 }]]],
+    ["saveFavorites", [[{ type: "note", id: "1" }]]],
     ["saveSettings", [{ appDataDir: 1, dbPath: "" }]],
     ["saveSettings", ["nope"]],
     ["saveTheme", [{}]],

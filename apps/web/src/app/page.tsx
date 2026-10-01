@@ -7,6 +7,13 @@ import { loadWorkspace } from "@/lib/composition/service";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { notes, groups, layout } = await loadWorkspace();
-  return <NotesApp initialNotes={notes} initialGroups={groups} initialLayout={layout} />;
+  const { notes, groups, layout, favorites } = await loadWorkspace();
+  return (
+    <NotesApp
+      initialNotes={notes}
+      initialGroups={groups}
+      initialLayout={layout}
+      initialFavorites={favorites}
+    />
+  );
 }

@@ -11,8 +11,16 @@ import {
   moveGroup as moveGroupAction,
   moveNoteToGroup as moveNoteToGroupAction,
   renameGroup as renameGroupAction,
+  saveFavorites,
   saveNoteContent,
 } from "@/lib/composition/client";
+import {
+  NO_FAVORITES,
+  removeFavorite,
+  toggleFavorite as toggleFavoriteIn,
+  type Favorites,
+  type FavoriteType,
+} from "@/lib/composition/favorites";
 import { canMoveGroup } from "@/lib/composition/groupMove";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { DropOverlay } from "./DropOverlay";
@@ -41,13 +49,19 @@ type Props = {
   initialNotes: Note[];
   initialGroups: Group[];
   initialLayout: Layout;
+  initialFavorites?: Favorites;
 };
 
 export function NotesApp(props: Props) {
   return <Workspace {...props} />;
 }
 
-function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
+function Workspace({
+  initialNotes,
+  initialGroups,
+  initialLayout,
+  initialFavorites = NO_FAVORITES,
+}: Props) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [groups, setGroups] = useState<Group[]>(initialGroups);
   // The open notes, side by side; the focused one is where sidebar picks and new notes open.
@@ -56,6 +70,9 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
   // When set, the group's listing page replaces the panes.
   const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
   const layout = useLayout(initialLayout);
+  const [favorites, setFavorites] = useState<Favorites>(initialFavorites);
+  // Mirrors `favorites` so two quick toggles never build on a stale list.
+  const latestFavorites = useRef(favorites);
 
   // Each open note debounces its own save: edits in two panes must not cancel each other's.
   const pendingSaves = useRef(
@@ -82,6 +99,24 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
   useEffect(() => () => flushPendingSave(), []);
 
   const { panes, focusedId } = paneState;
+
+  function updateFavorites(next: Favorites) {
+    latestFavorites.current = next;
+    setFavorites(next);
+    startTransition(async () => {
+      await saveFavorites(next);
+    });
+  }
+
+  function toggleFavorite(type: FavoriteType, id: number) {
+    updateFavorites(toggleFavoriteIn(latestFavorites.current, type, id));
+  }
+
+  // Deleting something pinned unpins it, so the stored list doesn't collect dead entries.
+  function forgetFavorite(type: FavoriteType, id: number) {
+    const next = removeFavorite(latestFavorites.current, type, id);
+    if (next.length !== latestFavorites.current.length) updateFavorites(next);
+  }
 
   // A group deleted while its page is open falls back to the panes.
   const viewedGroup = groups.find((g) => g.id === viewedGroupId) ?? null;
@@ -115,6 +150,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
 
     setNotes((prev) => prev.filter((n) => n.id !== id));
     setPaneState((prev) => closePane(prev, id));
+    forgetFavorite("note", id);
     startTransition(async () => {
       await deleteNote(id);
     });
@@ -159,6 +195,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
         return;
       }
       setGroups((prev) => prev.filter((g) => g.id !== id));
+      forgetFavorite("group", id);
     });
   }
 
@@ -202,6 +239,8 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
           viewedGroupId={viewedGroup?.id ?? null}
           width={layout.sidebarWidth}
           groupError={groupError}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
           onSelect={selectNote}
           onSelectGroup={selectGroup}
           onCreate={create}
