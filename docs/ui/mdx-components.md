@@ -67,8 +67,24 @@ See [images.md](../architecture/images.md) for where pasted images live and how 
 In `next dev`, React also logs that failure and Next shows its "Issue" badge. Production
 builds don't.
 
+## Completion in the editor
+
+Typing `<` in the editor opens a menu at the caret listing the components, like an IDE's
+completion. Keep typing to narrow it (`<wa` leaves `<Warning>`), then pick with ArrowUp/ArrowDown and
+Enter or Tab, or with the mouse; Escape dismisses it until the next `<`. Picking one inserts
+a ready-to-fill tag and puts the caret where you'd type next (between the blank lines of a
+callout, inside `src=""` for an image).
+
+It stays out of the way of ordinary text: no menu for `a<b` or `<<`, or inside a fenced code
+block. Source: [`mdx/completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts)
+(the catalog and trigger rules) and
+[`useMdxCompletion.ts`](../../apps/web/src/components/notes/useMdxCompletion.ts).
+
 ## Adding a component
 
 1. Write it in `components/notes/mdx/`. `Info` and `Warning` are thin wrappers over `Panel`, which holds the shared layout.
 2. Add it to `mdxComponents` in [`components.ts`](../../apps/web/src/components/notes/mdx/components.ts).
    That is the allowlist; the tag name in a note is the key.
+3. Add its entry to `catalog` in [`completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts):
+   a one-line description and the template to insert (`$0` is where the caret goes). The type
+   makes this a compile error to forget.

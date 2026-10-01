@@ -7,7 +7,9 @@ import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition
 import { FrontmatterCard } from "./FrontmatterCard";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
+import { MdxCompletionMenu } from "./MdxCompletionMenu";
 import { useCodeHighlighting } from "./useCodeHighlighting";
+import { useMdxCompletion } from "./useMdxCompletion";
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -98,6 +100,11 @@ export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, 
     resolvePlaceholder(placeholder, markdown);
   }
 
+  const completion = useMdxCompletion(textarea, value, (start, end, text, caret) => {
+    pendingCaret.current = start + caret;
+    replaceText(start, end, text);
+  });
+
   function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
     // Cells copied from a spreadsheet arrive as text and a picture of that text; the text is what was meant.
@@ -131,16 +138,23 @@ export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, 
           </p>
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
-        <Textarea
-          ref={textarea}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onPaste={onPaste}
-          spellCheck={false}
-          aria-label="Markdown editor"
-          placeholder="Start writing in Markdown…"
-          className="min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent"
-        />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <Textarea
+            ref={textarea}
+            value={value}
+            onChange={(e) => {
+              onChange(e.target.value);
+              completion.sync(e.target);
+            }}
+            onPaste={onPaste}
+            spellCheck={false}
+            aria-label="Markdown editor"
+            placeholder="Start writing in Markdown…"
+            {...completion.textareaProps}
+            className="min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent"
+          />
+          {completion.open && <MdxCompletionMenu {...completion.menu} />}
+        </div>
       </section>
       <ResizeHandle
         label="Resize editor and preview"
