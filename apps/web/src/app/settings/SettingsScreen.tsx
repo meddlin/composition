@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { SettingsForm } from "./SettingsForm";
+import { TrashCan } from "./TrashCan";
 
 /**
  * The Settings screen, rendered from a snapshot. The web page builds the
@@ -69,6 +70,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         currentDbPath={snapshot.dbPathOverride}
         derivedDbPathPlaceholder={snapshot.derivedDbPath}
       />
+
+      <TrashCan initialTrash={snapshot.trash} />
     </div>
   );
 }

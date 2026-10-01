@@ -35,6 +35,13 @@ export const createGroup: CompositionApi["createGroup"] = (name, parentId) =>
 export const renameGroup: CompositionApi["renameGroup"] = (id, name) =>
   bridge().renameGroup(id, name);
 export const deleteGroup: CompositionApi["deleteGroup"] = (id) => bridge().deleteGroup(id);
+export const loadTrash: CompositionApi["loadTrash"] = () => bridge().loadTrash();
+export const restoreNote: CompositionApi["restoreNote"] = (id) => bridge().restoreNote(id);
+export const restoreGroup: CompositionApi["restoreGroup"] = (id) => bridge().restoreGroup(id);
+export const permanentlyDeleteNote: CompositionApi["permanentlyDeleteNote"] = (id) =>
+  bridge().permanentlyDeleteNote(id);
+export const permanentlyDeleteGroup: CompositionApi["permanentlyDeleteGroup"] = (id) =>
+  bridge().permanentlyDeleteGroup(id);
 export const saveLayout: CompositionApi["saveLayout"] = (layout) => bridge().saveLayout(layout);
 export const saveFavorites: CompositionApi["saveFavorites"] = (favorites) =>
   bridge().saveFavorites(favorites);
@@ -57,6 +64,7 @@ export type {
   SettingsSnapshot,
   Workspace,
 } from "./api";
+export type { RestoreResult, Trash, TrashedGroup, TrashedNote } from "./trash";
 
 // Same exports as client.ts, checked against the contract.
 const _implementsApi: CompositionApi = {
@@ -72,6 +80,11 @@ const _implementsApi: CompositionApi = {
   renameGroup,
   deleteGroup,
   moveGroup,
+  loadTrash,
+  restoreNote,
+  restoreGroup,
+  permanentlyDeleteNote,
+  permanentlyDeleteGroup,
   saveLayout,
   saveFavorites,
   saveSettings,

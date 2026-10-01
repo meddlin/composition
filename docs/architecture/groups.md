@@ -45,7 +45,9 @@ classDiagram
 
 `NotesStore.delete_group` refuses to delete a group that still has sub-groups or notes
 directly in it, raising `GroupNotEmptyError`. There is no cascade and no
-auto-promotion of children to a parent — the group must be emptied first.
+auto-promotion of children to a parent — the group must be emptied first. (The web and
+desktop apps apply the same rule, but move the emptied group to the Trash Can instead of
+erasing it; see [web-trash-can.md](../ui/web-trash-can.md).)
 `NotesStore.group_is_empty` is the read-only check `MainScreen` uses to decide whether
 to show a warning notification instead of the delete-confirmation modal.
 

@@ -7,6 +7,8 @@ flows through it.
 
 See [ui/web-groups.md](ui/web-groups.md) for how groups are managed in the web app.
 
+See [ui/web-trash-can.md](ui/web-trash-can.md) for the delete confirmation and the Trash Can on the Settings page.
+
 See [ui/web-components.md](ui/web-components.md) for the shadcn/ui component setup and how its tokens map onto the color schemes.
 
 See [desktop-app-plan.md](desktop-app-plan.md) for the proposed Electron desktop app, and
@@ -27,6 +29,8 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
 
 - [x] Create note
 - [x] Delete note
+    - [x] Confirm before deleting (web and desktop)
+    - [x] Trash Can in Settings: restore recently deleted notes and groups; permanently deleted after 60 days (web and desktop)
 - [x] Search across notes
 - [x] Metadata support via front-matter
     - [] Support tags on notes, allow searching for notes via tags

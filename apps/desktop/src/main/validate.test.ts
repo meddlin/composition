@@ -36,6 +36,14 @@ describe("VALIDATORS", () => {
     ]);
   });
 
+  it("passes the Trash Can's ids through and takes no arguments to load it", () => {
+    expect(VALIDATORS.restoreNote([3, "extra"])).toEqual([3]);
+    expect(VALIDATORS.restoreGroup([4])).toEqual([4]);
+    expect(VALIDATORS.permanentlyDeleteNote([5])).toEqual([5]);
+    expect(VALIDATORS.permanentlyDeleteGroup([6])).toEqual([6]);
+    expect(VALIDATORS.loadTrash(["surprise"])).toEqual([]);
+  });
+
   it("drops arguments the method doesn't take", () => {
     expect(VALIDATORS.deleteNote([5, "extra", {}])).toEqual([5]);
     expect(VALIDATORS.loadWorkspace(["surprise"])).toEqual([]);
@@ -56,6 +64,10 @@ describe("VALIDATORS", () => {
     ["saveNoteContent", [1, 42]],
     ["deleteNote", [Number.NaN]],
     ["deleteNote", [undefined]],
+    ["restoreNote", ["3"]],
+    ["restoreGroup", [undefined]],
+    ["permanentlyDeleteNote", [Number.NaN]],
+    ["permanentlyDeleteGroup", [1.5]],
     ["moveNoteToGroup", [1, undefined]],
     ["moveNoteToGroup", [1, "7"]],
     ["createGroup", [{}, null]],

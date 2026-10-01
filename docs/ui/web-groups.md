@@ -55,7 +55,7 @@ was collapsed, so expand it to see the moved group.
 |---|---|
 | Rename | Same inline rename as double-click. |
 | New sub-group | Expands the group and shows an inline name field beneath it. |
-| Delete group | Deletes the group. Disabled unless the group has no notes and no sub-groups (see [Deleting a group](../architecture/groups.md#deleting-a-group)). |
+| Delete group | Asks for confirmation, then moves the group to the Trash Can (see [web-trash-can.md](web-trash-can.md)). Disabled unless the group has no notes and no sub-groups (see [Deleting a group](../architecture/groups.md#deleting-a-group)). |
 
 Keyboard: `Enter`/`Space` on `⋯` opens the menu and focuses the first item; `↑`/`↓`
 move between items; `Esc` closes it and returns focus to `⋯`; clicking elsewhere,

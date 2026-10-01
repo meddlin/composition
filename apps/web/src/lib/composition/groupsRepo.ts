@@ -92,13 +92,3 @@ export function groupIsEmpty(id: number): boolean {
     .get(id) as { count: number };
   return childGroupCount === 0 && noteCount === 0;
 }
-
-/** Refuses to delete a group that still has sub-groups or notes in it. */
-export function deleteGroup(id: number): void {
-  if (!groupIsEmpty(id)) {
-    throw new GroupNotEmptyError(
-      `Group ${id} still has sub-groups or notes; empty it before deleting.`,
-    );
-  }
-  getDb().prepare("DELETE FROM groups WHERE id = ?").run(id);
-}

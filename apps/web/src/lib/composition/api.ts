@@ -4,6 +4,7 @@ import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
+import type { RestoreResult, Trash } from "./trash";
 
 /**
  * The contract between the notes UI and whatever stores the data. Two
@@ -41,6 +42,8 @@ export type SettingsSnapshot = {
   derivedDbPath: string;
   dirWritable: boolean;
   dbExists: boolean;
+  /** The Trash Can's contents (empty when there is no database yet). */
+  trash: Trash;
   /** The saved city for the "Follow the sun" scheme, or "". */
   city: string;
   /** Today's sunrise and sunset there, formatted in its own timezone (when a city is saved and reachable). */
@@ -83,13 +86,22 @@ export interface CompositionApi {
   saveNoteContent(noteId: number, content: string): Promise<Note>;
   /** Stores a pasted image in `<application data>/app_data/`. Served back by `app_data/<name>`, which is not part of this contract. */
   saveImage(input: SaveImageInput): Promise<SaveImageResult>;
+  /** Moves the note to the Trash Can; it is not erased (see `permanentlyDeleteNote`). */
   deleteNote(id: number): Promise<void>;
   moveNoteToGroup(noteId: number, groupId: number | null): Promise<Note>;
 
   createGroup(name: string, parentId: number | null): Promise<Group>;
   renameGroup(id: number, name: string): Promise<Group>;
+  /** Moves an empty group to the Trash Can; a group with notes or sub-groups comes back as `error`. */
   deleteGroup(id: number): Promise<{ error?: string }>;
   moveGroup(id: number, parentId: number | null): Promise<MoveGroupResult>;
+
+  /** Recently deleted notes and groups. Anything older than `TRASH_RETENTION_DAYS` is permanently deleted first. */
+  loadTrash(): Promise<Trash>;
+  restoreNote(id: number): Promise<RestoreResult>;
+  restoreGroup(id: number): Promise<RestoreResult>;
+  permanentlyDeleteNote(id: number): Promise<void>;
+  permanentlyDeleteGroup(id: number): Promise<void>;
 
   saveLayout(layout: Layout): Promise<void>;
   /** Replaces the pinned list (the sidebar's Favorites section). */
@@ -121,6 +133,11 @@ export const API_METHODS = [
   "renameGroup",
   "deleteGroup",
   "moveGroup",
+  "loadTrash",
+  "restoreNote",
+  "restoreGroup",
+  "permanentlyDeleteNote",
+  "permanentlyDeleteGroup",
   "saveLayout",
   "saveFavorites",
   "saveSettings",

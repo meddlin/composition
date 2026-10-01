@@ -141,6 +141,7 @@ describe("loadSettings", () => {
       derivedDbPath: path.join(home, ".composition", "composition.db"),
       dirWritable: false,
       dbExists: false,
+      trash: { notes: [], groups: [] },
       city: "",
     });
   });
@@ -254,6 +255,197 @@ describe("groups", () => {
 
     expect(moved.groupId).toBe(group.id);
     expect(moved.updatedAt).toBe(note.updatedAt);
+  });
+});
+
+describe("Trash Can", () => {
+  it("moves a deleted note out of the workspace and the search index, but keeps it restorable", async () => {
+    const searchIndex = await import("./searchIndex");
+    const service = await import("./service");
+    const note = await service.createNote("Precious");
+
+    await service.deleteNote(note.id);
+
+    expect((await service.loadWorkspace()).notes).toEqual([]);
+    expect(searchIndex.deleteNoteFromIndex).toHaveBeenCalledWith(note.id);
+    const trash = await service.loadTrash();
+    expect(trash.notes).toEqual([
+      { id: note.id, title: "Precious", deletedAt: expect.any(String), expiresAt: expect.any(String) },
+    ]);
+  });
+
+  it("schedules permanent deletion 60 days after the deletion", async () => {
+    const service = await import("./service");
+    const note = await service.createNote("Precious");
+    await service.deleteNote(note.id);
+
+    const [trashed] = (await service.loadTrash()).notes;
+
+    const days = (Date.parse(trashed.expiresAt) - Date.parse(trashed.deletedAt)) / 86_400_000;
+    expect(days).toBe(60);
+  });
+
+  it("restores a note whole, into its group, and back into the search index", async () => {
+    const searchIndex = await import("./searchIndex");
+    const service = await import("./service");
+    const group = await service.createGroup("Work", null);
+    const note = await service.createNote("Precious", group.id);
+    const edited = await service.saveNoteContent(
+      note.id,
+      note.content.replace("title: Precious", "title: Precious\ntags:\n- a"),
+    );
+    await service.deleteNote(note.id);
+    vi.mocked(searchIndex.indexNote).mockClear();
+
+    expect(await service.restoreNote(note.id)).toEqual({ restoredToTopLevel: false });
+
+    const { notes } = await service.loadWorkspace();
+    expect(notes).toEqual([edited]);
+    expect(searchIndex.indexNote).toHaveBeenCalledWith(edited);
+    expect((await service.loadTrash()).notes).toEqual([]);
+  });
+
+  it("restores a note ungrouped when its group has been deleted since", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("Work", null);
+    const note = await service.createNote("Precious", group.id);
+    await service.deleteNote(note.id);
+    await service.deleteGroup(group.id);
+
+    expect(await service.restoreNote(note.id)).toEqual({ restoredToTopLevel: true });
+
+    expect((await service.loadWorkspace()).notes[0]).toMatchObject({ id: note.id, groupId: null });
+  });
+
+  it("restores a note into its group once that group has been restored too", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("Work", null);
+    const note = await service.createNote("Precious", group.id);
+    await service.deleteNote(note.id);
+    await service.deleteGroup(group.id);
+
+    await service.restoreGroup(group.id);
+    await service.restoreNote(note.id);
+
+    expect((await service.loadWorkspace()).notes[0]).toMatchObject({ id: note.id, groupId: group.id });
+  });
+
+  it("moves a deleted group to the trash and restores it under its parent", async () => {
+    const service = await import("./service");
+    const parent = await service.createGroup("Parent", null);
+    const child = await service.createGroup("Child", parent.id);
+
+    expect(await service.deleteGroup(child.id)).toEqual({});
+    expect((await service.loadWorkspace()).groups.map((g) => g.id)).toEqual([parent.id]);
+    expect((await service.loadTrash()).groups.map((g) => g.name)).toEqual(["Child"]);
+
+    expect(await service.restoreGroup(child.id)).toEqual({ restoredToTopLevel: false });
+    expect((await service.loadWorkspace()).groups).toContainEqual(child);
+  });
+
+  it("restores a group at the top level when its parent is gone", async () => {
+    const service = await import("./service");
+    const parent = await service.createGroup("Parent", null);
+    const child = await service.createGroup("Child", parent.id);
+    await service.deleteGroup(child.id);
+    await service.deleteGroup(parent.id);
+
+    expect(await service.restoreGroup(child.id)).toEqual({ restoredToTopLevel: true });
+
+    expect((await service.loadWorkspace()).groups).toEqual([{ ...child, parentId: null }]);
+  });
+
+  it("does not trash a group that still has a note", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("Work", null);
+    await service.createNote("In work", group.id);
+
+    await service.deleteGroup(group.id);
+
+    expect((await service.loadTrash()).groups).toEqual([]);
+  });
+
+  it("lists the most recently deleted first", async () => {
+    const service = await import("./service");
+    const a = await service.createNote("A");
+    const b = await service.createNote("B");
+    await service.deleteNote(a.id);
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await service.deleteNote(b.id);
+
+    expect((await service.loadTrash()).notes.map((n) => n.title)).toEqual(["B", "A"]);
+  });
+
+  it("permanently deletes an item on request, and says so when it is already gone", async () => {
+    const service = await import("./service");
+    const note = await service.createNote("Doomed");
+    const group = await service.createGroup("Doomed", null);
+    await service.deleteNote(note.id);
+    await service.deleteGroup(group.id);
+
+    await service.permanentlyDeleteNote(note.id);
+    await service.permanentlyDeleteGroup(group.id);
+
+    expect(await service.loadTrash()).toEqual({ notes: [], groups: [] });
+    expect(await service.restoreNote(note.id)).toEqual({ error: expect.any(String) });
+    expect(await service.restoreGroup(group.id)).toEqual({ error: expect.any(String) });
+  });
+
+  it("permanently deletes items older than 60 days when the trash is loaded, and keeps newer ones", async () => {
+    const { getDb } = await import("./db");
+    const service = await import("./service");
+    const old = await service.createNote("Old");
+    const recent = await service.createNote("Recent");
+    const oldGroup = await service.createGroup("Old group", null);
+    await service.deleteNote(old.id);
+    await service.deleteNote(recent.id);
+    await service.deleteGroup(oldGroup.id);
+    const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+    const db = getDb();
+    db.prepare("UPDATE trashed_notes SET deleted_at = ? WHERE id = ?").run(daysAgo(61), old.id);
+    db.prepare("UPDATE trashed_notes SET deleted_at = ? WHERE id = ?").run(daysAgo(59), recent.id);
+    db.prepare("UPDATE trashed_groups SET deleted_at = ? WHERE id = ?").run(daysAgo(61), oldGroup.id);
+
+    const trash = await service.loadTrash();
+
+    expect(trash.notes.map((n) => n.title)).toEqual(["Recent"]);
+    expect(trash.groups).toEqual([]);
+  });
+
+  it("clears expired items when the workspace opens", async () => {
+    const { getDb } = await import("./db");
+    const service = await import("./service");
+    const note = await service.createNote("Old");
+    await service.deleteNote(note.id);
+    getDb()
+      .prepare("UPDATE trashed_notes SET deleted_at = ?")
+      .run(new Date(Date.now() - 61 * 86_400_000).toISOString());
+
+    await service.loadWorkspace();
+
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM trashed_notes").get()).toEqual({ n: 0 });
+  });
+
+  it("shows the trash in the settings snapshot without creating a missing database", async () => {
+    const fsModule = await import("node:fs");
+    const service = await import("./service");
+
+    const empty = await service.loadSettings();
+    expect(empty.trash).toEqual({ notes: [], groups: [] });
+    expect(fsModule.existsSync(empty.dbPath)).toBe(false);
+
+    const note = await service.createNote("Keep");
+    await service.deleteNote(note.id);
+    expect((await service.loadSettings()).trash.notes.map((n) => n.title)).toEqual(["Keep"]);
+  });
+
+  it("leaves the CLI's two tables free of anything in the trash", async () => {
+    const { getDb } = await import("./db");
+    const service = await import("./service");
+    const note = await service.createNote("Gone");
+    await service.deleteNote(note.id);
+
+    expect(getDb().prepare("SELECT COUNT(*) AS n FROM notes").get()).toEqual({ n: 0 });
   });
 });
 

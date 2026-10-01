@@ -25,6 +25,8 @@ import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
 import { defaultDatabasePath, expandHome } from "./paths";
 import * as searchIndex from "./searchIndex";
+import { EMPTY_TRASH, type RestoreResult, type Trash } from "./trash";
+import * as trashRepo from "./trashRepo";
 import {
   cachedSunSchedule,
   geocodeCity,
@@ -57,6 +59,8 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 
 export async function loadWorkspace(): Promise<Workspace> {
   const { sidebarWidth, editorRatio, favorites } = loadWebSettings();
+  // Opening the app is when expired Trash Can items are cleared out.
+  trashRepo.purgeExpired();
   return {
     notes: notesRepo.listNotes(),
     groups: groupsRepo.listGroups(),
@@ -78,6 +82,9 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
   const settings = loadWebSettings();
   const dbPath = resolvedDbPath(settings);
   const { location } = settings;
+  // Looking at Settings must not be what creates a missing database file.
+  const dbExists = fs.existsSync(dbPath);
+  const trash = dbExists ? await loadTrash() : EMPTY_TRASH;
   return {
     theme: settings.theme,
     appDataDir: settings.appDataDir,
@@ -85,7 +92,8 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     dbPathOverride: settings.dbPath ?? "",
     derivedDbPath: defaultDatabasePath(settings.appDataDir),
     dirWritable: isWritableDir(settings.appDataDir),
-    dbExists: fs.existsSync(dbPath),
+    dbExists,
+    trash,
     city: location?.name ?? "",
     sunTimes: location
       ? todaysSunTimes(await loadSunEvents(location), location.timezone)
@@ -179,8 +187,12 @@ export async function createNote(
   return note;
 }
 
+/**
+ * Moves the note to the Trash Can rather than erasing it. It leaves the search
+ * index straight away, and comes back into it if restored.
+ */
 export async function deleteNote(id: number): Promise<void> {
-  notesRepo.deleteNote(id);
+  trashRepo.trashNote(id);
   await bestEffortIndex(() => searchIndex.deleteNoteFromIndex(id));
 }
 
@@ -199,13 +211,13 @@ export async function renameGroup(id: number, name: string): Promise<Group> {
 }
 
 /**
- * Returns an error message instead of throwing on GroupNotEmptyError, so a
- * race (another window added a note to this group mid-delete) surfaces as
- * inline feedback rather than a crashed action.
+ * Moves the group to the Trash Can. Returns an error message instead of
+ * throwing on GroupNotEmptyError, so a race (another window added a note to
+ * this group mid-delete) surfaces as inline feedback rather than a crashed action.
  */
 export async function deleteGroup(id: number): Promise<{ error?: string }> {
   try {
-    groupsRepo.deleteGroup(id);
+    trashRepo.trashGroup(id);
   } catch (error) {
     if (error instanceof GroupNotEmptyError) {
       return { error: "This group still has sub-groups or notes — empty it first." };
@@ -213,6 +225,34 @@ export async function deleteGroup(id: number): Promise<{ error?: string }> {
     throw error;
   }
   return {};
+}
+
+/** Expired items are cleared first, so the list never offers one that is about to vanish. */
+export async function loadTrash(): Promise<Trash> {
+  trashRepo.purgeExpired();
+  return trashRepo.listTrash();
+}
+
+const NOT_IN_TRASH = "That item is no longer in the Trash Can.";
+
+export async function restoreNote(id: number): Promise<RestoreResult> {
+  const restored = trashRepo.restoreNote(id);
+  if (!restored) return { error: NOT_IN_TRASH };
+  const note = notesRepo.getNote(id);
+  if (note) await bestEffortIndex(() => searchIndex.indexNote(note));
+  return restored;
+}
+
+export async function restoreGroup(id: number): Promise<RestoreResult> {
+  return trashRepo.restoreGroup(id) ?? { error: NOT_IN_TRASH };
+}
+
+export async function permanentlyDeleteNote(id: number): Promise<void> {
+  trashRepo.purgeNote(id);
+}
+
+export async function permanentlyDeleteGroup(id: number): Promise<void> {
+  trashRepo.purgeGroup(id);
 }
 
 /**
@@ -364,6 +404,11 @@ const _implementsApi: CompositionApi = {
   renameGroup,
   deleteGroup,
   moveGroup,
+  loadTrash,
+  restoreNote,
+  restoreGroup,
+  permanentlyDeleteNote,
+  permanentlyDeleteGroup,
   saveLayout,
   saveFavorites,
   saveSettings,
