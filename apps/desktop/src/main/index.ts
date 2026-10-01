@@ -23,6 +23,9 @@ registerSchemePrivileges();
 const userData = app.getPath("userData");
 process.env.COMPOSITION_SETTINGS_PATH = path.join(userData, "settings.json");
 
+// Images stay on this machine, so the web app's upload size limit does not apply.
+service.setMaxImageBytes(null);
+
 // Development loads the UI from `next dev`; a packaged app never does.
 const devUrl = app.isPackaged ? undefined : process.env.COMPOSITION_DEV_URL;
 const devOrigin = devUrl ? originOf(devUrl) : null;

@@ -20,6 +20,7 @@ import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import * as images from "./images";
+import { MAX_IMAGE_BYTES } from "./imageRefs";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
@@ -158,6 +159,16 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
   return note;
 }
 
+let maxImageBytes: number | null = MAX_IMAGE_BYTES;
+
+/**
+ * Overrides the largest image `saveImage` accepts (null: no limit). The web
+ * app keeps the default; the desktop app lifts it at startup.
+ */
+export function setMaxImageBytes(bytes: number | null): void {
+  maxImageBytes = bytes;
+}
+
 /**
  * Stores a pasted image under the current application data directory, named
  * after the note it was pasted into. A bad image comes back as `error` so the
@@ -166,7 +177,7 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
 export async function saveImage({ noteId, fileName, data }: SaveImageInput): Promise<SaveImageResult> {
   const note = notesRepo.getNote(noteId);
   if (!note) return { error: "That note no longer exists." };
-  return images.storeImage(loadWebSettings().appDataDir, { noteTitle: note.title, fileName, data });
+  return images.storeImage(loadWebSettings().appDataDir, { noteTitle: note.title, fileName, data }, maxImageBytes);
 }
 
 /**

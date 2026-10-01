@@ -59,12 +59,17 @@ export type StoreImageResult = { name: string; error?: undefined } | { name?: un
  * Writes the image under a name derived from the note and file names, plus a
  * hash of the bytes so two different images can never share one. Pasting the
  * same image into the same note again reuses the file instead of duplicating it.
+ * `maxBytes` is the size limit, or null for none.
  */
-export function storeImage(appDataDir: string, input: StoreImageInput): StoreImageResult {
+export function storeImage(
+  appDataDir: string,
+  input: StoreImageInput,
+  maxBytes: number | null = MAX_IMAGE_BYTES,
+): StoreImageResult {
   const { noteTitle, fileName, data } = input;
   if (data.byteLength === 0) return { error: "That image is empty." };
-  if (data.byteLength > MAX_IMAGE_BYTES) {
-    return { error: `Images can be at most ${MAX_IMAGE_BYTES / (1024 * 1024)} MB.` };
+  if (maxBytes !== null && data.byteLength > maxBytes) {
+    return { error: `Images can be at most ${maxBytes / (1024 * 1024)} MB.` };
   }
   const ext = sniffImage(data);
   if (!ext) return { error: "Only PNG, JPEG, GIF, and WebP images are supported." };

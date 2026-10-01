@@ -2,7 +2,8 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type Clip
 import { Textarea } from "@/components/ui/textarea";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
-import { imageRef, MAX_IMAGE_BYTES } from "@/lib/composition/imageRefs";
+import { imageRef } from "@/lib/composition/imageRefs";
+import { maxImageBytes } from "@/lib/composition/imageLimit";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { cn } from "@/lib/utils";
 import { panelId, tabId } from "./EditorTabs";
@@ -131,9 +132,9 @@ export function MarkdownEditor({
     setImageError(null);
 
     const { selectionStart, selectionEnd } = event.currentTarget;
-    const tooBig = images.find((file) => file.size > MAX_IMAGE_BYTES);
-    if (tooBig) {
-      setImageError(`Images can be at most ${MAX_IMAGE_BYTES / (1024 * 1024)} MB.`);
+    const limit = maxImageBytes;
+    if (limit !== null && images.some((file) => file.size > limit)) {
+      setImageError(`Images can be at most ${limit / (1024 * 1024)} MB.`);
       return;
     }
     // The first replaces the selection; any others follow it.

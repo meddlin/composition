@@ -71,8 +71,13 @@ plain URL (below).
   images never share a name, even from the same note with the same file name, and
   pasting the *same* image into the same note again reuses the existing file.
 - The extension comes from the bytes (PNG, JPEG, GIF, WebP), never from the claimed
-  file name or MIME type. Anything else is refused, as is an empty file or one over
-  10 MB. SVG is refused on purpose: it can carry script.
+  file name or MIME type. Anything else is refused, as is an empty file. SVG is refused
+  on purpose: it can carry script.
+- **Size:** the web app refuses images over 10 MB (`MAX_IMAGE_BYTES`, and a 12 MB
+  Server Action body limit in `next.config.ts` to carry them). The desktop app has no
+  limit: the image never leaves the user's machine. The editor's check is per build
+  (`imageLimit.ts` / `imageLimit.desktop.ts`); the main process lifts the server-side
+  one with `service.setMaxImageBytes(null)`.
 
 The title is read when the image is pasted. Renaming the note later leaves the
 file name as it was.

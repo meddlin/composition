@@ -87,6 +87,13 @@ describe("storeImage", () => {
     expect(result.name).toMatch(/\.jpg$/);
   });
 
+  it("accepts an image over the limit when the limit is lifted", () => {
+    const data = new Uint8Array(MAX_IMAGE_BYTES + 1);
+    data.set(JPEG);
+
+    expect(storeImage(dir, { noteTitle: "Trip", fileName: "x.png", data }, null).name).toMatch(/\.jpg$/);
+  });
+
   it.each([
     ["an empty file", new Uint8Array()],
     ["something that isn't an image", new TextEncoder().encode("not an image")],

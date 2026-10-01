@@ -11,7 +11,7 @@
 /** The folder inside the application data directory, and the prefix in a note's image path. */
 export const IMAGE_DIR_NAME = "app_data";
 
-/** Largest image the app accepts. */
+/** Largest image the web app accepts. The desktop app has no limit (see imageLimit.ts). */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /** Stored images only ever have these extensions; what is on disk is sniffed, not trusted. */
