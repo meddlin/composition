@@ -1,13 +1,16 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
 import { imageRef, MAX_IMAGE_BYTES } from "@/lib/composition/imageRefs";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
+import { cn } from "@/lib/utils";
+import { panelId, tabId } from "./EditorTabs";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
 import { useMdxCompletion } from "./useMdxCompletion";
 
@@ -20,14 +23,29 @@ type Props = {
   ratio: number;
   onRatioChange: (ratio: number) => void;
   onRatioCommit: () => void;
+  /** Which of the editor and preview to show; both, side by side, unless told otherwise. */
+  view?: PaneView;
+  /** Prefix for the panels' ids, so tabs elsewhere (EditorTabs) can point at them. */
+  idBase?: string;
 };
-
-const paneHeader = "border-b px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
 /** Markdown image syntax is `![alt](path)`, so brackets in the alt text must go. */
 const altTextFor = (fileName: string) => fileName.replace(/\.[^.]*$/, "").replace(/[[\]\r\n]+/g, " ").trim() || "image";
 
-export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, onRatioCommit }: Props) {
+export function MarkdownEditor({
+  noteId,
+  value,
+  onChange,
+  ratio,
+  onRatioChange,
+  onRatioCommit,
+  view = "split",
+  idBase,
+}: Props) {
+  const ownIdBase = useId();
+  const ids = idBase ?? ownIdBase;
+  const showEditor = view !== "preview";
+  const showPreview = view !== "markdown";
   // The raw text (frontmatter included) stays in the editor; the preview shows
   // the frontmatter as a metadata card rather than as Markdown content.
   const [fm, body] = useMemo(() => parse(value), [value]);
@@ -124,14 +142,23 @@ export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, 
   }
 
   return (
-    // Column sizes go through CSS variables so the panes still stack below `md`.
+    // Column sizes go through CSS variables. The editor stays mounted while the preview is
+    // shown alone, so its caret, undo history and any image still uploading are not lost.
     <div
       ref={grid}
       style={{ "--editor-col": `${ratio}fr`, "--preview-col": `${1 - ratio}fr` } as CSSProperties}
-      className="grid min-w-0 flex-1 grid-cols-1 grid-rows-2 md:grid-cols-[minmax(0,var(--editor-col))_auto_minmax(0,var(--preview-col))] md:grid-rows-1"
+      className={cn(
+        "grid min-h-0 min-w-0 flex-1 grid-rows-1",
+        view === "split" ? "grid-cols-[minmax(0,var(--editor-col))_auto_minmax(0,var(--preview-col))]" : "grid-cols-1",
+      )}
     >
-      <section className="flex min-h-0 flex-col">
-        <h2 className={paneHeader}>Markdown</h2>
+      <section
+        role="tabpanel"
+        id={panelId(ids, "markdown")}
+        aria-labelledby={tabId(ids, "markdown")}
+        hidden={!showEditor}
+        className="flex min-h-0 flex-col"
+      >
         {imageError && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
             {imageError}
@@ -156,24 +183,33 @@ export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, 
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
         </div>
       </section>
-      <ResizeHandle
-        label="Resize editor and preview"
-        valueNow={Math.round(ratio * 100)}
-        valueMin={MIN_EDITOR_RATIO * 100}
-        valueMax={MAX_EDITOR_RATIO * 100}
-        className="hidden md:block"
-        onResizeStart={() => {
-          dragStart.current = { ratio, width: grid.current?.getBoundingClientRect().width ?? 0 };
-        }}
-        onResize={(dx) => onRatioChange(dragRatio(dragStart.current.ratio, dx, dragStart.current.width))}
-        onResizeEnd={onRatioCommit}
-      />
-      <section className="flex min-h-0 flex-col border-t md:border-t-0">
-        <h2 className={paneHeader}>Preview</h2>
-        <div className="prose max-w-none flex-1 overflow-y-auto p-4">
-          {fm && <FrontmatterCard fm={fm} />}
-          <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
-        </div>
+      {view === "split" && (
+        <ResizeHandle
+          label="Resize editor and preview"
+          valueNow={Math.round(ratio * 100)}
+          valueMin={MIN_EDITOR_RATIO * 100}
+          valueMax={MAX_EDITOR_RATIO * 100}
+          onResizeStart={() => {
+            dragStart.current = { ratio, width: grid.current?.getBoundingClientRect().width ?? 0 };
+          }}
+          onResize={(dx) => onRatioChange(dragRatio(dragStart.current.ratio, dx, dragStart.current.width))}
+          onResizeEnd={onRatioCommit}
+        />
+      )}
+      <section
+        role="tabpanel"
+        id={panelId(ids, "preview")}
+        aria-labelledby={tabId(ids, "preview")}
+        hidden={!showPreview}
+        className="flex min-h-0 flex-col"
+      >
+        {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
+        {showPreview && (
+          <div className="prose max-w-none flex-1 overflow-y-auto p-4">
+            {fm && <FrontmatterCard fm={fm} />}
+            <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+          </div>
+        )}
       </section>
     </div>
   );
