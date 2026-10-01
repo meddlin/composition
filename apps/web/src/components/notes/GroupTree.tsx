@@ -7,14 +7,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Input } from "@/components/ui/input";
 import { canMoveGroup } from "@/lib/composition/groupMove";
 import { cn } from "@/lib/utils";
+import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
 import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
 import { noteTitle, type Group, type Note } from "./types";
-
-// Custom MIME type so drop targets can tell a dragged note apart from any
-// other draggable content a browser might offer.
-const NOTE_DRAG_TYPE = "application/x-composition-note-id";
-const GROUP_DRAG_TYPE = "application/x-composition-group-id";
 
 type TreeProps = {
   groups: Group[];
