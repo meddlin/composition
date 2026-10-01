@@ -248,3 +248,156 @@ describe("MarkdownEditor image preview", () => {
     expect(screen.getByAltText("inline")).toBeDefined();
   });
 });
+
+describe("MarkdownEditor component completion", () => {
+  afterEach(cleanup);
+
+  function Harness({ initial = "" }: { initial?: string }) {
+    const [value, setValue] = useState(initial);
+    return (
+      <MarkdownEditor noteId={7} value={value} onChange={setValue} ratio={0.5} onRatioChange={vi.fn()} onRatioCommit={vi.fn()} />
+    );
+  }
+
+  const editor = () => screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
+  const menu = () => screen.queryByRole("listbox", { name: "MDX components" });
+  const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
+
+  /** Types by replacing the text and leaving the caret at `caret` (default: the end). */
+  function type(value: string, caret = value.length) {
+    fireEvent.focus(editor());
+    fireEvent.change(editor(), { target: { value, selectionStart: caret, selectionEnd: caret } });
+  }
+  const key = (name: string) => fireEvent.keyDown(editor(), { key: name });
+
+  it("lists the components after a <", () => {
+    render(<Harness />);
+
+    type("<");
+
+    expect(options()).toEqual([
+      expect.stringContaining("<Info>"),
+      expect.stringContaining("<Warning>"),
+      expect.stringContaining("<Image>"),
+    ]);
+  });
+
+  it("narrows the list as the name is typed", () => {
+    render(<Harness />);
+
+    type("<wa");
+
+    expect(options()).toEqual([expect.stringContaining("<Warning>")]);
+  });
+
+  it("closes when nothing matches", () => {
+    render(<Harness />);
+
+    type("<div");
+
+    expect(menu()).toBeNull();
+  });
+
+  it("stays out of the way of an ordinary <", () => {
+    render(<Harness />);
+
+    type("1 <");
+    expect(menu()).not.toBeNull();
+
+    type("a<");
+    expect(menu()).toBeNull();
+  });
+
+  it("stays out of the way inside a fenced code block", () => {
+    render(<Harness />);
+
+    type("```html\n<");
+
+    expect(menu()).toBeNull();
+  });
+
+  it("inserts the highlighted component on Enter, with the caret inside it", () => {
+    render(<Harness initial="" />);
+    type("<");
+
+    key("ArrowDown");
+    key("Enter");
+
+    expect(editor().value).toBe("<Warning>\n\n\n\n</Warning>");
+    expect(editor().selectionStart).toBe("<Warning>\n\n".length);
+    expect(menu()).toBeNull();
+  });
+
+  it("inserts on Tab, replacing what was typed after the <", () => {
+    render(<Harness />);
+    type("intro\n\n<In");
+
+    key("Tab");
+
+    expect(editor().value).toBe("intro\n\n<Info>\n\n\n\n</Info>");
+  });
+
+  it("wraps from the first item to the last with ArrowUp", () => {
+    render(<Harness />);
+    type("<");
+
+    key("ArrowUp");
+    key("Enter");
+
+    expect(editor().value).toBe('<Image src="" alt="" />');
+    expect(editor().selectionStart).toBe('<Image src="'.length);
+  });
+
+  it("inserts a component picked with the mouse", () => {
+    render(<Harness />);
+    type("text <");
+
+    fireEvent.mouseDown(screen.getByRole("option", { name: /Info/ }));
+
+    expect(editor().value).toBe("text <Info>\n\n\n\n</Info>");
+  });
+
+  it("marks the highlighted option for assistive tech", () => {
+    render(<Harness />);
+    type("<");
+
+    key("ArrowDown");
+
+    const warning = screen.getByRole("option", { name: /Warning/ });
+    expect(warning.getAttribute("aria-selected")).toBe("true");
+    expect(editor().getAttribute("aria-activedescendant")).toBe(warning.id);
+    expect(editor().getAttribute("aria-controls")).toBe(menu()!.id);
+  });
+
+  it("closes on Escape and stays closed while the same tag is typed", () => {
+    render(<Harness />);
+    type("<");
+
+    key("Escape");
+    expect(menu()).toBeNull();
+    expect(editor().value).toBe("<");
+
+    type("<I");
+    expect(menu()).toBeNull();
+
+    // A new tag asks again.
+    type("<I and <");
+    expect(menu()).not.toBeNull();
+  });
+
+  it("leaves Enter alone when the menu is closed", () => {
+    render(<Harness />);
+    type("plain");
+
+    expect(fireEvent.keyDown(editor(), { key: "Enter" })).toBe(true);
+  });
+
+  it("closes when the textarea loses focus", () => {
+    render(<Harness />);
+    type("<");
+
+    fireEvent.blur(editor());
+
+    expect(menu()).toBeNull();
+  });
+});
