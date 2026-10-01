@@ -18,6 +18,7 @@ import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
 import * as service from "./service";
 import type { SunSchedule } from "./sunTimes";
+import type { RestoreResult, Trash } from "./trash";
 
 /**
  * The web app's transport for CompositionApi (see api.ts): Server Actions that
@@ -100,6 +101,31 @@ export async function moveNoteToGroup(
   const note = await service.moveNoteToGroup(noteId, groupId);
   revalidatePath("/");
   return note;
+}
+
+export async function loadTrash(): Promise<Trash> {
+  return service.loadTrash();
+}
+
+// Restoring changes what the notes workspace lists; deleting for good changes only the Trash Can.
+export async function restoreNote(id: number): Promise<RestoreResult> {
+  const result = await service.restoreNote(id);
+  if (!result.error) revalidatePath("/");
+  return result;
+}
+
+export async function restoreGroup(id: number): Promise<RestoreResult> {
+  const result = await service.restoreGroup(id);
+  if (!result.error) revalidatePath("/");
+  return result;
+}
+
+export async function permanentlyDeleteNote(id: number): Promise<void> {
+  await service.permanentlyDeleteNote(id);
+}
+
+export async function permanentlyDeleteGroup(id: number): Promise<void> {
+  await service.permanentlyDeleteGroup(id);
 }
 
 export async function saveLayout(layout: Layout): Promise<void> {

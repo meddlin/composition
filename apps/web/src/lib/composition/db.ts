@@ -25,6 +25,34 @@ CREATE TABLE IF NOT EXISTS groups (
 );
 `;
 
+/**
+ * The Trash Can. Deleted items move into their own tables, keeping their
+ * original ids, rather than being flagged in `notes`/`groups`: the CLI shares
+ * this database file and lists every row of those two tables, so a flag would
+ * leave "deleted" notes showing there.
+ */
+const TRASH_SCHEMA = `
+CREATE TABLE IF NOT EXISTS trashed_notes (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL DEFAULT '',
+    tags TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    group_id INTEGER,
+    deleted_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS trashed_groups (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    parent_id INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT NOT NULL
+);
+`;
+
 function ensureColumn(db: Database.Database, column: string, ddl: string): void {
   const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -41,6 +69,7 @@ function openConnection(dbPath: string): Database.Database {
   db.pragma("journal_mode = WAL");
   db.exec(SCHEMA);
   db.exec(GROUPS_SCHEMA);
+  db.exec(TRASH_SCHEMA);
   ensureColumn(db, "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,

@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useRef, useState } from "react";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import {
@@ -22,6 +23,7 @@ import {
   type FavoriteType,
 } from "@/lib/composition/favorites";
 import { canMoveGroup } from "@/lib/composition/groupMove";
+import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
@@ -39,7 +41,7 @@ import {
 } from "./panes";
 import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
-import { applySavedNote, type Group, type Note } from "./types";
+import { applySavedNote, noteTitle, type Group, type Note } from "./types";
 import { useLayout } from "./useLayout";
 import { useNoteDrop } from "./useNoteDrop";
 
@@ -67,6 +69,10 @@ function Workspace({
   // The open notes, side by side; the focused one is where sidebar picks and new notes open.
   const [paneState, setPaneState] = useState(() => initialPanes(initialNotes[0]?.id ?? null));
   const [groupError, setGroupError] = useState<string | null>(null);
+  // Nothing is deleted until the user confirms in the dialog this drives.
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "note" | "group"; id: number } | null
+  >(null);
   // When set, the group's listing page replaces the panes.
   const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
   const layout = useLayout(initialLayout);
@@ -142,6 +148,7 @@ function Workspace({
     });
   }
 
+  /** Moves the note to the Trash Can. Call only once the user has confirmed. */
   function remove(id: number) {
     // Nothing left to save for a note that is going away.
     const pending = pendingSaves.current.get(id);
@@ -186,6 +193,7 @@ function Workspace({
     });
   }
 
+  /** Moves the group to the Trash Can. Call only once the user has confirmed. */
   function deleteGroup(id: number) {
     setGroupError(null);
     startTransition(async () => {
@@ -226,6 +234,16 @@ function Workspace({
     });
   }
 
+  const pendingNote = pendingDelete?.kind === "note" ? notes.find((n) => n.id === pendingDelete.id) : undefined;
+  const pendingGroup = pendingDelete?.kind === "group" ? groups.find((g) => g.id === pendingDelete.id) : undefined;
+  const pendingName = pendingNote ? noteTitle(pendingNote) : pendingGroup?.name;
+
+  function confirmDelete() {
+    if (pendingNote) remove(pendingNote.id);
+    else if (pendingGroup) deleteGroup(pendingGroup.id);
+    setPendingDelete(null);
+  }
+
   return (
     <div className="flex h-screen flex-col">
       <header className="shrink-0 border-b p-2">
@@ -244,10 +262,10 @@ function Workspace({
           onSelect={selectNote}
           onSelectGroup={selectGroup}
           onCreate={create}
-          onDelete={remove}
+          onDelete={(id) => setPendingDelete({ kind: "note", id })}
           onCreateGroup={createGroup}
           onRenameGroup={renameGroup}
-          onDeleteGroup={deleteGroup}
+          onDeleteGroup={(id) => setPendingDelete({ kind: "group", id })}
           onMoveGroup={moveGroup}
           onMoveNoteToGroup={moveNoteToGroup}
         />
@@ -286,6 +304,15 @@ function Workspace({
           <EmptyState hasNotes={notes.length > 0} onCreate={create} onOpenNote={selectNote} />
         )}
       </div>
+      <ConfirmDialog
+        // Closes by itself if the item disappears (deleted elsewhere) while it is asking.
+        open={pendingName !== undefined}
+        title={`Delete ${pendingGroup ? "group " : ""}“${pendingName ?? ""}”?`}
+        description={`It moves to the Trash Can in Settings, where you can restore it. Items in the Trash Can are permanently deleted after ${TRASH_RETENTION_DAYS} days.`}
+        confirmLabel="Delete"
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
     </div>
   );
 }

@@ -17,10 +17,15 @@ export {
   deleteNote,
   loadSettings,
   loadSunSchedule,
+  loadTrash,
   loadWorkspace,
   moveGroup,
   moveNoteToGroup,
+  permanentlyDeleteGroup,
+  permanentlyDeleteNote,
   renameGroup,
+  restoreGroup,
+  restoreNote,
   saveFavorites,
   saveImage,
   saveLayout,
@@ -42,6 +47,7 @@ export type {
   SettingsSnapshot,
   Workspace,
 } from "./api";
+export type { RestoreResult, Trash, TrashedGroup, TrashedNote } from "./trash";
 
 // Type-level proof that the Server Actions implement the whole contract.
 type ActionsImplementApi = typeof import("./actions") extends CompositionApi ? true : never;

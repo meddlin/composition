@@ -444,7 +444,7 @@ describe("NotesApp group row menu", () => {
     expect(document.activeElement).toBe(input);
   });
 
-  it("deletes an empty group from the menu", async () => {
+  it("asks before deleting an empty group from the menu, and deletes it once confirmed", async () => {
     vi.mocked(deleteGroup).mockResolvedValue({});
     renderApp();
 
@@ -452,8 +452,63 @@ describe("NotesApp group row menu", () => {
     await act(async () => {
       fireEvent.click(item);
     });
+    expect(deleteGroup).not.toHaveBeenCalled();
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText("Delete group “Empty”?")).toBeTruthy();
+    expect(dialog.textContent).toMatch(/Trash Can in Settings/);
+    expect(dialog.textContent).toMatch(/permanently deleted after 60 days/);
+
+    await act(async () => {
+      fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+    });
 
     expect(deleteGroup).toHaveBeenCalledWith(2);
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Empty" })).toBeNull();
+  });
+
+  it("deletes nothing when the group deletion is cancelled", async () => {
+    renderApp();
+
+    const item = within(openMenu("Empty")).getByRole("menuitem", { name: "Delete group" });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+    });
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(deleteGroup).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Empty" })).toBeTruthy();
+  });
+
+  it("deletes nothing when the dialog is dismissed with Escape", async () => {
+    renderApp();
+
+    const item = within(openMenu("Empty")).getByRole("menuitem", { name: "Delete group" });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+    await act(async () => {
+      fireEvent.keyDown(screen.getByRole("alertdialog"), { key: "Escape" });
+    });
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(deleteGroup).not.toHaveBeenCalled();
+  });
+
+  it("starts with Cancel focused, so a stray Enter can't confirm the deletion", async () => {
+    renderApp();
+
+    const item = within(openMenu("Empty")).getByRole("menuitem", { name: "Delete group" });
+    await act(async () => {
+      fireEvent.click(item);
+    });
+
+    expect(document.activeElement).toBe(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Cancel" }),
+    );
   });
 
   it("disables delete for a group that still has notes", async () => {
@@ -815,8 +870,9 @@ describe("NotesApp favorites", () => {
     ]);
 
     // The only Delete button for Groceries is the tree's.
+    fireEvent.click(screen.getByLabelText("Delete Groceries"));
     await act(async () => {
-      fireEvent.click(screen.getByLabelText("Delete Groceries"));
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     });
 
     expect(deleteNote).toHaveBeenCalledWith(2);
@@ -828,7 +884,52 @@ describe("NotesApp favorites", () => {
     renderApp([{ type: "group", id: 2 }], []);
 
     await chooseAction("Home", "Delete group", favoritesSection()!);
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
+    });
 
     expect(saveFavorites).toHaveBeenLastCalledWith([]);
+  });
+});
+
+describe("NotesApp note deletion", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  function renderApp() {
+    render(<NotesApp initialNotes={[{ ...note, title: "Hello" }]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete Hello" }));
+    return screen.getByRole("alertdialog");
+  }
+
+  it("asks before deleting, naming the note and the Trash Can", () => {
+    const dialog = renderApp();
+
+    expect(within(dialog).getByText("Delete “Hello”?")).toBeTruthy();
+    expect(dialog.textContent).toMatch(/moves to the Trash Can in Settings/);
+    expect(dialog.textContent).toMatch(/permanently deleted after 60 days/);
+    expect(deleteNote).not.toHaveBeenCalled();
+  });
+
+  it("keeps the note when the deletion is cancelled", () => {
+    const dialog = renderApp();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(deleteNote).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Delete Hello" })).toBeTruthy();
+  });
+
+  it("deletes the note once confirmed", () => {
+    const dialog = renderApp();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(deleteNote).toHaveBeenCalledWith(1);
+    expect(screen.queryByRole("button", { name: "Delete Hello" })).toBeNull();
   });
 });

@@ -56,6 +56,12 @@ every startup, each checking `PRAGMA table_info(notes)` and issuing an additive
 brand-new and a pre-existing database. `groups` itself is a `CREATE TABLE IF NOT EXISTS`
 run alongside the `notes` schema, for the same reason.
 
+The web and desktop apps add two more tables, `trashed_notes` and `trashed_groups`: the
+same columns as `notes` and `groups` plus a `deleted_at` timestamp, holding what the user
+deleted until it is restored or permanently deleted after 60 days (see
+[web-trash-can.md](../ui/web-trash-can.md)). They are separate tables rather than a flag
+on `notes`/`groups` so the CLI, which knows nothing of them, never lists a deleted note.
+
 See [groups.md](groups.md) for how `notes.group_id` and `groups.parent_id` relate to
 each other and how they're rendered as a tree.
 

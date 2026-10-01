@@ -77,6 +77,11 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     id("moveGroup", groupId, "id"),
     nullableId("moveGroup", parentId, "parentId"),
   ],
+  loadTrash: none,
+  restoreNote: ([noteId]) => [id("restoreNote", noteId, "id")],
+  restoreGroup: ([groupId]) => [id("restoreGroup", groupId, "id")],
+  permanentlyDeleteNote: ([noteId]) => [id("permanentlyDeleteNote", noteId, "id")],
+  permanentlyDeleteGroup: ([groupId]) => [id("permanentlyDeleteGroup", groupId, "id")],
   saveLayout: ([layout]) => {
     const value = record("saveLayout", layout, "layout");
     return [

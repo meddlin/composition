@@ -409,10 +409,12 @@ describe("focus, closing and deleting", () => {
     expect(screen.getAllByText("+ New note").length).toBeGreaterThan(1);
   });
 
-  it("closes the pane of a deleted note", () => {
+  it("closes the pane of a deleted note, once the deletion is confirmed", () => {
     openAlphaBesideBeta();
 
     fireEvent.click(screen.getByRole("button", { name: "Delete Beta" }));
+    expect(deleteNote).not.toHaveBeenCalled();
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
 
     expect(paneTitles()).toEqual(["Alpha"]);
     expect(deleteNote).toHaveBeenCalledWith(2);
@@ -492,6 +494,7 @@ describe("saving with several panes", () => {
 
     fireEvent.change(editorIn("Beta"), { target: { value: "beta edited" } });
     fireEvent.click(screen.getByRole("button", { name: "Delete Beta" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete" }));
     await advance(1000);
 
     expect(saveNoteContent).not.toHaveBeenCalled();

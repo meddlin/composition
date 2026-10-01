@@ -89,8 +89,10 @@ SQLite).
 - The search bar debounces typing by 350 ms (same as the CLI), then calls the
   `searchNotes` server action, which maps hit ids back to SQLite rows. An unreachable
   Meilisearch comes back as an `error` the dropdown shows, not as "No matches".
-- `saveNoteContent`, `createNote` and `deleteNote` push to the index best-effort:
-  failures are logged and swallowed, like `NotesStore._index`.
+- `saveNoteContent`, `createNote`, `deleteNote` and `restoreNote` push to the index
+  best-effort: failures are logged and swallowed, like `NotesStore._index`. In the web
+  and desktop apps `deleteNote` moves the note to the Trash Can, which takes it out of
+  the index; `restoreNote` puts it back.
 - If the index has no documents, the first search rebuilds it from SQLite.
 - The query goes through [`searchQuery.ts`](../../apps/web/src/lib/composition/searchQuery.ts),
   a port of `parse_search_query` that understands every frontmatter field (below).

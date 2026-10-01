@@ -97,10 +97,6 @@ export function updateNote(
     .run(content, fields.title, fields.tags, fields.description, nowIso(), id);
 }
 
-export function deleteNote(id: number): void {
-  getDb().prepare("DELETE FROM notes WHERE id = ?").run(id);
-}
-
 /**
  * Doesn't bump updated_at — a move isn't a content edit, and bumping it
  * would reorder the note in listNotes() just from moving it.
