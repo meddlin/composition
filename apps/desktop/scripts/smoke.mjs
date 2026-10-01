@@ -86,7 +86,8 @@ try {
   }));
   check("window.composition is exposed", posture.bridge === "object");
   check("Node is not reachable from the page", posture.hasRequire === "undefined" && posture.hasProcess === "undefined");
-  check("the bridge exposes only the API (+ initial, platform)", posture.methods.length === 16, posture.methods.join(","));
+  check("the bridge exposes only the API (+ initial, platform)", posture.methods.length === 19, // 17 API methods + initial + platform
+     posture.methods.join(","));
   check("the initial theme is applied before paint", posture.theme === "dark", posture.theme);
 
   // ---- Navigation: desktop has no Docs viewer
@@ -109,6 +110,49 @@ try {
   check("the note is saved (autosave over IPC)", workspace.notes.length === 1 && workspace.notes[0].title === "Smoke note", workspace.notes[0]?.title);
   check("the database is at ~/.composition/composition.db", fs.existsSync(path.join(home, ".composition", "composition.db")));
   await page.screenshot({ path: path.join(out, "2-note.png") });
+
+  // ---- Images: pasted into the editor, stored in ~/.composition/app_data, shown in the preview
+  const pasted = await page.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 80;
+    canvas.height = 40;
+    const context = canvas.getContext("2d");
+    context.fillStyle = "#38a";
+    context.fillRect(0, 0, 80, 40);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    const data = new Uint8Array(await blob.arrayBuffer());
+
+    // Straight over IPC first: the bytes must survive the bridge as a Uint8Array.
+    const [note] = (await window.composition.loadWorkspace()).notes;
+    const direct = await window.composition.saveImage({ noteId: note.id, fileName: "direct.png", data });
+    const refused = await window.composition.saveImage({ noteId: note.id, fileName: "x.png", data: new Uint8Array([1, 2, 3]) });
+
+    // Then the way a person does it: a paste event carrying an image file.
+    const editor = document.querySelector('textarea[aria-label="Markdown editor"]');
+    editor.focus();
+    editor.setSelectionRange(editor.value.length, editor.value.length);
+    const clipboardData = new DataTransfer();
+    clipboardData.items.add(new File([blob], "Pasted Shot.png", { type: "image/png" }));
+    editor.dispatchEvent(new ClipboardEvent("paste", { clipboardData, bubbles: true, cancelable: true }));
+    return { direct, refused };
+  });
+  check("saveImage stores an image sent over IPC", /^smoke-note-direct-[0-9a-f]{12}\.png$/.test(pasted.direct.name ?? ""), pasted.direct.name ?? pasted.direct.error);
+  check("saveImage refuses bytes that aren't an image", typeof pasted.refused.error === "string" && !pasted.refused.name);
+  const preview = page.locator(".prose img").first();
+  await preview.waitFor({ timeout: 10_000 });
+  await waitFor(async () => preview.evaluate((img) => img.complete && img.naturalWidth === 80), { timeout: 10_000 });
+  const src = await preview.getAttribute("src");
+  check("a pasted image renders in the preview from app://", /^app:\/\/composition\/app_data\/smoke-note-pasted-shot-[0-9a-f]{12}\.png$/.test(src ?? ""), src ?? "");
+  const imageDir = path.join(home, ".composition", "app_data");
+  check("images are stored in ~/.composition/app_data", fs.existsSync(imageDir) && fs.readdirSync(imageDir).length === 2, fs.existsSync(imageDir) ? fs.readdirSync(imageDir).join(",") : "missing");
+  const served = await page.evaluate(async (url) => {
+    const response = await fetch(url);
+    return { status: response.status, type: response.headers.get("content-type") };
+  }, src);
+  check("app://…/app_data serves the image as image/png", served.status === 200 && served.type === "image/png", `${served.status} ${served.type}`);
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadWorkspace())).notes[0]?.content.includes("](app_data/smoke-note-pasted-shot-"), { timeout: 10_000 });
+  check("the note's Markdown refers to the image by its app_data path", true);
+  await page.screenshot({ path: path.join(out, "2b-image.png") });
 
   // ---- Groups
   await sidebar.getByRole("button", { name: "+ New group" }).click();
@@ -170,6 +214,16 @@ try {
 
   // Checked before the probe below, which provokes a (correct) CSP violation on purpose.
   check("no console errors or CSP violations", consoleProblems.length === 0, consoleProblems.slice(0, 3).join(" | "));
+
+  // ---- Only stored images are served from app_data (these 404s are logged by Chromium, hence after the check above)
+  const refused = await page.evaluate(async () => {
+    const status = async (url) => (await fetch(url)).status;
+    return {
+      traversal: await status("app://composition/app_data/..%2Fcomposition.db"),
+      notAnImage: await status("app://composition/app_data/composition.db"),
+    };
+  });
+  check("app://…/app_data refuses anything that isn't a stored image", refused.traversal === 404 && refused.notAnImage === 404, `${refused.traversal}, ${refused.notAnImage}`);
 
   // ---- The page can't reach outside its own origin or the API
   const isolation = await page.evaluate(async () => {

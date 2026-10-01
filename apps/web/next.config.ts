@@ -39,6 +39,13 @@ const nextConfig: NextConfig = desktop
         ],
       },
     }
-  : {};
+  : {
+      experimental: {
+        // Pasted images travel to the Server Action as request bodies; the 1 MB
+        // default would reject most screenshots. Room for MAX_IMAGE_BYTES plus
+        // the encoding overhead.
+        serverActions: { bodySizeLimit: "12mb" },
+      },
+    };
 
 export default nextConfig;

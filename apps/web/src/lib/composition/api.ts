@@ -65,6 +65,12 @@ export type SaveSettingsResult = {
   dbPath?: string;
 };
 
+/** An image pasted into a note; `fileName` is the original name, used only to name the stored copy. */
+export type SaveImageInput = { noteId: number; fileName: string; data: Uint8Array };
+
+/** `name` is the stored file; the note refers to it as `imageRef(name)` (imageRefs.ts). */
+export type SaveImageResult = { name?: string; error?: string };
+
 export interface CompositionApi {
   loadWorkspace(): Promise<Workspace>;
   loadSettings(): Promise<SettingsSnapshot>;
@@ -73,6 +79,8 @@ export interface CompositionApi {
 
   createNote(title: string, groupId?: number | null): Promise<Note>;
   saveNoteContent(noteId: number, content: string): Promise<Note>;
+  /** Stores a pasted image in `<application data>/app_data/`. Served back by `app_data/<name>`, which is not part of this contract. */
+  saveImage(input: SaveImageInput): Promise<SaveImageResult>;
   deleteNote(id: number): Promise<void>;
   moveNoteToGroup(noteId: number, groupId: number | null): Promise<Note>;
 
@@ -102,6 +110,7 @@ export const API_METHODS = [
   "searchNotes",
   "createNote",
   "saveNoteContent",
+  "saveImage",
   "deleteNote",
   "moveNoteToGroup",
   "createGroup",

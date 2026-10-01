@@ -203,6 +203,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
           />
         ) : active ? (
           <MarkdownEditor
+            noteId={active.id}
             value={active.content}
             onChange={update}
             ratio={layout.editorRatio}

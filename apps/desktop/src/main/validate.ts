@@ -31,6 +31,10 @@ function record(method: string, value: unknown, name: string): Record<string, un
     : fail(method, name);
 }
 
+function bytes(method: string, value: unknown, name: string): Uint8Array {
+  return value instanceof Uint8Array ? value : fail(method, name);
+}
+
 const none: Validator = () => [];
 
 export const VALIDATORS: Record<ApiMethod, Validator> = {
@@ -45,6 +49,16 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     id("saveNoteContent", noteId, "noteId"),
     text("saveNoteContent", content, "content"),
   ],
+  saveImage: ([input]) => {
+    const value = record("saveImage", input, "image");
+    return [
+      {
+        noteId: id("saveImage", value.noteId, "noteId"),
+        fileName: text("saveImage", value.fileName, "fileName"),
+        data: bytes("saveImage", value.data, "data"),
+      },
+    ];
+  },
   deleteNote: ([noteId]) => [id("deleteNote", noteId, "id")],
   moveNoteToGroup: ([noteId, groupId]) => [
     id("moveNoteToGroup", noteId, "noteId"),

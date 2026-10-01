@@ -338,3 +338,49 @@ describe("loadSunSchedule", () => {
     expect(initialSunTheme()).toMatchObject({ tone: expect.stringMatching(/^(light|dark)$/) });
   });
 });
+
+describe("saveImage", () => {
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+
+  it("files the image under the note's title in <app data>/app_data and reads it back", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { createNote, saveImage, readImage } = await import("./service");
+    const note = await createNote("Trip Plan");
+
+    const result = await saveImage({ noteId: note.id, fileName: "map.png", data: PNG });
+
+    expect(result.name).toMatch(/^trip-plan-map-[0-9a-f]{12}\.png$/);
+    expect(fs.existsSync(path.join(loadWebSettings().appDataDir, "app_data", result.name!))).toBe(true);
+    expect((await readImage(result.name!))?.contentType).toBe("image/png");
+  });
+
+  it("follows the application data directory when it is changed in Settings", async () => {
+    const { saveSettings, createNote, saveImage } = await import("./service");
+    const note = await createNote("Trip");
+    await saveSettings({ appDataDir: path.join(home, "elsewhere"), dbPath: path.join(home, "kept.db") });
+    const moved = await createNote("Trip");
+
+    const result = await saveImage({ noteId: moved.id, fileName: "map.png", data: PNG });
+
+    expect(note.id).toBeDefined();
+    expect(fs.readdirSync(path.join(home, "elsewhere", "app_data"))).toEqual([result.name]);
+  });
+
+  it("refuses a note that does not exist", async () => {
+    const { saveImage } = await import("./service");
+
+    expect(await saveImage({ noteId: 999, fileName: "map.png", data: PNG })).toEqual({
+      error: "That note no longer exists.",
+    });
+  });
+
+  it("returns the reason instead of throwing for something that isn't an image", async () => {
+    const { createNote, saveImage } = await import("./service");
+    const note = await createNote("Trip");
+
+    const result = await saveImage({ noteId: note.id, fileName: "x.png", data: new TextEncoder().encode("nope") });
+
+    expect(result.name).toBeUndefined();
+    expect(result.error).toMatch(/PNG, JPEG, GIF, and WebP/);
+  });
+});
