@@ -55,6 +55,11 @@ is duplicated per scheme.
 
 ## Things that bit during the migration
 
+- **UI written before the token rename still compiles, but changes color.** `bg-primary` and
+  `text-primary` used to be the scheme's blue; they are now the inverted foreground. Merging code
+  that predates this (the Info callout in `mdx/Panel.tsx` did) turns it grey with no error, so grep
+  new UI for `primary`, `secondary` and `accent` and use `brand` or `highlight` where blue or the
+  folder color was meant.
 - **Ghost buttons stay filled while `aria-expanded`.** A Radix trigger sets it while open, so the
   group-tree chevron overrides it (`aria-expanded:bg-transparent`).
 - **The group menu is non-modal on purpose** (`GroupMenu.tsx`). A modal Radix menu traps focus,

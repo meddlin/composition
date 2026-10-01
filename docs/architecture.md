@@ -120,3 +120,6 @@ diagrams tied to specific source lines:
   the SQLite schema, and the on-disk note content format.
 - [Groups](architecture/groups.md) — the `Group`/`Note` relationship, nesting, the
   blocked-delete rule, and how the notes/groups tree is rendered.
+- [Images](architecture/images.md) — pasting images into a note in the web and
+  desktop apps, where the files are stored, how they are named, and how the preview
+  shows them.

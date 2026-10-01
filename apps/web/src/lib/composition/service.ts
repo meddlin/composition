@@ -3,6 +3,8 @@ import path from "node:path";
 import type {
   CompositionApi,
   MoveGroupResult,
+  SaveImageInput,
+  SaveImageResult,
   SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
@@ -16,6 +18,7 @@ import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
+import * as images from "./images";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
@@ -143,6 +146,26 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
   if (!note) throw new Error(`Note ${noteId} not found`);
   await bestEffortIndex(() => searchIndex.indexNote(note));
   return note;
+}
+
+/**
+ * Stores a pasted image under the current application data directory, named
+ * after the note it was pasted into. A bad image comes back as `error` so the
+ * editor can say why instead of failing the action.
+ */
+export async function saveImage({ noteId, fileName, data }: SaveImageInput): Promise<SaveImageResult> {
+  const note = notesRepo.getNote(noteId);
+  if (!note) return { error: "That note no longer exists." };
+  return images.storeImage(loadWebSettings().appDataDir, { noteTitle: note.title, fileName, data });
+}
+
+/**
+ * Not part of CompositionApi: the web app's `/app_data/<name>` route and the
+ * desktop app's `app://` handler both serve images through this, following the
+ * application data directory as it is configured right now.
+ */
+export async function readImage(name: string): Promise<images.StoredImage | null> {
+  return images.readImage(loadWebSettings().appDataDir, name);
 }
 
 export async function createNote(
@@ -327,6 +350,7 @@ const _implementsApi: CompositionApi = {
   searchNotes,
   createNote,
   saveNoteContent,
+  saveImage,
   deleteNote,
   moveNoteToGroup,
   createGroup,

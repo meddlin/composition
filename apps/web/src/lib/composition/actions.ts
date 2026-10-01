@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import type {
   MoveGroupResult,
+  SaveImageInput,
+  SaveImageResult,
   SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
@@ -38,6 +40,12 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
   const note = await service.saveNoteContent(noteId, content);
   revalidatePath("/");
   return note;
+}
+
+// No revalidatePath: storing a file changes nothing the page renders until the
+// note's own content (which refers to it) is saved.
+export async function saveImage(input: SaveImageInput): Promise<SaveImageResult> {
+  return service.saveImage(input);
 }
 
 export async function createNote(

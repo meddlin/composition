@@ -90,6 +90,7 @@ const packages = new Map([
     "react-dom",
     "react-markdown",
     "remark-gfm",
+    "remark-mdx",
     "rehype-highlight",
     "lowlight",
     // shadcn/ui's runtime (apps/web/src/components/ui) and the animation CSS compiled into the stylesheet.

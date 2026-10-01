@@ -205,6 +205,7 @@ function Workspace({ initialNotes, initialGroups, initialLayout }: Props) {
           />
         ) : active ? (
           <MarkdownEditor
+            noteId={active.id}
             value={active.content}
             onChange={update}
             ratio={layout.editorRatio}
@@ -225,7 +226,8 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <EmptyHeader>
         <EmptyDescription>No notes yet.</EmptyDescription>
       </EmptyHeader>
-      <Button size="lg" onClick={onCreate}>
+      {/* Not `onClick={onCreate}`: that would pass the click event on as the group id. */}
+      <Button size="lg" onClick={() => onCreate()}>
         + New note
       </Button>
     </Empty>

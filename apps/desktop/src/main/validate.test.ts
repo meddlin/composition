@@ -15,6 +15,13 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
   });
 
+  it("passes a pasted image's bytes through and keeps only the known fields", () => {
+    const data = Uint8Array.from([1, 2, 3]);
+    expect(VALIDATORS.saveImage([{ noteId: 3, fileName: "a.png", data, extra: true }])).toEqual([
+      { noteId: 3, fileName: "a.png", data },
+    ]);
+  });
+
   it("defaults createNote's group to null when omitted", () => {
     expect(VALIDATORS.createNote(["Untitled"])).toEqual(["Untitled", null]);
     expect(VALIDATORS.createNote(["Untitled", 4])).toEqual(["Untitled", 4]);
@@ -54,6 +61,11 @@ describe("VALIDATORS", () => {
     ["saveSettings", [{ appDataDir: 1, dbPath: "" }]],
     ["saveSettings", ["nope"]],
     ["saveTheme", [{}]],
+    ["saveImage", [null]],
+    ["saveImage", [{ noteId: "3", fileName: "a.png", data: new Uint8Array(1) }]],
+    ["saveImage", [{ noteId: 3, fileName: 1, data: new Uint8Array(1) }]],
+    ["saveImage", [{ noteId: 3, fileName: "a.png", data: "bytes" }]],
+    ["saveImage", [{ noteId: 3, fileName: "a.png", data: [1, 2, 3] }]],
   ] as const)("rejects %s(%j)", (method, args) => {
     expect(() => VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });

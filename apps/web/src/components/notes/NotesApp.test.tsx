@@ -178,6 +178,21 @@ describe("NotesApp group note creation", () => {
     expect(createNote).toHaveBeenCalledWith("Untitled", 7);
   });
 
+  it("creates an ungrouped note from the empty-state button without leaking the click event", async () => {
+    vi.mocked(createNote).mockClear();
+    vi.mocked(createNote).mockResolvedValue({ ...note, id: 2 });
+    render(<NotesApp initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+
+    // Scoped to the empty state: the sidebar has a "+ New note" button of its own.
+    const emptyState = screen.getByText("No notes yet.").closest("[data-slot=empty]") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(emptyState).getByText("+ New note"));
+    });
+
+    expect(createNote).toHaveBeenCalledTimes(1);
+    expect(createNote).toHaveBeenCalledWith("Untitled", null);
+  });
+
   it("keeps the New note / New group buttons below the note tree", () => {
     render(<NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
 
