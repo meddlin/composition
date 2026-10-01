@@ -1,5 +1,6 @@
 import path from "node:path";
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { createAttachmentsApi } from "./attachments";
 import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
@@ -55,6 +56,27 @@ const api: CompositionApi = {
   },
 };
 
+// Files are chosen and saved in native dialogs, over the window that asked.
+const attachments = createAttachmentsApi(service, {
+  async pickFiles() {
+    const options = { properties: ["openFile", "multiSelections"] as ("openFile" | "multiSelections")[] };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+    return canceled ? [] : filePaths;
+  },
+  async pickSavePath(defaultName) {
+    const options = { defaultPath: defaultName };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, options)
+      : await dialog.showSaveDialog(options);
+    return canceled || !filePath ? null : filePath;
+  },
+  reveal: (file) => shell.showItemInFolder(file),
+});
+
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
 function openMainWindow(): BrowserWindow {
@@ -86,6 +108,7 @@ async function main(): Promise<void> {
   registerIpc({
     ipcMain,
     api,
+    attachments,
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, sidebarWidth, editorRatio } = loadWebSettings();

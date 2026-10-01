@@ -1,3 +1,4 @@
+import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { ApiMethod } from "./backend";
 
 /**
@@ -113,4 +114,13 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   saveTheme: ([theme]) => [text("saveTheme", theme, "theme")],
   saveLocation: ([city]) => [text("saveLocation", city, "city")],
   loadSunSchedule: none,
+};
+
+/** Arguments of the desktop-only attachment methods (see attachments.ts). Ids only: no path ever comes from the renderer. */
+export const ATTACHMENT_VALIDATORS: Record<AttachmentMethod, Validator> = {
+  listAttachments: ([noteId]) => [id("listAttachments", noteId, "noteId")],
+  addAttachments: ([noteId]) => [id("addAttachments", noteId, "noteId")],
+  revealAttachment: ([attachmentId]) => [id("revealAttachment", attachmentId, "id")],
+  saveAttachmentCopy: ([attachmentId]) => [id("saveAttachmentCopy", attachmentId, "id")],
+  removeAttachment: ([attachmentId]) => [id("removeAttachment", attachmentId, "id")],
 };

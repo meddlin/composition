@@ -53,6 +53,18 @@ CREATE TABLE IF NOT EXISTS trashed_groups (
 );
 `;
 
+const ATTACHMENTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
+`;
+
 function ensureColumn(db: Database.Database, column: string, ddl: string): void {
   const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -70,6 +82,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(SCHEMA);
   db.exec(GROUPS_SCHEMA);
   db.exec(TRASH_SCHEMA);
+  db.exec(ATTACHMENTS_SCHEMA);
   ensureColumn(db, "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,

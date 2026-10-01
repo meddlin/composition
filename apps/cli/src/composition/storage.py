@@ -36,6 +36,24 @@ CREATE TABLE IF NOT EXISTS groups (
 );
 """
 
+# Files attached to notes. Only the desktop app adds or shows them; the CLI
+# creates the table so the schema is identical in every app that opens the
+# file (docs/product-builds.md), and cleans up after a note it deletes.
+_ATTACHMENTS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
+"""
+
+# Folder, beside the database, that holds the attached files themselves.
+ATTACHMENT_DIR_NAME = "attachments"
+
 
 @dataclass
 class Note:
@@ -107,6 +125,7 @@ class NotesStore:
         self._connection.row_factory = sqlite3.Row
         self._connection.execute(_SCHEMA)
         self._connection.execute(_GROUPS_SCHEMA)
+        self._connection.executescript(_ATTACHMENTS_SCHEMA)
         self._connection.commit()
         _ensure_tags_column(self._connection)
         _ensure_description_column(self._connection)
@@ -179,6 +198,7 @@ class NotesStore:
     def delete_note(self, note_id: int) -> None:
         self._connection.execute("DELETE FROM notes WHERE id = ?", (note_id,))
         self._connection.commit()
+        self._delete_attachments(note_id)
         if self._search_index is not None:
             try:
                 self._search_index.delete_note(note_id)
@@ -250,6 +270,29 @@ class NotesStore:
 
     def close(self) -> None:
         self._connection.close()
+
+    def _delete_attachments(self, note_id: int) -> None:
+        """Drop a deleted note's attachment rows and the files they point at.
+
+        Files are best-effort: one that is already gone, or that can't be
+        removed, must not stop the note's deletion from completing.
+        """
+        stored_names = [
+            row["stored_name"]
+            for row in self._connection.execute(
+                "SELECT stored_name FROM attachments WHERE note_id = ?", (note_id,)
+            )
+        ]
+        self._connection.execute(
+            "DELETE FROM attachments WHERE note_id = ?", (note_id,)
+        )
+        self._connection.commit()
+        directory = self._db_path.parent / ATTACHMENT_DIR_NAME
+        for stored_name in stored_names:
+            try:
+                (directory / stored_name).unlink(missing_ok=True)
+            except OSError as exc:
+                print(f"attachment cleanup failed: {exc}", file=sys.stderr)
 
     def _index(self, note: Note) -> None:
         if self._search_index is None:

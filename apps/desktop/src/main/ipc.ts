@@ -1,7 +1,8 @@
+import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isAllowedOrigin } from "./origin";
-import { VALIDATORS } from "./validate";
+import { ATTACHMENT_VALIDATORS, VALIDATORS } from "./validate";
 
 /** The slice of Electron's `ipcMain` this module uses, so tests don't need Electron. */
 export type IpcMainLike = {
@@ -17,7 +18,8 @@ export type IpcEventLike = {
 export class UntrustedSenderError extends Error {}
 
 /**
- * Exposes the whole CompositionApi over IPC, one channel per method.
+ * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi, over
+ * IPC, one channel per method.
  *
  * Every call is checked twice: the sender must be a frame of our own UI (a
  * navigated-away or injected frame must never reach the notes database), and
@@ -26,25 +28,33 @@ export class UntrustedSenderError extends Error {}
 export function registerIpc(options: {
   ipcMain: IpcMainLike;
   api: CompositionApi;
+  attachments: AttachmentsApi;
   isTrustedUrl: (url: string) => boolean;
   /** Synchronous snapshot for the preload, taken before the page paints. */
   initial: () => unknown;
 }): void {
-  const { ipcMain, api, isTrustedUrl, initial } = options;
+  const { ipcMain, api, attachments, isTrustedUrl, initial } = options;
 
   const trusted = (event: IpcEventLike): boolean => {
     const url = event.senderFrame?.url;
     return typeof url === "string" && isTrustedUrl(url);
   };
 
-  for (const method of API_METHODS) {
+  const expose = (
+    method: string,
+    validate: (args: unknown[]) => unknown[],
+    target: object,
+  ) => {
     ipcMain.handle(channelFor(method), async (event, ...args) => {
       if (!trusted(event)) throw new UntrustedSenderError(`${method}: untrusted sender`);
-      const validated = VALIDATORS[method](args);
-      const call = api[method] as (...callArgs: unknown[]) => Promise<unknown>;
-      return call.apply(api, validated);
+      const validated = validate(args);
+      const call = (target as Record<string, (...callArgs: unknown[]) => Promise<unknown>>)[method];
+      return call.apply(target, validated);
     });
-  }
+  };
+
+  for (const method of API_METHODS) expose(method, VALIDATORS[method], api);
+  for (const method of ATTACHMENT_METHODS) expose(method, ATTACHMENT_VALIDATORS[method], attachments);
 
   ipcMain.on(INITIAL_CHANNEL, (event) => {
     event.returnValue = trusted(event) ? initial() : null;

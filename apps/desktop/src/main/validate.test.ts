@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { API_METHODS } from "./backend";
-import { InvalidArgumentsError, VALIDATORS } from "./validate";
+import { ATTACHMENT_VALIDATORS, InvalidArgumentsError, VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -94,5 +95,26 @@ describe("VALIDATORS", () => {
     ["saveImage", [{ noteId: 3, fileName: "a.png", data: [1, 2, 3] }]],
   ] as const)("rejects %s(%j)", (method, args) => {
     expect(() => VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("ATTACHMENT_VALIDATORS", () => {
+  it("has a validator for every attachment method, and no extras", () => {
+    expect(Object.keys(ATTACHMENT_VALIDATORS).sort()).toEqual([...ATTACHMENT_METHODS].sort());
+  });
+
+  it("takes only an id, dropping anything else the renderer sends (such as a path)", () => {
+    expect(ATTACHMENT_VALIDATORS.addAttachments([3, "/Users/me/.ssh/id_rsa"])).toEqual([3]);
+    expect(ATTACHMENT_VALIDATORS.saveAttachmentCopy([9, "/tmp/out"])).toEqual([9]);
+  });
+
+  it.each([
+    ["listAttachments", ["1"]],
+    ["addAttachments", [undefined]],
+    ["revealAttachment", [1.5]],
+    ["saveAttachmentCopy", [{ id: 1 }]],
+    ["removeAttachment", [Number.NaN]],
+  ] as const)("rejects a bad id for %s", (method, args) => {
+    expect(() => ATTACHMENT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });

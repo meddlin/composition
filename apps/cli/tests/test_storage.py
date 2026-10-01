@@ -17,6 +17,70 @@ def test_delete_note_removes_it(tmp_path):
     assert note.id not in [n.id for n in store.list_notes()]
 
 
+def _attach(db_path, note_id, stored_name):
+    """What the desktop app does when a file is attached: a row plus a file."""
+    attachments = db_path.parent / "attachments"
+    attachments.mkdir(exist_ok=True)
+    (attachments / stored_name).write_text("bytes")
+    connection = sqlite3.connect(db_path)
+    connection.execute(
+        "INSERT INTO attachments (note_id, file_name, stored_name, size, created_at) "
+        "VALUES (?, 'report.pdf', ?, 5, '2026-01-01T00:00:00+00:00')",
+        (note_id, stored_name),
+    )
+    connection.commit()
+    connection.close()
+
+
+def test_store_creates_the_attachments_table(tmp_path):
+    NotesStore(tmp_path / "test.db")
+
+    connection = sqlite3.connect(tmp_path / "test.db")
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(attachments)")}
+    connection.close()
+
+    assert columns == {
+        "id",
+        "note_id",
+        "file_name",
+        "stored_name",
+        "size",
+        "created_at",
+    }
+
+
+def test_delete_note_removes_its_attachments_and_their_files(tmp_path):
+    db_path = tmp_path / "test.db"
+    store = NotesStore(db_path)
+    doomed = store.create_note("Doomed")
+    kept = store.create_note("Kept")
+    _attach(db_path, doomed.id, "aaaa-report.pdf")
+    _attach(db_path, kept.id, "bbbb-report.pdf")
+
+    store.delete_note(doomed.id)
+
+    connection = sqlite3.connect(db_path)
+    remaining = [
+        r[0] for r in connection.execute("SELECT stored_name FROM attachments")
+    ]
+    connection.close()
+    assert remaining == ["bbbb-report.pdf"]
+    assert not (tmp_path / "attachments" / "aaaa-report.pdf").exists()
+    assert (tmp_path / "attachments" / "bbbb-report.pdf").exists()
+
+
+def test_delete_note_tolerates_an_attachment_file_that_is_already_gone(tmp_path):
+    db_path = tmp_path / "test.db"
+    store = NotesStore(db_path)
+    note = store.create_note("Doomed")
+    _attach(db_path, note.id, "aaaa-report.pdf")
+    (tmp_path / "attachments" / "aaaa-report.pdf").unlink()
+
+    store.delete_note(note.id)
+
+    assert store.get_note(note.id) is None
+
+
 def test_create_note_indexes_into_search(tmp_path):
     fake = FakeSearchIndex()
     store = NotesStore(tmp_path / "test.db", search_index=fake)

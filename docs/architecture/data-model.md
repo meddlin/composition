@@ -15,7 +15,8 @@ database file inside the configured application data directory:
 A note's Markdown content — including its embedded YAML frontmatter — is a single
 `TEXT` column in that database. Images pasted into a note in the web and desktop apps
 are the exception: they are files in an `app_data/` folder beside the database, and the
-note's Markdown refers to them by path (see [images.md](images.md)). The Meilisearch data directory (`meili_data/`), its
+note's Markdown refers to them by path (see [images.md](images.md)). Files attached to a note in the desktop app are files in an
+`attachments/` folder, described by rows of an `attachments` table (see [attachments.md](attachments.md)). The Meilisearch data directory (`meili_data/`), its
 log/master-key files, and `settings.yaml` live alongside it. The search index is
 derived data, not a second source of truth for the notes.
 
@@ -61,6 +62,21 @@ same columns as `notes` and `groups` plus a `deleted_at` timestamp, holding what
 deleted until it is restored or permanently deleted after 60 days (see
 [web-trash-can.md](../ui/web-trash-can.md)). They are separate tables rather than a flag
 on `notes`/`groups` so the CLI, which knows nothing of them, never lists a deleted note.
+
+```sql
+CREATE TABLE attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+```
+
+`attachments` is created with `CREATE TABLE IF NOT EXISTS` like `groups`. The CLI creates it
+and removes a deleted note's rows and files, but never shows or adds attachments. A note in
+the Trash Can keeps its attachments until it is permanently deleted.
 
 See [groups.md](groups.md) for how `notes.group_id` and `groups.parent_id` relate to
 each other and how they're rendered as a tree.

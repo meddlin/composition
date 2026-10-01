@@ -22,15 +22,19 @@ const userData = path.join(home, "userData");
 const out = process.env.SMOKE_OUT ?? fs.mkdtempSync(path.join(os.tmpdir(), "composition-smoke-shots-"));
 fs.mkdirSync(out, { recursive: true });
 
-// The bridge's expected members come from the same API_METHODS the preload
-// builds `window.composition` from (plus the two non-IPC members it adds), so
+// The bridge's expected members come from the same API_METHODS and ATTACHMENT_METHODS the
+// preload builds `window.composition` from (plus the two non-IPC members it adds), so
 // the "only the API" check below tracks the interface instead of a hand-kept
 // count. api.ts is TypeScript with type-only imports, so esbuild strips it down
 // to plain JS that Node can import.
-const apiSource = path.resolve(desktopDir, "../web/src/lib/composition/api.ts");
-const { code: apiCode } = await transform(fs.readFileSync(apiSource, "utf-8"), { loader: "ts", format: "esm" });
-const { API_METHODS } = await import(`data:text/javascript;base64,${Buffer.from(apiCode).toString("base64")}`);
-const expectedBridge = [...API_METHODS, "initial", "platform"].sort();
+async function importTypeScript(file) {
+  const { code } = await transform(fs.readFileSync(file, "utf-8"), { loader: "ts", format: "esm" });
+  return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
+}
+const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/api.ts"));
+// The desktop-only attachment methods (attachmentsApi.ts) ride on the same bridge.
+const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
+const expectedBridge = [...API_METHODS, ...ATTACHMENT_METHODS, "initial", "platform"].sort();
 
 const failures = [];
 function check(name, ok, detail = "") {
@@ -100,7 +104,7 @@ try {
   const missing = expectedBridge.filter((name) => !posture.methods.includes(name));
   const unexpected = posture.methods.filter((name) => !expectedBridge.includes(name));
   check(
-    "the bridge exposes only the API (+ initial, platform)",
+    "the bridge exposes only the API (+ attachments, initial, platform)",
     API_METHODS.length > 0 && missing.length === 0 && unexpected.length === 0,
     missing.length || unexpected.length
       ? `missing: ${missing.join(",") || "none"}; unexpected: ${unexpected.join(",") || "none"}`
@@ -171,6 +175,76 @@ try {
   await waitFor(async () => (await page.evaluate(() => window.composition.loadWorkspace())).notes[0]?.content.includes("](app_data/smoke-note-pasted-shot-"), { timeout: 10_000 });
   check("the note's Markdown refers to the image by its app_data path", true);
   await page.screenshot({ path: path.join(out, "2b-image.png") });
+
+  // ---- Attachments (desktop only): chosen in a native dialog, listed in a table below the note.
+  // Playwright can't click an OS dialog, so the main process's dialog and shell functions are
+  // replaced; everything from the button press to the file on disk is the real code path.
+  const inbox = path.join(home, "inbox");
+  fs.mkdirSync(path.join(inbox, "a folder"), { recursive: true });
+  const reportFile = path.join(inbox, "Quarterly report.pdf");
+  const archiveFile = path.join(inbox, "data.tar.gz");
+  fs.writeFileSync(reportFile, "%PDF-1.7 smoke");
+  fs.writeFileSync(archiveFile, Buffer.from([0x1f, 0x8b, 8, 0, 1, 2, 3]));
+  const copyTarget = path.join(inbox, "copy of report.pdf");
+  await app.evaluate(({ dialog, shell }, args) => {
+    globalThis.__smokePick = args.pick;
+    dialog.showOpenDialog = async () => ({ canceled: globalThis.__smokePick.length === 0, filePaths: globalThis.__smokePick });
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: args.copyTarget });
+    shell.showItemInFolder = (file) => { globalThis.__smokeRevealed = file; };
+  }, { pick: [reportFile, archiveFile], copyTarget });
+
+  const attachments = page.getByRole("region", { name: /^Attachments/ });
+  check("a note with no attachments shows the attach button and no table", (await page.getByRole("button", { name: "Attach files" }).count()) === 1 && (await page.getByRole("table").count()) === 0);
+  await page.getByRole("button", { name: "Attach files" }).click();
+  await attachments.getByRole("table").waitFor({ timeout: 10_000 });
+  const rows = attachments.getByRole("row");
+  check("attaching two files lists both in a table below the note", (await rows.count()) === 3, `${(await rows.count()) - 1} rows`);
+  check("the table shows each file's name", (await attachments.getByText("Quarterly report.pdf").count()) === 1 && (await attachments.getByText("data.tar.gz").count()) === 1);
+  check("the table shows each file's size", (await attachments.getByText("14 B").count()) === 1 && (await attachments.getByText("7 B").count()) === 1);
+  const attachmentDir = path.join(home, ".composition", "attachments");
+  const stored = fs.existsSync(attachmentDir) ? fs.readdirSync(attachmentDir).sort() : [];
+  check("the files are copied into ~/.composition/attachments", stored.length === 2 && stored.some((n) => /^[0-9a-f]{12}-Quarterly_report\.pdf$/.test(n)) && stored.some((n) => /\.gz$/.test(n)), stored.join(","));
+  check("the originals are left where they were", fs.existsSync(reportFile) && fs.existsSync(archiveFile));
+  const listed = await page.evaluate(async () => {
+    const [note] = (await window.composition.loadWorkspace()).notes;
+    return window.composition.listAttachments(note.id);
+  });
+  check("attachments persist and list over IPC, without their on-disk names", listed.length === 2 && listed.every((a) => !("storedName" in a)), JSON.stringify(Object.keys(listed[0] ?? {})));
+  const panelBox = await attachments.boundingBox();
+  const paneBox = await page.getByRole("region", { name: "Smoke note" }).boundingBox();
+  check("the table sits at the bottom of the note pane", Boolean(panelBox && paneBox) && Math.abs(panelBox.y + panelBox.height - (paneBox.y + paneBox.height)) < 2, `${panelBox?.y + panelBox?.height} vs ${paneBox?.y + paneBox?.height}`);
+  await page.screenshot({ path: path.join(out, "2c-attachments.png") });
+
+  await attachments.getByRole("button", { name: "Show Quarterly report.pdf in Finder" }).click();
+  const revealed = await waitFor(() => app.evaluate(() => globalThis.__smokeRevealed));
+  check("'Show in Finder' reveals the stored file", revealed.startsWith(attachmentDir) && revealed.endsWith("Quarterly_report.pdf"), revealed);
+  await attachments.getByRole("button", { name: "Save a copy of Quarterly report.pdf" }).click();
+  await waitFor(async () => fs.existsSync(copyTarget));
+  check("'Save a copy' writes the file where the save dialog said", fs.readFileSync(copyTarget, "utf-8") === "%PDF-1.7 smoke");
+
+  // A folder is refused by name; a cancelled dialog does nothing.
+  await app.evaluate(({}, folder) => { globalThis.__smokePick = [folder]; }, path.join(inbox, "a folder"));
+  await page.getByRole("button", { name: "Attach files" }).click();
+  // Scoped to the panel: Next's own route announcer is also a role="alert".
+  await attachments.getByRole("alert").filter({ hasText: "a folder: only files can be attached" }).waitFor({ timeout: 10_000 });
+  check("a folder is refused, by name, and nothing is added", (await rows.count()) === 3 && fs.readdirSync(attachmentDir).length === 2);
+  await app.evaluate(() => { globalThis.__smokePick = []; });
+  await page.getByRole("button", { name: "Attach files" }).click();
+  await sleep(500);
+  check("cancelling the file dialog adds nothing and shows no error", (await rows.count()) === 3 && (await attachments.getByRole("alert").count()) === 0);
+
+  // The renderer can only name an id, never a path.
+  const forged = await page.evaluate(async () => {
+    try { await window.composition.addAttachments(1, "/etc/passwd"); return "ok"; } catch { return "threw"; }
+  });
+  check("an extra path argument from the page is ignored", forged === "ok" && fs.readdirSync(attachmentDir).length === 2);
+  await app.evaluate(() => { globalThis.__smokePick = ["/etc/hosts"]; });
+
+  await attachments.getByRole("button", { name: "Remove data.tar.gz" }).click();
+  await attachments.getByRole("button", { name: "Remove data.tar.gz?" }).click();
+  await waitFor(async () => (await rows.count()) === 2);
+  check("removing an attachment drops its row and deletes the stored file", fs.readdirSync(attachmentDir).length === 1 && fs.readdirSync(attachmentDir)[0].endsWith("Quarterly_report.pdf"));
+  await app.evaluate(() => { globalThis.__smokePick = []; });
 
   // ---- Groups
   await sidebar.getByRole("button", { name: "+ New group" }).click();

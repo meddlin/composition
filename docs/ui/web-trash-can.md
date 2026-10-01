@@ -53,3 +53,6 @@ still removes the row for good.
 Moving to the trash removes the note from the search index; restoring puts it back.
 Images pasted into a note are never deleted either way (see
 [images.md](../architecture/images.md)).
+A note's attached files (desktop only) stay while it is in the Trash Can, so a restored
+note gets them back, and are deleted with the note when it is permanently deleted (see
+[attachments.md](../architecture/attachments.md#deleting)).

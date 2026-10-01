@@ -1,5 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import * as attachments from "./attachments";
+import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
+import type { StoredAttachment } from "./attachmentsRepo";
+import * as attachmentsRepo from "./attachmentsRepo";
 import type {
   CompositionApi,
   MoveGroupResult,
@@ -61,7 +65,7 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 export async function loadWorkspace(): Promise<Workspace> {
   const { sidebarWidth, editorRatio, favorites } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
-  trashRepo.purgeExpired();
+  await purgeExpiredTrash();
   return {
     notes: notesRepo.listNotes(),
     groups: groupsRepo.listGroups(),
@@ -205,6 +209,70 @@ export async function createNote(
 export async function deleteNote(id: number): Promise<void> {
   trashRepo.trashNote(id);
   await bestEffortIndex(() => searchIndex.deleteNoteFromIndex(id));
+  // Its attachments stay: restoring the note from the Trash Can brings them back.
+}
+
+/**
+ * Deletes the attachments of notes that are gone for good. The note is already
+ * gone, so a failure here leaves a stray file, not a half-deleted note: log it
+ * and carry on.
+ */
+async function removeOrphanedAttachments(): Promise<void> {
+  try {
+    await attachments.removeOrphans(loadWebSettings().appDataDir);
+  } catch (error) {
+    console.error("[attachments] cleanup failed:", error);
+  }
+}
+
+/** Clears Trash Can items past their retention window, and the attachments of any notes among them. */
+async function purgeExpiredTrash(): Promise<void> {
+  trashRepo.purgeExpired();
+  await removeOrphanedAttachments();
+}
+
+/*
+ * Attachments are desktop only (attachmentsApi.ts). Nothing below is part of
+ * CompositionApi, and actions.ts doesn't wrap it, so the web app exposes none of
+ * it; the desktop main process calls these directly, after it has run the
+ * native dialogs.
+ */
+
+/** What the UI gets: without `storedName`, so the file's place on disk never leaves the main process. */
+const publicAttachment = ({ id, noteId, fileName, size, createdAt }: StoredAttachment): Attachment => ({
+  id,
+  noteId,
+  fileName,
+  size,
+  createdAt,
+});
+
+export async function listAttachments(noteId: number): Promise<Attachment[]> {
+  return attachmentsRepo.listAttachments(noteId).map(publicAttachment);
+}
+
+/** Copies the files at `paths` (chosen by the user in a native dialog) into the application data directory and attaches them to the note. */
+export async function addAttachmentFiles(
+  noteId: number,
+  paths: readonly string[],
+): Promise<AddAttachmentsResult> {
+  if (!notesRepo.getNote(noteId)) return { attachments: [], error: "That note no longer exists." };
+  const { added, errors } = await attachments.addFiles(loadWebSettings().appDataDir, noteId, paths);
+  return {
+    attachments: added.map(publicAttachment),
+    ...(errors.length > 0 && { error: errors.join(" ") }),
+  };
+}
+
+/** Where an attachment's file is on disk, or null when it is unknown or its file has gone missing. */
+export async function findAttachmentFile(id: number): Promise<{ path: string; fileName: string } | null> {
+  const found = attachments.attachmentPath(loadWebSettings().appDataDir, id);
+  return found ? { path: found.path, fileName: found.attachment.fileName } : null;
+}
+
+export async function removeAttachment(id: number): Promise<AttachmentActionResult> {
+  const removed = await attachments.removeAttachment(loadWebSettings().appDataDir, id);
+  return removed ? {} : { error: "That attachment no longer exists." };
 }
 
 export async function createGroup(
@@ -240,7 +308,7 @@ export async function deleteGroup(id: number): Promise<{ error?: string }> {
 
 /** Expired items are cleared first, so the list never offers one that is about to vanish. */
 export async function loadTrash(): Promise<Trash> {
-  trashRepo.purgeExpired();
+  await purgeExpiredTrash();
   return trashRepo.listTrash();
 }
 
@@ -260,6 +328,7 @@ export async function restoreGroup(id: number): Promise<RestoreResult> {
 
 export async function permanentlyDeleteNote(id: number): Promise<void> {
   trashRepo.purgeNote(id);
+  await removeOrphanedAttachments();
 }
 
 export async function permanentlyDeleteGroup(id: number): Promise<void> {

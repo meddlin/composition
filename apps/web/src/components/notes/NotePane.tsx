@@ -4,6 +4,7 @@ import { XIcon } from "lucide-react";
 import { useId, useRef, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { AttachmentsSlot } from "./AttachmentsSlot";
 import { PANE_DRAG_TYPE } from "./dragTypes";
 import { DropOverlay } from "./DropOverlay";
 import { EditorTabs } from "./EditorTabs";
@@ -32,7 +33,8 @@ type Props = {
 
 /**
  * One open note: a header to drag it by or close it, tabs to see its editor,
- * its preview, or both beside each other, and that view of it. Dragging another
+ * its preview, or both beside each other, and that view of it. In the desktop
+ * app the note's attached files are listed below. Dragging another
  * note over it offers to open that note next to this one or in its place.
  */
 export function NotePane({
@@ -101,6 +103,7 @@ export function NotePane({
         onRatioChange={onRatioChange}
         onRatioCommit={onRatioCommit}
       />
+      <AttachmentsSlot key={note.id} noteId={note.id} />
       {drop.zone && <DropOverlay zone={drop.zone} />}
     </section>
   );

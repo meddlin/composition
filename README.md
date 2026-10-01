@@ -11,6 +11,8 @@ A note-taking system with Markdown support. This is a polyglot monorepo; each ap
 | [apps/desktop](apps/desktop) | Desktop app (macOS): the web UI in Electron, with bundled search | Electron, TypeScript, pnpm |
 | [docs](docs) | Architecture and product docs | Markdown |
 
+Which features each app has: [docs/feature-matrix.md](docs/feature-matrix.md).
+
 ## Getting started
 
 CLI:
