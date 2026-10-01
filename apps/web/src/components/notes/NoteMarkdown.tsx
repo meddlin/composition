@@ -1,8 +1,9 @@
-import { Component, type ReactNode } from "react";
+import { Component, useId, useMemo, type ReactNode } from "react";
 import Markdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
+import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 import { markdownComponents } from "./NoteImage";
 
@@ -14,10 +15,12 @@ type Props = {
 // Markdown's own elements that get a custom rendering (images), kept alongside the MDX tags.
 const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 
-const mdxRemarkPlugins: NonNullable<Options["remarkPlugins"]> = [
+// remarkHeadings goes after remarkRestrictMdx, whose renamed tags it looks for.
+const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"]> => [
   remarkGfm,
   remarkMdx,
   [remarkRestrictMdx, { allowed: Object.keys(mdxComponents) }],
+  [remarkHeadings, { idPrefix }],
 ];
 
 // remark-rehype turns node types it doesn't know into <div>s; these are left
@@ -28,9 +31,13 @@ const mdxRehypeOptions: NonNullable<Options["remarkRehypeOptions"]> = {
 
 /**
  * A note's rendered preview: Markdown (with images shown by `NoteImage`), plus
- * the MDX components in `mdxComponents` for notes that use any of them.
+ * the MDX components in `mdxComponents` for notes that use any of them. The
+ * headings of such a note get ids, which is what `<Toc />` links to.
  */
 export function NoteMarkdown({ body, rehypePlugins }: Props) {
+  // Heading ids are unique per preview, so a table of contents never scrolls a neighbouring pane.
+  const idPrefix = `${useId()}-`;
+  const remarkPlugins = useMemo(() => mdxRemarkPlugins(idPrefix), [idPrefix]);
   const plain = (
     <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins} components={markdownComponents}>
       {body}
@@ -41,7 +48,7 @@ export function NoteMarkdown({ body, rehypePlugins }: Props) {
   return (
     <MdxBoundary body={body} fallback={plain}>
       <Markdown
-        remarkPlugins={mdxRemarkPlugins}
+        remarkPlugins={remarkPlugins}
         remarkRehypeOptions={mdxRehypeOptions}
         rehypePlugins={rehypePlugins}
         components={noteComponents}

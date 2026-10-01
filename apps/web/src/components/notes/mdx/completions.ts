@@ -26,6 +26,10 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "An image, same as ![alt](src)",
     template: '<Image src="$0" alt="" />',
   },
+  Toc: {
+    description: "Table of contents that follows the note's headings",
+    template: "<Toc />$0",
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));
