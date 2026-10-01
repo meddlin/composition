@@ -92,7 +92,38 @@ SQLite).
 - `saveNoteContent`, `createNote` and `deleteNote` push to the index best-effort:
   failures are logged and swallowed, like `NotesStore._index`.
 - If the index has no documents, the first search rebuilds it from SQLite.
-- Only free-text search is supported so far; `tag:` / `title:` / `createdOn:` are not.
+- The query goes through [`searchQuery.ts`](../../apps/web/src/lib/composition/searchQuery.ts),
+  a port of `parse_search_query` that understands every frontmatter field (below).
+- Documents also carry `description`, which is searchable. Because that changes the
+  document shape, the first search after the server starts rebuilds the index from
+  SQLite (`reindexAll` also counts), so an index built by an older version isn't
+  left without it.
+- Results are capped at 50. A query with filters but no text lists matches newest
+  first (`updated_at_ts:desc`).
+
+### Filter syntax (web and desktop)
+
+`field: value` anywhere in the query, case-insensitive field names, space after the
+colon optional:
+
+| Field | Example | Matches |
+|---|---|---|
+| `tags:` / `tag:` | `tags: web development` | notes with exactly that tag (tag matching ignores case) |
+| `title:` | `title: routng` | typo-tolerant search over titles only |
+| `description:` | `description: ownership` | typo-tolerant search over descriptions only |
+| `created:` / `createdAt:` / `createdOn:` | `created: >=2026-05-30` | creation date; operators `>`, `>=`, `<`, `<=`, `=` (default `=`, the whole UTC day) |
+| `updated:` / `updatedAt:` / `updatedOn:` | `updated: <2026-01-01` | same, for the last-modified date |
+
+- An unquoted value runs up to the next `field:` or the end of the query, so
+  `tags: web development` is the one tag "web development". To follow a value with
+  free text, put the text first (`async tags: web development`) or quote the value
+  (`tags:"web development" async`).
+- Repeating a field, or combining fields, ANDs them. `title:` and `description:`
+  are the exception: Meilisearch can't scope individual words to an attribute, so
+  their values and any free text are joined into one query over the named
+  attributes.
+- A field with no value yet (`tags:`) is ignored. A malformed date stays as literal
+  text, so it finds nothing instead of silently dropping the constraint.
 
 Because the index is fully derived, `SearchIndex.reindex_all(notes)` can blow it away
 and rebuild it from the SQLite rows at any time — this runs once at startup (see

@@ -82,7 +82,7 @@ export function SearchBar({ onSelect }: Props) {
         }}
         onFocus={() => setOpen(true)}
         onKeyDown={onKeyDown}
-        placeholder="Search notes…"
+        placeholder="Search notes… or filter: tags: web development"
         aria-label="Search notes"
         role="combobox"
         aria-expanded={showDropdown}
