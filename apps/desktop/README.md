@@ -50,6 +50,7 @@ SMOKE_EXECUTABLE="$PWD/release/mac-arm64/Composition.app/Contents/MacOS/Composit
 | What | Where |
 |---|---|
 | Notes database | `~/.composition/composition.db` (shared with the CLI and web app, for now; [product-builds.md](../../docs/product-builds.md)) |
+| Attached files | `~/.composition/attachments/` (desktop only; [docs/architecture/attachments.md](../../docs/architecture/attachments.md)) |
 | Desktop settings | `~/Library/Application Support/Composition/settings.json` |
 | Search index, key, log | `~/Library/Application Support/Composition/search/` |
 
