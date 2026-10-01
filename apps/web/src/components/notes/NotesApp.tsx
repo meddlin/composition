@@ -224,7 +224,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       <p className="text-sm">No notes yet.</p>
       <button
         type="button"
-        onClick={onCreate}
+        onClick={() => onCreate()}
         className="rounded-md bg-foreground px-3 py-2 text-sm font-medium text-background transition-opacity hover:opacity-80"
       >
         + New note

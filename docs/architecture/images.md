@@ -3,6 +3,7 @@
 Source: [`images.ts`](../../apps/web/src/lib/composition/images.ts),
 [`imageRefs.ts`](../../apps/web/src/lib/composition/imageRefs.ts),
 [`NoteImage.tsx`](../../apps/web/src/components/notes/NoteImage.tsx),
+[`mdx/Image.tsx`](../../apps/web/src/components/notes/mdx/Image.tsx),
 [`MarkdownEditor.tsx`](../../apps/web/src/components/notes/MarkdownEditor.tsx)
 
 Images in notes are supported in the **web and desktop apps**. The CLI does not
@@ -79,7 +80,8 @@ file name as it was.
 ## Showing images
 
 The preview renders Markdown images with `NoteImage`, which react-markdown uses in
-place of a plain `<img>`:
+place of a plain `<img>`. The `<Image src alt />` [MDX component](../ui/mdx-components.md)
+is the same component written as a tag:
 
 | `src` in the note          | Shown from                                              |
 | -------------------------- | ------------------------------------------------------- |

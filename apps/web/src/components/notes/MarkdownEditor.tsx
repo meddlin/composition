@@ -1,12 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
 import { imageRef, MAX_IMAGE_BYTES } from "@/lib/composition/imageRefs";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { FrontmatterCard } from "./FrontmatterCard";
-import { markdownComponents } from "./NoteImage";
+import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
 import { useCodeHighlighting } from "./useCodeHighlighting";
 
@@ -159,9 +157,7 @@ export function MarkdownEditor({ noteId, value, onChange, ratio, onRatioChange, 
         <h2 className={paneHeader}>Preview</h2>
         <div className="prose max-w-none flex-1 overflow-y-auto p-4">
           {fm && <FrontmatterCard fm={fm} />}
-          <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins} components={markdownComponents}>
-            {body}
-          </Markdown>
+          <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
         </div>
       </section>
     </div>
