@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import electronPath from "electron";
+import { transform } from "esbuild";
 import { _electron as electron } from "playwright-core";
 
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -20,6 +21,16 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-smoke-"));
 const userData = path.join(home, "userData");
 const out = process.env.SMOKE_OUT ?? fs.mkdtempSync(path.join(os.tmpdir(), "composition-smoke-shots-"));
 fs.mkdirSync(out, { recursive: true });
+
+// The bridge's expected members come from the same API_METHODS the preload
+// builds `window.composition` from (plus the two non-IPC members it adds), so
+// the "only the API" check below tracks the interface instead of a hand-kept
+// count. api.ts is TypeScript with type-only imports, so esbuild strips it down
+// to plain JS that Node can import.
+const apiSource = path.resolve(desktopDir, "../web/src/lib/composition/api.ts");
+const { code: apiCode } = await transform(fs.readFileSync(apiSource, "utf-8"), { loader: "ts", format: "esm" });
+const { API_METHODS } = await import(`data:text/javascript;base64,${Buffer.from(apiCode).toString("base64")}`);
+const expectedBridge = [...API_METHODS, "initial", "platform"].sort();
 
 const failures = [];
 function check(name, ok, detail = "") {
@@ -86,8 +97,15 @@ try {
   }));
   check("window.composition is exposed", posture.bridge === "object");
   check("Node is not reachable from the page", posture.hasRequire === "undefined" && posture.hasProcess === "undefined");
-  check("the bridge exposes only the API (+ initial, platform)", posture.methods.length === 19, // 17 API methods + initial + platform
-     posture.methods.join(","));
+  const missing = expectedBridge.filter((name) => !posture.methods.includes(name));
+  const unexpected = posture.methods.filter((name) => !expectedBridge.includes(name));
+  check(
+    "the bridge exposes only the API (+ initial, platform)",
+    API_METHODS.length > 0 && missing.length === 0 && unexpected.length === 0,
+    missing.length || unexpected.length
+      ? `missing: ${missing.join(",") || "none"}; unexpected: ${unexpected.join(",") || "none"}`
+      : `${posture.methods.length} members: ${posture.methods.join(",")}`,
+  );
   check("the initial theme is applied before paint", posture.theme === "dark", posture.theme);
 
   // ---- Navigation: desktop has no Docs viewer
