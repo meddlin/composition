@@ -78,15 +78,15 @@ export async function settle(rendered: Rendered, ms = 250): Promise<void> {
 
 export const frame = (rendered: Rendered): string => rendered.captureCharFrame();
 
-/** The background color of one screen cell, as #RRGGBB: proof of what the user would see. */
-export function backgroundAt(rendered: Rendered, row: number, column: number): string {
+/** The color of one screen cell, as #RRGGBB: proof of what the user would see. */
+function colorAt(rendered: Rendered, row: number, column: number, layer: "fg" | "bg"): string {
   const { lines } = rendered.captureSpans() as unknown as {
-    lines: { spans: { width: number; bg: { buffer: ArrayLike<number> } }[] }[];
+    lines: { spans: { width: number; fg: { buffer: ArrayLike<number> }; bg: { buffer: ArrayLike<number> } }[] }[];
   };
   let x = 0;
   for (const span of lines[row].spans) {
     if (column < x + span.width) {
-      const [r, g, b] = [0, 1, 2].map((i) => span.bg.buffer[i]);
+      const [r, g, b] = [0, 1, 2].map((i) => span[layer].buffer[i]);
       const scale = r > 1 || g > 1 || b > 1 ? 1 : 255; // 0-255, or 0-1 floats
       return `#${[r, g, b].map((c) => Math.round(c * scale).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
     }
@@ -94,6 +94,12 @@ export function backgroundAt(rendered: Rendered, row: number, column: number): s
   }
   throw new Error(`no cell at row ${row}, column ${column}`);
 }
+
+/** The background color of one screen cell. */
+export const backgroundAt = (rendered: Rendered, row: number, column: number): string => colorAt(rendered, row, column, "bg");
+
+/** The text color of one screen cell. */
+export const foregroundAt = (rendered: Rendered, row: number, column: number): string => colorAt(rendered, row, column, "fg");
 
 export async function press(rendered: Rendered, key: string, modifiers: { ctrl?: boolean; meta?: boolean } = {}, ms = 150) {
   rendered.mockInput.pressKey(key as never, modifiers as never);

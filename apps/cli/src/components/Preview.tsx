@@ -1,6 +1,7 @@
-import type { SyntaxStyle } from "@opentui/core";
+import { CodeRenderable, type MarkdownOptions, type SyntaxStyle } from "@opentui/core";
 import { useMemo } from "react";
 import type { Api } from "../api";
+import { highlightCode } from "../codeHighlight";
 import { parsePreview, type Block, type TocEntry } from "../mdx";
 import { mix, type Palette } from "../theme";
 import { PreviewImage } from "./PreviewImage";
@@ -9,6 +10,22 @@ type Look = { palette: Palette; syntax: SyntaxStyle; api: Pick<Api, "readImage">
 
 /** How much of a panel's color tints its background: enough to read as a callout, not to fight the text. */
 export const PANEL_TINT = 0.14;
+
+/**
+ * Draws a fenced code block as OpenTUI would, but colors it with highlight.js, as web does
+ * (see codeHighlight.ts). Only blocks are routed here (`codeBlockOnly`); everything else in
+ * the note is still drawn by OpenTUI as before.
+ */
+const renderNode: NonNullable<MarkdownOptions["renderNode"]> = Object.assign(
+  (token: { type: string; lang?: string }, context: { defaultRender: () => unknown }) => {
+    const block = token.type === "code" ? context.defaultRender() : null;
+    if (block instanceof CodeRenderable) {
+      block.onHighlight = (_treeSitter, { content }) => highlightCode(content, token.lang);
+    }
+    return block as ReturnType<NonNullable<MarkdownOptions["renderNode"]>>;
+  },
+  { codeBlockOnly: true },
+);
 
 /**
  * A note's rendered preview: its Markdown, drawn by OpenTUI, with the MDX components the web
@@ -43,7 +60,15 @@ function Blocks({ blocks, palette, syntax, api, background }: Look & { blocks: B
         const marginTop = index === 0 ? 0 : 1;
         switch (block.kind) {
           case "markdown":
-            return <markdown key={index} content={block.source} syntaxStyle={syntax} bg={background} marginTop={marginTop} />;
+            return <markdown
+                key={index}
+                content={block.source}
+                syntaxStyle={syntax}
+                fg={palette.foreground}
+                renderNode={renderNode}
+                bg={background}
+                marginTop={marginTop}
+              />;
           case "panel":
             return <Panel key={index} block={block} marginTop={marginTop} palette={palette} syntax={syntax} api={api} />;
           case "toc":

@@ -7,7 +7,8 @@ import { autoPalette, isTruecolor, mix, paletteFor, PALETTES, readableOn, type P
 describe("the palettes", () => {
   it.each(["dark", "light", "forest", "cream"] as const)("%s has every color", (name) => {
     const palette = paletteFor(name);
-    for (const [key, value] of Object.entries(palette)) {
+    const { syntax, ...colors } = palette;
+    for (const [key, value] of Object.entries({ ...colors, ...Object.fromEntries(Object.entries(syntax).map(([k, v]) => [`syntax.${k}`, v])) })) {
       if (key === "name") continue;
       expect(value, `${name}.${key}`).toMatch(/^#[0-9A-F]{6}$/);
     }
@@ -44,6 +45,7 @@ describe("the palettes", () => {
       expect(p.warning).toBe(web(name, "warning"));
       expect(p.error).toBe(web(name, "error"));
       expect(p.success).toBe(web(name, "success"));
+      for (const [token, color] of Object.entries(p.syntax)) expect(color, `syntax.${token}`).toBe(web(name, `syntax-${token}`));
     });
   });
 });
