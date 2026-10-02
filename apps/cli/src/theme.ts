@@ -23,6 +23,18 @@ export type Palette = {
   selectionText: string;
   border: string;
   borderFocused: string;
+  /** Code block colors, by what highlight.js calls the token (the web's --syntax-*). */
+  syntax: SyntaxColors;
+};
+
+export type SyntaxColors = {
+  comment: string;
+  keyword: string;
+  string: string;
+  number: string;
+  function: string;
+  type: string;
+  attr: string;
 };
 
 // --- color math ------------------------------------------------------------------
@@ -74,6 +86,7 @@ type Base = {
   warning: string;
   error: string;
   success: string;
+  syntax: SyntaxColors;
 };
 
 function palette(base: Base): Palette {
@@ -98,6 +111,15 @@ const DARK = palette({
   warning: "#FFA62B",
   error: "#BA3C5B",
   success: "#4EBF71",
+  syntax: {
+    comment: "#8B949E",
+    keyword: "#FF7B72",
+    string: "#A5D6FF",
+    number: "#79C0FF",
+    function: "#D2A8FF",
+    type: "#FFA657",
+    attr: "#7EE787",
+  },
 });
 
 const LIGHT = palette({
@@ -110,6 +132,15 @@ const LIGHT = palette({
   warning: "#B7791F",
   error: "#C4314B",
   success: "#1A7F4B",
+  syntax: {
+    comment: "#5C6670",
+    keyword: "#CF222E",
+    string: "#0A3069",
+    number: "#0550AE",
+    function: "#7442D1",
+    type: "#953800",
+    attr: "#116329",
+  },
 });
 
 const FOREST = palette({
@@ -122,6 +153,15 @@ const FOREST = palette({
   warning: "#E0A030",
   error: "#D9596B",
   success: "#7BD88F",
+  syntax: {
+    comment: "#84A08D",
+    keyword: "#F08FA0",
+    string: "#A8D98A",
+    number: "#E3B341",
+    function: "#7CC7E8",
+    type: "#E0A066",
+    attr: "#7BD88F",
+  },
 });
 
 const CREAM = palette({
@@ -134,6 +174,15 @@ const CREAM = palette({
   warning: "#96600C",
   error: "#B23A48",
   success: "#4F7A3A",
+  syntax: {
+    comment: "#6B5C46",
+    keyword: "#A8341F",
+    string: "#3F6B2C",
+    number: "#8A5608",
+    function: "#7A3E9D",
+    type: "#9A4A1F",
+    attr: "#22627A",
+  },
 });
 
 export const PALETTES = { dark: DARK, light: LIGHT, forest: FOREST, cream: CREAM } as const;
@@ -203,5 +252,15 @@ export function syntaxStyleFor(p: Palette): SyntaxStyle {
     "markup.list.unchecked": { fg: p.muted },
     "markup.quote": { fg: p.muted, italic: true },
     "punctuation.special": { fg: p.muted },
+    // code blocks (codeHighlight.ts)
+    "code.comment": { fg: p.syntax.comment, italic: true },
+    "code.keyword": { fg: p.syntax.keyword },
+    "code.string": { fg: p.syntax.string },
+    "code.number": { fg: p.syntax.number },
+    "code.function": { fg: p.syntax.function },
+    "code.type": { fg: p.syntax.type },
+    "code.attr": { fg: p.syntax.attr },
+    "code.emphasis": { fg: p.foreground, italic: true },
+    "code.strong": { fg: p.foreground, bold: true },
   });
 }
