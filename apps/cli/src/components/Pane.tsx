@@ -4,6 +4,7 @@ import type { Api } from "../api";
 import { frontmatter, type Note, type panes } from "../backend";
 import { markdownSpans } from "../highlight";
 import type { Palette } from "../theme";
+import { Preview } from "./Preview";
 
 export const AUTOSAVE_DELAY_MS = 500;
 
@@ -142,7 +143,7 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
         </box>
         <box flexGrow={1} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
           <scrollbox focused={focused && !showEditor}>
-            <markdown content={body} syntaxStyle={syntax} />
+            <Preview body={body} palette={palette} syntax={syntax} api={api} />
           </scrollbox>
         </box>
       </box>

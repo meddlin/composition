@@ -40,9 +40,10 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
 | Markdown preview | ✅ | ✅ | ✅ | |
-| Images in notes: paste, and shown in the preview | ❌ | ✅ | ✅ | The CLI shows the Markdown text. [images.md](architecture/images.md) |
+| Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
+| Images in notes: paste | ❌ | ✅ | ✅ | |
 | Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |
-| `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ❌ | ✅ | ✅ | [mdx-components.md](ui/mdx-components.md) |
+| `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
 | **Attach any file to a note, listed in a table on the note** | ❌ | 🚫 | ✅ | Desktop only, by design. [attachments.md](architecture/attachments.md) |
 
 ## Appearance and settings
@@ -80,7 +81,7 @@ carries 🚫, which marks a deliberate decision.
 All three products open the same `composition.db`, so a note can carry something a
 product can't show. The rule so far is that the product that can't show it must not lose it:
 
-- **Images:** the note's Markdown holds the path. The CLI shows it as text, and its "move the data" setting carries the image folder along.
+- **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview but cannot paste one, and its "move the data" setting carries the image folder along.
 - **Attachments:** they live in their own table, never in the note's text, so the CLI and
   web app never rewrite them. Neither shows anything for them. Moving a note to the Trash
   Can keeps its attachments, so a restored note gets them back; they are deleted when the

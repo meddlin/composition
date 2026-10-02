@@ -115,8 +115,10 @@ method at a time.
 | [`src/tree.ts`](../apps/cli/src/tree.ts) | Turns notes, groups, favorites and a search into the tree's rows. Pure. |
 | [`src/keymap.ts`](../apps/cli/src/keymap.ts) | Every binding, driving the handlers, the footer and the `?` overlay. See [cli-keybindings.md](ui/cli-keybindings.md). |
 | [`src/highlight.ts`](../apps/cli/src/highlight.ts) | Markdown highlighting for the editor, which OpenTUI's textarea does not do itself. Pure. |
+| [`src/mdx.ts`](../apps/cli/src/mdx.ts) | Turns a note's body into what the preview draws: stretches of Markdown, `<Info>`/`<Warning>` panels, a `<Toc>`, images. Parses with the web's MDX plugins. Pure. See [mdx-components.md](ui/mdx-components.md). |
+| [`src/images.ts`](../apps/cli/src/images.ts) | Reads and decodes a stored image (shrunk, cached), and works out how many cells to draw it in. See [images.md](architecture/images.md#in-the-cli). |
 | [`src/theme.ts`](../apps/cli/src/theme.ts), [`src/useSunLevel.ts`](../apps/cli/src/useSunLevel.ts) | The five color schemes and the "follow the sun" blend. |
-| [`src/components/`](../apps/cli/src/components) | `Tree`, `Pane` (editor, preview, autosave), `TrashScreen`, `SettingsScreen` and the dialogs. |
+| [`src/components/`](../apps/cli/src/components) | `Tree`, `Pane` (editor, preview, autosave), `Preview` and `PreviewImage` (the Markdown, MDX and image drawing), `TrashScreen`, `SettingsScreen` and the dialogs. |
 | [`src/tools/`](../apps/cli/src/tools) | `pnpm seed` and `pnpm search:playground`: dummy notes and a search REPL, both in scratch folders. |
 | [`scripts/build.mjs`](../apps/cli/scripts/build.mjs), [`scripts/dev.mjs`](../apps/cli/scripts/dev.mjs) | The esbuild bundle, and build-then-run with an optional scratch home. |
 
@@ -127,7 +129,8 @@ The CLI imports, through [`backend.ts`](../apps/cli/src/backend.ts):
 - from `apps/web/src/lib/composition`: `service`, `searchIndex`, the settings, `frontmatter`,
   `favorites`, `themes`, the pure group-move and sun-schedule helpers;
 - from `apps/web/src/components/notes`: `panes.ts`, the arrangement of side-by-side panes (pure
-  state, no React);
+  state, no React), and `mdx/remarkRestrictMdx.ts` and `mdx/remarkHeadings.ts`, the plugins that
+  decide which MDX a note may use and collect its headings (pure functions over the syntax tree);
 - from `apps/desktop/src/main`: `MeiliProcessManager`, `SearchSidecar` and `resolveMeiliBinary`
   (Node built-ins only, no Electron).
 
@@ -153,6 +156,6 @@ Each of these covers one slice of the system in more depth:
   schema, and the on-disk note format.
 - [Groups](architecture/groups.md): the group and note relationship, nesting, the blocked-delete
   rule, favorites, and how the tree is built.
-- [Images](architecture/images.md): pasting images into a note in the web and desktop apps (the
-  terminal app shows the Markdown text).
+- [Images](architecture/images.md): pasting images into a note in the web and desktop apps, and how
+  the terminal app draws them.
 - [Attachments](architecture/attachments.md): files attached to a note (desktop only).
