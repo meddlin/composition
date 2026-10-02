@@ -13,7 +13,7 @@ importers:
         version: 0.5.14(typescript@7.0.2)(web-tree-sitter@0.25.10)
       '@opentui/react':
         specifier: 0.5.14
-        version: 0.5.14(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.25.10)(ws@8.22.0)
+        version: 0.5.14(react-devtools-core@7.0.1)(react@19.3.0)(typescript@7.0.2)(web-tree-sitter@0.25.10)(ws@8.22.0)
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
@@ -24,8 +24,8 @@ importers:
         specifier: ^3.3.0
         version: 3.3.0
       react:
-        specifier: 19.2.8
-        version: 19.2.8
+        specifier: 19.3.0
+        version: 19.3.0
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
@@ -47,7 +47,7 @@ importers:
         version: 4.0.9
       '@types/node':
         specifier: ^26
-        version: 26.6.3
+        version: 26.6.2
       '@types/react':
         specifier: ^19
         version: 19.3.0
@@ -59,7 +59,7 @@ importers:
         version: 7.0.2
       vitest:
         specifier: ^5.0.2
-        version: 5.0.3(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2))
+        version: 5.0.3(@types/node@26.6.2)(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2))
 
 packages:
 
@@ -416,8 +416,8 @@ packages:
   '@types/ms@2.1.0':
     resolution: {integrity: sha512-GsCCIZDE/p3i96vtEqx+7dBUGXrc7zeSK3wwPHIaRThS+9OhWIXRqzs4d6k1SVU8g91DrNRWxWUGhp5KXQb2VA==}
 
-  '@types/node@26.6.3':
-    resolution: {integrity: sha512-dsqMQQoeTLqu9wynDD00q573mNzso3IdQOAfHRJqLCcmCFPoGo9A1bDpUcv/9tnKpErQWv9uKeGfl37EIS02Yg==}
+  '@types/node@26.6.2':
+    resolution: {integrity: sha512-X1P21scMv4zGKLYqjdGjaKa7COa0RKVYYZZN/NfvLQ1JegxFhdhpZG/Lyn8AXx6CDUavKAd11v6BvfpkDByK8g==}
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
@@ -1077,8 +1077,8 @@ packages:
     peerDependencies:
       react: ^19.2.0
 
-  react@19.2.8:
-    resolution: {integrity: sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==}
+  react@19.3.0:
+    resolution: {integrity: sha512-E8LUcbtBWt20bbl2YoHfx4ZDBdxVTfOKtCZn9cDSJ4l6/nuoApcpIBcj47t2wZoVX8g2ZHuMHbiShgCR1T5Sog==}
     engines: {node: '>=0.10.0'}
 
   readable-stream@3.6.2:
@@ -1113,8 +1113,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  shell-quote@1.11.0:
-    resolution: {integrity: sha512-JdxDPD0DBTyu08pq0kPC0xSNet/qsU07qT6IsX1AS8oO2ICNRY4ldNa8OAI6PuwAH8tG3lxEhbqmyp4Dw4036g==}
+  shell-quote@1.10.0:
+    resolution: {integrity: sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA==}
     engines: {node: '>= 0.4'}
 
   simple-concat@1.0.1:
@@ -1468,12 +1468,12 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@opentui/react@0.5.14(react-devtools-core@7.0.1)(react@19.2.8)(typescript@7.0.2)(web-tree-sitter@0.25.10)(ws@8.22.0)':
+  '@opentui/react@0.5.14(react-devtools-core@7.0.1)(react@19.3.0)(typescript@7.0.2)(web-tree-sitter@0.25.10)(ws@8.22.0)':
     dependencies:
       '@opentui/core': 0.5.14(typescript@7.0.2)(web-tree-sitter@0.25.10)
-      react: 19.2.8
+      react: 19.3.0
       react-devtools-core: 7.0.1
-      react-reconciler: 0.33.0(react@19.2.8)
+      react-reconciler: 0.33.0(react@19.3.0)
       ws: 8.22.0
     transitivePeerDependencies:
       - typescript
@@ -1530,7 +1530,7 @@ snapshots:
 
   '@types/better-sqlite3@9.6.0':
     dependencies:
-      '@types/node': 26.6.3
+      '@types/node': 26.6.2
 
   '@types/chai@5.2.3':
     dependencies:
@@ -1561,7 +1561,7 @@ snapshots:
 
   '@types/ms@2.1.0': {}
 
-  '@types/node@26.6.3':
+  '@types/node@26.6.2':
     dependencies:
       undici-types: 8.9.0
 
@@ -1633,14 +1633,14 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
-  '@vitest/mocker@5.0.3(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2))':
+  '@vitest/mocker@5.0.3(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
       magic-string: 1.4.2
     optionalDependencies:
-      vite: 8.3.1(@types/node@26.6.3)(esbuild@0.28.2)
+      vite: 8.3.1(@types/node@26.6.2)(esbuild@0.28.2)
 
   '@vitest/spy@5.0.3': {}
 
@@ -2379,18 +2379,18 @@ snapshots:
 
   react-devtools-core@7.0.1:
     dependencies:
-      shell-quote: 1.11.0
+      shell-quote: 1.10.0
       ws: 7.5.13
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  react-reconciler@0.33.0(react@19.2.8):
+  react-reconciler@0.33.0(react@19.3.0):
     dependencies:
-      react: 19.2.8
+      react: 19.3.0
       scheduler: 0.27.0
 
-  react@19.2.8: {}
+  react@19.3.0: {}
 
   readable-stream@3.6.2:
     dependencies:
@@ -2458,7 +2458,7 @@ snapshots:
 
   semver@7.8.5: {}
 
-  shell-quote@1.11.0: {}
+  shell-quote@1.10.0: {}
 
   simple-concat@1.0.1: {}
 
@@ -2593,7 +2593,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2):
+  vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -2601,14 +2601,14 @@ snapshots:
       rolldown: 1.2.12
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 26.6.3
+      '@types/node': 26.6.2
       esbuild: 0.28.2
       fsevents: 2.3.3
 
-  vitest@5.0.3(@types/node@26.6.3)(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2)):
+  vitest@5.0.3(@types/node@26.6.2)(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(vite@8.3.1(@types/node@26.6.3)(esbuild@0.28.2))
+      '@vitest/mocker': 5.0.3(vite@8.3.1(@types/node@26.6.2)(esbuild@0.28.2))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -2619,10 +2619,10 @@ snapshots:
       tinybench: 6.2.0
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.1(@types/node@26.6.3)(esbuild@0.28.2)
+      vite: 8.3.1(@types/node@26.6.2)(esbuild@0.28.2)
       why-is-node-running: 3.2.1
     optionalDependencies:
-      '@types/node': 26.6.3
+      '@types/node': 26.6.2
     transitivePeerDependencies:
       - msw
 
