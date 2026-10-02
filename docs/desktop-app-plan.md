@@ -230,7 +230,7 @@ web/desktop database split described in [product-builds.md](product-builds.md).
 | Nested Meilisearch binary fails notarization | Phase 1; `osx-sign` `binaries` option |
 | Apple enrollment delay | Phase 0, start immediately |
 | Electron majors every 8 weeks, three supported | Budget a quarterly bump; Dependabot covers it once D2 is wired |
-| Third writer on the shared SQLite file | WAL already on; idempotent migrations; single-instance lock; schema changes must land in both `storage.py` and `db.ts` ([product-builds.md](product-builds.md)) |
+| Third writer on the shared SQLite file | WAL already on; idempotent migrations; single-instance lock; the schema lives only in `db.ts`, which the terminal app now uses too ([product-builds.md](product-builds.md)) |
 | Shipping the wrong Meilisearch edition | Community asset only, version + checksum recorded; see [Licensing Meilisearch](#licensing-meilisearch) |
 | Phase 2 regresses the web app | Behavior-preserving, test-first, merged on its own |
 

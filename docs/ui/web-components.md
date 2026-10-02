@@ -44,7 +44,7 @@ is duplicated per scheme.
 - The look is shadcn's neutral one: the primary action is foreground on background, inverted.
   Hover fills and borders are translucent foreground, so they read on `--background`,
   `--surface` and `--panel` alike.
-- **Renamed palette tokens.** Textual's `primary`, `secondary` and `accent` are `--brand`,
+- **Renamed palette tokens.** The terminal's `primary`, `secondary` and `accent` are `--brand`,
   `--brand-dim` and `--highlight`, because shadcn owns those three names. `--brand` tints focus
   rings and the resize handle; `--highlight` colors folder icons.
 - `dark:` follows the selected scheme's tone, not the OS setting (the `@custom-variant dark` in

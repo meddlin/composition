@@ -30,6 +30,8 @@ See [architecture/attachments.md](architecture/attachments.md) for files attache
 
 See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys belong to the editor, and which keys can't be used and why.
 
+See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the three apps share into one package.
+
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
 
 
@@ -81,7 +83,9 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
 
 ### Deployment
 
-Should this be deployed via PyPi? a full desktop app?
+The desktop app ships as a manual download (see [product-builds.md](product-builds.md)). The terminal app runs from
+source today (`pnpm dev`, or the `composition` bin): should it be published to npm, or shipped as a
+single-file executable? Both are open; neither is needed to use it.
 
 How to automate builds and deployments?
 

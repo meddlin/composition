@@ -57,9 +57,9 @@ stored name is `<12 random hex digits>-<original name made safe>`: anything outs
 `A-Za-z0-9_-` becomes `_`, and the extension is kept so Finder still knows the file type.
 Two attachments with the same name never collide, and no name can contain a path.
 
-The table is created by `db.ts` and, identically, by the CLI's `storage.py`, since both
-open the same file ([product-builds.md](../product-builds.md#what-sharing-costs-right-now) says
-schema changes land twice).
+The table is created by `db.ts`, which the CLI, web and desktop apps all open the file through
+([product-builds.md](../product-builds.md#what-sharing-costs-right-now) says why the schema now
+lives in one place).
 
 ## How it works
 

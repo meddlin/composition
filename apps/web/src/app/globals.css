@@ -4,11 +4,10 @@
 
 /*
  * Color schemes, selected in Settings and applied as `data-theme` on <html>
- * (see app/layout.tsx). Palettes mirror the CLI's themes.py:
- * dark = textual-dark, light = composition-light, forest = composition-forest.
- * cream and auto have no CLI counterpart.
+ * (see app/layout.tsx). The terminal app draws the same five schemes with the same
+ * colors (apps/cli/src/theme.ts, whose tests fail if the two drift apart).
  *
- * Textual's primary, secondary and accent are --brand, --brand-dim and --highlight
+ * The terminal's primary, secondary and accent are --brand, --brand-dim and --highlight
  * here: shadcn/ui owns those three names (see the semantic tokens below).
  *
  * auto ("Follow the sun") reuses the dark and light palettes: text and accent

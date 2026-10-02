@@ -32,14 +32,6 @@ jobs:
             apps/web/pnpm-lock.yaml
             apps/desktop/pnpm-lock.yaml
 
-      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: apps/cli/uv.lock
-
-      - name: Install CLI dependencies
-        run: uv sync --frozen --project apps/cli
-
       - name: Install web dependencies
         run: pnpm --dir apps/web install --frozen-lockfile
 
@@ -48,7 +40,8 @@ jobs:
       - name: Install desktop dependencies
         run: pnpm --dir apps/desktop install --frozen-lockfile
 
-      - name: Run unit tests (CLI + web + desktop)
+      # The CLI needs a newer Node than web and desktop, so it is tested in its own job below.
+      - name: Run unit tests (web + desktop)
         run: pnpm test
 
   # The TypeScript CLI needs a newer Node than web and desktop (OpenTUI uses node:ffi,

@@ -1,14 +1,14 @@
 /**
- * TypeScript port of `apps/cli/src/composition/frontmatter.py`.
- *
  * Parsing/generation of the YAML frontmatter block at the top of a note.
- * Keep this in sync with the Python source — it's what lets notes created or
- * edited by either app stay readable by the other.
+ * The terminal app and the desktop app use this same module, and every note already
+ * stored has frontmatter written by it (or by the Python CLI that preceded it), so the
+ * output format must stay stable: it's what lets notes written by one app stay readable
+ * by the others.
  */
 import yaml from "js-yaml";
 
-// Mirrors Python's `\A---\r?\n(?P<yaml>.*?)\r?\n---[ \t]*\r?\n?` with re.DOTALL:
-// anchored at the very start of the string (not per-line), non-greedy body.
+// The opening `---` line, a non-greedy YAML body, then the closing `---` line:
+// anchored at the very start of the string (not per line).
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
 
 export type Frontmatter = {
@@ -106,9 +106,9 @@ function serialize(fm: Frontmatter): string {
 
 function asString(value: unknown): string {
   if (value === null || value === undefined) return "";
-  // js-yaml, like PyYAML, auto-parses unquoted ISO8601 scalars into Date
-  // objects (YAML 1.1 timestamp resolver) — mirrors frontmatter.py's own
-  // datetime/date handling in `_as_str`.
+  // js-yaml auto-parses unquoted ISO8601 scalars into Date objects (the YAML 1.1
+  // timestamp resolver), so a date typed into the frontmatter by hand is turned
+  // back into the string the rest of the app expects.
   if (value instanceof Date) return value.toISOString();
   return String(value);
 }

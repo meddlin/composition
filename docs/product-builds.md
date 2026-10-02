@@ -8,7 +8,7 @@ the gap is written down instead of remembered.
 
 | Product | Path | Stack | Distribution |
 |---|---|---|---|
-| CLI | `apps/cli` | Python, Textual | Undecided (see the PyPI question in [index.md](index.md)) |
+| CLI | `apps/cli` | TypeScript, OpenTUI (React), Node 26.10+ | Undecided (see the distribution question in [index.md](index.md)) |
 | Web | `apps/web` | Next.js | Undecided |
 | Desktop | `apps/desktop` | Electron | **GitHub Releases, manual download, macOS only for now** ([plan](desktop-app-plan.md)) |
 
@@ -16,7 +16,7 @@ the gap is written down instead of remembered.
 
 **Everything shares one database, `~/.composition/composition.db`.** That is the CLI's
 default, the web app's default (`DEFAULT_APP_DATA_DIR` in `apps/web/src/lib/composition/paths.ts`),
-and the desktop app's default.
+and the desktop app's default. All three open it through the same data layer, `apps/web/src/lib/composition`.
 
 Shared: the SQLite file.
 Not shared, on purpose: each product's settings file and each product's Meilisearch index.
@@ -25,7 +25,7 @@ The index is derived data that any product rebuilds from SQLite ([search.md](arc
 | | CLI | Web | Desktop |
 |---|---|---|---|
 | Database | `~/.composition/composition.db` | same | same |
-| Settings | `~/.composition/settings.yaml` | `~/.composition-web/settings.json` | `~/Library/Application Support/Composition/settings.json` |
+| Settings | `~/.composition-cli/settings.json` | `~/.composition-web/settings.json` | `~/Library/Application Support/Composition/settings.json` |
 | Meilisearch data | `~/.composition/meili_data` | `~/.composition-web/meili_data` | `~/Library/Application Support/Composition/search/meili_data` |
 | Meilisearch process | Spawned by the CLI, random port | Started by hand (`pnpm meili`), port 7700 | Spawned by the app (bundled binary), random port, own master key |
 
@@ -38,13 +38,19 @@ desktop search until the next launch.
 
 ### What sharing costs right now
 
-- **Several writers on one file.** SQLite WAL mode is set by the web app's `db.ts` and is
-  stored in the file header, so it covers the other writers too. The desktop app holds a
-  single-instance lock, so there is never more than one desktop writer.
-- **Schema changes land twice.** Column migrations are additive `ALTER TABLE` checks
-  implemented separately in Python (`storage.py`, `_ensure_*_column`) and TypeScript
-  (`db.ts`, `ensureColumn`). While the file is shared, any schema change must be made in both,
-  or the product that is not updated will quietly run against a schema it does not know.
+- **Several writers on one file.** SQLite WAL mode is set by `db.ts` and is stored in the file
+  header, so it covers every writer. The desktop app holds a single-instance lock, so there is
+  never more than one desktop writer; a terminal app and a web server can be open at the same time.
+- **The schema lives in one place.** Column migrations are additive `ALTER TABLE` checks in
+  `db.ts` (`ensureColumn`), which the terminal, web and desktop apps all run. (Until the CLI was
+  rewritten in TypeScript there was a second copy in Python, and every schema change had to land in
+  both.) `db.test.ts` opens databases as each earlier version created them. The remaining cost is
+  that the three apps reach that file by relative import rather than from a package: see
+  [shared-core-plan.md](shared-core-plan.md).
+- **Different Node versions.** The terminal app needs Node 26.10 or newer (OpenTUI uses `node:ffi`);
+  web runs on Node 22 and desktop on Electron's bundled Node. `better-sqlite3` is a native module
+  built per Node, so each app resolves its own copy: the CLI's bundle and its tests load the CLI's.
+  Version 12 is used because it supports all of them.
 
 ## Data storage: later
 
@@ -63,12 +69,12 @@ It is mostly configuration, and small:
 
 - The web app already reads its location from settings (`appDataDir`, or an explicit
   `dbPath`), so pointing it at its own file needs no code change. What changes is the
-  **default**: `DEFAULT_APP_DATA_DIR` in `paths.ts` currently points at the CLI's directory.
+  **default**: `DEFAULT_APP_DATA_DIR` in `paths.ts` currently points at the terminal app's directory.
 - `searchIndex.ts` reads the Meilisearch master key from the CLI's
   `~/.composition/meili_master_key` regardless of the configured data directory. That is a
   second hard-coded coupling to remove at the same time.
-- The duplicated migrations stop being a cross-product hazard for the web app, and remain one
-  for desktop and CLI.
+- Migrations are already in one place (`db.ts`), so a split would not duplicate them; the
+  shared-core move would make that place a package.
 - Desktop and CLI keep sharing the file, so the single-instance lock, WAL mode and
   schema-in-two-places rule continue to apply to them.
 
