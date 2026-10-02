@@ -6,7 +6,8 @@ import { testRender } from "@opentui/react/test-utils";
 import { vi } from "vitest";
 import { defaultApi, type Api } from "./api";
 import { App } from "./App";
-import { closeDb, searchIndex, service } from "./backend";
+import { closeDb, service } from "./backend";
+import { keepSearchOffline } from "./offlineSearch";
 
 /** Helpers for tests that render the real app over a real, temporary database. */
 
@@ -34,9 +35,10 @@ export function createSandbox(): Sandbox {
   const settings = path.join(home, "settings.json");
   fs.writeFileSync(settings, JSON.stringify({ appDataDir: path.join(home, "data"), theme: "dark" }));
   vi.stubEnv("COMPOSITION_SETTINGS_PATH", settings);
-  // Saving a note indexes it. Without this a test would try web's default Meilisearch port, and
-  // write into a developer's real index if `pnpm meili` happened to be running.
-  searchIndex.disableSearch("Search is off in tests.");
+  // Saving a note tries to index it, and web's search layer defaults to the Meilisearch a developer
+  // may have running on 7700. This points it at nothing, so notes saved here can't reach that index;
+  // dispose() undoes it.
+  keepSearchOffline();
   const mounted: Rendered[] = [];
 
   return {

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { isExecutableFile, listNotes, resolveMeiliBinary, service } from "./backend";
 import { ApplicationDataMoveError } from "./dataLocation";
+import { keepSearchOffline } from "./offlineSearch";
 import { startRuntime, type Runtime } from "./runtime";
 
 /** A stand-in Meilisearch: same flags and /health endpoint, nothing else. */
@@ -24,6 +25,9 @@ const writeSettings = (appDataDir: string) =>
   fs.writeFileSync(process.env.COMPOSITION_SETTINGS_PATH!, JSON.stringify({ appDataDir, theme: "dark" }));
 
 beforeEach(() => {
+  // Only matters for a test where the sidecar doesn't come up (no binary): saving a note would
+  // otherwise fall back to a developer's own Meilisearch on 7700. A running sidecar overrides it.
+  keepSearchOffline();
   home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-runtime-"));
   dataDir = path.join(home, "data");
   vi.stubEnv("COMPOSITION_SETTINGS_PATH", path.join(home, ".composition-cli", "settings.json"));

@@ -407,6 +407,9 @@ describe("the Trash Can", () => {
     const group = await service.createGroup("Gone", null);
     await service.createNote("Orphan", group.id);
     await trashNote("Orphan");
+    // The Trash Can orders by deletion time, to the millisecond; deleting back to back could tie,
+    // and then the note would come first.
+    await sleep(5);
     await service.deleteGroup(group.id);
     const app = await sandbox.mount();
 
