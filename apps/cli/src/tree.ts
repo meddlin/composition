@@ -16,6 +16,7 @@ export type TreeRow =
       expanded: boolean;
     }
   | { kind: "note"; key: string; noteId: number; label: string; depth: number }
+  | { kind: "trash"; key: "trash"; label: string; depth: 0 }
   | { kind: "settings"; key: "settings"; label: string; depth: 0 }
   | { kind: "message"; key: string; label: string; depth: 0 };
 
@@ -86,6 +87,7 @@ export function buildTree({ notes, groups, collapsed, filtering = false }: TreeI
     if (expanded) addNotes(null, 1);
   }
 
+  rows.push({ kind: "trash", key: "trash", label: "⌫ Trash", depth: 0 });
   rows.push({ kind: "settings", key: "settings", label: "⚙ Settings", depth: 0 });
   return rows;
 }

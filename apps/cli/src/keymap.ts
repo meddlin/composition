@@ -9,6 +9,7 @@ export type Scope = "tree" | "pane" | "trash" | "settings";
 export type ActionId =
   | "open"
   | "open-beside"
+  | "open-trash"
   | "collapse"
   | "expand"
   | "new-note"
@@ -39,25 +40,29 @@ export type KeyBinding = {
   description: string;
   /** Shown in the footer for its scope. */
   footer: boolean;
+  /** Kept in the footer even when the terminal is too narrow for every hint. */
+  essential?: boolean;
 };
 
 export const BINDINGS: readonly KeyBinding[] = [
+  // Most useful first: when the footer must shorten, the later hints go first.
   { action: "open", scope: "tree", keys: ["enter"], hint: "Enter open", description: "Open the note in the focused pane", footer: true },
-  { action: "open-beside", scope: "tree", keys: ["o"], hint: "o open beside", description: "Open the note in a new pane to the right", footer: true },
   { action: "collapse", scope: "tree", keys: ["left"], hint: "← fold", description: "Collapse the highlighted group", footer: false },
   { action: "expand", scope: "tree", keys: ["right"], hint: "→ unfold", description: "Expand the highlighted group", footer: false },
   { action: "new-note", scope: "tree", keys: ["ctrl+n"], hint: "ctrl+n note", description: "New note in the highlighted group", footer: true },
-  { action: "new-group", scope: "tree", keys: ["ctrl+g"], hint: "ctrl+g group", description: "New group inside the highlighted group", footer: true },
-  { action: "rename-group", scope: "tree", keys: ["r"], hint: "r rename", description: "Rename the highlighted group", footer: false },
-  { action: "move", scope: "tree", keys: ["m"], hint: "m move", description: "Move the highlighted note or group", footer: true },
-  { action: "favorite", scope: "tree", keys: ["f"], hint: "f pin", description: "Pin or unpin the highlighted note or group", footer: false },
-  { action: "delete", scope: "tree", keys: ["ctrl+d"], hint: "ctrl+d delete", description: "Delete the highlighted note or group (a note goes to the Trash Can)", footer: true },
   { action: "search", scope: "tree", keys: ["/", "ctrl+space"], hint: "/ search", description: "Focus the search bar", footer: true },
-  { action: "help", scope: "tree", keys: ["?"], hint: "? help", description: "Show every key", footer: true },
+  { action: "delete", scope: "tree", keys: ["ctrl+d"], hint: "ctrl+d delete", description: "Delete the highlighted note or group (a note goes to the Trash Can)", footer: true },
+  { action: "open-trash", scope: "tree", keys: ["t"], hint: "t trash", description: "Open the Trash Can: restore or permanently delete what you deleted", footer: true },
+  { action: "open-beside", scope: "tree", keys: ["o"], hint: "o open beside", description: "Open the note in a new pane to the right", footer: true },
+  { action: "new-group", scope: "tree", keys: ["ctrl+g"], hint: "ctrl+g group", description: "New group inside the highlighted group", footer: true },
+  { action: "move", scope: "tree", keys: ["m"], hint: "m move", description: "Move the highlighted note or group", footer: true },
+  { action: "rename-group", scope: "tree", keys: ["r"], hint: "r rename", description: "Rename the highlighted group", footer: false },
+  { action: "favorite", scope: "tree", keys: ["f"], hint: "f pin", description: "Pin or unpin the highlighted note or group", footer: false },
+  { action: "help", scope: "tree", keys: ["?"], hint: "? help", description: "Show every key", footer: true, essential: true },
   { action: "next-pane", scope: "tree", keys: ["ctrl+o"], hint: "ctrl+o panes", description: "Go to the first pane", footer: false },
-  { action: "quit", scope: "tree", keys: ["q"], hint: "q quit", description: "Quit", footer: true },
+  { action: "quit", scope: "tree", keys: ["q"], hint: "q quit", description: "Quit", footer: true, essential: true },
 
-  { action: "to-tree", scope: "pane", keys: ["escape"], hint: "Esc tree", description: "Back to the tree", footer: true },
+  { action: "to-tree", scope: "pane", keys: ["escape"], hint: "Esc tree", description: "Back to the tree", footer: true, essential: true },
   { action: "next-pane", scope: "pane", keys: ["ctrl+o"], hint: "ctrl+o next pane", description: "Next pane (tree, pane 1, pane 2, … then the tree)", footer: true },
   { action: "cycle-view", scope: "pane", keys: ["ctrl+t"], hint: "ctrl+t view", description: "Cycle the pane's view: editor, split, preview", footer: true },
   { action: "close-pane", scope: "pane", keys: ["ctrl+x"], hint: "ctrl+x close", description: "Close the pane", footer: true },
@@ -65,9 +70,9 @@ export const BINDINGS: readonly KeyBinding[] = [
 
   { action: "restore", scope: "trash", keys: ["r"], hint: "r restore", description: "Restore the highlighted note or group", footer: true },
   { action: "delete-forever", scope: "trash", keys: ["ctrl+d"], hint: "ctrl+d delete forever", description: "Delete it for good", footer: true },
-  { action: "back", scope: "trash", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true },
+  { action: "back", scope: "trash", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 
-  { action: "back", scope: "settings", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true },
+  { action: "back", scope: "settings", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 ];
 
 /** The part of an OpenTUI key event the keymap looks at. */
@@ -88,10 +93,20 @@ export function bindingsFor(scope: Scope): KeyBinding[] {
   return BINDINGS.filter((binding) => binding.scope === scope);
 }
 
-/** The footer line for a scope: the hints, in list order. */
-export function footerFor(scope: Scope): string {
-  return bindingsFor(scope)
-    .filter((binding) => binding.footer)
-    .map((binding) => binding.hint)
-    .join("  ·  ");
+const FOOTER_SEPARATOR = "  ·  ";
+
+/**
+ * The footer line for a scope: its hints in list order. When the terminal is too narrow for
+ * all of them, the later ones are dropped first, but the essential ones (help, quit, the
+ * way back) always stay.
+ */
+export function footerFor(scope: Scope, width = Number.POSITIVE_INFINITY): string {
+  let hints = bindingsFor(scope).filter((binding) => binding.footer);
+  const text = () => hints.map((binding) => binding.hint).join(FOOTER_SEPARATOR);
+  while (text().length > width) {
+    const droppable = hints.map((binding) => binding.essential).lastIndexOf(undefined);
+    if (droppable === -1) break;
+    hints = hints.filter((_, index) => index !== droppable);
+  }
+  return text();
 }

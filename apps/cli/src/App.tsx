@@ -5,6 +5,7 @@ import { panes as paneLib, type Group, type Note, type Workspace } from "./backe
 import { ConfirmDialog, HelpDialog, PickerDialog, PromptDialog, type PickerOption } from "./components/Dialogs";
 import { Pane, type FlushRegistry } from "./components/Pane";
 import { Tree } from "./components/Tree";
+import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
 import { paletteFor, syntaxStyleFor } from "./theme";
 import { buildTree, groupKey, noteKey, orderedGroups, targetGroupId, type TreeRow } from "./tree";
@@ -25,6 +26,7 @@ type Dialog =
   | { kind: "delete-note"; note: Note }
   | { kind: "delete-group"; group: Group }
   | { kind: "help" }
+  | { kind: "trash" }
   | null;
 
 export type AppProps = {
@@ -275,6 +277,9 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
       case "help":
         setDialog({ kind: "help" });
         break;
+      case "open-trash":
+        setDialog({ kind: "trash" });
+        break;
       case "next-pane":
         nextPane();
         break;
@@ -289,6 +294,7 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
     if (!row) return;
     if (row.kind === "note") openNote(row.noteId);
     else if (row.kind === "group") toggleGroup(row);
+    else if (row.kind === "trash") setDialog({ kind: "trash" });
     else if (row.kind === "settings") setToast("Settings arrive in the next step of the port.");
   };
 
@@ -421,6 +427,18 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
         );
       case "help":
         return <HelpDialog palette={palette} onClose={closeDialog} />;
+      case "trash":
+        return (
+          <TrashScreen
+            api={api}
+            palette={palette}
+            width={terminalWidth}
+            onClose={() => {
+              closeDialog();
+              void reload(); // what was restored belongs in the tree again
+            }}
+          />
+        );
     }
   };
 
@@ -497,7 +515,7 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
       </box>
 
       <box height={1} paddingLeft={1}>
-        <text fg={toast ? palette.warning : palette.muted}>{toast ?? footerFor(focus === "pane" ? "pane" : "tree")}</text>
+        <text fg={toast ? palette.warning : palette.muted}>{toast ?? footerFor(focus === "pane" ? "pane" : "tree", terminalWidth - 2)}</text>
       </box>
 
       {renderDialog()}

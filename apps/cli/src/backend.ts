@@ -31,6 +31,8 @@ export { listNotes } from "../../web/src/lib/composition/notesRepo";
 export type { Note } from "../../web/src/lib/composition/notesRepo";
 export type { Group } from "../../web/src/lib/composition/groupsRepo";
 export type { Favorites } from "../../web/src/lib/composition/favorites";
+export type { RestoreResult, Trash, TrashedGroup, TrashedNote } from "../../web/src/lib/composition/trash";
+export { daysLeft, TRASH_RETENTION_DAYS } from "../../web/src/lib/composition/trash";
 export type { ThemeName } from "../../web/src/lib/composition/themes";
 export * as favorites from "../../web/src/lib/composition/favorites";
 export * as frontmatter from "../../web/src/lib/composition/frontmatter";

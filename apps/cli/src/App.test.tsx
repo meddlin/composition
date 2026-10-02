@@ -115,8 +115,10 @@ describe("opening and editing a note", () => {
 
 const arrowDown = (app: Rendered, times = 1) => (async () => { for (let i = 0; i < times; i++) await press(app, "ARROW_DOWN", {}, 40); })();
 const arrowUp = (app: Rendered, times = 1) => (async () => { for (let i = 0; i < times; i++) await press(app, "ARROW_UP", {}, 40); })();
-const inTree = (app: Rendered) => frame(app).includes("ctrl+g group");
-const inPane = (app: Rendered) => frame(app).includes("ctrl+t view");
+// "q quit" is an essential hint (never dropped from a narrow footer) and belongs to the tree alone.
+const inTree = (app: Rendered) => frame(app).includes("q quit");
+// "Esc tree" is the pane footer's essential hint.
+const inPane = (app: Rendered) => frame(app).includes("Esc tree");
 
 describe("panes", () => {
   it("opens a second note beside the first with o, and moves between them with ctrl+o", async () => {
@@ -326,6 +328,165 @@ describe("when the data layer fails", () => {
   });
 });
 
+/** Deletes a note the way the app does, so it lands in the Trash Can. */
+async function trashNote(title: string) {
+  const note = listNotes().find((n) => n.title === title)!;
+  await service.deleteNote(note.id);
+  return note;
+}
+
+describe("the Trash Can", () => {
+  it("opens with t and lists what was deleted, with the days left", async () => {
+    await seed();
+    await trashNote("Plan");
+    const app = await sandbox.mount();
+
+    await press(app, "t", {}, 400);
+
+    const screen = frame(app);
+    expect(screen).toContain("Trash Can");
+    expect(screen).toContain("Plan");
+    expect(screen).toContain("60 days left");
+    expect(screen).toContain("r restore");
+    expect(screen).toContain("Esc back");
+  });
+
+  it("opens from the Trash row too", async () => {
+    await seed();
+    await trashNote("Plan");
+    const app = await sandbox.mount();
+    await arrowDown(app, 6); // to the bottom of the tree, which is Settings
+    await arrowUp(app); // and one up: the Trash row
+
+    await press(app, "RETURN", {}, 400);
+
+    expect(frame(app)).toContain("Deleted in the last 60 days");
+  });
+
+  it("shows a note you just deleted in the app", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "d", { ctrl: true });
+    await press(app, "y", {}, 400);
+
+    await press(app, "t", {}, 400);
+
+    expect(frame(app)).toContain("Plan");
+    expect(frame(app)).not.toContain("is empty");
+  });
+
+  it("says when it is empty, and Escape goes back to the notes", async () => {
+    await seed();
+    const app = await sandbox.mount();
+
+    await press(app, "t", {}, 300);
+    expect(frame(app)).toContain("The Trash Can is empty.");
+    await pressEscape(app, 300);
+
+    expect(frame(app)).not.toContain("Trash Can");
+    expect(inTree(app)).toBe(true);
+  });
+
+  it("restores a note with r and puts it back in the tree", async () => {
+    await seed();
+    await trashNote("Plan");
+    const app = await sandbox.mount();
+    expect(frame(app)).not.toContain("Plan");
+
+    await press(app, "t", {}, 300);
+    await press(app, "r", {}, 500);
+    expect(frame(app)).toContain('Restored "Plan".');
+    expect(frame(app)).toContain("The Trash Can is empty.");
+    await pressEscape(app, 400);
+
+    expect(listNotes().map((n) => n.title).sort()).toEqual(["Loose", "Plan"]);
+    expect(frame(app)).toContain("Plan");
+  });
+
+  it("restores a note at the top level when its group has been deleted since", async () => {
+    const group = await service.createGroup("Gone", null);
+    await service.createNote("Orphan", group.id);
+    await trashNote("Orphan");
+    await service.deleteGroup(group.id);
+    const app = await sandbox.mount();
+
+    await press(app, "t", {}, 300);
+    // the most recently deleted comes first: the group. Move to the note and restore it.
+    await press(app, "ARROW_DOWN");
+    await press(app, "r", {}, 500);
+
+    expect(frame(app)).toContain('Restored "Orphan" at the top level, because its group is gone.');
+    expect(listNotes().find((n) => n.title === "Orphan")?.groupId).toBeNull();
+  });
+
+  it("restores a deleted group", async () => {
+    const group = await service.createGroup("Archive", null);
+    await service.deleteGroup(group.id);
+    const app = await sandbox.mount();
+
+    await press(app, "t", {}, 300);
+    await press(app, "r", {}, 500);
+
+    expect(frame(app)).toContain('Restored "Archive".');
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Archive"]);
+  });
+
+  it("deletes for good after confirmation, and keeps the item if you decline", async () => {
+    await seed();
+    await trashNote("Plan");
+    const app = await sandbox.mount();
+    await press(app, "t", {}, 300);
+
+    await press(app, "d", { ctrl: true });
+    expect(frame(app)).toContain('Delete "Plan" for good?');
+    await press(app, "n");
+    expect((await service.loadTrash()).notes).toHaveLength(1);
+
+    await press(app, "d", { ctrl: true });
+    await press(app, "y", {}, 500);
+
+    expect((await service.loadTrash()).notes).toEqual([]);
+    expect(frame(app)).toContain('Deleted "Plan" for good.');
+    expect(frame(app)).toContain("The Trash Can is empty.");
+  });
+
+  it("does nothing for r or ctrl+d when there is nothing to act on", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "t", {}, 300);
+
+    await press(app, "r");
+    await press(app, "d", { ctrl: true });
+
+    expect(frame(app)).toContain("The Trash Can is empty.");
+    expect(frame(app)).not.toContain("for good?");
+  });
+
+  it("keeps the open panes while you look in the Trash", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await pressEscape(app);
+
+    await press(app, "t", {}, 300);
+    await pressEscape(app, 300);
+
+    expect(frame(app)).toContain("Plan — saved");
+  });
+});
+
+describe("a narrow terminal", () => {
+  it("still shows help and quit in the footer", async () => {
+    await seed();
+    const app = await sandbox.mount({ width: 60 });
+
+    const footer = frame(app).split("\n").find((row) => row.includes("q quit")) ?? "";
+
+    expect(footer).toContain("? help");
+    expect(footer.trimEnd().length).toBeLessThanOrEqual(60);
+  });
+});
+
 describe("renaming and moving", () => {
   it("renames a group with r, prefilled with its name", async () => {
     await seed();
@@ -446,6 +607,22 @@ describe("help and quitting", () => {
     await pressEscape(app);
 
     expect(frame(app)).not.toContain("Typing in an editor always wins");
+  });
+
+  it("fits the key list to a short terminal and scrolls to the rest", async () => {
+    await seed();
+    const app = await sandbox.mount({ height: 20 });
+
+    await press(app, "?");
+    expect(frame(app)).toContain("Typing in an editor always wins"); // the note is never scrolled away
+    expect(frame(app)).toContain("In the tree");
+    expect(frame(app)).not.toContain("In the Trash"); // below the fold
+
+    for (let i = 0; i < 40; i++) app.mockInput.pressKey("ARROW_DOWN" as never);
+    await settle(app, 200);
+
+    expect(frame(app)).toContain("In the Trash");
+    expect(frame(app)).toContain("Back to the notes");
   });
 
   it("saves an edit that is still waiting when you quit", async () => {

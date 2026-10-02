@@ -15,6 +15,11 @@ export type Api = Pick<
   | "moveNoteToGroup"
   | "saveNoteContent"
   | "searchNotes"
+  | "loadTrash"
+  | "restoreNote"
+  | "restoreGroup"
+  | "permanentlyDeleteNote"
+  | "permanentlyDeleteGroup"
 >;
 
 export const defaultApi: Api = service;

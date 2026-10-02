@@ -39,7 +39,7 @@ describe("buildTree", () => {
       "  Projects",
       "    Plan",
       "  Standup",
-      "⚙ Settings",
+      "⌫ Trash", "⚙ Settings",
     ]);
   });
 
@@ -50,7 +50,7 @@ describe("buildTree", () => {
       collapsed: none,
     });
 
-    expect(labels(rows)).toEqual(["Home", "  Taxes", "Ungrouped", "  Loose", "⚙ Settings"]);
+    expect(labels(rows)).toEqual(["Home", "  Taxes", "Ungrouped", "  Loose", "⌫ Trash", "⚙ Settings"]);
   });
 
   it("omits the Ungrouped bucket when it would be empty and groups exist", () => {
@@ -62,7 +62,7 @@ describe("buildTree", () => {
   it("shows an empty Ungrouped bucket when there are no groups at all", () => {
     expect(labels(buildTree({ groups: [], notes: [], collapsed: none }))).toEqual([
       "Ungrouped",
-      "⚙ Settings",
+      "⌫ Trash", "⚙ Settings",
     ]);
   });
 
@@ -79,20 +79,20 @@ describe("buildTree", () => {
       collapsed: new Set([groupKey(1)]),
     });
 
-    expect(labels(rows)).toEqual(["Work", "⚙ Settings"]);
+    expect(labels(rows)).toEqual(["Work", "⌫ Trash", "⚙ Settings"]);
     expect(rows[0]).toMatchObject({ kind: "group", groupId: 1, expanded: false });
   });
 
   it("can collapse the Ungrouped bucket", () => {
     const rows = buildTree({ groups: [], notes: [note(1, "Loose")], collapsed: new Set([groupKey(null)]) });
 
-    expect(labels(rows)).toEqual(["Ungrouped", "⚙ Settings"]);
+    expect(labels(rows)).toEqual(["Ungrouped", "⌫ Trash", "⚙ Settings"]);
   });
 
   it("gives every row a stable key", () => {
     const rows = buildTree({ groups: [group(1, "Work")], notes: [note(7, "Plan", 1)], collapsed: none });
 
-    expect(rows.map((r) => r.key)).toEqual([groupKey(1), noteKey(7), "settings"]);
+    expect(rows.map((r) => r.key)).toEqual([groupKey(1), noteKey(7), "trash", "settings"]);
   });
 
   describe("while a search is filtering the notes", () => {
@@ -104,13 +104,13 @@ describe("buildTree", () => {
         filtering: true,
       });
 
-      expect(labels(rows)).toEqual(["Work", "  Projects", "    Plan", "⚙ Settings"]);
+      expect(labels(rows)).toEqual(["Work", "  Projects", "    Plan", "⌫ Trash", "⚙ Settings"]);
     });
 
     it("says nothing matched instead of showing an empty Ungrouped bucket", () => {
       const rows = buildTree({ groups: [group(1, "Home")], notes: [], collapsed: none, filtering: true });
 
-      expect(labels(rows)).toEqual(["No notes match.", "⚙ Settings"]);
+      expect(labels(rows)).toEqual(["No notes match.", "⌫ Trash", "⚙ Settings"]);
       expect(rows[0].kind).toBe("message");
     });
   });
@@ -137,6 +137,7 @@ describe("targetGroupId", () => {
     expect(targetGroupId(at(noteKey(8)), notesById)).toBeNull();
     expect(targetGroupId(at(groupKey(null)), notesById)).toBeNull();
     expect(targetGroupId(at("settings"), notesById)).toBeNull();
+    expect(targetGroupId(at("trash"), notesById)).toBeNull();
     expect(targetGroupId(undefined, notesById)).toBeNull();
   });
 });

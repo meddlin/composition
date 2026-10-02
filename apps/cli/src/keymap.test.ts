@@ -30,6 +30,7 @@ describe("actionFor", () => {
     expect(actionFor("pane", { name: "x", ctrl: true })).toBe("close-pane");
     expect(actionFor("pane", { name: "escape" })).toBe("to-tree");
     expect(actionFor("trash", { name: "r" })).toBe("restore");
+    expect(actionFor("tree", { name: "t" })).toBe("open-trash");
   });
 
   it("gives the same key different jobs in different scopes", () => {
@@ -95,8 +96,34 @@ describe("footerFor", () => {
   it("lists the footer hints for a scope", () => {
     const tree = footerFor("tree");
     expect(tree).toContain("ctrl+n note");
+    expect(tree).toContain("t trash");
     expect(tree).toContain("q quit");
     expect(tree).not.toContain("ctrl+o");
     expect(footerFor("pane")).toContain("ctrl+o next pane");
+  });
+
+  it("fits a narrow terminal by dropping the later hints, never help or quit", () => {
+    for (const width of [78, 60, 40, 25, 10]) {
+      const line = footerFor("tree", width);
+      expect(line, `at width ${width}`).toContain("? help");
+      expect(line, `at width ${width}`).toContain("q quit");
+      // Everything that was kept is still in the original order.
+      const full = footerFor("tree").split("  ·  ");
+      const kept = line.split("  ·  ");
+      expect(kept.every((hint) => full.includes(hint))).toBe(true);
+      expect(kept.map((hint) => full.indexOf(hint))).toEqual([...kept.map((hint) => full.indexOf(hint))].sort((a, b) => a - b));
+    }
+  });
+
+  it("drops hints only as far as it has to", () => {
+    const full = footerFor("tree");
+    expect(footerFor("tree", full.length)).toBe(full);
+    expect(footerFor("tree", full.length - 1).length).toBeLessThanOrEqual(full.length - 1);
+    expect(footerFor("tree", full.length - 1)).toContain("Enter open");
+  });
+
+  it("keeps the way back in every other scope, however narrow", () => {
+    expect(footerFor("pane", 5)).toContain("Esc tree");
+    expect(footerFor("trash", 5)).toContain("Esc back");
   });
 });

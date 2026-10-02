@@ -1,4 +1,4 @@
-import { useKeyboard } from "@opentui/react";
+import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import type { SelectOption } from "@opentui/core";
 import { useRef, useState } from "react";
 import { BINDINGS, type Scope } from "../keymap";
@@ -129,23 +129,30 @@ const SCOPE_TITLES: Record<Scope, string> = {
 };
 
 export function HelpDialog({ palette, onClose }: { palette: Palette; onClose: () => void }) {
+  const { height } = useTerminalDimensions();
   useKeyboard((key) => {
     if (key.name === "escape" || key.name === "q" || key.name === "?") onClose();
   });
   const scopes: Scope[] = ["tree", "pane", "trash"];
+  // The dialog's frame and padding take 6 rows and the note above the list 1 more.
+  const listHeight = Math.max(4, height - 9);
   return (
     <Overlay palette={palette} title="Keys" width={72}>
-      {scopes.map((scope) => (
-        <box key={scope} flexDirection="column" marginBottom={1}>
-          <text fg={palette.accent}>{SCOPE_TITLES[scope]}</text>
-          {BINDINGS.filter((binding) => binding.scope === scope).map((binding) => (
-            <text key={`${scope}:${binding.action}`} fg={palette.foreground}>
-              {`${binding.keys.join(" or ").padEnd(18)} ${binding.description}`}
-            </text>
+      <text fg={palette.muted}>Typing in an editor always wins. ↑↓ scroll, Esc closes.</text>
+      <box height={listHeight} marginTop={1}>
+        <scrollbox focused>
+          {scopes.map((scope) => (
+            <box key={scope} flexDirection="column" marginBottom={1}>
+              <text fg={palette.accent}>{SCOPE_TITLES[scope]}</text>
+              {BINDINGS.filter((binding) => binding.scope === scope).map((binding) => (
+                <text key={`${scope}:${binding.action}`} fg={palette.foreground}>
+                  {`${binding.keys.join(" or ").padEnd(18)} ${binding.description}`}
+                </text>
+              ))}
+            </box>
           ))}
-        </box>
-      ))}
-      <text fg={palette.muted}>Typing in an editor always wins. Esc closes this.</text>
+        </scrollbox>
+      </box>
     </Overlay>
   );
 }

@@ -5,7 +5,8 @@ described here is being built on branch `claude/cli-typescript-port-2f440f`; unt
 lands, the Python CLI still uses the older subset marked *(existing)* below.
 
 This page is the one place the CLI's keys are written down. The footer and the `?`
-help overlay will show the live bindings; if they ever disagree with this page, the code
+help overlay show the live bindings (the footer drops its later hints in a narrow terminal, but
+never help, quit or the way back; the overlay scrolls in a short one); if they ever disagree with this page, the code
 wins and this page needs updating in the same pull request.
 
 ## Rules
@@ -34,6 +35,7 @@ wins and this page needs updating in the same pull request.
 | `f` | Pin / unpin the highlighted note or group as a favorite | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |
+| `t` | Open the Trash Can (the same as pressing Enter on the "Trash" row) | new |
 | `ctrl+o` | Go to the first pane | new |
 | `q` | Quit (saves any edit still waiting first) | *(existing)* |
 
@@ -67,7 +69,9 @@ Reached with `/` or `ctrl+space` from the tree. Everything you type goes into th
 
 ## Trash screen
 
-Opened from the "Trash" row beside "Settings" at the bottom of the tree.
+Opened with `t` in the tree, or with Enter on the "Trash" row beside "Settings" at the bottom of
+the tree. It lists everything deleted in the last 60 days, notes and groups together, the most
+recently deleted first, with how many days each has left.
 
 | Key | Action |
 |---|---|
@@ -76,7 +80,8 @@ Opened from the "Trash" row beside "Settings" at the bottom of the tree.
 | `ctrl+d` | Delete it for good, after a confirmation |
 | `Esc` | Back |
 
-Items are kept 60 days and cleared at startup after that.
+Items are kept 60 days and cleared at startup after that. Restoring a note puts it back in its
+group, or at the top level (and says so) if the group has been deleted since.
 
 ## Settings screen
 
