@@ -1,6 +1,6 @@
 # Composition
 
-A note-taking system with Markdown support. This is a polyglot monorepo; each app has its own toolchain.
+A note-taking system with Markdown and (minimal) MDX support. This is a polyglot monorepo; each app has its own toolchain.
 
 ## Layout
 
