@@ -12,6 +12,10 @@ leaving the terminal. It opens the same notes as the web and desktop apps in thi
 
 - Write and edit notes in Markdown, directly in the terminal, with a live preview, side by side if
   you like: open several notes in panes next to each other
+- See the MDX components a note uses (`<Info>`, `<Warning>`, `<Toc>`, `<Image>`) drawn in the preview,
+  written the same way as in the web and desktop apps ([docs/ui/mdx-components.md](../../docs/ui/mdx-components.md))
+- See the images in a note, as pictures: with the Kitty or Sixel graphics protocol where your terminal
+  has one, and in colored block characters anywhere else ([docs/architecture/images.md](../../docs/architecture/images.md#in-the-cli))
 - Store notes locally in a SQLite database, in nested groups, with YAML frontmatter for the title,
   description and tags
 - Search across all notes with fuzzy full-text search and filters (`tag: work`, `created: >2026-05-30`),
@@ -60,6 +64,9 @@ can also be started with `pnpm start`, or by running `bin/composition.mjs`, whic
 `composition` command in `package.json` points at.
 
 Press `q` to quit. `ctrl+c` quits too, and both save any edit still waiting.
+
+To choose how images are drawn, set `COMPOSITION_IMAGE_PROTOCOL` to `blocks`, `kitty` or `sixel`. It is
+`auto` by default, which picks the best one your terminal reports.
 
 Where things live by default:
 

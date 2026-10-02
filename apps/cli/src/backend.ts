@@ -19,8 +19,9 @@ export type {
   Workspace,
 } from "../../web/src/lib/composition/api";
 export { closeDb } from "../../web/src/lib/composition/db";
-// The folders, beside the database, that hold pasted images and attached files.
-export { IMAGE_DIR_NAME } from "../../web/src/lib/composition/imageRefs";
+// The folders, beside the database, that hold pasted images and attached files, and how a note's
+// Markdown points at one (`app_data/<name>`).
+export { IMAGE_DIR_NAME, imageNameFromRef } from "../../web/src/lib/composition/imageRefs";
 export { ATTACHMENT_DIR_NAME } from "../../web/src/lib/composition/attachmentNames";
 export { expandHome } from "../../web/src/lib/composition/paths";
 export {
@@ -49,6 +50,14 @@ export * as themes from "../../web/src/lib/composition/themes";
 
 // --- apps/web: pane arrangement (pure state, no React) -----------------------
 export * as panes from "../../web/src/components/notes/panes";
+
+// --- apps/web: MDX plugins (pure functions over the syntax tree, no React) ----
+// The allowlist plugin and the heading collector, so a note is accepted or rejected, and its
+// table of contents built, exactly as in the web preview. The components themselves (React) are not
+// shared; `mdx.ts` lists the same names and its test checks them against web's.
+export { remarkRestrictMdx, renderKey } from "../../web/src/components/notes/mdx/remarkRestrictMdx";
+export { remarkHeadings, HEADINGS_PROP } from "../../web/src/components/notes/mdx/remarkHeadings";
+export type { TocHeading } from "../../web/src/components/notes/mdx/remarkHeadings";
 
 // --- apps/desktop: Meilisearch process and search sidecar (no Electron) ------
 export {
