@@ -546,6 +546,16 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
               })
             }
             onDataMoved={() => void reload()}
+            flushNotes={async () => void (await flushAll())}
+            onRestored={() => {
+              // Everything shown came from the data that was just replaced.
+              setPaneState(paneLib.initialPanes(null));
+              void api.loadWorkspace().then((workspace) => {
+                setNotes(workspace.notes);
+                setGroups(workspace.groups);
+                setFavorites(workspace.favorites);
+              });
+            }}
             onClose={closeDialog}
           />
         );

@@ -141,6 +141,7 @@ describe("loadSettings", () => {
       derivedDbPath: path.join(home, ".composition", "composition.db"),
       dirWritable: false,
       dbExists: false,
+      backupDir: path.join(home, "Composition Backups"),
       trash: { notes: [], groups: [] },
       city: "",
     });

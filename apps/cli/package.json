@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "seed": "node scripts/build.mjs && node dist/seed.mjs",
-    "search:playground": "node scripts/build.mjs && node dist/search-playground.mjs"
+    "search:playground": "node scripts/build.mjs && node dist/search-playground.mjs",
+    "manual:backup": "node scripts/build.mjs && node dist/backup-manual.mjs"
   },
   "dependencies": {
     "@opentui/core": "0.5.14",

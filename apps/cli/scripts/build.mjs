@@ -13,11 +13,12 @@ const cliDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const watch = process.argv.includes("--watch");
 
 const config = {
-  // The app, and the two developer tools (`pnpm seed`, `pnpm search:playground`).
+  // The app, and the developer tools (`pnpm seed`, `pnpm search:playground`, `pnpm manual:backup`).
   entryPoints: {
     main: "src/main.tsx",
     seed: "src/tools/seed.ts",
     "search-playground": "src/tools/searchPlayground.ts",
+    "backup-manual": "src/tools/backupManual.ts",
   },
   outdir: "dist",
   outExtension: { ".js": ".mjs" },

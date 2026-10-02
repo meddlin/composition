@@ -23,6 +23,12 @@ export { closeDb } from "../../web/src/lib/composition/db";
 // Markdown points at one (`app_data/<name>`).
 export { IMAGE_DIR_NAME, imageNameFromRef } from "../../web/src/lib/composition/imageRefs";
 export { ATTACHMENT_DIR_NAME } from "../../web/src/lib/composition/attachmentNames";
+// Backup and restore: the sentence that says what a backup holds, and byte sizes.
+export { describeCounts } from "../../web/src/lib/composition/backupApi";
+export type { BackupResult } from "../../web/src/lib/composition/backupApi";
+export * as backup from "../../web/src/lib/composition/backup";
+export { readArchive } from "../../web/src/lib/composition/tarArchive";
+export { formatBytes } from "../../web/src/lib/composition/attachmentNames";
 export { expandHome } from "../../web/src/lib/composition/paths";
 export {
   loadWebSettings,

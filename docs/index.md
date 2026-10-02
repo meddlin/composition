@@ -58,8 +58,8 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
 
 ### Admin Features
 
-- [] Support data backup & restore
-    - [] Full database backup
+- [x] Support data backup & restore (Settings → Backup and Restore, in all three apps; see [architecture/backup-restore.md](architecture/backup-restore.md))
+    - [x] Full backup: notes, groups, Trash Can, images, attachments and settings in one `.tar.gz`
     - [] Full notes backup to JSON files
 - [x] Settings page for application configurations:
     - [x] Application data location
@@ -117,3 +117,6 @@ Debounce user input in search bar, by 350ms
 
 - Create a loading script that will load 100 dummy note files
 - Test the search capability with this data set
+
+See [architecture/backup-restore.md](architecture/backup-restore.md) for backing up and restoring everything from Settings, and
+[manual-tests/backup-restore.md](manual-tests/backup-restore.md) for the guided manual test of it in each app.

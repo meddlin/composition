@@ -53,6 +53,9 @@ pnpm test:cli    # the CLI (vitest), which needs Node 26.10 or newer
 pnpm test:cli:types
 ```
 
+Backup and restore have a guided manual test for each app: `pnpm manual:backup cli|web|desktop`
+([docs/manual-tests/backup-restore.md](docs/manual-tests/backup-restore.md)).
+
 The CLI needs a newer Node than the other two (OpenTUI uses `node:ffi`), which is why it is not part
 of `pnpm test`. On a machine with Node 22 as the default, `nvm use 26` first.
 
