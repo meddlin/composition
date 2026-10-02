@@ -1,6 +1,7 @@
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
+import { createBackupApi } from "./backup";
 import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
@@ -77,6 +78,30 @@ const attachments = createAttachmentsApi(service, {
   reveal: (file) => shell.showItemInFolder(file),
 });
 
+// Where a backup is saved, and which one is restored, are also chosen in native dialogs.
+const backup = createBackupApi(service, {
+  async pickSavePath(defaultName) {
+    const options = { defaultPath: path.join(app.getPath("documents"), defaultName), filters: [{ name: "Composition backup", extensions: ["gz"] }] };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, options)
+      : await dialog.showSaveDialog(options);
+    return canceled || !filePath ? null : filePath;
+  },
+  async pickBackupFile() {
+    const options = {
+      properties: ["openFile"] as "openFile"[],
+      defaultPath: app.getPath("documents"),
+      filters: [{ name: "Composition backup", extensions: ["gz"] }],
+    };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+    return canceled || filePaths.length === 0 ? null : filePaths[0];
+  },
+});
+
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
 function openMainWindow(): BrowserWindow {
@@ -109,6 +134,7 @@ async function main(): Promise<void> {
     ipcMain,
     api,
     attachments,
+    backup,
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, sidebarWidth, editorRatio } = loadWebSettings();

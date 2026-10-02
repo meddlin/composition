@@ -2,12 +2,12 @@ import type { SelectOption } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useRef, useState } from "react";
 import type { Api } from "../api";
-import { expandHome, themes, type SettingsSnapshot, type ThemeName } from "../backend";
+import { describeCounts, expandHome, formatBytes, themes, type BackupResult, type SettingsSnapshot, type ThemeName } from "../backend";
 import { actionFor, footerFor } from "../keymap";
 import type { Palette } from "../theme";
 
-type Field = "path" | "theme" | "city";
-const FIELDS: Field[] = ["path", "theme", "city"];
+type Field = "path" | "theme" | "city" | "backup" | "restore";
+const FIELDS: Field[] = ["path", "theme", "city", "backup", "restore"];
 
 type SettingsScreenProps = {
   api: Api;
@@ -21,6 +21,10 @@ type SettingsScreenProps = {
   moveDataLocation?: (destination: string) => Promise<void>;
   /** Called after the data has moved, so the workspace can load it again. */
   onDataMoved: () => void;
+  /** Saves every open note, so a backup holds the latest edits and a restore leaves nothing half-written behind. */
+  flushNotes: () => Promise<void>;
+  /** Called after a backup was restored: everything the workspace shows (notes, pins, open panes) is out of date. */
+  onRestored: () => void;
   onClose: () => void;
 };
 
@@ -48,19 +52,25 @@ function Section({ title, focused, palette, height, children }: {
 }
 
 /**
- * Where the data lives, which color scheme to use, and the city "follow the sun" uses.
- * Tab moves between the three; Enter saves or applies the one you are on.
+ * Where the data lives, which color scheme to use, the city "follow the sun" uses, and backing up
+ * and restoring everything. Tab moves between them; Enter saves or applies the one you are on.
  */
-export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCityChanged, moveDataLocation, onDataMoved, onClose }: SettingsScreenProps) {
+export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCityChanged, moveDataLocation, onDataMoved, flushNotes, onRestored, onClose }: SettingsScreenProps) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null);
   const [field, setField] = useState<Field>("path");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState("");
   const [city, setCity] = useState("");
+  const [backupDir, setBackupDir] = useState("");
+  const [backupFile, setBackupFile] = useState("");
+  // The backup file waiting for a "y": restoring replaces everything, so Enter only asks.
+  const [confirming, setConfirming] = useState<string | null>(null);
   // The inputs' own submit argument is typed loosely; what was typed is tracked here instead.
   const typedPath = useRef("");
   const typedCity = useRef("");
+  const typedBackupDir = useRef("");
+  const typedBackupFile = useRef("");
 
   const load = async () => {
     const next = await api.loadSettings();
@@ -73,6 +83,8 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
       typedPath.current = first.appDataDir;
       setCity(first.city);
       typedCity.current = first.city;
+      setBackupDir(first.backupDir);
+      typedBackupDir.current = first.backupDir;
     });
   }, []);
 
@@ -110,6 +122,51 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
     setMessage(`Saved ${name}${sunrise && sunset ? `: sunrise ${sunrise}, sunset ${sunset}` : ""}.`);
   };
 
+  const describe = (result: BackupResult) => (result.counts ? describeCounts(result.counts) : "everything");
+
+  const createBackup = async () => {
+    setBusy(true);
+    setMessage("Backing up…");
+    try {
+      await flushNotes();
+      const result = await api.createBackup(typedBackupDir.current);
+      if (result.error) return setMessage(result.error);
+      const size = result.bytes === undefined ? "" : ` (${formatBytes(result.bytes)})`;
+      setMessage(`Backed up ${describe(result)} to ${result.file}${size}.`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const askToRestore = () => {
+    const file = typedBackupFile.current.trim();
+    if (!file) return setMessage("Enter the path of a backup file.");
+    setConfirming(file);
+    setMessage(`Press y to replace EVERYTHING here with this backup, any other key to cancel. What is here now is saved first. (${file})`);
+  };
+
+  const restore = async (file: string) => {
+    setConfirming(null);
+    setBusy(true);
+    setMessage("Restoring…");
+    try {
+      await flushNotes();
+      const result = await api.restoreBackup(file);
+      if (result.error) return setMessage(result.error);
+      const next = await load();
+      setPath(next.appDataDir);
+      typedPath.current = next.appDataDir;
+      setCity(next.city);
+      typedCity.current = next.city;
+      onThemeChange(next.theme);
+      onCityChanged();
+      onRestored();
+      setMessage(`Restored ${describe(result)}.${result.safetyBackup ? ` What it replaced is saved in ${result.safetyBackup}.` : ""}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const applyTheme = async (name: ThemeName) => {
     const result = await api.saveTheme(name);
     if (result.error) return setMessage(result.error);
@@ -120,6 +177,14 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
 
   useKeyboard((key) => {
     if (busy) return;
+    if (confirming !== null) {
+      if (actionFor("settings", key) === "confirm") void restore(confirming).catch(fail);
+      else {
+        setConfirming(null);
+        setMessage("Restore cancelled.");
+      }
+      return;
+    }
     switch (actionFor("settings", key)) {
       case "back":
         onClose();
@@ -203,11 +268,38 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
                 : "Without a city it uses 06:30 and 18:30."}
             </text>
           </Section>
+
+          <Section title="Create a backup, in this folder" focused={field === "backup"} palette={palette} height={3}>
+            <input
+              focused={field === "backup" && !busy}
+              value={backupDir}
+              onInput={(next) => {
+                typedBackupDir.current = next;
+                setBackupDir(next);
+              }}
+              onSubmit={() => void createBackup().catch(fail)}
+              {...input}
+            />
+          </Section>
+
+          <Section title="Restore from this backup file" focused={field === "restore"} palette={palette} height={3}>
+            <input
+              focused={field === "restore" && !busy && confirming === null}
+              value={backupFile}
+              placeholder="Path of a composition-backup-….tar.gz"
+              onInput={(next) => {
+                typedBackupFile.current = next;
+                setBackupFile(next);
+              }}
+              onSubmit={askToRestore}
+              {...input}
+            />
+          </Section>
         </>
       )}
 
       <box flexGrow={1} />
-      <box height={1} paddingLeft={1}>
+      <box height={message ? Math.min(3, Math.ceil(message.length / Math.max(1, width - 3))) : 1} paddingLeft={1}>
         <text fg={message ? palette.warning : palette.muted}>{message ?? footerFor("settings", width - 2)}</text>
       </box>
     </box>

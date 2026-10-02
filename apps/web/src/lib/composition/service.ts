@@ -17,7 +17,9 @@ import type {
   SettingsSnapshot,
   Workspace,
 } from "./api";
-import { closeDb } from "./db";
+import * as backup from "./backup";
+import type { BackupResult } from "./backupApi";
+import { closeDb, getDb } from "./db";
 import { parseFavorites, type Favorites } from "./favorites";
 import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
@@ -98,6 +100,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     derivedDbPath: defaultDatabasePath(settings.appDataDir),
     dirWritable: isWritableDir(settings.appDataDir),
     dbExists,
+    backupDir: backup.defaultBackupDir(),
     trash,
     city: location?.name ?? "",
     sunTimes: location
@@ -273,6 +276,114 @@ export async function findAttachmentFile(id: number): Promise<{ path: string; fi
 export async function removeAttachment(id: number): Promise<AttachmentActionResult> {
   const removed = await attachments.removeAttachment(loadWebSettings().appDataDir, id);
   return removed ? {} : { error: "That attachment no longer exists." };
+}
+
+/*
+ * Backup and restore (backup.ts). Like attachments, not part of CompositionApi:
+ * the web app and the CLI call `createBackup`/`restoreBackup` with a path the
+ * person typed; the desktop app opens its native dialogs in the main process
+ * and calls `createBackupAt`/`restoreBackup` with what they return, so a
+ * renderer never names a path (backupApi.ts).
+ */
+
+let backupRunning = false;
+
+/** One backup or restore at a time: a second would see the first one's half-moved files. */
+async function exclusively(work: () => Promise<BackupResult>): Promise<BackupResult> {
+  if (backupRunning) return { error: "Another backup or restore is already running." };
+  backupRunning = true;
+  try {
+    return await work();
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  } finally {
+    backupRunning = false;
+  }
+}
+
+/** `~` expanded, and absolute: a relative path would mean the server's working directory, which nobody typing in a form knows. */
+function absolutePath(input: string, what: string): { path: string } | { error: string } {
+  const trimmed = input.trim();
+  if (trimmed === "") return { error: `Enter ${what}.` };
+  const expanded = expandHome(trimmed);
+  return path.isAbsolute(expanded)
+    ? { path: path.normalize(expanded) }
+    : { error: `Enter the full path (for example ${backup.defaultBackupDir()}).` };
+}
+
+/** Writes a backup of everything to exactly `file`. */
+export async function createBackupAt(file: string): Promise<BackupResult> {
+  return exclusively(async () => {
+    const settings = loadWebSettings();
+    return backup.createBackup({ file, db: getDb(), appDataDir: settings.appDataDir, settings });
+  });
+}
+
+/** Writes a new, timestamped backup into `directory` (created if it isn't there). */
+export async function createBackup(directory: string): Promise<BackupResult> {
+  const dir = absolutePath(directory, "a folder to save the backup in");
+  if ("error" in dir) return dir;
+  return createBackupAt(path.join(/*turbopackIgnore: true*/ dir.path, backup.backupFileName()));
+}
+
+/**
+ * Replaces everything (notes, groups, the Trash Can, images, attachments, and
+ * the color scheme, city, column sizes and favorites) with what is in the
+ * backup at `file`. The data location is left alone.
+ *
+ * The file is unpacked and checked before anything is touched, then the
+ * current data is saved to a "pre-restore" backup in the default backup folder,
+ * so a restore is never the end of the road. The search index is rebuilt.
+ * Nothing else may have the database open meanwhile (another Composition app).
+ */
+export async function restoreBackup(file: string): Promise<BackupResult> {
+  const source = absolutePath(file, "the path of a backup file");
+  if ("error" in source) return source;
+
+  return exclusively(async () => {
+    const settings = loadWebSettings();
+    const { appDataDir } = settings;
+    const dbPath = resolvedDbPath(settings);
+
+    let staged: backup.StagedBackup;
+    try {
+      staged = await backup.stageBackup(source.path, appDataDir);
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+
+    let safetyBackup: string | undefined;
+    try {
+      const hasCurrentData = [dbPath, images.imageDir(appDataDir), attachments.attachmentDir(appDataDir)].some((p) =>
+        fs.existsSync(p),
+      );
+      if (hasCurrentData) {
+        safetyBackup = path.join(/*turbopackIgnore: true*/ backup.defaultBackupDir(), backup.backupFileName(new Date(), "pre-restore"));
+        await backup.createBackup({ file: safetyBackup, db: getDb(), appDataDir, settings });
+      }
+    } catch (error) {
+      await backup.discardStagedBackup(staged);
+      const message = error instanceof Error ? error.message : String(error);
+      return { error: `Couldn't save your current data before restoring (${message}), so nothing was restored.` };
+    }
+
+    try {
+      closeDb();
+      backup.applyStagedBackup(staged, { appDataDir, dbPath });
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+
+    if (staged.settings) {
+      // The backup's choices, but this machine's data location.
+      const { dbPath: override } = loadWebSettings();
+      saveWebSettings({ ...staged.settings, appDataDir, ...(override && { dbPath: override }) });
+    }
+    // Search is derived from the database, which just changed wholesale.
+    await bestEffortIndex(() => searchIndex.reindexAll(notesRepo.listNotes()));
+
+    return { file: source.path, createdAt: staged.createdAt, counts: staged.counts, ...(safetyBackup && { safetyBackup }) };
+  });
 }
 
 export async function createGroup(

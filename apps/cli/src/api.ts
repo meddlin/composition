@@ -27,6 +27,8 @@ export type Api = Pick<
   | "saveLocation"
   | "loadSettings"
   | "loadSunSchedule"
+  | "createBackup"
+  | "restoreBackup"
 >;
 
 export const defaultApi: Api = service;

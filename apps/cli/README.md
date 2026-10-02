@@ -28,6 +28,8 @@ leaving the terminal. It opens the same notes as the web and desktop apps in thi
 - Navigate a fast, keyboard-driven UI. Press `?` for every key; they are also listed in
   [docs/ui/cli-keybindings.md](../../docs/ui/cli-keybindings.md)
 - Move all application data to a directory of your choice from Settings
+- Back up everything (notes, images, attachments, settings) to one file, and restore it, from Settings
+  ([docs/architecture/backup-restore.md](../../docs/architecture/backup-restore.md))
 
 ## Requirements
 

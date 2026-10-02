@@ -1,4 +1,5 @@
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
+import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { ApiMethod } from "./backend";
 
 /**
@@ -123,4 +124,10 @@ export const ATTACHMENT_VALIDATORS: Record<AttachmentMethod, Validator> = {
   revealAttachment: ([attachmentId]) => [id("revealAttachment", attachmentId, "id")],
   saveAttachmentCopy: ([attachmentId]) => [id("saveAttachmentCopy", attachmentId, "id")],
   removeAttachment: ([attachmentId]) => [id("removeAttachment", attachmentId, "id")],
+};
+
+/** The desktop-only backup methods take nothing: the main process asks with a dialog, so no path ever comes from the renderer. */
+export const BACKUP_VALIDATORS: Record<BackupMethod, Validator> = {
+  createBackup: none,
+  restoreBackup: none,
 };

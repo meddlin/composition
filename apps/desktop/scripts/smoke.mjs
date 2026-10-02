@@ -32,9 +32,10 @@ async function importTypeScript(file) {
   return import(`data:text/javascript;base64,${Buffer.from(code).toString("base64")}`);
 }
 const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/api.ts"));
-// The desktop-only attachment methods (attachmentsApi.ts) ride on the same bridge.
+// The desktop-only attachment and backup methods (attachmentsApi.ts, backupApi.ts) ride on the same bridge.
 const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
-const expectedBridge = [...API_METHODS, ...ATTACHMENT_METHODS, "initial", "platform"].sort();
+const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/backupApi.ts"));
+const expectedBridge = [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, "initial", "platform"].sort();
 
 const failures = [];
 function check(name, ok, detail = "") {
@@ -104,7 +105,7 @@ try {
   const missing = expectedBridge.filter((name) => !posture.methods.includes(name));
   const unexpected = posture.methods.filter((name) => !expectedBridge.includes(name));
   check(
-    "the bridge exposes only the API (+ attachments, initial, platform)",
+    "the bridge exposes only the API (+ attachments, backup, initial, platform)",
     API_METHODS.length > 0 && missing.length === 0 && unexpected.length === 0,
     missing.length || unexpected.length
       ? `missing: ${missing.join(",") || "none"}; unexpected: ${unexpected.join(",") || "none"}`
@@ -297,6 +298,69 @@ try {
   check("the theme is stored in the app's own settings file", fs.existsSync(path.join(userData, "settings.json")) && JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).theme === "light");
   check("the web app's settings file was not touched", !fs.existsSync(path.join(home, ".composition-web", "settings.json")));
   await page.screenshot({ path: path.join(out, "4-settings-light.png") });
+
+  // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real
+  // main-process code and the real files are exercised; only the OS picker is not.
+  const backupFile = path.join(inbox, "smoke-backup.tar.gz");
+  await app.evaluate(({ dialog }, file) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: file });
+    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] });
+  }, backupFile);
+  const beforeBackup = await page.evaluate(async () => {
+    const workspace = await window.composition.loadWorkspace();
+    return { titles: workspace.notes.map((n) => n.title).sort(), theme: (await window.composition.loadSettings()).theme };
+  });
+  const imagesBefore = fs.readdirSync(imageDir).sort();
+  const attachmentsBefore = fs.readdirSync(attachmentDir).sort();
+
+  await page.getByRole("button", { name: "Create backup…" }).click();
+  await page.getByRole("status").filter({ hasText: "Backed up" }).waitFor({ timeout: 20_000 });
+  check("Create backup writes the file the save dialog chose", fs.existsSync(backupFile) && fs.statSync(backupFile).size > 0);
+  const listing = execFileSync("tar", ["-tzf", backupFile], { encoding: "utf-8" }).trim().split("\n");
+  check(
+    "the backup holds the database, settings, images and attachments",
+    ["composition.db", "settings.json", "composition-backup.json"].every((name) => listing.includes(name)) &&
+      imagesBefore.every((name) => listing.includes(`app_data/${name}`)) &&
+      attachmentsBefore.every((name) => listing.includes(`attachments/${name}`)),
+    `${listing.length} entries`,
+  );
+  check("the backup does not carry the data location", !execFileSync("tar", ["-xzOf", backupFile, "settings.json"], { encoding: "utf-8" }).includes("appDataDir"));
+
+  // Damage everything the backup covers, then restore through the UI.
+  await page.evaluate(async () => {
+    const api = window.composition;
+    const extra = await api.createNote("Written after the backup", null);
+    for (const note of (await api.loadWorkspace()).notes) if (note.id !== extra.id) await api.deleteNote(note.id);
+    await api.saveTheme("dark");
+  });
+  for (const name of fs.readdirSync(imageDir)) fs.rmSync(path.join(imageDir, name));
+  for (const name of fs.readdirSync(attachmentDir)) fs.rmSync(path.join(attachmentDir, name));
+
+  await page.getByRole("button", { name: "Restore from backup…" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Restore", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Restored" }).waitFor({ timeout: 30_000 });
+  const afterRestore = await page.evaluate(async () => {
+    const workspace = await window.composition.loadWorkspace();
+    return { titles: workspace.notes.map((n) => n.title).sort(), theme: (await window.composition.loadSettings()).theme };
+  });
+  check("Restore brings the notes back and drops what was written afterwards", JSON.stringify(afterRestore.titles) === JSON.stringify(beforeBackup.titles), afterRestore.titles.join(","));
+  check("Restore brings back the images and attachments", JSON.stringify(fs.readdirSync(imageDir).sort()) === JSON.stringify(imagesBefore) && JSON.stringify(fs.readdirSync(attachmentDir).sort()) === JSON.stringify(attachmentsBefore));
+  check("Restore brings back the settings and reloads the page with them", afterRestore.theme === beforeBackup.theme && (await page.evaluate(() => document.documentElement.dataset.theme)) === beforeBackup.theme);
+  check("the page says what it restored, across the reload", (await page.getByRole("status").filter({ hasText: /Restored .* note/ }).count()) === 1);
+  const safety = path.join(home, "Composition Backups");
+  check("the data it replaced was saved first", fs.existsSync(safety) && fs.readdirSync(safety).some((n) => n.startsWith("composition-pre-restore-")));
+  check("the scratch folders are cleaned up", fs.readdirSync(path.join(home, ".composition")).every((n) => !n.startsWith(".restore-")));
+  await page.screenshot({ path: path.join(out, "4b-restored.png") });
+
+  // A file that is not a backup is refused and changes nothing.
+  const junk = path.join(inbox, "not-a-backup.tar.gz");
+  fs.writeFileSync(junk, "definitely not a backup");
+  await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }); }, junk);
+  await page.getByRole("button", { name: "Restore from backup…" }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Restore", exact: true }).click();
+  await page.getByRole("alert").filter({ hasText: "not a Composition backup" }).waitFor({ timeout: 10_000 });
+  const afterRefusal = await page.evaluate(async () => (await window.composition.loadWorkspace()).notes.map((n) => n.title).sort());
+  check("a file that isn't a backup is refused, and nothing changes", JSON.stringify(afterRefusal) === JSON.stringify(beforeBackup.titles));
 
   // ---- Back to notes; state survives
   await page.getByRole("link", { name: /Back to notes/ }).click();

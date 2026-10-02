@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
+import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
 import { API_METHODS } from "./backend";
-import { ATTACHMENT_VALIDATORS, InvalidArgumentsError, VALIDATORS } from "./validate";
+import { ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -116,5 +117,16 @@ describe("ATTACHMENT_VALIDATORS", () => {
     ["removeAttachment", [Number.NaN]],
   ] as const)("rejects a bad id for %s", (method, args) => {
     expect(() => ATTACHMENT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("BACKUP_VALIDATORS", () => {
+  it("covers exactly the backup methods", () => {
+    expect(Object.keys(BACKUP_VALIDATORS).sort()).toEqual([...BACKUP_METHODS].sort());
+  });
+
+  it("takes no arguments at all, so a page can't name a path", () => {
+    expect(BACKUP_VALIDATORS.createBackup(["/etc/cron.d/evil"])).toEqual([]);
+    expect(BACKUP_VALIDATORS.restoreBackup(["/tmp/x.tar.gz", 1])).toEqual([]);
   });
 });

@@ -154,3 +154,8 @@ picture's placement while the help overlay is open and puts it back when it clos
   the built app against a terminal that answers like Kitty and reading the graphics commands it
   sent, and Sixel, which is OpenTUI's own, not at all. If a terminal draws one of them wrongly,
   `COMPOSITION_IMAGE_PROTOCOL=blocks` avoids it.
+
+## Backups
+
+**Settings → Backup** includes every file in `app_data/`, and **Restore** puts them back, so the
+images in restored notes still show; see [backup-restore.md](backup-restore.md).

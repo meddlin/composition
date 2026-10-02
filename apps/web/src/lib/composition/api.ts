@@ -42,6 +42,8 @@ export type SettingsSnapshot = {
   derivedDbPath: string;
   dirWritable: boolean;
   dbExists: boolean;
+  /** Where "Create backup" offers to save by default (the web app and the CLI; the desktop app asks in a dialog). */
+  backupDir: string;
   /** The Trash Can's contents (empty when there is no database yet). */
   trash: Trash;
   /** The saved city for the "Follow the sun" scheme, or "". */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SettingsSnapshot } from "@/lib/composition/api";
+import { BackupRestore } from "./BackupRestore";
 import { SettingsForm } from "./SettingsForm";
 import { TrashCan } from "./TrashCan";
 
@@ -70,6 +71,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         currentDbPath={snapshot.dbPathOverride}
         derivedDbPathPlaceholder={snapshot.derivedDbPath}
       />
+
+      <BackupRestore defaultBackupDir={snapshot.backupDir} />
 
       <TrashCan initialTrash={snapshot.trash} />
     </div>

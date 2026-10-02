@@ -65,24 +65,28 @@ function parseLocation(value: unknown): SavedLocation | undefined {
   };
 }
 
+/** Reads settings from already-parsed JSON, falling back to the default for anything missing or invalid. */
+export function parseWebSettings(data: unknown): WebSettings {
+  const value = (data ?? {}) as Record<string, unknown>;
+  const hasAppDataDir = typeof value.appDataDir === "string" && value.appDataDir !== "";
+  const settings: WebSettings = {
+    appDataDir: hasAppDataDir ? (value.appDataDir as string) : DEFAULT_APP_DATA_DIR,
+    theme: isThemeName(value.theme) ? value.theme : DEFAULT_THEME,
+    sidebarWidth: clampSidebarWidth(value.sidebarWidth),
+    editorRatio: clampEditorRatio(value.editorRatio),
+    favorites: parseFavorites(value.favorites),
+  };
+  if (typeof value.dbPath === "string" && value.dbPath !== "") {
+    settings.dbPath = value.dbPath;
+  }
+  const location = parseLocation(value.location);
+  if (location) settings.location = location;
+  return settings;
+}
+
 export function loadWebSettings(): WebSettings {
   try {
-    const raw = fs.readFileSync(settingsPath(), "utf-8");
-    const data = JSON.parse(raw);
-    const hasAppDataDir = typeof data?.appDataDir === "string" && data.appDataDir !== "";
-    const settings: WebSettings = {
-      appDataDir: hasAppDataDir ? data.appDataDir : DEFAULT_APP_DATA_DIR,
-      theme: isThemeName(data.theme) ? data.theme : DEFAULT_THEME,
-      sidebarWidth: clampSidebarWidth(data.sidebarWidth),
-      editorRatio: clampEditorRatio(data.editorRatio),
-      favorites: parseFavorites(data.favorites),
-    };
-    if (typeof data.dbPath === "string" && data.dbPath !== "") {
-      settings.dbPath = data.dbPath;
-    }
-    const location = parseLocation(data.location);
-    if (location) settings.location = location;
-    return settings;
+    return parseWebSettings(JSON.parse(fs.readFileSync(settingsPath(), "utf-8")));
   } catch {
     return DEFAULT_SETTINGS;
   }

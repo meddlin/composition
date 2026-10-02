@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeDb, listNotes, loadWebSettings, resolvedDbPath, service, sunLevel, type SunEvent } from "./backend";
 import { moveApplicationData } from "./dataLocation";
 import { backgroundAt, createSandbox, frame, press, pressEscape, settle, sleep, type Rendered, type Sandbox } from "./testing";
@@ -403,6 +403,137 @@ describe("the Settings screen", () => {
     await settle(app, 100);
     await press(app, "RETURN", {}, 500);
     expect(frame(app)).toContain("The new location already contains Composition data");
+  });
+
+  describe("backup and restore", () => {
+    beforeEach(() => {
+      // The "pre-restore" backup goes to ~/Composition Backups; keep that inside the sandbox.
+      vi.stubEnv("HOME", sandbox.home);
+    });
+
+    /** Tab past the path, color scheme and city fields. */
+    async function tabTo(app: Rendered, field: "backup" | "restore") {
+      for (let i = 0; i < (field === "backup" ? 3 : 4); i++) await press(app, "TAB");
+    }
+
+    it("offers the default backup folder, and creates a backup in it with Enter", async () => {
+      await seed();
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "backup");
+      expect(frame(app)).toContain(path.join(sandbox.home, "Composition Backups"));
+
+      await press(app, "RETURN", {}, 800);
+
+      const folder = path.join(sandbox.home, "Composition Backups");
+      const [file] = fs.readdirSync(folder);
+      expect(file).toMatch(/^composition-backup-.*\.tar\.gz$/);
+      expect(frame(app)).toContain("Backed up 2 notes, 1 group, 0 images and 0 attached files to");
+    });
+
+    it("backs up into a folder that was typed", async () => {
+      await seed();
+      const target = path.join(sandbox.home, "usb");
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "backup");
+      await press(app, "u", { ctrl: true });
+      await app.mockInput.typeText(target);
+      await settle(app, 100);
+
+      await press(app, "RETURN", {}, 800);
+
+      expect(fs.readdirSync(target)).toHaveLength(1);
+    });
+
+    it("shows why a backup could not be made", async () => {
+      await seed();
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "backup");
+      await press(app, "u", { ctrl: true });
+      await app.mockInput.typeText("not/an/absolute/path");
+      await settle(app, 100);
+
+      await press(app, "RETURN", {}, 500);
+
+      expect(frame(app)).toContain("Enter the full path");
+    });
+
+    async function lostEverythingAfterABackup() {
+      await seed();
+      const { file } = await service.createBackup(path.join(sandbox.home, "backups"));
+      const [note] = listNotes();
+      await service.deleteNote(note.id);
+      await service.permanentlyDeleteNote(note.id);
+      await service.createNote("Written after the backup", null);
+      return file!;
+    }
+
+    it("asks before restoring, and replaces everything once y is pressed", async () => {
+      const file = await lostEverythingAfterABackup();
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "restore");
+      await app.mockInput.typeText(file);
+      await settle(app, 100);
+
+      await press(app, "RETURN", {}, 300);
+      expect(frame(app)).toContain("Press y to replace EVERYTHING");
+      expect(listNotes().map((n) => n.title)).toContain("Written after the backup"); // nothing happened yet
+
+      await press(app, "y", {}, 1000);
+
+      expect(frame(app)).toContain("Restored 2 notes, 1 group");
+      expect(listNotes().map((n) => n.title).sort()).toEqual(["Loose", "Plan"]);
+      // The tree behind Settings shows the restored notes, not the ones that were replaced.
+      await pressEscape(app, 300);
+      expect(frame(app)).toContain("Plan");
+      expect(frame(app)).not.toContain("Written after the backup");
+    });
+
+    it("does nothing when any other key answers the question", async () => {
+      const file = await lostEverythingAfterABackup();
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "restore");
+      await app.mockInput.typeText(file);
+      await settle(app, 100);
+      await press(app, "RETURN", {}, 300);
+
+      await press(app, "n", {}, 300);
+
+      expect(frame(app)).toContain("Restore cancelled.");
+      expect(listNotes().map((n) => n.title)).toContain("Written after the backup");
+    });
+
+    it("refuses a file that is not a backup, and changes nothing", async () => {
+      await seed();
+      const junk = path.join(sandbox.home, "junk.tar.gz");
+      fs.writeFileSync(junk, "definitely not a backup");
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "restore");
+      await app.mockInput.typeText(junk);
+      await settle(app, 100);
+      await press(app, "RETURN", {}, 300);
+
+      await press(app, "y", {}, 800);
+
+      expect(frame(app)).toContain("not a Composition backup");
+      expect(listNotes().map((n) => n.title).sort()).toEqual(["Loose", "Plan"]);
+    });
+
+    it("asks for a path when there is none", async () => {
+      await seed();
+      const app = await sandbox.mount();
+      await openSettings(app);
+      await tabTo(app, "restore");
+
+      await press(app, "RETURN", {}, 300);
+
+      expect(frame(app)).toContain("Enter the path of a backup file.");
+    });
   });
 
   it("cannot move the data where the app has no way to", async () => {

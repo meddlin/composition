@@ -120,6 +120,11 @@ A file that is already gone is never an error.
 - **Not in the note's frontmatter.** The CLI rewrites frontmatter from the keys it knows,
   so an unknown key would be dropped the first time a note was edited there.
 
+## Backups
+
+**Settings → Backup** includes every attached file (and the `attachments` table, which is in the
+database), and **Restore** brings them back; see [backup-restore.md](backup-restore.md).
+
 ## Gaps
 
 - Attachment names and contents are not searched.
