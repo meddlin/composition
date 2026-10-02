@@ -22,7 +22,7 @@
   "dependencies": {
     "@opentui/core": "0.5.14",
     "@opentui/react": "0.5.14",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.3.2",
     "lowlight": "^3.3.0",
     "react": "19.3.0",
