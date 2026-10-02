@@ -28,6 +28,8 @@ See [feature-matrix.md](feature-matrix.md) for which features the CLI, web and d
 
 See [architecture/attachments.md](architecture/attachments.md) for files attached to a note (desktop only).
 
+See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys belong to the editor, and which keys can't be used and why.
+
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
 
 

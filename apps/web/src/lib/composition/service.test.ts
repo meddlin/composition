@@ -210,6 +210,22 @@ describe("groups", () => {
     expect((await service.loadWorkspace()).groups).toHaveLength(1);
   });
 
+  it("renames a group and returns it", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("Old name", null);
+
+    const renamed = await service.renameGroup(group.id, "New name");
+
+    expect(renamed.name).toBe("New name");
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["New name"]);
+  });
+
+  it("refuses to rename a group that doesn't exist", async () => {
+    const service = await import("./service");
+
+    await expect(service.renameGroup(999, "Anything")).rejects.toThrow("Group 999 not found");
+  });
+
   it("deletes an empty group", async () => {
     const service = await import("./service");
     const group = await service.createGroup("Empty", null);

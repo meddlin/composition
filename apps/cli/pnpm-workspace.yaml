@@ -1,0 +1,6 @@
+# pnpm 11 refuses to run dependency build scripts unless they're decided here.
+allowBuilds:
+  # better-sqlite3 12 downloads a prebuilt binary for the running Node.
+  better-sqlite3: true
+  # Optional speed-up only; esbuild works without its install script.
+  esbuild: false
