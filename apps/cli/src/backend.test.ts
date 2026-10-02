@@ -1,15 +1,16 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { closeDb, listNotes, loadWebSettings, resolvedDbPath, searchIndex, service } from "./backend";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { closeDb, listNotes, loadWebSettings, resolvedDbPath, service } from "./backend";
+import { keepSearchOffline } from "./offlineSearch";
 
 // Never the real ~/.composition: every test points the shared data layer at a temp home.
 let home: string;
 const saved = process.env.COMPOSITION_SETTINGS_PATH;
 
 beforeEach(() => {
-  searchIndex.disableSearch("Search is off in tests."); // never reach a real Meilisearch
+  keepSearchOffline(); // never reach a real Meilisearch
   home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-cli-"));
   const settings = path.join(home, "settings.json");
   fs.writeFileSync(settings, JSON.stringify({ appDataDir: path.join(home, "data"), theme: "dark" }));
@@ -18,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   closeDb();
+  vi.unstubAllEnvs();
   if (saved === undefined) delete process.env.COMPOSITION_SETTINGS_PATH;
   else process.env.COMPOSITION_SETTINGS_PATH = saved;
   fs.rmSync(home, { recursive: true, force: true });
