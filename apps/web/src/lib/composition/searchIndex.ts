@@ -8,11 +8,10 @@ import { DEFAULT_APP_DATA_DIR } from "./paths";
 import { parseSearchQuery } from "./searchQuery";
 
 /**
- * Mirrors apps/cli/src/composition/search.py: same uid, same document shape,
- * same settings, plus `description` so it can be searched with `description:`.
- * (The CLI and web app keep separate indexes, so this doesn't have to match
- * byte for byte.) SQLite stays the source of truth; this index is derived and
- * can be rebuilt at any time.
+ * One index, "notes", with the id as primary key and the title, description, content,
+ * tags and timestamps of each note. The terminal, web and desktop apps each keep their own
+ * Meilisearch and index, so they don't have to match one another byte for byte. SQLite
+ * stays the source of truth; this index is derived and can be rebuilt at any time.
  */
 const INDEX_UID = "notes";
 const DEFAULT_MEILI_URL = "http://127.0.0.1:7700";

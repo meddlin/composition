@@ -8,8 +8,9 @@ import {
   tagsToString,
 } from "./frontmatter";
 
-// Cases mirror apps/cli/tests/test_frontmatter.py: notes must stay readable
-// by whichever app (CLI or web) last wrote them.
+// Notes must stay readable by whichever app (terminal, web or desktop) last wrote them,
+// including notes written by the Python CLI that preceded the terminal app, so the
+// format these cases pin down is not free to change.
 const CREATED = "2026-08-26T12:00:00+00:00";
 const UPDATED = "2026-08-26T12:00:00+00:00";
 const opts = { createdAt: CREATED, updatedAt: UPDATED };

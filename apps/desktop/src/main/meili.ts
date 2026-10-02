@@ -6,10 +6,10 @@ import path from "node:path";
 
 /**
  * Starts, supervises and stops a local Meilisearch server for the app.
- * A TypeScript counterpart of the CLI's MeiliProcessManager
- * (apps/cli/src/composition/search.py), with the same behavior: random free
- * port, generated master key kept in a 0600 file, health-poll before use,
- * terminate then kill on stop.
+ * Also used by the terminal app (apps/cli reaches it through its backend.ts seam),
+ * which started life with a Python version of this class and kept its behavior:
+ * random free port, generated master key kept in a 0600 file, health-poll before
+ * use, terminate then kill on stop.
  *
  * Differences from the CLI:
  *  - the master key goes in the environment rather than argv (so it isn't

@@ -1,13 +1,14 @@
 /**
  * Color schemes the user can choose between in Settings.
  *
- * Mirrors the CLI's `apps/cli/src/composition/themes.py`:
- *   dark   -> textual-dark (default)
- *   light  -> composition-light
- *   forest -> composition-forest
- *   cream  -> web only (no CLI counterpart yet)
- *   auto   -> web only; blends dark and light along the saved city's sunrise and sunset
- * The palettes themselves live in `app/globals.css`, keyed by `data-theme`.
+ * The same five schemes exist in the terminal app, which reads these names from here:
+ *   dark   -> the default
+ *   light
+ *   forest -> dark green
+ *   cream  -> warm light
+ *   auto   -> blends dark and light along the saved city's sunrise and sunset
+ * The palettes themselves live in `app/globals.css`, keyed by `data-theme`; the terminal
+ * app's copy is apps/cli/src/theme.ts.
  */
 
 export const THEME_CHOICES = [

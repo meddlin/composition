@@ -1,122 +1,123 @@
 # Groups
 
-Source: [`storage.py`](../../apps/cli/src/composition/storage.py),
-[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
-[`screens/new_group_modal.py`](../../apps/cli/src/composition/screens/new_group_modal.py),
-[`screens/select_group_modal.py`](../../apps/cli/src/composition/screens/select_group_modal.py)
+Source: [`groupsRepo.ts`](../../apps/web/src/lib/composition/groupsRepo.ts),
+[`groupMove.ts`](../../apps/web/src/lib/composition/groupMove.ts),
+[`favorites.ts`](../../apps/web/src/lib/composition/favorites.ts),
+[`tree.ts`](../../apps/cli/src/tree.ts),
+[`App.tsx`](../../apps/cli/src/App.tsx)
 
-Groups let a note be organized under a folder-like name in the UI. A note belongs to
-at most one group; groups themselves can nest.
+Groups let a note be organized under a folder-like name in the UI. A note belongs to at most one
+group; groups themselves can nest.
 
 ## Relationship
 
 ```mermaid
 classDiagram
     class Group {
-        +int id
-        +str name
-        +int parent_id
-        +str created_at
-        +str updated_at
+        +number id
+        +string name
+        +number|null parentId
+        +string createdAt
+        +string updatedAt
     }
     class Note {
-        +int id
-        +str title
-        +int group_id
+        +number id
+        +string title
+        +number|null groupId
     }
-    Group "0..1" <-- "many" Group : parent_id (self-reference)
-    Group "0..1" <-- "many" Note : group_id
+    Group "0..1" <-- "many" Group : parentId (self-reference)
+    Group "0..1" <-- "many" Note : groupId
 ```
 
-- `groups.parent_id` is `NULL` for a top-level group, or another group's `id` for a
-  sub-group. Nesting is unbounded.
+- `groups.parent_id` is `NULL` for a top-level group, or another group's `id` for a sub-group.
+  Nesting is unbounded.
 - `notes.group_id` is `NULL` for an ungrouped note.
-- This is **one group per note**, not tag-style many-to-many — a note lives under
-  exactly one place in the tree, matching how the UI presents it (top-level group
-  names, notes nested underneath).
-- Group membership is **database-only**. Unlike `title`/`tags`/`description`, it is
-  never written into or read from a note's YAML frontmatter block — see
-  [data-model.md](data-model.md).
-- There's no DB-level `FOREIGN KEY` constraint (the codebase never turns on
-  `PRAGMA foreign_keys`); referential integrity is enforced at the `NotesStore` layer
-  instead, consistent with the rest of its hand-rolled style.
+- This is **one group per note**, not tag-style many-to-many: a note lives under exactly one place in
+  the tree, matching how the UI presents it (top-level group names, notes nested underneath).
+- Group membership is **database-only**. Unlike `title`, `tags` and `description`, it is never
+  written into or read from a note's YAML frontmatter block (see [data-model.md](data-model.md)).
+- There is no database-level `FOREIGN KEY` constraint (the data layer never turns on
+  `PRAGMA foreign_keys`); referential integrity is enforced in the repos instead.
 
 ## Deleting a group
 
-`NotesStore.delete_group` refuses to delete a group that still has sub-groups or notes
-directly in it, raising `GroupNotEmptyError`. There is no cascade and no
-auto-promotion of children to a parent — the group must be emptied first. (The web and
-desktop apps apply the same rule, but move the emptied group to the Trash Can instead of
-erasing it; see [web-trash-can.md](../ui/web-trash-can.md).)
-`NotesStore.group_is_empty` is the read-only check `MainScreen` uses to decide whether
-to show a warning notification instead of the delete-confirmation modal.
+A group that still has sub-groups or notes directly in it **cannot be deleted**: the repo refuses
+with `GroupNotEmptyError`, and `service.deleteGroup` turns that into a message for the UI. There is
+no cascade and no auto-promotion of children to a parent; the group must be emptied first. A group
+that is deleted goes to the Trash Can rather than being erased (see
+[web-trash-can.md](../ui/web-trash-can.md)), and comes back under its old parent, or at the top
+level if that parent has gone.
+
+The terminal app checks for emptiness before it asks, so for a non-empty group it shows
+`"Work" still has sub-groups or notes in it. Empty it before deleting.` in the footer instead of a
+confirmation. The service's own refusal is still there for the case where another window put a note
+in the group a moment earlier.
+
+## Moving a group
+
+`m` on a group offers the top level and every group **except the group itself and everything beneath
+it** (a group cannot become its own descendant). The rule is `canMoveGroup` and `wouldCreateCycle` in
+`groupMove.ts`, shared with the web app's drag and drop, and the service refuses an invalid move
+too. If there is nowhere to move it (a lone top-level group), the footer says so instead of opening an
+empty list. `m` on a note offers "Ungrouped" and every group.
 
 ## Rendering as a tree
 
-`MainScreen` renders a Textual `Tree` (`#notes-tree`) instead of a flat list, since
-groups nest arbitrarily. `_populate_tree` in
-[`main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py):
+The tree is built by `buildTree` in [`tree.ts`](../../apps/cli/src/tree.ts), a pure function from the
+notes, the groups, which groups are folded, the favorites, and whether a search is filtering, to a
+flat list of rows. The terminal list widget just draws the rows. It:
 
-1. Loads the full group hierarchy via `store.list_groups()` and buckets it by
-   `parent_id`, so the entire group structure — including empty groups — is always
-   visible and navigable (e.g. right after creating a new one).
-2. Buckets the given `notes` list by `group_id` and attaches each note as a leaf under
-   its group's node, or under a synthetic "Ungrouped" node (`data={"type": "group",
-   "id": None}`) for notes with no group.
-3. Tags every node's `data` with `{"type": "group" | "note", "id": ...}` so the
-   highlight/select/delete handlers can branch on it.
+1. Buckets the groups by `parentId` and sorts siblings by name, so the whole group structure,
+   including empty groups, is always visible and navigable (for instance right after creating one).
+2. Buckets the notes by `groupId` and lists each group's sub-groups first and then its own notes,
+   most recently edited first.
+3. Puts notes with no group under a synthetic **Ungrouped** bucket (`groupId: null`), shown when it
+   has notes or when there are no groups at all. Like the Trash and Settings rows below it, it is not
+   a real group: rename, delete and move do nothing there.
+4. Ends with the **Trash** and **Settings** rows.
+5. Gives every row a stable key, so the cursor stays on the same row when the tree is rebuilt.
 
-The same function serves both browse mode (`notes = store.list_notes()`) and search
-mode (`notes` = the filtered/matched notes) — search only changes which notes appear
-as leaves; the group scaffolding stays stable either way, avoiding a separate
-tree-vs-list mode switch.
+The same function serves browsing (all notes) and searching (only the notes that matched). While a
+search is filtering, groups with no matching note anywhere below them are left out, and with no match
+at all the tree says `No notes match.` instead of showing empty groups.
 
-Every group node is expanded on each rebuild (`expand=True`); collapsed state isn't
-persisted across a refresh (a search, a create, a delete), keeping the implementation
-simple at the cost of losing manual collapses on the next rebuild.
+Groups start unfolded; `←` and `→` fold and unfold the highlighted one, and Enter toggles it. Which
+groups are folded is kept for the run, not saved.
 
-## Favorites (web and desktop)
+## Favorites
 
-The web and desktop sidebar can pin a group or a note to a **Favorites** section above the
-tree: "Add to favorites" in the `⋯` menu on a group row or a note row, "Remove from
-favorites" from the same menu (also available on the pinned rows themselves). Pinning is a
-shortcut, not a move — the item stays where it is in the tree. Favorites appear in the
-order they were pinned, and the section is hidden while nothing is pinned.
+Pin a group or a note with `f` and it is listed in a **★ Favorites** section above the tree, in the
+order it was pinned, and starred (`★`) where it also sits in the tree. Pinning is a shortcut, not a
+move: the item stays where it is. The section is hidden while nothing is pinned, and while a search
+is filtering the tree.
 
-A pinned group is the same expandable node the tree uses, so its sub-groups and notes can
-be browsed from the Favorites section; it starts collapsed. Notes can never be deleted
-from the section — pinned notes and notes inside a pinned group have no delete button —
-only from the tree below it.
+- A pinned **note** opens like any note (Enter, or `o` to open it beside).
+- A pinned **group** (`◆ Name`) is a shortcut: Enter jumps the cursor to the group's own place in the
+  tree, unfolding whatever hides it. It cannot be folded itself.
+- Everything else works on the underlying note or group: `m`, `r`, `ctrl+d`.
+- Unpinning from inside the section leaves the cursor on the item's own row.
+- A pinned item that no longer exists is skipped when drawing, and deleting a pinned note or group
+  removes its entry.
 
-The pinned list (`{ type: "group" | "note", id }[]`, see
-[`favorites.ts`](../../apps/web/src/lib/composition/favorites.ts)) lives in the web
-settings file next to the column layout, not in the database. The CLI builds its `Note`
-and `Group` models straight from `SELECT *` rows, so an extra column would break it. The
-trade-off: pins belong to the settings file, so pointing the app at a different database
-keeps the same list; entries whose group or note no longer exists are skipped when
-rendering, and deleting a pinned note or group removes its entry. The CLI has no favorites.
+The pinned list (`{ type: "group" | "note", id }[]`) lives in the settings file, not in the
+database: an extra column would break any app that builds its models straight from `SELECT *`. The
+trade-off is that pins belong to the settings file, so pointing an app at a different database keeps
+the same list. The web and desktop apps have the same feature, with a menu instead of a key.
 
 ## Key bindings
 
 | Key | Action |
 |---|---|
-| `ctrl+g` | New group (`NewGroupModal`), nested under the highlighted group if any |
-| `r` | Rename the highlighted group (`RenameGroupModal`), pre-filled with its current name |
-| `m` | Move the highlighted note to a different group (`SelectGroupModal`) |
-| `ctrl+d` | Delete the highlighted note or (if empty) group |
+| `ctrl+g` | New group, inside the highlighted group if any |
+| `r` | Rename the highlighted group, pre-filled with its current name |
+| `m` | Move the highlighted note or group |
+| `f` | Pin or unpin the highlighted note or group |
+| `ctrl+d` | Delete the highlighted note, or (if empty) group |
 
-`r` is a no-op unless a real group node is highlighted — it does nothing on a note leaf
-or on the synthetic "Ungrouped" bucket, the same guard `ctrl+d` and `ctrl+g` use for
-telling a real group (`data["id"] is not None`) from that pseudo-node.
-
-See [screen-navigation.md](screen-navigation.md) for the full key-binding table.
+The full table is [cli-keybindings.md](../ui/cli-keybindings.md).
 
 ## Follow-ups (not implemented)
 
-- **Reparenting an existing group in the CLI.** The web app supports it (drag a group
-  onto another; see [web-groups.md](../ui/web-groups.md)), with cycle prevention: a
-  group can't become its own descendant. `NotesStore` has no equivalent yet.
-- **A `group:` search-bar filter token**, mirroring `tag:`. Today, group membership is
-  already reflected correctly in the tree during a search (a note only appears under
-  its real group), but there's no dedicated syntax to filter the search itself down to
-  one group's contents.
+- **A `group:` search-bar filter token**, mirroring `tag:`. Today, group membership is already
+  reflected correctly in the tree during a search (a note only appears under its real group), but
+  there is no dedicated syntax to filter the search itself down to one group's contents.
