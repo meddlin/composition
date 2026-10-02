@@ -13,8 +13,14 @@ const cliDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const watch = process.argv.includes("--watch");
 
 const config = {
-  entryPoints: ["src/main.tsx"],
-  outfile: "dist/main.mjs",
+  // The app, and the two developer tools (`pnpm seed`, `pnpm search:playground`).
+  entryPoints: {
+    main: "src/main.tsx",
+    seed: "src/tools/seed.ts",
+    "search-playground": "src/tools/searchPlayground.ts",
+  },
+  outdir: "dist",
+  outExtension: { ".js": ".mjs" },
   bundle: true,
   platform: "node",
   format: "esm",

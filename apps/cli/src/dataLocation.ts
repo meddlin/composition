@@ -1,6 +1,13 @@
 import fs from "node:fs";
 import path from "node:path";
-import { expandHome, resolvedDbPath, saveWebSettings, type WebSettings } from "./backend";
+import {
+  ATTACHMENT_DIR_NAME,
+  expandHome,
+  IMAGE_DIR_NAME,
+  resolvedDbPath,
+  saveWebSettings,
+  type WebSettings,
+} from "./backend";
 
 /**
  * Moving the application data to another folder, from Settings.
@@ -8,8 +15,9 @@ import { expandHome, resolvedDbPath, saveWebSettings, type WebSettings } from ".
  * Web and desktop only repoint to a new folder; the CLI has always moved the files
  * for you, so it still does (with a rollback if anything fails halfway). Beyond the
  * database and the search index the Python CLI moved, this also carries the folders
- * web and desktop keep beside the database: pasted `images/` (notes link to them) and
- * `attachments/`. Leaving those behind would break every image in every note.
+ * web and desktop keep beside the database: the pasted images (notes link to them) and the
+ * attachments. Leaving those behind would break every image in every note. Their names come
+ * from the web app's own constants, so they cannot drift.
  *
  * The caller closes the database and stops Meilisearch first, and reopens them after.
  */
@@ -20,7 +28,7 @@ const DATABASE_NAME = "composition.db";
 /** SQLite's side files; present only while a connection is open or after a crash. */
 const DATABASE_SUFFIXES = ["", "-wal", "-shm", "-journal"];
 /** Everything else the app keeps in its data directory. */
-const OTHER_ENTRIES = ["meili_data", "meili.log", "meili_master_key", "attachments", "images"];
+const OTHER_ENTRIES = ["meili_data", "meili.log", "meili_master_key", ATTACHMENT_DIR_NAME, IMAGE_DIR_NAME];
 
 type MoveDeps = {
   /** Persists the new settings; replaced in tests. */

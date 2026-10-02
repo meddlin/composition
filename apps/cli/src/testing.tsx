@@ -18,7 +18,13 @@ export type Rendered = Awaited<ReturnType<typeof testRender>>;
 export type Sandbox = {
   home: string;
   /** Mounts the app over whatever is in the database now. */
-  mount: (options?: { api?: Partial<Api>; width?: number; height?: number }) => Promise<Rendered>;
+  mount: (options?: {
+    api?: Partial<Api>;
+    width?: number;
+    height?: number;
+    theme?: string;
+    moveDataLocation?: (destination: string) => Promise<void>;
+  }) => Promise<Rendered>;
   dispose: () => Promise<void>;
 };
 
@@ -35,9 +41,9 @@ export function createSandbox(): Sandbox {
 
   return {
     home,
-    async mount({ api = {}, width = 120, height = 30 } = {}) {
+    async mount({ api = {}, width = 120, height = 30, theme, moveDataLocation } = {}) {
       const initial = await service.loadWorkspace();
-      const rendered = await testRender(<App initial={initial} api={{ ...defaultApi, ...api }} />, { width, height });
+      const rendered = await testRender(<App initial={initial} api={{ ...defaultApi, ...api }} theme={theme} moveDataLocation={moveDataLocation} />, { width, height });
       // testRender turns act() warnings on; the app's own timers update state outside act on purpose.
       (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = false;
       mounted.push(rendered);
@@ -69,6 +75,23 @@ export async function settle(rendered: Rendered, ms = 250): Promise<void> {
 }
 
 export const frame = (rendered: Rendered): string => rendered.captureCharFrame();
+
+/** The background color of one screen cell, as #RRGGBB: proof of what the user would see. */
+export function backgroundAt(rendered: Rendered, row: number, column: number): string {
+  const { lines } = rendered.captureSpans() as unknown as {
+    lines: { spans: { width: number; bg: { buffer: ArrayLike<number> } }[] }[];
+  };
+  let x = 0;
+  for (const span of lines[row].spans) {
+    if (column < x + span.width) {
+      const [r, g, b] = [0, 1, 2].map((i) => span.bg.buffer[i]);
+      const scale = r > 1 || g > 1 || b > 1 ? 1 : 255; // 0-255, or 0-1 floats
+      return `#${[r, g, b].map((c) => Math.round(c * scale).toString(16).padStart(2, "0")).join("")}`.toUpperCase();
+    }
+    x += span.width;
+  }
+  throw new Error(`no cell at row ${row}, column ${column}`);
+}
 
 export async function press(rendered: Rendered, key: string, modifiers: { ctrl?: boolean; meta?: boolean } = {}, ms = 150) {
   rendered.mockInput.pressKey(key as never, modifiers as never);

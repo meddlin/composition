@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { WebSettings } from "./backend";
+import { ATTACHMENT_DIR_NAME, IMAGE_DIR_NAME, type WebSettings } from "./backend";
 import { ApplicationDataMoveError, moveApplicationData } from "./dataLocation";
 
 let root: string;
@@ -37,15 +37,21 @@ function writeAllApplicationData(dir: string) {
   fs.writeFileSync(path.join(dir, "meili_data", "data.ms"), "search data");
   fs.writeFileSync(path.join(dir, "meili.log"), "log");
   fs.writeFileSync(path.join(dir, "meili_master_key"), "secret");
-  fs.mkdirSync(path.join(dir, "attachments"));
-  fs.writeFileSync(path.join(dir, "attachments", "a.pdf"), "attachment");
-  fs.mkdirSync(path.join(dir, "images"));
-  fs.writeFileSync(path.join(dir, "images", "pic.png"), "image");
+  fs.mkdirSync(path.join(dir, ATTACHMENT_DIR_NAME));
+  fs.writeFileSync(path.join(dir, ATTACHMENT_DIR_NAME, "a.pdf"), "attachment");
+  fs.mkdirSync(path.join(dir, IMAGE_DIR_NAME));
+  fs.writeFileSync(path.join(dir, IMAGE_DIR_NAME, "pic.png"), "image");
 }
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(...parts), "utf-8");
 
 describe("moveApplicationData", () => {
+  it("pins the folder names to the ones the web and desktop apps actually use", () => {
+    // If either changes there, the move must follow: a pasted image left behind is a broken link.
+    expect(IMAGE_DIR_NAME).toBe("app_data");
+    expect(ATTACHMENT_DIR_NAME).toBe("attachments");
+  });
+
   it("moves every managed file, images and attachments included", () => {
     const oldDir = path.join(root, "old");
     const newDir = path.join(root, "new");
@@ -66,8 +72,8 @@ describe("moveApplicationData", () => {
     expect(read(newDir, "meili_data", "data.ms")).toBe("search data");
     expect(read(newDir, "meili.log")).toBe("log");
     expect(read(newDir, "meili_master_key")).toBe("secret");
-    expect(read(newDir, "attachments", "a.pdf")).toBe("attachment");
-    expect(read(newDir, "images", "pic.png")).toBe("image");
+    expect(read(newDir, ATTACHMENT_DIR_NAME, "a.pdf")).toBe("attachment");
+    expect(read(newDir, IMAGE_DIR_NAME, "pic.png")).toBe("image");
     expect(fs.existsSync(oldDir)).toBe(false);
   });
 
@@ -171,8 +177,8 @@ describe("moveApplicationData", () => {
     expect(read(oldDir, "composition.db")).toBe("database");
     expect(read(oldDir, "composition.db-wal")).toBe("wal");
     expect(read(oldDir, "meili_data", "data.ms")).toBe("search data");
-    expect(read(oldDir, "attachments", "a.pdf")).toBe("attachment");
-    expect(read(oldDir, "images", "pic.png")).toBe("image");
+    expect(read(oldDir, ATTACHMENT_DIR_NAME, "a.pdf")).toBe("attachment");
+    expect(read(oldDir, IMAGE_DIR_NAME, "pic.png")).toBe("image");
     expect(fs.existsSync(newDir)).toBe(false);
   });
 

@@ -1,8 +1,8 @@
 # CLI: keybindings
 
-Status: **agreed 2026-10-02 for the TypeScript CLI** (OpenTUI on Node 26). The CLI
-described here is being built on branch `claude/cli-typescript-port-2f440f`; until it
-lands, the Python CLI still uses the older subset marked *(existing)* below.
+Status: **agreed 2026-10-02 and implemented** in the TypeScript CLI (OpenTUI on Node 26).
+The marks *(existing)* and "new" say whether a key was already in the Python CLI that
+preceded it, or is new.
 
 This page is the one place the CLI's keys are written down. The footer and the `?`
 help overlay show the live bindings (the footer drops its later hints in a narrow terminal, but
@@ -26,13 +26,13 @@ wins and this page needs updating in the same pull request.
 |---|---|---|
 | `↑` `↓` | Move through the tree | *(existing)* |
 | `←` `→` | Collapse / expand a group | *(existing)* |
-| `Enter` | On a note: open it in the focused pane (or focus the pane it is already in). On a group: fold or unfold it. On "Settings" or "Trash": open that screen | *(existing, now opens a pane)* |
+| `Enter` | On a note: open it in the focused pane (or focus the pane it is already in). On a group or the Favorites header: fold or unfold it. On a pinned group: jump to the group in the tree. On "Trash" or "Settings": open that screen | *(existing, now opens a pane)* |
 | `o` | Open the note in a **new pane to the right** | new |
 | `ctrl+n` | New note (in the highlighted group) | *(existing)* |
 | `ctrl+g` | New group (inside the highlighted group) | *(existing)* |
 | `r` | Rename the highlighted group | *(existing)* |
-| `m` | Move the highlighted **note or group** to another group | note: *(existing)*; group: new |
-| `f` | Pin / unpin the highlighted note or group as a favorite | new |
+| `m` | Move the highlighted **note or group** to another group, or a group back to the top level. A group's list leaves out the group itself and everything beneath it | note: *(existing)*; group: new |
+| `f` | Pin or unpin the highlighted note or group. Pinned items are listed in a "★ Favorites" section above the tree, in the order they were pinned, and starred where they sit in the tree | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |
 | `t` | Open the Trash Can (the same as pressing Enter on the "Trash" row) | new |
@@ -85,15 +85,24 @@ group, or at the top level (and says so) if the group has been deleted since.
 
 ## Settings screen
 
-Not specified in the 2026-10-02 agreement beyond `Esc`; the rest are the natural form
-controls and will be confirmed when the screen is built.
+Opened with Enter on the "Settings" row. It has three fields; Tab moves between them.
+
+| Field | What it does |
+|---|---|
+| Application data location | Type a folder and press `Enter` to move **everything** there: the database, the search index, pasted images and attachments. Nothing is overwritten, and if the move fails it is undone |
+| Color scheme | `↑` `↓` to choose, `Enter` to apply and remember. A `●` marks the one in use. Dark, Light, Forest, Cream, or Follow the sun |
+| City, for follow the sun | Type "City, State" or "City, Country" and press `Enter`. It is looked up on Open-Meteo, only when you save here and only while Follow the sun is chosen. Empty it to forget the city |
 
 | Key | Action |
 |---|---|
-| `Tab` / `Shift+Tab` | Move between fields |
-| `Enter` | Save the data location or the city |
-| `↑` `↓` | Choose a color scheme |
+| `Tab` | Next field |
+| `Enter` | Save or apply the field you are on |
 | `Esc` | Back *(existing)* |
+
+"Follow the sun" fades the surfaces between the dark and light schemes along the city's sunrise
+and sunset, and switches the text color at the half-way point, as the web app does. In a terminal
+without truecolor (`COLORTERM` is not `truecolor` or `24bit`) it switches between the two
+schemes instead, since a smooth fade needs the colors.
 
 ## Dialogs
 
@@ -137,7 +146,7 @@ Found while building the spike on 2026-10-02; the reason matters more than the l
 | `ctrl+e` | The editor's end-of-line key, so it can't be "cycle view" |
 | `ctrl+1` … `ctrl+9`, `alt+1` … `alt+9` | Mission Control uses `ctrl+digit` to switch desktops, and `alt+digit` types symbols (`¡ ™ £`) in Terminal.app by default |
 | `ctrl+shift+<letter>` | A legacy terminal cannot tell it from `ctrl+<letter>`, so there is no "previous pane" key |
-| `ctrl+c` | Quits the app (OpenTUI's `exitOnCtrlC`) |
+| `ctrl+c` | Quits the app from anywhere, saving open notes first (the app handles it itself; OpenTUI's own exit-on-`ctrl+c` is off) |
 
 Before adding a binding, check this table and the editor-owned table above. Keys that
 are free inside the editor today: `ctrl+x`, `ctrl+t`, `ctrl+o`, `ctrl+g`, `ctrl+n`,

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { listNotes, service } from "./backend";
+import { listNotes, loadWebSettings, service } from "./backend";
 import { createSandbox, frame, press, pressEscape, settle, sleep, type Sandbox, type Rendered } from "./testing";
 import { AUTOSAVE_DELAY_MS } from "./components/Pane";
 
@@ -597,6 +597,32 @@ describe("search", () => {
 });
 
 describe("help and quitting", () => {
+  it("saves an edit that is still waiting when you press ctrl+c, from the editor itself", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await press(app, "END");
+    await app.mockInput.typeText("\nlost without a save");
+    await settle(app, 30); // well inside the autosave delay
+    expect(stored("Plan")).not.toContain("lost without a save");
+
+    await press(app, "c", { ctrl: true }, 600);
+
+    expect(stored("Plan")).toContain("lost without a save");
+  });
+
+  it("leaves with ctrl+c from a dialog too", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "n", { ctrl: true }); // a dialog is open
+    expect(frame(app)).toContain("New note");
+
+    await press(app, "c", { ctrl: true }, 400);
+
+    // The renderer was destroyed: nothing more is drawn, and nothing was created.
+    expect(listNotes()).toHaveLength(2);
+  });
+
   it("lists the keys with ? and closes with Escape", async () => {
     await seed();
     const app = await sandbox.mount();
@@ -637,5 +663,110 @@ describe("help and quitting", () => {
     await press(app, "q", {}, 600);
 
     expect(stored("Plan")).toContain("last words");
+  });
+});
+
+// Behaviours the Python CLI's tests pinned down, kept when it was replaced.
+describe("search details", () => {
+  const looseHit = () => {
+    const loose = listNotes().find((n) => n.title === "Loose")!;
+    return { hits: [{ id: loose.id, title: "Loose", description: "" }] };
+  };
+
+  it("leaves the tree alone until the pause after typing has passed", async () => {
+    await seed();
+    const app = await sandbox.mount({ api: { searchNotes: async () => looseHit() } });
+    await press(app, "/");
+
+    await app.mockInput.typeText("loose");
+    await sleep(100); // well inside the 350 ms debounce
+    await settle(app, 50);
+    expect(frame(app)).toContain("Work");
+    expect(frame(app)).toContain("Plan");
+
+    await sleep(500);
+    await settle(app, 100);
+    expect(frame(app)).not.toContain("Plan");
+  });
+
+  it("keeps typing in the search bar while results arrive", async () => {
+    await seed();
+    const app = await sandbox.mount({ api: { searchNotes: async () => looseHit() } });
+    await press(app, "/");
+    await app.mockInput.typeText("lo");
+    await sleep(700);
+    await settle(app, 100);
+    expect(frame(app)).not.toContain("Plan"); // results have replaced the tree
+
+    await app.mockInput.typeText("ose");
+    await settle(app, 100);
+
+    expect(frame(app)).toContain("search: loose");
+  });
+
+  it("keeps the search applied after opening a note from the results and coming back", async () => {
+    await seed();
+    const app = await sandbox.mount({ api: { searchNotes: async () => looseHit() } });
+    await press(app, "/");
+    await app.mockInput.typeText("loose");
+    await sleep(700);
+    await press(app, "RETURN", {}, 200); // back to the tree, search kept
+    await press(app, "RETURN", {}, 500); // open the one match
+
+    expect(frame(app)).toContain("Loose — saved");
+    await pressEscape(app, 500); // and back to the tree
+
+    expect(frame(app)).toContain("search: loose");
+    expect(frame(app)).not.toContain("Plan");
+  });
+});
+
+describe("rows that are not real notes or groups", () => {
+  it("does nothing for r, ctrl+d and m on the Ungrouped bucket", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await arrowDown(app); // from Plan, one down is the Ungrouped bucket
+
+    await press(app, "r");
+    await press(app, "d", { ctrl: true });
+    await press(app, "m");
+
+    expect(frame(app)).not.toContain("Rename group");
+    expect(frame(app)).not.toContain("Delete");
+    expect(frame(app)).not.toContain("Move");
+    expect(inTree(app)).toBe(true);
+  });
+
+  it("does nothing for r, ctrl+d and m on the Trash and Settings rows", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await arrowDown(app, 12); // the last row: Settings
+
+    for (const [key, mods] of [["r", {}], ["d", { ctrl: true }], ["m", {}], ["f", {}], ["o", {}]] as const) {
+      await press(app, key, mods);
+    }
+
+    expect(inTree(app)).toBe(true);
+    expect(frame(app)).not.toContain("Rename group");
+    expect(listNotes()).toHaveLength(2);
+  });
+});
+
+describe("Settings keeps what was not saved", () => {
+  it("does not save a data path that was typed but not submitted when a color scheme is chosen", async () => {
+    await seed();
+    const before = loadWebSettings().appDataDir;
+    const app = await sandbox.mount();
+    await arrowDown(app, 12);
+    await press(app, "RETURN", {}, 500); // Settings
+    await app.mockInput.typeText("/never/saved");
+    await settle(app, 100);
+
+    await press(app, "TAB");
+    await press(app, "ARROW_DOWN");
+    await press(app, "RETURN", {}, 500); // apply Light
+
+    expect(loadWebSettings().theme).toBe("light");
+    expect(loadWebSettings().appDataDir).toBe(before);
   });
 });

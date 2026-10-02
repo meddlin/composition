@@ -95,6 +95,11 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
     };
   }, []);
 
+  // A new color scheme means new style ids; the old highlights would point at the old ones.
+  useEffect(() => {
+    highlight();
+  }, [syntax]);
+
   const showEditor = view !== "preview";
   const showPreview = view !== "markdown";
   const [, body] = frontmatter.parse(text);

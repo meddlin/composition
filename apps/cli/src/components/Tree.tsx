@@ -5,9 +5,18 @@ import type { TreeRow } from "../tree";
 /** How a row looks in the list: indentation, a fold marker for groups, then the label. */
 export function rowText(row: TreeRow): string {
   const indent = "  ".repeat(row.depth);
-  if (row.kind === "group") return `${indent}${row.expanded ? "▾" : "▸"} ${row.label}`;
-  if (row.kind === "note") return `${indent}  ${row.label}`;
-  return `${indent}${row.label}`;
+  switch (row.kind) {
+    case "section":
+      return `${indent}${row.expanded ? "▾" : "▸"} ${row.label}`;
+    case "group":
+      // A favorite group is a shortcut to the group, not the group itself, so it can't be folded.
+      if (row.favorite) return `${indent}◆ ${row.label}`;
+      return `${indent}${row.expanded ? "▾" : "▸"} ${row.label}${row.pinned ? " ★" : ""}`;
+    case "note":
+      return `${indent}  ${row.label}${row.pinned && !row.favorite ? " ★" : ""}`;
+    default:
+      return `${indent}${row.label}`;
+  }
 }
 
 type TreeProps = {

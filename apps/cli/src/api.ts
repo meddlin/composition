@@ -20,6 +20,12 @@ export type Api = Pick<
   | "restoreGroup"
   | "permanentlyDeleteNote"
   | "permanentlyDeleteGroup"
+  | "moveGroup"
+  | "saveFavorites"
+  | "saveTheme"
+  | "saveLocation"
+  | "loadSettings"
+  | "loadSunSchedule"
 >;
 
 export const defaultApi: Api = service;

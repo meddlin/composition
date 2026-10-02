@@ -27,6 +27,8 @@ export type ActionId =
   | "close-pane"
   | "restore"
   | "delete-forever"
+  | "next-field"
+  | "save"
   | "back";
 
 export type KeyBinding = {
@@ -72,6 +74,8 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "delete-forever", scope: "trash", keys: ["ctrl+d"], hint: "ctrl+d delete forever", description: "Delete it for good", footer: true },
   { action: "back", scope: "trash", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 
+  { action: "next-field", scope: "settings", keys: ["tab"], hint: "Tab next field", description: "Move to the next setting", footer: true },
+  { action: "save", scope: "settings", keys: ["enter"], hint: "Enter save", description: "Save the data location or city, or apply the highlighted color scheme", footer: true },
   { action: "back", scope: "settings", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 ];
 

@@ -15,7 +15,9 @@
     "build": "node scripts/build.mjs",
     "start": "node bin/composition.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "node scripts/build.mjs && node dist/seed.mjs",
+    "search:playground": "node scripts/build.mjs && node dist/search-playground.mjs"
   },
   "dependencies": {
     "@opentui/core": "0.5.14",

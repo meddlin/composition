@@ -1,4 +1,4 @@
-import type { Group, Note } from "./backend";
+import { favorites as favoritesLib, type Favorites, type Group, type Note } from "./backend";
 
 /**
  * What the left-hand tree shows, as plain rows. Pure (no UI), so the ordering and the
@@ -14,8 +14,22 @@ export type TreeRow =
       label: string;
       depth: number;
       expanded: boolean;
+      /** Pinned as a favorite. */
+      pinned: boolean;
+      /** This row is the entry in the Favorites section, not the group's own place in the tree. */
+      favorite?: true;
     }
-  | { kind: "note"; key: string; noteId: number; label: string; depth: number }
+  | {
+      kind: "note";
+      key: string;
+      noteId: number;
+      label: string;
+      depth: number;
+      pinned: boolean;
+      /** This row is the entry in the Favorites section, not the note's own place in the tree. */
+      favorite?: true;
+    }
+  | { kind: "section"; key: "favorites"; label: string; depth: 0; expanded: boolean }
   | { kind: "trash"; key: "trash"; label: string; depth: 0 }
   | { kind: "settings"; key: "settings"; label: string; depth: 0 }
   | { kind: "message"; key: string; label: string; depth: 0 };
@@ -31,9 +45,20 @@ export type TreeInput = {
   collapsed: ReadonlySet<string>;
   /** A search is narrowing `notes`: leave out groups with nothing matching. */
   filtering?: boolean;
+  /** Pinned items, in the order they were pinned. */
+  favorites?: Favorites;
 };
 
-export function buildTree({ notes, groups, collapsed, filtering = false }: TreeInput): TreeRow[] {
+export const FAVORITES_KEY = "favorites";
+
+/** Pinned items whose note or group is gone are dropped; order is kept. */
+export function pruneFavorites(favorites: Favorites, notes: readonly Note[], groups: readonly Group[]): Favorites {
+  const noteIds = new Set(notes.map((n) => n.id));
+  const groupIds = new Set(groups.map((g) => g.id));
+  return favorites.filter((f) => (f.type === "note" ? noteIds.has(f.id) : groupIds.has(f.id)));
+}
+
+export function buildTree({ notes, groups, collapsed, filtering = false, favorites = [] }: TreeInput): TreeRow[] {
   const notesByGroup = new Map<number | null, Note[]>();
   for (const note of notes) {
     const list = notesByGroup.get(note.groupId) ?? [];
@@ -56,16 +81,53 @@ export function buildTree({ notes, groups, collapsed, filtering = false }: TreeI
 
   const rows: TreeRow[] = [];
 
+  // The pinned section comes first. It reads from every note and group, not from the search results.
+  if (!filtering) {
+    const pinned = pruneFavorites(favorites, notes, groups);
+    if (pinned.length > 0) {
+      const expanded = !collapsed.has(FAVORITES_KEY);
+      rows.push({ kind: "section", key: FAVORITES_KEY, label: "★ Favorites", depth: 0, expanded });
+      if (expanded) {
+        const noteById = new Map(notes.map((n) => [n.id, n]));
+        const groupById = new Map(groups.map((g) => [g.id, g]));
+        for (const favorite of pinned) {
+          if (favorite.type === "note") {
+            const note = noteById.get(favorite.id)!;
+            rows.push({ kind: "note", key: `fav:note:${note.id}`, noteId: note.id, label: note.title, depth: 1, pinned: true, favorite: true });
+          } else {
+            const group = groupById.get(favorite.id)!;
+            rows.push({ kind: "group", key: `fav:group:${group.id}`, groupId: group.id, label: group.name, depth: 1, expanded: false, pinned: true, favorite: true });
+          }
+        }
+      }
+    }
+  }
+
   const addNotes = (groupId: number | null, depth: number) => {
     for (const note of notesByGroup.get(groupId) ?? []) {
-      rows.push({ kind: "note", key: noteKey(note.id), noteId: note.id, label: note.title, depth });
+      rows.push({
+        kind: "note",
+        key: noteKey(note.id),
+        noteId: note.id,
+        label: note.title,
+        depth,
+        pinned: favoritesLib.isFavorite(favorites, "note", note.id),
+      });
     }
   };
 
   const addGroup = (group: Group, depth: number) => {
     const key = groupKey(group.id);
     const expanded = !collapsed.has(key);
-    rows.push({ kind: "group", key, groupId: group.id, label: group.name, depth, expanded });
+    rows.push({
+      kind: "group",
+      key,
+      groupId: group.id,
+      label: group.name,
+      depth,
+      expanded,
+      pinned: favoritesLib.isFavorite(favorites, "group", group.id),
+    });
     if (!expanded) return;
     for (const child of childrenOf.get(group.id) ?? []) {
       if (!filtering || hasNotes(child.id)) addGroup(child, depth + 1);
@@ -83,7 +145,7 @@ export function buildTree({ notes, groups, collapsed, filtering = false }: TreeI
   } else if (ungrouped.length > 0 || (groups.length === 0 && !filtering)) {
     const key = groupKey(null);
     const expanded = !collapsed.has(key);
-    rows.push({ kind: "group", key, groupId: null, label: "Ungrouped", depth: 0, expanded });
+    rows.push({ kind: "group", key, groupId: null, label: "Ungrouped", depth: 0, expanded, pinned: false });
     if (expanded) addNotes(null, 1);
   }
 

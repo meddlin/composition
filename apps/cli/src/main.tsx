@@ -11,7 +11,8 @@ const workspace = await service.loadWorkspace();
 let failure: unknown;
 
 const renderer = await createCliRenderer({
-  exitOnCtrlC: true,
+  // ctrl+c is handled by the app (see App.tsx), which saves open notes before leaving.
+  exitOnCtrlC: false,
   onDestroy: () => {
     // Stop Meilisearch and close the database before leaving.
     void runtime.stop().finally(() => {
@@ -35,4 +36,6 @@ const fail = (error: unknown) => {
 };
 process.on("uncaughtException", fail);
 process.on("unhandledRejection", fail);
-createRoot(renderer).render(<App initial={workspace} theme={loadWebSettings().theme} />);
+createRoot(renderer).render(
+  <App initial={workspace} theme={loadWebSettings().theme} moveDataLocation={runtime.moveDataLocation} />,
+);

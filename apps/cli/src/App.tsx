@@ -1,14 +1,16 @@
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultApi, type Api } from "./api";
-import { panes as paneLib, type Group, type Note, type Workspace } from "./backend";
+import { canMoveGroup, favorites as favoritesLib, panes as paneLib, type Favorites, type Group, type Note, type Workspace } from "./backend";
 import { ConfirmDialog, HelpDialog, PickerDialog, PromptDialog, type PickerOption } from "./components/Dialogs";
 import { Pane, type FlushRegistry } from "./components/Pane";
+import { SettingsScreen } from "./components/SettingsScreen";
 import { Tree } from "./components/Tree";
 import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
-import { paletteFor, syntaxStyleFor } from "./theme";
-import { buildTree, groupKey, noteKey, orderedGroups, targetGroupId, type TreeRow } from "./tree";
+import { autoPalette, isTruecolor, paletteFor, syntaxStyleFor } from "./theme";
+import { useSunLevel } from "./useSunLevel";
+import { buildTree, groupKey, noteKey, orderedGroups, pruneFavorites, targetGroupId, type TreeRow } from "./tree";
 
 export const SIDEBAR_WIDTH = 34;
 export const SEARCH_DEBOUNCE_MS = 350;
@@ -23,17 +25,21 @@ type Dialog =
   | { kind: "new-group"; parentId: number | null }
   | { kind: "rename-group"; group: Group }
   | { kind: "move-note"; note: Note }
+  | { kind: "move-group"; group: Group }
   | { kind: "delete-note"; note: Note }
   | { kind: "delete-group"; group: Group }
   | { kind: "help" }
   | { kind: "trash" }
+  | { kind: "settings" }
   | null;
 
 export type AppProps = {
   initial: Workspace;
   api?: Api;
-  /** The color scheme's name; schemes without a palette yet fall back to dark. */
+  /** The color scheme's name: dark, light, forest, cream or auto (follow the sun). */
   theme?: string;
+  /** Moves all the app's data to another folder and reopens it there (see runtime.ts). */
+  moveDataLocation?: (destination: string) => Promise<void>;
 };
 
 const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
@@ -42,10 +48,17 @@ const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
   preview: "split",
 };
 
-export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
+export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation }: AppProps) {
   const renderer = useRenderer();
   const { width: terminalWidth } = useTerminalDimensions();
-  const palette = useMemo(() => paletteFor(theme), [theme]);
+  const [theme, setTheme] = useState(initialTheme);
+  // Bumped when the saved city or the scheme changes, so "follow the sun" looks its times up again.
+  const [sunVersion, setSunVersion] = useState(0);
+  const sunLevel = useSunLevel(theme === "auto", api, sunVersion);
+  const palette = useMemo(
+    () => (sunLevel === null ? paletteFor(theme) : autoPalette(sunLevel, isTruecolor())),
+    [theme, sunLevel],
+  );
   const syntax = useMemo(() => syntaxStyleFor(palette), [palette]);
 
   const [notes, setNotes] = useState(initial.notes);
@@ -59,6 +72,7 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
   const [focus, setFocus] = useState<Focus>("tree");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<Favorites>(initial.favorites);
 
   // --- saving on the way out ------------------------------------------------
   const flushSet = useRef(new Set<() => Promise<void>>());
@@ -72,9 +86,12 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
     [],
   );
   const quit = async () => {
-    await Promise.all([...flushSet.current].map((flush) => flush().catch(() => {})));
+    await flushAll();
     renderer.destroy();
   };
+
+  /** Saves every open note, so nothing is half-written while the files move. */
+  const flushAll = () => Promise.all([...flushSet.current].map((flush) => flush().catch(() => {})));
 
   // --- data -----------------------------------------------------------------
   const reload = async () => {
@@ -87,6 +104,15 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
   const noteSaved = (stored: Note) => setNotes((current) => current.map((n) => (n.id === stored.id ? stored : n)));
 
   const notesById = useMemo(() => new Map(notes.map((n) => [n.id, n])), [notes]);
+
+  // A pinned note or group that has been deleted drops out of the list.
+  useEffect(() => {
+    const pruned = pruneFavorites(favorites, notes, groups);
+    if (pruned.length !== favorites.length) {
+      setFavorites(pruned);
+      void api.saveFavorites(pruned).catch(() => {});
+    }
+  }, [notes, groups]);
 
   // --- search ---------------------------------------------------------------
   const searchRun = useRef(0);
@@ -117,14 +143,14 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
     [hits, notes, notesById],
   );
   const rows = useMemo(
-    () => buildTree({ notes: visibleNotes, groups, collapsed, filtering: hits !== null }),
-    [visibleNotes, groups, collapsed, hits],
+    () => buildTree({ notes: visibleNotes, groups, collapsed, filtering: hits !== null, favorites }),
+    [visibleNotes, groups, collapsed, hits, favorites],
   );
   const selectedIndex = useMemo(() => {
     const found = rows.findIndex((row) => row.key === cursorKey);
     if (found >= 0) return found;
-    // Prefer landing on a note over a group header.
-    const firstNote = rows.findIndex((row) => row.kind === "note");
+    // Prefer landing on a note over a group header, and on the tree itself over the Favorites shortcuts.
+    const firstNote = rows.findIndex((row) => row.kind === "note" && !row.favorite);
     return firstNote >= 0 ? firstNote : 0;
   }, [rows, cursorKey]);
   const highlighted: TreeRow | undefined = rows[selectedIndex];
@@ -136,14 +162,45 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
       return next;
     });
 
+  /** A group (not a favorites shortcut to one) or the Favorites section folds and unfolds. */
   const toggleGroup = (row: TreeRow) => {
-    if (row.kind !== "group") return;
+    if (!(row.kind === "section" || (row.kind === "group" && !row.favorite))) return;
     setCollapsed((current) => {
       const next = new Set(current);
       if (next.has(row.key)) next.delete(row.key);
       else next.add(row.key);
       return next;
     });
+  };
+
+  /** Moves the cursor to a group's own place in the tree, unfolding whatever hides it. */
+  const jumpToGroup = (groupId: number) => {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      for (let id: number | null = groupId; id !== null; id = groups.find((g) => g.id === id)?.parentId ?? null) {
+        next.delete(groupKey(id));
+      }
+      return next;
+    });
+    setCursorKey(groupKey(groupId));
+  };
+
+  const toggleFavorite = () => {
+    if (!highlighted) return;
+    let item: { type: "note" | "group"; id: number; label: string } | null = null;
+    if (highlighted.kind === "note") item = { type: "note", id: highlighted.noteId, label: highlighted.label };
+    else if (highlighted.kind === "group" && highlighted.groupId !== null) item = { type: "group", id: highlighted.groupId, label: highlighted.label };
+    if (!item) return;
+
+    const next = favoritesLib.toggleFavorite(pruneFavorites(favorites, notes, groups), item.type, item.id);
+    setFavorites(next);
+    void api.saveFavorites(next).catch((error) => setToast(`That didn't work: ${error instanceof Error ? error.message : String(error)}`));
+    const pinned = favoritesLib.isFavorite(next, item.type, item.id);
+    setToast(pinned ? `Pinned "${item.label}" to Favorites.` : `Unpinned "${item.label}".`);
+    // Unpinning from the Favorites section removes the row under the cursor: stay on the item itself.
+    if (!pinned && "favorite" in highlighted && highlighted.favorite) {
+      setCursorKey(item.type === "note" ? noteKey(item.id) : groupKey(item.id));
+    }
   };
 
   // --- toasts ---------------------------------------------------------------
@@ -208,7 +265,33 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
     }
   };
 
+  /** Where a group could go: the top level and every group that is not itself or beneath it. */
+  const moveTargets = (moving: Group): PickerOption[] => [
+    ...(canMoveGroup(groups, moving.id, null) ? [{ label: "Top level", value: null }] : []),
+    ...orderedGroups(groups)
+      .filter(({ group }) => group.id !== moving.id && canMoveGroup(groups, moving.id, group.id))
+      .map(({ group, depth }) => ({ label: `${"  ".repeat(depth)}${group.name}`, value: group.id })),
+  ];
+
+  const startMove = () => {
+    if (highlighted?.kind === "note") {
+      const note = notesById.get(highlighted.noteId);
+      if (note) setDialog({ kind: "move-note", note });
+    } else if (highlighted?.kind === "group" && highlighted.groupId !== null) {
+      const group = groups.find((g) => g.id === highlighted.groupId);
+      if (!group) return;
+      if (moveTargets(group).length === 0) setToast(`There is nowhere else to move "${group.name}".`);
+      else setDialog({ kind: "move-group", group });
+    }
+  };
+
   useKeyboard((key) => {
+    // ctrl+c leaves from anywhere, and saves first, like q: an edit still inside the autosave
+    // delay must not be lost.
+    if (key.ctrl && key.name === "c") {
+      void quit();
+      return;
+    }
     if (dialog) return;
 
     if (focus === "search") {
@@ -245,10 +328,10 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
         if (highlighted?.kind === "note") openNote(highlighted.noteId, true);
         break;
       case "collapse":
-        if (highlighted?.kind === "group" && highlighted.expanded) toggleGroup(highlighted);
+        if ((highlighted?.kind === "group" || highlighted?.kind === "section") && highlighted.expanded) toggleGroup(highlighted);
         break;
       case "expand":
-        if (highlighted?.kind === "group" && !highlighted.expanded) toggleGroup(highlighted);
+        if ((highlighted?.kind === "group" || highlighted?.kind === "section") && !highlighted.expanded) toggleGroup(highlighted);
         break;
       case "new-note":
         setDialog({ kind: "new-note", groupId: targetGroupId(highlighted, notesById) });
@@ -263,10 +346,10 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
         }
         break;
       case "move":
-        if (highlighted?.kind === "note") {
-          const note = notesById.get(highlighted.noteId);
-          if (note) setDialog({ kind: "move-note", note });
-        }
+        startMove();
+        break;
+      case "favorite":
+        toggleFavorite();
         break;
       case "delete":
         startDelete();
@@ -293,9 +376,10 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
     const row = rows[index];
     if (!row) return;
     if (row.kind === "note") openNote(row.noteId);
-    else if (row.kind === "group") toggleGroup(row);
+    else if (row.kind === "group" && row.favorite && row.groupId !== null) jumpToGroup(row.groupId);
+    else if (row.kind === "group" || row.kind === "section") toggleGroup(row);
     else if (row.kind === "trash") setDialog({ kind: "trash" });
-    else if (row.kind === "settings") setToast("Settings arrive in the next step of the port.");
+    else if (row.kind === "settings") setDialog({ kind: "settings" });
   };
 
   // --- dialogs --------------------------------------------------------------
@@ -390,6 +474,24 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
           />
         );
       }
+      case "move-group":
+        return (
+          <PickerDialog
+            palette={palette}
+            title={`Move "${dialog.group.name}" to…`}
+            options={moveTargets(dialog.group)}
+            onCancel={closeDialog}
+            onPick={(parentId) =>
+              void attempt(async () => {
+                const result = await api.moveGroup(dialog.group.id, parentId);
+                if (result.error) setToast(result.error);
+                await reload();
+                unfold(parentId);
+                closeDialog();
+              })()
+            }
+          />
+        );
       case "delete-note":
         return (
           <ConfirmDialog
@@ -427,6 +529,26 @@ export function App({ initial, api = defaultApi, theme = "dark" }: AppProps) {
         );
       case "help":
         return <HelpDialog palette={palette} onClose={closeDialog} />;
+      case "settings":
+        return (
+          <SettingsScreen
+            api={api}
+            palette={palette}
+            width={terminalWidth}
+            theme={theme}
+            onThemeChange={setTheme}
+            onCityChanged={() => setSunVersion((version) => version + 1)}
+            moveDataLocation={
+              moveDataLocation &&
+              (async (destination) => {
+                await flushAll();
+                await moveDataLocation(destination);
+              })
+            }
+            onDataMoved={() => void reload()}
+            onClose={closeDialog}
+          />
+        );
       case "trash":
         return (
           <TrashScreen

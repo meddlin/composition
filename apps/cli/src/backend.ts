@@ -19,6 +19,9 @@ export type {
   Workspace,
 } from "../../web/src/lib/composition/api";
 export { closeDb } from "../../web/src/lib/composition/db";
+// The folders, beside the database, that hold pasted images and attached files.
+export { IMAGE_DIR_NAME } from "../../web/src/lib/composition/imageRefs";
+export { ATTACHMENT_DIR_NAME } from "../../web/src/lib/composition/attachmentNames";
 export { expandHome } from "../../web/src/lib/composition/paths";
 export {
   loadWebSettings,
@@ -31,6 +34,10 @@ export { listNotes } from "../../web/src/lib/composition/notesRepo";
 export type { Note } from "../../web/src/lib/composition/notesRepo";
 export type { Group } from "../../web/src/lib/composition/groupsRepo";
 export type { Favorites } from "../../web/src/lib/composition/favorites";
+export { canMoveGroup, wouldCreateCycle } from "../../web/src/lib/composition/groupMove";
+export { fallbackSunEvents, INK_FLIP_LEVEL, sunLevel, RAMP_HALF_WIDTH_MS } from "../../web/src/lib/composition/sunSchedule";
+export type { SunEvent } from "../../web/src/lib/composition/sunSchedule";
+export type { SunSchedule } from "../../web/src/lib/composition/sunTimes";
 export type { RestoreResult, Trash, TrashedGroup, TrashedNote } from "../../web/src/lib/composition/trash";
 export { daysLeft, TRASH_RETENTION_DAYS } from "../../web/src/lib/composition/trash";
 export type { ThemeName } from "../../web/src/lib/composition/themes";
