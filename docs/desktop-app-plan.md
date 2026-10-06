@@ -181,7 +181,7 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 
 ### Phase 5: CI and release (M)
 
-**Status: partly done. Desktop typecheck and unit tests run in `unit-tests.yml`; Dependabot watches `apps/desktop`. **Not done:** the tag-triggered release workflow (needs the signing secrets).**
+**Status: mostly done. Desktop typecheck and unit tests run in `unit-tests.yml`; Dependabot watches `apps/desktop`. The tag-triggered release workflow is written (`release-desktop.yml`, runs `apps/desktop/scripts/release.mjs`; setup in `docs/deployment/manual-build-release.md`). **Not done:** its first run on GitHub, which needs the five signing secrets in a `release` environment.**
 
 - Extend `.github/workflows/unit-tests.yml`: install `apps/desktop`, run `test:desktop`,
   update `cache-dependency-path`.
