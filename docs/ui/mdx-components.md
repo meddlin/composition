@@ -1,10 +1,13 @@
 # MDX components in notes
 
 Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.tsx),
-[`mdx/`](../../apps/web/src/components/notes/mdx/)
+[`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
+[`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`) written as
-JSX tags. They work the same in the web and desktop apps, since both run the same renderer.
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`) written as
+JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
+CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
+everywhere.
 
 ## `<Info>`
 
@@ -51,6 +54,20 @@ image into the editor inserts the Markdown form:
 `src` and `alt` are plain strings (an `{expression}` is rejected, like for any component).
 See [images.md](../architecture/images.md) for where pasted images live and how `app_data/` paths resolve.
 
+## `<Toc>`
+
+A table of contents for the note it is in: its headings as a nested list. It lists whatever
+headings the note has when it is drawn, so it follows edits with no upkeep.
+
+```mdx
+<Toc />
+
+<Toc maxDepth="3" />
+```
+
+`maxDepth` (a string, 1 to 6) stops the list at that heading level; without it, all six are listed.
+On the web and desktop each entry links to its heading.
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -66,6 +83,34 @@ See [images.md](../architecture/images.md) for where pasted images live and how 
 
 In `next dev`, React also logs that failure and Next shows its "Issue" badge. Production
 builds don't.
+
+## In the CLI
+
+The preview in the terminal accepts exactly what the web preview accepts, with the same error
+messages, because it parses with the same plugins (`remark-mdx`, then the web's
+[`remarkRestrictMdx`](../../apps/web/src/components/notes/mdx/remarkRestrictMdx.ts) and
+[`remarkHeadings`](../../apps/web/src/components/notes/mdx/remarkHeadings.ts), imported through
+[`backend.ts`](../../apps/cli/src/backend.ts)). What differs is how a component is drawn:
+
+| Component | In the terminal |
+|---|---|
+| `<Info>` | A rounded box in the color scheme's primary color, titled `Info`, with a tinted background, and the content rendered as Markdown inside. |
+| `<Warning>` | The same, in the scheme's warning color, titled `Warning`. |
+| `<Toc>` | A box titled `Contents` listing the headings, indented by nesting and cut off at `maxDepth`. It isn't clickable, and follows the note as it is edited. |
+| `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
+
+A few things follow from the terminal drawing Markdown in whole pieces:
+
+- A component can be nested in another (an `<Info>` in an `<Info>`), and a one-line
+  `<Info>text</Info>` is a box too.
+- Inside a sentence, a list item or a quote, a component can't be a box. An `<Image>` still becomes its
+  Markdown form, shown as its alt text, an `<Info>` or `<Warning>` keeps its content without the box, and a `<Toc>` is left out.
+- The position in an MDX error counts from the first line below the frontmatter, as on the web.
+- The editor does not offer completion for `<` yet; that is web and desktop only.
+
+Every other Markdown stretch in a note is still drawn by OpenTUI's own `<markdown>`, from the note's
+own text, so a note without components renders exactly as it did before this existed: it isn't even
+parsed as MDX.
 
 ## Completion in the editor
 
@@ -88,3 +133,7 @@ block. Source: [`mdx/completions.ts`](../../apps/web/src/components/notes/mdx/co
 3. Add its entry to `catalog` in [`completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts):
    a one-line description and the template to insert (`$0` is where the caret goes). The type
    makes this a compile error to forget.
+4. For the CLI, add the name to `MDX_COMPONENTS` in [`mdx.ts`](../../apps/cli/src/mdx.ts) and say how it
+   is drawn: in `elementBlocks` (and `replacement`, for where it can't be a block), plus a
+   `Block` kind and its drawing in [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) if it needs
+   one. The CLI's tests fail until the two lists match.

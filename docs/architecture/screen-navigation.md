@@ -1,84 +1,104 @@
 # Screen navigation
 
-Source: [`app.py`](../../apps/cli/src/composition/app.py),
-[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
-[`screens/editor_screen.py`](../../apps/cli/src/composition/screens/editor_screen.py),
-[`screens/new_note_modal.py`](../../apps/cli/src/composition/screens/new_note_modal.py),
-[`screens/new_group_modal.py`](../../apps/cli/src/composition/screens/new_group_modal.py),
-[`screens/rename_group_modal.py`](../../apps/cli/src/composition/screens/rename_group_modal.py),
-[`screens/select_group_modal.py`](../../apps/cli/src/composition/screens/select_group_modal.py),
-[`screens/delete_note_modal.py`](../../apps/cli/src/composition/screens/delete_note_modal.py)
+Source: [`App.tsx`](../../apps/cli/src/App.tsx),
+[`keymap.ts`](../../apps/cli/src/keymap.ts),
+[`tree.ts`](../../apps/cli/src/tree.ts),
+[`components/`](../../apps/cli/src/components)
 
-Composition uses Textual's screen stack (`push_screen`/`pop_screen`) rather than a
-static route table. `MainScreen` is the only screen that's ever the base of the stack;
-everything else is pushed on top of it and popped or dismissed back off.
+The terminal app has one workspace and a handful of things that open on top of it. It does not
+use a stack of screens, and nothing replaces the workspace: the tree and the open notes stay
+mounted underneath, so an editor keeps its cursor and undo history while you look in the Trash Can.
 
-## Flow
+The model is the web and desktop app's: a sidebar tree plus a single row of side-by-side panes,
+each showing one note as its editor, its preview, or both. There is no separate full-screen editor.
+The full list of keys is in [cli-keybindings.md](../ui/cli-keybindings.md).
+
+## Focus areas
+
+Keyboard input always goes to exactly one of three places in the workspace:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Tree
+    Tree --> Search: "/" or ctrl+space
+    Search --> Tree: Enter, ↓ or Esc
+    Tree --> Pane: Enter on a note, "o", ctrl+n, ctrl+o
+    Pane --> Pane: ctrl+o (next pane)
+    Pane --> Tree: Esc, or ctrl+o from the last pane,<br/>or ctrl+x closing the last pane
+```
+
+| Focus | What handles keys | Plain letters do |
+|---|---|---|
+| **Tree** | `App.tsx`, through `keymap.ts` (scope `tree`); the list widget moves the cursor itself | Act: `o`, `m`, `r`, `f`, `t`, `q` … |
+| **Search bar** | The input widget; the app only watches for Enter, ↓ and Esc | Type, so `q` is a letter here |
+| **A pane** | The text editor; the app only watches `Esc`, `ctrl+o`, `ctrl+t`, `ctrl+x` and `ctrl+n` | Type |
+
+The rule behind this is "keys inside the editor always win": a binding is never taken from the
+editor, and [`keymap.test.ts`](../../apps/cli/src/keymap.test.ts) fails if one collides with a key
+OpenTUI's text editor already uses.
+
+## What opens on top
+
+Everything below is one `dialog` state in `App.tsx`. While one is open the workspace is not
+focused at all (every widget under it gets `focused={false}`), so no key can leak through to it,
+and the only global key is `ctrl+c`, which quits.
 
 ```mermaid
 flowchart TD
-    Start(["App starts"]) --> Main["MainScreen<br/>(notes/groups tree + preview)"]
+    Work(["The workspace<br/>tree, search bar, panes"])
 
-    Main -- "select a note<br/>(Tree.NodeSelected)" --> Editor["EditorScreen<br/>(full-screen editor)"]
-    Editor -- "escape<br/>(flush save, pop_screen)" --> Main
+    Work -- "ctrl+n" --> NewNote["New note: title prompt"]
+    NewNote -- "Enter: create, open in a pane" --> Work
+    NewNote -- "Esc" --> Work
 
-    Main -- "ctrl+n<br/>(global, on CompositionApp)" --> NewModal["NewNoteModal"]
-    NewModal -- "submit title<br/>(creates note)" --> Editor
-    NewModal -- "escape<br/>(dismiss None)" --> Main
+    Work -- "ctrl+g" --> NewGroup["New group: name prompt"]
+    Work -- "r on a group" --> Rename["Rename group: prompt, pre-filled"]
+    Work -- "m on a note" --> MoveNote["Move note: group picker"]
+    Work -- "m on a group" --> MoveGroup["Move group: picker<br/>(not itself or anything beneath it)"]
+    NewGroup & Rename & MoveNote & MoveGroup -- "Enter / Esc" --> Work
 
-    Main -- "ctrl+g<br/>(new group)" --> NewGroupModal["NewGroupModal"]
-    NewGroupModal -- "submit name<br/>(creates group)" --> Main
-    NewGroupModal -- "escape<br/>(dismiss None)" --> Main
+    Work -- "ctrl+d on a note" --> DelNote["Confirm: move to the Trash Can?"]
+    Work -- "ctrl+d on an empty group" --> DelGroup["Confirm: delete the empty group?"]
+    DelNote & DelGroup -- "y: delete   n / Esc: cancel" --> Work
 
-    Main -- "r<br/>(rename highlighted group)" --> RenameGroupModal["RenameGroupModal"]
-    RenameGroupModal -- "submit name<br/>(renames group)" --> Main
-    RenameGroupModal -- "escape<br/>(dismiss None)" --> Main
+    Work -- "t, or Enter on the Trash row" --> Trash["Trash Can screen"]
+    Trash -- "r restore" --> Trash
+    Trash -- "ctrl+d" --> Forever["Confirm: delete for good?"]
+    Forever --> Trash
+    Trash -- "Esc" --> Work
 
-    Main -- "m<br/>(move highlighted note)" --> SelectGroupModal["SelectGroupModal"]
-    SelectGroupModal -- "select a group<br/>(moves note)" --> Main
-    SelectGroupModal -- "escape<br/>(dismiss None)" --> Main
+    Work -- "Enter on the Settings row" --> Settings["Settings screen<br/>data location, color scheme, city"]
+    Settings -- "Esc" --> Work
 
-    Main -- "ctrl+d<br/>(delete highlighted note or empty group)" --> DelModal["ConfirmDeleteModal"]
-    DelModal -- "y / Delete button<br/>(dismiss True)" --> Main
-    DelModal -- "n / escape / Cancel button<br/>(dismiss False)" --> Main
+    Work -- "?" --> Help["Key list (scrolls)"]
+    Help -- "Esc" --> Work
 ```
 
-Note that `ctrl+n` is bound on `CompositionApp` itself (a global binding), not on
-`MainScreen` — it works from anywhere `MainScreen` is the active screen, and pushes
-straight to `EditorScreen`, bypassing `MainScreen`'s tree until the user backs out of
-the editor and `on_screen_resume` re-syncs it.
+The Trash Can and Settings are drawn as full-screen overlays, the rest as centered boxes. Closing
+the Trash Can reloads the workspace, so a restored note is back in the tree.
 
-## Key bindings
+`ctrl+d` on a non-empty group shows a message in the footer instead of a confirmation, and `r`, `m` and
+`ctrl+d` do nothing on the "Ungrouped" bucket, the Trash row, the Settings row or a message row,
+none of which is a real note or group.
 
-| Scope | Key | Action |
-|---|---|---|
-| `CompositionApp` (global) | `ctrl+n` | New note → `NewNoteModal`, in the highlighted group |
-| `CompositionApp` (global) | `q` | Quit |
-| `MainScreen` | `ctrl+d` | Delete the highlighted note, or an empty highlighted group → `ConfirmDeleteModal` |
-| `MainScreen` | `ctrl+g` | New group → `NewGroupModal`, nested under the highlighted group |
-| `MainScreen` | `r` | Rename the highlighted group → `RenameGroupModal` |
-| `MainScreen` | `m` | Move the highlighted note to a different group → `SelectGroupModal` |
-| `MainScreen` | `ctrl+space` | Focus the search input |
-| `EditorScreen` | `escape` | Flush pending autosave, back to `MainScreen` |
-| `NewNoteModal` | `enter` (on title input) | Create note, push `EditorScreen` |
-| `NewNoteModal` | `escape` | Cancel, dismiss with `None` |
-| `NewGroupModal` | `enter` (on name input) | Create group, dismiss with the new `Group` |
-| `NewGroupModal` | `escape` | Cancel, dismiss with `None` |
-| `RenameGroupModal` | `enter` (on name input, pre-filled) | Rename group, dismiss with the updated `Group` |
-| `RenameGroupModal` | `escape` | Cancel, dismiss with `None` |
-| `SelectGroupModal` | `enter` (on a group) | Move the note there, dismiss with `GroupSelection` |
-| `SelectGroupModal` | `escape` | Cancel, dismiss with `None` |
-| `ConfirmDeleteModal` | `y` / Delete button | Confirm, dismiss `True` |
-| `ConfirmDeleteModal` | `n` / `escape` / Cancel button | Cancel, dismiss `False` |
+## Opening notes into panes
 
-`MainScreen` sets `AUTO_FOCUS = "#notes-tree"` instead of Textual's default (which
-would focus the search `Input` first, since it's composed before the tree). If the
-search input had default focus, its own built-in `ctrl+d` binding (delete-char-right)
-would shadow the screen's delete action before the user ever typed anything.
+The pane arrangement is the web app's, imported as-is ([`panes.ts`](../../apps/web/src/components/notes/panes.ts)):
 
-## Returning to `MainScreen`
+- each note is open in at most one pane, and panes sit in one row;
+- **Enter** puts the note in the focused pane (or focuses the pane it is already in);
+- **`o`** puts it in a new pane to the right of the focused one;
+- **`ctrl+x`** closes the pane, giving its width to its neighbour;
+- the arrangement is not saved: the next run starts with no panes, as on the web.
 
-`MainScreen.on_screen_resume` fires every time a pushed screen is popped back to it
-(returning from the editor, or a modal dismissing). It re-runs the active search query
-if the search box has text, otherwise reloads the full notes/groups tree — so edits
-made in `EditorScreen` (title changes, deletions) are always reflected immediately.
+A pane shows `split` (editor and preview side by side), `editor` or `preview`; `ctrl+t` cycles them.
+A pane narrower than 80 columns shows the editor instead of `split`, rather than squeezing two
+columns into it, the same fallback the web app has.
+
+## Returning to the tree
+
+Going back to the tree (Esc, leaving a pane, closing a screen) reloads the notes and groups from
+SQLite. That is when a note you just edited moves to the top of its group: while you are typing the
+tree is kept in step (a title changed in the frontmatter shows up) but never reordered under you.
+An active search stays applied, so coming back from a note opened from the results leaves them as
+they were.

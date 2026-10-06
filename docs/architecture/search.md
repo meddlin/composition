@@ -1,112 +1,56 @@
 # Search
 
-Source: [`search.py`](../../apps/cli/src/composition/search.py),
-[`screens/main_screen.py`](../../apps/cli/src/composition/screens/main_screen.py),
-[`storage.py`](../../apps/cli/src/composition/storage.py)
+Source: [`searchQuery.ts`](../../apps/web/src/lib/composition/searchQuery.ts),
+[`searchIndex.ts`](../../apps/web/src/lib/composition/searchIndex.ts),
+[`service.ts`](../../apps/web/src/lib/composition/service.ts) (`searchNotes`),
+[`App.tsx`](../../apps/cli/src/App.tsx) (the terminal app's search bar),
+[`runtime.ts`](../../apps/cli/src/runtime.ts) (starting Meilisearch),
+[`meili.ts`](../../apps/desktop/src/main/meili.ts) (the process)
 
-Search is fuzzy full-text search over titles and content, plus structured filter
-tokens (`tag:`, `title:`, `createdOn:`), served by a local Meilisearch index that
-`NotesStore` keeps in sync with SQLite on every write.
+Search is fuzzy full-text search over titles, descriptions and content, plus structured filter
+tokens (`tag:`, `title:`, `created:` …), served by a local Meilisearch index that is kept in sync
+with SQLite on every write. The terminal, web and desktop apps all use the same query parser,
+index shape and `searchNotes` function; they differ in who starts Meilisearch (below).
 
-## Query flow
+## Query flow (terminal app)
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant Main as MainScreen
-    participant Parse as parse_search_query
-    participant Idx as SearchIndex
+    participant App as App.tsx
+    participant Svc as service.searchNotes
+    participant Parse as parseSearchQuery
+    participant Idx as searchIndex
     participant Meili as Meilisearch
 
-    User->>Main: types in #search-input
-    Main->>Main: on_input_changed → debounce 350ms
-    Main->>Idx: search_index.search(query)
-    Idx->>Parse: parse_search_query(raw)
-    Parse-->>Idx: ParsedQuery(text, filters, attributes_to_search_on)
-    Idx->>Meili: index.search(text, {filter, attributesToSearchOn, sort?})
+    User->>App: types in the search bar
+    App->>App: wait 350 ms after the last keystroke
+    App->>Svc: searchNotes(query)
+    Svc->>Idx: searchNoteIds(query)
+    Idx->>Parse: parseSearchQuery(raw)
+    Parse-->>Idx: { text, filters, attributesToSearchOn }
+    Idx->>Meili: index.search(text, { filter, attributesToSearchOn, sort? })
     Meili-->>Idx: hits
-    Idx-->>Main: [note_id, ...] (deduped, order preserved)
-    Main->>Main: map ids -> already-loaded Note objects
-    Main->>Main: _populate_list(matched notes)
+    Idx-->>Svc: ids (de-duplicated, order kept)
+    Svc-->>App: { hits } or { hits: [], error }
+    App->>App: keep only the notes whose ids came back,<br/>rebuild the tree from them
 ```
 
-If `search_index.search()` raises for any reason, `MainScreen._run_search` swallows
-the exception and leaves the list as-is — a flaky or restarting search backend
-degrades to "stale results" rather than crashing the UI.
+A search never throws into the UI. If Meilisearch is down or was never started, `searchNotes`
+returns `{ hits: [], error }` with the reason (for instance, that the binary wasn't found), the
+terminal app shows it in its header and leaves the tree as it was. A search that is
+still waiting when a newer one starts is discarded when it comes back, so slow answers cannot
+overwrite fast ones.
 
-When the query is empty, `MainScreen` skips search entirely and calls
-`_refresh_notes()`, which lists straight from SQLite ordered by `updated_at DESC`.
+While a search is filtering the tree, groups with no matching note below them are left out and
+the Favorites section is hidden; with no match at all the tree says `No notes match.` An empty
+search bar lists everything from SQLite, most recently edited first, without asking Meilisearch.
 
 ## Query syntax
 
-`parse_search_query` (a pure function, no network calls) recognizes filter tokens
-anywhere in the string and treats everything else as free text:
-
-| Token | Example | Becomes |
-|---|---|---|
-| `tag:<value>` | `tag:software` | Meilisearch filter `tags = "software"` |
-| `title:<value>` | `title:Next.js` | Narrows `attributesToSearchOn` to `["title"]`; value also joins the free-text query |
-| `createdOn:[op]<date>` | `createdOn:>=2026-05-30` | Filter on `created_at_ts`; `op` is one of `>`, `>=`, `<`, `<=`, `=` (default `=`, matching the whole day) |
-
-Multiple filter tokens combine with `AND`. A malformed `createdOn:` date (fails the
-`YYYY-MM-DD` pattern) is left in place as literal search text instead of raising, so a
-half-typed date degrades to "no matches" rather than breaking the debounced handler
-mid-keystroke.
-
-## Keeping the index in sync
-
-SQLite is the source of truth; Meilisearch holds a derived index that `NotesStore`
-pushes to on every mutation:
-
-```mermaid
-sequenceDiagram
-    participant Store as NotesStore
-    participant DB as SQLite
-    participant Idx as SearchIndex
-
-    Note over Store: create_note / update_note / update_note_content
-    Store->>DB: write row
-    Store->>Store: _index(note)
-    Store->>Idx: index_note(note)
-    Note over Store,Idx: exceptions are caught and logged to stderr —<br/>indexing must never break a storage write
-
-    Note over Store: delete_note
-    Store->>DB: DELETE row
-    Store->>Idx: delete_note(note_id)
-```
-
-## Web app
-
-The web app ([`searchIndex.ts`](../../apps/web/src/lib/composition/searchIndex.ts),
-[`SearchBar.tsx`](../../apps/web/src/components/notes/SearchBar.tsx)) uses the same
-`notes` index, document shape and settings. It connects to the Meilisearch at
-`MEILI_URL` (default `http://127.0.0.1:7700`) with `MEILI_MASTER_KEY` or the key file
-at `~/.composition/meili_master_key`. `pnpm meili` (in `apps/web`) starts one with its
-own data dir, `~/.composition-web/meili_data`; the CLI's subprocess uses a random port
-and `~/.composition/meili_data`, so the two do not share an index (each is rebuilt from
-SQLite).
-
-- The search bar debounces typing by 350 ms (same as the CLI), then calls the
-  `searchNotes` server action, which maps hit ids back to SQLite rows. An unreachable
-  Meilisearch comes back as an `error` the dropdown shows, not as "No matches".
-- `saveNoteContent`, `createNote`, `deleteNote` and `restoreNote` push to the index
-  best-effort: failures are logged and swallowed, like `NotesStore._index`. In the web
-  and desktop apps `deleteNote` moves the note to the Trash Can, which takes it out of
-  the index; `restoreNote` puts it back.
-- If the index has no documents, the first search rebuilds it from SQLite.
-- The query goes through [`searchQuery.ts`](../../apps/web/src/lib/composition/searchQuery.ts),
-  a port of `parse_search_query` that understands every frontmatter field (below).
-- Documents also carry `description`, which is searchable. Because that changes the
-  document shape, the first search after the server starts rebuilds the index from
-  SQLite (`reindexAll` also counts), so an index built by an older version isn't
-  left without it.
-- Results are capped at 50. A query with filters but no text lists matches newest
-  first (`updated_at_ts:desc`).
-
-### Filter syntax (web and desktop)
-
-`field: value` anywhere in the query, case-insensitive field names, space after the
-colon optional:
+`parseSearchQuery` is a pure function (no network), so it is safe to run on every debounced
+keystroke. It recognizes `field: value` anywhere in the query, case-insensitive field names, space
+after the colon optional, and treats everything else as free text:
 
 | Field | Example | Matches |
 |---|---|---|
@@ -116,18 +60,68 @@ colon optional:
 | `created:` / `createdAt:` / `createdOn:` | `created: >=2026-05-30` | creation date; operators `>`, `>=`, `<`, `<=`, `=` (default `=`, the whole UTC day) |
 | `updated:` / `updatedAt:` / `updatedOn:` | `updated: <2026-01-01` | same, for the last-modified date |
 
-- An unquoted value runs up to the next `field:` or the end of the query, so
-  `tags: web development` is the one tag "web development". To follow a value with
-  free text, put the text first (`async tags: web development`) or quote the value
-  (`tags:"web development" async`).
-- Repeating a field, or combining fields, ANDs them. `title:` and `description:`
-  are the exception: Meilisearch can't scope individual words to an attribute, so
-  their values and any free text are joined into one query over the named
-  attributes.
-- A field with no value yet (`tags:`) is ignored. A malformed date stays as literal
-  text, so it finds nothing instead of silently dropping the constraint.
+- An unquoted value runs up to the next `field:` or the end of the query, so `tags: web development`
+  is the one tag "web development". To follow a value with free text, put the text first
+  (`async tags: web development`) or quote the value (`tags:"web development" async`).
+- Repeating a field, or combining fields, ANDs them. `title:` and `description:` are the
+  exception: Meilisearch can't scope individual words to an attribute, so their values and any
+  free text are joined into one query over the named attributes.
+- A field with no value yet (`tags:`) is ignored. A malformed date stays as literal text, so it
+  finds nothing instead of silently dropping the constraint, and a half-typed date degrades to "no
+  matches" rather than breaking the handler mid-keystroke.
+- Results are capped at 50. A query with filters but no text lists matches newest first
+  (`updated_at_ts:desc`).
 
-Because the index is fully derived, `SearchIndex.reindex_all(notes)` can blow it away
-and rebuild it from the SQLite rows at any time — this runs once at startup (see
-[startup.md](startup.md)) and is the same mechanism `apps/cli/scripts/search_playground.py`
-uses to exercise search against a throwaway index.
+(The Python CLI that preceded the terminal app understood only `tag:`, `title:` and `createdOn:`.)
+
+## The index
+
+One Meilisearch index, `notes`, with the note id as primary key and the title, description,
+content, tags and creation and update times as documents. Title, content and description are
+searchable; tags and the timestamps are filterable; the update time is sortable.
+
+SQLite is the source of truth and the index is derived, so it can be thrown away and rebuilt at any
+time:
+
+- `searchIndex.reindexAll(notes)` empties it and re-adds every note. The terminal app does this
+  in the background at every start (`SearchSidecar.start`, see [startup.md](startup.md)), and again
+  after the data location changes.
+- If the index has no documents, or the server was started fresh, the first search of a run
+  rebuilds it, so a stale or empty index is never shown as "no matches". A document shape change
+  (the `description` field was added) is handled the same way.
+
+```mermaid
+sequenceDiagram
+    participant Svc as service
+    participant DB as SQLite
+    participant Idx as searchIndex
+
+    Note over Svc: createNote / saveNoteContent / restoreNote
+    Svc->>DB: write the row
+    Svc->>Idx: indexNote(note)
+    Note over Svc,Idx: failures are logged and swallowed:<br/>indexing must never break a write
+
+    Note over Svc: deleteNote (to the Trash Can)
+    Svc->>DB: move the row to trashed_notes
+    Svc->>Idx: deleteNoteFromIndex(id)
+```
+
+## Who runs Meilisearch
+
+Each product keeps its own index, and none shares a Meilisearch data directory with another, so two
+server processes never fight over one index:
+
+| | Terminal app | Web app | Desktop app |
+|---|---|---|---|
+| Meilisearch | spawned by the app (`MeiliProcessManager`), random port | started by hand, `pnpm meili`, port 7700 | spawned by the app, bundled binary, random port |
+| Binary | `meilisearch` on the `PATH`, or `COMPOSITION_MEILI_BIN` | the same, run by hand | bundled in the app |
+| Data | `<app data>/meili_data` (default `~/.composition/meili_data`) | `~/.composition-web/meili_data` | under the app's own data folder |
+
+The web app connects to `MEILI_URL` (default `http://127.0.0.1:7700`) with `MEILI_MASTER_KEY` or the
+key file at `~/.composition/meili_master_key`. A search that can't reach Meilisearch comes back as an
+error the UI shows, never as "No matches".
+
+Developer tools for trying search against a throwaway index: `pnpm search:playground` in
+`apps/cli` loads 100 dummy notes into a temporary database and Meilisearch of its own, and gives a
+`search>` prompt; `pnpm seed` writes the same dummy notes into a scratch home you can open with
+`COMPOSITION_DEV_HOME=<folder> pnpm dev`.

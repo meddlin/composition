@@ -167,7 +167,9 @@ is an exposure A simply does not have.
 
 - **Current behavior.** The CLI spawns `meilisearch` from `PATH` on a random free port with a
   generated master key (`0600`), its own `--db-path`, `--no-analytics`, polls `health()` for
-  10 s, and terminates it (kill after 5 s) on exit (`apps/cli/src/composition/search.py`).
+  10 s, and terminates it (kill after 5 s) on exit. (This research was done against the Python CLI's version, since
+  replaced by the TypeScript one; the desktop app's `meili.ts` has the same behavior and is what the
+  terminal app now uses.)
   The web app does **not** start one; `pnpm meili` does, on `:7700` with
   `~/.composition-web/meili_data`. Each app's index is separate and rebuildable from SQLite
   ([search.md](architecture/search.md)). The desktop app has to implement the CLI's lifecycle

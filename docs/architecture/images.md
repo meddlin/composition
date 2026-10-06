@@ -4,10 +4,12 @@ Source: [`images.ts`](../../apps/web/src/lib/composition/images.ts),
 [`imageRefs.ts`](../../apps/web/src/lib/composition/imageRefs.ts),
 [`NoteImage.tsx`](../../apps/web/src/components/notes/NoteImage.tsx),
 [`mdx/Image.tsx`](../../apps/web/src/components/notes/mdx/Image.tsx),
-[`MarkdownEditor.tsx`](../../apps/web/src/components/notes/MarkdownEditor.tsx)
+[`MarkdownEditor.tsx`](../../apps/web/src/components/notes/MarkdownEditor.tsx); in the CLI,
+[`images.ts`](../../apps/cli/src/images.ts),
+[`PreviewImage.tsx`](../../apps/cli/src/components/PreviewImage.tsx)
 
-Images in notes are supported in the **web and desktop apps**. The CLI does not
-render them; it shows the Markdown text as written.
+Images in notes are supported in the **web and desktop apps**, which can paste them. The CLI
+shows them in its preview ([In the CLI](#in-the-cli)) but cannot paste one.
 
 ## What a note contains
 
@@ -107,6 +109,37 @@ an image extension (so `..` and other files in the directory are a 404) and look
 whichever application data directory is configured at that moment. Responses carry
 `nosniff` and a long `immutable` cache lifetime, safe because names embed a content hash.
 
+## In the CLI
+
+The terminal app shows a note's stored images in its preview. It can't paste one (that is a
+browser feature), so images come from the web or desktop app. Which images get drawn is decided
+in [`mdx.ts`](../../apps/cli/src/mdx.ts), alongside the [MDX components](../ui/mdx-components.md).
+
+| In the note | In the terminal |
+|---|---|
+| `![alt](app_data/<name>)` or `<Image src="app_data/<name>" />`, alone in its paragraph (several, one per line, is fine) | The picture |
+| …when the file is missing | `Image not found: alt` (the file name, with no alt text) |
+| …when the file isn't an image the decoder takes | `Can’t display this image: alt` |
+| `https://…`, `data:…` | The alt text. The CLI never fetches an image, so opening a note makes no network request |
+| An image inside a sentence, a list item, a quote or a link | The alt text: a picture can't sit in a line of text |
+
+**How it is drawn.** By OpenTUI's `<image>`: with the Kitty graphics protocol where the terminal
+has it (Kitty and Ghostty, for instance), with Sixel where the terminal reports that, and
+otherwise, and always under tmux, in quadrant block characters (`▘▚▟` and the like): each cell is a
+2x2 grid of pixels in two colors. That works in any terminal with colors, but a cell can only hold
+two colors, so it is coarser than a real picture, most of all on fine detail. The image is first
+averaged down to exactly that grid (see `pixelsForCells`): handed a larger one, OpenTUI picks pixels
+out of it instead of averaging them, which turns text and edges into noise.
+
+Set `COMPOSITION_IMAGE_PROTOCOL` to `auto` (the default), `blocks`, `kitty` or `sixel` to choose.
+
+**How big.** As wide as the pane and no taller than about 60% of the screen, keeping its
+proportions, and never larger than its own pixels, so an icon isn't blown up. An image is shrunk to
+1,600 pixels on its longer side when it is loaded, and the last 16 are kept, so scrolling back to
+one, or opening the note in a second pane, doesn't decode it again. PNG, JPEG, GIF and WebP are
+shown, the four the apps store; nothing is animated. Under the Kitty protocol, OpenTUI removes a
+picture's placement while the help overlay is open and puts it back when it closes.
+
 ## Gaps
 
 - Images are never deleted: removing a note, or the image's line from it, leaves the
@@ -114,4 +147,15 @@ whichever application data directory is configured at that moment. Responses car
 - Changing **Application data location** in the web and desktop apps only points them
   at a new directory; nothing is moved. Images are then looked up in the new
   `app_data/`, so copy that folder along with `composition.db`.
-- Images can only be added by pasting; drag-and-drop and a file picker are not wired up.
+- Images can only be added by pasting, and only in the web and desktop apps; drag-and-drop and a
+  file picker are not wired up, and the CLI cannot add one.
+- In the CLI, the block-character drawing is covered by tests, including one that compares what is
+  drawn with the best the grid allows. The Kitty path was only checked by running
+  the built app against a terminal that answers like Kitty and reading the graphics commands it
+  sent, and Sixel, which is OpenTUI's own, not at all. If a terminal draws one of them wrongly,
+  `COMPOSITION_IMAGE_PROTOCOL=blocks` avoids it.
+
+## Backups
+
+**Settings → Backup** includes every file in `app_data/`, and **Restore** puts them back, so the
+images in restored notes still show; see [backup-restore.md](backup-restore.md).

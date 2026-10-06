@@ -141,6 +141,7 @@ describe("loadSettings", () => {
       derivedDbPath: path.join(home, ".composition", "composition.db"),
       dirWritable: false,
       dbExists: false,
+      backupDir: path.join(home, "Composition Backups"),
       trash: { notes: [], groups: [] },
       city: "",
     });
@@ -208,6 +209,22 @@ describe("groups", () => {
 
     expect(result.error).toMatch(/still has sub-groups or notes/);
     expect((await service.loadWorkspace()).groups).toHaveLength(1);
+  });
+
+  it("renames a group and returns it", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("Old name", null);
+
+    const renamed = await service.renameGroup(group.id, "New name");
+
+    expect(renamed.name).toBe("New name");
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["New name"]);
+  });
+
+  it("refuses to rename a group that doesn't exist", async () => {
+    const service = await import("./service");
+
+    await expect(service.renameGroup(999, "Anything")).rejects.toThrow("Group 999 not found");
   });
 
   it("deletes an empty group", async () => {

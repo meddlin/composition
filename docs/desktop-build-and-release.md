@@ -58,8 +58,9 @@ The first command that needs Electron (`dev`, `smoke`, `package`) downloads its 
 pnpm test
 ```
 
-This runs, in order: the repo scripts, the CLI (pytest), the web app (Vitest), then the desktop
-type check and unit tests. To test only the desktop app:
+This runs, in order: the repo scripts, the web app (Vitest), then the desktop type check and unit
+tests. (The terminal app needs a newer Node, so it is tested separately with `pnpm test:cli`.) To
+test only the desktop app:
 
 ```bash
 pnpm test:desktop

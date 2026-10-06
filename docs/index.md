@@ -31,6 +31,10 @@ See [feature-matrix.md](feature-matrix.md) for which features the CLI, web and d
 
 See [architecture/attachments.md](architecture/attachments.md) for files attached to a note (desktop only).
 
+See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys belong to the editor, and which keys can't be used and why.
+
+See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the three apps share into one package.
+
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
 
 
@@ -57,8 +61,8 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
 
 ### Admin Features
 
-- [] Support data backup & restore
-    - [] Full database backup
+- [x] Support data backup & restore (Settings → Backup and Restore, in all three apps; see [architecture/backup-restore.md](architecture/backup-restore.md))
+    - [x] Full backup: notes, groups, Trash Can, images, attachments and settings in one `.tar.gz`
     - [] Full notes backup to JSON files
 - [x] Settings page for application configurations:
     - [x] Application data location
@@ -82,7 +86,9 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
 
 ### Deployment
 
-Should this be deployed via PyPi? a full desktop app?
+The desktop app ships as a manual download (see [product-builds.md](product-builds.md)). The terminal app runs from
+source today (`pnpm dev`, or the `composition` bin): should it be published to npm, or shipped as a
+single-file executable? Both are open; neither is needed to use it.
 
 How to automate builds and deployments?
 
@@ -114,3 +120,6 @@ Debounce user input in search bar, by 350ms
 
 - Create a loading script that will load 100 dummy note files
 - Test the search capability with this data set
+
+See [architecture/backup-restore.md](architecture/backup-restore.md) for backing up and restoring everything from Settings, and
+[manual-tests/backup-restore.md](manual-tests/backup-restore.md) for the guided manual test of it in each app.

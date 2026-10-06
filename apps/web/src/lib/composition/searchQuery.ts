@@ -1,8 +1,8 @@
 /**
  * Parses the search bar's GitHub-style `field: value` syntax into a Meilisearch
  * query. Pure (no network), so it is safe to run on every debounced keystroke.
- * Port of `parse_search_query` in apps/cli/src/composition/search.py, extended to
- * every frontmatter field (see docs/architecture/search.md for the syntax table).
+ * The terminal app shares this parser. It understands every frontmatter field (see
+ * docs/architecture/search.md for the syntax table).
  */
 
 export type ParsedQuery = {
