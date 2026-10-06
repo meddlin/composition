@@ -2,7 +2,9 @@
 
 A runbook for testing and building the Electron app in `apps/desktop`, then publishing the
 binary to GitHub Releases. Background and decisions live in [desktop-app-plan.md](desktop-app-plan.md);
-the command reference is [apps/desktop/README.md](../apps/desktop/README.md).
+the command reference is [apps/desktop/README.md](../apps/desktop/README.md). Getting the Apple
+certificate and notarization key, and building a signed app, is in
+[deployment/manual-build-release.md](deployment/manual-build-release.md).
 
 **macOS only.** Run every command from the repository root unless a step says otherwise.
 
@@ -11,13 +13,14 @@ the command reference is [apps/desktop/README.md](../apps/desktop/README.md).
 | Part | Status |
 |---|---|
 | Install, test, build, smoke test, unsigned `.app` | Works. Verified 2026-09-30. |
-| Unsigned DMG/ZIP, uploaded by hand | Steps 7 and 8 below. Not yet run end to end: check the output before you upload it. |
-| Signed and notarized DMG | **Blocked** on Apple Developer credentials (Phase 0 of the plan). |
-| Tag-triggered release workflow | **Not built.** There is no release workflow in `.github/workflows/`, so every release is manual for now. |
+| Signed and notarized DMG/ZIP | Works locally. Built on arm64, installed from the DMG and checked with `codesign`, `spctl` and `stapler` on 2026-10-05; see [manual-build-release.md](deployment/manual-build-release.md). Intel (`mac-x64`) not built yet. |
+| Unsigned DMG/ZIP | Step 7 below. Not run end to end: check the output before you use it. |
+| Upload to GitHub Releases (step 8) | Not yet run end to end with a signed build. |
+| Tag-triggered release workflow | Written ([release-desktop.yml](../.github/workflows/release-desktop.yml)), **not yet run on GitHub**. Runs only when you push a `desktop-v*` tag; needs the five secrets set up first. See [deployment/manual-build-release.md](deployment/manual-build-release.md#5-release-from-github-actions). |
 
-An unsigned build is fine for your own testing and for a **draft** release you hand to a few
-people. Do not publish it as a normal release: macOS Gatekeeper will warn or refuse to open it
-(see [What users will see](#what-users-will-see-with-an-unsigned-build)).
+An unsigned build is fine for your own testing. Publish a normal release only from a signed and
+notarized build: otherwise macOS Gatekeeper will warn or refuse to open it (see
+[What users will see](#what-users-will-see-with-an-unsigned-build)).
 
 ## Prerequisites (one time)
 
@@ -31,6 +34,9 @@ people. Do not publish it as a normal release: macOS Gatekeeper will warn or ref
   gh auth status
   ```
 - `brew install meilisearch` is only needed for `pnpm dev` (search). Packaged builds bundle their own.
+- To sign: a Developer ID Application certificate in your login keychain and an App Store Connect
+  API key. One-time setup is in [deployment/manual-build-release.md](deployment/manual-build-release.md#1-get-and-install-the-signing-certificate-one-time).
+  Check with `security find-identity -v -p codesigning`.
 
 ## 1. Pull and install
 
@@ -130,7 +136,13 @@ You can also open it: `open release/mac-arm64/Composition.app`.
 Decide the version, then set it in `apps/desktop/package.json` (`"version"`); electron-builder
 names the files from it. Commit that change.
 
-**Unsigned (what you can do today)**, from `apps/desktop`:
+**Shortcut for a signed release:** `pnpm release` (in `apps/desktop`) does this whole step for
+both architectures, including the signature checks and `SHA256SUMS.txt`, and warns about anything
+missing first. `pnpm release --check` only checks. It is the same script the release workflow
+runs ([details](deployment/manual-build-release.md#or-one-command-for-both-architectures)). The
+rest of this step is the same thing done by hand.
+
+**Unsigned (for your own testing)**, from `apps/desktop`:
 
 ```bash
 pnpm build
@@ -140,34 +152,47 @@ ls release/*.dmg release/*.zip
 
 This is `pnpm package` without `--dir`, so it also builds the DMG and ZIP targets from
 `electron-builder.yml`. Add `--x64` or `--arm64` to choose an architecture (fetch that
-architecture's Meilisearch first). Check the output names with `ls`: electron-builder picks them.
+architecture's Meilisearch first). The files are named `Composition-<version>-<arch>.dmg` and `.zip`, with `arm64` or `x64`.
 
-**Signed and notarized (once credentials exist):**
+**Signed and notarized**, from `apps/desktop`:
 
 ```bash
-export CSC_LINK=...            # Developer ID Application certificate (.p12 path or base64)
-export CSC_KEY_PASSWORD=...
-export APPLE_API_KEY=...       # App Store Connect API key (.p8 path)
-export APPLE_API_KEY_ID=...
-export APPLE_API_ISSUER=...
+export APPLE_API_KEY=~/.private_keys/AuthKey_XXXXXXXXXX.p8   # App Store Connect API key (.p8 path)
+export APPLE_API_KEY_ID=XXXXXXXXXX
+export APPLE_API_ISSUER=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 pnpm dist
 ```
+
+electron-builder signs with the Developer ID Application identity in your login keychain, so a
+local build needs no `CSC_LINK` or `CSC_KEY_PASSWORD`; those are for CI. The first signing run
+asks for your login keychain password: click **Always Allow**. Notarization takes a few minutes.
+Details, the certificate setup and troubleshooting are in
+[deployment/manual-build-release.md](deployment/manual-build-release.md).
 
 Credentials come from the environment only, never from files in the repo. Confirm the app
 identifier in `electron-builder.yml` is final before the first public release: it is part of the code
 signature, and changing it later orphans existing installs.
 
-Before you upload, verify the signature if you signed it:
+Before you upload, verify the signed build:
 
 ```bash
 codesign --verify --deep --strict --verbose=2 release/mac-arm64/Composition.app
 spctl --assess --type execute --verbose release/mac-arm64/Composition.app
+xcrun stapler validate release/mac-arm64/Composition.app
 ```
+
+Expect `valid on disk`, `accepted` with `source=Notarized Developer ID`, and `The validate action
+worked!` ([what each output means](deployment/manual-build-release.md#4-verify-the-build)).
 
 ## 8. Publish to GitHub Releases
 
 Tag convention from the plan: `desktop-v<version>`. Create a **draft** first so you can check it
 before anyone sees it.
+
+(Once the release workflow's secrets are set up, pushing a `desktop-v<version>` tag does this
+step for you: it builds, signs, notarizes and creates the draft. See
+[deployment/manual-build-release.md](deployment/manual-build-release.md#5-release-from-github-actions).
+The commands below are the by-hand version.)
 
 ```bash
 cd apps/desktop
@@ -210,8 +235,9 @@ that is the same signature problem, and it goes away only with signing and notar
 
 ## Checklist before a public (non-draft, non-pre-release) release
 
-- [ ] Developer ID certificate and App Store Connect API key exist, and the build is signed and notarized.
-- [ ] `codesign` and `spctl` checks above pass; the packaged smoke test passes.
+- [ ] The release build is signed and notarized with `pnpm dist` (setup:
+      [manual-build-release.md](deployment/manual-build-release.md)).
+- [ ] `codesign`, `spctl` and `stapler` checks above pass; the packaged smoke test passes.
 - [ ] The app identifier in `electron-builder.yml` is final.
 - [ ] The Meilisearch Rust-crate license list is generated and shipped
       (see [Licensing Meilisearch](desktop-app-plan.md#licensing-meilisearch)).
@@ -219,9 +245,10 @@ that is the same signature problem, and it goes away only with signing and notar
 - [ ] The app icon is in place (not done yet; see Phase 6 of the plan).
 - [ ] Both architectures are built if you want to support Intel Macs (`mac-x64`).
 
-## Later: automate it
+## Automation
 
-The plan's Phase 5 describes the workflow this runbook stands in for: a macOS runner triggered by
-a `desktop-v*` tag that builds per architecture, signs, notarizes and attaches the files to a draft
-release, using the five signing secrets above. It needs the Apple credentials first. When you
-write it, pin every `uses:` to a commit SHA and run `pnpm lint:actions`, then replace steps 6 to 8 here with a link to it.
+The release workflow ([release-desktop.yml](../.github/workflows/release-desktop.yml)) replaces
+steps 6 to 8 once it has run successfully: a `desktop-v*` tag push builds both architectures on a
+macOS runner, signs, notarizes and attaches the files to a draft release. Setup, the secrets and
+how to cut a release are in [deployment/manual-build-release.md](deployment/manual-build-release.md#5-release-from-github-actions).
+Until its first successful run, keep this runbook as the fallback.

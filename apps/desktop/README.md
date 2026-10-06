@@ -35,7 +35,8 @@ Run `pnpm install` in `apps/web` first: the desktop build bundles code and style
 | `pnpm build` | Static renderer + main and preload bundles + license notices, into `dist/`. |
 | `pnpm smoke` | Launches the built app and drives it end to end against a throwaway `HOME`. Never touches real notes. |
 | `pnpm package` | Unsigned, unpacked `.app` in `release/`. For checking a build. |
-| `pnpm dist` | Signed and notarized DMG and ZIP. Needs the credentials below. |
+| `pnpm dist` | Signed and notarized DMG and ZIP for this Mac's architecture. Needs the credentials below. |
+| `pnpm release` | Signed, notarized and verified DMG and ZIP for both architectures, plus checksums; warns about missing requirements first (`--check` only checks, `--unsigned` skips signing). The release workflow runs the same script. |
 | `pnpm fetch:meilisearch` | Downloads the pinned, checksum-verified Meilisearch binaries (about 116 MiB each) into `resources/meilisearch/`. |
 
 Check a packaged build end to end:
@@ -73,6 +74,9 @@ Credentials are read from the environment, never from files:
 `CSC_LINK` and `CSC_KEY_PASSWORD` (Developer ID Application certificate) and `APPLE_API_KEY`,
 `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` (notarization). The app identifier in
 `electron-builder.yml` is provisional.
+
+Getting the certificate and API key, building by hand, and releasing from GitHub Actions (a
+`desktop-v*` tag push): [docs/deployment/manual-build-release.md](../../docs/deployment/manual-build-release.md).
 
 ## Things worth knowing
 

@@ -14,6 +14,7 @@
     "smoke": "node scripts/smoke.mjs",
     "package": "pnpm build && electron-builder --dir -c.mac.identity=null",
     "dist": "pnpm build && electron-builder",
+    "release": "node scripts/release.mjs",
     "fetch:meilisearch": "node scripts/fetch-meilisearch.mjs"
   },
   "dependencies": {

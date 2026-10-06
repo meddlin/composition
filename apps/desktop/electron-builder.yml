@@ -45,6 +45,9 @@ extraResources:
 
 mac:
   category: public.app-category.productivity
+  # Name the DMG and ZIP after their architecture. Without this the Intel build gets no
+  # suffix (Composition-0.1.0.dmg) next to Composition-0.1.0-arm64.dmg.
+  artifactName: ${productName}-${version}-${arch}.${ext}
   hardenedRuntime: true
   gatekeeperAssess: false
   target:

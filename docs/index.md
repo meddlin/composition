@@ -17,6 +17,9 @@ See [desktop-app-plan.md](desktop-app-plan.md) for the proposed Electron desktop
 See [desktop-build-and-release.md](desktop-build-and-release.md) for the step-by-step from
 `git pull` to a local desktop build and a GitHub Release.
 
+See [deployment/manual-build-release.md](deployment/manual-build-release.md) for getting an Apple
+certificate and notarization key, and producing a signed, notarized desktop build by hand.
+
 See [product-builds.md](product-builds.md) for which database each product (CLI, web,
 desktop) uses today and is meant to use later.
 
