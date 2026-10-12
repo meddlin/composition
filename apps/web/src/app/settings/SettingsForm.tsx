@@ -20,6 +20,7 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
   dark: ["#121212", "#e0e0e0", "#0178d4"],
   light: ["#f7f7f4", "#24292f", "#0b62d6"],
   forest: ["#0c1510", "#d5e5da", "#3fb876"],
+  wine: ["#160a0e", "#ecdde0", "#c8405f"],
   cream: ["#f6f0e1", "#3b3226", "#9a4a1f"],
   // Shows the dark and light backgrounds it moves between.
   auto: ["#121212", "#f7f7f4", "#0178d4"],

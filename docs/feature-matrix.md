@@ -50,7 +50,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
-| Color schemes | 5 | 5 | 5 | Dark, light, forest, cream and "follow the sun", in all three. The CLI's colors are the web's (a test fails if they drift) |
+| Color schemes | 6 | 6 | 6 | Dark, light, forest, wine, cream and "follow the sun", in all three. The CLI's colors are the web's (a test fails if they drift) |
 | "Follow the sun" scheme | ✅ | ✅ | ✅ | [web-follow-the-sun.md](ui/web-follow-the-sun.md). The CLI fades smoothly only in a truecolor terminal, and otherwise switches between dark and light |
 | Resizable columns, remembered | ❌ | ✅ | ✅ | The CLI's tree is a fixed width |
 | Application data location setting | ✅ | ✅ | ✅ | |

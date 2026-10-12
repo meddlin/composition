@@ -90,7 +90,7 @@ Opened with Enter on the "Settings" row. It has five fields; Tab moves between t
 | Field | What it does |
 |---|---|
 | Application data location | Type a folder and press `Enter` to move **everything** there: the database, the search index, pasted images and attachments. Nothing is overwritten, and if the move fails it is undone |
-| Color scheme | `↑` `↓` to choose, `Enter` to apply and remember. A `●` marks the one in use. Dark, Light, Forest, Cream, or Follow the sun |
+| Color scheme | `↑` `↓` to choose, `Enter` to apply and remember. A `●` marks the one in use. Dark, Light, Forest, Wine, Cream, or Follow the sun |
 | City, for follow the sun | Type "City, State" or "City, Country" and press `Enter`. It is looked up on Open-Meteo, only when you save here and only while Follow the sun is chosen. Empty it to forget the city |
 | Create a backup, in this folder | A folder (it starts as `~/Composition Backups`). `Enter` saves open notes and writes a new timestamped `.tar.gz` there with everything: notes, groups, the Trash Can, images, attachments, and the color scheme, city and favorites. The bottom line says what it holds and where it went |
 | Restore from this backup file | Type the path of a backup and press `Enter`. The bottom line asks first; `y` **replaces everything** with the backup (what was here is saved to a "pre-restore" backup in `~/Composition Backups` first), any other key cancels. The data location is not changed. See [backup-restore.md](../architecture/backup-restore.md) |

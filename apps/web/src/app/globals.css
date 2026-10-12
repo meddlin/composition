@@ -4,7 +4,7 @@
 
 /*
  * Color schemes, selected in Settings and applied as `data-theme` on <html>
- * (see app/layout.tsx). The terminal app draws the same five schemes with the same
+ * (see app/layout.tsx). The terminal app draws the same six schemes with the same
  * colors (apps/cli/src/theme.ts, whose tests fail if the two drift apart).
  *
  * The terminal's primary, secondary and accent are --brand, --brand-dim and --highlight
@@ -88,6 +88,30 @@
   --syntax-attr: #7bd88f;
 }
 
+/* Dark red wine: burgundy backgrounds, rose accents, champagne highlights. */
+[data-theme="wine"] {
+  color-scheme: dark;
+  --background: #160a0e;
+  --foreground: #ecdde0;
+  --surface: #22111a;
+  --panel: #2d1620;
+  --brand: #c8405f;
+  --brand-dim: #8a2b43;
+  --highlight: #e0b878;
+  --warning: #e3a044;
+  --error: #e8604f;
+  --success: #86c98a;
+  --link: #e8798f;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #a08a90;
+  --syntax-keyword: #f08090;
+  --syntax-string: #e8c48a;
+  --syntax-number: #e8a07a;
+  --syntax-function: #d9a6e8;
+  --syntax-type: #f0b27a;
+  --syntax-attr: #8fd49b;
+}
+
 /* Warm paper look: cream backgrounds, brown ink, terracotta accents. Web only. */
 [data-theme="cream"] {
   color-scheme: light;
@@ -125,7 +149,7 @@
 }
 
 /* `dark:` utilities follow the selected scheme, not the OS setting. */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *, [data-theme="auto"][data-tone="dark"], [data-theme="auto"][data-tone="dark"] *));
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, [data-theme="forest"], [data-theme="forest"] *, [data-theme="wine"], [data-theme="wine"] *, [data-theme="auto"][data-tone="dark"], [data-theme="auto"][data-tone="dark"] *));
 
 /*
  * shadcn/ui's custom variants, which the generated components in components/ui are written

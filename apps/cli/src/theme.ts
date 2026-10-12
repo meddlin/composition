@@ -164,6 +164,27 @@ const FOREST = palette({
   },
 });
 
+const WINE = palette({
+  name: "wine",
+  background: "#160A0E",
+  foreground: "#ECDDE0",
+  surface: "#22111A",
+  primary: "#C8405F",
+  accent: "#E0B878",
+  warning: "#E3A044",
+  error: "#E8604F",
+  success: "#86C98A",
+  syntax: {
+    comment: "#A08A90",
+    keyword: "#F08090",
+    string: "#E8C48A",
+    number: "#E8A07A",
+    function: "#D9A6E8",
+    type: "#F0B27A",
+    attr: "#8FD49B",
+  },
+});
+
 const CREAM = palette({
   name: "cream",
   background: "#F6F0E1",
@@ -185,7 +206,7 @@ const CREAM = palette({
   },
 });
 
-export const PALETTES = { dark: DARK, light: LIGHT, forest: FOREST, cream: CREAM } as const;
+export const PALETTES = { dark: DARK, light: LIGHT, forest: FOREST, wine: WINE, cream: CREAM } as const;
 
 /** The palette for a scheme by name. "auto" is computed (see `autoPalette`), so it, and anything unknown, is dark here. */
 export function paletteFor(theme: string): Palette {

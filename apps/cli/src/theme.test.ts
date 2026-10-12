@@ -5,7 +5,7 @@ import { INK_FLIP_LEVEL } from "./backend";
 import { autoPalette, isTruecolor, mix, paletteFor, PALETTES, readableOn, type Palette } from "./theme";
 
 describe("the palettes", () => {
-  it.each(["dark", "light", "forest", "cream"] as const)("%s has every color", (name) => {
+  it.each(["dark", "light", "forest", "wine", "cream"] as const)("%s has every color", (name) => {
     const palette = paletteFor(name);
     const { syntax, ...colors } = palette;
     for (const [key, value] of Object.entries({ ...colors, ...Object.fromEntries(Object.entries(syntax).map(([k, v]) => [`syntax.${k}`, v])) })) {
@@ -20,7 +20,7 @@ describe("the palettes", () => {
   });
 
   it("keeps the selected row readable in every scheme", () => {
-    for (const name of ["dark", "light", "forest", "cream"] as const) {
+    for (const name of ["dark", "light", "forest", "wine", "cream"] as const) {
       const p = paletteFor(name);
       expect(contrast(p.selectionText, p.selection), name).toBeGreaterThan(3);
       expect(contrast(p.foreground, p.background), name).toBeGreaterThan(7);
@@ -35,7 +35,7 @@ describe("the palettes", () => {
       return (block.match(new RegExp(`--${token}:\\s*(#[0-9a-fA-F]{6})`))?.[1] ?? "").toUpperCase();
     };
 
-    it.each(["dark", "light", "forest", "cream"] as const)("%s matches", (name) => {
+    it.each(["dark", "light", "forest", "wine", "cream"] as const)("%s matches", (name) => {
       const p = paletteFor(name);
       expect(p.background).toBe(web(name, "background"));
       expect(p.foreground).toBe(web(name, "foreground"));

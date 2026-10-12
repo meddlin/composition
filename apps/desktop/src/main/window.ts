@@ -12,6 +12,7 @@ export const THEME_BACKGROUND: Record<Exclude<ThemeName, "auto">, string> = {
   dark: "#121212",
   light: "#f7f7f4",
   forest: "#0c1510",
+  wine: "#160a0e",
   cream: "#f6f0e1",
 };
 
