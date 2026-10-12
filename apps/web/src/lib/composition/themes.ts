@@ -1,10 +1,11 @@
 /**
  * Color schemes the user can choose between in Settings.
  *
- * The same five schemes exist in the terminal app, which reads these names from here:
+ * The same six schemes exist in the terminal app, which reads these names from here:
  *   dark   -> the default
  *   light
  *   forest -> dark green
+ *   wine   -> dark red
  *   cream  -> warm light
  *   auto   -> blends dark and light along the saved city's sunrise and sunset
  * The palettes themselves live in `app/globals.css`, keyed by `data-theme`; the terminal
@@ -15,6 +16,7 @@ export const THEME_CHOICES = [
   { name: "dark", label: "Dark" },
   { name: "light", label: "Light" },
   { name: "forest", label: "Forest (dark green)" },
+  { name: "wine", label: "Wine (dark red)" },
   { name: "cream", label: "Cream (warm light)" },
   { name: "auto", label: "Follow the sun (dark at night, light by day)" },
 ] as const;

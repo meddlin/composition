@@ -36,7 +36,7 @@ type Dialog =
 export type AppProps = {
   initial: Workspace;
   api?: Api;
-  /** The color scheme's name: dark, light, forest, cream or auto (follow the sun). */
+  /** The color scheme's name: dark, light, forest, wine, cream or auto (follow the sun). */
   theme?: string;
   /** Moves all the app's data to another folder and reopens it there (see runtime.ts). */
   moveDataLocation?: (destination: string) => Promise<void>;

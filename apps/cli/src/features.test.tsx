@@ -218,6 +218,7 @@ describe("color schemes", () => {
     ["dark", "#121212"],
     ["light", "#F7F7F4"],
     ["forest", "#0C1510"],
+    ["wine", "#160A0E"],
     ["cream", "#F6F0E1"],
   ];
 
@@ -313,12 +314,12 @@ describe("the Settings screen", () => {
     expect(backgroundAt(app, 20, 70)).toBe("#F7F7F4");
   });
 
-  it("lists all five schemes and marks the one in use", async () => {
+  it("lists all six schemes and marks the one in use", async () => {
     await seed();
     const app = await sandbox.mount({ theme: "forest" });
     await openSettings(app);
 
-    for (const label of ["Dark", "Light", "Forest", "Cream", "Follow the sun"]) {
+    for (const label of ["Dark", "Light", "Forest", "Wine", "Cream", "Follow the sun"]) {
       expect(frame(app)).toContain(label);
     }
     expect(frame(app)).toContain("● Forest");
