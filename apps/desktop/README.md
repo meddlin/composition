@@ -73,7 +73,7 @@ binary still has to be generated (it warns until then).
 Credentials are read from the environment, never from files:
 `CSC_LINK` and `CSC_KEY_PASSWORD` (Developer ID Application certificate) and `APPLE_API_KEY`,
 `APPLE_API_KEY_ID`, `APPLE_API_ISSUER` (notarization). The app identifier in
-`electron-builder.yml` is provisional.
+`electron-builder.yml` is `com.rushinglabs.composition`; don't change it after the first release.
 
 Getting the certificate and API key, building by hand, and releasing from GitHub Actions (a
 `desktop-v*` tag push): [docs/deployment/manual-build-release.md](../../docs/deployment/manual-build-release.md).
