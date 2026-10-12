@@ -1,12 +1,18 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { Input } from "@/components/ui/input";
 import { searchNotes, type SearchHit, type SearchResult } from "@/lib/composition/client";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 
 export const SEARCH_DEBOUNCE_MS = 350;
+
+// The platform never changes, so there is nothing to subscribe to. The server snapshot is
+// null (platform unknown), which keeps hydration consistent before the hint appears.
+const subscribeNever = () => () => {};
+const clientShortcutHint = () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘K" : "Ctrl K");
+const serverShortcutHint = () => null;
 
 type Props = {
   onSelect: (id: number) => void;
@@ -18,8 +24,11 @@ export function SearchBar({ onSelect }: Props) {
   const [open, setOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const requestId = useRef(0);
   const listboxId = useId();
+
+  const shortcutHint = useSyncExternalStore(subscribeNever, clientShortcutHint, serverShortcutHint);
 
   const debouncedQuery = useDebouncedValue(query.trim(), SEARCH_DEBOUNCE_MS);
 
@@ -41,6 +50,20 @@ export function SearchBar({ onSelect }: Props) {
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, []);
+
+  useEffect(() => {
+    // Cmd+K on macOS, Ctrl+K elsewhere. Registered on `document` so it works from
+    // anywhere in the app, including inside the editor.
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "k" || event.altKey || event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault(); // Keep the browser from claiming Ctrl+K (e.g. Firefox's search bar).
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
   const hits = result?.hits ?? [];
@@ -74,6 +97,7 @@ export function SearchBar({ onSelect }: Props) {
   return (
     <div ref={containerRef} className="relative mx-auto w-full max-w-xl">
       <Input
+        ref={inputRef}
         type="search"
         value={query}
         onChange={(e) => {
@@ -88,8 +112,17 @@ export function SearchBar({ onSelect }: Props) {
         aria-expanded={showDropdown}
         aria-controls={listboxId}
         aria-autocomplete="list"
+        aria-keyshortcuts="Control+K Meta+K"
         className="bg-background px-3"
       />
+      {shortcutHint && query === "" && (
+        <kbd
+          aria-hidden
+          className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border bg-muted px-1.5 font-mono text-xs text-muted-foreground"
+        >
+          {shortcutHint}
+        </kbd>
+      )}
       {showDropdown && (
         <ul
           id={listboxId}
