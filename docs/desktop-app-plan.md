@@ -274,13 +274,13 @@ a license before publishing binaries on GitHub Releases.
 | Code signing + notarization | **Blocked on Apple Developer credentials** |
 | Release workflow (tag -> draft GitHub Release) | Not started; needs the signing secrets |
 | Meilisearch Rust-crate license list | Not generated; release blocker |
-| App identifier, name, icon | Provisional: `com.meddlin.composition`, default Electron icon |
+| App identifier, name, icon | `com.rushinglabs.composition`, "Composition", custom icon |
 
 ## Still open
 
-- **App name and bundle identifier.** `com.meddlin.composition` is a placeholder in
-  `apps/desktop/electron-builder.yml`. It becomes part of the code signature and of where macOS
-  stores app data, so settle it before the first public build.
+- **App name and bundle identifier.** Settled: `com.rushinglabs.composition` in
+  `apps/desktop/electron-builder.yml`. It is part of the code signature, so don't change it after
+  the first public build.
 - **Apple Developer Program enrollment and a Developer ID certificate** (Phase 0).
 - **Meilisearch third-party notices.** Generate the license list for the Rust crates in the
   pinned version's `Cargo.lock` into `apps/desktop/licenses/meilisearch-third-party.txt`;

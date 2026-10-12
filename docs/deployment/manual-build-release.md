@@ -171,7 +171,6 @@ fix. A **MISSING** item stops the build, and a **warning** doesn't:
 | warning: the `.p8` is inside the repository | It could be committed by accident | Move it to `~/.private_keys/` |
 | warning: several Developer ID identities | electron-builder picks one | Set `CSC_NAME` |
 | warning: uncommitted changes, or not on `main` | The build won't match a release commit | Commit, or switch to `main` |
-| warning: `appId` still PROVISIONAL | Part of the code signature | [Can I change the app identifier later?](#can-i-change-the-app-identifier-later) |
 | warning: Node below 22.14 | Recommended for the web build | Switch Node versions |
 
 The script deletes `apps/desktop/release/` at the start so old artifacts can't end up in a
@@ -380,9 +379,9 @@ The Meilisearch binary for the architecture being built is missing. Run
 
 ### Can I change the app identifier later?
 
-Avoid it. `appId` in `electron-builder.yml` is part of the code signature and decides where macOS
-stores app preferences, so changing it after release orphans existing installs. It is marked
-provisional in that file: settle it before the first public release.
+Avoid it. `appId` in `electron-builder.yml` (`com.rushinglabs.composition`) is part of the code
+signature and decides where macOS stores app preferences, so changing it after release orphans
+existing installs.
 
 ### Does any of this cover Windows?
 
