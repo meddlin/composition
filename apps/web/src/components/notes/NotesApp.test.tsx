@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createGroup, createNote, deleteGroup, deleteNote, moveGroup, renameGroup, saveFavorites, saveLayout, saveNoteContent } from "@/lib/composition/client";
+import { createGroup, createNote, deleteGroup, deleteNote, moveGroup, moveNoteToGroup, placeGroup, placeNote, renameGroup, saveFavorites, saveLayout, saveNoteContent } from "@/lib/composition/client";
 import type { Favorites } from "@/lib/composition/favorites";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
@@ -14,6 +14,8 @@ vi.mock("@/lib/composition/client", () => ({
   deleteNote: vi.fn(),
   moveGroup: vi.fn(),
   moveNoteToGroup: vi.fn(),
+  placeGroup: vi.fn(),
+  placeNote: vi.fn(),
   renameGroup: vi.fn(),
   saveFavorites: vi.fn(),
   saveLayout: vi.fn(),
@@ -688,6 +690,294 @@ describe("NotesApp group drag-and-drop nesting", () => {
     const zone = screen.getByText("Drop here to move to top level");
     // true = default not prevented = drop refused.
     expect(fireEvent.dragOver(zone, { dataTransfer: dt })).toBe(true);
+  });
+});
+
+describe("NotesApp drag-and-drop reordering", () => {
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  const at = "2026-01-01T00:00:00.000Z";
+  const group = (id: number, name: string, parentId: number | null = null) => ({
+    id,
+    name,
+    parentId,
+    createdAt: at,
+    updatedAt: at,
+  });
+  const noteIn = (id: number, title: string, groupId: number | null): Note => ({
+    ...note,
+    id,
+    title,
+    content: `---\ntitle: ${title}\n---\n`,
+    groupId,
+  });
+
+  // Top level: Alpha (empty), Beta (empty), Gamma (with Inner under it).
+  const groups = [
+    group(1, "Alpha"),
+    group(2, "Beta"),
+    group(3, "Gamma"),
+    group(4, "Inner", 3),
+  ];
+  // Group Alpha holds N1, N2, N3 in that order; Beta holds N4.
+  const notes = [
+    noteIn(11, "N1", 1),
+    noteIn(12, "N2", 1),
+    noteIn(13, "N3", 1),
+    noteIn(14, "N4", 2),
+    noteIn(15, "Loose one", null),
+    noteIn(16, "Loose two", null),
+  ];
+
+  function renderApp(initialFavorites?: Favorites) {
+    render(
+      <NotesApp
+        initialNotes={notes}
+        initialGroups={groups}
+        initialLayout={DEFAULT_LAYOUT}
+        initialFavorites={initialFavorites}
+      />,
+    );
+  }
+
+  function dataTransfer() {
+    const data = new Map<string, string>();
+    return {
+      setData: (type: string, value: string) => void data.set(type, value),
+      getData: (type: string) => data.get(type) ?? "",
+      get types() {
+        return [...data.keys()];
+      },
+      effectAllowed: "all",
+    };
+  }
+
+  const sidebar = () => within(screen.getByRole("navigation", { name: "Notes" }));
+  const groupRow = (name: string) =>
+    sidebar().getByTitle(`View all notes in ${name}`).closest("[draggable]") as HTMLElement;
+  // A note's title is also in the editor, so look only in the sidebar.
+  const noteButton = (title: string) => sidebar().getByText(title).closest("button") as HTMLElement;
+  // The element that listens for drops on a note row: the button's row, then its drop zone.
+  const noteZone = (title: string) => noteButton(title).parentElement!.parentElement as HTMLElement;
+  const groupZone = (name: string) => groupRow(name).parentElement as HTMLElement;
+
+  /** Hovers `zone` with the pointer `y` px from its top, as if it were 40px tall. */
+  function hover(zone: HTMLElement, dt: ReturnType<typeof dataTransfer>, y: number) {
+    vi.spyOn(zone, "getBoundingClientRect").mockReturnValue({
+      top: 0, left: 0, right: 200, bottom: 40, width: 200, height: 40, x: 0, y: 0, toJSON: () => ({}),
+    });
+    return fire("dragOver", zone, dt, y);
+  }
+
+  function drop(zone: HTMLElement, dt: ReturnType<typeof dataTransfer>, y: number) {
+    hover(zone, dt, y);
+    fire("drop", zone, dt, y);
+  }
+
+  // jsdom has no DragEvent, so its events drop `clientY`; set it on the event itself.
+  function fire(type: "dragOver" | "drop", zone: HTMLElement, dt: ReturnType<typeof dataTransfer>, y: number) {
+    const event = createEvent[type](zone, { dataTransfer: dt });
+    Object.defineProperty(event, "clientY", { value: y });
+    return fireEvent(zone, event);
+  }
+
+  function dragNote(title: string) {
+    const dt = dataTransfer();
+    fireEvent.dragStart(noteButton(title), { dataTransfer: dt });
+    return dt;
+  }
+
+  function dragGroup(name: string) {
+    const dt = dataTransfer();
+    fireEvent.dragStart(groupRow(name), { dataTransfer: dt });
+    return dt;
+  }
+
+  const order = (...titles: string[]) =>
+    titles.map((t) => sidebar().getByText(t)).sort((a, b) =>
+      a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+    ).map((el) => el.textContent);
+
+  it("shows a line above a note when the pointer is on its upper half", () => {
+    renderApp();
+    const dt = dragNote("N3");
+    const zone = noteZone("N1");
+
+    expect(hover(zone, dt, 5)).toBe(false);
+
+    expect(zone.querySelector("[data-drop-edge=before]")).not.toBeNull();
+  });
+
+  it("places a note before the one it is dropped on", async () => {
+    vi.mocked(placeNote).mockResolvedValue(notes[2]);
+    renderApp();
+
+    const dt = dragNote("N3");
+    await act(async () => drop(noteZone("N1"), dt, 5));
+
+    expect(placeNote).toHaveBeenCalledWith(13, 1, 11);
+    expect(order("N3", "N1", "N2")).toEqual(["N3", "N1", "N2"]);
+  });
+
+  it("places a note after the one it is dropped on, before that note's next sibling", async () => {
+    vi.mocked(placeNote).mockResolvedValue(notes[0]);
+    renderApp();
+
+    const dt = dragNote("N1");
+    await act(async () => drop(noteZone("N2"), dt, 35));
+
+    expect(placeNote).toHaveBeenCalledWith(11, 1, 13);
+    expect(order("N2", "N1", "N3")).toEqual(["N2", "N1", "N3"]);
+  });
+
+  it("places a note last when it is dropped below the last one", async () => {
+    vi.mocked(placeNote).mockResolvedValue(notes[0]);
+    renderApp();
+
+    const dt = dragNote("N1");
+    await act(async () => drop(noteZone("N3"), dt, 35));
+
+    expect(placeNote).toHaveBeenCalledWith(11, 1, null);
+  });
+
+  it("files a note dragged to another group's note in that group", async () => {
+    vi.mocked(placeNote).mockResolvedValue({ ...notes[0], groupId: 2 });
+    renderApp();
+
+    const dt = dragNote("N1");
+    await act(async () => drop(noteZone("N4"), dt, 5));
+
+    expect(placeNote).toHaveBeenCalledWith(11, 2, 14);
+  });
+
+  it("orders the ungrouped notes too", async () => {
+    vi.mocked(placeNote).mockResolvedValue(notes[5]);
+    renderApp();
+
+    const dt = dragNote("Loose two");
+    await act(async () => drop(noteZone("Loose one"), dt, 5));
+
+    expect(placeNote).toHaveBeenCalledWith(16, null, 15);
+  });
+
+  it("does nothing when a note is dropped where it already is", async () => {
+    renderApp();
+
+    const dt = dragNote("N2");
+    await act(async () => drop(noteZone("N3"), dt, 5));
+    await act(async () => drop(noteZone("N1"), dragNote("N2"), 35));
+
+    expect(placeNote).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a dragged group on a note row", () => {
+    renderApp();
+    const dt = dragGroup("Alpha");
+
+    expect(hover(noteZone("N1"), dt, 5)).toBe(true);
+  });
+
+  it("still moves a dragged note into a group dropped on the middle of its row", async () => {
+    vi.mocked(moveNoteToGroup).mockResolvedValue({ ...notes[0], groupId: 2 });
+    renderApp();
+
+    const dt = dragNote("N1");
+    await act(async () => drop(groupZone("Beta"), dt, 20));
+
+    expect(placeNote).not.toHaveBeenCalled();
+    expect(moveNoteToGroup).toHaveBeenCalledWith(11, 2);
+  });
+
+  it("places a group before another top-level group when dropped on its upper edge", async () => {
+    vi.mocked(placeGroup).mockResolvedValue({ group: groups[2] });
+    renderApp();
+
+    const dt = dragGroup("Gamma");
+    const zone = groupZone("Alpha");
+    hover(zone, dt, 2);
+    expect(zone.querySelector("[data-drop-edge=before]")).not.toBeNull();
+    await act(async () => drop(zone, dt, 2));
+
+    expect(placeGroup).toHaveBeenCalledWith(3, null, 1);
+    expect(order("Gamma", "Alpha", "Beta")).toEqual(["Gamma", "Alpha", "Beta"]);
+  });
+
+  it("places a group after another, before that group's next sibling, from its lower edge", async () => {
+    vi.mocked(placeGroup).mockResolvedValue({ group: groups[0] });
+    renderApp();
+
+    // Collapsed, Beta's lower edge means "below it" (expanded with contents, it would mean "into").
+    fireEvent.click(screen.getByLabelText("Collapse Beta"));
+    const dt = dragGroup("Alpha");
+    await act(async () => drop(groupZone("Beta"), dt, 38));
+
+    expect(placeGroup).toHaveBeenCalledWith(1, null, 3);
+  });
+
+  it("nests the group instead when it is dropped on the middle of a row", async () => {
+    vi.mocked(moveGroup).mockResolvedValue({ group: { ...groups[0], parentId: 2 } });
+    renderApp();
+
+    const dt = dragGroup("Alpha");
+    await act(async () => drop(groupZone("Beta"), dt, 20));
+
+    expect(moveGroup).toHaveBeenCalledWith(1, 2);
+    expect(placeGroup).not.toHaveBeenCalled();
+  });
+
+  it("treats the lower edge of an expanded group as dropping into it", () => {
+    renderApp();
+    const dt = dragGroup("Alpha");
+    const zone = groupZone("Gamma");
+
+    hover(zone, dt, 38);
+
+    expect(zone.querySelector("[data-drop-edge]")).toBeNull();
+  });
+
+  it("reorders a group within its own parent", async () => {
+    vi.mocked(placeGroup).mockResolvedValue({ group: groups[3] });
+    const withTwoChildren = [...groups, group(5, "Inner two", 3)];
+    render(<NotesApp initialNotes={[]} initialGroups={withTwoChildren} initialLayout={DEFAULT_LAYOUT} />);
+
+    const dt = dragGroup("Inner two");
+    await act(async () => drop(groupZone("Inner"), dt, 2));
+
+    expect(placeGroup).toHaveBeenCalledWith(5, 3, 4);
+  });
+
+  it("does not offer a group a place beside itself or beneath its own descendants", () => {
+    renderApp();
+    const dt = dragGroup("Gamma");
+
+    expect(hover(groupZone("Gamma"), dt, 2)).toBe(true);
+    expect(hover(groupZone("Inner"), dt, 2)).toBe(true);
+  });
+
+  it("rolls the order back and shows the error when the server refuses a placement", async () => {
+    vi.mocked(placeGroup).mockResolvedValue({ error: "That group can't be moved there." });
+    renderApp();
+
+    const dt = dragGroup("Gamma");
+    await act(async () => drop(groupZone("Alpha"), dt, 2));
+
+    expect(screen.getByText("That group can't be moved there.")).toBeTruthy();
+    expect(order("Alpha", "Beta", "Gamma")).toEqual(["Alpha", "Beta", "Gamma"]);
+  });
+
+  it("keeps the pinned copy of a group out of reordering", () => {
+    renderApp([{ type: "group", id: 2 }]);
+    const dt = dragGroup("Gamma");
+    // The first "Beta" row is the pinned one in the Favorites section.
+    const pinned = sidebar().getAllByTitle("View all notes in Beta")[0].closest("[draggable]")!
+      .parentElement as HTMLElement;
+
+    hover(pinned, dt, 2);
+
+    expect(pinned.querySelector("[data-drop-edge]")).toBeNull();
   });
 });
 

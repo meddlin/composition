@@ -103,6 +103,26 @@ export async function moveNoteToGroup(
   return note;
 }
 
+export async function placeNote(
+  noteId: number,
+  groupId: number | null,
+  beforeNoteId: number | null,
+): Promise<Note> {
+  const note = await service.placeNote(noteId, groupId, beforeNoteId);
+  revalidatePath("/");
+  return note;
+}
+
+export async function placeGroup(
+  id: number,
+  parentId: number | null,
+  beforeGroupId: number | null,
+): Promise<MoveGroupResult> {
+  const result = await service.placeGroup(id, parentId, beforeGroupId);
+  if (result.group) revalidatePath("/");
+  return result;
+}
+
 export async function loadTrash(): Promise<Trash> {
   return service.loadTrash();
 }

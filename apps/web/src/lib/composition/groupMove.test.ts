@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canMoveGroup, wouldCreateCycle } from "./groupMove";
+import { canMoveGroup, canPlaceGroup, wouldCreateCycle } from "./groupMove";
 
 // 1 ─ 2 ─ 3   and a separate root 4
 const groups = [
@@ -48,5 +48,22 @@ describe("canMoveGroup", () => {
   it("is true for a legal reparent", () => {
     expect(canMoveGroup(groups, 3, 4)).toBe(true);
     expect(canMoveGroup(groups, 2, null)).toBe(true);
+  });
+});
+
+describe("canPlaceGroup", () => {
+  it("allows reordering within the current parent", () => {
+    expect(canPlaceGroup(groups, 2, 1)).toBe(true);
+    expect(canPlaceGroup(groups, 1, null)).toBe(true);
+  });
+
+  it("allows a legal reparent", () => {
+    expect(canPlaceGroup(groups, 3, 4)).toBe(true);
+  });
+
+  it("refuses itself, its descendants and unknown groups", () => {
+    expect(canPlaceGroup(groups, 1, 1)).toBe(false);
+    expect(canPlaceGroup(groups, 1, 3)).toBe(false);
+    expect(canPlaceGroup(groups, 99, null)).toBe(false);
   });
 });

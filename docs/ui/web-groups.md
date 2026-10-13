@@ -26,7 +26,8 @@ Left to right: expand/collapse chevron, folder icon, group name, `+ note`, `⋯`
 | `+ note` | Creates a note directly in this group. |
 | `⋯` | Opens the group's action menu (below). |
 | Drop a dragged note on the row | Moves the note into the group. |
-| Drag the row onto another group | Nests it inside that group, sub-groups and notes included. |
+| Drag the row onto the middle of another group | Nests it inside that group, sub-groups and notes included. |
+| Drag the row to the top or bottom edge of a sibling | Reorders it (below). |
 
 `+ note` and `⋯` appear on hover, and whenever they have keyboard focus or the menu is
 open.
@@ -48,6 +49,29 @@ The move is optimistic, like renaming: the tree updates immediately and rolls ba
 with an error under the tree, if the server refuses. A group's notes and sub-groups
 travel with it, since they reference it by id. The destination stays collapsed if it
 was collapsed, so expand it to see the moved group.
+
+### Reordering by drag-and-drop
+
+Notes and groups can be put in any order among their siblings. While dragging:
+
+- **A note** shows a line above or below the note row it is over, whichever half of the row the
+  pointer is in. Drop it there to put it at that spot, in that group (so this also files a note
+  under another group at a chosen position). Ungrouped notes work the same way. Dropping a note on a
+  *group* row still moves it into the group.
+- **A group** shows a line when the pointer is on the top or bottom quarter of another group's
+  row; the middle still nests it. The line puts it before or after that group, under that group's
+  parent. A group can be dragged to a different level this way too. Below an expanded group that
+  has contents, the lower edge counts as the middle (a line there would read as "beside its last
+  child"), so drop on the group above or on the parent's row to place it last.
+- Places that would put a group inside itself or its own descendants show no line, as with nesting.
+- The pinned copies in **Favorites** only accept a nest (a drop on the middle); their order is the
+  order they were pinned. The notes and groups *inside* a pinned group are the real thing and can be
+  reordered from there.
+
+The order is saved and shared with the desktop app. Until something is dragged, notes stay most
+recently edited first and groups alphabetical; after a drag, that group's items stay where they
+were put (see [Ordering](../architecture/groups.md#ordering)). Like nesting, it is optimistic and
+rolls back with an error under the tree if the server refuses.
 
 ### The `⋯` menu
 

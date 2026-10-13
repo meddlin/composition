@@ -108,8 +108,19 @@ describe("opening the database", () => {
     const db = getDb();
 
     expect(columnsOf(db, "notes").sort()).toEqual(
-      ["content", "created_at", "description", "group_id", "id", "tags", "title", "updated_at"].sort(),
+      [
+        "content",
+        "created_at",
+        "description",
+        "group_id",
+        "id",
+        "position",
+        "tags",
+        "title",
+        "updated_at",
+      ].sort(),
     );
+    expect(columnsOf(db, "groups")).toContain("position");
     expect(db.prepare("SELECT COUNT(*) AS n FROM notes").get()).toEqual({ n: 1 });
   });
 

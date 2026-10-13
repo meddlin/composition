@@ -91,12 +91,23 @@ export interface CompositionApi {
   /** Moves the note to the Trash Can; it is not erased (see `permanentlyDeleteNote`). */
   deleteNote(id: number): Promise<void>;
   moveNoteToGroup(noteId: number, groupId: number | null): Promise<Note>;
+  /**
+   * Files the note in `groupId` (null = ungrouped) immediately before the sibling note
+   * `beforeNoteId`, or last when that is null, and keeps the siblings in that order.
+   */
+  placeNote(noteId: number, groupId: number | null, beforeNoteId: number | null): Promise<Note>;
 
   createGroup(name: string, parentId: number | null): Promise<Group>;
   renameGroup(id: number, name: string): Promise<Group>;
   /** Moves an empty group to the Trash Can; a group with notes or sub-groups comes back as `error`. */
   deleteGroup(id: number): Promise<{ error?: string }>;
   moveGroup(id: number, parentId: number | null): Promise<MoveGroupResult>;
+  /** Like `placeNote`, for a group among its parent's sub-groups. Refuses the moves `moveGroup` does. */
+  placeGroup(
+    id: number,
+    parentId: number | null,
+    beforeGroupId: number | null,
+  ): Promise<MoveGroupResult>;
 
   /** Recently deleted notes and groups. Anything older than `TRASH_RETENTION_DAYS` is permanently deleted first. */
   loadTrash(): Promise<Trash>;
@@ -131,10 +142,12 @@ export const API_METHODS = [
   "saveImage",
   "deleteNote",
   "moveNoteToGroup",
+  "placeNote",
   "createGroup",
   "renameGroup",
   "deleteGroup",
   "moveGroup",
+  "placeGroup",
   "loadTrash",
   "restoreNote",
   "restoreGroup",

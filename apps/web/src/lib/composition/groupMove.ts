@@ -31,3 +31,16 @@ export function canMoveGroup(
   if (!group || group.parentId === newParentId) return false;
   return !wouldCreateCycle(groups, id, newParentId);
 }
+
+/**
+ * Whether group `id` may be placed among the sub-groups of `parentId`: any parent that
+ * is not the group itself or beneath it, including the one it already has (which just
+ * reorders it).
+ */
+export function canPlaceGroup(
+  groups: GroupLike[],
+  id: number,
+  parentId: number | null,
+): boolean {
+  return groups.some((g) => g.id === id) && !wouldCreateCycle(groups, id, parentId);
+}

@@ -478,6 +478,37 @@ export async function moveNoteToGroup(
   return note;
 }
 
+export async function placeNote(
+  noteId: number,
+  groupId: number | null,
+  beforeNoteId: number | null,
+): Promise<Note> {
+  if (!notesRepo.getNote(noteId)) throw new Error(`Note ${noteId} not found`);
+  notesRepo.placeNote(noteId, groupId, beforeNoteId);
+  const note = notesRepo.getNote(noteId);
+  if (!note) throw new Error(`Note ${noteId} not found`);
+  return note;
+}
+
+/** Refuses like `moveGroup` does, with the same `error` for the UI to roll back on. */
+export async function placeGroup(
+  id: number,
+  parentId: number | null,
+  beforeGroupId: number | null,
+): Promise<MoveGroupResult> {
+  try {
+    groupsRepo.placeGroup(id, parentId, beforeGroupId);
+  } catch (error) {
+    if (error instanceof InvalidGroupMoveError) {
+      return { error: "That group can't be moved there." };
+    }
+    throw error;
+  }
+  const group = groupsRepo.getGroup(id);
+  if (!group) throw new Error(`Group ${id} not found`);
+  return { group };
+}
+
 /**
  * Persists the dragged column sizes. Re-clamped here rather than trusting the
  * client; merged into the stored settings so theme and data location survive.
@@ -591,10 +622,12 @@ const _implementsApi: CompositionApi = {
   saveImage,
   deleteNote,
   moveNoteToGroup,
+  placeNote,
   createGroup,
   renameGroup,
   deleteGroup,
   moveGroup,
+  placeGroup,
   loadTrash,
   restoreNote,
   restoreGroup,

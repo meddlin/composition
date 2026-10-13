@@ -61,6 +61,35 @@ it** (a group cannot become its own descendant). The rule is `canMoveGroup` and 
 too. If there is nowhere to move it (a lone top-level group), the footer says so instead of opening an
 empty list. `m` on a note offers "Ungrouped" and every group.
 
+## Ordering
+
+Siblings (the notes in one group, the sub-groups of one group) have a default order and an
+optional hand-set one, stored in a nullable `position` column on `notes` and on `groups`. Both are
+part of what `listNotes` and `listGroups` return, so every consumer sees the same order:
+
+| | Default (`position` is `NULL`) | Hand-placed |
+|---|---|---|
+| Notes | Most recently edited first | By `position`, after the unplaced notes |
+| Groups | By name | By `position`, before the unplaced groups |
+
+So a new note appears at the top of its group and a new group at the bottom, as it does in the
+sidebar before a reload. `placeNote` and `placeGroup` (the web and desktop drag-and-drop) put an
+item immediately before a named sibling, or last, and then rewrite `position` for **every**
+sibling in the new list as 0, 1, 2, …, so the order the user saw is the order that stays. Notes
+whose groups were never reordered keep sorting by recency. The pure rule is `placeBefore` in
+[`ordering.ts`](../../apps/web/src/lib/composition/ordering.ts), shared with the UI's optimistic
+update.
+
+- A plain move into another group (`moveNoteToGroup`, `moveGroup`, the CLI's `m`) clears the item's
+  `position`: a place among the old siblings means nothing among the new ones.
+- Placing a note doesn't bump `updated_at`, for the reason given on `setNoteGroup`; placing a group
+  does, as `moveGroup` does.
+- Placing a group refuses what moving one refuses (itself or a descendant as the parent, a missing
+  group), so it cannot create a loop.
+- A restored note or group comes back with no position.
+- The terminal app can't reorder yet, and still lists groups by name whatever their `position`;
+  its notes follow the stored order.
+
 ## Rendering as a tree
 
 The tree is built by `buildTree` in [`tree.ts`](../../apps/cli/src/tree.ts), a pure function from the

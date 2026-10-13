@@ -1,13 +1,14 @@
 "use client";
 
 import { ChevronRightIcon, StarIcon, XIcon } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { isFavorite, type Favorites, type FavoriteType } from "@/lib/composition/favorites";
-import { canMoveGroup } from "@/lib/composition/groupMove";
+import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { cn } from "@/lib/utils";
+import { dropEdge, type DropEdge } from "./dropEdge";
 import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
 import { FavoriteMenu } from "./FavoriteMenu";
 import { FolderIcon } from "./FolderIcon";
@@ -36,6 +37,10 @@ type TreeProps = {
   onDeleteGroup: (id: number) => void;
   onMoveGroup: (id: number, parentId: number | null) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+  /** Files the note in the group (null = ungrouped) just before a sibling note, or last when that is null. */
+  onPlaceNote: (noteId: number, groupId: number | null, beforeNoteId: number | null) => void;
+  /** Same for a group among its parent's sub-groups. */
+  onPlaceGroup: (id: number, parentId: number | null, beforeGroupId: number | null) => void;
 };
 
 export function GroupTree({
@@ -54,6 +59,8 @@ export function GroupTree({
   onDeleteGroup,
   onMoveGroup,
   onMoveNoteToGroup,
+  onPlaceNote,
+  onPlaceGroup,
 }: TreeProps) {
   // Only one group is ever being dragged; tracked here (dragover can't read the
   // payload) so each row can tell whether it is a legal place to drop it.
@@ -63,10 +70,19 @@ export function GroupTree({
     return draggingGroupId !== null && canMoveGroup(groups, draggingGroupId, parentId);
   }
 
+  function canPlaceGroupIn(parentId: number | null): boolean {
+    return draggingGroupId !== null && canPlaceGroup(groups, draggingGroupId, parentId);
+  }
+
   function dropGroup(id: number, parentId: number | null) {
     // The moved row remounts under its new parent, so its dragend never fires.
     setDraggingGroupId(null);
     onMoveGroup(id, parentId);
+  }
+
+  function placeGroup(id: number, parentId: number | null, beforeId: number | null) {
+    setDraggingGroupId(null);
+    onPlaceGroup(id, parentId, beforeId);
   }
 
   const childGroupsByParent = new Map<number | null, Group[]>();
@@ -100,9 +116,11 @@ export function GroupTree({
     isGroupEmpty,
     draggingGroupId,
     canDropGroupOn,
+    canPlaceGroupIn,
     onDragGroupStart: setDraggingGroupId,
     onDragGroupEnd: () => setDraggingGroupId(null),
     onDropGroup: dropGroup,
+    onPlaceGroup: placeGroup,
     onSelectNote,
     onSelectGroup,
     canDeleteNotes: true,
@@ -112,6 +130,7 @@ export function GroupTree({
     onRenameGroup,
     onDeleteGroup,
     onMoveNoteToGroup,
+    onPlaceNote,
   };
 
   const groupsById = new Map(groups.map((g) => [g.id, g]));
@@ -127,8 +146,14 @@ export function GroupTree({
           </div>
         </DropZone>
       )}
-      {(childGroupsByParent.get(null) ?? []).map((group) => (
-        <GroupNode key={group.id} group={group} depth={0} {...shared} />
+      {(childGroupsByParent.get(null) ?? []).map((group, index, siblings) => (
+        <GroupNode
+          key={group.id}
+          group={group}
+          depth={0}
+          nextSiblingId={siblings[index + 1]?.id ?? null}
+          {...shared}
+        />
       ))}
 
       <DropZone onDropNote={(noteId) => onMoveNoteToGroup(noteId, null)}>
@@ -139,13 +164,16 @@ export function GroupTree({
           Ungrouped
         </div>
       </DropZone>
-      {(notesByGroup.get(null) ?? []).map((note) => (
+      {(notesByGroup.get(null) ?? []).map((note, index, siblings) => (
         <NoteRow
           key={note.id}
           note={note}
           depth={1}
           active={note.id === activeId}
           favorite={isFavorite(favorites, "note", note.id)}
+          onDropNote={(noteId, edge) =>
+            onPlaceNote(noteId, null, edge === "before" ? note.id : (siblings[index + 1]?.id ?? null))
+          }
           onSelect={() => onSelectNote(note.id)}
           onDelete={() => onDeleteNote(note.id)}
           onToggleFavorite={() => onToggleFavorite("note", note.id)}
@@ -198,7 +226,14 @@ function FavoritesSection({
       </div>
       {rows.map((row) =>
         "group" in row ? (
-          <GroupNode key={row.key} group={row.group} depth={0} defaultCollapsed {...favoritesShared} />
+          <GroupNode
+            key={row.key}
+            group={row.group}
+            depth={0}
+            defaultCollapsed
+            reorderable={false}
+            {...favoritesShared}
+          />
         ) : (
           <NoteRow
             key={row.key}
@@ -225,9 +260,12 @@ type SharedProps = {
   isGroupEmpty: (id: number) => boolean;
   draggingGroupId: number | null;
   canDropGroupOn: (parentId: number | null) => boolean;
+  /** Whether the dragged group may sit among the sub-groups of `parentId` (even its current parent). */
+  canPlaceGroupIn: (parentId: number | null) => boolean;
   onDragGroupStart: (id: number) => void;
   onDragGroupEnd: () => void;
   onDropGroup: (id: number, parentId: number | null) => void;
+  onPlaceGroup: (id: number, parentId: number | null, beforeGroupId: number | null) => void;
   onSelectNote: (id: number) => void;
   onSelectGroup: (id: number) => void;
   /** Whether note rows show a delete button; off inside the Favorites section. */
@@ -238,6 +276,7 @@ type SharedProps = {
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+  onPlaceNote: (noteId: number, groupId: number | null, beforeNoteId: number | null) => void;
 };
 
 function GroupNode({
@@ -252,9 +291,11 @@ function GroupNode({
   isGroupEmpty,
   draggingGroupId,
   canDropGroupOn,
+  canPlaceGroupIn,
   onDragGroupStart,
   onDragGroupEnd,
   onDropGroup,
+  onPlaceGroup,
   onSelectNote,
   onSelectGroup,
   canDeleteNotes,
@@ -264,8 +305,19 @@ function GroupNode({
   onRenameGroup,
   onDeleteGroup,
   onMoveNoteToGroup,
+  onPlaceNote,
   defaultCollapsed = false,
-}: SharedProps & { group: Group; depth: number; defaultCollapsed?: boolean }) {
+  nextSiblingId = null,
+  reorderable = true,
+}: SharedProps & {
+  group: Group;
+  depth: number;
+  defaultCollapsed?: boolean;
+  /** The sub-group listed after this one under the same parent, which "drop below" places before. */
+  nextSiblingId?: number | null;
+  /** False for the pinned copies in Favorites, which sit in a list of their own, not among their siblings. */
+  reorderable?: boolean;
+}) {
   const [renaming, setRenaming] = useState(false);
   const [addingSubgroup, setAddingSubgroup] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -273,6 +325,15 @@ function GroupNode({
   const empty = isGroupEmpty(group.id);
   const childGroups = childGroupsByParent.get(group.id) ?? [];
   const childNotes = notesByGroup.get(group.id) ?? [];
+
+  // What a dragged group may do to this row. Dropping below an expanded group with contents would
+  // read as dropping beside its last child, so there the lower edge is the row's middle instead.
+  const groupEdges: DropEdge[] = [];
+  if (canDropGroupOn(group.id)) groupEdges.push("into");
+  if (reorderable && draggingGroupId !== group.id && canPlaceGroupIn(group.parentId)) {
+    groupEdges.push("before");
+    if (collapsed || empty) groupEdges.push("after");
+  }
 
   return (
     <Collapsible open={!collapsed} onOpenChange={(open) => setCollapsed(!open)}>
@@ -289,11 +350,12 @@ function GroupNode({
       ) : (
         <DropZone
           onDropNote={(noteId) => onMoveNoteToGroup(noteId, group.id)}
-          onDropGroup={
-            canDropGroupOn(group.id)
-              ? (groupId) => onDropGroup(groupId, group.id)
-              : undefined
-          }
+          groupEdges={groupEdges}
+          onDropGroup={(groupId, edge) => {
+            if (edge === "into") onDropGroup(groupId, group.id);
+            else
+              onPlaceGroup(groupId, group.parentId, edge === "before" ? group.id : nextSiblingId);
+          }}
         >
           <div
             draggable
@@ -397,11 +459,12 @@ function GroupNode({
           className="absolute bottom-0 top-0 w-px bg-border"
           style={{ left: `${depth * 16 + 12}px` }}
         />
-        {childGroups.map((child) => (
+        {childGroups.map((child, index) => (
           <GroupNode
             key={child.id}
             group={child}
             depth={depth + 1}
+            nextSiblingId={childGroups[index + 1]?.id ?? null}
             childGroupsByParent={childGroupsByParent}
             notesByGroup={notesByGroup}
             activeId={activeId}
@@ -411,9 +474,11 @@ function GroupNode({
             isGroupEmpty={isGroupEmpty}
             draggingGroupId={draggingGroupId}
             canDropGroupOn={canDropGroupOn}
+            canPlaceGroupIn={canPlaceGroupIn}
             onDragGroupStart={onDragGroupStart}
             onDragGroupEnd={onDragGroupEnd}
             onDropGroup={onDropGroup}
+            onPlaceGroup={onPlaceGroup}
             onSelectNote={onSelectNote}
             onSelectGroup={onSelectGroup}
             canDeleteNotes={canDeleteNotes}
@@ -423,16 +488,24 @@ function GroupNode({
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
             onMoveNoteToGroup={onMoveNoteToGroup}
+            onPlaceNote={onPlaceNote}
           />
         ))}
 
-        {childNotes.map((note) => (
+        {childNotes.map((note, index) => (
           <NoteRow
             key={note.id}
             note={note}
             depth={depth + 1}
             active={note.id === activeId}
             favorite={isFavorite(favorites, "note", note.id)}
+            onDropNote={(noteId, edge) =>
+              onPlaceNote(
+                noteId,
+                group.id,
+                edge === "before" ? note.id : (childNotes[index + 1]?.id ?? null),
+              )
+            }
             onSelect={() => onSelectNote(note.id)}
             onDelete={canDeleteNotes ? () => onDeleteNote(note.id) : undefined}
             onToggleFavorite={() => onToggleFavorite("note", note.id)}
@@ -448,6 +521,7 @@ function NoteRow({
   depth,
   active,
   favorite,
+  onDropNote,
   onSelect,
   onDelete,
   onToggleFavorite,
@@ -456,12 +530,14 @@ function NoteRow({
   depth: number;
   active: boolean;
   favorite: boolean;
+  /** Called when a note is dropped above or below this row. Omitted for rows that aren't part of a sibling list (the pinned notes). */
+  onDropNote?: (noteId: number, edge: DropEdge) => void;
   onSelect: () => void;
   /** Omitted where notes mustn't be deleted from the row (the Favorites section): no delete button. */
   onDelete?: () => void;
   onToggleFavorite: () => void;
 }) {
-  return (
+  const row = (
     <div className="group/row relative">
       <Button
         variant="ghost"
@@ -496,57 +572,103 @@ function NoteRow({
       </div>
     </div>
   );
+
+  return onDropNote ? (
+    <DropZone noteEdges={NOTE_ROW_EDGES} onDropNote={onDropNote}>
+      {row}
+    </DropZone>
+  ) : (
+    row
+  );
 }
+
+const NOTE_ROW_EDGES: readonly DropEdge[] = ["before", "after"];
+const INTO_ONLY: readonly DropEdge[] = ["into"];
 
 /**
  * Wraps its children as an HTML5 drop target for a dragged note and, when
  * `onDropGroup` is given, a dragged group. Omitting it leaves group drags
  * unhandled, so the browser shows its "not allowed" cursor.
+ *
+ * `noteEdges`/`groupEdges` say which parts of the zone the drag may use: dropped
+ * "into" it (highlighted), or above or below it (a line at that edge). A drag that
+ * may use none of them where the pointer is isn't accepted there, and the drop
+ * handler is told which edge it landed on.
  */
 function DropZone({
   onDropNote,
   onDropGroup,
+  noteEdges = INTO_ONLY,
+  groupEdges = INTO_ONLY,
   children,
 }: {
-  onDropNote?: (noteId: number) => void;
-  onDropGroup?: (groupId: number) => void;
+  onDropNote?: (noteId: number, edge: DropEdge) => void;
+  onDropGroup?: (groupId: number, edge: DropEdge) => void;
+  noteEdges?: readonly DropEdge[];
+  groupEdges?: readonly DropEdge[];
   children: ReactNode;
 }) {
-  const [dragOver, setDragOver] = useState(false);
+  const [hover, setHover] = useState<DropEdge | null>(null);
 
-  function accepts(types: readonly string[]): "note" | "group" | null {
-    if (onDropNote && types.includes(NOTE_DRAG_TYPE)) return "note";
-    if (onDropGroup && types.includes(GROUP_DRAG_TYPE)) return "group";
-    return null;
+  function targetOf(e: DragEvent<HTMLDivElement>): { kind: "note" | "group"; edge: DropEdge } | null {
+    const types = Array.from(e.dataTransfer.types);
+    const kind =
+      onDropNote && types.includes(NOTE_DRAG_TYPE)
+        ? "note"
+        : onDropGroup && types.includes(GROUP_DRAG_TYPE)
+          ? "group"
+          : null;
+    if (!kind) return null;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const edge = dropEdge(
+      e.clientY - rect.top,
+      rect.height,
+      kind === "note" ? noteEdges : groupEdges,
+    );
+    return edge ? { kind, edge } : null;
   }
 
   return (
     <div
       onDragOver={(e) => {
-        if (!accepts(Array.from(e.dataTransfer.types))) return;
+        const target = targetOf(e);
+        if (!target) {
+          setHover(null);
+          return;
+        }
         e.preventDefault();
-        setDragOver(true);
+        setHover(target.edge);
       }}
       onDragLeave={(e) => {
         // Moving onto a child of the zone also fires dragleave; ignore it.
         if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragOver(false);
+        setHover(null);
       }}
       onDrop={(e) => {
-        setDragOver(false);
-        const kind = accepts(Array.from(e.dataTransfer.types));
-        if (!kind) return;
+        setHover(null);
+        const target = targetOf(e);
+        if (!target) return;
         e.preventDefault();
         const id = Number(
-          e.dataTransfer.getData(kind === "note" ? NOTE_DRAG_TYPE : GROUP_DRAG_TYPE),
+          e.dataTransfer.getData(target.kind === "note" ? NOTE_DRAG_TYPE : GROUP_DRAG_TYPE),
         );
         if (Number.isNaN(id)) return;
-        if (kind === "note") onDropNote?.(id);
-        else onDropGroup?.(id);
+        if (target.kind === "note") onDropNote?.(id, target.edge);
+        else onDropGroup?.(id, target.edge);
       }}
-      className={cn("rounded-md", dragOver && "bg-accent")}
+      className={cn("relative rounded-md", hover === "into" && "bg-accent")}
     >
       {children}
+      {(hover === "before" || hover === "after") && (
+        <span
+          aria-hidden
+          data-drop-edge={hover}
+          className={cn(
+            "pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-primary",
+            hover === "before" ? "top-0" : "bottom-0",
+          )}
+        />
+      )}
     </div>
   );
 }

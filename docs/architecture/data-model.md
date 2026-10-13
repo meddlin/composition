@@ -73,7 +73,8 @@ CREATE TABLE notes (
     description TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    group_id INTEGER
+    group_id INTEGER,
+    position INTEGER
 );
 
 CREATE TABLE groups (
@@ -81,14 +82,17 @@ CREATE TABLE groups (
     name TEXT NOT NULL,
     parent_id INTEGER,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    position INTEGER
 );
 ```
 
-`tags`, `description`, and `group_id` were all added after the `notes` table's original creation.
-Rather than a migration-file system, `db.ts` runs three `ensureColumn` checks every time it opens
-the file, each looking at `PRAGMA table_info(notes)` and issuing an additive `ALTER TABLE … ADD
-COLUMN` only if the column is missing: safe against both a brand-new and a pre-existing database.
+`tags`, `description`, `group_id` and `position` were all added after the `notes` table's original
+creation (`position` after `groups`' too). Rather than a migration-file system, `db.ts` runs an
+`ensureColumn` check for each every time it opens the file, looking at `PRAGMA table_info(<table>)`
+and issuing an additive `ALTER TABLE … ADD COLUMN` only if the column is missing: safe against both
+a brand-new and a pre-existing database. `position` is the hand-set order among siblings (see
+[groups.md](groups.md#ordering)); it is `NULL` until the item has been dragged into place.
 Every other table is a `CREATE TABLE IF NOT EXISTS`, for the same reason. `db.test.ts` opens
 databases as each earlier version created them and checks every column arrives with the data
 intact.
