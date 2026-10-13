@@ -30,6 +30,10 @@ export const moveGroup: CompositionApi["moveGroup"] = (id, parentId) =>
   bridge().moveGroup(id, parentId);
 export const moveNoteToGroup: CompositionApi["moveNoteToGroup"] = (noteId, groupId) =>
   bridge().moveNoteToGroup(noteId, groupId);
+export const placeNote: CompositionApi["placeNote"] = (noteId, groupId, beforeNoteId) =>
+  bridge().placeNote(noteId, groupId, beforeNoteId);
+export const placeGroup: CompositionApi["placeGroup"] = (id, parentId, beforeGroupId) =>
+  bridge().placeGroup(id, parentId, beforeGroupId);
 export const createGroup: CompositionApi["createGroup"] = (name, parentId) =>
   bridge().createGroup(name, parentId);
 export const renameGroup: CompositionApi["renameGroup"] = (id, name) =>
@@ -76,10 +80,12 @@ const _implementsApi: CompositionApi = {
   saveImage,
   deleteNote,
   moveNoteToGroup,
+  placeNote,
   createGroup,
   renameGroup,
   deleteGroup,
   moveGroup,
+  placeGroup,
   loadTrash,
   restoreNote,
   restoreGroup,

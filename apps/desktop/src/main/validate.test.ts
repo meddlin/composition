@@ -15,6 +15,9 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.createGroup(["Work", 2])).toEqual(["Work", 2]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
+    expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
+    expect(VALIDATORS.placeNote([3, 2, null])).toEqual([3, 2, null]);
+    expect(VALIDATORS.placeGroup([4, null, 7])).toEqual([4, null, 7]);
   });
 
   it("passes a pasted image's bytes through and keeps only the known fields", () => {
@@ -76,6 +79,11 @@ describe("VALIDATORS", () => {
     ["moveGroup", ["4", null]],
     ["moveGroup", [4, undefined]],
     ["moveGroup", [4, "2"]],
+    ["placeNote", [1, null, undefined]],
+    ["placeNote", [1, null, "5"]],
+    ["placeNote", ["1", null, null]],
+    ["placeGroup", [4, undefined, null]],
+    ["placeGroup", [4, null, 1.5]],
     ["searchNotes", [null]],
     ["saveLayout", [null]],
     ["saveLayout", [[1, 2]]],

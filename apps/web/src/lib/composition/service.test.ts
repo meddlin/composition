@@ -275,6 +275,171 @@ describe("groups", () => {
   });
 });
 
+describe("manual ordering", () => {
+  const titles = async (service: typeof import("./service")) =>
+    (await service.loadWorkspace()).notes.map((n) => n.title);
+  const names = async (service: typeof import("./service")) =>
+    (await service.loadWorkspace()).groups.map((g) => g.name);
+
+  it("lists groups by name until one is placed by hand", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    await service.createGroup("B", null);
+    const c = await service.createGroup("C", null);
+
+    expect(await names(service)).toEqual(["A", "B", "C"]);
+
+    await service.placeGroup(c.id, null, a.id);
+
+    expect(await names(service)).toEqual(["C", "A", "B"]);
+  });
+
+  it("places a group last when there is no group to go before", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    await service.createGroup("B", null);
+
+    await service.placeGroup(a.id, null, null);
+
+    expect(await names(service)).toEqual(["B", "A"]);
+  });
+
+  it("puts a group dragged between two others from a different parent in that slot", async () => {
+    const service = await import("./service");
+    const parent = await service.createGroup("Parent", null);
+    const x = await service.createGroup("X", parent.id);
+    await service.createGroup("Y", parent.id);
+    const loose = await service.createGroup("Loose", null);
+
+    const result = await service.placeGroup(loose.id, parent.id, x.id);
+
+    expect(result.group).toMatchObject({ id: loose.id, parentId: parent.id });
+    const { groups } = await service.loadWorkspace();
+    expect(groups.filter((g) => g.parentId === parent.id).map((g) => g.name)).toEqual([
+      "Loose",
+      "X",
+      "Y",
+    ]);
+  });
+
+  it("keeps a placed group's order across other groups being created", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    const b = await service.createGroup("B", null);
+    await service.placeGroup(b.id, null, a.id);
+    await service.createGroup("0 new", null);
+
+    // Hand-placed groups first, anything not placed after them.
+    expect(await names(service)).toEqual(["B", "A", "0 new"]);
+  });
+
+  it("refuses to place a group inside itself or a descendant, changing nothing", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    const b = await service.createGroup("B", a.id);
+
+    expect(await service.placeGroup(a.id, a.id, null)).toEqual({ error: expect.any(String) });
+    expect(await service.placeGroup(a.id, b.id, null)).toEqual({ error: expect.any(String) });
+    expect(await service.placeGroup(a.id, 999, null)).toEqual({ error: expect.any(String) });
+    expect(await service.placeGroup(999, null, null)).toEqual({ error: expect.any(String) });
+    const { groups } = await service.loadWorkspace();
+    expect(groups.find((g) => g.id === a.id)?.parentId).toBeNull();
+  });
+
+  it("lists notes newest-first until one is placed by hand, then in the placed order", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("G", null);
+    const first = await service.createNote("First", group.id);
+    await service.createNote("Second", group.id);
+    const third = await service.createNote("Third", group.id);
+    // Recency order: Third, Second, First.
+    expect(await titles(service)).toEqual(["Third", "Second", "First"]);
+
+    await service.placeNote(first.id, group.id, third.id);
+
+    expect(await titles(service)).toEqual(["First", "Third", "Second"]);
+  });
+
+  it("keeps a hand-placed order when a note is edited, and lists a new note above it", async () => {
+    const service = await import("./service");
+    const first = await service.createNote("First");
+    const second = await service.createNote("Second");
+    await service.placeNote(first.id, null, null);
+    await service.placeNote(second.id, null, null);
+    expect(await titles(service)).toEqual(["First", "Second"]);
+
+    await service.saveNoteContent(first.id, "---\ntitle: First\n---\nedited");
+    await service.createNote("Fresh");
+
+    expect(await titles(service)).toEqual(["Fresh", "First", "Second"]);
+  });
+
+  it("files a note in another group at the chosen slot without touching updatedAt", async () => {
+    const service = await import("./service");
+    const from = await service.createGroup("From", null);
+    const to = await service.createGroup("To", null);
+    const moving = await service.createNote("Moving", from.id);
+    const a = await service.createNote("A", to.id);
+    await service.createNote("B", to.id);
+
+    // `To` lists newest first: B, A.
+    const placed = await service.placeNote(moving.id, to.id, a.id);
+
+    expect(placed.groupId).toBe(to.id);
+    expect(placed.updatedAt).toBe(moving.updatedAt);
+    const { notes } = await service.loadWorkspace();
+    expect(notes.filter((n) => n.groupId === to.id).map((n) => n.title)).toEqual(["B", "Moving", "A"]);
+    expect(notes.filter((n) => n.groupId === from.id)).toEqual([]);
+  });
+
+  it("places a note ungrouped, last", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("G", null);
+    const grouped = await service.createNote("Grouped", group.id);
+    await service.createNote("Loose");
+
+    const placed = await service.placeNote(grouped.id, null, null);
+
+    expect(placed.groupId).toBeNull();
+    expect(await titles(service)).toEqual(["Loose", "Grouped"]);
+  });
+
+  it("forgets a note's hand-set place when it is simply moved into another group", async () => {
+    const service = await import("./service");
+    const group = await service.createGroup("G", null);
+    const a = await service.createNote("A");
+    await service.createNote("B");
+    await service.placeNote(a.id, null, null);
+    const placed = await service.createNote("Placed", group.id);
+    await service.placeNote(placed.id, group.id, null);
+    await service.moveNoteToGroup(a.id, group.id);
+
+    // `a` is unplaced again, so it lists above the hand-placed note.
+    expect(
+      (await service.loadWorkspace()).notes.filter((n) => n.groupId === group.id).map((n) => n.title),
+    ).toEqual(["A", "Placed"]);
+  });
+
+  it("rejects placing a note that does not exist", async () => {
+    const service = await import("./service");
+
+    await expect(service.placeNote(999, null, null)).rejects.toThrow("Note 999 not found");
+  });
+
+  it("restores a trashed note and group with no hand-set position, after the placed ones", async () => {
+    const service = await import("./service");
+    const a = await service.createGroup("A", null);
+    const b = await service.createGroup("B", null);
+    await service.placeGroup(b.id, null, a.id);
+    await service.deleteGroup(b.id);
+
+    await service.restoreGroup(b.id);
+
+    // Restored groups are unplaced, so they sort by name after the placed ones (here: none).
+    expect(await names(service)).toEqual(["A", "B"]);
+  });
+});
+
 describe("Trash Can", () => {
   it("moves a deleted note out of the workspace and the search index, but keeps it restorable", async () => {
     const searchIndex = await import("./searchIndex");

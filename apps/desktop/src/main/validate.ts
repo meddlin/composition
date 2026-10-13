@@ -66,6 +66,11 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     id("moveNoteToGroup", noteId, "noteId"),
     nullableId("moveNoteToGroup", groupId, "groupId"),
   ],
+  placeNote: ([noteId, groupId, beforeNoteId]) => [
+    id("placeNote", noteId, "noteId"),
+    nullableId("placeNote", groupId, "groupId"),
+    nullableId("placeNote", beforeNoteId, "beforeNoteId"),
+  ],
   createGroup: ([name, parentId]) => [
     text("createGroup", name, "name"),
     nullableId("createGroup", parentId, "parentId"),
@@ -78,6 +83,11 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   moveGroup: ([groupId, parentId]) => [
     id("moveGroup", groupId, "id"),
     nullableId("moveGroup", parentId, "parentId"),
+  ],
+  placeGroup: ([groupId, parentId, beforeGroupId]) => [
+    id("placeGroup", groupId, "id"),
+    nullableId("placeGroup", parentId, "parentId"),
+    nullableId("placeGroup", beforeGroupId, "beforeGroupId"),
   ],
   loadTrash: none,
   restoreNote: ([noteId]) => [id("restoreNote", noteId, "id")],

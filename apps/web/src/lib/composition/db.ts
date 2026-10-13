@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
 `;
 
-function ensureColumn(db: Database.Database, column: string, ddl: string): void {
-  const columns = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[];
+function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
     db.exec(ddl);
   }
@@ -83,13 +83,17 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(GROUPS_SCHEMA);
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
-  ensureColumn(db, "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,
+    "notes",
     "description",
     "ALTER TABLE notes ADD COLUMN description TEXT NOT NULL DEFAULT ''",
   );
-  ensureColumn(db, "group_id", "ALTER TABLE notes ADD COLUMN group_id INTEGER");
+  ensureColumn(db, "notes", "group_id", "ALTER TABLE notes ADD COLUMN group_id INTEGER");
+  // Hand-set order among siblings; NULL until the item is dragged into place (see ordering.ts).
+  ensureColumn(db, "notes", "position", "ALTER TABLE notes ADD COLUMN position INTEGER");
+  ensureColumn(db, "groups", "position", "ALTER TABLE groups ADD COLUMN position INTEGER");
   return db;
 }
 

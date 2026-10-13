@@ -11,6 +11,8 @@ import {
   deleteNote,
   moveGroup as moveGroupAction,
   moveNoteToGroup as moveNoteToGroupAction,
+  placeGroup as placeGroupAction,
+  placeNote as placeNoteAction,
   renameGroup as renameGroupAction,
   saveFavorites,
   saveNoteContent,
@@ -22,7 +24,8 @@ import {
   type Favorites,
   type FavoriteType,
 } from "@/lib/composition/favorites";
-import { canMoveGroup } from "@/lib/composition/groupMove";
+import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
+import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { DropOverlay } from "./DropOverlay";
@@ -234,6 +237,50 @@ function Workspace({
     });
   }
 
+  /** Files the note in the group just before a sibling note (last when `beforeNoteId` is null). */
+  function placeNote(noteId: number, groupId: number | null, beforeNoteId: number | null) {
+    const siblings = notes.filter((n) => n.groupId === groupId).map((n) => n.id);
+    const ordered = placeBefore(siblings, noteId, beforeNoteId);
+    const unchanged =
+      notes.find((n) => n.id === noteId)?.groupId === groupId &&
+      ordered.every((id, index) => id === siblings[index]);
+    if (unchanged) return;
+    setNotes((prev) =>
+      applyOrder(
+        prev.map((n) => (n.id === noteId ? { ...n, groupId } : n)),
+        ordered,
+      ),
+    );
+    startTransition(async () => {
+      const note = await placeNoteAction(noteId, groupId, beforeNoteId);
+      setNotes((prev) => applySavedNote(prev, note));
+    });
+  }
+
+  /** Files the group under the parent just before a sibling group (last when `beforeGroupId` is null). */
+  function placeGroup(id: number, parentId: number | null, beforeGroupId: number | null) {
+    if (!canPlaceGroup(groups, id, parentId)) return;
+    const siblings = groups.filter((g) => g.parentId === parentId).map((g) => g.id);
+    const ordered = placeBefore(siblings, id, beforeGroupId);
+    const previous = groups;
+    const unchanged =
+      groups.find((g) => g.id === id)?.parentId === parentId &&
+      ordered.every((siblingId, index) => siblingId === siblings[index]);
+    if (unchanged) return;
+    setGroupError(null);
+    setGroups(applyOrder(groups.map((g) => (g.id === id ? { ...g, parentId } : g)), ordered));
+    startTransition(async () => {
+      const result = await placeGroupAction(id, parentId, beforeGroupId);
+      if (result.group) {
+        const saved = result.group;
+        setGroups((prev) => prev.map((g) => (g.id === saved.id ? saved : g)));
+        return;
+      }
+      setGroups(previous);
+      if (result.error) setGroupError(result.error);
+    });
+  }
+
   const pendingNote = pendingDelete?.kind === "note" ? notes.find((n) => n.id === pendingDelete.id) : undefined;
   const pendingGroup = pendingDelete?.kind === "group" ? groups.find((g) => g.id === pendingDelete.id) : undefined;
   const pendingName = pendingNote ? noteTitle(pendingNote) : pendingGroup?.name;
@@ -268,6 +315,8 @@ function Workspace({
           onDeleteGroup={(id) => setPendingDelete({ kind: "group", id })}
           onMoveGroup={moveGroup}
           onMoveNoteToGroup={moveNoteToGroup}
+          onPlaceNote={placeNote}
+          onPlaceGroup={placeGroup}
         />
         <ResizeHandle
           label="Resize sidebar"

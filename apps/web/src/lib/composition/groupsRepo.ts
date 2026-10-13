@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { wouldCreateCycle } from "./groupMove";
+import { placeBefore } from "./ordering";
 
 export type Group = {
   id: number;
@@ -35,8 +36,13 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Display order: hand-placed groups first, in their set order; the rest (new ones too) by name. */
+const DISPLAY_ORDER = "position IS NULL, position, name, id";
+
 export function listGroups(): Group[] {
-  const rows = getDb().prepare("SELECT * FROM groups ORDER BY name").all() as GroupRow[];
+  const rows = getDb()
+    .prepare(`SELECT * FROM groups ORDER BY ${DISPLAY_ORDER}`)
+    .all() as GroupRow[];
   return rows.map(fromRow);
 }
 
@@ -65,8 +71,8 @@ export function renameGroup(id: number, name: string): void {
     .run(name, nowIso(), id);
 }
 
-/** Reparents a group (`null` = top level); refuses to create a loop in the hierarchy. */
-export function moveGroup(id: number, parentId: number | null): void {
+/** Throws unless `parentId` (`null` = top level) is a legal new parent for group `id`. */
+function assertCanMove(id: number, parentId: number | null): void {
   if (!getGroup(id)) throw new InvalidGroupMoveError(`Group ${id} not found.`);
   if (parentId !== null && !getGroup(parentId)) {
     throw new InvalidGroupMoveError(`Group ${parentId} not found.`);
@@ -76,9 +82,42 @@ export function moveGroup(id: number, parentId: number | null): void {
       `Group ${id} cannot be moved into itself or one of its sub-groups.`,
     );
   }
+}
+
+/**
+ * Reparents a group (`null` = top level); refuses to create a loop in the hierarchy.
+ * It lands after any hand-placed siblings, since its old position meant nothing there.
+ */
+export function moveGroup(id: number, parentId: number | null): void {
+  assertCanMove(id, parentId);
   getDb()
-    .prepare("UPDATE groups SET parent_id = ?, updated_at = ? WHERE id = ?")
+    .prepare("UPDATE groups SET parent_id = ?, position = NULL, updated_at = ? WHERE id = ?")
     .run(parentId, nowIso(), id);
+}
+
+/**
+ * Puts a group under `parentId` immediately before its sibling `beforeId` (last when
+ * null) and fixes the whole sibling list's order. Same refusals as `moveGroup`; a
+ * group may also be placed within the parent it already has, which just reorders it.
+ */
+export function placeGroup(id: number, parentId: number | null, beforeId: number | null): void {
+  assertCanMove(id, parentId);
+  const db = getDb();
+  db.transaction(() => {
+    const siblings = (
+      db
+        .prepare(`SELECT id FROM groups WHERE parent_id IS ? ORDER BY ${DISPLAY_ORDER}`)
+        .all(parentId) as { id: number }[]
+    ).map((row) => row.id);
+    const ordered = placeBefore(siblings, id, beforeId);
+    db.prepare("UPDATE groups SET parent_id = ?, updated_at = ? WHERE id = ?").run(
+      parentId,
+      nowIso(),
+      id,
+    );
+    const setPosition = db.prepare("UPDATE groups SET position = ? WHERE id = ?");
+    ordered.forEach((groupId, index) => setPosition.run(index, groupId));
+  })();
 }
 
 /** Whether a group has no sub-groups and no notes directly in it. */

@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import * as frontmatter from "./frontmatter";
+import { placeBefore } from "./ordering";
 
 export type Note = {
   id: number;
@@ -40,9 +41,16 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/**
+ * Display order. Notes nobody has dragged into place (`position` NULL, which includes
+ * every new note) come first, most recently edited first; hand-placed ones follow in
+ * their set order.
+ */
+const DISPLAY_ORDER = "position IS NOT NULL, position, updated_at DESC, id DESC";
+
 export function listNotes(): Note[] {
   const rows = getDb()
-    .prepare("SELECT * FROM notes ORDER BY updated_at DESC")
+    .prepare(`SELECT * FROM notes ORDER BY ${DISPLAY_ORDER}`)
     .all() as NoteRow[];
   return rows.map(fromRow);
 }
@@ -99,8 +107,31 @@ export function updateNote(
 
 /**
  * Doesn't bump updated_at — a move isn't a content edit, and bumping it
- * would reorder the note in listNotes() just from moving it.
+ * would reorder the note in listNotes() just from moving it. Clears the
+ * note's hand-set position: it no longer means anything among new siblings.
  */
 export function setNoteGroup(id: number, groupId: number | null): void {
-  getDb().prepare("UPDATE notes SET group_id = ? WHERE id = ?").run(groupId, id);
+  getDb()
+    .prepare("UPDATE notes SET group_id = ?, position = NULL WHERE id = ?")
+    .run(groupId, id);
+}
+
+/**
+ * Puts a note in `groupId` immediately before the sibling `beforeId` (last when
+ * null) and fixes the whole sibling list's order, so what the user sees is what
+ * stays. Like setNoteGroup, it isn't a content edit.
+ */
+export function placeNote(id: number, groupId: number | null, beforeId: number | null): void {
+  const db = getDb();
+  db.transaction(() => {
+    const siblings = (
+      db
+        .prepare(`SELECT id FROM notes WHERE group_id IS ? ORDER BY ${DISPLAY_ORDER}`)
+        .all(groupId) as { id: number }[]
+    ).map((row) => row.id);
+    const ordered = placeBefore(siblings, id, beforeId);
+    db.prepare("UPDATE notes SET group_id = ? WHERE id = ?").run(groupId, id);
+    const setPosition = db.prepare("UPDATE notes SET position = ? WHERE id = ?");
+    ordered.forEach((noteId, index) => setPosition.run(index, noteId));
+  })();
 }

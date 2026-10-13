@@ -23,6 +23,8 @@ export {
   moveNoteToGroup,
   permanentlyDeleteGroup,
   permanentlyDeleteNote,
+  placeGroup,
+  placeNote,
   renameGroup,
   restoreGroup,
   restoreNote,
