@@ -140,6 +140,8 @@ class ByteReader {
   private readonly iterator: AsyncIterator<Buffer>;
 
   constructor(source: AsyncIterable<Buffer>) {
+    // The key is the well-known Symbol.asyncIterator, not caller-controlled data.
+    // nosemgrep: unsafe-dynamic-method
     this.iterator = source[Symbol.asyncIterator]();
   }
 
