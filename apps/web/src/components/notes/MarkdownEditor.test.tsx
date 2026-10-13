@@ -338,6 +338,37 @@ describe("MarkdownEditor component completion", () => {
     expect(editor().value).toBe("intro\n\n<Info>\n\n\n\n</Info>");
   });
 
+  it("types a tab on Tab when no menu is open, at the caret", () => {
+    render(<Harness />);
+    type("- one\n- two", "- one".length);
+
+    const notCancelled = fireEvent.keyDown(editor(), { key: "Tab" });
+
+    expect(notCancelled).toBe(false);
+    expect(editor().value).toBe("- one\t\n- two");
+    expect(editor().selectionStart).toBe("- one\t".length);
+  });
+
+  it("replaces a selection with the tab", () => {
+    render(<Harness />);
+    type("a-b");
+    editor().setSelectionRange(1, 2);
+
+    fireEvent.keyDown(editor(), { key: "Tab" });
+
+    expect(editor().value).toBe("a\tb");
+  });
+
+  it("leaves Shift+Tab alone so focus can still leave the editor", () => {
+    render(<Harness />);
+    type("text");
+
+    const notCancelled = fireEvent.keyDown(editor(), { key: "Tab", shiftKey: true });
+
+    expect(notCancelled).toBe(true);
+    expect(editor().value).toBe("text");
+  });
+
   it("wraps from the first item to the last with ArrowUp", () => {
     render(<Harness />);
     type("<");

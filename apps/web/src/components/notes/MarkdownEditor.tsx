@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
@@ -124,6 +124,20 @@ export function MarkdownEditor({
     replaceText(start, end, text);
   });
 
+  /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    // The completion menu takes Tab while it is open. Shift+Tab stays free so the keyboard can still leave the editor.
+    completion.textareaProps.onKeyDown(event);
+    if (event.defaultPrevented || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing) return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    const el = event.currentTarget;
+    // execCommand keeps the browser's undo history; it is missing or refused in some environments.
+    if (document.execCommand?.("insertText", false, "\t")) return;
+    pendingCaret.current = el.selectionStart + 1;
+    replaceText(el.selectionStart, el.selectionEnd, "\t");
+  }
+
   function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
     const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
     // Cells copied from a spreadsheet arrive as text and a picture of that text; the text is what was meant.
@@ -179,6 +193,7 @@ export function MarkdownEditor({
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}
+            onKeyDown={onKeyDown}
             className="min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent"
           />
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
