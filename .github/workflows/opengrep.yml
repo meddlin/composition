@@ -1,0 +1,65 @@
+name: Opengrep
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: opengrep-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Bump both together: the checksum is the SHA-256 of opengrep_manylinux_x86 for that release.
+  OPENGREP_VERSION: v1.30.2
+  OPENGREP_SHA256: a66aa3278457f02b287b985a45b6762aebcaba5000f2689245fd1ed86d1456c7
+
+jobs:
+  opengrep:
+    name: opengrep (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [cli, desktop, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Pinned to a commit so rule updates never change results unreviewed.
+      - name: Check out Opengrep rules
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: opengrep/opengrep-rules
+          ref: f1d2b562b414783763fd02a6ed2736eaed622efa
+          path: .opengrep-rules
+          persist-credentials: false
+
+      - name: Install Opengrep
+        run: |
+          curl -fsSL -o opengrep "https://github.com/opengrep/opengrep/releases/download/${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          echo "${OPENGREP_SHA256}  opengrep" | sha256sum --check --strict
+          chmod +x opengrep
+          sudo mv opengrep /usr/local/bin/opengrep
+          opengrep --version
+
+      # Security rules only: the full rule packs also carry style and i18n checks
+      # (e.g. react-props-spreading) that would bury real findings. Any finding fails the job.
+      - name: Scan apps/${{ matrix.project }}
+        run: |
+          rule_args=()
+          while IFS= read -r dir; do
+            rule_args+=(-f "$dir")
+          done < <(cd .opengrep-rules && find javascript typescript bash yaml/github-actions generic/secrets generic/ci -type d -name security | sort | sed 's|^|.opengrep-rules/|')
+
+          opengrep scan \
+            --error \
+            --disable-version-check \
+            --exclude node_modules \
+            --exclude dist \
+            --exclude release \
+            --exclude '*.test.*' \
+            "${rule_args[@]}" \
+            "apps/${{ matrix.project }}"
