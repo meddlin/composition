@@ -65,7 +65,13 @@ export function GroupMenu({
         align="end"
         loop
         aria-label={`${groupName} actions`}
-        className="w-48"
+        // No exit animation: while it plays the closed menu is still mounted, and the first pointer
+        // move over one of its items hands focus back to it, blurring the new sub-group or rename
+        // field, which then cancels itself.
+        // No exit animation: while it plays the closed menu is still mounted, and the first pointer
+        // move over one of its items hands focus back to it, blurring the new sub-group or rename
+        // field, which then cancels itself.
+        className="w-48 data-closed:animate-none!"
         // React events bubble through the portal to the row, which renames on double-click.
         onDoubleClick={(e) => e.stopPropagation()}
         onCloseAutoFocus={(e) => {
