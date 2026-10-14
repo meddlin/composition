@@ -5,8 +5,10 @@ name: Release desktop
 #
 #   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
 #
-# It builds both macOS architectures, signs and notarizes them, and attaches them to a
-# DRAFT GitHub Release for you to check and publish. Local equivalent: `pnpm release` in
+# It builds both macOS architectures, signs and notarizes them, and attaches them, with the
+# update feed (latest-mac.yml), to a DRAFT GitHub Release for you to check and publish.
+# Publishing it as a normal (non-pre-release) release is what makes installed apps offer it
+# as an update. Local equivalent: `pnpm release` in
 # apps/desktop. Setup and secrets: docs/deployment/manual-build-release.md.
 on:
   push:
@@ -104,8 +106,8 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "Composition desktop $version" \
-            --notes "macOS desktop build, signed and notarized. Checksums are in SHA256SUMS.txt. Built by the Release desktop workflow." \
-            release/*.dmg release/*.zip release/SHA256SUMS.txt
+            --notes "macOS desktop build, signed and notarized. Checksums are in SHA256SUMS.txt. latest-mac.yml and the .blockmap files are what installed apps update from; leave them attached. Built by the Release desktop workflow." \
+            release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml release/SHA256SUMS.txt
 
       - name: Remove the API key
         if: always()

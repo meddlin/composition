@@ -1,5 +1,6 @@
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
+import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { ApiMethod } from "./backend";
 
 /**
@@ -140,4 +141,14 @@ export const ATTACHMENT_VALIDATORS: Record<AttachmentMethod, Validator> = {
 export const BACKUP_VALIDATORS: Record<BackupMethod, Validator> = {
   createBackup: none,
   restoreBackup: none,
+};
+
+/** The update methods take nothing from the page except one boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
+export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
+  getUpdateState: none,
+  checkForUpdates: none,
+  downloadUpdate: none,
+  installUpdate: none,
+  setAutoCheckUpdates: ([enabled]) =>
+    typeof enabled === "boolean" ? [enabled] : fail("setAutoCheckUpdates", "enabled"),
 };

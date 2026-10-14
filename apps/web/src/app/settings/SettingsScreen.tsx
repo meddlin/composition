@@ -6,6 +6,7 @@ import type { SettingsSnapshot } from "@/lib/composition/api";
 import { BackupRestore } from "./BackupRestore";
 import { SettingsForm } from "./SettingsForm";
 import { TrashCan } from "./TrashCan";
+import { Updates } from "./Updates";
 
 /**
  * The Settings screen, rendered from a snapshot. The web page builds the
@@ -71,6 +72,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         currentDbPath={snapshot.dbPathOverride}
         derivedDbPathPlaceholder={snapshot.derivedDbPath}
       />
+
+      <Updates />
 
       <BackupRestore defaultBackupDir={snapshot.backupDir} />
 

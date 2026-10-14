@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   archesFor,
+  checkUpdateFeed,
   checksumFile,
   isInside,
   parseArgs,
   parseSigningIdentities,
+  releaseAssetNames,
   tagVersion,
 } from "./release-lib.mjs";
 
@@ -128,5 +130,73 @@ describe("checksumFile", () => {
     expect(checksumFile([{ name: "a.dmg", sha256: "abc" }, { name: "b.zip", sha256: "def" }])).toBe(
       "abc  a.dmg\ndef  b.zip\n",
     );
+  });
+});
+
+// The shape electron-builder writes for a build of both architectures.
+const feed = `version: 0.2.0
+files:
+  - url: Composition-0.2.0-arm64.zip
+    sha512: abc==
+    size: 123
+    blockMapSize: 45
+  - url: Composition-0.2.0-arm64.dmg
+    sha512: def==
+    size: 456
+  - url: Composition-0.2.0-x64.zip
+    sha512: ghi==
+    size: 789
+path: Composition-0.2.0-arm64.zip
+sha512: abc==
+releaseDate: '2026-10-14T12:00:00.000Z'
+`;
+
+describe("checkUpdateFeed", () => {
+  it("accepts a feed that names the version and a ZIP for each architecture", () => {
+    expect(checkUpdateFeed(feed, "0.2.0", ["arm64", "x64"], "Composition")).toEqual([]);
+  });
+
+  it("only requires the architectures that were built", () => {
+    expect(checkUpdateFeed(feed.replace(/  - url: Composition-0.2.0-x64.zip[\s\S]*?size: 789\n/, ""), "0.2.0", ["arm64"], "Composition")).toEqual([]);
+  });
+
+  it("names a missing architecture", () => {
+    const withoutIntel = feed.replace(/  - url: Composition-0.2.0-x64.zip[\s\S]*?size: 789\n/, "");
+    expect(checkUpdateFeed(withoutIntel, "0.2.0", ["arm64", "x64"], "Composition")).toEqual([
+      "latest-mac.yml doesn't list Composition-0.2.0-x64.zip; x64 Macs would never update.",
+    ]);
+  });
+
+  it("catches a version that doesn't match the build", () => {
+    expect(checkUpdateFeed(feed, "0.3.0", ["arm64"], "Composition")[0]).toMatch(/says version 0\.2\.0, expected 0\.3\.0/);
+  });
+
+  it("accepts quoted values, and catches a feed with no checksums or no content", () => {
+    expect(checkUpdateFeed(feed.replace("version: 0.2.0", "version: '0.2.0'").replace(/url: (\S+)/g, 'url: "$1"'), "0.2.0", ["arm64"], "Composition")).toEqual([]);
+    expect(checkUpdateFeed("", "0.2.0", ["arm64"], "Composition")).toHaveLength(3);
+  });
+});
+
+describe("releaseAssetNames", () => {
+  it("keeps the downloads, the update feed and the blockmaps, and nothing else", () => {
+    expect(
+      releaseAssetNames([
+        "Composition-0.2.0-arm64.dmg",
+        "Composition-0.2.0-arm64.dmg.blockmap",
+        "Composition-0.2.0-arm64.zip",
+        "Composition-0.2.0-arm64.zip.blockmap",
+        "SHA256SUMS.txt",
+        "builder-debug.yml",
+        "latest-mac.yml",
+        "mac-arm64",
+      ]),
+    ).toEqual([
+      "Composition-0.2.0-arm64.dmg",
+      "Composition-0.2.0-arm64.dmg.blockmap",
+      "Composition-0.2.0-arm64.zip",
+      "Composition-0.2.0-arm64.zip.blockmap",
+      "SHA256SUMS.txt",
+      "latest-mac.yml",
+    ]);
   });
 });

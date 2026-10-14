@@ -16,6 +16,7 @@ certificate and notarization key, and building a signed app, is in
 | Signed and notarized DMG/ZIP | Works locally. Built on arm64, installed from the DMG and checked with `codesign`, `spctl` and `stapler` on 2026-10-05; see [manual-build-release.md](deployment/manual-build-release.md). Intel (`mac-x64`) not built yet. |
 | Unsigned DMG/ZIP | Step 7 below. Not run end to end: check the output before you use it. |
 | Upload to GitHub Releases (step 8) | Not yet run end to end with a signed build. |
+| Over-the-air updates | Code and pipeline done 2026-10-14, [desktop-updates-plan.md](desktop-updates-plan.md). **Not yet tried against a real signed release**: that needs two published versions (see the plan's step 5). |
 | Tag-triggered release workflow | Written ([release-desktop.yml](../.github/workflows/release-desktop.yml)), **not yet run on GitHub**. Runs only when you push a `desktop-v*` tag; needs the five secrets set up first. See [deployment/manual-build-release.md](deployment/manual-build-release.md#5-release-from-github-actions). |
 
 An unsigned build is fine for your own testing. Publish a normal release only from a signed and
@@ -212,8 +213,11 @@ gh release create "$TAG" \
   --draft \
   --title "Composition desktop $VERSION" \
   --notes "macOS desktop build. See docs/desktop-build-and-release.md." \
-  release/*.dmg release/*.zip release/SHA256SUMS.txt
+  release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml release/SHA256SUMS.txt
 ```
+
+`latest-mac.yml` and the `.blockmap` files are not for people: installed apps read them to find
+and download updates ([desktop-updates-plan.md](desktop-updates-plan.md)). Leave them attached.
 
 For an unsigned build, add `--prerelease` and say so in `--notes` (for example "Unsigned build;
 see the release notes for how to open it"). Then:
@@ -222,6 +226,12 @@ see the release notes for how to open it"). Then:
    that the file sizes look right.
 2. Download the DMG *from the draft* onto a Mac that has not built the app, install it and open it.
 3. Publish: `gh release edit "$TAG" --draft=false`.
+
+**Publishing is also the moment installed apps start offering the update.** They follow GitHub's
+"latest release", which skips drafts and anything marked pre-release, so a normal (non-pre-release)
+publish reaches every install within about six hours, and a pre-release reaches none. To pull a bad
+release back, set it to draft again (`gh release edit "$TAG" --draft`); "latest" then points at the
+previous one, and apps that already downloaded the bad one are fixed by publishing a newer version.
 
 To add a forgotten file to an existing release: `gh release upload "$TAG" <file> --clobber`.
 
@@ -244,6 +254,7 @@ that is the same signature problem, and it goes away only with signing and notar
 - [ ] The repo has a `LICENSE` file. It has none today, so the app's own license is undefined.
 - [ ] The app icon is in place (not done yet; see Phase 6 of the plan).
 - [ ] Both architectures are built if you want to support Intel Macs (`mac-x64`).
+- [ ] `latest-mac.yml` and the blockmaps are attached to the release, and `latest-mac.yml` lists every architecture (`pnpm release` checks this).
 
 ## Automation
 
