@@ -123,7 +123,7 @@ describe("addAttachmentFiles", () => {
     const result = await service.addAttachmentFiles(note.id, [big]);
 
     expect(result.attachments).toEqual([]);
-    expect(result.error).toMatch(/big\.bin: files can be at most 105 MB/);
+    expect(result.error).toMatch(/big\.bin: files can be at most 1 GB/);
     expect(storedFiles()).toEqual([]);
   });
 

@@ -29,7 +29,7 @@ appears under the bar:
 - **Remove** asks a second time ("Remove report.pdf?"), because it deletes the stored
   file for good.
 
-A file that can't be attached (a folder, one over 100 MB, one that can't be read) is named
+A file that can't be attached (a folder, one over 1 GB, one that can't be read) is named
 in a message above the table; the other files chosen with it are still attached.
 
 ## Where things live
@@ -114,7 +114,7 @@ A file that is already gone is never an error.
 - **No "open".** Opening an attachment in its default app would run an attached `.command`
   script or `.app`, and a note's database can come from someone else. Showing it in Finder
   or saving a copy leaves that choice to the user.
-- **100 MB per file.** The bytes are on disk, not in the database, so this is a sanity
+- **1 GB per file.** The bytes are on disk, not in the database, so this is a sanity
   limit. It is `MAX_ATTACHMENT_BYTES` in
   [`attachmentNames.ts`](../../apps/web/src/lib/composition/attachmentNames.ts).
 - **Not in the note's frontmatter.** The CLI rewrites frontmatter from the keys it knows,

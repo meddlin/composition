@@ -91,7 +91,7 @@ its panes and reloads the tree, favorites and color scheme.
 ## The archive code
 
 [`tarArchive.ts`](../../apps/web/src/lib/composition/tarArchive.ts) is a hundred-odd-line tar
-writer and reader over Node's built-in gzip. It streams (a 100 MB attachment is never held in
+writer and reader over Node's built-in gzip. It streams (a 1 GB attachment is never held in
 memory), writes GNU long names for paths over 100 bytes, and understands the POSIX `path` extension
 so an archive re-created with the system `tar` still restores. It is deliberately strict where a
 general extractor is lenient; the tests include archives made by the system `tar` in both

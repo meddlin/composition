@@ -7,7 +7,7 @@
 export const ATTACHMENT_DIR_NAME = "attachments";
 
 /** Largest file the app attaches. The bytes sit on disk, not in the database, so this is a sanity limit, not a storage one. */
-export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
+export const MAX_ATTACHMENT_BYTES = 1_000_000_000;
 
 const MAX_STORED_NAME_LENGTH = 100;
 
