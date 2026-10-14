@@ -131,7 +131,7 @@ describe("favorites", () => {
     await seed();
     const loose = listNotes().find((n) => n.title === "Loose")!;
     const app = await sandbox.mount({
-      api: { searchNotes: async () => ({ hits: [{ id: loose.id, title: "Loose", description: "" }] }) },
+      api: { searchNotes: async () => ({ hits: [{ id: loose.id, title: "Loose", description: "", groupPath: [] }] }) },
     });
     await press(app, "f", {}, 300);
 
