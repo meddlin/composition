@@ -433,3 +433,38 @@ describe("MarkdownEditor component completion", () => {
     expect(menu()).toBeNull();
   });
 });
+
+describe("MarkdownEditor syntax highlighting", () => {
+  afterEach(cleanup);
+
+  const layer = (container: HTMLElement) => container.querySelector<HTMLElement>("[aria-hidden='true'] pre");
+  const renderEditor = (value: string) =>
+    render(
+      <MarkdownEditor noteId={7} value={value} onChange={vi.fn()} ratio={0.5} onRatioChange={vi.fn()} onRatioCommit={vi.fn()} view="markdown" />,
+    );
+
+  it("draws the text again in colour under the textarea, hidden from assistive tech", () => {
+    const { container } = renderEditor("# Title\n\nSome **bold** text");
+
+    const pre = layer(container)!;
+    expect(pre.textContent).toBe("# Title\n\nSome **bold** text​");
+    expect(pre.querySelector(".md-heading")?.textContent).toBe("# Title");
+    expect(pre.querySelector(".md-strong")?.textContent).toBe("**bold**");
+    expect(pre.closest("[aria-hidden='true']")).not.toBeNull();
+    // The textarea stays the one thing a user or a screen reader deals with.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+  });
+
+  it("makes the textarea's own text transparent so only the coloured copy shows", () => {
+    renderEditor("text");
+
+    expect(screen.getByRole("textbox").className).toContain("text-transparent");
+  });
+
+  it("drops the layer, and shows the textarea's own text, for a very large note", () => {
+    const { container } = renderEditor("a".repeat(100_001));
+
+    expect(layer(container)).toBeNull();
+    expect(screen.getByRole("textbox").className).not.toContain("text-transparent");
+  });
+});

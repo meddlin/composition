@@ -356,6 +356,38 @@
   font-weight: 700;
 }
 
+/*
+ * Markdown syntax colors in the editor (components/notes/MarkdownHighlight.tsx). Color only:
+ * the layer must stay glyph-for-glyph in line with the textarea above it.
+ */
+.md-frontmatter,
+.md-fence,
+.md-rule,
+.md-url {
+  color: var(--syntax-comment);
+}
+.md-heading {
+  color: var(--syntax-function);
+}
+.md-code {
+  color: var(--syntax-string);
+}
+.md-marker {
+  color: var(--syntax-number);
+}
+.md-strong {
+  color: var(--syntax-type);
+}
+.md-emphasis {
+  color: var(--syntax-attr);
+}
+.md-link {
+  color: var(--link);
+}
+.md-tag {
+  color: var(--syntax-keyword);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
