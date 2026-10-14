@@ -10,6 +10,7 @@ import { panelId, tabId } from "./EditorTabs";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
+import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
@@ -124,6 +125,9 @@ export function MarkdownEditor({
     replaceText(start, end, text);
   });
 
+  const highlight = value.length <= MAX_HIGHLIGHT_CHARS;
+  const highlightLayer = useHighlightSync(textarea, highlight, value);
+
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     // The completion menu takes Tab while it is open. Shift+Tab stays free so the keyboard can still leave the editor.
@@ -181,6 +185,7 @@ export function MarkdownEditor({
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
+          {highlight && <MarkdownHighlight text={value} layer={highlightLayer.layer} />}
           <Textarea
             ref={textarea}
             value={value}
@@ -194,7 +199,15 @@ export function MarkdownEditor({
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}
             onKeyDown={onKeyDown}
-            className="min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent"
+            onScroll={(event) => {
+              completion.textareaProps.onScroll(event);
+              highlightLayer.sync();
+            }}
+            className={cn(
+              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
+              // The colours come from the layer underneath; the textarea only draws the caret and selection over it.
+              highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
+            )}
           />
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
         </div>

@@ -41,6 +41,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
 | Markdown preview | ✅ | ✅ | ✅ | |
+| Syntax highlighting while writing Markdown | ❌ | ✅ | ✅ | [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
 | Images in notes: paste | ❌ | ✅ | ✅ | |
 | Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |
