@@ -18,7 +18,13 @@ import type { RestoreResult, Trash } from "./trash";
  * (renderer, preload, main).
  */
 
-export type SearchHit = { id: number; title: string; description: string };
+export type SearchHit = {
+  id: number;
+  title: string;
+  description: string;
+  /** Names of the note's group and its ancestors, outermost first; empty when the note is ungrouped. */
+  groupPath: string[];
+};
 
 export type SearchResult = { hits: SearchHit[]; error?: string };
 

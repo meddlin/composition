@@ -537,7 +537,7 @@ describe("search", () => {
     await seed();
     const loose = listNotes().find((n) => n.title === "Loose")!;
     const app = await sandbox.mount({
-      api: { searchNotes: async () => ({ hits: [{ id: loose.id, title: "Loose", description: "" }] }) },
+      api: { searchNotes: async () => ({ hits: [{ id: loose.id, title: "Loose", description: "", groupPath: [] }] }) },
     });
 
     await press(app, "/");
@@ -673,7 +673,7 @@ describe("help and quitting", () => {
 describe("search details", () => {
   const looseHit = () => {
     const loose = listNotes().find((n) => n.title === "Loose")!;
-    return { hits: [{ id: loose.id, title: "Loose", description: "" }] };
+    return { hits: [{ id: loose.id, title: "Loose", description: "", groupPath: [] }] };
   };
 
   it("leaves the tree alone until the pause after typing has passed", async () => {
