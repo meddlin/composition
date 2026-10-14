@@ -288,7 +288,10 @@ electron-builder imports it into a temporary keychain for the run.
    job installs, builds both architectures, signs, notarizes, verifies and creates the draft.
 4. Check the draft (`gh release view desktop-v0.1.0 --web`), download the DMG from it onto a Mac
    that hasn't built the app, open it and check search. Then publish:
-   `gh release edit desktop-v0.1.0 --draft=false`.
+   `gh release edit desktop-v0.1.0 --draft=false`. Publishing a normal release also starts
+   offering it to installed apps as an update (see
+   [desktop-updates-plan.md](../desktop-updates-plan.md)); leave `latest-mac.yml` and the
+   `.blockmap` files attached.
 
 If it fails before the draft exists, fix the cause and use **Re-run failed jobs** on the run. If
 the tag itself was wrong, delete it (`git push origin :refs/tags/desktop-v0.1.0` and

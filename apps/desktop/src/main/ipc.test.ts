@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isTrustedUrl, registerIpc, type IpcEventLike } from "./ipc";
@@ -24,24 +25,28 @@ function setup() {
   const backup = Object.fromEntries(
     BACKUP_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof DesktopBackupApi]: ReturnType<typeof vi.fn> };
+  const updates = Object.fromEntries(
+    UPDATE_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
+  ) as unknown as { [K in keyof UpdatesApi]: ReturnType<typeof vi.fn> };
   registerIpc({
     ipcMain,
     api: api as unknown as CompositionApi,
     attachments: attachments as unknown as AttachmentsApi,
     backup: backup as unknown as DesktopBackupApi,
+    updates: updates as unknown as UpdatesApi,
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup };
+  return { handlers, listeners, api, attachments, backup, updates };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment and backup method, and nothing else", () => {
+  it("registers one handler per API, attachment, backup and update method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS].map(channelFor).sort(),
     );
   });
 
@@ -53,6 +58,17 @@ describe("registerIpc", () => {
 
     expect(backup.createBackup).toHaveBeenCalledWith();
     expect(backup.restoreBackup).toHaveBeenCalledWith();
+  });
+
+  it("calls the update methods with a boolean at most, never a url", async () => {
+    const { handlers, updates } = setup();
+
+    await handlers.get(channelFor("checkForUpdates"))!(own, "https://evil.example/feed");
+    await handlers.get(channelFor("setAutoCheckUpdates"))!(own, false, "https://evil.example/feed");
+
+    expect(updates.checkForUpdates).toHaveBeenCalledWith();
+    expect(updates.setAutoCheckUpdates).toHaveBeenCalledWith(false);
+    await expect(handlers.get(channelFor("setAutoCheckUpdates"))!(own, "false")).rejects.toThrow(/invalid/);
   });
 
   it("calls the attachment methods with validated ids, never a path", async () => {
@@ -89,7 +105,7 @@ describe("registerIpc", () => {
     ["a missing frame", { senderFrame: null }],
     ["an unparsable url", { senderFrame: { url: "not a url" } }],
   ])("refuses every method from %s", async (_name, event) => {
-    const { handlers, api, attachments, backup } = setup();
+    const { handlers, api, attachments, backup, updates } = setup();
 
     for (const method of API_METHODS) {
       await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(
@@ -108,6 +124,12 @@ describe("registerIpc", () => {
         /untrusted sender/,
       );
       expect(backup[method]).not.toHaveBeenCalled();
+    }
+    for (const method of UPDATE_METHODS) {
+      await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(
+        /untrusted sender/,
+      );
+      expect(updates[method]).not.toHaveBeenCalled();
     }
   });
 

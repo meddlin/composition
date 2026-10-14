@@ -59,3 +59,12 @@ mac:
 
 dmg:
   title: ${productName} ${version}
+
+# Over-the-air updates (docs/desktop-updates-plan.md). electron-builder writes this URL into the
+# app as app-update.yml, and writes latest-mac.yml (plus .blockmap files) next to the ZIPs;
+# upload those with the release. "latest/download" is GitHub's redirect to the newest normal
+# (non-draft, non-pre-release) release, so the tag name doesn't matter. Nothing is uploaded by
+# electron-builder itself: publishing stays the release workflow's job.
+publish:
+  provider: generic
+  url: https://github.com/meddlin/composition/releases/latest/download

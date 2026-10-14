@@ -78,6 +78,15 @@ Credentials are read from the environment, never from files:
 Getting the certificate and API key, building by hand, and releasing from GitHub Actions (a
 `desktop-v*` tag push): [docs/deployment/manual-build-release.md](../../docs/deployment/manual-build-release.md).
 
+## Updates
+
+The packaged app updates itself from GitHub Releases ([design](../../docs/desktop-updates-plan.md)).
+`src/main/updates.ts` is the state machine (tested without Electron), `src/main/updater.ts` the
+Electron side, and Settings > Updates the UI. The feed URL is `publish` in `electron-builder.yml`.
+A development run reports "not supported" and never touches the network. `pnpm release` also
+writes and checks `latest-mac.yml`, which every release must carry; only a normal (non-pre-release)
+published release is offered to installed apps.
+
 ## Things worth knowing
 
 - **Node floor for better-sqlite3 13.** This app uses v13 (N-API), which needs Node >= 22.14

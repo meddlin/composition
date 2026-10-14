@@ -15,7 +15,17 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARCHES, archesFor, checksumFile, isInside, parseArgs, parseSigningIdentities, tagVersion } from "./release-lib.mjs";
+import {
+  ARCHES,
+  archesFor,
+  checksumFile,
+  checkUpdateFeed,
+  isInside,
+  parseArgs,
+  parseSigningIdentities,
+  releaseAssetNames,
+  tagVersion,
+} from "./release-lib.mjs";
 
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(desktopDir, "../..");
@@ -176,7 +186,9 @@ function build() {
   run("Fetch Meilisearch", "pnpm", ["fetch:meilisearch", ...arches.map((arch) => ARCHES[arch].meilisearch)]);
   run("Build the app", "pnpm", ["build"]);
 
-  const builderArgs = ["exec", "electron-builder", "--mac", ...arches.map((arch) => ARCHES[arch].builderFlag)];
+  // `--publish never`: electron-builder writes the update feed (latest-mac.yml) but uploads
+  // nothing; attaching files to the GitHub Release is the workflow's job, after verification.
+  const builderArgs = ["exec", "electron-builder", "--mac", ...arches.map((arch) => ARCHES[arch].builderFlag), "--publish", "never"];
   if (options.unsigned) builderArgs.push("-c.mac.identity=null");
   run(options.unsigned ? "Package (unsigned)" : "Package, sign and notarize", "pnpm", builderArgs);
 }
@@ -238,6 +250,18 @@ function verify() {
   return failures;
 }
 
+/** The update feed installed apps read: it must exist, name this version, and cover every architecture built. */
+function verifyUpdateFeed() {
+  const file = path.join(releaseDir, "latest-mac.yml");
+  if (!fs.existsSync(file)) {
+    return ["latest-mac.yml wasn't produced, so installed apps could never find this release. Is `publish` still set in electron-builder.yml?"];
+  }
+  console.log("\nlatest-mac.yml (the update feed)");
+  const problems = checkUpdateFeed(fs.readFileSync(file, "utf-8"), pkg.version, arches, pkg.productName);
+  console.log(`  ${problems.length === 0 ? "ok  " : "FAIL"}  names ${pkg.version} and a ZIP for ${arches.join(" + ")}`);
+  return problems;
+}
+
 function writeChecksums() {
   const files = fs
     .readdirSync(releaseDir)
@@ -277,7 +301,7 @@ if (!options.unsigned && !inCI) {
 }
 
 build();
-const failures = verify();
+const failures = [...verify(), ...verifyUpdateFeed()];
 if (failures.length > 0) {
   console.error(`\nVerification failed:\n\n${failures.join("\n\n")}`);
   process.exit(1);
@@ -285,11 +309,11 @@ if (failures.length > 0) {
 const files = writeChecksums();
 
 console.log(`\nDone. In ${path.relative(repoRoot, releaseDir)}/:`);
-for (const file of [...files, "SHA256SUMS.txt"]) console.log(`  ${file}`);
+for (const file of releaseAssetNames(fs.readdirSync(releaseDir))) console.log(`  ${file}`);
 if (options.unsigned) {
   console.log("\nThese builds are UNSIGNED: for your own testing only. Don't publish them as a release.");
 } else {
   console.log(
-    `\nNext: open the DMG on a Mac, drag the app to Applications and check search works,\nthen publish a draft release (docs/desktop-build-and-release.md, step 8).`,
+    `\nNext: open the DMG on a Mac, drag the app to Applications and check search works,\nthen publish a draft release (docs/desktop-build-and-release.md, step 8). Attach every file listed above:\nlatest-mac.yml and the .blockmap files are what installed apps update from.`,
   );
 }

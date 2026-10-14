@@ -3,16 +3,20 @@ import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
 import type { Layout } from "./layout";
 import type { ThemeName } from "./themes";
+import type { UpdatesApi, UpdateStateListener } from "./updatesApi";
 
 /**
  * What Electron's preload script exposes on `window.composition` (apps/desktop).
- * Everything in CompositionApi, plus the desktop-only AttachmentsApi and DesktopBackupApi, plus a
+ * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi and UpdatesApi, plus a
  * synchronous snapshot taken before the page paints so the first frame already
  * has the right color scheme.
  */
 export type DesktopBridge = CompositionApi &
   AttachmentsApi &
-  DesktopBackupApi & {
+  DesktopBackupApi &
+  UpdatesApi & {
+    /** Calls `listener` with each update state the app pushes; returns the function that stops listening. */
+    onUpdateState(listener: UpdateStateListener): () => void;
     readonly initial: {
       theme: ThemeName;
       layout: Layout;

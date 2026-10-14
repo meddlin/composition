@@ -7,6 +7,7 @@ import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
+import { createElectronUpdates } from "./updater";
 import { createMainWindow } from "./window";
 
 app.setName("Composition");
@@ -102,6 +103,25 @@ const backup = createBackupApi(service, {
   },
 });
 
+// Stopping Meilisearch and closing the database, once, whichever way the app quits: Cmd+Q, the
+// last window closing, or restarting into an update (which calls this itself, ahead of
+// quitAndInstall, so the installer never meets a prevented `before-quit`).
+let shutdown: Promise<void> | undefined;
+let shutdownDone = false;
+function shutDown(): Promise<void> {
+  shutdown ??= (async () => {
+    try {
+      await sidecar.stop();
+    } finally {
+      closeDb();
+      shutdownDone = true;
+    }
+  })();
+  return shutdown;
+}
+
+const updates = createElectronUpdates({ userData, prepareToQuit: shutDown });
+
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
 function openMainWindow(): BrowserWindow {
@@ -135,6 +155,7 @@ async function main(): Promise<void> {
     api,
     attachments,
     backup,
+    updates: updates.manager,
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, sidebarWidth, editorRatio } = loadWebSettings();
@@ -145,6 +166,8 @@ async function main(): Promise<void> {
   // Search comes up in the background; the window doesn't wait for it.
   void sidecar.start();
   openMainWindow();
+  updates.installMenuItem();
+  updates.manager.start();
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) openMainWindow();
@@ -157,15 +180,11 @@ app.on("window-all-closed", () => {
 
 // Stop Meilisearch and close the database cleanly before exiting, so no
 // orphaned server is left holding the index and the WAL is checkpointed.
-let shuttingDown = false;
 app.on("before-quit", (event) => {
-  if (shuttingDown) return;
+  if (shutdownDone) return;
   event.preventDefault();
-  shuttingDown = true;
-  void sidecar.stop().finally(() => {
-    closeDb();
-    app.quit();
-  });
+  updates.manager.stop();
+  void shutDown().finally(() => app.quit());
 });
 
 main().catch((error) => {

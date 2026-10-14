@@ -56,13 +56,14 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Resizable columns, remembered | ❌ | ✅ | ✅ | The CLI's tree is a fixed width |
 | Application data location setting | ✅ | ✅ | ✅ | |
 | Backup and restore everything from Settings | ✅ | ✅ | ✅ | Notes, groups, Trash Can, images, attachments, and the color scheme, city, column sizes and favorites, in one `.tar.gz`. The web and CLI type a path; the desktop uses file dialogs. [backup-restore.md](architecture/backup-restore.md) |
+| Automatic updates | 🚫 | 🚫 | ✅ | Checks GitHub Releases at launch and every 6 hours, asks before downloading and again before restarting. Settings has the on/off toggle. [desktop-updates-plan.md](desktop-updates-plan.md) |
 | Developer docs viewer (`/docs`) | ❌ | ✅ | 🚫 | It reads this repo's docs from disk, which an installed app doesn't have |
 
 ## Distribution
 
 | | CLI | Web | Desktop |
 |---|---|---|---|
-| Shipped as | Undecided (runs from source: `pnpm dev`, or the `composition` bin) | Undecided | Manual download from GitHub Releases |
+| Shipped as | Undecided (runs from source: `pnpm dev`, or the `composition` bin) | Undecided | Download from GitHub Releases once; after that it updates itself |
 | Platforms | macOS and Linux, on Node 26.10 or newer. Windows later | Any browser | macOS only for now |
 | Notes database | `~/.composition/composition.db`, shared by all three | same | same |
 
