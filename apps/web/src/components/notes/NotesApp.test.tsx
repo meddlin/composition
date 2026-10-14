@@ -444,6 +444,33 @@ describe("NotesApp group row menu", () => {
     expect(document.activeElement).toBe(input);
   });
 
+  it("does not leave the closed menu mounted for its exit animation", async () => {
+    // jsdom applies no stylesheet, so report what the real one does: an animation on each state
+    // change, which keeps a closed menu mounted until it ends, unless the menu's classes switch it off.
+    const real = globalThis.getComputedStyle.bind(globalThis);
+    const spy = vi.spyOn(globalThis, "getComputedStyle").mockImplementation((element, pseudo) => {
+      const style = real(element, pseudo);
+      if (element.getAttribute("data-slot") !== "dropdown-menu-content") return style;
+      // Live, like a real computed style: Radix reads it again after the state flips.
+      const animationName = () =>
+        element.getAttribute("data-state") === "closed" && !element.className.includes("data-closed:animate-none!") ? "exit" : "enter";
+      return new Proxy(style, { get: (target, key) => (key === "animationName" ? animationName() : Reflect.get(target, key)) });
+    });
+    try {
+      renderApp();
+
+      fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "New sub-group" }));
+      await settle();
+
+      // While it lingers, a pointer moving over one of its items moves focus onto it, off the new
+      // field, and the field cancels itself when it blurs.
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(document.activeElement).toBe(screen.getByPlaceholderText("Group name"));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("asks before deleting an empty group from the menu, and deletes it once confirmed", async () => {
     vi.mocked(deleteGroup).mockResolvedValue({});
     renderApp();
