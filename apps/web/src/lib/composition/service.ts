@@ -109,6 +109,21 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
   };
 }
 
+/** Group names from the outermost ancestor down to `groupId` itself; empty when there is no group. */
+function groupPath(groupId: number | null): string[] {
+  const path: string[] = [];
+  const seen = new Set<number>();
+  let id = groupId;
+  while (id !== null && !seen.has(id)) {
+    seen.add(id);
+    const group = groupsRepo.getGroup(id);
+    if (!group) break;
+    path.unshift(group.name);
+    id = group.parentId;
+  }
+  return path;
+}
+
 /**
  * Never throws: an unreachable Meilisearch comes back as `error` (no hits) so
  * the UI can say "unavailable" instead of a misleading "No matches".
@@ -119,7 +134,14 @@ export async function searchNotes(query: string): Promise<SearchResult> {
     const hits: SearchHit[] = [];
     for (const id of ids) {
       const note = notesRepo.getNote(id);
-      if (note) hits.push({ id: note.id, title: note.title, description: note.description });
+      if (note) {
+        hits.push({
+          id: note.id,
+          title: note.title,
+          description: note.description,
+          groupPath: groupPath(note.groupId),
+        });
+      }
     }
     return { hits };
   } catch (error) {

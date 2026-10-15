@@ -85,3 +85,4 @@ It is mostly configuration, and small:
   intended later split.
 - 2026-09-30: the desktop app bundles Meilisearch in v1.
 - 2026-09-30: desktop releases are manual downloads from GitHub Releases; no auto-update yet.
+- 2026-10-14: the desktop app updates itself from GitHub Releases (electron-updater, generic feed, asks before downloading and before restarting). Design: [desktop-updates-plan.md](desktop-updates-plan.md). Supersedes the line above.

@@ -35,7 +35,16 @@ const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/
 // The desktop-only attachment and backup methods (attachmentsApi.ts, backupApi.ts) ride on the same bridge.
 const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
 const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/backupApi.ts"));
-const expectedBridge = [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, "initial", "platform"].sort();
+const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
+const expectedBridge = [
+  ...API_METHODS,
+  ...ATTACHMENT_METHODS,
+  ...BACKUP_METHODS,
+  ...UPDATE_METHODS,
+  "onUpdateState",
+  "initial",
+  "platform",
+].sort();
 
 const failures = [];
 function check(name, ok, detail = "") {
@@ -105,7 +114,7 @@ try {
   const missing = expectedBridge.filter((name) => !posture.methods.includes(name));
   const unexpected = posture.methods.filter((name) => !expectedBridge.includes(name));
   check(
-    "the bridge exposes only the API (+ attachments, backup, initial, platform)",
+    "the bridge exposes only the API (+ attachments, backup, updates, initial, platform)",
     API_METHODS.length > 0 && missing.length === 0 && unexpected.length === 0,
     missing.length || unexpected.length
       ? `missing: ${missing.join(",") || "none"}; unexpected: ${unexpected.join(",") || "none"}`
@@ -291,6 +300,26 @@ try {
   check("client-side navigation to /settings works", page.url().includes("/settings"), page.url());
   check("settings show the database path", (await page.getByText(path.join(home, ".composition", "composition.db")).count()) > 0);
   await page.screenshot({ path: path.join(out, "3-settings-dark.png") });
+
+  // ---- Updates (Settings). Nothing here reaches the network: the first automatic check is 30 s
+  // after launch, and the toggle is only ever switched off.
+  await page.getByRole("heading", { name: "Updates" }).waitFor();
+  const updateState = await page.evaluate(() => window.composition.getUpdateState());
+  const appVersion = JSON.parse(fs.readFileSync(path.join(desktopDir, "package.json"), "utf-8")).version;
+  check(
+    "updates are reported as supported only in the packaged app, at this version",
+    updateState.supported === Boolean(packaged) && updateState.currentVersion === appVersion && updateState.phase === "idle",
+    JSON.stringify(updateState),
+  );
+  check("automatic checking starts on", updateState.autoCheck === true);
+  // click(), not uncheck(): the box is driven by the main process's state, so it flips a moment after the click.
+  await page.getByLabel("Check for updates automatically").click();
+  const updatePrefsFile = path.join(userData, "updates.json");
+  await waitFor(async () => fs.existsSync(updatePrefsFile));
+  check("switching it off is stored in the updater's own file", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).autoCheck === false);
+  const settingsFile = path.join(userData, "settings.json"); // only exists once something has been saved to it
+  check("and not in the shared settings file", !fs.existsSync(settingsFile) || !("autoCheck" in JSON.parse(fs.readFileSync(settingsFile, "utf-8"))));
+  check("the page can't make an update install that isn't ready", (await page.evaluate(() => window.composition.installUpdate())).phase === "idle");
 
   await page.getByLabel("Light", { exact: true }).check();
   await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).theme === "light");

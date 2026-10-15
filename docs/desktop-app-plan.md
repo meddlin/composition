@@ -15,7 +15,7 @@ the web app, reading and writing the same SQLite file as the CLI and web app. No
 server to start, no Meilisearch to install.
 
 **Non-goals for the first release:** Windows/Linux (later), auto-update (manual downloads
-first), sync, MDX/attachments (see [product-positioning.md](product-positioning.md)), Mac App
+first; added 2026-10-14, see [desktop-updates-plan.md](desktop-updates-plan.md)), sync, MDX/attachments (see [product-positioning.md](product-positioning.md)), Mac App
 Store, a universal binary.
 
 ## Confirmed scope
@@ -25,7 +25,7 @@ Store, a universal binary.
 | Platforms | macOS only for now; Windows and Linux builds later. |
 | Database | All products share `composition.db` for now. The intended later split (desktop + CLI share one; web gets its own) is documented in [product-builds.md](product-builds.md). |
 | Meilisearch | v1 bundles it. Licensing is cleared with conditions; see [Licensing Meilisearch](#licensing-meilisearch). |
-| Updates | Manual downloads from GitHub Releases. No auto-update in v1. |
+| Updates | Manual downloads in v1. Over-the-air updates were added afterwards: [desktop-updates-plan.md](desktop-updates-plan.md). |
 
 ## Decisions
 
@@ -191,7 +191,7 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 - Every `uses:` SHA-pinned with a version comment; run `pnpm lint:actions` (repo rule in
   `AGENTS.md`).
 - Dependabot: add an `npm` entry for `/apps/desktop`.
-- Distribution is **manual download** from the GitHub Release. No auto-update in v1.
+- Distribution was **manual download** from the GitHub Release in v1. Auto-update came later: [desktop-updates-plan.md](desktop-updates-plan.md).
 
 **Exit:** pushing a tag produces a draft release with notarized, downloadable DMGs.
 
@@ -206,8 +206,8 @@ name, bundle id.
 
 ### Later (L, not scheduled)
 
-Windows (EV or Azure Artifact Signing), Linux, auto-update (`update.electronjs.org` fits:
-the repo is public, builds are on GitHub Releases, and macOS builds will already be signed),
+Windows (EV or Azure Artifact Signing), Linux, auto-update (done: [desktop-updates-plan.md](desktop-updates-plan.md); it uses electron-updater rather than
+`update.electronjs.org`, for tag-naming and ownership reasons given there),
 universal binary, SQLite FTS5 as a Meilisearch-free fallback, docs viewer, deep links, and the
 web/desktop database split described in [product-builds.md](product-builds.md).
 

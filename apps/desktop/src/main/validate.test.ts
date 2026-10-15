@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { API_METHODS } from "./backend";
-import { ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, VALIDATORS } from "./validate";
+import { ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -136,5 +137,22 @@ describe("BACKUP_VALIDATORS", () => {
   it("takes no arguments at all, so a page can't name a path", () => {
     expect(BACKUP_VALIDATORS.createBackup(["/etc/cron.d/evil"])).toEqual([]);
     expect(BACKUP_VALIDATORS.restoreBackup(["/tmp/x.tar.gz", 1])).toEqual([]);
+  });
+});
+
+describe("UPDATE_VALIDATORS", () => {
+  it("covers exactly the update methods", () => {
+    expect(Object.keys(UPDATE_VALIDATORS).sort()).toEqual([...UPDATE_METHODS].sort());
+  });
+
+  it("takes no arguments except one boolean, so a page can't name a feed or a path", () => {
+    expect(UPDATE_VALIDATORS.checkForUpdates(["https://evil.example/feed"])).toEqual([]);
+    expect(UPDATE_VALIDATORS.downloadUpdate(["/tmp/x"])).toEqual([]);
+    expect(UPDATE_VALIDATORS.installUpdate([{ file: "/tmp/x" }])).toEqual([]);
+    expect(UPDATE_VALIDATORS.setAutoCheckUpdates([true, "extra"])).toEqual([true]);
+  });
+
+  it.each([[[]], [["true"]], [[1]], [[null]]])("rejects %j for setAutoCheckUpdates", (args) => {
+    expect(() => UPDATE_VALIDATORS.setAutoCheckUpdates(args)).toThrow(InvalidArgumentsError);
   });
 });

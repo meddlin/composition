@@ -632,6 +632,25 @@ describe("Trash Can", () => {
 });
 
 describe("searchNotes", () => {
+  it("reports each hit's group and sub-group path, empty for ungrouped notes", async () => {
+    const searchIndex = await import("./searchIndex");
+    const service = await import("./service");
+    const lawn = await service.createGroup("Lawn Care", null);
+    const sprinklers = await service.createGroup("Sprinklers", lawn.id);
+    const inGroup = await service.createNote("Maintenance", lawn.id);
+    const inSub = await service.createNote("Winterize", sprinklers.id);
+    const loose = await service.createNote("Loose");
+    vi.mocked(searchIndex.searchNoteIds).mockResolvedValueOnce([inGroup.id, inSub.id, loose.id]);
+
+    const { hits } = await service.searchNotes("anything");
+
+    expect(hits.map((hit) => hit.groupPath)).toEqual([
+      ["Lawn Care"],
+      ["Lawn Care", "Sprinklers"],
+      [],
+    ]);
+  });
+
   it("reports an unavailable search backend instead of throwing", async () => {
     const searchIndex = await import("./searchIndex");
     vi.mocked(searchIndex.searchNoteIds).mockRejectedValueOnce(new Error("ECONNREFUSED"));

@@ -93,3 +93,38 @@ export function isInside(root, file) {
 export function checksumFile(entries) {
   return entries.map(({ name, sha256 }) => `${sha256}  ${name}\n`).join("");
 }
+
+/**
+ * Checks the text of `latest-mac.yml`, the file installed apps read to find an update. It
+ * must name this version and a ZIP for every architecture built: an app whose architecture is
+ * missing would silently never update. Returns the problems; empty means it's good.
+ *
+ * Deliberately reads lines rather than parsing YAML: the file is written by electron-builder
+ * in one fixed shape, and this needs no dependency.
+ *
+ * @param {string} text
+ * @param {string} version  desktop version, e.g. "0.2.0"
+ * @param {string[]} arches  keys of ARCHES
+ * @param {string} productName  e.g. "Composition"
+ */
+export function checkUpdateFeed(text, version, arches, productName) {
+  const problems = [];
+  const feedVersion = /^version:\s*['"]?([^'"\s]+)['"]?\s*$/m.exec(text)?.[1];
+  if (feedVersion !== version) {
+    problems.push(`latest-mac.yml says version ${feedVersion ?? "(none)"}, expected ${version}.`);
+  }
+  const urls = [...text.matchAll(/^\s*(?:-\s+)?url:\s*['"]?([^'"\s]+)['"]?\s*$/gm)].map((match) => match[1]);
+  for (const arch of arches) {
+    const zip = `${productName}-${version}-${arch}.zip`;
+    if (!urls.includes(zip)) problems.push(`latest-mac.yml doesn't list ${zip}; ${arch} Macs would never update.`);
+  }
+  if (!/^\s*sha512:\s*\S+/m.test(text)) problems.push("latest-mac.yml has no sha512 checksums.");
+  return problems;
+}
+
+/** Files in release/ that go on the GitHub Release: the downloads, the update feed and its blockmaps (for small, differential updates). */
+export function releaseAssetNames(files) {
+  return files
+    .filter((file) => /\.(dmg|zip|blockmap)$/.test(file) || file === "latest-mac.yml" || file === "SHA256SUMS.txt")
+    .sort();
+}

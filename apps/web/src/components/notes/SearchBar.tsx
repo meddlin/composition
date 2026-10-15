@@ -151,6 +151,11 @@ export function SearchBar({ onSelect }: Props) {
                 <div className="truncate font-medium">
                   {hit.title || "Untitled"}
                 </div>
+                {hit.groupPath.length > 0 && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    {hit.groupPath.join(" › ")}
+                  </div>
+                )}
                 {hit.description && (
                   <div className="truncate text-xs text-muted-foreground">
                     {hit.description}

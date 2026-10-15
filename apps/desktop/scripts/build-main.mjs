@@ -26,7 +26,7 @@ const configs = [
     ...common,
     entryPoints: ["src/main/index.ts"],
     outfile: "dist/main.js",
-    external: ["electron", "better-sqlite3"],
+    external: ["electron", "electron-updater", "better-sqlite3"],
   },
   {
     // Sandboxed preload scripts can only require "electron" (and a few

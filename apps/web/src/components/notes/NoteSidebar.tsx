@@ -8,6 +8,7 @@ import type { Favorites, FavoriteType } from "@/lib/composition/favorites";
 import { Separator } from "@/components/ui/separator";
 import { GroupTree, InlineTextInput } from "./GroupTree";
 import { NAV_LINKS } from "./navLinks";
+import { UpdateDot } from "./UpdateDot";
 import type { Group, Note } from "./types";
 
 type Props = {
@@ -118,7 +119,10 @@ export function NoteSidebar({
             size="lg"
             className="justify-start px-3 text-muted-foreground hover:text-foreground"
           >
-            <Link href={href}>{label}</Link>
+            <Link href={href}>
+              {label}
+              {href === "/settings" && <UpdateDot />}
+            </Link>
           </Button>
         ))}
       </div>
