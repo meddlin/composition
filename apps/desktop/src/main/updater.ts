@@ -3,13 +3,16 @@ import { app, BrowserWindow, dialog, Menu, MenuItem } from "electron";
 import { autoUpdater } from "electron-updater";
 import { UPDATE_STATE_CHANNEL } from "../shared/channels";
 import { createUpdatePrefsStore } from "./updatePrefs";
+import { findLatestRelease, STABLE_FEED_URL } from "./releaseFeed";
 import { UpdateManager, type UpdaterLike } from "./updates";
 
 /**
  * The Electron side of updates: picks the real updater (or an inert one), pushes state to
  * the windows, and adds "Check for Updates…" to the app menu. The logic is in updates.ts.
  * The feed it reads is fixed at build time (`publish` in electron-builder.yml, which
- * electron-builder copies into the app as app-update.yml); nothing here names a URL.
+ * electron-builder copies into the app as app-update.yml). The one other place it can read from
+ * is a GitHub release of this repo, found by releaseFeed.ts when "Include pre-release versions"
+ * is on; no URL ever comes from a window.
  */
 
 /** Stands in where updating is impossible (development runs), so electron-updater is never touched. */
@@ -17,6 +20,7 @@ const inertUpdater: UpdaterLike = {
   autoDownload: false,
   autoInstallOnAppQuit: false,
   allowPrerelease: false,
+  setFeedURL: () => {},
   checkForUpdates: async () => null,
   downloadUpdate: async () => [],
   quitAndInstall: () => {},
@@ -44,6 +48,7 @@ export function createElectronUpdates(options: {
     support,
     prefs: createUpdatePrefsStore(path.join(options.userData, "updates.json")),
     prepareToQuit: options.prepareToQuit,
+    releaseFeed: support.ok ? { findLatest: () => findLatestRelease(), stableUrl: STABLE_FEED_URL } : undefined,
     onChange: (state) => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(UPDATE_STATE_CHANNEL, state);
@@ -86,8 +91,11 @@ export function createElectronUpdates(options: {
     }
 
     if (state.phase === "ready") return offerRestart(state.version);
-    if (state.phase === "error") return void (await say("Couldn't check for updates.", state.error ?? "Unknown error."));
-    await say("Composition is up to date.", `You have the latest version (${state.currentVersion}).`);
+    if (state.phase === "error") {
+      const title = state.version ? "Couldn't download the update." : "Couldn't check for updates.";
+      return void (await say(title, state.error ?? "Something went wrong. Please try again later."));
+    }
+    await say("Already running the latest supported version.", `You have ${state.currentVersion}.`);
   }
 
   /** Adds "Check for Updates…" under "About Composition", in Electron's default application menu. */

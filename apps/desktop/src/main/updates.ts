@@ -22,6 +22,8 @@ export interface UpdaterLike {
   autoInstallOnAppQuit: boolean;
   /** Only normal releases are offered: the feed is GitHub's "latest release" (plan decision U6). */
   allowPrerelease: boolean;
+  /** Points the updater at another feed; only used by "Include pre-release versions". */
+  setFeedURL(options: { provider: "generic"; url: string; channel?: string }): void;
   checkForUpdates(): Promise<{
     isUpdateAvailable: boolean;
     updateInfo: { version: string; releaseNotes?: string | { note?: string | null }[] | null };
@@ -31,7 +33,7 @@ export interface UpdaterLike {
   on(event: "download-progress", listener: (progress: { percent: number }) => void): unknown;
 }
 
-export type UpdatePrefs = { autoCheck: boolean };
+export type UpdatePrefs = { autoCheck: boolean; allowPrerelease: boolean };
 
 export type UpdatePrefsStore = {
   load(): UpdatePrefs;
@@ -50,6 +52,14 @@ export type UpdateManagerOptions = {
    * `before-quit` interacts with the installer.
    */
   prepareToQuit: () => Promise<void>;
+  /**
+   * Where updates come from when "Include pre-release versions" is on (the newest release of any
+   * kind), and the normal feed to go back to when it is off. Left out where there is no network.
+   */
+  releaseFeed?: {
+    findLatest(): Promise<{ url: string; channel: string } | null>;
+    stableUrl: string;
+  };
   /** Called with the new state after every change, to push it to the windows. */
   onChange?: (state: UpdateState) => void;
   now?: () => Date;
@@ -77,12 +87,35 @@ export function releaseNotesText(notes: string | { note?: string | null }[] | nu
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
+/**
+ * electron-updater's errors carry the whole HTTP response (headers, cookies, a stack). The person
+ * gets a sentence; the full error goes to the log.
+ */
+const NETWORK_PROBLEM =
+  /ERR_INTERNET_DISCONNECTED|ERR_NETWORK|ERR_NAME_NOT_RESOLVED|ERR_CONNECTION|ERR_TIMED_OUT|ERR_PROXY|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN/;
+
+/** The feed is GitHub's "latest release", which 404s when there is no normal (non-draft, non-pre-release) release. */
+export function isNoReleaseError(error: unknown): boolean {
+  return (error as { statusCode?: unknown } | null)?.statusCode === 404;
+}
+
+export function friendlyUpdateError(error: unknown, action: "check" | "download"): string {
+  if (NETWORK_PROBLEM.test(messageOf(error))) {
+    return "Couldn't reach GitHub. Check your internet connection and try again.";
+  }
+  return action === "check"
+    ? "Something went wrong while checking for updates. Please try again later."
+    : "Something went wrong while downloading the update. Please try again later.";
+}
+
 export class UpdateManager implements UpdatesApi {
   private readonly o: UpdateManagerOptions;
   private state: UpdateState;
   private timer: ReturnType<typeof setTimeout> | undefined;
   private inFlightCheck: Promise<UpdateState> | undefined;
   private lastPercent = -1;
+  /** Whether the updater was last pointed at a pre-release-inclusive feed, so it can be pointed back. */
+  private onReleaseFeed = false;
 
   constructor(options: UpdateManagerOptions) {
     this.o = options;
@@ -97,7 +130,7 @@ export class UpdateManager implements UpdatesApi {
       currentVersion: options.currentVersion,
       supported: options.support.ok,
       ...(options.support.ok ? {} : { unsupportedReason: options.support.reason }),
-      autoCheck: options.prefs.load().autoCheck,
+      ...options.prefs.load(),
     };
   }
 
@@ -129,7 +162,7 @@ export class UpdateManager implements UpdatesApi {
       this.set({ phase: "ready", percent: undefined });
     } catch (error) {
       this.o.log?.("update download failed", error);
-      this.set({ phase: "error", error: messageOf(error), version, percent: undefined });
+      this.set({ phase: "error", error: friendlyUpdateError(error, "download"), version, percent: undefined });
     }
     return this.state;
   }
@@ -148,10 +181,23 @@ export class UpdateManager implements UpdatesApi {
 
   async setAutoCheckUpdates(enabled: boolean): Promise<UpdateState> {
     if (typeof enabled !== "boolean") return this.state;
-    this.o.prefs.save({ autoCheck: enabled });
+    this.o.prefs.save({ autoCheck: enabled, allowPrerelease: this.state.allowPrerelease });
     this.set({ autoCheck: enabled });
     // Turning it on checks at once; turning it off lets any timer already running find it off.
     if (enabled && this.state.phase === "idle") void this.check(false);
+    return this.state;
+  }
+
+  async setAllowPrerelease(enabled: boolean): Promise<UpdateState> {
+    if (typeof enabled !== "boolean") return this.state;
+    this.o.prefs.save({ autoCheck: this.state.autoCheck, allowPrerelease: enabled });
+    this.set({ allowPrerelease: enabled });
+    const phase = this.state.phase;
+    // An offer from the other feed no longer stands; look again. A download under way is left alone.
+    if (phase === "idle" || phase === "available" || phase === "error") {
+      this.set({ phase: "idle", version: undefined, releaseNotes: undefined, error: undefined });
+      void this.check(false);
+    }
     return this.state;
   }
 
@@ -173,7 +219,8 @@ export class UpdateManager implements UpdatesApi {
     const before = this.state;
     this.set({ phase: "checking", error: undefined });
     try {
-      const result = await this.o.updater.checkForUpdates();
+      const hasFeed = await this.pointUpdaterAtFeed();
+      const result = hasFeed ? await this.o.updater.checkForUpdates() : null;
       const lastCheckedAt = (this.o.now?.() ?? new Date()).toISOString();
       if (result?.isUpdateAvailable) {
         this.set({
@@ -186,11 +233,38 @@ export class UpdateManager implements UpdatesApi {
         this.set({ phase: "idle", version: undefined, releaseNotes: undefined, lastCheckedAt });
       }
     } catch (error) {
+      if (isNoReleaseError(error)) {
+        // Nothing published to update to: the same answer as "no newer version".
+        this.o.log?.("no published release to update to", messageOf(error));
+        this.set({
+          phase: "idle",
+          version: undefined,
+          releaseNotes: undefined,
+          lastCheckedAt: (this.o.now?.() ?? new Date()).toISOString(),
+        });
+        return this.state;
+      }
       this.o.log?.("update check failed", error);
-      if (manual) this.set({ phase: "error", error: messageOf(error) });
+      if (manual) this.set({ phase: "error", error: friendlyUpdateError(error, "check") });
       else this.set({ phase: before.phase, error: before.error });
     }
     return this.state;
+  }
+
+  /** Chooses the feed for this check; false when pre-releases are on and GitHub lists nothing to update from. */
+  private async pointUpdaterAtFeed(): Promise<boolean> {
+    const feed = this.o.releaseFeed;
+    if (!feed) return true;
+    if (this.state.allowPrerelease) {
+      const found = await feed.findLatest();
+      if (!found) return false;
+      this.o.updater.setFeedURL({ provider: "generic", ...found });
+      this.onReleaseFeed = true;
+    } else if (this.onReleaseFeed) {
+      this.o.updater.setFeedURL({ provider: "generic", url: feed.stableUrl });
+      this.onReleaseFeed = false;
+    }
+    return true;
   }
 
   private schedule(delayMs: number): void {

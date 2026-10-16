@@ -69,6 +69,10 @@ describe("registerIpc", () => {
     expect(updates.checkForUpdates).toHaveBeenCalledWith();
     expect(updates.setAutoCheckUpdates).toHaveBeenCalledWith(false);
     await expect(handlers.get(channelFor("setAutoCheckUpdates"))!(own, "false")).rejects.toThrow(/invalid/);
+
+    await handlers.get(channelFor("setAllowPrerelease"))!(own, true, "https://evil.example/feed");
+    expect(updates.setAllowPrerelease).toHaveBeenCalledWith(true);
+    await expect(handlers.get(channelFor("setAllowPrerelease"))!(own, "true")).rejects.toThrow(/invalid/);
   });
 
   it("calls the attachment methods with validated ids, never a path", async () => {

@@ -10,19 +10,28 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe("createUpdatePrefsStore", () => {
   it("checks for updates when there is no file yet", () => {
-    expect(createUpdatePrefsStore(path.join(dir, "updates.json")).load()).toEqual({ autoCheck: true });
+    expect(createUpdatePrefsStore(path.join(dir, "updates.json")).load()).toEqual({
+      autoCheck: true,
+      allowPrerelease: false,
+    });
   });
 
   it("remembers the choice, creating the folder if needed", () => {
     const file = path.join(dir, "nested", "updates.json");
-    createUpdatePrefsStore(file).save({ autoCheck: false });
-    expect(createUpdatePrefsStore(file).load()).toEqual({ autoCheck: false });
+    createUpdatePrefsStore(file).save({ autoCheck: false, allowPrerelease: true });
+    expect(createUpdatePrefsStore(file).load()).toEqual({ autoCheck: false, allowPrerelease: true });
     expect(fs.readdirSync(path.dirname(file))).toEqual(["updates.json"]);
   });
 
-  it.each([["not json"], ["null"], ["[]"], ['{"autoCheck":"no"}'], ["{}"]])("falls back to on for %s", (contents) => {
+  it.each([["not json"], ["null"], ["[]"], ['{"autoCheck":"no"}'], ["{}"]])("falls back to the defaults for %s", (contents) => {
     const file = path.join(dir, "updates.json");
     fs.writeFileSync(file, contents);
-    expect(createUpdatePrefsStore(file).load()).toEqual({ autoCheck: true });
+    expect(createUpdatePrefsStore(file).load()).toEqual({ autoCheck: true, allowPrerelease: false });
+  });
+
+  it("reads a file written before pre-releases existed as pre-releases off", () => {
+    const file = path.join(dir, "updates.json");
+    fs.writeFileSync(file, '{"autoCheck":false}');
+    expect(createUpdatePrefsStore(file).load()).toEqual({ autoCheck: false, allowPrerelease: false });
   });
 });

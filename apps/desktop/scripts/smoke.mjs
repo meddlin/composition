@@ -312,11 +312,13 @@ try {
     JSON.stringify(updateState),
   );
   check("automatic checking starts on", updateState.autoCheck === true);
+  check("pre-release versions start off", updateState.allowPrerelease === false);
   // click(), not uncheck(): the box is driven by the main process's state, so it flips a moment after the click.
   await page.getByLabel("Check for updates automatically").click();
   const updatePrefsFile = path.join(userData, "updates.json");
   await waitFor(async () => fs.existsSync(updatePrefsFile));
   check("switching it off is stored in the updater's own file", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).autoCheck === false);
+  check("and the pre-release choice is kept beside it, still off", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).allowPrerelease === false);
   const settingsFile = path.join(userData, "settings.json"); // only exists once something has been saved to it
   check("and not in the shared settings file", !fs.existsSync(settingsFile) || !("autoCheck" in JSON.parse(fs.readFileSync(settingsFile, "utf-8"))));
   check("the page can't make an update install that isn't ready", (await page.evaluate(() => window.composition.installUpdate())).phase === "idle");

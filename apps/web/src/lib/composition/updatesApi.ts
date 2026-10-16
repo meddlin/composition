@@ -19,6 +19,8 @@ export type UpdateState = {
   unsupportedReason?: string;
   /** Whether the app checks on its own (at launch, then every few hours). */
   autoCheck: boolean;
+  /** Whether pre-release versions are offered too (early builds that may be unstable). Off by default. */
+  allowPrerelease: boolean;
   /** When the last check finished, as an ISO timestamp; absent until one has. */
   lastCheckedAt?: string;
   /** The newer version, in "available", "downloading" and "ready". */
@@ -41,6 +43,7 @@ export interface UpdatesApi {
   /** Restarts into the downloaded version. Does nothing unless the phase is "ready". */
   installUpdate(): Promise<UpdateState>;
   setAutoCheckUpdates(enabled: boolean): Promise<UpdateState>;
+  setAllowPrerelease(enabled: boolean): Promise<UpdateState>;
 }
 
 /** Every method of UpdatesApi, as data; the check below fails to compile if one is missing (see API_METHODS in api.ts). */
@@ -50,6 +53,7 @@ export const UPDATE_METHODS = [
   "downloadUpdate",
   "installUpdate",
   "setAutoCheckUpdates",
+  "setAllowPrerelease",
 ] as const satisfies readonly (keyof UpdatesApi)[];
 
 export type UpdateMethod = (typeof UPDATE_METHODS)[number];
@@ -74,10 +78,10 @@ export function describeUpdateState(state: UpdateState): string {
     case "ready":
       return `Version ${state.version} is ready. Restart to update.`;
     case "error":
-      return `Couldn't check for updates: ${state.error ?? "unknown error"}`;
+      return state.error ?? "Something went wrong while checking for updates. Please try again later.";
     case "idle":
       return state.lastCheckedAt
-        ? `Composition ${state.currentVersion} is up to date.`
+        ? `Composition ${state.currentVersion}. Already running the latest supported version.`
         : `Composition ${state.currentVersion}. Not checked yet.`;
   }
 }

@@ -143,7 +143,7 @@ export const BACKUP_VALIDATORS: Record<BackupMethod, Validator> = {
   restoreBackup: none,
 };
 
-/** The update methods take nothing from the page except one boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
+/** The update methods take nothing from the page except a boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
 export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
   getUpdateState: none,
   checkForUpdates: none,
@@ -151,4 +151,6 @@ export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
   installUpdate: none,
   setAutoCheckUpdates: ([enabled]) =>
     typeof enabled === "boolean" ? [enabled] : fail("setAutoCheckUpdates", "enabled"),
+  setAllowPrerelease: ([enabled]) =>
+    typeof enabled === "boolean" ? [enabled] : fail("setAllowPrerelease", "enabled"),
 };

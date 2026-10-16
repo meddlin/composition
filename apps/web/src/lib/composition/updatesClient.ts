@@ -15,4 +15,5 @@ export const checkForUpdates = (): Promise<UpdateState> => unavailable();
 export const downloadUpdate = (): Promise<UpdateState> => unavailable();
 export const installUpdate = (): Promise<UpdateState> => unavailable();
 export const setAutoCheckUpdates = (enabled: boolean): Promise<UpdateState> => (void enabled, unavailable());
+export const setAllowPrerelease = (enabled: boolean): Promise<UpdateState> => (void enabled, unavailable());
 export const subscribeToUpdateState = (listener: UpdateStateListener): (() => void) => (void listener, () => {});

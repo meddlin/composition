@@ -22,4 +22,5 @@ export const checkForUpdates = (): Promise<UpdateState> => bridge().checkForUpda
 export const downloadUpdate = (): Promise<UpdateState> => bridge().downloadUpdate();
 export const installUpdate = (): Promise<UpdateState> => bridge().installUpdate();
 export const setAutoCheckUpdates = (enabled: boolean): Promise<UpdateState> => bridge().setAutoCheckUpdates(enabled);
+export const setAllowPrerelease = (enabled: boolean): Promise<UpdateState> => bridge().setAllowPrerelease(enabled);
 export const subscribeToUpdateState = (listener: UpdateStateListener): (() => void) => bridge().onUpdateState(listener);

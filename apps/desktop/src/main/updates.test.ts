@@ -17,12 +17,13 @@ const found = (version: string, releaseNotes?: string): CheckResult => ({
 });
 const none: CheckResult = { isUpdateAvailable: false, updateInfo: { version: "0.1.3" } };
 
-function setup(overrides: Partial<UpdateManagerOptions> = {}, autoCheck = true) {
+function setup(overrides: Partial<UpdateManagerOptions> = {}, autoCheck = true, allowPrerelease = false) {
   let progress: (p: { percent: number }) => void = () => {};
   const updater = {
     autoDownload: true,
     autoInstallOnAppQuit: false,
     allowPrerelease: true,
+    setFeedURL: vi.fn(),
     checkForUpdates: vi.fn(async (): Promise<CheckResult> => none),
     downloadUpdate: vi.fn(async () => ["update.zip"]),
     quitAndInstall: vi.fn(),
@@ -30,14 +31,14 @@ function setup(overrides: Partial<UpdateManagerOptions> = {}, autoCheck = true) 
       progress = listener;
     }),
   };
-  const saved: { autoCheck: boolean }[] = [];
+  const saved: { autoCheck: boolean; allowPrerelease: boolean }[] = [];
   const changes: UpdateState[] = [];
   const order: string[] = [];
   const manager = new UpdateManager({
     updater,
     currentVersion: "0.1.3",
     support: { ok: true },
-    prefs: { load: () => ({ autoCheck }), save: (prefs) => void saved.push(prefs) },
+    prefs: { load: () => ({ autoCheck, allowPrerelease }), save: (prefs) => void saved.push(prefs) },
     prepareToQuit: async () => void order.push("cleanup"),
     onChange: (state) => void changes.push(state),
     now: () => new Date("2026-10-14T12:00:00Z"),
@@ -62,6 +63,7 @@ describe("UpdateManager", () => {
       currentVersion: "0.1.3",
       supported: true,
       autoCheck: false,
+      allowPrerelease: false,
     });
   });
 
@@ -105,8 +107,27 @@ describe("UpdateManager", () => {
       updater.checkForUpdates.mockRejectedValue(new Error("net::ERR_INTERNET_DISCONNECTED"));
       expect(await manager.checkForUpdates()).toMatchObject({
         phase: "error",
-        error: "net::ERR_INTERNET_DISCONNECTED",
+        error: "Couldn't reach GitHub. Check your internet connection and try again.",
       });
+    });
+
+    it("hides the raw error behind a plain sentence", async () => {
+      const log = vi.fn();
+      const { manager, updater } = setup({ log });
+      updater.checkForUpdates.mockRejectedValue(new Error('HttpError: 500 "headers: {set-cookie: ...}"'));
+      expect(await manager.checkForUpdates()).toMatchObject({
+        phase: "error",
+        error: "Something went wrong while checking for updates. Please try again later.",
+      });
+      expect(log).toHaveBeenCalledWith("update check failed", expect.any(Error));
+    });
+
+    it("treats a 404 from the feed (no normal release published) as up to date", async () => {
+      const { manager, updater } = setup();
+      updater.checkForUpdates.mockRejectedValue(Object.assign(new Error('Cannot find channel "latest-mac.yml"'), { statusCode: 404 }));
+      const state = await manager.checkForUpdates();
+      expect(state).toMatchObject({ phase: "idle", lastCheckedAt: expect.any(String) });
+      expect(state).not.toHaveProperty("error");
     });
 
     it("clears an old error when the next check works", async () => {
@@ -154,7 +175,7 @@ describe("UpdateManager", () => {
       updater.downloadUpdate.mockRejectedValue(new Error("sha512 checksum mismatch"));
       expect(await manager.downloadUpdate()).toMatchObject({
         phase: "error",
-        error: "sha512 checksum mismatch",
+        error: "Something went wrong while downloading the update. Please try again later.",
         version: "0.2.0",
       });
     });
@@ -211,7 +232,7 @@ describe("UpdateManager", () => {
     it("is saved and shown", async () => {
       const { manager, saved } = setup();
       const state = await manager.setAutoCheckUpdates(false);
-      expect(saved).toEqual([{ autoCheck: false }]);
+      expect(saved).toEqual([{ autoCheck: false, allowPrerelease: false }]);
       expect(state.autoCheck).toBe(false);
     });
 
@@ -224,6 +245,89 @@ describe("UpdateManager", () => {
     it("ignores anything that isn't a boolean", async () => {
       const { manager, saved } = setup();
       await manager.setAutoCheckUpdates("yes" as unknown as boolean);
+      expect(saved).toEqual([]);
+    });
+  });
+
+  describe("including pre-releases", () => {
+    const releaseFeed = (found: { url: string; channel: string } | null = { url: "https://example.test/rel", channel: "beta" }) => ({
+      findLatest: vi.fn(async () => found),
+      stableUrl: "https://example.test/stable",
+    });
+
+    it("is off by default and the normal feed is left alone", async () => {
+      const feed = releaseFeed();
+      const { manager, updater } = setup({ releaseFeed: feed });
+      expect((await manager.getUpdateState()).allowPrerelease).toBe(false);
+      await manager.checkForUpdates();
+      expect(feed.findLatest).not.toHaveBeenCalled();
+      expect(updater.setFeedURL).not.toHaveBeenCalled();
+    });
+
+    it("checks the newest release of any kind when on", async () => {
+      const feed = releaseFeed();
+      const { manager, updater } = setup({ releaseFeed: feed }, true, true);
+      updater.checkForUpdates.mockResolvedValue(found("0.2.0-beta.1"));
+      expect(await manager.checkForUpdates()).toMatchObject({ phase: "available", version: "0.2.0-beta.1" });
+      expect(updater.setFeedURL).toHaveBeenCalledWith({ provider: "generic", url: "https://example.test/rel", channel: "beta" });
+    });
+
+    it("is up to date when GitHub lists nothing to update from", async () => {
+      const { manager, updater } = setup({ releaseFeed: releaseFeed(null) }, true, true);
+      const state = await manager.checkForUpdates();
+      expect(state).toMatchObject({ phase: "idle", lastCheckedAt: "2026-10-14T12:00:00.000Z" });
+      expect(updater.checkForUpdates).not.toHaveBeenCalled();
+    });
+
+    it("reports a failure to list releases like any other failed check", async () => {
+      const feed = releaseFeed();
+      feed.findLatest.mockRejectedValue(new Error("ENOTFOUND api.github.com"));
+      const { manager } = setup({ releaseFeed: feed }, true, true);
+      expect(await manager.checkForUpdates()).toMatchObject({
+        phase: "error",
+        error: "Couldn't reach GitHub. Check your internet connection and try again.",
+      });
+    });
+
+    it("is saved, shown and checked straight away when turned on", async () => {
+      const feed = releaseFeed();
+      const { manager, updater, saved } = setup({ releaseFeed: feed });
+      const state = await manager.setAllowPrerelease(true);
+      expect(saved).toEqual([{ autoCheck: true, allowPrerelease: true }]);
+      expect(state.allowPrerelease).toBe(true);
+      await vi.waitFor(() => expect(updater.checkForUpdates).toHaveBeenCalledTimes(1));
+      expect(updater.setFeedURL).toHaveBeenCalledTimes(1);
+    });
+
+    it("goes back to the normal feed and drops a pre-release offer when turned off", async () => {
+      const feed = releaseFeed();
+      const { manager, updater } = setup({ releaseFeed: feed }, true, true);
+      updater.checkForUpdates.mockResolvedValue(found("0.2.0-beta.1"));
+      await manager.checkForUpdates();
+      updater.checkForUpdates.mockResolvedValue(none);
+
+      const state = await manager.setAllowPrerelease(false);
+      expect(state).toMatchObject({ allowPrerelease: false });
+      expect(state).not.toHaveProperty("version");
+      await vi.waitFor(async () => expect((await manager.getUpdateState()).phase).toBe("idle"));
+      expect(updater.checkForUpdates).toHaveBeenCalledTimes(2);
+      expect(updater.setFeedURL).toHaveBeenLastCalledWith({ provider: "generic", url: "https://example.test/stable" });
+    });
+
+    it("keeps a finished download when the toggle changes", async () => {
+      const { manager, updater } = setup();
+      updater.checkForUpdates.mockResolvedValue(found("0.2.0"));
+      await manager.checkForUpdates();
+      await manager.downloadUpdate();
+      updater.checkForUpdates.mockClear();
+      const state = await manager.setAllowPrerelease(true);
+      expect(state).toMatchObject({ phase: "ready", allowPrerelease: true });
+      expect(updater.checkForUpdates).not.toHaveBeenCalled();
+    });
+
+    it("ignores anything that isn't a boolean", async () => {
+      const { manager, saved } = setup();
+      await manager.setAllowPrerelease("yes" as unknown as boolean);
       expect(saved).toEqual([]);
     });
   });
