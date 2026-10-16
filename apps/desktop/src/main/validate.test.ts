@@ -150,6 +150,11 @@ describe("UPDATE_VALIDATORS", () => {
     expect(UPDATE_VALIDATORS.downloadUpdate(["/tmp/x"])).toEqual([]);
     expect(UPDATE_VALIDATORS.installUpdate([{ file: "/tmp/x" }])).toEqual([]);
     expect(UPDATE_VALIDATORS.setAutoCheckUpdates([true, "extra"])).toEqual([true]);
+    expect(UPDATE_VALIDATORS.setAllowPrerelease([false, "extra"])).toEqual([false]);
+  });
+
+  it.each([[[]], [["true"]], [[1]], [[null]]])("rejects %j for setAllowPrerelease", (args) => {
+    expect(() => UPDATE_VALIDATORS.setAllowPrerelease(args)).toThrow(InvalidArgumentsError);
   });
 
   it.each([[[]], [["true"]], [[1]], [[null]]])("rejects %j for setAutoCheckUpdates", (args) => {

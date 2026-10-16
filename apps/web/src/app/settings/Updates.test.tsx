@@ -7,6 +7,7 @@ import {
   downloadUpdate,
   getUpdateState,
   installUpdate,
+  setAllowPrerelease,
   setAutoCheckUpdates,
   subscribeToUpdateState,
 } from "@/lib/composition/updatesClient";
@@ -19,10 +20,11 @@ vi.mock("@/lib/composition/updatesClient", () => ({
   downloadUpdate: vi.fn(),
   installUpdate: vi.fn(),
   setAutoCheckUpdates: vi.fn(),
+  setAllowPrerelease: vi.fn(),
   subscribeToUpdateState: vi.fn(),
 }));
 
-const idle: UpdateState = { phase: "idle", currentVersion: "0.1.3", supported: true, autoCheck: true };
+const idle: UpdateState = { phase: "idle", currentVersion: "0.1.3", supported: true, autoCheck: true, allowPrerelease: false };
 let push: UpdateStateListener;
 
 beforeEach(() => {
@@ -51,7 +53,7 @@ describe("Updates", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
 
-    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Composition 0.1.3 is up to date."));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Composition 0.1.3. Already running the latest supported version."));
     expect(checkForUpdates).toHaveBeenCalledTimes(1);
   });
 
@@ -83,8 +85,8 @@ describe("Updates", () => {
 
   it("shows an error as an alert", async () => {
     await renderIt();
-    act(() => push({ ...idle, phase: "error", error: "net::ERR_INTERNET_DISCONNECTED" }));
-    expect(screen.getByRole("alert").textContent).toBe("Couldn't check for updates: net::ERR_INTERNET_DISCONNECTED");
+    act(() => push({ ...idle, phase: "error", error: "Couldn't reach GitHub. Check your internet connection and try again." }));
+    expect(screen.getByRole("alert").textContent).toBe("Couldn't reach GitHub. Check your internet connection and try again.");
   });
 
   it("saves the automatic-check choice", async () => {
@@ -96,6 +98,17 @@ describe("Updates", () => {
     fireEvent.click(box);
 
     await waitFor(() => expect(setAutoCheckUpdates).toHaveBeenCalledWith(false));
+  });
+
+  it("saves the pre-release choice, off until turned on", async () => {
+    vi.mocked(setAllowPrerelease).mockResolvedValue({ ...idle, allowPrerelease: true });
+    await renderIt();
+
+    const box = screen.getByLabelText("Include pre-release versions") as HTMLInputElement;
+    expect(box.checked).toBe(false);
+    fireEvent.click(box);
+
+    await waitFor(() => expect(setAllowPrerelease).toHaveBeenCalledWith(true));
   });
 
   it("explains instead of offering buttons when updates aren't supported", async () => {

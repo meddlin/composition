@@ -9,6 +9,7 @@ import {
   checkForUpdates,
   downloadUpdate,
   installUpdate,
+  setAllowPrerelease,
   setAutoCheckUpdates,
   UPDATES_AVAILABLE,
 } from "@/lib/composition/updatesClient";
@@ -54,7 +55,8 @@ export function Updates() {
         <CardDescription>
           Composition looks for a newer version on GitHub when it starts and every few hours. Nothing is downloaded
           until you say so, and the app only restarts when you choose to. Checking contacts github.com; nothing from
-          your notes is sent.
+          your notes is sent. Pre-release versions are early builds and can be unstable; they are only offered if you
+          include them below.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
@@ -109,6 +111,17 @@ export function Updates() {
                 className="size-4 accent-primary"
               />
               Check for updates automatically
+            </label>
+
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={state.allowPrerelease}
+                disabled={pending}
+                onChange={(event) => run(() => setAllowPrerelease(event.target.checked))}
+                className="size-4 accent-primary"
+              />
+              Include pre-release versions
             </label>
           </>
         )}

@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import { describeUpdateState, updateNeedsAttention, type UpdateState } from "./updatesApi";
 
-const base: UpdateState = { phase: "idle", currentVersion: "0.1.3", supported: true, autoCheck: true };
+const base: UpdateState = { phase: "idle", currentVersion: "0.1.3", supported: true, autoCheck: true, allowPrerelease: false };
 
 describe("describeUpdateState", () => {
   it.each([
     [{ ...base }, "Composition 0.1.3. Not checked yet."],
-    [{ ...base, lastCheckedAt: "2026-10-14T12:00:00Z" }, "Composition 0.1.3 is up to date."],
+    [{ ...base, lastCheckedAt: "2026-10-14T12:00:00Z" }, "Composition 0.1.3. Already running the latest supported version."],
     [{ ...base, phase: "checking" }, "Checking for updates…"],
     [{ ...base, phase: "available", version: "0.2.0" }, "Version 0.2.0 is available."],
     [{ ...base, phase: "downloading", version: "0.2.0", percent: 41.6 }, "Downloading version 0.2.0… 42%"],
     [{ ...base, phase: "downloading", version: "0.2.0" }, "Downloading version 0.2.0… 0%"],
     [{ ...base, phase: "ready", version: "0.2.0" }, "Version 0.2.0 is ready. Restart to update."],
-    [{ ...base, phase: "error", error: "offline" }, "Couldn't check for updates: offline"],
+    [{ ...base, phase: "error", error: "offline" }, "offline"],
     [{ ...base, supported: false, unsupportedReason: "Only in the installed app." }, "Only in the installed app."],
   ] as [UpdateState, string][])("says the right thing for %j", (state, text) => {
     expect(describeUpdateState(state)).toBe(text);
