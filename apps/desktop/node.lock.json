@@ -1,0 +1,16 @@
+{
+  "$comment": "The Node.js runtime bundled with the desktop app for the command line tool (apps/cli). Electron's own Node (24.x) is not used: the CLI needs node:ffi, which arrived in Node 26.1 and is not in Electron's build. Digests come from https://nodejs.org/dist/<version>/SHASUMS256.txt. Change the version here, nowhere else. It must satisfy apps/cli/package.json engines.node.",
+  "version": "v26.12.0",
+  "assets": {
+    "mac-arm64": {
+      "name": "node-v26.12.0-darwin-arm64.tar.gz",
+      "sha256": "2a154d4a5458930e0a2d6a1ecf64eddf5a2b3e1c13636b609c2ecb042e8c4553",
+      "size": 58327892
+    },
+    "mac-x64": {
+      "name": "node-v26.12.0-darwin-x64.tar.gz",
+      "sha256": "878ecede191c7abc1bff01d3fb81f7ed81aa1161040dba18776b8ff8593614b1",
+      "size": 59797494
+    }
+  }
+}

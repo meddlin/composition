@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   closeDb,
+  defaultSharedLocationPath,
   isExecutableFile,
   listNotes,
   loadWebSettings,
@@ -61,6 +62,8 @@ function makeLogger(file: string) {
 export async function startRuntime({ home = os.homedir() }: RuntimeOptions = {}): Promise<Runtime> {
   // The shared data layer reads this on every call, so it can be set after import.
   const settingsFile = (process.env.COMPOSITION_SETTINGS_PATH ??= defaultSettingsPath(home));
+  // Settings stay this app's own; only the data location is agreed with the desktop app.
+  process.env.COMPOSITION_SHARED_LOCATION_PATH ??= defaultSharedLocationPath(home);
   importLegacySettings({ target: settingsFile, legacy: legacySettingsPath(home) });
   const log = makeLogger(path.join(path.dirname(settingsFile), "cli.log"));
 

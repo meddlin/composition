@@ -20,9 +20,27 @@ const FRONTMATTER = /^---\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n?/;
 const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 const FENCE_CLOSE = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 const HEADING = /^ {0,3}#{1,6}(?:[ \t]|$)/;
-const RULE = /^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/;
 const QUOTE_PREFIX = /^ {0,3}(?:>[ \t]?)+/;
 const LIST_MARKER = /^[ \t]*(?:[-*+]|\d{1,9}[.)])(?=[ \t])[ \t]*/;
+
+/**
+ * A thematic break: up to three spaces, then three or more of one of `-`, `*`, `_`, with spaces or tabs
+ * allowed between and after them. Written as a loop, not a regular expression, because the
+ * repeated-group form (`([-*_])(?:[ \t]*\1){2,}`) is what ReDoS scanners flag.
+ */
+function isThematicBreak(line: string): boolean {
+  let i = 0;
+  while (i < 3 && line[i] === " ") i++;
+  const marker = line[i];
+  if (marker !== "-" && marker !== "*" && marker !== "_") return false;
+  let count = 0;
+  for (; i < line.length; i++) {
+    const char = line[i];
+    if (char === marker) count++;
+    else if (char !== " " && char !== "\t") return false;
+  }
+  return count >= 3;
+}
 
 // One alternation, so the leftmost construct wins. Everything is single-line. The groups are
 // numbered (the build targets ES2017, which has no named groups): see INLINE_KINDS.
@@ -119,7 +137,7 @@ function tokenizeLine(line: string, out: Segment[], fence: Fence | null): Fence 
     return { char: open[1][0], length: open[1].length };
   }
   if (HEADING.test(line)) push(out, line, "heading");
-  else if (RULE.test(line)) push(out, line, "rule");
+  else if (isThematicBreak(line)) push(out, line, "rule");
   else {
     let rest = line;
     const quote = QUOTE_PREFIX.exec(rest);

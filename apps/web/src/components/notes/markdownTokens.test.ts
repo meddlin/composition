@@ -95,6 +95,20 @@ describe("tokenizeMarkdown", () => {
         ["rule", "_ _ _"],
       ]);
     });
+
+    it("needs three of one marker, with only spaces or tabs between them, and at most three spaces of indent", () => {
+      expect(kinds("  - - -  \n---\t")).toEqual([
+        ["rule", "  - - -  "],
+        ["rule", "---\t"],
+      ]);
+      for (const line of ["--", "-*-", "--- a", "    ---", "-_-_"]) expect(kinds(line)).not.toContainEqual(["rule", line]);
+    });
+
+    it("stays fast on a long line that almost is a thematic break", () => {
+      const started = Date.now();
+      tokenizeMarkdown(`-${" ".repeat(50_000)}x`);
+      expect(Date.now() - started).toBeLessThan(1000);
+    });
   });
 
   describe("inline", () => {

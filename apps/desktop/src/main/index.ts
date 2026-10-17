@@ -2,7 +2,8 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
-import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
+import { installCliToolMenuItem } from "./cliToolMenu";
+import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
@@ -15,7 +16,7 @@ app.setAboutPanelOptions({
   applicationName: "Composition",
   copyright: "Copyright © Composition contributors",
   credits:
-    "Includes Meilisearch (MIT), Electron and Chromium. License notices are in the app bundle's Resources/licenses folder.",
+    "Includes Meilisearch (MIT), Node.js (MIT) for the command line tool, Electron and Chromium. License notices are in the app bundle's Resources/licenses folder.",
 });
 // Before the app is ready, as Electron requires for custom schemes.
 registerSchemePrivileges();
@@ -25,6 +26,9 @@ registerSchemePrivileges();
 // lives in ~/.composition by default (docs/product-builds.md).
 const userData = app.getPath("userData");
 process.env.COMPOSITION_SETTINGS_PATH = path.join(userData, "settings.json");
+// The data location alone is agreed with the terminal app, which shares the database, so a
+// move made in either one is followed by the other (docs/product-builds.md).
+process.env.COMPOSITION_SHARED_LOCATION_PATH = defaultSharedLocationPath(app.getPath("home"));
 
 // Images stay on this machine, so the web app's upload size limit does not apply.
 service.setMaxImageBytes(null);
@@ -167,6 +171,7 @@ async function main(): Promise<void> {
   void sidecar.start();
   openMainWindow();
   updates.installMenuItem();
+  installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
   updates.manager.start();
 
   app.on("activate", () => {

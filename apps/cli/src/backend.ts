@@ -32,6 +32,7 @@ export { readArchive } from "../../web/src/lib/composition/tarArchive";
 export { formatBytes } from "../../web/src/lib/composition/attachmentNames";
 export { expandHome } from "../../web/src/lib/composition/paths";
 export {
+  defaultSharedLocationPath,
   loadWebSettings,
   resolvedDbPath,
   saveWebSettings,

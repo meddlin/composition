@@ -56,7 +56,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Color schemes | 6 | 6 | 6 | Dark, light, forest, wine, cream and "follow the sun", in all three. The CLI's colors are the web's (a test fails if they drift) |
 | "Follow the sun" scheme | ✅ | ✅ | ✅ | [web-follow-the-sun.md](ui/web-follow-the-sun.md). The CLI fades smoothly only in a truecolor terminal, and otherwise switches between dark and light |
 | Resizable columns, remembered | ✅ | ✅ | ✅ | Web and desktop: drag the dividers. CLI: `<` `>` for the tree and `[` `]` for the editor/preview split. The CLI's tree width is stored in its own field (`cliSidebarColumns`, in columns), so a backup restored from another app never resizes it; the split is the shared `editorRatio`. [keybindings](ui/cli-keybindings.md) |
-| Application data location setting | ✅ | ✅ | ✅ | |
+| Application data location setting | ✅ | ✅ | ✅ | Moving it in the CLI or the desktop app moves the other one too, through `~/.composition-location.json`. The web app keeps its own. The CLI moves the files; web and desktop only repoint. [product-builds.md](product-builds.md) |
 | Backup and restore everything from Settings | ✅ | ✅ | ✅ | Notes, groups, Trash Can, images, attachments, and the color scheme, city, column sizes and favorites, in one `.tar.gz`. The web and CLI type a path; the desktop uses file dialogs. [backup-restore.md](architecture/backup-restore.md) |
 | Automatic updates | 🚫 | 🚫 | ✅ | Checks GitHub Releases at launch and every 6 hours, asks before downloading and again before restarting. Settings has the on/off toggle. [desktop-updates-plan.md](desktop-updates-plan.md) |
 | Developer docs viewer (`/docs`) | ❌ | ✅ | 🚫 | It reads this repo's docs from disk, which an installed app doesn't have |
@@ -65,7 +65,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 
 | | CLI | Web | Desktop |
 |---|---|---|---|
-| Shipped as | Undecided (runs from source: `pnpm dev`, or the `composition` bin) | Undecided | Download from GitHub Releases once; after that it updates itself |
+| Shipped as | Inside the macOS desktop app (Composition > Install Command Line Tool…); from source elsewhere (`pnpm dev`, or the `composition` bin) | Undecided | Download from GitHub Releases once; after that it updates itself |
 | Platforms | macOS and Linux, on Node 26.10 or newer. Windows later | Any browser | macOS only for now |
 | Notes database | `~/.composition/composition.db`, shared by all three | same | same |
 

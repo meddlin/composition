@@ -31,6 +31,12 @@ leaving the terminal. It opens the same notes as the web and desktop apps in thi
 - Back up everything (notes, images, attachments, settings) to one file, and restore it, from Settings
   ([docs/architecture/backup-restore.md](../../docs/architecture/backup-restore.md))
 
+## Getting it with the desktop app
+
+On macOS, the Composition desktop app includes this terminal app, its own Node 26 and Meilisearch, so
+there is nothing else to install: open Composition, choose **Composition > Install Command Line Tool…**,
+then run `composition` in any Terminal window. The rest of this page is for running it from source.
+
 ## Requirements
 
 - **Node 26.10 or newer.** OpenTUI uses Node's `node:ffi`, which is on by default from 26.10.

@@ -5,6 +5,9 @@ dist/
 release/
 # Meilisearch binary fetched by `pnpm fetch:meilisearch`; never committed
 resources/meilisearch/
+# Node runtime fetched by `pnpm fetch:node`, and the command line tool assembled by `pnpm stage:cli`
+resources/node/
+resources/cli/
 # Assembled by scripts/collect-licenses.mjs
 resources/licenses/
 *.tsbuildinfo
