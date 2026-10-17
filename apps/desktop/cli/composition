@@ -1,0 +1,24 @@
+#!/bin/sh
+# Launcher for the Composition command line tool that ships inside Composition.app
+# (Contents/Resources/cli/). It runs the app's own Node 26 on the bundled CLI, so nothing
+# needs installing, and points search at the Meilisearch the app ships.
+#
+# The app's "Install Command Line Tool" menu item symlinks this file onto the PATH, so
+# find the real location by following symlinks first.
+self="$0"
+while [ -L "$self" ]; do
+  dir=$(cd "$(dirname "$self")" && pwd -P)
+  self=$(readlink "$self")
+  case "$self" in
+    /*) ;;
+    *) self="$dir/$self" ;;
+  esac
+done
+here=$(cd "$(dirname "$self")" && pwd -P)
+
+if [ -z "${COMPOSITION_MEILI_BIN:-}" ] && [ -x "$here/../meilisearch/meilisearch" ]; then
+  COMPOSITION_MEILI_BIN="$here/../meilisearch/meilisearch"
+  export COMPOSITION_MEILI_BIN
+fi
+
+exec "$here/node" "$here/app/bin/composition.mjs" "$@"

@@ -123,14 +123,18 @@ export APPLE_API_ISSUER=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
 cd apps/desktop
 pnpm fetch:meilisearch mac-arm64     # once per architecture; omit the argument for both
+pnpm fetch:node mac-arm64            # Node 26 for the bundled command line tool
+(cd ../cli && pnpm install --frozen-lockfile)
+pnpm stage:cli mac-arm64
 pnpm dist
 ```
 
 What happens:
 
 - electron-builder finds the Developer ID Application identity in your login keychain and signs
-  every executable in the bundle, including the Meilisearch binary and the better-sqlite3
-  `.node` files. You do **not** set `CSC_LINK` or `CSC_KEY_PASSWORD` for a local build. Those
+  every executable in the bundle, including the Meilisearch binary, the better-sqlite3
+  `.node` files, and the command line tool's Node, OpenTUI library and better-sqlite3 (all under
+  `Contents/Resources/cli`). Notarization covers them in the same submission. You do **not** set `CSC_LINK` or `CSC_KEY_PASSWORD` for a local build. Those
   are for CI, where there is no login keychain.
 - It then submits the app to Apple and waits. The first submission can take several minutes.
 - Output lands in `apps/desktop/release/`: the DMG, the ZIP and `mac-arm64/Composition.app`.
@@ -377,8 +381,8 @@ xcrun notarytool log <submission-id> --key "$APPLE_API_KEY" --key-id "$APPLE_API
 
 ### Why does the build fail at `extraResources`?
 
-The Meilisearch binary for the architecture being built is missing. Run
-`pnpm fetch:meilisearch` first ([step 6 of the release runbook](../desktop-build-and-release.md#6-fetch-meilisearch-and-package-the-app)).
+The Meilisearch binary, or the command line tool (`resources/cli/<os>-<arch>`), for the architecture
+being built is missing. Run `pnpm fetch:meilisearch`, `pnpm fetch:node` and `pnpm stage:cli` first ([step 6 of the release runbook](../desktop-build-and-release.md#6-fetch-meilisearch-and-package-the-app)).
 
 ### Can I change the app identifier later?
 

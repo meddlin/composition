@@ -15,7 +15,9 @@
     "package": "pnpm build && electron-builder --dir -c.mac.identity=null",
     "dist": "pnpm build && electron-builder",
     "release": "node scripts/release.mjs",
-    "fetch:meilisearch": "node scripts/fetch-meilisearch.mjs"
+    "fetch:meilisearch": "node scripts/fetch-meilisearch.mjs",
+    "fetch:node": "node scripts/fetch-node.mjs",
+    "stage:cli": "node scripts/stage-cli.mjs"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

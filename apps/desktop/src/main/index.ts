@@ -2,6 +2,7 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
+import { installCliToolMenuItem } from "./cliToolMenu";
 import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
@@ -15,7 +16,7 @@ app.setAboutPanelOptions({
   applicationName: "Composition",
   copyright: "Copyright © Composition contributors",
   credits:
-    "Includes Meilisearch (MIT), Electron and Chromium. License notices are in the app bundle's Resources/licenses folder.",
+    "Includes Meilisearch (MIT), Node.js (MIT) for the command line tool, Electron and Chromium. License notices are in the app bundle's Resources/licenses folder.",
 });
 // Before the app is ready, as Electron requires for custom schemes.
 registerSchemePrivileges();
@@ -167,6 +168,7 @@ async function main(): Promise<void> {
   void sidecar.start();
   openMainWindow();
   updates.installMenuItem();
+  installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
   updates.manager.start();
 
   app.on("activate", () => {

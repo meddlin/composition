@@ -4,6 +4,7 @@ import {
   checkUpdateFeed,
   checksumFile,
   isInside,
+  isMachO,
   parseArgs,
   parseSigningIdentities,
   releaseAssetNames,
@@ -198,5 +199,23 @@ describe("releaseAssetNames", () => {
       "SHA256SUMS.txt",
       "latest-mac.yml",
     ]);
+  });
+});
+
+describe("isMachO", () => {
+  it.each([
+    ["a 64-bit arm64/x86_64 binary", "cffaedfe"],
+    ["a 32-bit binary", "cefaedfe"],
+    ["a big-endian 64-bit binary", "feedfacf"],
+    ["a universal binary", "cafebabe"],
+  ])("recognises %s", (_name, magic) => {
+    expect(isMachO(Buffer.from(`${magic}0000000c`, "hex"))).toBe(true);
+  });
+
+  it("rejects scripts, text and files too short to tell", () => {
+    expect(isMachO(Buffer.from("#!/bin/sh\n"))).toBe(false);
+    expect(isMachO(Buffer.from("{\"a\":1}"))).toBe(false);
+    expect(isMachO(Buffer.from("cf", "hex"))).toBe(false);
+    expect(isMachO(Buffer.alloc(0))).toBe(false);
   });
 });

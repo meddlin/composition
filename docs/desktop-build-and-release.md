@@ -107,18 +107,25 @@ Launches the built app with Playwright against a throwaway `HOME`, from `/` (as 
 prints `PASS`/`FAIL` per check. It never touches real notes. Set `SMOKE_OUT=/some/dir` to keep the
 screenshots. Fix any `FAIL` before going on.
 
-## 6. Fetch Meilisearch and package the `.app`
+## 6. Fetch Meilisearch and Node, assemble the CLI, and package the `.app`
 
-Packaged builds bundle Meilisearch from `resources/meilisearch/<os>-<arch>/`. That folder is
-gitignored, so a fresh clone has none:
+Packaged builds bundle Meilisearch from `resources/meilisearch/<os>-<arch>/`, and the `composition`
+command line tool from `resources/cli/<os>-<arch>/`. Both folders are gitignored, so a fresh clone
+has neither:
 
 ```bash
 pnpm fetch:meilisearch mac-arm64      # Apple Silicon; omit the argument for both architectures
+pnpm fetch:node mac-arm64             # the Node 26 the command line tool runs on
+(cd ../cli && pnpm install --frozen-lockfile)
+pnpm stage:cli mac-arm64              # builds apps/cli and assembles resources/cli/mac-arm64
 ```
 
-About 116 MiB per architecture. Each download is checked against the SHA-256 in
-`meilisearch.lock.json`; a mismatch deletes the file and fails the run. The lock pins the
-**community** (MIT) build. Never swap in an `enterprise` asset.
+Meilisearch is about 116 MiB per architecture and Node about 57 MiB. Each download is checked against
+the SHA-256 in `meilisearch.lock.json` / `node.lock.json`; a mismatch deletes the file and fails the
+run. The Meilisearch lock pins the **community** (MIT) build. Never swap in an `enterprise` asset.
+
+The command line tool needs its own Node because Electron's (24.x) has no `node:ffi`, which the
+terminal UI needs. `pnpm release` runs all of these steps for you.
 
 Then package and smoke test the real bundle:
 

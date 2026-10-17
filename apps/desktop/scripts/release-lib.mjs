@@ -4,10 +4,10 @@ import path from "node:path";
 
 export const TAG_PREFIX = "desktop-v";
 
-/** The architectures a release builds, and how each one is named by the tools involved. */
+/** The architectures a release builds, and how each one is named by the tools involved. `platform` is the key used by the lock files and resources/ folders. */
 export const ARCHES = {
-  arm64: { builderFlag: "--arm64", meilisearch: "mac-arm64", lipo: "arm64" },
-  x64: { builderFlag: "--x64", meilisearch: "mac-x64", lipo: "x86_64" },
+  arm64: { builderFlag: "--arm64", platform: "mac-arm64", lipo: "arm64" },
+  x64: { builderFlag: "--x64", platform: "mac-x64", lipo: "x86_64" },
 };
 
 /** "desktop-v1.2.3" -> "1.2.3". Null if the tag isn't a desktop release tag. */
@@ -127,4 +127,13 @@ export function releaseAssetNames(files) {
   return files
     .filter((file) => /\.(dmg|zip|blockmap)$/.test(file) || file === "latest-mac.yml" || file === "SHA256SUMS.txt")
     .sort();
+}
+
+// Mach-O headers: 32/64-bit in either byte order, and the "fat" universal header. Every
+// executable inside a signed app must be one of these, and must itself carry a signature.
+const MACH_O_MAGIC = new Set(["feedface", "feedfacf", "cefaedfe", "cffaedfe", "cafebabe", "bebafeca"]);
+
+/** True if `head` (the first bytes of a file) starts like a Mach-O binary. */
+export function isMachO(head) {
+  return head.length >= 4 && MACH_O_MAGIC.has(Buffer.from(head.subarray(0, 4)).toString("hex"));
 }

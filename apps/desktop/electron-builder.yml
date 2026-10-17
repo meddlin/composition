@@ -39,6 +39,11 @@ npmRebuild: false
 extraResources:
   - from: resources/meilisearch/${os}-${arch}
     to: meilisearch
+  # The command line tool (`composition`): a launcher, its own Node 26 (Electron's Node has no
+  # node:ffi, which the terminal UI needs) and the CLI bundle with its native modules.
+  # `pnpm fetch:node` then `pnpm stage:cli` assemble resources/cli/<os>-<arch>/.
+  - from: resources/cli/${os}-${arch}
+    to: cli
   # License notices (scripts/collect-licenses.mjs): Electron, Chromium, Meilisearch, JS packages.
   - from: resources/licenses
     to: licenses

@@ -8,9 +8,28 @@ the gap is written down instead of remembered.
 
 | Product | Path | Stack | Distribution |
 |---|---|---|---|
-| CLI | `apps/cli` | TypeScript, OpenTUI (React), Node 26.10+ | Undecided (see the distribution question in [index.md](index.md)) |
+| CLI | `apps/cli` | TypeScript, OpenTUI (React), Node 26.10+ | **Inside the macOS desktop app** (below); from source elsewhere |
 | Web | `apps/web` | Next.js | Undecided |
 | Desktop | `apps/desktop` | Electron | **GitHub Releases, manual download, macOS only for now** ([plan](desktop-app-plan.md)) |
+
+## The CLI ships inside the desktop app
+
+The macOS desktop installer also carries the terminal app, so one download gives both. In the app
+bundle, `Contents/Resources/cli/` holds a launcher, a pinned **Node 26** and the CLI bundle with its
+native modules; the app's **Install Command Line Tool…** menu item links `composition` onto the PATH.
+Details and build steps: [apps/desktop/README.md](../apps/desktop/README.md#the-command-line-tool).
+
+- **Why its own Node.** Electron 44 (and 45) bundle Node 24, and Electron's Node has no `node:ffi`,
+  which OpenTUI needs (Node 26.1+, on by default from 26.10). So the bundle carries the official
+  Node 26 beside Electron. Re-check `import("node:ffi")` under `ELECTRON_RUN_AS_NODE=1` on each
+  Electron major; if it ever works, that Node can go.
+- **Signing.** Everything under `Contents/Resources/cli` is signed with the same Developer ID
+  certificate as the app and notarized in the same submission (`pnpm release` verifies it).
+- **Versions and updates.** The CLI is released with the desktop app: its version in the bundle is
+  whatever `apps/cli` had at the desktop tag, and the app's updater replaces it along with everything else.
+- **Same database, same version.** A combined install can never have the CLI and desktop disagree
+  about the schema, since they ship together. Both use better-sqlite3 13 (N-API).
+- **macOS only.** A Linux CLI still runs from source.
 
 ## Data storage: today
 
@@ -85,4 +104,5 @@ It is mostly configuration, and small:
   intended later split.
 - 2026-09-30: the desktop app bundles Meilisearch in v1.
 - 2026-09-30: desktop releases are manual downloads from GitHub Releases; no auto-update yet.
+- 2026-10-17: the desktop installer includes the CLI (own Node 26, launcher, Install Command Line Tool menu item), signed and notarized with the app; `apps/cli` moved to better-sqlite3 13 so one machine can stage both Mac architectures. Packaging via the existing release workflow, plus `package-desktop.yml` on pull requests.
 - 2026-10-14: the desktop app updates itself from GitHub Releases (electron-updater, generic feed, asks before downloading and before restarting). Design: [desktop-updates-plan.md](desktop-updates-plan.md). Supersedes the line above.
