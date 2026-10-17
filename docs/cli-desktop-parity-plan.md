@@ -100,12 +100,17 @@ Result: steps 1 and 2 are done (`ctrl+l`; pasting image paths, which is also wha
 the terminal does), the limit is lifted in `main.tsx`, and step 3 (clipboard) is left out as decided.
 The size-limit call is in the entry point, which tests don't run, so nothing checks it automatically.
 
-### Phase 5: remembered column sizes
+### Phase 5: remembered column sizes (done 2026-10-17)
 
 - Keys to widen or narrow the sidebar, and to change the editor/preview split in a pane; keep
   `SIDEBAR_WIDTH` as the default, not a constant. Mouse drag on the divider as a follow-up.
 - Persist through `service.saveLayout`.
 - Open question (below): the shared layout stores **pixels**, the CLI draws **columns**.
+- Result: option (b). `cliSidebarColumns` is a new optional field of the shared settings (`webSettings.ts`, clamped
+  20 to 60 in `layout.ts`); the editor/preview split reuses `editorRatio`, which is unitless. One correction to
+  the decision's reasoning: the CLI already has its own settings file, so the apps never overwrote each other's
+  sizes; (b)'s real benefit is that restoring a backup made in another app leaves the CLI's tree width alone.
+  Keys are `<` `>` and `[` `]` in the tree (not in a pane, where plain keys type). Mouse dragging is not done.
 
 ## Decisions
 

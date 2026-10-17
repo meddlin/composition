@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampCliSidebarColumns,
   clampEditorRatio,
   clampSidebarWidth,
   DEFAULT_EDITOR_RATIO,
@@ -23,6 +24,18 @@ describe("clampSidebarWidth", () => {
 
   it.each([NaN, Infinity, "300", null, undefined])("falls back to the default for %s", (value) => {
     expect(clampSidebarWidth(value)).toBe(DEFAULT_SIDEBAR_WIDTH);
+  });
+});
+
+describe("clampCliSidebarColumns", () => {
+  it("rounds to whole columns inside 20 to 60", () => {
+    expect(clampCliSidebarColumns(40.4)).toBe(40);
+    expect(clampCliSidebarColumns(3)).toBe(20);
+    expect(clampCliSidebarColumns(300)).toBe(60);
+  });
+
+  it.each([NaN, "40", null, undefined])("falls back to 34 for %s", (value) => {
+    expect(clampCliSidebarColumns(value)).toBe(34);
   });
 });
 

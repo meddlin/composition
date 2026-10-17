@@ -10,12 +10,12 @@ import { Tree } from "./components/Tree";
 import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
 import { imagePathsIn } from "./imageImport";
+import { drawnSidebar, loadColumns, resizeEditorShare, resizeSidebar, saveColumns, type Columns } from "./columns";
 import { placementFor, type Direction } from "./reorder";
 import { autoPalette, isTruecolor, paletteFor, syntaxStyleFor } from "./theme";
 import { useSunLevel } from "./useSunLevel";
 import { buildTree, groupKey, noteKey, orderedGroups, pruneFavorites, targetGroupId, type TreeRow } from "./tree";
 
-export const SIDEBAR_WIDTH = 34;
 export const SEARCH_DEBOUNCE_MS = 350;
 const TOAST_MS = 4000;
 /** A pane narrower than this shows the editor or the preview, not both side by side. */
@@ -45,6 +45,8 @@ export type AppProps = {
   theme?: string;
   /** Moves all the app's data to another folder and reopens it there (see runtime.ts). */
   moveDataLocation?: (destination: string) => Promise<void>;
+  /** The remembered column sizes; read from the settings file when not given. */
+  columns?: Columns;
 };
 
 const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
@@ -53,7 +55,7 @@ const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
   preview: "split",
 };
 
-export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation }: AppProps) {
+export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation, columns: initialColumns }: AppProps) {
   const renderer = useRenderer();
   const { width: terminalWidth } = useTerminalDimensions();
   const [theme, setTheme] = useState(initialTheme);
@@ -78,6 +80,24 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Favorites>(initial.favorites);
+
+  // --- column sizes ---------------------------------------------------------
+  const [columns, setColumns] = useState<Columns>(() => initialColumns ?? loadColumns());
+  // Keys can arrive faster than the screen redraws (a held key), so each step starts from the latest
+  // size, not from the one this render was drawn with.
+  const latestColumns = useRef(columns);
+  const resize = (change: (current: Columns) => Columns) => {
+    const current = latestColumns.current;
+    const next = change(current);
+    if (next.sidebarColumns === current.sidebarColumns && next.editorRatio === current.editorRatio) return;
+    latestColumns.current = next;
+    setColumns(next);
+    try {
+      saveColumns(next);
+    } catch (error) {
+      setToast(`That size couldn't be remembered: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
 
   // --- images ---------------------------------------------------------------
   const imageRequestId = useRef(0);
@@ -399,6 +419,18 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         startMove();
         break;
       // The list widget would also read shift+arrow as a jump of several rows; this key is ours.
+      case "narrow-sidebar":
+        resize((c) => ({ ...c, sidebarColumns: resizeSidebar(c.sidebarColumns, -1) }));
+        break;
+      case "widen-sidebar":
+        resize((c) => ({ ...c, sidebarColumns: resizeSidebar(c.sidebarColumns, 1) }));
+        break;
+      case "less-editor":
+        resize((c) => ({ ...c, editorRatio: resizeEditorShare(c.editorRatio, -1) }));
+        break;
+      case "more-editor":
+        resize((c) => ({ ...c, editorRatio: resizeEditorShare(c.editorRatio, 1) }));
+        break;
       case "move-up":
         key.preventDefault();
         void rearrange("up");
@@ -665,7 +697,8 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   // --- drawing --------------------------------------------------------------
   const openPanes = paneState.panes;
   const totalSize = openPanes.reduce((sum, pane) => sum + pane.size, 0) || 1;
-  const paneAreaWidth = Math.max(0, terminalWidth - SIDEBAR_WIDTH);
+  const sidebarWidth = drawnSidebar(columns.sidebarColumns, terminalWidth);
+  const paneAreaWidth = Math.max(0, terminalWidth - sidebarWidth);
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={palette.background}>
@@ -689,7 +722,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
 
       <box flexDirection="row" flexGrow={1}>
         <box
-          width={SIDEBAR_WIDTH}
+          width={sidebarWidth}
           border
           borderStyle="single"
           borderColor={focus === "tree" ? palette.borderFocused : palette.border}
@@ -729,6 +762,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
                   onSaved={noteSaved}
                   imageRequest={imageRequest?.noteId === pane.noteId ? imageRequest : null}
                   onNotice={setToast}
+                  editorRatio={columns.editorRatio}
                 />
               );
             })

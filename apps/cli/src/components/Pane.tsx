@@ -33,13 +33,15 @@ type PaneProps = {
   imageRequest?: ImageRequest | null;
   /** Something to tell the person: an image was added, or couldn't be. */
   onNotice?: (text: string) => void;
+  /** The editor's share (0 to 1) of the pane when it shows editor and preview together. */
+  editorRatio?: number;
 };
 
 /**
  * One open note: its editor, its live preview, or both. The editor saves itself shortly
  * after you stop typing, and once more when the pane closes or the app quits.
  */
-export function Pane({ note, size, view, focused, api, palette, syntax, flushes, onSaved, imageRequest, onNotice }: PaneProps) {
+export function Pane({ note, size, view, focused, api, palette, syntax, flushes, onSaved, imageRequest, onNotice, editorRatio = 0.5 }: PaneProps) {
   const editor = useRef<TextareaRenderable | null>(null);
   // The textarea owns the text from the moment it is created; later renders must not reset it.
   const initial = useRef(note.content);
@@ -146,7 +148,7 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
       title={` ${note.title} — ${statusText} · ${viewLabel} `}
     >
       <box flexDirection="row" flexGrow={1}>
-        <box flexGrow={1} flexBasis={0} visible={showEditor} paddingLeft={1} paddingRight={1}>
+        <box flexGrow={editorRatio * 100} flexBasis={0} visible={showEditor} paddingLeft={1} paddingRight={1}>
           <textarea
             ref={editor}
             focused={focused && showEditor}
@@ -184,7 +186,7 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
             }}
           />
         </box>
-        <box flexGrow={1} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
+        <box flexGrow={(1 - editorRatio) * 100} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
           <scrollbox focused={focused && !showEditor}>
             <Preview body={body} palette={palette} syntax={syntax} api={api} />
           </scrollbox>

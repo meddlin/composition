@@ -29,6 +29,10 @@ export type ActionId =
   | "close-pane"
   | "open-attachments"
   | "insert-image"
+  | "narrow-sidebar"
+  | "widen-sidebar"
+  | "less-editor"
+  | "more-editor"
   | "attach"
   | "save-copy"
   | "remove-attachment"
@@ -69,6 +73,10 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "move-up", scope: "tree", keys: ["shift+up"], hint: "shift+↑ up", description: "Move the highlighted note or group up one place among its siblings", footer: false },
   { action: "move-down", scope: "tree", keys: ["shift+down"], hint: "shift+↓ down", description: "Move the highlighted note or group down one place among its siblings", footer: false },
   { action: "open-attachments", scope: "tree", keys: ["a"], hint: "a files", description: "Open the highlighted note's attachments: attach files, save copies, remove", footer: false },
+  { action: "narrow-sidebar", scope: "tree", keys: ["<"], hint: "< narrower", description: "Make the tree narrower (remembered)", footer: false },
+  { action: "widen-sidebar", scope: "tree", keys: [">"], hint: "> wider", description: "Make the tree wider (remembered)", footer: false },
+  { action: "less-editor", scope: "tree", keys: ["["], hint: "[ less editor", description: "Give the editor less of a pane that shows editor and preview together, and the preview more (remembered)", footer: false },
+  { action: "more-editor", scope: "tree", keys: ["]"], hint: "] more editor", description: "Give the editor more of a pane that shows editor and preview together (remembered)", footer: false },
   { action: "rename-group", scope: "tree", keys: ["r"], hint: "r rename", description: "Rename the highlighted group", footer: false },
   { action: "favorite", scope: "tree", keys: ["f"], hint: "f pin", description: "Pin or unpin the highlighted note or group", footer: false },
   { action: "help", scope: "tree", keys: ["?"], hint: "? help", description: "Show every key", footer: true, essential: true },

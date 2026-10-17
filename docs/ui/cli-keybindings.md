@@ -34,6 +34,8 @@ wins and this page needs updating in the same pull request.
 | `m` | Move the highlighted **note or group** to another group, or a group back to the top level. A group's list leaves out the group itself and everything beneath it | note: *(existing)*; group: new |
 | `shift+↑` `shift+↓` | Move the highlighted note or group one place up or down among its siblings (the notes of one group, or the sub-groups of one parent), and keep that order. Does nothing at either end, in Favorites, or while a search is narrowing the tree. Web and desktop do the same by dragging | new |
 | `a` | Open the highlighted note's **Attachments** screen (see [below](#attachments-screen)) | new |
+| `<` `>` | Make the tree narrower or wider, two columns at a time, between 20 and 60 (it never takes so much that the panes have under 30 columns). Remembered | new |
+| `[` `]` | Give the editor less or more of a pane that shows editor and preview together, a tenth at a time, between 20% and 80%. Remembered | new |
 | `f` | Pin or unpin the highlighted note or group. Pinned items are listed in a "★ Favorites" section above the tree, in the order they were pinned, and starred where they sit in the tree | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |

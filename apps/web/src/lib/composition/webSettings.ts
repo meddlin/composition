@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { NO_FAVORITES, parseFavorites, type Favorites } from "./favorites";
-import { clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
+import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import type { SavedLocation } from "./sunTimes";
 import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
@@ -32,6 +32,8 @@ export type WebSettings = {
   location?: SavedLocation;
   sidebarWidth: number;
   editorRatio: number;
+  /** The terminal app's sidebar width in columns; absent until the CLI saves one (see layout.ts). */
+  cliSidebarColumns?: number;
   /** Pinned groups and notes, in pin order. */
   favorites: Favorites;
 };
@@ -78,6 +80,9 @@ export function parseWebSettings(data: unknown): WebSettings {
   };
   if (typeof value.dbPath === "string" && value.dbPath !== "") {
     settings.dbPath = value.dbPath;
+  }
+  if (value.cliSidebarColumns !== undefined) {
+    settings.cliSidebarColumns = clampCliSidebarColumns(value.cliSidebarColumns);
   }
   const location = parseLocation(value.location);
   if (location) settings.location = location;

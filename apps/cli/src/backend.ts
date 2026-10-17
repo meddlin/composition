@@ -42,6 +42,13 @@ export { listNotes } from "../../web/src/lib/composition/notesRepo";
 export type { Note } from "../../web/src/lib/composition/notesRepo";
 export type { Group } from "../../web/src/lib/composition/groupsRepo";
 export type { Favorites } from "../../web/src/lib/composition/favorites";
+export {
+  clampCliSidebarColumns,
+  clampEditorRatio,
+  DEFAULT_CLI_SIDEBAR_COLUMNS,
+  MAX_EDITOR_RATIO,
+  MIN_EDITOR_RATIO,
+} from "../../web/src/lib/composition/layout";
 export { canMoveGroup, wouldCreateCycle } from "../../web/src/lib/composition/groupMove";
 export { fallbackSunEvents, INK_FLIP_LEVEL, sunLevel, RAMP_HALF_WIDTH_MS } from "../../web/src/lib/composition/sunSchedule";
 export type { SunEvent } from "../../web/src/lib/composition/sunSchedule";

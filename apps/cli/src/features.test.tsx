@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeDb, listNotes, loadWebSettings, resolvedDbPath, service, sunLevel, type SunEvent } from "./backend";
+import { loadColumns, saveColumns } from "./columns";
 import { moveApplicationData } from "./dataLocation";
 import { backgroundAt, createSandbox, frame, press, pressEscape, settle, sleep, type Rendered, type Sandbox } from "./testing";
 
@@ -276,6 +277,81 @@ describe("rearranging with shift+arrows", () => {
     await press(app, "ARROW_DOWN", { shift: true }, 300);
 
     expect(frame(app)).toContain("Clear the search to rearrange");
+  });
+});
+
+describe("column sizes", () => {
+  /** Where the tree ends: the column of the first pane's top-left corner. */
+  const sidebarWidth = (app: Rendered) => frame(app).split("\n")[2].indexOf("\u250c", 1);
+  /** Where the preview starts in a split pane: its first line is the note's body, so the frontmatter the editor shows isn't on it. */
+  const previewColumn = (app: Rendered) => {
+    const row = frame(app).split("\n").find((line) => line.includes("Marker line")) ?? "";
+    return row.indexOf("Marker line");
+  };
+
+  it("widens and narrows the tree with > and <, two columns at a time, and remembers it", async () => {
+    await service.createNote("Plan", null);
+    const app = await sandbox.mount();
+    expect(sidebarWidth(app)).toBe(34);
+
+    await press(app, ">", {}, 100);
+    await press(app, ">", {}, 100);
+    expect(sidebarWidth(app)).toBe(38);
+    expect(loadColumns().sidebarColumns).toBe(38);
+
+    await press(app, "<", {}, 100);
+    expect(sidebarWidth(app)).toBe(36);
+    expect(loadColumns().sidebarColumns).toBe(36);
+  });
+
+  it("starts from the remembered width", async () => {
+    await service.createNote("Plan", null);
+    saveColumns({ sidebarColumns: 44, editorRatio: 0.5 });
+
+    const app = await sandbox.mount();
+
+    expect(sidebarWidth(app)).toBe(44);
+  });
+
+  it("stops at the limits", async () => {
+    await service.createNote("Plan", null);
+    const app = await sandbox.mount({ width: 200 });
+    for (let i = 0; i < 20; i++) app.mockInput.pressKey("<" as never);
+    await settle(app, 200);
+    expect(sidebarWidth(app)).toBe(20);
+
+    for (let i = 0; i < 30; i++) app.mockInput.pressKey(">" as never);
+    await settle(app, 200);
+    expect(sidebarWidth(app)).toBe(60);
+  });
+
+  it("keeps room for the panes in a narrow terminal, whatever width is remembered", async () => {
+    await service.createNote("Plan", null);
+    saveColumns({ sidebarColumns: 60, editorRatio: 0.5 });
+
+    const app = await sandbox.mount({ width: 80 });
+
+    expect(sidebarWidth(app)).toBe(50); // 80 - 30 columns left for the panes
+  });
+
+  it("gives the editor more or less of a split pane with ] and [, and remembers it", async () => {
+    const note = await service.createNote("Plan", null);
+    await service.saveNoteContent(note.id, `${note.content}\nMarker line\n`);
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 500);
+    await pressEscape(app, 300); // back to the tree, where the size keys live
+    const before = previewColumn(app);
+
+    await press(app, "]", {}, 200);
+    await press(app, "]", {}, 300);
+
+    expect(previewColumn(app)).toBeGreaterThan(before);
+    expect(loadColumns().editorRatio).toBe(0.7);
+
+    for (let i = 0; i < 10; i++) app.mockInput.pressKey("[" as never);
+    await settle(app, 300);
+    expect(loadColumns().editorRatio).toBe(0.2);
+    expect(previewColumn(app)).toBeLessThan(before);
   });
 });
 

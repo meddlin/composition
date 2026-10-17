@@ -12,6 +12,14 @@ export const DEFAULT_EDITOR_RATIO = 0.5;
 export const MIN_EDITOR_RATIO = 0.2;
 export const MAX_EDITOR_RATIO = 0.8;
 
+/**
+ * The terminal app's sidebar, in character columns rather than pixels. Kept apart from
+ * `sidebarWidth` so a backup restored from another app never resizes it.
+ */
+export const DEFAULT_CLI_SIDEBAR_COLUMNS = 34;
+export const MIN_CLI_SIDEBAR_COLUMNS = 20;
+export const MAX_CLI_SIDEBAR_COLUMNS = 60;
+
 export type Layout = {
   sidebarWidth: number;
   editorRatio: number;
@@ -29,6 +37,10 @@ function clamp(value: unknown, fallback: number, min: number, max: number): numb
 
 export function clampSidebarWidth(value: unknown): number {
   return clamp(value, DEFAULT_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH);
+}
+
+export function clampCliSidebarColumns(value: unknown): number {
+  return Math.round(clamp(value, DEFAULT_CLI_SIDEBAR_COLUMNS, MIN_CLI_SIDEBAR_COLUMNS, MAX_CLI_SIDEBAR_COLUMNS));
 }
 
 export function clampEditorRatio(value: unknown): number {
