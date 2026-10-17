@@ -4,6 +4,9 @@ import { App } from "./App";
 import { loadWebSettings, service } from "./backend";
 import { startRuntime } from "./runtime";
 
+// Images stay on this machine, so the web app's upload size limit does not apply (the desktop app lifts it too).
+service.setMaxImageBytes(null);
+
 const runtime = await startRuntime();
 const workspace = await service.loadWorkspace();
 

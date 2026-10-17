@@ -4,11 +4,12 @@ import { defaultApi, type Api } from "./api";
 import { canMoveGroup, favorites as favoritesLib, panes as paneLib, type Favorites, type Group, type Note, type Workspace } from "./backend";
 import { ConfirmDialog, HelpDialog, PickerDialog, PromptDialog, type PickerOption } from "./components/Dialogs";
 import { AttachmentsScreen } from "./components/AttachmentsScreen";
-import { Pane, type FlushRegistry } from "./components/Pane";
+import { Pane, type FlushRegistry, type ImageRequest } from "./components/Pane";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { Tree } from "./components/Tree";
 import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
+import { imagePathsIn } from "./imageImport";
 import { placementFor, type Direction } from "./reorder";
 import { autoPalette, isTruecolor, paletteFor, syntaxStyleFor } from "./theme";
 import { useSunLevel } from "./useSunLevel";
@@ -33,6 +34,7 @@ type Dialog =
   | { kind: "help" }
   | { kind: "trash" }
   | { kind: "attachments"; note: Note }
+  | { kind: "insert-image" }
   | { kind: "settings" }
   | null;
 
@@ -76,6 +78,10 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Favorites>(initial.favorites);
+
+  // --- images ---------------------------------------------------------------
+  const imageRequestId = useRef(0);
+  const [imageRequest, setImageRequest] = useState<(ImageRequest & { noteId: number }) | null>(null);
 
   // --- saving on the way out ------------------------------------------------
   const flushSet = useRef(new Set<() => Promise<void>>());
@@ -350,6 +356,9 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         case "new-note":
           setDialog({ kind: "new-note", groupId: targetGroupId(highlighted, notesById) });
           break;
+        case "insert-image":
+          if (paneState.focusedId !== null) setDialog({ kind: "insert-image" });
+          break;
         case "open-attachments": {
           const open = paneState.focusedId === null ? undefined : notesById.get(paneState.focusedId);
           if (open) setDialog({ kind: "attachments", note: open });
@@ -609,6 +618,24 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
             onClose={closeDialog}
           />
         );
+      case "insert-image":
+        return (
+          <PromptDialog
+            palette={palette}
+            title="Insert image"
+            label="Path of an image file (PNG, JPEG, GIF or WebP); quote a name with spaces"
+            onCancel={closeDialog}
+            onSubmit={(typed) => {
+              const files = imagePathsIn(typed, process.cwd());
+              closeDialog();
+              if (!files || paneState.focusedId === null) {
+                setToast("That isn't the path of an image file (PNG, JPEG, GIF or WebP).");
+                return;
+              }
+              setImageRequest({ id: ++imageRequestId.current, noteId: paneState.focusedId, files });
+            }}
+          />
+        );
       case "attachments":
         return (
           <AttachmentsScreen
@@ -700,6 +727,8 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
                   syntax={syntax}
                   flushes={flushes}
                   onSaved={noteSaved}
+                  imageRequest={imageRequest?.noteId === pane.noteId ? imageRequest : null}
+                  onNotice={setToast}
                 />
               );
             })

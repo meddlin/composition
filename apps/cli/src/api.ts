@@ -17,6 +17,7 @@ export type Api = Pick<
   | "placeGroup"
   | "saveNoteContent"
   | "readImage"
+  | "saveImage"
   | "searchNotes"
   | "loadTrash"
   | "restoreNote"

@@ -28,6 +28,7 @@ export type ActionId =
   | "cycle-view"
   | "close-pane"
   | "open-attachments"
+  | "insert-image"
   | "attach"
   | "save-copy"
   | "remove-attachment"
@@ -79,6 +80,7 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "cycle-view", scope: "pane", keys: ["ctrl+t"], hint: "ctrl+t view", description: "Cycle the pane's view: editor, split, preview", footer: true },
   { action: "close-pane", scope: "pane", keys: ["ctrl+x"], hint: "ctrl+x close", description: "Close the pane", footer: true },
   { action: "new-note", scope: "pane", keys: ["ctrl+n"], hint: "ctrl+n note", description: "New note", footer: false },
+  { action: "insert-image", scope: "pane", keys: ["ctrl+l"], hint: "ctrl+l image", description: "Insert an image from a file: type its path. (Pasting or dragging an image file in does the same)", footer: false },
   { action: "open-attachments", scope: "pane", keys: ["ctrl+p"], hint: "ctrl+p files", description: "Open the note's attachments", footer: false },
 
   { action: "restore", scope: "trash", keys: ["r"], hint: "r restore", description: "Restore the highlighted note or group", footer: true },

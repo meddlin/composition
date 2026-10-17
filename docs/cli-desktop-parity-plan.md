@@ -82,7 +82,7 @@ in order rather than in parallel.
 - Done when: a file attached in the CLI appears in the desktop table, and the reverse; moving a note
   to the Trash Can and back keeps its attachments (that part is the data layer's, unchanged).
 
-### Phase 4: add images from the terminal
+### Phase 4: add images from the terminal (done 2026-10-17)
 
 A terminal cannot paste image bytes, so parity here means "get an image into a note some other way":
 
@@ -95,6 +95,10 @@ A terminal cannot paste image bytes, so parity here means "get an image into a n
 
 Image size: follow the desktop (no limit) by calling `service.setMaxImageBytes(null)` at startup, as
 the desktop main process does.
+
+Result: steps 1 and 2 are done (`ctrl+l`; pasting image paths, which is also what dragging a file into
+the terminal does), the limit is lifted in `main.tsx`, and step 3 (clipboard) is left out as decided.
+The size-limit call is in the entry point, which tests don't run, so nothing checks it automatically.
 
 ### Phase 5: remembered column sizes
 

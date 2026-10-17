@@ -54,6 +54,7 @@ Search syntax is shared with web and desktop: `tag:`, `title:`, `description:`,
 | `ctrl+x` | Close the pane |
 | `ctrl+n` | New note (works here as well as in the tree, as it did in the Python CLI) |
 | `ctrl+p` | Open the note's **Attachments** screen. Mnemonic: paper clip |
+| `ctrl+l` | Insert an image from a file: type its path (a name with spaces in quotes). Pasting or dragging an image file into the editor does the same, so `ctrl+l` is the typed route. Mnemonic: picture |
 | everything else | Editing (see below) |
 
 Each note is open in at most one pane, panes sit in a single row, and the arrangement is
@@ -174,7 +175,7 @@ Found while building the spike on 2026-10-02; the reason matters more than the l
 
 Before adding a binding, check this table and the editor-owned table above. Keys that
 are free inside the editor today: `ctrl+x`, `ctrl+t`, `ctrl+o`, `ctrl+g`, `ctrl+n`,
-`ctrl+p` (now attachments), `ctrl+r`, `ctrl+s`, `ctrl+l`, `ctrl+space`.
+`ctrl+p` (now attachments), `ctrl+r`, `ctrl+s`, `ctrl+l` (now images), `ctrl+space`.
 
 ## Where this is defined
 

@@ -44,8 +44,8 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Syntax highlighting while writing Markdown | ✅ | ✅ | ✅ | The CLI colors the editor with the same palette ([highlight.ts](../apps/cli/src/highlight.ts)). [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
 | Tab types a tab in the editor, to indent nested lists | ✅ | ✅ | ✅ | |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
-| Images in notes: paste | ❌ | ✅ | ✅ | |
-| Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |
+| Images in notes: paste | ✅ | ✅ | ✅ | A terminal can't paste picture bytes. The CLI adds an image from a file: `ctrl+l` and a path, or dragging the file into the terminal. Copying a screenshot to the clipboard doesn't work in the CLI. [images.md](architecture/images.md#in-the-cli) |
+| Image size limit | None | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
 | **Attach any file to a note, listed in a table on the note** | ✅ | 🚫 | ✅ | Desktop and CLI; the web app has no way to hand files to a server on purpose. The CLI types paths where the desktop opens a file picker, and has no "show in Finder". [attachments.md](architecture/attachments.md) |
 
@@ -86,7 +86,7 @@ carries 🚫, which marks a deliberate decision.
 All three products open the same `composition.db`, so a note can carry something a
 product can't show. The rule so far is that the product that can't show it must not lose it:
 
-- **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview but cannot paste one, and its "move the data" setting carries the image folder along.
+- **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview and adds one from a file, and its "move the data" setting carries the image folder along.
 - **Attachments:** they live in their own table, never in the note's text, so no app rewrites them
   by saving a note. The web app shows nothing for them; the CLI has its Attachments screen. Moving a note to the Trash
   Can keeps its attachments, so a restored note gets them back; they are deleted when the
