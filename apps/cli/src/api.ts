@@ -13,6 +13,8 @@ export type Api = Pick<
   | "deleteNote"
   | "deleteGroup"
   | "moveNoteToGroup"
+  | "placeNote"
+  | "placeGroup"
   | "saveNoteContent"
   | "readImage"
   | "searchNotes"

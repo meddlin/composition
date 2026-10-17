@@ -48,7 +48,7 @@ in order rather than in parallel.
   from `onKeyDown`; plain typing and Tab replace a selection alike. There is no focus-moving Tab in the CLI
   (`Esc` leaves the editor), so Shift+Tab is simply unbound.
 
-### Phase 2: reorder with the keyboard
+### Phase 2: reorder with the keyboard (done 2026-10-17)
 
 - Keys in the tree scope to move the highlighted note or group up or down among its siblings
   (proposal: `shift+↑` / `shift+↓`; rule 4 in the keybindings doc forbids only `ctrl`/`alt` arrows).
@@ -57,6 +57,10 @@ in order rather than in parallel.
 - `buildTree` must sort sibling groups with the same rule as the data layer (hand-placed by
   `position` first, then by name), instead of always by name. Reuse `ordering.ts`'s `placeBefore`.
 - Keep the cursor on the moved row (rows already have stable keys).
+- Result: `shift+↑`/`shift+↓` (the list widget also reads them, so the handler calls `preventDefault`). Reordering is
+  refused while a search narrows the tree and in Favorites. `buildTree` and `orderedGroups` now keep the data
+  layer's sibling order instead of re-sorting by name; `Group` carries no `position`, the SQL order is the order.
+  Not yet checked in a real Terminal.app/iTerm window: the tests send the keys through OpenTUI's own parser.
 - Done when: reorder in the CLI shows the same order in the desktop app after a reload, and the reverse.
   Update [groups.md](architecture/groups.md#ordering): remove "the terminal app can't reorder yet".
 

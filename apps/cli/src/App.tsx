@@ -8,6 +8,7 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { Tree } from "./components/Tree";
 import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
+import { placementFor, type Direction } from "./reorder";
 import { autoPalette, isTruecolor, paletteFor, syntaxStyleFor } from "./theme";
 import { useSunLevel } from "./useSunLevel";
 import { buildTree, groupKey, noteKey, orderedGroups, pruneFavorites, targetGroupId, type TreeRow } from "./tree";
@@ -273,6 +274,34 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
       .map(({ group, depth }) => ({ label: `${"  ".repeat(depth)}${group.name}`, value: group.id })),
   ];
 
+  /** Moves the highlighted note or group one place up or down among its siblings, and saves that order. */
+  const rearrange = async (direction: Direction) => {
+    if (hits !== null) {
+      setToast("Clear the search to rearrange: it only shows some of the notes.");
+      return;
+    }
+    if (highlighted && "favorite" in highlighted && highlighted.favorite) {
+      setToast("Rearrange it in the tree: Favorites stay in the order they were pinned.");
+      return;
+    }
+    const placement = placementFor(highlighted, direction, notes, groups);
+    if (!placement) return; // already first or last, or not something that can move
+    try {
+      if (placement.type === "note") {
+        await api.placeNote(placement.id, placement.groupId, placement.beforeId);
+      } else {
+        const result = await api.placeGroup(placement.id, placement.parentId, placement.beforeId);
+        if (result.error) {
+          setToast(result.error);
+          return;
+        }
+      }
+      await reload(); // the cursor follows the row's key to its new place
+    } catch (error) {
+      setToast(`That didn't work: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   const startMove = () => {
     if (highlighted?.kind === "note") {
       const note = notesById.get(highlighted.noteId);
@@ -347,6 +376,15 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         break;
       case "move":
         startMove();
+        break;
+      // The list widget would also read shift+arrow as a jump of several rows; this key is ours.
+      case "move-up":
+        key.preventDefault();
+        void rearrange("up");
+        break;
+      case "move-down":
+        key.preventDefault();
+        void rearrange("down");
         break;
       case "favorite":
         toggleFavorite();

@@ -22,8 +22,8 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | YAML frontmatter (title, description, tags, dates) | ✅ | ✅ | ✅ | [data-model.md](architecture/data-model.md) |
 | Nested groups: create, rename, delete when empty | ✅ | ✅ | ✅ | [groups.md](architecture/groups.md) |
 | Move a note to another group | ✅ | ✅ | ✅ | CLI: the `m` key. Web and desktop: drag the note onto a group |
-| Drag and drop notes and groups | ❌ | ✅ | ✅ | [web-groups.md](ui/web-groups.md) |
-| Reorder notes and groups by hand | ❌ | ✅ | ✅ | Drag a row to the edge of a sibling. The terminal app lists notes in the saved order but groups by name. [groups.md](architecture/groups.md#ordering) |
+| Drag and drop notes and groups | 🚫 | ✅ | ✅ | A terminal has no dragging worth the name; the CLI moves with keys instead (`m`, and `shift+↑` `shift+↓` below). [web-groups.md](ui/web-groups.md) |
+| Reorder notes and groups by hand | ✅ | ✅ | ✅ | Web and desktop: drag a row to the edge of a sibling. CLI: `shift+↑` `shift+↓` move the highlighted row one place. [groups.md](architecture/groups.md#ordering) |
 | Move an existing group under another | ✅ | ✅ | ✅ | CLI: the `m` key, which offers every group except the group itself and what is beneath it |
 | Several notes open side by side | ✅ | ✅ | ✅ | CLI: the `o` key opens a note in a new pane, `ctrl+o` moves between panes. Web and desktop: draggable panes. [screen-navigation.md](architecture/screen-navigation.md) |
 | Favorites: pin groups and notes above the tree | ✅ | ✅ | ✅ | CLI: the `f` key. [groups.md](architecture/groups.md#favorites) |

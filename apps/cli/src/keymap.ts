@@ -16,6 +16,8 @@ export type ActionId =
   | "new-group"
   | "rename-group"
   | "move"
+  | "move-up"
+  | "move-down"
   | "favorite"
   | "delete"
   | "search"
@@ -59,6 +61,8 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "open-beside", scope: "tree", keys: ["o"], hint: "o open beside", description: "Open the note in a new pane to the right", footer: true },
   { action: "new-group", scope: "tree", keys: ["ctrl+g"], hint: "ctrl+g group", description: "New group inside the highlighted group", footer: true },
   { action: "move", scope: "tree", keys: ["m"], hint: "m move", description: "Move the highlighted note or group", footer: true },
+  { action: "move-up", scope: "tree", keys: ["shift+up"], hint: "shift+↑ up", description: "Move the highlighted note or group up one place among its siblings", footer: false },
+  { action: "move-down", scope: "tree", keys: ["shift+down"], hint: "shift+↓ down", description: "Move the highlighted note or group down one place among its siblings", footer: false },
   { action: "rename-group", scope: "tree", keys: ["r"], hint: "r rename", description: "Rename the highlighted group", footer: false },
   { action: "favorite", scope: "tree", keys: ["f"], hint: "f pin", description: "Pin or unpin the highlighted note or group", footer: false },
   { action: "help", scope: "tree", keys: ["?"], hint: "? help", description: "Show every key", footer: true, essential: true },

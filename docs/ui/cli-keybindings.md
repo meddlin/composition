@@ -32,6 +32,7 @@ wins and this page needs updating in the same pull request.
 | `ctrl+g` | New group (inside the highlighted group) | *(existing)* |
 | `r` | Rename the highlighted group | *(existing)* |
 | `m` | Move the highlighted **note or group** to another group, or a group back to the top level. A group's list leaves out the group itself and everything beneath it | note: *(existing)*; group: new |
+| `shift+↑` `shift+↓` | Move the highlighted note or group one place up or down among its siblings (the notes of one group, or the sub-groups of one parent), and keep that order. Does nothing at either end, in Favorites, or while a search is narrowing the tree. Web and desktop do the same by dragging | new |
 | `f` | Pin or unpin the highlighted note or group. Pinned items are listed in a "★ Favorites" section above the tree, in the order they were pinned, and starred where they sit in the tree | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |
@@ -149,7 +150,7 @@ Found while building the spike on 2026-10-02; the reason matters more than the l
 | `alt+←` `alt+→` | The editor's word-move keys. Terminal.app also sends them as `alt+b` / `alt+f` |
 | `ctrl+e` | The editor's end-of-line key, so it can't be "cycle view" |
 | `ctrl+1` … `ctrl+9`, `alt+1` … `alt+9` | Mission Control uses `ctrl+digit` to switch desktops, and `alt+digit` types symbols (`¡ ™ £`) in Terminal.app by default |
-| `ctrl+shift+<letter>` | A legacy terminal cannot tell it from `ctrl+<letter>`, so there is no "previous pane" key |
+| `ctrl+shift+<letter>` | A legacy terminal cannot tell it from `ctrl+<letter>`, so there is no "previous pane" key. (`shift` with an arrow key is fine: terminals send it as its own sequence) |
 | `ctrl+c` | Quits the app from anywhere, saving open notes first (the app handles it itself; OpenTUI's own exit-on-`ctrl+c` is off) |
 
 Before adding a binding, check this table and the editor-owned table above. Keys that

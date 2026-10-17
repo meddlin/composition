@@ -77,7 +77,7 @@ describe("the list itself", () => {
     const forbidden = (key: string) =>
       /^(ctrl|alt)\+(left|right)$/.test(key) || // Mission Control; also the editor's word moves
       /^(ctrl|alt)\+\d$/.test(key) || // desktops; symbols in Terminal.app
-      key.includes("shift+") || // legacy terminals can't tell ctrl+shift+x from ctrl+x
+      /^(ctrl|alt)\+shift\+/.test(key) || // legacy terminals can't tell ctrl+shift+x from ctrl+x (shift+arrow is fine)
       key === "ctrl+c"; // quits the app
     for (const binding of BINDINGS) {
       for (const key of binding.keys) expect(forbidden(key), `${key} must not be bound`).toBe(false);

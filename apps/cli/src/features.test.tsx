@@ -213,6 +213,72 @@ describe("moving a group", () => {
   });
 });
 
+/** The row numbers of the given labels in the current screen, to compare their order. */
+const rowOf = (app: Rendered, label: string) => frame(app).split("\n").findIndex((line) => line.includes(label));
+
+describe("rearranging with shift+arrows", () => {
+  it("moves a group down among its siblings, keeps the cursor on it, and saves the order", async () => {
+    await service.createGroup("Alpha", null);
+    await service.createGroup("Beta", null);
+    await service.createGroup("Gamma", null);
+    await service.createNote("Loose", null);
+    const app = await sandbox.mount();
+    await arrowUp(app, 4); // Loose -> Ungrouped -> Gamma -> Beta -> Alpha
+
+    await press(app, "ARROW_DOWN", { shift: true }, 400);
+    expect(rowOf(app, "Beta")).toBeLessThan(rowOf(app, "Alpha"));
+    expect(rowOf(app, "Alpha")).toBeLessThan(rowOf(app, "Gamma"));
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Beta", "Alpha", "Gamma"]);
+
+    await press(app, "ARROW_DOWN", { shift: true }, 400); // still on Alpha
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Beta", "Gamma", "Alpha"]);
+  });
+
+  it("moves a note up within its group", async () => {
+    const work = await service.createGroup("Work", null);
+    await service.createNote("Plan", work.id);
+    await service.createNote("Draft", work.id);
+    await service.createNote("Notes", work.id); // newest first: Notes, Draft, Plan
+    const app = await sandbox.mount();
+    expect(rowOf(app, "Notes")).toBeLessThan(rowOf(app, "Plan"));
+    await arrowDown(app, 2); // the cursor starts on the first note: Notes -> Draft -> Plan
+
+    await press(app, "ARROW_UP", { shift: true }, 400);
+
+    const order = (await service.loadWorkspace()).notes.map((n) => n.title);
+    expect(order).toEqual(["Notes", "Plan", "Draft"]);
+    expect(rowOf(app, "Plan")).toBeLessThan(rowOf(app, "Draft"));
+  });
+
+  it("does nothing at the end of the list", async () => {
+    await service.createGroup("Alpha", null);
+    await service.createGroup("Beta", null);
+    await service.createNote("Loose", null);
+    const app = await sandbox.mount();
+    await arrowUp(app, 4); // Alpha, the first group
+
+    await press(app, "ARROW_UP", { shift: true }, 300);
+
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("refuses while a search is narrowing the tree", async () => {
+    const work = await service.createGroup("Work", null);
+    const plan = await service.createNote("Plan", work.id);
+    await service.createNote("Draft", work.id);
+    const app = await sandbox.mount({ api: { searchNotes: async () => ({ hits: [{ id: plan.id, title: "Plan", description: "", groupPath: ["Work"] }] }) } });
+    await press(app, "/");
+    await app.mockInput.typeText("plan");
+    await settle(app, 700);
+    await press(app, "RETURN"); // back to the tree, keeping the search
+    await press(app, "ARROW_DOWN", {}, 40);
+
+    await press(app, "ARROW_DOWN", { shift: true }, 300);
+
+    expect(frame(app)).toContain("Clear the search to rearrange");
+  });
+});
+
 describe("color schemes", () => {
   const BACKGROUNDS: [string, string][] = [
     ["dark", "#121212"],
