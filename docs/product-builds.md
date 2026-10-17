@@ -18,14 +18,17 @@ the gap is written down instead of remembered.
 default, the web app's default (`DEFAULT_APP_DATA_DIR` in `apps/web/src/lib/composition/paths.ts`),
 and the desktop app's default. All three open it through the same data layer, `apps/web/src/lib/composition`.
 
-Shared: the SQLite file.
-Not shared, on purpose: each product's settings file and each product's Meilisearch index.
+Shared: the SQLite file, and the *location* of that file between the desktop and terminal apps
+(see [One data location for desktop and CLI](#one-data-location-for-desktop-and-cli)).
+Not shared, on purpose: each product's settings file (color scheme, city, column sizes and
+favorites stay per app) and each product's Meilisearch index.
 The index is derived data that any product rebuilds from SQLite ([search.md](architecture/search.md)).
 
 | | CLI | Web | Desktop |
 |---|---|---|---|
 | Database | `~/.composition/composition.db` | same | same |
 | Settings | `~/.composition-cli/settings.json` | `~/.composition-web/settings.json` | `~/Library/Application Support/Composition/settings.json` |
+| Data location, as agreed between the apps | `~/.composition-location.json` | not read or written | `~/.composition-location.json` |
 | Meilisearch data | `~/.composition/meili_data` | `~/.composition-web/meili_data` | `~/Library/Application Support/Composition/search/meili_data` |
 | Meilisearch process | Spawned by the CLI, random port | Started by hand (`pnpm meili`), port 7700 | Spawned by the app (bundled binary), random port, own master key |
 
@@ -35,6 +38,56 @@ made in the CLI while the desktop app is closed is missing from the desktop inde
 next starts, when it rebuilds its index from SQLite (as it also does after the data location is
 changed in Settings). An edit made in the CLI *while the desktop app is open* does not appear in
 desktop search until the next launch.
+
+### One data location for desktop and CLI
+
+Each app keeps its own settings file, and the data location (`appDataDir`, `dbPath`) is one of the
+settings in it. With nothing else, moving the location in one app would leave the other opening
+`~/.composition`, and the two would quietly stop sharing a database.
+
+So the location alone is also kept in a small file both apps read and write,
+`~/.composition-location.json`: `{ "appDataDir": "...", "dbPath": "..." }` (`dbPath` only when
+set). It is outside every data directory, so relocating the data cannot strand it.
+Implemented in `webSettings.ts`; each host opts in by setting `COMPOSITION_SHARED_LOCATION_PATH`
+(as it sets `COMPOSITION_SETTINGS_PATH`). The web app does not, so it still answers to its own
+settings alone.
+
+- **Reading.** If the file exists and is valid, its location wins over the app's own setting, for
+  `appDataDir` and `dbPath` together (a stale override in the app's own file is dropped). If it is
+  missing or unreadable, each app uses its own setting, as before.
+- **Writing.** Only a save that *changes* the location writes the file: moving the data in the
+  CLI's Settings, or saving a new location in the desktop app's. Saving a color scheme or a
+  favorite does not. The app's own file is written too, so deleting the shared file leaves both
+  apps on the last agreed location and then free to diverge again.
+- **Existing installs.** Nothing changes until someone moves the location. An install where the two
+  apps already disagree (say, the desktop app was pointed at another folder earlier) stays that
+  way until the next move in either app, which then brings both to that location.
+- **Moving files.** The CLI moves the database, search data, images and attachments; the desktop app
+  only repoints. Either way the *other* app follows on its next database call, but its
+  Meilisearch index does not move with it (below), and it should not be open on the data while the
+  CLI is moving files. Close the other app first.
+
+### Search index drift between the apps
+
+Each app has its own Meilisearch index, so a note edited in one app is missing from the other's
+search until that app rebuilds its index from SQLite. Both apps do that when they start (the
+shared `SearchSidecar`), and the desktop app also after its own data-location change. The gaps:
+
+- an edit made in one app *while the other is open* stays out of the other's search until that
+  app restarts;
+- when the agreed location changes in the other app, a running app follows it for notes (the
+  database connection re-resolves the location on every call) but its Meilisearch keeps indexing
+  the old data directory, so its search describes the old database until it restarts.
+
+Not built. Options, cheapest first:
+
+1. Notice that the agreed location changed under a running app and restart its search sidecar there
+   (the same restart the CLI already does after its own move).
+2. Stamp the index with the database's `PRAGMA data_version` or the newest `updated_at` and compare
+   it on focus or on a timer; rebuild when it moved.
+3. Share one Meilisearch process (one app starts it and the other attaches). This needs a
+   lock and handover when the owner quits, so it is the most work, and the index directory is only
+   safe with one process on it.
 
 ### What sharing costs right now
 
@@ -86,3 +139,6 @@ It is mostly configuration, and small:
 - 2026-09-30: the desktop app bundles Meilisearch in v1.
 - 2026-09-30: desktop releases are manual downloads from GitHub Releases; no auto-update yet.
 - 2026-10-14: the desktop app updates itself from GitHub Releases (electron-updater, generic feed, asks before downloading and before restarting). Design: [desktop-updates-plan.md](desktop-updates-plan.md). Supersedes the line above.
+- 2026-10-17: the desktop and terminal apps agree on the data location through
+  `~/.composition-location.json`, written only when the location changes; everything else in their
+  settings stays per app. The index drift above is documented, not fixed.
