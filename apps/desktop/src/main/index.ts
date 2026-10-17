@@ -2,7 +2,7 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
-import { closeDb, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
@@ -25,6 +25,9 @@ registerSchemePrivileges();
 // lives in ~/.composition by default (docs/product-builds.md).
 const userData = app.getPath("userData");
 process.env.COMPOSITION_SETTINGS_PATH = path.join(userData, "settings.json");
+// The data location alone is agreed with the terminal app, which shares the database, so a
+// move made in either one is followed by the other (docs/product-builds.md).
+process.env.COMPOSITION_SHARED_LOCATION_PATH = defaultSharedLocationPath(app.getPath("home"));
 
 // Images stay on this machine, so the web app's upload size limit does not apply.
 service.setMaxImageBytes(null);

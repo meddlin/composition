@@ -31,6 +31,7 @@ beforeEach(() => {
   home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-runtime-"));
   dataDir = path.join(home, "data");
   vi.stubEnv("COMPOSITION_SETTINGS_PATH", path.join(home, ".composition-cli", "settings.json"));
+  vi.stubEnv("COMPOSITION_SHARED_LOCATION_PATH", path.join(home, ".composition-location.json"));
   fs.mkdirSync(path.join(home, ".composition-cli"), { recursive: true });
   writeSettings(dataDir);
   const fake = path.join(home, "fake-meilisearch");
@@ -93,6 +94,58 @@ describe("startRuntime", () => {
     runtime = await startRuntime({ home });
 
     expect(process.env.COMPOSITION_SETTINGS_PATH).toBe(path.join(home, ".composition-cli", "settings.json"));
+  });
+});
+
+describe("data location shared with the desktop app", () => {
+  const sharedFile = () => process.env.COMPOSITION_SHARED_LOCATION_PATH!;
+
+  it("agrees with ~/.composition-location.json when no path is configured", async () => {
+    delete process.env.COMPOSITION_SHARED_LOCATION_PATH;
+
+    runtime = await startRuntime({ home });
+
+    expect(process.env.COMPOSITION_SHARED_LOCATION_PATH).toBe(path.join(home, ".composition-location.json"));
+  });
+
+  it("opens the location the desktop app agreed on, not its own setting", async () => {
+    const desktopDir = path.join(home, "desktop-data");
+    fs.writeFileSync(sharedFile(), JSON.stringify({ appDataDir: desktopDir }));
+
+    runtime = await startRuntime({ home });
+    await service.createNote("Written from the terminal");
+
+    expect(fs.existsSync(path.join(desktopDir, "composition.db"))).toBe(true);
+    expect(fs.existsSync(path.join(desktopDir, "meili.pid"))).toBe(true);
+    expect(fs.existsSync(path.join(dataDir, "composition.db"))).toBe(false);
+  });
+
+  it("starts as before, and starts no agreement, when the desktop app has not agreed on anything", async () => {
+    runtime = await startRuntime({ home });
+    await service.createNote("Plain start");
+
+    expect(fs.existsSync(path.join(dataDir, "composition.db"))).toBe(true);
+    expect(fs.existsSync(sharedFile())).toBe(false);
+  });
+
+  it("tells the desktop app where the data moved", async () => {
+    runtime = await startRuntime({ home });
+    const newDir = path.join(home, "new-data");
+
+    await runtime.moveDataLocation(newDir);
+
+    expect(JSON.parse(fs.readFileSync(sharedFile(), "utf-8"))).toEqual({ appDataDir: newDir });
+  });
+
+  it("does not tell the desktop app about a move that was put back", async () => {
+    runtime = await startRuntime({ home });
+    const blocked = path.join(home, "blocked");
+    fs.mkdirSync(blocked);
+    fs.writeFileSync(path.join(blocked, "composition.db"), "someone else's");
+
+    await expect(runtime.moveDataLocation(blocked)).rejects.toBeInstanceOf(ApplicationDataMoveError);
+
+    expect(fs.existsSync(sharedFile())).toBe(false);
   });
 });
 
