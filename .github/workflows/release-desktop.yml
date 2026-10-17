@@ -5,7 +5,8 @@ name: Release desktop
 #
 #   git tag desktop-v0.1.0 && git push origin desktop-v0.1.0
 #
-# It builds both macOS architectures, signs and notarizes them, and attaches them, with the
+# It builds both macOS architectures (each with the `composition` command line tool and its own
+# Node inside the app), signs and notarizes them, and attaches them, with the
 # update feed (latest-mac.yml), to a DRAFT GitHub Release for you to check and publish.
 # Publishing it as a normal (non-pre-release) release is what makes installed apps offer it
 # as an update. Local equivalent: `pnpm release` in
@@ -71,6 +72,7 @@ jobs:
           cache-dependency-path: |
             apps/web/pnpm-lock.yaml
             apps/desktop/pnpm-lock.yaml
+            apps/cli/pnpm-lock.yaml
 
       # notarytool reads the key from a file, so the secret (the .p8 contents) is written to one.
       - name: Write the App Store Connect API key
@@ -81,7 +83,8 @@ jobs:
           printf '%s' "$APPLE_API_KEY_P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "APPLE_API_KEY=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
 
-      # Installs, fetches Meilisearch, builds, signs, notarizes and verifies; see the script.
+      # Installs (web, desktop and CLI), fetches Meilisearch and Node 26, assembles the command line
+      # tool that ships inside the app, builds, signs, notarizes and verifies; see the script.
       # electron-builder imports CSC_LINK into a temporary keychain for the run.
       - name: Build, sign and notarize
         working-directory: apps/desktop

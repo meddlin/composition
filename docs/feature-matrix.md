@@ -64,7 +64,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 
 | | CLI | Web | Desktop |
 |---|---|---|---|
-| Shipped as | Undecided (runs from source: `pnpm dev`, or the `composition` bin) | Undecided | Download from GitHub Releases once; after that it updates itself |
+| Shipped as | Inside the macOS desktop app (Composition > Install Command Line Tool…); from source elsewhere (`pnpm dev`, or the `composition` bin) | Undecided | Download from GitHub Releases once; after that it updates itself |
 | Platforms | macOS and Linux, on Node 26.10 or newer. Windows later | Any browser | macOS only for now |
 | Notes database | `~/.composition/composition.db`, shared by all three | same | same |
 

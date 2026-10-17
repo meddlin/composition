@@ -1,3 +1,8 @@
+# Only this folder is a project. Without this, pnpm also treats the CLI that scripts/stage-cli.mjs
+# assembles (resources/cli/*/app) and the packaged copies in release/ as projects of this workspace.
+packages:
+  - "."
+
 # pnpm 11 refuses to run dependency build scripts unless they're decided here.
 # (Electron 44 has no install script: its binary downloads on first use.)
 allowBuilds:

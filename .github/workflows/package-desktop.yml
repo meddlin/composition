@@ -1,0 +1,69 @@
+name: Package desktop
+
+# Builds the desktop app unsigned, with the command line tool inside it, and runs that tool.
+# build-apps.yml only compiles the app on Linux; this is the one check that the macOS bundle
+# (Node 26, native modules, launcher) still comes together. It needs no secrets.
+on:
+  pull_request:
+    paths:
+      - "apps/desktop/**"
+      - "apps/cli/**"
+      - "apps/web/src/lib/composition/**"
+      - ".github/workflows/package-desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package-desktop:
+    # macos-latest is Apple Silicon, so this packages (and runs) the arm64 app.
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/web/pnpm-lock.yaml
+            apps/desktop/pnpm-lock.yaml
+            apps/cli/pnpm-lock.yaml
+
+      # The desktop build bundles code from apps/web, and the CLI bundle does too.
+      - name: Install web dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: Install CLI dependencies
+        run: pnpm --dir apps/cli install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Fetch Meilisearch and Node, and assemble the command line tool
+        working-directory: apps/desktop
+        run: |
+          pnpm fetch:meilisearch mac-arm64
+          pnpm fetch:node mac-arm64
+          pnpm stage:cli mac-arm64
+
+      - name: Package the app (unsigned)
+        working-directory: apps/desktop
+        run: pnpm package
+
+      - name: Run the command line tool from inside the app
+        working-directory: apps/desktop
+        run: |
+          expected=$(node -p "require('../cli/package.json').version")
+          actual=$(release/mac-arm64/Composition.app/Contents/Resources/cli/composition --version)
+          echo "composition --version: $actual"
+          test "$actual" = "$expected"

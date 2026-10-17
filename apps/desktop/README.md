@@ -14,6 +14,8 @@ main process                               IPC, validated and sender-checked
     ├── service.ts (from apps/web)         the same code the web app's Server Actions call
     │       └── SQLite  ~/.composition/composition.db   (shared with the CLI and web app)
     └── Meilisearch (bundled binary)       127.0.0.1, random port, own master key
+
+Contents/Resources/cli/                    the `composition` terminal app (apps/cli), see below
 ```
 
 - **The UI is `apps/web`.** `COMPOSITION_TARGET=desktop next build` makes a static export; files
@@ -38,6 +40,8 @@ Run `pnpm install` in `apps/web` first: the desktop build bundles code and style
 | `pnpm dist` | Signed and notarized DMG and ZIP for this Mac's architecture. Needs the credentials below. |
 | `pnpm release` | Signed, notarized and verified DMG and ZIP for both architectures, plus checksums; warns about missing requirements first (`--check` only checks, `--unsigned` skips signing). The release workflow runs the same script. |
 | `pnpm fetch:meilisearch` | Downloads the pinned, checksum-verified Meilisearch binaries (about 116 MiB each) into `resources/meilisearch/`. |
+| `pnpm fetch:node` | Downloads the pinned, checksum-verified Node 26 (about 57 MiB each) into `resources/node/`, for the command line tool. |
+| `pnpm stage:cli` | Builds `apps/cli` and assembles the command line tool for each architecture in `resources/cli/` (needs `apps/cli` installed and `pnpm fetch:node` run). |
 
 Check a packaged build end to end:
 
@@ -67,6 +71,38 @@ why it's unavailable.
 License notices for everything shipped are assembled into `Resources/licenses` by
 `scripts/collect-licenses.mjs`. The license list for the Rust crates inside the Meilisearch
 binary still has to be generated (it warns until then).
+
+## The command line tool
+
+The app also ships the terminal app (`apps/cli`) so one install gives both. It lives in
+`Contents/Resources/cli/`:
+
+```
+composition     launcher script: finds its own folder (through symlinks), points search at the
+                app's Meilisearch (COMPOSITION_MEILI_BIN) and runs the bundled node
+node            Node 26 (node.lock.json), because Electron's own Node has no node:ffi
+app/            apps/cli's bundle and a production-only node_modules for this architecture
+```
+
+**Installing the `composition` command.** A disk image can only copy the app, so the app's menu has
+**Composition > Install Command Line Tool…**. It symlinks the launcher into the first of
+`/opt/homebrew/bin`, `/usr/local/bin` (only if they exist and are writable) or `~/.local/bin` (created),
+so it needs no password. Choosing it again offers to uninstall. It refuses an app that is running from
+a disk image or another volume, and never replaces a file or link it didn't make
+(`src/main/cliTool.ts`, tested on temporary folders). The link survives updates because the app is
+replaced in place.
+
+**What is shared with the desktop app.** The database (`~/.composition/composition.db`), pasted images
+and attachments. Not shared: settings files and the Meilisearch index ([docs/product-builds.md](../../docs/product-builds.md)).
+
+**Building it.** `pnpm release` does everything. By hand: `pnpm fetch:node`, install `apps/cli`, then
+`pnpm stage:cli`, then `pnpm package` / `pnpm dist`. `scripts/stage-cli.mjs` installs the CLI's
+production dependencies from `apps/cli`'s own lockfile once per architecture (pnpm's
+`supportedArchitectures` fetches the other Mac's native packages), drops type-only packages and the
+foreign-platform prebuilds, and checks with `lipo` that every native file matches. `pnpm release`
+then checks the packaged app: the launcher is there, its Node matches the app's architecture, and
+`composition --version` runs; when signing, that every Mach-O file under `cli/` is signed and the
+bundled Node has the hardened runtime.
 
 ## Signing and releases
 

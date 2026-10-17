@@ -21,9 +21,9 @@
     "manual:backup": "node scripts/build.mjs && node dist/backup-manual.mjs"
   },
   "dependencies": {
-    "@opentui/core": "0.5.14",
+    "@opentui/core": "0.5.15",
     "@opentui/react": "0.5.15",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.3.2",
     "lowlight": "^3.3.0",
     "react": "19.3.0",

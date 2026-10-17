@@ -37,7 +37,7 @@ locally-spawned search engine, all running on the user's machine.
 | UI language | React 19 | The same major version as the web app, so state logic reads the same way in both. |
 | Full-text search | `meilisearch` (JavaScript client, from `apps/web`) | Talks to a locally-spawned `meilisearch` binary over HTTP; not a hosted service. |
 | Frontmatter | `js-yaml` | Parse and generate the YAML block. |
-| Persistence | `better-sqlite3` 12 | No ORM; hand-written schema and additive `ALTER TABLE` migrations, in `apps/web/src/lib/composition/db.ts`. Version 12 because it runs on both web's Node 22 and the CLI's Node 26. |
+| Persistence | `better-sqlite3` 13 | No ORM; hand-written schema and additive `ALTER TABLE` migrations, in `apps/web/src/lib/composition/db.ts`. Version 13 (N-API, the desktop app's version) because its prebuilds cover both Mac architectures, so the desktop installer can bundle the CLI for either from one machine. The web app stays on 12 for Node 22. |
 | Build | `esbuild` | One ESM bundle per entry point (`scripts/build.mjs`). OpenTUI and `better-sqlite3` stay external. |
 | Type-check | TypeScript 7 | `pnpm typecheck`; it also checks the web and desktop files the CLI imports. |
 | Tests | `vitest` 5 | Components are rendered headlessly with OpenTUI's test renderer (`@opentui/react/test-utils`) over a real temporary database. |

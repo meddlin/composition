@@ -21,6 +21,7 @@ import {
   checksumFile,
   checkUpdateFeed,
   isInside,
+  isMachO,
   parseArgs,
   parseSigningIdentities,
   releaseAssetNames,
@@ -183,7 +184,11 @@ function build() {
   // Install web first: the desktop build bundles code and styles from it.
   run("Install web dependencies", "pnpm", ["--dir", path.join(repoRoot, "apps/web"), "install", "--frozen-lockfile"]);
   run("Install desktop dependencies", "pnpm", ["install", "--frozen-lockfile"]);
-  run("Fetch Meilisearch", "pnpm", ["fetch:meilisearch", ...arches.map((arch) => ARCHES[arch].meilisearch)]);
+  // The command line tool shipped inside the app is built from apps/cli.
+  run("Install CLI dependencies", "pnpm", ["--dir", path.join(repoRoot, "apps/cli"), "install", "--frozen-lockfile"]);
+  run("Fetch Meilisearch", "pnpm", ["fetch:meilisearch", ...arches.map((arch) => ARCHES[arch].platform)]);
+  run("Fetch Node (for the command line tool)", "pnpm", ["fetch:node", ...arches.map((arch) => ARCHES[arch].platform)]);
+  run("Assemble the command line tool", "pnpm", ["stage:cli", ...arches.map((arch) => ARCHES[arch].platform)]);
   run("Build the app", "pnpm", ["build"]);
 
   // `--publish never`: electron-builder writes the update feed (latest-mac.yml) but uploads
@@ -204,6 +209,28 @@ function packagedApps() {
   return apps;
 }
 
+/** Every Mach-O binary under `dir`: the files that must each carry a signature. */
+function machOFiles(dir) {
+  const found = [];
+  const head = Buffer.alloc(4);
+  const visit = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.isFile()) {
+        const fd = fs.openSync(full, "r");
+        const read = fs.readSync(fd, head, 0, 4, 0);
+        fs.closeSync(fd);
+        if (isMachO(head.subarray(0, read))) found.push(full);
+      }
+    }
+  };
+  visit(dir);
+  return found;
+}
+
+const cliPackage = JSON.parse(fs.readFileSync(path.join(repoRoot, "apps/cli/package.json"), "utf-8"));
+
 /** Checks the packaged apps; returns the failures. */
 function verify() {
   const failures = [];
@@ -223,7 +250,25 @@ function verify() {
       if (!ok) failures.push(`${name}: ${label}\n${result.out}`);
     };
 
+    // The command line tool inside the app: present, and (when this Mac can run it) working.
+    const cliRoot = path.join(app, "Contents/Resources/cli");
+    check("command line tool: launcher is in the app", "test", ["-x", path.join(cliRoot, "composition")], () => true);
+    check("command line tool: its Node is this architecture", "lipo", ["-archs", path.join(cliRoot, "node")], (out) => out === archs);
+    const hostArchs = process.arch === "arm64" ? "arm64" : "x86_64";
+    if (archs === hostArchs) {
+      check(`command line tool runs (composition --version is ${cliPackage.version})`, path.join(cliRoot, "composition"), ["--version"], (out) => out === cliPackage.version);
+    }
+
     if (options.unsigned) continue;
+    const unsignedCli = machOFiles(cliRoot).filter((file) => !capture("codesign", ["--verify", "--strict", file]).ok);
+    console.log(`  ${unsignedCli.length === 0 ? "ok  " : "FAIL"}  every binary of the command line tool is signed`);
+    if (unsignedCli.length > 0) failures.push(`${name}: unsigned binaries in the command line tool:\n${unsignedCli.join("\n")}`);
+    check(
+      "command line tool: bundled Node runs with the hardened runtime",
+      "codesign",
+      ["-dv", "--verbose=2", path.join(cliRoot, "node")],
+      (out) => /flags=0x[0-9a-f]+\(runtime\)/.test(out),
+    );
     check("signature is intact (codesign --verify --deep --strict)", "codesign", ["--verify", "--deep", "--strict", app], () => true);
     check(
       "bundled Meilisearch is signed",
