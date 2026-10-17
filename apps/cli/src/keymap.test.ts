@@ -2,7 +2,7 @@ import { defaultTextareaKeyBindings } from "@opentui/core";
 import { describe, expect, it } from "vitest";
 import { actionFor, BINDINGS, bindingsFor, footerFor, keyId, type Scope } from "./keymap";
 
-const SCOPES: Scope[] = ["tree", "pane", "trash", "settings"];
+const SCOPES: Scope[] = ["tree", "pane", "trash", "settings", "attachments"];
 
 describe("keyId", () => {
   it.each([

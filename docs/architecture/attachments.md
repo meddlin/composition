@@ -6,8 +6,15 @@ Source: [`attachmentsApi.ts`](../../apps/web/src/lib/composition/attachmentsApi.
 [`AttachmentsPanel.tsx`](../../apps/web/src/components/notes/AttachmentsPanel.tsx),
 [`main/attachments.ts`](../../apps/desktop/src/main/attachments.ts)
 
-Any type of file can be attached to a note in the **desktop app**. The web app and the
-CLI do not offer it (see the [feature matrix](../feature-matrix.md)).
+Any type of file can be attached to a note in the **desktop app** and in the **CLI**. The web app
+does not offer it (see the [feature matrix](../feature-matrix.md)).
+
+The CLI's version is the Attachments screen ([cli-keybindings.md](../ui/cli-keybindings.md#attachments-screen)):
+the same table, with paths typed where the desktop app opens a file picker. It calls the same
+`service` functions the desktop's main process does (`listAttachments`, `addAttachmentFiles`,
+`findAttachmentFile`, `removeAttachment`), and writes a copy with `saveCopy` in
+[`attachmentFiles.ts`](../../apps/cli/src/attachmentFiles.ts). A terminal app has no renderer to
+distrust, so the "renderer never supplies a path" rule below is about the desktop app only.
 
 An attachment is not part of the note's text. Unlike an [image](images.md), nothing in
 the Markdown refers to it: the note's attachments are a list kept beside it, shown in a
@@ -104,9 +111,6 @@ Reaching the table in the build takes three build-time swaps (the same mechanism
   deletes its attachments: rows and stored files. The service removes any attachment whose
   note is in neither `notes` nor `trashed_notes` (`removeOrphans` in
   [`attachments.ts`](../../apps/web/src/lib/composition/attachments.ts)).
-- **Deleting a note in the CLI**, which has no Trash Can and deletes for good, removes its
-  attachment rows and files at once (`NotesStore.delete_note`).
-
 A file that is already gone is never an error.
 
 ## Decisions

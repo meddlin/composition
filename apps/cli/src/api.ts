@@ -29,6 +29,10 @@ export type Api = Pick<
   | "saveLocation"
   | "loadSettings"
   | "loadSunSchedule"
+  | "listAttachments"
+  | "addAttachmentFiles"
+  | "findAttachmentFile"
+  | "removeAttachment"
   | "createBackup"
   | "restoreBackup"
 >;

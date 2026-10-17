@@ -64,7 +64,7 @@ in order rather than in parallel.
 - Done when: reorder in the CLI shows the same order in the desktop app after a reload, and the reverse.
   Update [groups.md](architecture/groups.md#ordering): remove "the terminal app can't reorder yet".
 
-### Phase 3: attachments
+### Phase 3: attachments (done 2026-10-17)
 
 - An **Attachments** panel for the open note, below the editor in the pane: a table of name, size,
   added. Focus it with a new key (free keys: `ctrl+p`, `ctrl+r`, `ctrl+s`, `ctrl+l`; proposal `ctrl+p`, "paperclip").
@@ -74,8 +74,13 @@ in order rather than in parallel.
   1 GB limit and name safety are already in `attachmentNames.ts`; show the same per-file error text
   the desktop shows, and still attach the other files.
 - Same security stance as desktop: never "open" an attachment (it could run a script).
+- Result, with one change from the plan: an **Attachments screen** (like the Trash Can's) instead of a panel
+  inside the pane, which would have cost editor height in a short terminal. `a` on a note in the tree, or
+  `ctrl+p` in its pane; there `a` attaches, `s` saves a copy, `ctrl+d` removes. Paths are read like a shell
+  reads them, so files dragged into the terminal work. A note's attachment count is not shown in its
+  pane title yet, so a note with files looks like one without until the screen is opened.
 - Done when: a file attached in the CLI appears in the desktop table, and the reverse; moving a note
-  to the Trash Can and back keeps its attachments.
+  to the Trash Can and back keeps its attachments (that part is the data layer's, unchanged).
 
 ### Phase 4: add images from the terminal
 

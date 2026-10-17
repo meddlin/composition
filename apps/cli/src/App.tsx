@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultApi, type Api } from "./api";
 import { canMoveGroup, favorites as favoritesLib, panes as paneLib, type Favorites, type Group, type Note, type Workspace } from "./backend";
 import { ConfirmDialog, HelpDialog, PickerDialog, PromptDialog, type PickerOption } from "./components/Dialogs";
+import { AttachmentsScreen } from "./components/AttachmentsScreen";
 import { Pane, type FlushRegistry } from "./components/Pane";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { Tree } from "./components/Tree";
@@ -31,6 +32,7 @@ type Dialog =
   | { kind: "delete-group"; group: Group }
   | { kind: "help" }
   | { kind: "trash" }
+  | { kind: "attachments"; note: Note }
   | { kind: "settings" }
   | null;
 
@@ -348,6 +350,11 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         case "new-note":
           setDialog({ kind: "new-note", groupId: targetGroupId(highlighted, notesById) });
           break;
+        case "open-attachments": {
+          const open = paneState.focusedId === null ? undefined : notesById.get(paneState.focusedId);
+          if (open) setDialog({ kind: "attachments", note: open });
+          break;
+        }
       }
       return;
     }
@@ -356,6 +363,11 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
       case "open-beside":
         if (highlighted?.kind === "note") openNote(highlighted.noteId, true);
         break;
+      case "open-attachments": {
+        const noteRow = highlighted?.kind === "note" ? notesById.get(highlighted.noteId) : undefined;
+        if (noteRow) setDialog({ kind: "attachments", note: noteRow });
+        break;
+      }
       case "collapse":
         if ((highlighted?.kind === "group" || highlighted?.kind === "section") && highlighted.expanded) toggleGroup(highlighted);
         break;
@@ -594,6 +606,17 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
                 setFavorites(workspace.favorites);
               });
             }}
+            onClose={closeDialog}
+          />
+        );
+      case "attachments":
+        return (
+          <AttachmentsScreen
+            api={api}
+            noteId={dialog.note.id}
+            noteTitle={dialog.note.title}
+            palette={palette}
+            width={terminalWidth}
             onClose={closeDialog}
           />
         );

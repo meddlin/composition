@@ -126,6 +126,7 @@ const SCOPE_TITLES: Record<Scope, string> = {
   pane: "In a pane",
   trash: "In the Trash",
   settings: "In Settings",
+  attachments: "In Attachments",
 };
 
 export function HelpDialog({ palette, onClose }: { palette: Palette; onClose: () => void }) {
@@ -133,7 +134,7 @@ export function HelpDialog({ palette, onClose }: { palette: Palette; onClose: ()
   useKeyboard((key) => {
     if (key.name === "escape" || key.name === "q" || key.name === "?") onClose();
   });
-  const scopes: Scope[] = ["tree", "pane", "trash"];
+  const scopes: Scope[] = ["tree", "pane", "trash", "attachments"];
   // The dialog's frame and padding take 6 rows and the note above the list 1 more.
   const listHeight = Math.max(4, height - 9);
   return (

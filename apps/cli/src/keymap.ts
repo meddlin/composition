@@ -4,7 +4,7 @@
  * the keys that must never appear here (the editor's, and the ones macOS keeps).
  */
 
-export type Scope = "tree" | "pane" | "trash" | "settings";
+export type Scope = "tree" | "pane" | "trash" | "settings" | "attachments";
 
 export type ActionId =
   | "open"
@@ -27,6 +27,10 @@ export type ActionId =
   | "next-pane"
   | "cycle-view"
   | "close-pane"
+  | "open-attachments"
+  | "attach"
+  | "save-copy"
+  | "remove-attachment"
   | "restore"
   | "delete-forever"
   | "next-field"
@@ -63,6 +67,7 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "move", scope: "tree", keys: ["m"], hint: "m move", description: "Move the highlighted note or group", footer: true },
   { action: "move-up", scope: "tree", keys: ["shift+up"], hint: "shift+↑ up", description: "Move the highlighted note or group up one place among its siblings", footer: false },
   { action: "move-down", scope: "tree", keys: ["shift+down"], hint: "shift+↓ down", description: "Move the highlighted note or group down one place among its siblings", footer: false },
+  { action: "open-attachments", scope: "tree", keys: ["a"], hint: "a files", description: "Open the highlighted note's attachments: attach files, save copies, remove", footer: false },
   { action: "rename-group", scope: "tree", keys: ["r"], hint: "r rename", description: "Rename the highlighted group", footer: false },
   { action: "favorite", scope: "tree", keys: ["f"], hint: "f pin", description: "Pin or unpin the highlighted note or group", footer: false },
   { action: "help", scope: "tree", keys: ["?"], hint: "? help", description: "Show every key", footer: true, essential: true },
@@ -74,10 +79,16 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "cycle-view", scope: "pane", keys: ["ctrl+t"], hint: "ctrl+t view", description: "Cycle the pane's view: editor, split, preview", footer: true },
   { action: "close-pane", scope: "pane", keys: ["ctrl+x"], hint: "ctrl+x close", description: "Close the pane", footer: true },
   { action: "new-note", scope: "pane", keys: ["ctrl+n"], hint: "ctrl+n note", description: "New note", footer: false },
+  { action: "open-attachments", scope: "pane", keys: ["ctrl+p"], hint: "ctrl+p files", description: "Open the note's attachments", footer: false },
 
   { action: "restore", scope: "trash", keys: ["r"], hint: "r restore", description: "Restore the highlighted note or group", footer: true },
   { action: "delete-forever", scope: "trash", keys: ["ctrl+d"], hint: "ctrl+d delete forever", description: "Delete it for good", footer: true },
   { action: "back", scope: "trash", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
+
+  { action: "attach", scope: "attachments", keys: ["a"], hint: "a attach", description: "Attach files: type or paste their paths", footer: true },
+  { action: "save-copy", scope: "attachments", keys: ["s"], hint: "s save a copy", description: "Save a copy of the highlighted file where you say", footer: true },
+  { action: "remove-attachment", scope: "attachments", keys: ["ctrl+d"], hint: "ctrl+d remove", description: "Remove the highlighted file from the note, and delete the stored copy", footer: true },
+  { action: "back", scope: "attachments", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 
   { action: "next-field", scope: "settings", keys: ["tab"], hint: "Tab next field", description: "Move to the next setting", footer: true },
   { action: "save", scope: "settings", keys: ["enter"], hint: "Enter save", description: "Save the data location or city, apply the highlighted color scheme, create a backup, or ask to restore one", footer: true },

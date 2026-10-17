@@ -47,7 +47,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Images in notes: paste | ❌ | ✅ | ✅ | |
 | Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
-| **Attach any file to a note, listed in a table on the note** | ❌ | 🚫 | ✅ | Desktop only, by design. [attachments.md](architecture/attachments.md) |
+| **Attach any file to a note, listed in a table on the note** | ✅ | 🚫 | ✅ | Desktop and CLI; the web app has no way to hand files to a server on purpose. The CLI types paths where the desktop opens a file picker, and has no "show in Finder". [attachments.md](architecture/attachments.md) |
 
 ## Appearance and settings
 
@@ -87,8 +87,8 @@ All three products open the same `composition.db`, so a note can carry something
 product can't show. The rule so far is that the product that can't show it must not lose it:
 
 - **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview but cannot paste one, and its "move the data" setting carries the image folder along.
-- **Attachments:** they live in their own table, never in the note's text, so the CLI and
-  web app never rewrite them. Neither shows anything for them. Moving a note to the Trash
+- **Attachments:** they live in their own table, never in the note's text, so no app rewrites them
+  by saving a note. The web app shows nothing for them; the CLI has its Attachments screen. Moving a note to the Trash
   Can keeps its attachments, so a restored note gets them back; they are deleted when the
   note is permanently deleted (by hand or after 60 days). The CLI's "move the data" setting
   carries the attachments folder along.

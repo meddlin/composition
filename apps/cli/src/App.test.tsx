@@ -662,7 +662,7 @@ describe("help and quitting", () => {
     const app = await sandbox.mount();
 
     await press(app, "?");
-    expect(frame(app)).toContain("ctrl+o");
+    expect(frame(app)).toContain("ctrl+n"); // near the top of the list; the rest scrolls
     expect(frame(app)).toContain("Typing in an editor always wins");
     await pressEscape(app);
 
@@ -676,12 +676,12 @@ describe("help and quitting", () => {
     await press(app, "?");
     expect(frame(app)).toContain("Typing in an editor always wins"); // the note is never scrolled away
     expect(frame(app)).toContain("In the tree");
-    expect(frame(app)).not.toContain("In the Trash"); // below the fold
+    expect(frame(app)).not.toContain("In Attachments"); // below the fold
 
     for (let i = 0; i < 40; i++) app.mockInput.pressKey("ARROW_DOWN" as never);
     await settle(app, 200);
 
-    expect(frame(app)).toContain("In the Trash");
+    expect(frame(app)).toContain("In Attachments");
     expect(frame(app)).toContain("Back to the notes");
   });
 

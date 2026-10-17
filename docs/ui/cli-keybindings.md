@@ -33,6 +33,7 @@ wins and this page needs updating in the same pull request.
 | `r` | Rename the highlighted group | *(existing)* |
 | `m` | Move the highlighted **note or group** to another group, or a group back to the top level. A group's list leaves out the group itself and everything beneath it | note: *(existing)*; group: new |
 | `shift+↑` `shift+↓` | Move the highlighted note or group one place up or down among its siblings (the notes of one group, or the sub-groups of one parent), and keep that order. Does nothing at either end, in Favorites, or while a search is narrowing the tree. Web and desktop do the same by dragging | new |
+| `a` | Open the highlighted note's **Attachments** screen (see [below](#attachments-screen)) | new |
 | `f` | Pin or unpin the highlighted note or group. Pinned items are listed in a "★ Favorites" section above the tree, in the order they were pinned, and starred where they sit in the tree | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |
@@ -52,6 +53,7 @@ Search syntax is shared with web and desktop: `tag:`, `title:`, `description:`,
 | `ctrl+t` | Cycle the pane's view: editor, split (editor and preview side by side), preview. Mnemonic: toggle view |
 | `ctrl+x` | Close the pane |
 | `ctrl+n` | New note (works here as well as in the tree, as it did in the Python CLI) |
+| `ctrl+p` | Open the note's **Attachments** screen. Mnemonic: paper clip |
 | everything else | Editing (see below) |
 
 Each note is open in at most one pane, panes sit in a single row, and the arrangement is
@@ -108,6 +110,23 @@ and sunset, and switches the text color at the half-way point, as the web app do
 without truecolor (`COLORTERM` is not `truecolor` or `24bit`) it switches between the two
 schemes instead, since a smooth fade needs the colors.
 
+## Attachments screen
+
+Opened with `a` on a note in the tree, or `ctrl+p` in its pane. It is the table the desktop app
+shows under a note (name, size, day attached), over the files attached to **that note**; the CLI,
+web and desktop apps read and write the same table, so a file attached in one shows in the others.
+
+| Key | Action |
+|---|---|
+| `↑` `↓` | Move |
+| `a` | Attach files. Type or paste their paths. Spaces split paths the way a shell does, so quote a name that has spaces, or drag the files into the terminal, which pastes them quoted. A path that is one existing file is taken whole. `~` works, and a relative path starts from where the app was launched. Each file is copied in (the original is left alone); one that can't be attached (a folder, over 1 GB, unreadable) is named while the others still go in |
+| `s` | Save a copy of the highlighted file. The prompt starts with `~/<its name>`; give a new file name or a folder. It never overwrites a file that exists |
+| `ctrl+d` | Remove the highlighted file, after a confirmation: its stored copy is deleted for good |
+| `Esc` | Back |
+
+There is no "open", and no "show in Finder": opening an attachment could run it, which is why the
+desktop app doesn't either (see [attachments.md](../architecture/attachments.md#decisions)).
+
 ## Dialogs
 
 | Dialog | Keys |
@@ -155,7 +174,7 @@ Found while building the spike on 2026-10-02; the reason matters more than the l
 
 Before adding a binding, check this table and the editor-owned table above. Keys that
 are free inside the editor today: `ctrl+x`, `ctrl+t`, `ctrl+o`, `ctrl+g`, `ctrl+n`,
-`ctrl+p`, `ctrl+r`, `ctrl+s`, `ctrl+l`, `ctrl+space`.
+`ctrl+p` (now attachments), `ctrl+r`, `ctrl+s`, `ctrl+l`, `ctrl+space`.
 
 ## Where this is defined
 
