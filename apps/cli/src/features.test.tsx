@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { closeDb, listNotes, loadWebSettings, resolvedDbPath, service, sunLevel, type SunEvent } from "./backend";
+import { loadColumns, saveColumns } from "./columns";
 import { moveApplicationData } from "./dataLocation";
 import { backgroundAt, createSandbox, frame, press, pressEscape, settle, sleep, type Rendered, type Sandbox } from "./testing";
 
@@ -210,6 +211,147 @@ describe("moving a group", () => {
     await press(app, "RETURN", {}, 400); // the first option is Top level
 
     expect((await service.loadWorkspace()).groups.find((g) => g.id === sub.id)?.parentId).toBeNull();
+  });
+});
+
+/** The row numbers of the given labels in the current screen, to compare their order. */
+const rowOf = (app: Rendered, label: string) => frame(app).split("\n").findIndex((line) => line.includes(label));
+
+describe("rearranging with shift+arrows", () => {
+  it("moves a group down among its siblings, keeps the cursor on it, and saves the order", async () => {
+    await service.createGroup("Alpha", null);
+    await service.createGroup("Beta", null);
+    await service.createGroup("Gamma", null);
+    await service.createNote("Loose", null);
+    const app = await sandbox.mount();
+    await arrowUp(app, 4); // Loose -> Ungrouped -> Gamma -> Beta -> Alpha
+
+    await press(app, "ARROW_DOWN", { shift: true }, 400);
+    expect(rowOf(app, "Beta")).toBeLessThan(rowOf(app, "Alpha"));
+    expect(rowOf(app, "Alpha")).toBeLessThan(rowOf(app, "Gamma"));
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Beta", "Alpha", "Gamma"]);
+
+    await press(app, "ARROW_DOWN", { shift: true }, 400); // still on Alpha
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Beta", "Gamma", "Alpha"]);
+  });
+
+  it("moves a note up within its group", async () => {
+    const work = await service.createGroup("Work", null);
+    await service.createNote("Plan", work.id);
+    await service.createNote("Draft", work.id);
+    await service.createNote("Notes", work.id); // newest first: Notes, Draft, Plan
+    const app = await sandbox.mount();
+    expect(rowOf(app, "Notes")).toBeLessThan(rowOf(app, "Plan"));
+    await arrowDown(app, 2); // the cursor starts on the first note: Notes -> Draft -> Plan
+
+    await press(app, "ARROW_UP", { shift: true }, 400);
+
+    const order = (await service.loadWorkspace()).notes.map((n) => n.title);
+    expect(order).toEqual(["Notes", "Plan", "Draft"]);
+    expect(rowOf(app, "Plan")).toBeLessThan(rowOf(app, "Draft"));
+  });
+
+  it("does nothing at the end of the list", async () => {
+    await service.createGroup("Alpha", null);
+    await service.createGroup("Beta", null);
+    await service.createNote("Loose", null);
+    const app = await sandbox.mount();
+    await arrowUp(app, 4); // Alpha, the first group
+
+    await press(app, "ARROW_UP", { shift: true }, 300);
+
+    expect((await service.loadWorkspace()).groups.map((g) => g.name)).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("refuses while a search is narrowing the tree", async () => {
+    const work = await service.createGroup("Work", null);
+    const plan = await service.createNote("Plan", work.id);
+    await service.createNote("Draft", work.id);
+    const app = await sandbox.mount({ api: { searchNotes: async () => ({ hits: [{ id: plan.id, title: "Plan", description: "", groupPath: ["Work"] }] }) } });
+    await press(app, "/");
+    await app.mockInput.typeText("plan");
+    await settle(app, 700);
+    await press(app, "RETURN"); // back to the tree, keeping the search
+    await press(app, "ARROW_DOWN", {}, 40);
+
+    await press(app, "ARROW_DOWN", { shift: true }, 300);
+
+    expect(frame(app)).toContain("Clear the search to rearrange");
+  });
+});
+
+describe("column sizes", () => {
+  /** Where the tree ends: the column of the first pane's top-left corner. */
+  const sidebarWidth = (app: Rendered) => frame(app).split("\n")[2].indexOf("\u250c", 1);
+  /** Where the preview starts in a split pane: its first line is the note's body, so the frontmatter the editor shows isn't on it. */
+  const previewColumn = (app: Rendered) => {
+    const row = frame(app).split("\n").find((line) => line.includes("Marker line")) ?? "";
+    return row.indexOf("Marker line");
+  };
+
+  it("widens and narrows the tree with > and <, two columns at a time, and remembers it", async () => {
+    await service.createNote("Plan", null);
+    const app = await sandbox.mount();
+    expect(sidebarWidth(app)).toBe(34);
+
+    await press(app, ">", {}, 100);
+    await press(app, ">", {}, 100);
+    expect(sidebarWidth(app)).toBe(38);
+    expect(loadColumns().sidebarColumns).toBe(38);
+
+    await press(app, "<", {}, 100);
+    expect(sidebarWidth(app)).toBe(36);
+    expect(loadColumns().sidebarColumns).toBe(36);
+  });
+
+  it("starts from the remembered width", async () => {
+    await service.createNote("Plan", null);
+    saveColumns({ sidebarColumns: 44, editorRatio: 0.5 });
+
+    const app = await sandbox.mount();
+
+    expect(sidebarWidth(app)).toBe(44);
+  });
+
+  it("stops at the limits", async () => {
+    await service.createNote("Plan", null);
+    const app = await sandbox.mount({ width: 200 });
+    for (let i = 0; i < 20; i++) app.mockInput.pressKey("<" as never);
+    await settle(app, 200);
+    expect(sidebarWidth(app)).toBe(20);
+
+    for (let i = 0; i < 30; i++) app.mockInput.pressKey(">" as never);
+    await settle(app, 200);
+    expect(sidebarWidth(app)).toBe(60);
+  });
+
+  it("keeps room for the panes in a narrow terminal, whatever width is remembered", async () => {
+    await service.createNote("Plan", null);
+    saveColumns({ sidebarColumns: 60, editorRatio: 0.5 });
+
+    const app = await sandbox.mount({ width: 80 });
+
+    expect(sidebarWidth(app)).toBe(50); // 80 - 30 columns left for the panes
+  });
+
+  it("gives the editor more or less of a split pane with ] and [, and remembers it", async () => {
+    const note = await service.createNote("Plan", null);
+    await service.saveNoteContent(note.id, `${note.content}\nMarker line\n`);
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 500);
+    await pressEscape(app, 300); // back to the tree, where the size keys live
+    const before = previewColumn(app);
+
+    await press(app, "]", {}, 200);
+    await press(app, "]", {}, 300);
+
+    expect(previewColumn(app)).toBeGreaterThan(before);
+    expect(loadColumns().editorRatio).toBe(0.7);
+
+    for (let i = 0; i < 10; i++) app.mockInput.pressKey("[" as never);
+    await settle(app, 300);
+    expect(loadColumns().editorRatio).toBe(0.2);
+    expect(previewColumn(app)).toBeLessThan(before);
   });
 });
 

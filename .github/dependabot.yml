@@ -6,6 +6,12 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      # @opentui/react pins the exact @opentui/core it was built with; bumped apart, the app
+      # ends up with two copies of core and the types no longer match.
+      opentui:
+        patterns:
+          - "@opentui/*"
 
   - package-ecosystem: "npm"
     directory: "/apps/web"

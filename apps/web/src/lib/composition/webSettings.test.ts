@@ -64,6 +64,19 @@ describe("web settings layout", () => {
     expect(loadWebSettings()).toMatchObject(DEFAULT_LAYOUT);
   });
 
+  it("keeps the terminal app's sidebar width apart from the pixel one, and clamps it", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    writeSettings({ appDataDir: "/data", sidebarWidth: 320, cliSidebarColumns: 44.6 });
+    expect(loadWebSettings()).toMatchObject({ sidebarWidth: 320, cliSidebarColumns: 45 });
+
+    writeSettings({ appDataDir: "/data", cliSidebarColumns: 500 });
+    expect(loadWebSettings().cliSidebarColumns).toBe(60);
+    writeSettings({ appDataDir: "/data", cliSidebarColumns: "wide" });
+    expect(loadWebSettings().cliSidebarColumns).toBe(34);
+    writeSettings({ appDataDir: "/data" });
+    expect(loadWebSettings()).not.toHaveProperty("cliSidebarColumns");
+  });
+
   it("round-trips through save and load", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
     const settings = { ...loadWebSettings(), sidebarWidth: 300, editorRatio: 0.4 };

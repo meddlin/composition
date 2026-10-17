@@ -3,16 +3,19 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultApi, type Api } from "./api";
 import { canMoveGroup, favorites as favoritesLib, panes as paneLib, type Favorites, type Group, type Note, type Workspace } from "./backend";
 import { ConfirmDialog, HelpDialog, PickerDialog, PromptDialog, type PickerOption } from "./components/Dialogs";
-import { Pane, type FlushRegistry } from "./components/Pane";
+import { AttachmentsScreen } from "./components/AttachmentsScreen";
+import { Pane, type FlushRegistry, type ImageRequest } from "./components/Pane";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { Tree } from "./components/Tree";
 import { TrashScreen } from "./components/TrashScreen";
 import { actionFor, footerFor } from "./keymap";
+import { imagePathsIn } from "./imageImport";
+import { drawnSidebar, loadColumns, resizeEditorShare, resizeSidebar, saveColumns, type Columns } from "./columns";
+import { placementFor, type Direction } from "./reorder";
 import { autoPalette, isTruecolor, paletteFor, syntaxStyleFor } from "./theme";
 import { useSunLevel } from "./useSunLevel";
 import { buildTree, groupKey, noteKey, orderedGroups, pruneFavorites, targetGroupId, type TreeRow } from "./tree";
 
-export const SIDEBAR_WIDTH = 34;
 export const SEARCH_DEBOUNCE_MS = 350;
 const TOAST_MS = 4000;
 /** A pane narrower than this shows the editor or the preview, not both side by side. */
@@ -30,6 +33,8 @@ type Dialog =
   | { kind: "delete-group"; group: Group }
   | { kind: "help" }
   | { kind: "trash" }
+  | { kind: "attachments"; note: Note }
+  | { kind: "insert-image" }
   | { kind: "settings" }
   | null;
 
@@ -40,6 +45,8 @@ export type AppProps = {
   theme?: string;
   /** Moves all the app's data to another folder and reopens it there (see runtime.ts). */
   moveDataLocation?: (destination: string) => Promise<void>;
+  /** The remembered column sizes; read from the settings file when not given. */
+  columns?: Columns;
 };
 
 const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
@@ -48,7 +55,7 @@ const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
   preview: "split",
 };
 
-export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation }: AppProps) {
+export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation, columns: initialColumns }: AppProps) {
   const renderer = useRenderer();
   const { width: terminalWidth } = useTerminalDimensions();
   const [theme, setTheme] = useState(initialTheme);
@@ -73,6 +80,28 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   const [dialog, setDialog] = useState<Dialog>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Favorites>(initial.favorites);
+
+  // --- column sizes ---------------------------------------------------------
+  const [columns, setColumns] = useState<Columns>(() => initialColumns ?? loadColumns());
+  // Keys can arrive faster than the screen redraws (a held key), so each step starts from the latest
+  // size, not from the one this render was drawn with.
+  const latestColumns = useRef(columns);
+  const resize = (change: (current: Columns) => Columns) => {
+    const current = latestColumns.current;
+    const next = change(current);
+    if (next.sidebarColumns === current.sidebarColumns && next.editorRatio === current.editorRatio) return;
+    latestColumns.current = next;
+    setColumns(next);
+    try {
+      saveColumns(next);
+    } catch (error) {
+      setToast(`That size couldn't be remembered: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // --- images ---------------------------------------------------------------
+  const imageRequestId = useRef(0);
+  const [imageRequest, setImageRequest] = useState<(ImageRequest & { noteId: number }) | null>(null);
 
   // --- saving on the way out ------------------------------------------------
   const flushSet = useRef(new Set<() => Promise<void>>());
@@ -273,6 +302,34 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
       .map(({ group, depth }) => ({ label: `${"  ".repeat(depth)}${group.name}`, value: group.id })),
   ];
 
+  /** Moves the highlighted note or group one place up or down among its siblings, and saves that order. */
+  const rearrange = async (direction: Direction) => {
+    if (hits !== null) {
+      setToast("Clear the search to rearrange: it only shows some of the notes.");
+      return;
+    }
+    if (highlighted && "favorite" in highlighted && highlighted.favorite) {
+      setToast("Rearrange it in the tree: Favorites stay in the order they were pinned.");
+      return;
+    }
+    const placement = placementFor(highlighted, direction, notes, groups);
+    if (!placement) return; // already first or last, or not something that can move
+    try {
+      if (placement.type === "note") {
+        await api.placeNote(placement.id, placement.groupId, placement.beforeId);
+      } else {
+        const result = await api.placeGroup(placement.id, placement.parentId, placement.beforeId);
+        if (result.error) {
+          setToast(result.error);
+          return;
+        }
+      }
+      await reload(); // the cursor follows the row's key to its new place
+    } catch (error) {
+      setToast(`That didn't work: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
   const startMove = () => {
     if (highlighted?.kind === "note") {
       const note = notesById.get(highlighted.noteId);
@@ -319,6 +376,14 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         case "new-note":
           setDialog({ kind: "new-note", groupId: targetGroupId(highlighted, notesById) });
           break;
+        case "insert-image":
+          if (paneState.focusedId !== null) setDialog({ kind: "insert-image" });
+          break;
+        case "open-attachments": {
+          const open = paneState.focusedId === null ? undefined : notesById.get(paneState.focusedId);
+          if (open) setDialog({ kind: "attachments", note: open });
+          break;
+        }
       }
       return;
     }
@@ -327,6 +392,11 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
       case "open-beside":
         if (highlighted?.kind === "note") openNote(highlighted.noteId, true);
         break;
+      case "open-attachments": {
+        const noteRow = highlighted?.kind === "note" ? notesById.get(highlighted.noteId) : undefined;
+        if (noteRow) setDialog({ kind: "attachments", note: noteRow });
+        break;
+      }
       case "collapse":
         if ((highlighted?.kind === "group" || highlighted?.kind === "section") && highlighted.expanded) toggleGroup(highlighted);
         break;
@@ -347,6 +417,27 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
         break;
       case "move":
         startMove();
+        break;
+      // The list widget would also read shift+arrow as a jump of several rows; this key is ours.
+      case "narrow-sidebar":
+        resize((c) => ({ ...c, sidebarColumns: resizeSidebar(c.sidebarColumns, -1) }));
+        break;
+      case "widen-sidebar":
+        resize((c) => ({ ...c, sidebarColumns: resizeSidebar(c.sidebarColumns, 1) }));
+        break;
+      case "less-editor":
+        resize((c) => ({ ...c, editorRatio: resizeEditorShare(c.editorRatio, -1) }));
+        break;
+      case "more-editor":
+        resize((c) => ({ ...c, editorRatio: resizeEditorShare(c.editorRatio, 1) }));
+        break;
+      case "move-up":
+        key.preventDefault();
+        void rearrange("up");
+        break;
+      case "move-down":
+        key.preventDefault();
+        void rearrange("down");
         break;
       case "favorite":
         toggleFavorite();
@@ -559,6 +650,35 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
             onClose={closeDialog}
           />
         );
+      case "insert-image":
+        return (
+          <PromptDialog
+            palette={palette}
+            title="Insert image"
+            label="Path of an image file (PNG, JPEG, GIF or WebP); quote a name with spaces"
+            onCancel={closeDialog}
+            onSubmit={(typed) => {
+              const files = imagePathsIn(typed, process.cwd());
+              closeDialog();
+              if (!files || paneState.focusedId === null) {
+                setToast("That isn't the path of an image file (PNG, JPEG, GIF or WebP).");
+                return;
+              }
+              setImageRequest({ id: ++imageRequestId.current, noteId: paneState.focusedId, files });
+            }}
+          />
+        );
+      case "attachments":
+        return (
+          <AttachmentsScreen
+            api={api}
+            noteId={dialog.note.id}
+            noteTitle={dialog.note.title}
+            palette={palette}
+            width={terminalWidth}
+            onClose={closeDialog}
+          />
+        );
       case "trash":
         return (
           <TrashScreen
@@ -577,7 +697,8 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   // --- drawing --------------------------------------------------------------
   const openPanes = paneState.panes;
   const totalSize = openPanes.reduce((sum, pane) => sum + pane.size, 0) || 1;
-  const paneAreaWidth = Math.max(0, terminalWidth - SIDEBAR_WIDTH);
+  const sidebarWidth = drawnSidebar(columns.sidebarColumns, terminalWidth);
+  const paneAreaWidth = Math.max(0, terminalWidth - sidebarWidth);
 
   return (
     <box flexDirection="column" width="100%" height="100%" backgroundColor={palette.background}>
@@ -601,7 +722,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
 
       <box flexDirection="row" flexGrow={1}>
         <box
-          width={SIDEBAR_WIDTH}
+          width={sidebarWidth}
           border
           borderStyle="single"
           borderColor={focus === "tree" ? palette.borderFocused : palette.border}
@@ -639,6 +760,9 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
                   syntax={syntax}
                   flushes={flushes}
                   onSaved={noteSaved}
+                  imageRequest={imageRequest?.noteId === pane.noteId ? imageRequest : null}
+                  onNotice={setToast}
+                  editorRatio={columns.editorRatio}
                 />
               );
             })

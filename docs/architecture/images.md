@@ -8,8 +8,9 @@ Source: [`images.ts`](../../apps/web/src/lib/composition/images.ts),
 [`images.ts`](../../apps/cli/src/images.ts),
 [`PreviewImage.tsx`](../../apps/cli/src/components/PreviewImage.tsx)
 
-Images in notes are supported in the **web and desktop apps**, which can paste them. The CLI
-shows them in its preview ([In the CLI](#in-the-cli)) but cannot paste one.
+Images in notes are supported in all three apps. The web and desktop apps paste them; the CLI shows
+them in its preview and adds them from an image *file* ([In the CLI](#in-the-cli)), since a
+terminal cannot receive picture bytes from a paste.
 
 ## What a note contains
 
@@ -111,9 +112,24 @@ whichever application data directory is configured at that moment. Responses car
 
 ## In the CLI
 
-The terminal app shows a note's stored images in its preview. It can't paste one (that is a
-browser feature), so images come from the web or desktop app. Which images get drawn is decided
-in [`mdx.ts`](../../apps/cli/src/mdx.ts), alongside the [MDX components](../ui/mdx-components.md).
+The terminal app shows a note's stored images in its preview, and can add one from a file.
+
+**Adding.** Two ways, both ending in the same `saveImage` and the same `![alt](app_data/<name>)`
+at the cursor (replacing a selection), implemented in [`imageImport.ts`](../../apps/cli/src/imageImport.ts):
+
+- `ctrl+l` in a pane asks for the path of an image file.
+- Pasting into the editor. Dragging a file into a terminal pastes its path (quoted if it has
+  spaces), so when everything pasted is the path of an existing PNG, JPEG, GIF or WebP file, the
+  editor adds the image instead of typing the path. Several dragged files become one image each,
+  one per line. Any other paste, including text that merely mentions a path, is typed as text.
+
+A file that isn't really an image is refused by `saveImage`'s byte check and named in the message,
+and the other files are still added. There is no size limit, as on the desktop app: `main.tsx`
+calls `service.setMaxImageBytes(null)`. Reading the system clipboard for a copied screenshot is
+not done: it would need `osascript`, `wl-paste` or `xclip` per platform.
+
+Which images get drawn is decided in [`mdx.ts`](../../apps/cli/src/mdx.ts), alongside the
+[MDX components](../ui/mdx-components.md).
 
 | In the note | In the terminal |
 |---|---|

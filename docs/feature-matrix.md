@@ -22,8 +22,8 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | YAML frontmatter (title, description, tags, dates) | ✅ | ✅ | ✅ | [data-model.md](architecture/data-model.md) |
 | Nested groups: create, rename, delete when empty | ✅ | ✅ | ✅ | [groups.md](architecture/groups.md) |
 | Move a note to another group | ✅ | ✅ | ✅ | CLI: the `m` key. Web and desktop: drag the note onto a group |
-| Drag and drop notes and groups | ❌ | ✅ | ✅ | [web-groups.md](ui/web-groups.md) |
-| Reorder notes and groups by hand | ❌ | ✅ | ✅ | Drag a row to the edge of a sibling. The terminal app lists notes in the saved order but groups by name. [groups.md](architecture/groups.md#ordering) |
+| Drag and drop notes and groups | 🚫 | ✅ | ✅ | A terminal has no dragging worth the name; the CLI moves with keys instead (`m`, and `shift+↑` `shift+↓` below). [web-groups.md](ui/web-groups.md) |
+| Reorder notes and groups by hand | ✅ | ✅ | ✅ | Web and desktop: drag a row to the edge of a sibling. CLI: `shift+↑` `shift+↓` move the highlighted row one place. [groups.md](architecture/groups.md#ordering) |
 | Move an existing group under another | ✅ | ✅ | ✅ | CLI: the `m` key, which offers every group except the group itself and what is beneath it |
 | Several notes open side by side | ✅ | ✅ | ✅ | CLI: the `o` key opens a note in a new pane, `ctrl+o` moves between panes. Web and desktop: draggable panes. [screen-navigation.md](architecture/screen-navigation.md) |
 | Favorites: pin groups and notes above the tree | ✅ | ✅ | ✅ | CLI: the `f` key. [groups.md](architecture/groups.md#favorites) |
@@ -41,12 +41,13 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
 | Markdown preview | ✅ | ✅ | ✅ | |
-| Syntax highlighting while writing Markdown | ❌ | ✅ | ✅ | [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
+| Syntax highlighting while writing Markdown | ✅ | ✅ | ✅ | The CLI colors the editor with the same palette ([highlight.ts](../apps/cli/src/highlight.ts)). [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
+| Tab types a tab in the editor, to indent nested lists | ✅ | ✅ | ✅ | |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
-| Images in notes: paste | ❌ | ✅ | ✅ | |
-| Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |
+| Images in notes: paste | ✅ | ✅ | ✅ | A terminal can't paste picture bytes. The CLI adds an image from a file: `ctrl+l` and a path, or dragging the file into the terminal. Copying a screenshot to the clipboard doesn't work in the CLI. [images.md](architecture/images.md#in-the-cli) |
+| Image size limit | None | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
-| **Attach any file to a note, listed in a table on the note** | ❌ | 🚫 | ✅ | Desktop only, by design. [attachments.md](architecture/attachments.md) |
+| **Attach any file to a note, listed in a table on the note** | ✅ | 🚫 | ✅ | Desktop and CLI; the web app has no way to hand files to a server on purpose. The CLI types paths where the desktop opens a file picker, and has no "show in Finder". [attachments.md](architecture/attachments.md) |
 
 ## Appearance and settings
 
@@ -54,7 +55,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 |---|:-:|:-:|:-:|---|
 | Color schemes | 6 | 6 | 6 | Dark, light, forest, wine, cream and "follow the sun", in all three. The CLI's colors are the web's (a test fails if they drift) |
 | "Follow the sun" scheme | ✅ | ✅ | ✅ | [web-follow-the-sun.md](ui/web-follow-the-sun.md). The CLI fades smoothly only in a truecolor terminal, and otherwise switches between dark and light |
-| Resizable columns, remembered | ❌ | ✅ | ✅ | The CLI's tree is a fixed width |
+| Resizable columns, remembered | ✅ | ✅ | ✅ | Web and desktop: drag the dividers. CLI: `<` `>` for the tree and `[` `]` for the editor/preview split. The CLI's tree width is stored in its own field (`cliSidebarColumns`, in columns), so a backup restored from another app never resizes it; the split is the shared `editorRatio`. [keybindings](ui/cli-keybindings.md) |
 | Application data location setting | ✅ | ✅ | ✅ | Moving it in the CLI or the desktop app moves the other one too, through `~/.composition-location.json`. The web app keeps its own. The CLI moves the files; web and desktop only repoint. [product-builds.md](product-builds.md) |
 | Backup and restore everything from Settings | ✅ | ✅ | ✅ | Notes, groups, Trash Can, images, attachments, and the color scheme, city, column sizes and favorites, in one `.tar.gz`. The web and CLI type a path; the desktop uses file dialogs. [backup-restore.md](architecture/backup-restore.md) |
 | Automatic updates | 🚫 | 🚫 | ✅ | Checks GitHub Releases at launch and every 6 hours, asks before downloading and again before restarting. Settings has the on/off toggle. [desktop-updates-plan.md](desktop-updates-plan.md) |
@@ -85,9 +86,9 @@ carries 🚫, which marks a deliberate decision.
 All three products open the same `composition.db`, so a note can carry something a
 product can't show. The rule so far is that the product that can't show it must not lose it:
 
-- **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview but cannot paste one, and its "move the data" setting carries the image folder along.
-- **Attachments:** they live in their own table, never in the note's text, so the CLI and
-  web app never rewrite them. Neither shows anything for them. Moving a note to the Trash
+- **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview and adds one from a file, and its "move the data" setting carries the image folder along.
+- **Attachments:** they live in their own table, never in the note's text, so no app rewrites them
+  by saving a note. The web app shows nothing for them; the CLI has its Attachments screen. Moving a note to the Trash
   Can keeps its attachments, so a restored note gets them back; they are deleted when the
   note is permanently deleted (by hand or after 60 days). The CLI's "move the data" setting
   carries the attachments folder along.

@@ -23,6 +23,7 @@ export { closeDb } from "../../web/src/lib/composition/db";
 // Markdown points at one (`app_data/<name>`).
 export { IMAGE_DIR_NAME, imageNameFromRef } from "../../web/src/lib/composition/imageRefs";
 export { ATTACHMENT_DIR_NAME } from "../../web/src/lib/composition/attachmentNames";
+export type { Attachment } from "../../web/src/lib/composition/attachmentsApi";
 // Backup and restore: the sentence that says what a backup holds, and byte sizes.
 export { describeCounts } from "../../web/src/lib/composition/backupApi";
 export type { BackupResult } from "../../web/src/lib/composition/backupApi";
@@ -42,6 +43,13 @@ export { listNotes } from "../../web/src/lib/composition/notesRepo";
 export type { Note } from "../../web/src/lib/composition/notesRepo";
 export type { Group } from "../../web/src/lib/composition/groupsRepo";
 export type { Favorites } from "../../web/src/lib/composition/favorites";
+export {
+  clampCliSidebarColumns,
+  clampEditorRatio,
+  DEFAULT_CLI_SIDEBAR_COLUMNS,
+  MAX_EDITOR_RATIO,
+  MIN_EDITOR_RATIO,
+} from "../../web/src/lib/composition/layout";
 export { canMoveGroup, wouldCreateCycle } from "../../web/src/lib/composition/groupMove";
 export { fallbackSunEvents, INK_FLIP_LEVEL, sunLevel, RAMP_HALF_WIDTH_MS } from "../../web/src/lib/composition/sunSchedule";
 export type { SunEvent } from "../../web/src/lib/composition/sunSchedule";

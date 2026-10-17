@@ -38,8 +38,9 @@ export const groupKey = (groupId: number | null): string => `group:${groupId ?? 
 export const noteKey = (noteId: number): string => `note:${noteId}`;
 
 export type TreeInput = {
-  /** In the order they should appear within a group: most recently edited first. */
+  /** In the order they should appear within a group: the data layer's (hand-placed after the rest, which are newest first). */
   notes: readonly Note[];
+  /** In the order the data layer lists them: hand-placed first, then by name. Siblings keep that order. */
   groups: readonly Group[];
   /** Keys (see `groupKey`) of the groups the user has folded away. */
   collapsed: ReadonlySet<string>;
@@ -72,7 +73,6 @@ export function buildTree({ notes, groups, collapsed, filtering = false, favorit
     list.push(group);
     childrenOf.set(group.parentId, list);
   }
-  for (const list of childrenOf.values()) list.sort((a, b) => a.name.localeCompare(b.name));
 
   /** Whether anything matching sits in this group or below it. */
   const hasNotes = (groupId: number): boolean =>
@@ -165,7 +165,7 @@ export function targetGroupId(row: TreeRow | undefined, notesById: ReadonlyMap<n
   return null;
 }
 
-/** Every group, parents before children and siblings by name, with how deep each one sits. */
+/** Every group, parents before children and siblings in the order given, with how deep each one sits. */
 export function orderedGroups(groups: readonly Group[]): { group: Group; depth: number }[] {
   const childrenOf = new Map<number | null, Group[]>();
   for (const group of groups) {
@@ -175,7 +175,7 @@ export function orderedGroups(groups: readonly Group[]): { group: Group; depth: 
   }
   const ordered: { group: Group; depth: number }[] = [];
   const visit = (parentId: number | null, depth: number) => {
-    for (const group of [...(childrenOf.get(parentId) ?? [])].sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const group of childrenOf.get(parentId) ?? []) {
       ordered.push({ group, depth });
       visit(group.id, depth + 1);
     }

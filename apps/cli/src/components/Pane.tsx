@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Api } from "../api";
 import { frontmatter, type Note, type panes } from "../backend";
 import { markdownSpans } from "../highlight";
+import { imagePathsIn, importImages } from "../imageImport";
 import type { Palette } from "../theme";
 import { Preview } from "./Preview";
 
@@ -10,6 +11,9 @@ export const AUTOSAVE_DELAY_MS = 500;
 
 /** Lets the app save every open note before it quits. */
 export type FlushRegistry = { register(flush: () => Promise<void>): () => void };
+
+/** Image files to add at the cursor; a new `id` means a new request. */
+export type ImageRequest = { id: number; files: string[] };
 
 type PaneProps = {
   note: Note;
@@ -25,13 +29,19 @@ type PaneProps = {
   flushes: FlushRegistry;
   /** The note as the data layer stored it after a save (its title may have changed). */
   onSaved: (note: Note) => void;
+  /** Image files the app was asked to put into this note (the "insert image" dialog). */
+  imageRequest?: ImageRequest | null;
+  /** Something to tell the person: an image was added, or couldn't be. */
+  onNotice?: (text: string) => void;
+  /** The editor's share (0 to 1) of the pane when it shows editor and preview together. */
+  editorRatio?: number;
 };
 
 /**
  * One open note: its editor, its live preview, or both. The editor saves itself shortly
  * after you stop typing, and once more when the pane closes or the app quits.
  */
-export function Pane({ note, size, view, focused, api, palette, syntax, flushes, onSaved }: PaneProps) {
+export function Pane({ note, size, view, focused, api, palette, syntax, flushes, onSaved, imageRequest, onNotice, editorRatio = 0.5 }: PaneProps) {
   const editor = useRef<TextareaRenderable | null>(null);
   // The textarea owns the text from the moment it is created; later renders must not reset it.
   const initial = useRef(note.content);
@@ -96,6 +106,25 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
     };
   }, []);
 
+  /** Stores the image files and writes their Markdown at the cursor, replacing a selection. */
+  const addImages = async (files: readonly string[]) => {
+    const { markdown, errors } = await importImages(api, note.id, files);
+    if (markdown !== "") {
+      editor.current?.insertText(markdown);
+      check();
+    }
+    const added = markdown === "" ? 0 : markdown.split("\n").length;
+    const parts = [added > 0 ? `Added ${added} image${added === 1 ? "" : "s"}.` : "", ...errors];
+    if (parts.some(Boolean)) onNotice?.(parts.filter(Boolean).join(" "));
+  };
+
+  const lastRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (!imageRequest || imageRequest.id === lastRequest.current) return;
+    lastRequest.current = imageRequest.id;
+    void addImages(imageRequest.files);
+  }, [imageRequest?.id]);
+
   // A new color scheme means new style ids; the old highlights would point at the old ones.
   useEffect(() => {
     highlight();
@@ -119,7 +148,7 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
       title={` ${note.title} — ${statusText} · ${viewLabel} `}
     >
       <box flexDirection="row" flexGrow={1}>
-        <box flexGrow={1} flexBasis={0} visible={showEditor} paddingLeft={1} paddingRight={1}>
+        <box flexGrow={editorRatio * 100} flexBasis={0} visible={showEditor} paddingLeft={1} paddingRight={1}>
           <textarea
             ref={editor}
             focused={focused && showEditor}
@@ -137,11 +166,27 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
               { name: "y", ctrl: true, action: "redo" },
             ]}
             onContentChange={check}
+            // A terminal cannot paste a picture, but dragging an image file into it pastes the file's
+            // path. Paths that are all image files become images; any other paste is typed as text.
+            onPaste={(event) => {
+              const files = imagePathsIn(new TextDecoder().decode(event.bytes), process.cwd());
+              if (!files) return;
+              event.preventDefault();
+              void addImages(files).catch((error) => onNotice?.(`That didn't work: ${error instanceof Error ? error.message : String(error)}`));
+            }}
             // Undo and redo change the text without telling onContentChange, so look after every key.
-            onKeyDown={() => setTimeout(check, 0)}
+            onKeyDown={(key) => {
+              // A bare Tab types a tab, so nested list items can be indented, as in the web editor.
+              // Shift+Tab is left alone.
+              if (key.name === "tab" && !key.shift && !key.ctrl && !key.meta) {
+                key.preventDefault();
+                editor.current?.insertText("\t");
+              }
+              setTimeout(check, 0);
+            }}
           />
         </box>
-        <box flexGrow={1} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
+        <box flexGrow={(1 - editorRatio) * 100} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
           <scrollbox focused={focused && !showEditor}>
             <Preview body={body} palette={palette} syntax={syntax} api={api} />
           </scrollbox>

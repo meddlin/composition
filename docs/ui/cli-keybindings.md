@@ -32,6 +32,10 @@ wins and this page needs updating in the same pull request.
 | `ctrl+g` | New group (inside the highlighted group) | *(existing)* |
 | `r` | Rename the highlighted group | *(existing)* |
 | `m` | Move the highlighted **note or group** to another group, or a group back to the top level. A group's list leaves out the group itself and everything beneath it | note: *(existing)*; group: new |
+| `shift+↑` `shift+↓` | Move the highlighted note or group one place up or down among its siblings (the notes of one group, or the sub-groups of one parent), and keep that order. Does nothing at either end, in Favorites, or while a search is narrowing the tree. Web and desktop do the same by dragging | new |
+| `a` | Open the highlighted note's **Attachments** screen (see [below](#attachments-screen)) | new |
+| `<` `>` | Make the tree narrower or wider, two columns at a time, between 20 and 60 (it never takes so much that the panes have under 30 columns). Remembered | new |
+| `[` `]` | Give the editor less or more of a pane that shows editor and preview together, a tenth at a time, between 20% and 80%. Remembered | new |
 | `f` | Pin or unpin the highlighted note or group. Pinned items are listed in a "★ Favorites" section above the tree, in the order they were pinned, and starred where they sit in the tree | new |
 | `ctrl+d` | Delete the highlighted note or group. A note goes to the Trash Can, after a confirmation | *(existing, now goes to Trash)* |
 | `/` or `ctrl+space` | Focus the search bar | `ctrl+space` *(existing)*, `/` new |
@@ -51,6 +55,8 @@ Search syntax is shared with web and desktop: `tag:`, `title:`, `description:`,
 | `ctrl+t` | Cycle the pane's view: editor, split (editor and preview side by side), preview. Mnemonic: toggle view |
 | `ctrl+x` | Close the pane |
 | `ctrl+n` | New note (works here as well as in the tree, as it did in the Python CLI) |
+| `ctrl+p` | Open the note's **Attachments** screen. Mnemonic: paper clip |
+| `ctrl+l` | Insert an image from a file: type its path (a name with spaces in quotes). Pasting or dragging an image file into the editor does the same, so `ctrl+l` is the typed route. Mnemonic: picture |
 | everything else | Editing (see below) |
 
 Each note is open in at most one pane, panes sit in a single row, and the arrangement is
@@ -107,6 +113,23 @@ and sunset, and switches the text color at the half-way point, as the web app do
 without truecolor (`COLORTERM` is not `truecolor` or `24bit`) it switches between the two
 schemes instead, since a smooth fade needs the colors.
 
+## Attachments screen
+
+Opened with `a` on a note in the tree, or `ctrl+p` in its pane. It is the table the desktop app
+shows under a note (name, size, day attached), over the files attached to **that note**; the CLI,
+web and desktop apps read and write the same table, so a file attached in one shows in the others.
+
+| Key | Action |
+|---|---|
+| `↑` `↓` | Move |
+| `a` | Attach files. Type or paste their paths. Spaces split paths the way a shell does, so quote a name that has spaces, or drag the files into the terminal, which pastes them quoted. A path that is one existing file is taken whole. `~` works, and a relative path starts from where the app was launched. Each file is copied in (the original is left alone); one that can't be attached (a folder, over 1 GB, unreadable) is named while the others still go in |
+| `s` | Save a copy of the highlighted file. The prompt starts with `~/<its name>`; give a new file name or a folder. It never overwrites a file that exists |
+| `ctrl+d` | Remove the highlighted file, after a confirmation: its stored copy is deleted for good |
+| `Esc` | Back |
+
+There is no "open", and no "show in Finder": opening an attachment could run it, which is why the
+desktop app doesn't either (see [attachments.md](../architecture/attachments.md#decisions)).
+
 ## Dialogs
 
 | Dialog | Keys |
@@ -118,7 +141,7 @@ schemes instead, since a smooth fade needs the colors.
 ## Editor-owned keys
 
 These belong to the text editor (OpenTUI's `Textarea`) and are not available to the app
-while an editor has focus. Most are its defaults; the two marked ★ are our remapping.
+while an editor has focus. Most are its defaults; the ones marked ★ are our remapping.
 
 | Keys | What they do |
 |---|---|
@@ -135,6 +158,7 @@ while an editor has focus. Most are its defaults; the two marked ★ are our rem
 | `Shift` + any movement key | Extend the selection |
 | `ctrl+z` ★ | Undo (OpenTUI's default is `ctrl+-`) |
 | `ctrl+y` ★ | Redo (OpenTUI's default is `ctrl+.`) |
+| `Tab` ★ | Type a tab at the cursor (replacing a selection), so nested list items can be indented. The editor has no focus-moving Tab, since `Esc` is the way out |
 
 Undo goes one keystroke at a time.
 
@@ -148,12 +172,12 @@ Found while building the spike on 2026-10-02; the reason matters more than the l
 | `alt+←` `alt+→` | The editor's word-move keys. Terminal.app also sends them as `alt+b` / `alt+f` |
 | `ctrl+e` | The editor's end-of-line key, so it can't be "cycle view" |
 | `ctrl+1` … `ctrl+9`, `alt+1` … `alt+9` | Mission Control uses `ctrl+digit` to switch desktops, and `alt+digit` types symbols (`¡ ™ £`) in Terminal.app by default |
-| `ctrl+shift+<letter>` | A legacy terminal cannot tell it from `ctrl+<letter>`, so there is no "previous pane" key |
+| `ctrl+shift+<letter>` | A legacy terminal cannot tell it from `ctrl+<letter>`, so there is no "previous pane" key. (`shift` with an arrow key is fine: terminals send it as its own sequence) |
 | `ctrl+c` | Quits the app from anywhere, saving open notes first (the app handles it itself; OpenTUI's own exit-on-`ctrl+c` is off) |
 
 Before adding a binding, check this table and the editor-owned table above. Keys that
 are free inside the editor today: `ctrl+x`, `ctrl+t`, `ctrl+o`, `ctrl+g`, `ctrl+n`,
-`ctrl+p`, `ctrl+r`, `ctrl+s`, `ctrl+l`, `ctrl+space`.
+`ctrl+p` (now attachments), `ctrl+r`, `ctrl+s`, `ctrl+l` (now images), `ctrl+space`.
 
 ## Where this is defined
 

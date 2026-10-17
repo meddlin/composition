@@ -101,7 +101,7 @@ export const backgroundAt = (rendered: Rendered, row: number, column: number): s
 /** The text color of one screen cell. */
 export const foregroundAt = (rendered: Rendered, row: number, column: number): string => colorAt(rendered, row, column, "fg");
 
-export async function press(rendered: Rendered, key: string, modifiers: { ctrl?: boolean; meta?: boolean } = {}, ms = 150) {
+export async function press(rendered: Rendered, key: string, modifiers: { ctrl?: boolean; meta?: boolean; shift?: boolean } = {}, ms = 150) {
   rendered.mockInput.pressKey(key as never, modifiers as never);
   await settle(rendered, ms);
 }

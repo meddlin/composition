@@ -25,9 +25,9 @@ const labels = (rows: TreeRow[]) => rows.map((r) => `${"  ".repeat(r.depth)}${r.
 const none = new Set<string>();
 
 describe("buildTree", () => {
-  it("lists groups by name, each with its sub-groups first and then its own notes", () => {
+  it("lists groups in the order given, each with its sub-groups first and then its own notes", () => {
     const rows = buildTree({
-      groups: [group(2, "Work"), group(1, "Home"), group(3, "Projects", 2)],
+      groups: [group(1, "Home"), group(2, "Work"), group(3, "Projects", 2)],
       notes: [note(1, "Taxes", 1), note(2, "Plan", 3), note(3, "Standup", 2)],
       collapsed: none,
     });
@@ -41,6 +41,16 @@ describe("buildTree", () => {
       "  Standup",
       "⌫ Trash", "⚙ Settings",
     ]);
+  });
+
+  it("keeps hand-placed sibling groups where the data layer put them, not in name order", () => {
+    const rows = buildTree({
+      groups: [group(2, "Work"), group(1, "Home"), group(4, "Zeta", 2), group(3, "Alpha", 2)],
+      notes: [],
+      collapsed: none,
+    });
+
+    expect(labels(rows)).toEqual(["Work", "  Zeta", "  Alpha", "Home", "⌫ Trash", "⚙ Settings"]);
   });
 
   it("puts ungrouped notes in an Ungrouped bucket after the groups", () => {
@@ -225,8 +235,8 @@ describe("targetGroupId", () => {
 });
 
 describe("orderedGroups", () => {
-  it("lists parents before children, siblings by name, with depth", () => {
-    const ordered = orderedGroups([group(3, "Projects", 2), group(2, "Work"), group(1, "Home"), group(4, "Archive", 3)]);
+  it("lists parents before children, siblings in the order given, with depth", () => {
+    const ordered = orderedGroups([group(1, "Home"), group(2, "Work"), group(3, "Projects", 2), group(4, "Archive", 3)]);
 
     expect(ordered.map(({ group: g, depth }) => [g.name, depth])).toEqual([
       ["Home", 0],

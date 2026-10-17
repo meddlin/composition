@@ -87,8 +87,9 @@ update.
 - Placing a group refuses what moving one refuses (itself or a descendant as the parent, a missing
   group), so it cannot create a loop.
 - A restored note or group comes back with no position.
-- The terminal app can't reorder yet, and still lists groups by name whatever their `position`;
-  its notes follow the stored order.
+- The terminal app reorders with `shift+↑` / `shift+↓`, which call `placeNote` / `placeGroup` with the
+  neighbouring sibling (`placementFor` in [`reorder.ts`](../../apps/cli/src/reorder.ts)). It draws siblings
+  in the order `listNotes` and `listGroups` return them, as the other apps do, and does not sort by name itself.
 
 ## Rendering as a tree
 
@@ -96,10 +97,10 @@ The tree is built by `buildTree` in [`tree.ts`](../../apps/cli/src/tree.ts), a p
 notes, the groups, which groups are folded, the favorites, and whether a search is filtering, to a
 flat list of rows. The terminal list widget just draws the rows. It:
 
-1. Buckets the groups by `parentId` and sorts siblings by name, so the whole group structure,
+1. Buckets the groups by `parentId`, keeping siblings in the data layer's order (hand-placed first, then by name), so the whole group structure,
    including empty groups, is always visible and navigable (for instance right after creating one).
 2. Buckets the notes by `groupId` and lists each group's sub-groups first and then its own notes,
-   most recently edited first.
+   in the data layer's order (most recently edited first, unless placed by hand).
 3. Puts notes with no group under a synthetic **Ungrouped** bucket (`groupId: null`), shown when it
    has notes or when there are no groups at all. Like the Trash and Settings rows below it, it is not
    a real group: rename, delete and move do nothing there.

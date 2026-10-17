@@ -96,6 +96,37 @@ describe("opening and editing a note", () => {
     expect(stored("Plan")).not.toContain("first second");
   });
 
+  it("types a tab on Tab, at the cursor, so nested list items can be indented", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await press(app, "END");
+    await app.mockInput.typeText("\n- one\n");
+
+    await press(app, "TAB");
+    await app.mockInput.typeText("- nested");
+    await autosave();
+
+    expect(stored("Plan")).toContain("- one\n\t- nested");
+  });
+
+  it("replaces a selection with the tab", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await press(app, "END");
+    await app.mockInput.typeText("\nabc");
+    app.mockInput.pressKey("ARROW_LEFT", { shift: true } as never); // selects the "c"
+    app.mockInput.pressKey("ARROW_LEFT", { shift: true } as never); // and the "b"
+    await settle(app);
+
+    await press(app, "TAB");
+    await autosave();
+
+    expect(stored("Plan")).toContain("\na\t");
+    expect(stored("Plan")).not.toContain("bc");
+  });
+
   it("follows a title edited in the frontmatter into the tree", async () => {
     await seed();
     const app = await sandbox.mount();
@@ -631,7 +662,7 @@ describe("help and quitting", () => {
     const app = await sandbox.mount();
 
     await press(app, "?");
-    expect(frame(app)).toContain("ctrl+o");
+    expect(frame(app)).toContain("ctrl+n"); // near the top of the list; the rest scrolls
     expect(frame(app)).toContain("Typing in an editor always wins");
     await pressEscape(app);
 
@@ -645,12 +676,12 @@ describe("help and quitting", () => {
     await press(app, "?");
     expect(frame(app)).toContain("Typing in an editor always wins"); // the note is never scrolled away
     expect(frame(app)).toContain("In the tree");
-    expect(frame(app)).not.toContain("In the Trash"); // below the fold
+    expect(frame(app)).not.toContain("In Attachments"); // below the fold
 
     for (let i = 0; i < 40; i++) app.mockInput.pressKey("ARROW_DOWN" as never);
     await settle(app, 200);
 
-    expect(frame(app)).toContain("In the Trash");
+    expect(frame(app)).toContain("In Attachments");
     expect(frame(app)).toContain("Back to the notes");
   });
 
