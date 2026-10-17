@@ -41,7 +41,8 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
 | Markdown preview | ✅ | ✅ | ✅ | |
-| Syntax highlighting while writing Markdown | ❌ | ✅ | ✅ | [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
+| Syntax highlighting while writing Markdown | ✅ | ✅ | ✅ | The CLI colors the editor with the same palette ([highlight.ts](../apps/cli/src/highlight.ts)). [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
+| Tab types a tab in the editor, to indent nested lists | ✅ | ✅ | ✅ | |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
 | Images in notes: paste | ❌ | ✅ | ✅ | |
 | Image size limit | n/a | 10 MB | None | See [Image size limit](#image-size-limit) |

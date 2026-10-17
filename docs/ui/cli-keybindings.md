@@ -118,7 +118,7 @@ schemes instead, since a smooth fade needs the colors.
 ## Editor-owned keys
 
 These belong to the text editor (OpenTUI's `Textarea`) and are not available to the app
-while an editor has focus. Most are its defaults; the two marked ★ are our remapping.
+while an editor has focus. Most are its defaults; the ones marked ★ are our remapping.
 
 | Keys | What they do |
 |---|---|
@@ -135,6 +135,7 @@ while an editor has focus. Most are its defaults; the two marked ★ are our rem
 | `Shift` + any movement key | Extend the selection |
 | `ctrl+z` ★ | Undo (OpenTUI's default is `ctrl+-`) |
 | `ctrl+y` ★ | Redo (OpenTUI's default is `ctrl+.`) |
+| `Tab` ★ | Type a tab at the cursor (replacing a selection), so nested list items can be indented. The editor has no focus-moving Tab, since `Esc` is the way out |
 
 Undo goes one keystroke at a time.
 

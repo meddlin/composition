@@ -96,6 +96,37 @@ describe("opening and editing a note", () => {
     expect(stored("Plan")).not.toContain("first second");
   });
 
+  it("types a tab on Tab, at the cursor, so nested list items can be indented", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await press(app, "END");
+    await app.mockInput.typeText("\n- one\n");
+
+    await press(app, "TAB");
+    await app.mockInput.typeText("- nested");
+    await autosave();
+
+    expect(stored("Plan")).toContain("- one\n\t- nested");
+  });
+
+  it("replaces a selection with the tab", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await press(app, "RETURN", {}, 400);
+    await press(app, "END");
+    await app.mockInput.typeText("\nabc");
+    app.mockInput.pressKey("ARROW_LEFT", { shift: true } as never); // selects the "c"
+    app.mockInput.pressKey("ARROW_LEFT", { shift: true } as never); // and the "b"
+    await settle(app);
+
+    await press(app, "TAB");
+    await autosave();
+
+    expect(stored("Plan")).toContain("\na\t");
+    expect(stored("Plan")).not.toContain("bc");
+  });
+
   it("follows a title edited in the frontmatter into the tree", async () => {
     await seed();
     const app = await sandbox.mount();

@@ -138,7 +138,15 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
             ]}
             onContentChange={check}
             // Undo and redo change the text without telling onContentChange, so look after every key.
-            onKeyDown={() => setTimeout(check, 0)}
+            onKeyDown={(key) => {
+              // A bare Tab types a tab, so nested list items can be indented, as in the web editor.
+              // Shift+Tab is left alone.
+              if (key.name === "tab" && !key.shift && !key.ctrl && !key.meta) {
+                key.preventDefault();
+                editor.current?.insertText("\t");
+              }
+              setTimeout(check, 0);
+            }}
           />
         </box>
         <box flexGrow={1} flexBasis={0} visible={showPreview} paddingLeft={1} paddingRight={1}>
