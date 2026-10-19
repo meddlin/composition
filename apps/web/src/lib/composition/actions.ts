@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type {
   MoveGroupResult,
   SaveImageInput,
@@ -48,6 +49,16 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
 // note's own content (which refers to it) is saved.
 export async function saveImage(input: SaveImageInput): Promise<SaveImageResult> {
   return service.saveImage(input);
+}
+
+// Attachments are listed and removed through Server Actions; their bytes travel
+// by the route handlers in app/api (upload and download), which can stream.
+export async function listAttachments(noteId: number): Promise<Attachment[]> {
+  return service.listAttachments(noteId);
+}
+
+export async function removeAttachment(id: number): Promise<AttachmentActionResult> {
+  return service.removeAttachment(id);
 }
 
 export async function createNote(

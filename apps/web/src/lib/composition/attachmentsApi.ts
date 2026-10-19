@@ -1,13 +1,17 @@
 /**
  * The contract for files attached to a note. Unlike `CompositionApi` (api.ts),
- * which both builds implement, this one is **desktop only**: the web app has no
- * Server Actions for it, so nothing in a web deployment can add, read or remove
- * an attachment. Types only here, apart from ATTACHMENT_METHODS, so this file is
- * safe to import anywhere (renderer, preload, main).
+ * this one is not all Server Actions, because a file can be 1 GB and an action's
+ * body is capped and held in memory. The desktop build carries it over Electron
+ * IPC; the web build lists and removes with Server Actions and moves the bytes
+ * with streaming route handlers (attachmentsClient.ts). Types only here, apart
+ * from ATTACHMENT_METHODS, so this file is safe to import anywhere (renderer,
+ * preload, main).
  *
- * Files are chosen and saved through the operating system's own dialogs, which
- * only the Electron main process can open. The renderer never supplies a path,
- * so a compromised page can't point the app at an arbitrary file on disk.
+ * On desktop, files are chosen and saved through the operating system's own
+ * dialogs, which only the Electron main process can open. The renderer never
+ * supplies a path, so a compromised page can't point the app at an arbitrary
+ * file on disk. In a browser, the page hands over the bytes of files the user
+ * picked, and the server never reads a path from the request.
  */
 
 /** One file attached to a note. The bytes live on disk (attachments.ts); this is the row that describes them. */
@@ -32,11 +36,11 @@ export type AttachmentActionResult = { error?: string; canceled?: boolean };
 
 export interface AttachmentsApi {
   listAttachments(noteId: number): Promise<Attachment[]>;
-  /** Opens the native file picker and attaches whatever the user chooses to the note. */
+  /** Opens the file picker (native on desktop, the browser's on web) and attaches whatever the user chooses to the note. */
   addAttachments(noteId: number): Promise<AddAttachmentsResult>;
-  /** Shows the stored file in Finder. */
+  /** Shows the stored file in Finder. Desktop only: the web build answers with an error. */
   revealAttachment(id: number): Promise<AttachmentActionResult>;
-  /** Asks where to save, then writes a copy of the attachment there. */
+  /** Asks where to save, then writes a copy of the attachment there. In a browser, starts a download. */
   saveAttachmentCopy(id: number): Promise<AttachmentActionResult>;
   /** Detaches the file from its note and deletes the stored copy. */
   removeAttachment(id: number): Promise<AttachmentActionResult>;

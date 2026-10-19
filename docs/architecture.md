@@ -158,4 +158,4 @@ Each of these covers one slice of the system in more depth:
   rule, favorites, and how the tree is built.
 - [Images](architecture/images.md): pasting images into a note in the web and desktop apps, and how
   the terminal app draws them.
-- [Attachments](architecture/attachments.md): files attached to a note (desktop only).
+- [Attachments](architecture/attachments.md): files attached to a note.

@@ -16,6 +16,13 @@ function bridge(): AttachmentsApi {
   return api;
 }
 
+/** How the two builds differ for the one UI they share (see `attachmentsClient.ts`). */
+export const attachmentCapabilities = {
+  canReveal: true,
+  saveCopyTitle: "Save a copy…",
+  saveCopyLabel: (fileName: string) => `Save a copy of ${fileName}`,
+};
+
 export const listAttachments: AttachmentsApi["listAttachments"] = (noteId) =>
   bridge().listAttachments(noteId);
 export const addAttachments: AttachmentsApi["addAttachments"] = (noteId) =>

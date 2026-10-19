@@ -47,7 +47,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Images in notes: paste | ✅ | ✅ | ✅ | A terminal can't paste picture bytes. The CLI adds an image from a file: `ctrl+l` and a path, or dragging the file into the terminal. Copying a screenshot to the clipboard doesn't work in the CLI. [images.md](architecture/images.md#in-the-cli) |
 | Image size limit | None | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
-| **Attach any file to a note, listed in a table on the note** | ✅ | 🚫 | ✅ | Desktop and CLI; the web app has no way to hand files to a server on purpose. The CLI types paths where the desktop opens a file picker, and has no "show in Finder". [attachments.md](architecture/attachments.md) |
+| **Attach any file to a note, listed in a table on the note** | ✅ | ✅ | ✅ | The web app uploads through the browser's file picker and downloads instead of "save a copy"; it has no "show in Finder". The CLI types paths where the desktop opens a file picker, and has no "show in Finder" either. [attachments.md](architecture/attachments.md) |
 
 ## Appearance and settings
 
@@ -88,7 +88,7 @@ product can't show. The rule so far is that the product that can't show it must 
 
 - **Images:** the note's Markdown holds the path. The CLI draws the picture in its preview and adds one from a file, and its "move the data" setting carries the image folder along.
 - **Attachments:** they live in their own table, never in the note's text, so no app rewrites them
-  by saving a note. The web app shows nothing for them; the CLI has its Attachments screen. Moving a note to the Trash
+  by saving a note. The CLI has its Attachments screen. Moving a note to the Trash
   Can keeps its attachments, so a restored note gets them back; they are deleted when the
   note is permanently deleted (by hand or after 60 days). The CLI's "move the data" setting
   carries the attachments folder along.
