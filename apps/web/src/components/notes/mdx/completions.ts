@@ -45,6 +45,11 @@ export type CompletionTrigger = {
 const OPEN_TAG = /(?:^|[^\w<])<([A-Za-z]*)$/;
 const FENCE = /^ {0,3}(?:`{3,}|~{3,})/gm;
 
+/** Whether the line starting at `lineStart` sits inside a fenced code block. */
+export function insideFence(text: string, lineStart: number): boolean {
+  return (text.slice(0, lineStart).match(FENCE)?.length ?? 0) % 2 === 1;
+}
+
 /**
  * The `<` the caret is just after, if the user is starting a tag there.
  * Nothing is offered inside a fenced code block, where `<` is just text.
@@ -54,8 +59,7 @@ export function findTrigger(text: string, caret: number): CompletionTrigger | nu
   const match = OPEN_TAG.exec(text.slice(lineStart, caret));
   if (!match) return null;
 
-  const fences = text.slice(0, lineStart).match(FENCE)?.length ?? 0;
-  if (fences % 2 === 1) return null;
+  if (insideFence(text, lineStart)) return null;
 
   return { start: caret - match[1].length - 1, query: match[1] };
 }

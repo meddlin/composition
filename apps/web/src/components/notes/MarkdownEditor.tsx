@@ -12,9 +12,13 @@ import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import { NoteLinkMenu } from "./NoteLinkMenu";
+import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
+import type { Note } from "./types";
 import { useMdxCompletion } from "./useMdxCompletion";
+import { useNoteLinkPicker } from "./useNoteLinkPicker";
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -29,7 +33,13 @@ type Props = {
   view?: PaneView;
   /** Prefix for the panels' ids, so tabs elsewhere (EditorTabs) can point at them. */
   idBase?: string;
+  /** Every note, for the picker that links to one and for telling a link to a deleted note from a good one. */
+  notes?: readonly Note[];
+  /** Opens a note a link points at; `beside` asks for it next to this one rather than in its place. */
+  onOpenNote?: (noteId: number, beside: boolean) => void;
 };
+
+const NO_NOTES: readonly Note[] = [];
 
 /** Markdown image syntax is `![alt](path)`, so brackets in the alt text must go. */
 const altTextFor = (fileName: string) => fileName.replace(/\.[^.]*$/, "").replace(/[[\]\r\n]+/g, " ").trim() || "image";
@@ -43,6 +53,8 @@ export function MarkdownEditor({
   onRatioCommit,
   view = "split",
   idBase,
+  notes = NO_NOTES,
+  onOpenNote,
 }: Props) {
   const ownIdBase = useId();
   const ids = idBase ?? ownIdBase;
@@ -125,12 +137,23 @@ export function MarkdownEditor({
     replaceText(start, end, text);
   });
 
+  const noteLinkPicker = useNoteLinkPicker(textarea, value, notes, noteId, (start, end, text, caret) => {
+    pendingCaret.current = start + caret;
+    replaceText(start, end, text);
+  });
+  const noteLinks = useMemo<NoteLinks>(
+    () => ({ exists: (id) => notes.some((n) => n.id === id), open: onOpenNote ?? (() => {}) }),
+    [notes, onOpenNote],
+  );
+
   const highlight = value.length <= MAX_HIGHLIGHT_CHARS;
   const highlightLayer = useHighlightSync(textarea, highlight, value);
 
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    // The completion menu takes Tab while it is open. Shift+Tab stays free so the keyboard can still leave the editor.
+    // The menus take Tab while one is open. Shift+Tab stays free so the keyboard can still leave the editor.
+    noteLinkPicker.textareaProps.onKeyDown(event);
+    if (event.defaultPrevented) return;
     completion.textareaProps.onKeyDown(event);
     if (event.defaultPrevented || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
@@ -192,15 +215,34 @@ export function MarkdownEditor({
             onChange={(e) => {
               onChange(e.target.value);
               completion.sync(e.target);
+              noteLinkPicker.sync(e.target);
             }}
             onPaste={onPaste}
             spellCheck={false}
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}
+            aria-controls={completion.textareaProps["aria-controls"] ?? noteLinkPicker.textareaProps["aria-controls"]}
+            aria-activedescendant={
+              completion.textareaProps["aria-activedescendant"] ?? noteLinkPicker.textareaProps["aria-activedescendant"]
+            }
+            aria-keyshortcuts={noteLinkPicker.textareaProps["aria-keyshortcuts"]}
             onKeyDown={onKeyDown}
+            onSelect={(event) => {
+              completion.textareaProps.onSelect(event);
+              noteLinkPicker.textareaProps.onSelect(event);
+            }}
+            onFocus={(event) => {
+              completion.textareaProps.onFocus(event);
+              noteLinkPicker.textareaProps.onFocus(event);
+            }}
+            onBlur={() => {
+              completion.textareaProps.onBlur();
+              noteLinkPicker.textareaProps.onBlur();
+            }}
             onScroll={(event) => {
               completion.textareaProps.onScroll(event);
+              noteLinkPicker.textareaProps.onScroll(event);
               highlightLayer.sync();
             }}
             className={cn(
@@ -210,6 +252,7 @@ export function MarkdownEditor({
             )}
           />
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
+          {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}
         </div>
       </section>
       {view === "split" && (
@@ -236,7 +279,9 @@ export function MarkdownEditor({
         {showPreview && (
           <div className="prose max-w-none flex-1 overflow-y-auto p-4">
             {fm && <FrontmatterCard fm={fm} />}
-            <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+            <NoteLinksProvider value={noteLinks}>
+              <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+            </NoteLinksProvider>
           </div>
         )}
       </section>
