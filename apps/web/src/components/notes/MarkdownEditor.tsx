@@ -6,7 +6,9 @@ import { imageRef } from "@/lib/composition/imageRefs";
 import { maxImageBytes } from "@/lib/composition/imageLimit";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { cn } from "@/lib/utils";
+import { caretCoordinates } from "./caretCoordinates";
 import { panelId, tabId } from "./EditorTabs";
+import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { ResizeHandle } from "./ResizeHandle";
@@ -14,7 +16,18 @@ import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./Mark
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
+import { usePreviewFind } from "./usePreviewFind";
 import { useMdxCompletion } from "./useMdxCompletion";
+
+/** A search within this note: what to look for, which match is being looked at, and where to report how many there are. */
+export type FindState = {
+  query: string;
+  options: FindOptions;
+  current: number;
+  onCount: (count: number) => void;
+};
+
+const NO_MATCHES: Match[] = [];
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -29,6 +42,8 @@ type Props = {
   view?: PaneView;
   /** Prefix for the panels' ids, so tabs elsewhere (EditorTabs) can point at them. */
   idBase?: string;
+  /** Highlights this phrase in whichever of the editor and preview are showing. */
+  find?: FindState;
 };
 
 /** Markdown image syntax is `![alt](path)`, so brackets in the alt text must go. */
@@ -43,6 +58,7 @@ export function MarkdownEditor({
   onRatioCommit,
   view = "split",
   idBase,
+  find,
 }: Props) {
   const ownIdBase = useId();
   const ids = idBase ?? ownIdBase;
@@ -128,6 +144,41 @@ export function MarkdownEditor({
   const highlight = value.length <= MAX_HIGHLIGHT_CHARS;
   const highlightLayer = useHighlightSync(textarea, highlight, value);
 
+  const previewBox = useRef<HTMLDivElement>(null);
+  const findQuery = find?.query ?? "";
+  const findCurrent = find?.current ?? 0;
+  const matchCase = find?.options.matchCase ?? false;
+  const wholeWord = find?.options.wholeWord ?? false;
+  const onFindCount = find?.onCount;
+  const findOptions = useMemo(() => ({ matchCase, wholeWord }), [matchCase, wholeWord]);
+  // The editor is searched as source text, frontmatter and Markdown syntax included; the preview as it renders.
+  const editorMatches = useMemo(
+    () => (showEditor ? findMatches(value, findQuery, findOptions) : NO_MATCHES),
+    [showEditor, value, findQuery, findOptions],
+  );
+  const previewMatchCount = usePreviewFind(previewBox, showPreview && findQuery !== "", findQuery, findOptions, findCurrent);
+  // Both showing is the usual case, and they agree except where Markdown syntax gets in the way; the editor leads.
+  const findCount = showEditor ? editorMatches.length : previewMatchCount;
+  useEffect(() => onFindCount?.(findCount), [onFindCount, findCount]);
+
+  const currentMatch = editorMatches.length === 0 ? -1 : Math.min(findCurrent, editorMatches.length - 1);
+  const scrolledTo = useRef("");
+  useEffect(() => {
+    const el = textarea.current;
+    if (currentMatch === -1 || !el) {
+      scrolledTo.current = "";
+      return;
+    }
+    // Only a different match or query moves the view; the same match shifting under typing must not.
+    const key = `${findQuery}\u0000${matchCase}\u0000${wholeWord}\u0000${currentMatch}`;
+    if (scrolledTo.current === key) return;
+    scrolledTo.current = key;
+    const { top, height } = caretCoordinates(el, editorMatches[currentMatch].start);
+    if (top < el.scrollTop || top + height > el.scrollTop + el.clientHeight) {
+      el.scrollTop = Math.max(0, top - el.clientHeight / 3);
+    }
+  }, [editorMatches, currentMatch, findQuery, matchCase, wholeWord]);
+
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     // The completion menu takes Tab while it is open. Shift+Tab stays free so the keyboard can still leave the editor.
@@ -185,7 +236,9 @@ export function MarkdownEditor({
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          {highlight && <MarkdownHighlight text={value} layer={highlightLayer.layer} />}
+          {highlight && (
+            <MarkdownHighlight text={value} layer={highlightLayer.layer} matches={editorMatches} current={currentMatch} />
+          )}
           <Textarea
             ref={textarea}
             value={value}
@@ -234,7 +287,7 @@ export function MarkdownEditor({
       >
         {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
         {showPreview && (
-          <div className="prose max-w-none flex-1 overflow-y-auto p-4">
+          <div ref={previewBox} className="prose max-w-none flex-1 overflow-y-auto p-4">
             {fm && <FrontmatterCard fm={fm} />}
             <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
           </div>

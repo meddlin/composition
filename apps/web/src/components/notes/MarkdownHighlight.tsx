@@ -1,5 +1,9 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
+import { cn } from "@/lib/utils";
+import { markMatches, type Match } from "./findMatches";
 import { tokenizeMarkdown } from "./markdownTokens";
+
+const NO_MATCHES: Match[] = [];
 
 /** Past this the layer is dropped and the text is left plain: re-colouring a huge note on every keystroke would lag typing. */
 export const MAX_HIGHLIGHT_CHARS = 100_000;
@@ -9,17 +13,34 @@ export const MAX_HIGHLIGHT_CHARS = 100_000;
  * undo and input handling and draws its text transparent; this draws the same text in colour.
  * It therefore has to lay the text out exactly as the textarea does (same font, padding and
  * wrapping), and use only colour to tell tokens apart, since a heavier or wider glyph would
- * push everything after it out of line.
+ * push everything after it out of line. The same goes for find-in-note: matches get a background
+ * and nothing that changes a glyph's width.
  */
-export function MarkdownHighlight({ text, layer }: { text: string; layer: RefObject<HTMLDivElement | null> }) {
-  const segments = useMemo(() => tokenizeMarkdown(text), [text]);
+export function MarkdownHighlight({
+  text,
+  layer,
+  matches = NO_MATCHES,
+  current = -1,
+}: {
+  text: string;
+  layer: RefObject<HTMLDivElement | null>;
+  /** Stretches of `text` found by the note's find bar, painted behind the text. */
+  matches?: Match[];
+  /** Which of `matches` is being looked at. */
+  current?: number;
+}) {
+  const tokens = useMemo(() => tokenizeMarkdown(text), [text]);
+  const segments = useMemo(() => markMatches(tokens, matches, current), [tokens, matches, current]);
   return (
     // Windows high-contrast mode forces the textarea's text visible, so the layer would only double it.
     <div ref={layer} aria-hidden className="pointer-events-none absolute inset-y-0 left-0 select-none overflow-hidden forced-colors:hidden">
       <pre className="m-0 whitespace-pre-wrap break-words p-4 font-mono text-sm leading-6">
         {segments.map((segment, index) =>
-          segment.kind ? (
-            <span key={index} className={`md-${segment.kind}`}>
+          segment.kind || segment.match ? (
+            <span
+              key={index}
+              className={cn(segment.kind && `md-${segment.kind}`, segment.match && `find-${segment.match}`)}
+            >
               {segment.text}
             </span>
           ) : (
