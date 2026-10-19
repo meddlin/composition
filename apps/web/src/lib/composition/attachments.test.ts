@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { Readable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MAX_ATTACHMENT_BYTES } from "./attachmentNames";
 
@@ -142,6 +143,87 @@ describe("addAttachmentFiles", () => {
     const result = await service.addAttachmentFiles(9999, [write("a.txt")]);
 
     expect(result).toEqual({ attachments: [], error: "That note no longer exists." });
+    expect(storedFiles()).toEqual([]);
+  });
+});
+
+describe("addAttachmentStream", () => {
+  const stream = (content: string | Buffer) => Readable.from([Buffer.from(content)]);
+
+  it("stores the streamed bytes as an attachment of the note", async () => {
+    const { service, note } = await setup();
+
+    const result = await service.addAttachmentStream(note.id, "itinerary.pdf", stream("%PDF-1.7 ..."));
+
+    expect(result.error).toBeUndefined();
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ noteId: note.id, fileName: "itinerary.pdf", size: 12 }),
+    ]);
+    expect(await service.listAttachments(note.id)).toEqual(result.attachments);
+    const found = await service.findAttachmentFile(result.attachments[0].id);
+    expect(fs.readFileSync(found!.path, "utf8")).toBe("%PDF-1.7 ...");
+    expect(storedFiles()).toEqual([expect.stringMatching(/^[0-9a-f]{12}-itinerary\.pdf$/)]);
+  });
+
+  it("keeps a path in the name out of the stored file's name", async () => {
+    const { service, note } = await setup();
+
+    const result = await service.addAttachmentStream(note.id, "../../etc/passwd", stream("x"));
+
+    expect(result.attachments[0].fileName).toBe("passwd");
+    expect(storedFiles()).toHaveLength(1);
+    expect(fs.existsSync(path.join(home, "etc"))).toBe(false);
+  });
+
+  it("accepts an empty file", async () => {
+    const { service, note } = await setup();
+
+    const result = await service.addAttachmentStream(note.id, "empty.txt", stream(""));
+
+    expect(result.attachments).toEqual([expect.objectContaining({ fileName: "empty.txt", size: 0 })]);
+  });
+
+  it("refuses a note that no longer exists", async () => {
+    const { service } = await setup();
+
+    const result = await service.addAttachmentStream(9999, "a.txt", stream("x"));
+
+    expect(result).toEqual({ attachments: [], error: "That note no longer exists." });
+    expect(storedFiles()).toEqual([]);
+  });
+
+  it("stops at the size limit and leaves nothing behind", async () => {
+    const { service, note } = await setup();
+    const chunk = Buffer.alloc(8 * 1024 * 1024);
+    let sent = 0;
+    const endless = new Readable({
+      read() {
+        sent += chunk.length;
+        this.push(sent > MAX_ATTACHMENT_BYTES + chunk.length ? null : chunk);
+      },
+    });
+
+    const result = await service.addAttachmentStream(note.id, "big.bin", endless);
+
+    expect(result.attachments).toEqual([]);
+    expect(result.error).toMatch(/big\.bin: files can be at most 1 GB/);
+    expect(storedFiles()).toEqual([]);
+    expect(await service.listAttachments(note.id)).toEqual([]);
+  }, 60_000);
+
+  it("leaves nothing behind when the upload is cut off", async () => {
+    const { service, note } = await setup();
+    const broken = new Readable({
+      read() {
+        this.push(Buffer.from("partial"));
+        this.destroy(new Error("connection reset"));
+      },
+    });
+
+    const result = await service.addAttachmentStream(note.id, "cut.txt", broken);
+
+    expect(result.attachments).toEqual([]);
+    expect(result.error).toMatch(/cut\.txt: could not be attached \(connection reset\)/);
     expect(storedFiles()).toEqual([]);
   });
 });

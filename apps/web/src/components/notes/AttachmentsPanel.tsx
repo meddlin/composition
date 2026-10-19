@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatBytes } from "@/lib/composition/attachmentNames";
 import {
   addAttachments,
+  attachmentCapabilities,
   listAttachments,
   removeAttachment,
   revealAttachment,
@@ -24,11 +25,13 @@ function formatDate(iso: string): string {
 
 /**
  * The files attached to one note, listed in a table below its editor, with a
- * button to attach more. Desktop only: the web build never imports this (see
- * AttachmentsSlot.tsx). With nothing attached there is no table, only the button.
+ * button to attach more. With nothing attached there is no table, only the button.
  *
- * Files are picked and saved in the operating system's own dialogs, opened by
- * the main process; this component never handles a path or the file's bytes.
+ * Both builds render it; `attachmentsClient` decides what differs. On desktop,
+ * files are picked and saved in the operating system's own dialogs, opened by
+ * the main process. In a browser, they are picked in the browser's dialog and
+ * streamed to the server, and "save a copy" is a download. Either way this
+ * component never handles a path or the file's bytes.
  *
  * Loads once per mount, so the parent keys it by note: switching a pane to
  * another note remounts it with that note's files.
@@ -144,20 +147,22 @@ export function AttachmentsPanel({ noteId }: { noteId: number }) {
                         </>
                       ) : (
                         <>
+                          {attachmentCapabilities.canReveal && (
+                            <Button
+                              variant="ghost"
+                              size="icon-xs"
+                              title="Show in Finder"
+                              aria-label={`Show ${attachment.fileName} in Finder`}
+                              onClick={() => act(() => revealAttachment(attachment.id), "Could not show the file.")}
+                            >
+                              <FolderOpenIcon />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon-xs"
-                            title="Show in Finder"
-                            aria-label={`Show ${attachment.fileName} in Finder`}
-                            onClick={() => act(() => revealAttachment(attachment.id), "Could not show the file.")}
-                          >
-                            <FolderOpenIcon />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon-xs"
-                            title="Save a copy…"
-                            aria-label={`Save a copy of ${attachment.fileName}`}
+                            title={attachmentCapabilities.saveCopyTitle}
+                            aria-label={attachmentCapabilities.saveCopyLabel(attachment.fileName)}
                             onClick={() => act(() => saveAttachmentCopy(attachment.id), "Could not save a copy.")}
                           >
                             <DownloadIcon />

@@ -4,7 +4,7 @@ import { SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AttachmentsSlot } from "./AttachmentsSlot";
+import { AttachmentsPanel } from "./AttachmentsPanel";
 import { PANE_DRAG_TYPE } from "./dragTypes";
 import { DropOverlay } from "./DropOverlay";
 import { EditorTabs } from "./EditorTabs";
@@ -202,7 +202,7 @@ export function NotePane({
         notes={notes}
         onOpenNote={onOpenNote}
       />
-      <AttachmentsSlot key={note.id} noteId={note.id} />
+      <AttachmentsPanel key={note.id} noteId={note.id} />
       {drop.zone && <DropOverlay zone={drop.zone} />}
     </section>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { displayName, formatBytes, storedFileName } from "./attachmentNames";
+import { attachmentDisposition, displayName, formatBytes, storedFileName } from "./attachmentNames";
 
 describe("storedFileName", () => {
   it("keeps the extension and prefixes a unique part", () => {
@@ -47,5 +47,25 @@ describe("formatBytes", () => {
     [3_200_000_000, "3.2 GB"],
   ])("%d bytes is %s", (bytes, text) => {
     expect(formatBytes(bytes)).toBe(text);
+  });
+});
+
+describe("attachmentDisposition", () => {
+  it("is always a download, with the name quoted", () => {
+    expect(attachmentDisposition("report.pdf")).toBe(`attachment; filename="report.pdf"; filename*=UTF-8''report.pdf`);
+  });
+
+  it("keeps a non-ASCII name in filename* and a safe stand-in in filename", () => {
+    const value = attachmentDisposition("café menu (1).pdf");
+    expect(value).toContain(`filename="caf_ menu (1).pdf"`);
+    expect(value).toContain(`filename*=UTF-8''caf%C3%A9%20menu%20%281%29.pdf`);
+  });
+
+  it("can't be broken out of by quotes, semicolons, path separators or newlines", () => {
+    const value = attachmentDisposition('a"; filename=evil.html\r\nX: y/../b.txt');
+    expect(value.startsWith("attachment; filename=")).toBe(true);
+    expect(value).not.toMatch(/[\r\n]/);
+    expect(value.match(/filename=/g)).toHaveLength(1);
+    expect(value).toContain("b.txt");
   });
 });

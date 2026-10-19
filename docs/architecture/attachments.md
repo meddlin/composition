@@ -6,8 +6,11 @@ Source: [`attachmentsApi.ts`](../../apps/web/src/lib/composition/attachmentsApi.
 [`AttachmentsPanel.tsx`](../../apps/web/src/components/notes/AttachmentsPanel.tsx),
 [`main/attachments.ts`](../../apps/desktop/src/main/attachments.ts)
 
-Any type of file can be attached to a note in the **desktop app** and in the **CLI**. The web app
-does not offer it (see the [feature matrix](../feature-matrix.md)).
+Any type of file can be attached to a note in the **desktop app**, the **web app** and the **CLI**
+(see the [feature matrix](../feature-matrix.md)).
+
+The web app's version is the same panel, with the browser's own file picker, and a download in place
+of "save a copy". Its routes are described under [In the web app](#in-the-web-app).
 
 The CLI's version is the Attachments screen ([cli-keybindings.md](../ui/cli-keybindings.md#attachments-screen)):
 the same table, with paths typed where the desktop app opens a file picker. It calls the same
@@ -38,6 +41,37 @@ appears under the bar:
 
 A file that can't be attached (a folder, one over 1 GB, one that can't be read) is named
 in a message above the table; the other files chosen with it are still attached.
+
+## In the web app
+
+The panel is the same component in both builds (`AttachmentsPanel`); what differs is
+`attachmentsClient.ts`, which each build resolves to its own file (next.config.ts):
+
+| | Web | Desktop |
+|---|---|---|
+| Choose files | The browser's file picker (`<input type=file>`) | The macOS picker, opened by the main process |
+| Add | `POST /api/notes/<id>/attachments?name=…`, the raw bytes as the body, one request per file | IPC: the main process copies the picked paths |
+| List, remove | Server Actions (`listAttachments`, `removeAttachment`) | IPC |
+| Get a copy | The button is **Download**: a link to `GET /api/attachments/<id>` | **Save a copy…**: a save dialog |
+| Show in Finder | Not offered (the stored copy is on the server's disk) | Offered |
+
+Bytes go through route handlers, not Server Actions, because a file can be 1 GB: an action's body
+is capped (12 MB here, for pasted images) and held in memory, while a route handler can stream the
+request to a temporary file (`addStream` in [`attachments.ts`](../../apps/web/src/lib/composition/attachments.ts)),
+count the bytes, and stop at the limit. The browser also refuses a file over 1 GB before uploading it.
+The desktop build leaves the routes out entirely (it has no server).
+
+Security, since a route handler gets none of the protection Server Actions have:
+
+- **Uploads must be ours.** A request needs the `x-composition-upload: 1` header, which a page on
+  another site can't add without a CORS preflight (this app never approves one), and its `Origin`, when
+  present, must be this host ([`uploadGuard.ts`](../../apps/web/src/lib/composition/uploadGuard.ts)). Without this, any
+  web page you visit could POST files to `localhost`.
+- **Downloads are never displayed.** They are `application/octet-stream` with `Content-Disposition:
+  attachment` and `nosniff`, so an attached `.html` or `.svg` can't run script on the app's origin.
+  This is the web's version of "no open" in [Decisions](#decisions).
+- **No paths from the page.** The upload names a note and a file name (reduced to its last segment and
+  made safe, as everywhere); the download is found from the row's id.
 
 ## Where things live
 
@@ -70,9 +104,9 @@ lives in one place).
 
 ## How it works
 
-The desktop-only methods are a **separate contract**, `AttachmentsApi`, not part of
-`CompositionApi`. The web app implements every method of `CompositionApi` as a Server
-Action; since attachments are not in it, the web app has no endpoint for them at all.
+The methods are a **separate contract**, `AttachmentsApi`, not part of `CompositionApi`, because
+the web build can't carry file bytes in a Server Action (see [In the web app](#in-the-web-app)).
+The sequence below is the desktop build's.
 
 ```mermaid
 sequenceDiagram
@@ -94,13 +128,11 @@ the bridge. So a compromised page can't make the app read `~/.ssh/id_rsa` into a
 overwrite a file of its choosing: the paths come from a dialog the user is looking at, and
 the stored file is found from the row, never from anything the page sent.
 
-Reaching the table in the build takes three build-time swaps (the same mechanism as
-`navLinks.desktop.ts`; see [next.config.ts](../../apps/web/next.config.ts)):
-
-| Web build | Desktop build |
-|---|---|
-| `AttachmentsSlot.tsx`: renders nothing, so the panel is not in the web bundle | `AttachmentsSlot.desktop.tsx`: the panel |
-| `attachmentsClient.ts`: throws "only available in the desktop app" | `attachmentsClient.desktop.ts`: calls `window.composition` |
+The panel reaches the backend through `attachmentsClient.ts`. The desktop build resolves
+`attachmentsClient.desktop.ts` in its place (the same mechanism as `navLinks.desktop.ts`; see
+[next.config.ts](../../apps/web/next.config.ts)), which calls `window.composition`. Both export
+`attachmentCapabilities`, which tells the panel whether to offer "Show in Finder" and what to call
+the copy button.
 
 ## Deleting
 
@@ -132,10 +164,11 @@ database), and **Restore** brings them back; see [backup-restore.md](backup-rest
 ## Gaps
 
 - Attachment names and contents are not searched.
-- Files are added only with the button: no drag-and-drop from Finder, and no rename.
+- Files are added only with the button: no drag-and-drop from Finder or the desktop, and no rename.
+- A web upload has no progress bar; a very large file shows the panel busy until the server has it all.
 - Changing **Application data location** points the apps at a new directory without moving
   anything. Copy `attachments/` along with `composition.db`, as with `app_data/`.
 - `attachments/` is found beside the application data directory (the CLI: beside the
   database file), so a database path overridden into a different folder from it splits them.
-- The web app shows nothing for a note's attachments, even when it opens a database the
-  desktop app has attached files to.
+- The web app keeps its own application data location (see [product-builds.md](../product-builds.md)), so it
+  shows only the attachments of the database it opens.

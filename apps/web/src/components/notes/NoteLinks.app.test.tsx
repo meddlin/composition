@@ -5,6 +5,16 @@ import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
 
+// Every open note shows its Attachments below the editor; none of these tests are about them.
+vi.mock("@/lib/composition/attachmentsClient", () => ({
+  attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
+  listAttachments: vi.fn(async () => []),
+  addAttachments: vi.fn(),
+  revealAttachment: vi.fn(),
+  saveAttachmentCopy: vi.fn(),
+  removeAttachment: vi.fn(),
+}));
+
 vi.mock("@/lib/composition/client", () => ({
   createGroup: vi.fn(),
   createNote: vi.fn(),
@@ -36,7 +46,12 @@ const notes = [
   makeNote(3, "Gamma", "plain"),
 ];
 
-const paneTitles = () => screen.getAllByRole("region").map((p) => p.getAttribute("aria-label"));
+// A pane is the region named by its aria-label; the Attachments section below each editor is a region too.
+const paneTitles = () =>
+  screen
+    .getAllByRole("region")
+    .filter((r) => r.hasAttribute("aria-label"))
+    .map((p) => p.getAttribute("aria-label"));
 const link = (pane: string, name: string) =>
   within(screen.getByRole("region", { name: pane })).getByRole("link", { name });
 

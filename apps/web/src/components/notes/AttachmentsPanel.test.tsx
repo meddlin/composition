@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   addAttachments,
+  attachmentCapabilities,
   listAttachments,
   removeAttachment,
   revealAttachment,
@@ -11,7 +12,15 @@ import {
 } from "@/lib/composition/attachmentsClient";
 import { AttachmentsPanel } from "./AttachmentsPanel";
 
+// The desktop build's capabilities; a test below swaps in the web build's.
+const desktopCapabilities = vi.hoisted(() => ({
+  canReveal: true,
+  saveCopyTitle: "Save a copy…",
+  saveCopyLabel: (fileName: string) => `Save a copy of ${fileName}`,
+}));
+
 vi.mock("@/lib/composition/attachmentsClient", () => ({
+  attachmentCapabilities: desktopCapabilities,
   listAttachments: vi.fn(),
   addAttachments: vi.fn(),
   revealAttachment: vi.fn(),
@@ -36,6 +45,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  Object.assign(attachmentCapabilities, desktopCapabilities);
   cleanup();
   vi.clearAllMocks();
 });
@@ -167,5 +177,21 @@ describe("AttachmentsPanel", () => {
 
     expect(await screen.findByText("second.txt")).toBeTruthy();
     expect(screen.queryByText("first.txt")).toBeNull();
+  });
+
+  it("offers a download, and no Show in Finder, when the build can't reveal files", async () => {
+    Object.assign(attachmentCapabilities, {
+      canReveal: false,
+      saveCopyTitle: "Download",
+      saveCopyLabel: (fileName: string) => `Download ${fileName}`,
+    });
+    vi.mocked(listAttachments).mockResolvedValue([attachment(7, "report.pdf")]);
+    render(<AttachmentsPanel noteId={1} />);
+    await screen.findByRole("table");
+
+    expect(screen.queryByRole("button", { name: /Finder/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Download report.pdf" }));
+
+    await waitFor(() => expect(saveAttachmentCopy).toHaveBeenCalledWith(7));
   });
 });

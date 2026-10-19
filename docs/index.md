@@ -29,7 +29,7 @@ See [ui/web-follow-the-sun.md](ui/web-follow-the-sun.md) for the sunrise/sunset 
 
 See [feature-matrix.md](feature-matrix.md) for which features the CLI, web and desktop apps each have.
 
-See [architecture/attachments.md](architecture/attachments.md) for files attached to a note (desktop only).
+See [architecture/attachments.md](architecture/attachments.md) for files attached to a note.
 
 See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys belong to the editor, and which keys can't be used and why.
 
@@ -53,7 +53,7 @@ See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info
     - [x] Allow users to "upload" images directly into a note (paste)
     - [x] Show the image in a rendered version of the note
     - [] CLI support
-- [x] Attach any type of file to a note, listed in a table on the note (desktop only; see [architecture/attachments.md](architecture/attachments.md))
+- [x] Attach any type of file to a note, listed in a table on the note (see [architecture/attachments.md](architecture/attachments.md))
     - [] Drag files in from Finder
     - [] Search attachment names
 - [] Support cross-linking between files

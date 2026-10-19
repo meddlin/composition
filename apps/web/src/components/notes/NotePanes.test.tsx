@@ -7,6 +7,16 @@ import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE, PANE_DRAG_TYPE } from "./dragTypes";
 import { NotesApp } from "./NotesApp";
 import type { Group, Note } from "./types";
 
+// Every open note shows its Attachments below the editor; none of these tests are about them.
+vi.mock("@/lib/composition/attachmentsClient", () => ({
+  attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
+  listAttachments: vi.fn(async () => []),
+  addAttachments: vi.fn(),
+  revealAttachment: vi.fn(),
+  saveAttachmentCopy: vi.fn(),
+  removeAttachment: vi.fn(),
+}));
+
 vi.mock("@/lib/composition/client", () => ({
   createGroup: vi.fn(),
   createNote: vi.fn(),
@@ -55,7 +65,9 @@ function dataTransfer() {
 type Transfer = ReturnType<typeof dataTransfer>;
 
 const pane = (title: string) => screen.getByRole("region", { name: title });
-const paneTitles = () => screen.getAllByRole("region").map((p) => p.getAttribute("aria-label"));
+// A pane is the region named by its aria-label; the Attachments section below each editor is a region too.
+const paneRegions = () => screen.queryAllByRole("region").filter((r) => r.hasAttribute("aria-label"));
+const paneTitles = () => paneRegions().map((p) => p.getAttribute("aria-label"));
 const sidebarRow = (title: string) =>
   within(screen.getByRole("navigation", { name: "Notes" })).getByRole("button", { name: title });
 const editorIn = (title: string) => within(pane(title)).getByLabelText<HTMLTextAreaElement>("Markdown editor");
@@ -184,7 +196,7 @@ describe("opening notes beside each other", () => {
   it("opens a note dragged into the empty workspace", () => {
     renderApp();
     fireEvent.click(within(pane("Alpha")).getByRole("button", { name: "Close Alpha" }));
-    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(paneRegions()).toHaveLength(0);
 
     const dt = dragFromSidebar("Beta", 2);
     const empty = screen.getByText(/No note is open/).closest("[data-slot=empty]")!.parentElement!;
@@ -428,7 +440,7 @@ describe("focus, closing and deleting", () => {
     expect(paneTitles()).toEqual(["Alpha", "Beta"]);
 
     fireEvent.click(screen.getByRole("button", { name: "Work" }));
-    expect(screen.queryAllByRole("region")).toHaveLength(0);
+    expect(paneRegions()).toHaveLength(0);
     fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Beta" }));
 
     expect(paneTitles()).toEqual(["Alpha", "Beta"]);

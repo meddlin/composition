@@ -48,3 +48,16 @@ export function formatBytes(bytes: number): string {
   }
   return `${value >= 100 ? Math.round(value) : Math.round(value * 10) / 10} ${units[unit]}`;
 }
+
+/**
+ * A `Content-Disposition` value that makes a browser save the file under
+ * `fileName` instead of showing it. `attachment` is the point: served inline, an
+ * attached `.html` or `.svg` would run script on the app's own origin. The
+ * quoted ASCII form is for old clients; `filename*` carries the real name.
+ */
+export function attachmentDisposition(fileName: string): string {
+  const name = displayName(fileName).replace(/[\u0000-\u001f\u007f]/g, "");
+  const fallback = name.replace(/[^\x20-\x7e]|["\\%;]/g, "_");
+  const encoded = encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}

@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import type { Readable } from "node:stream";
 import * as attachments from "./attachments";
 import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type { StoredAttachment } from "./attachmentsRepo";
@@ -287,6 +288,33 @@ export async function addAttachmentFiles(
     attachments: added.map(publicAttachment),
     ...(errors.length > 0 && { error: errors.join(" ") }),
   };
+}
+
+/**
+ * Attaches a file whose bytes are arriving from a browser upload. The web
+ * app's counterpart of `addAttachmentFiles`: it has no path to copy from, only
+ * a stream. Reports problems in the same `{ attachments, error }` shape.
+ */
+export async function addAttachmentStream(
+  noteId: number,
+  fileName: string,
+  body: Readable,
+): Promise<AddAttachmentsResult> {
+  const name = fileName.split(/[\\/]/).pop() || "file";
+  if (!notesRepo.getNote(noteId)) {
+    body.destroy();
+    return { attachments: [], error: "That note no longer exists." };
+  }
+  try {
+    const added = await attachments.addStream(loadWebSettings().appDataDir, noteId, name, body);
+    return { attachments: [publicAttachment(added)] };
+  } catch (error) {
+    const message =
+      error instanceof attachments.AttachmentTooLargeError
+        ? error.message
+        : `could not be attached (${error instanceof Error ? error.message : String(error)}).`;
+    return { attachments: [], error: `${name}: ${message}` };
+  }
 }
 
 /** Where an attachment's file is on disk, or null when it is unknown or its file has gone missing. */
