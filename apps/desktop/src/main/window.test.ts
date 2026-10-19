@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // window.ts imports Electron, which only exists inside the app; the color table
 // is all this test needs.
-vi.mock("electron", () => ({ BrowserWindow: class {}, shell: {} }));
+vi.mock("electron", () => ({ BrowserWindow: class {}, Menu: {}, shell: {} }));
 
 describe("THEME_BACKGROUND", () => {
   it("matches each theme's --background in the web app's stylesheet", async () => {

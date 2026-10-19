@@ -247,7 +247,8 @@ export function MarkdownEditor({
               completion.sync(e.target);
             }}
             onPaste={onPaste}
-            spellCheck={false}
+            // The text is drawn by the highlight layer, but the browser's squiggles still land on the textarea's own text.
+            spellCheck
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}

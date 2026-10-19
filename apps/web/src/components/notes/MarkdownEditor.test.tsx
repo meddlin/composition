@@ -468,3 +468,13 @@ describe("MarkdownEditor syntax highlighting", () => {
     expect(screen.getByRole("textbox").className).not.toContain("text-transparent");
   });
 });
+
+describe("MarkdownEditor spellcheck", () => {
+  afterEach(cleanup);
+
+  it("lets the browser underline misspelled words while writing", () => {
+    renderPreview("Hello");
+    // jsdom has no `spellcheck` property, so check the attribute the browser reads.
+    expect(screen.getByLabelText("Markdown editor").getAttribute("spellcheck")).toBe("true");
+  });
+});

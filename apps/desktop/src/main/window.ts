@@ -1,5 +1,6 @@
 import { BrowserWindow, shell } from "electron";
 import type { ThemeName } from "./backend";
+import { installContextMenu } from "./contextMenu";
 import { isAllowedOrigin } from "./origin";
 
 /**
@@ -48,8 +49,11 @@ export function createMainWindow(options: {
       sandbox: true,
       nodeIntegration: false,
       webSecurity: true,
+      // Underlines misspelled words in the editor (the OS dictionary on macOS); contextMenu.ts offers the fixes.
+      spellcheck: true,
     },
   });
+  installContextMenu(window.webContents);
 
   window.once("ready-to-show", () => window.show());
 
