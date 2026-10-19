@@ -19,6 +19,8 @@ type Props = {
   onClose: (noteId: number) => void;
   onChange: (noteId: number, content: string) => void;
   onDropNote: (noteId: number, targetId: number, zone: DropZone) => void;
+  /** A link in `fromId`'s preview was followed; `beside` asks for the note next to that pane. */
+  onOpenNote: (noteId: number, fromId: number, beside: boolean) => void;
   onResizePanes: (sizes: number[]) => void;
 };
 
@@ -35,6 +37,7 @@ export function PaneArea({
   onClose,
   onChange,
   onDropNote,
+  onOpenNote,
   onResizePanes,
 }: Props) {
   const row = useRef<HTMLDivElement>(null);
@@ -82,6 +85,8 @@ export function PaneArea({
               onClose={() => onClose(pane.noteId)}
               onChange={(content) => onChange(pane.noteId, content)}
               onDropNote={(noteId, zone) => onDropNote(noteId, pane.noteId, zone)}
+              notes={notes}
+              onOpenNote={(noteId, beside) => onOpenNote(noteId, pane.noteId, beside)}
             />
           </Fragment>
         );

@@ -7,7 +7,7 @@ import { expandCompletion, findTrigger, matchCompletions, type MdxCompletion } f
 const MENU_HEIGHT_PX = 200;
 const GAP_PX = 4;
 
-type Position = { left: number; top?: number; bottom?: number };
+export type Position = { left: number; top?: number; bottom?: number };
 
 /**
  * Intellisense for MDX components in the editor's textarea: after a `<` it
@@ -95,14 +95,14 @@ export function useMdxCompletion(
   };
 }
 
-/** Puts the menu under the `<` at `start`, or above it when it would run off the bottom. */
-function placeMenu(el: HTMLTextAreaElement, start: number): Position {
+/** Puts a menu `menuHeight` tall under the character at `start`, or above it when it would run off the bottom. */
+export function placeMenu(el: HTMLTextAreaElement, start: number, menuHeight = MENU_HEIGHT_PX): Position {
   const { top, left, height } = caretCoordinates(el, start);
   const lineTop = top - el.scrollTop;
   const maxLeft = Math.max(0, el.clientWidth - MENU_WIDTH_PX);
   const x = Math.min(Math.max(0, left - el.scrollLeft), maxLeft);
-  const fitsBelow = lineTop + height + GAP_PX + MENU_HEIGHT_PX <= el.clientHeight;
-  return fitsBelow || lineTop < MENU_HEIGHT_PX
+  const fitsBelow = lineTop + height + GAP_PX + menuHeight <= el.clientHeight;
+  return fitsBelow || lineTop < menuHeight
     ? { left: x, top: lineTop + height + GAP_PX }
     : { left: x, bottom: el.clientHeight - lineTop + GAP_PX };
 }

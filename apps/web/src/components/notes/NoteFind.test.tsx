@@ -32,6 +32,8 @@ function renderPane(props: Partial<Parameters<typeof NotePane>[0]> = {}) {
       onClose={vi.fn()}
       onChange={vi.fn()}
       onDropNote={vi.fn()}
+      notes={[note]}
+      onOpenNote={vi.fn()}
       {...props}
     />,
   );

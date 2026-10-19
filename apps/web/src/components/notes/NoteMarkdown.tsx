@@ -5,14 +5,16 @@ import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
 import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
-import { markdownComponents } from "./NoteImage";
+import { markdownComponents as imageComponents } from "./NoteImage";
+import { NoteAnchor, noteUrlTransform } from "./NoteLink";
 
 type Props = {
   body: string;
   rehypePlugins: NonNullable<Options["rehypePlugins"]>;
 };
 
-// Markdown's own elements that get a custom rendering (images), kept alongside the MDX tags.
+// Markdown's own elements that get a custom rendering (images, links), kept alongside the MDX tags.
+const markdownComponents = { ...imageComponents, a: NoteAnchor };
 const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 
 // remarkHeadings goes after remarkRestrictMdx, whose renamed tags it looks for.
@@ -39,7 +41,12 @@ export function NoteMarkdown({ body, rehypePlugins }: Props) {
   const idPrefix = `${useId()}-`;
   const remarkPlugins = useMemo(() => mdxRemarkPlugins(idPrefix), [idPrefix]);
   const plain = (
-    <Markdown remarkPlugins={[remarkGfm]} rehypePlugins={rehypePlugins} components={markdownComponents}>
+    <Markdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={rehypePlugins}
+      components={markdownComponents}
+      urlTransform={noteUrlTransform}
+    >
       {body}
     </Markdown>
   );
@@ -52,6 +59,7 @@ export function NoteMarkdown({ body, rehypePlugins }: Props) {
         remarkRehypeOptions={mdxRehypeOptions}
         rehypePlugins={rehypePlugins}
         components={noteComponents}
+        urlTransform={noteUrlTransform}
       >
         {body}
       </Markdown>

@@ -125,3 +125,5 @@ See [architecture/backup-restore.md](architecture/backup-restore.md) for backing
 [manual-tests/backup-restore.md](manual-tests/backup-restore.md) for the guided manual test of it in each app.
 
 See [ui/markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) for how the Markdown tab colours text as you write, and the rules that keep the colours aligned with the caret.
+
+See [ui/note-links.md](ui/note-links.md) for linking one note to another (`[[`, the shortcut, and following links).

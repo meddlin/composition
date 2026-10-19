@@ -52,6 +52,8 @@ function renderPane() {
       onClose={() => {}}
       onChange={() => {}}
       onDropNote={() => {}}
+      notes={[note]}
+      onOpenNote={() => {}}
     />,
   );
 }
