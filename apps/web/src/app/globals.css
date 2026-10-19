@@ -388,6 +388,21 @@
   color: var(--syntax-keyword);
 }
 
+/*
+ * Find in note. The editor's layer paints matches with a background behind the text; the preview's
+ * rendered text is painted through the CSS Custom Highlight API (components/notes/previewHighlights.ts).
+ * Neither may change a glyph's size or weight, or the editor's layer would drift from its textarea.
+ */
+.find-match,
+::highlight(find-match) {
+  background-color: color-mix(in srgb, var(--warning) 40%, transparent);
+}
+.find-current,
+::highlight(find-current) {
+  background-color: var(--warning);
+  color: var(--background);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

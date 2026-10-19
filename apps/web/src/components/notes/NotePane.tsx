@@ -1,14 +1,16 @@
 "use client";
 
-import { XIcon } from "lucide-react";
-import { useId, useRef, type CSSProperties } from "react";
+import { SearchIcon, XIcon } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AttachmentsSlot } from "./AttachmentsSlot";
 import { PANE_DRAG_TYPE } from "./dragTypes";
 import { DropOverlay } from "./DropOverlay";
 import { EditorTabs } from "./EditorTabs";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { FindBar } from "./FindBar";
+import type { FindOptions } from "./findMatches";
+import { MarkdownEditor, type FindState } from "./MarkdownEditor";
 import { SIDE_BY_SIDE_MIN_WIDTH, shownView, type DropZone, type PaneView } from "./panes";
 import { noteTitle, type Note } from "./types";
 import { useMinWidth } from "./useMinWidth";
@@ -37,7 +39,9 @@ type Props = {
 
 /**
  * One open note: a header to drag it by or close it, tabs to see its editor,
- * its preview, or both beside each other, and that view of it. In the desktop
+ * its preview, or both beside each other, and that view of it. Ctrl/Cmd+F (or the
+ * magnifier in the header) opens a find bar that highlights a word or phrase in
+ * this note alone, separate from the app-wide search. In the desktop
  * app the note's attached files are listed below. Dragging another
  * note over it offers to open that note next to this one or in its place.
  */
@@ -63,6 +67,62 @@ export function NotePane({
   const section = useRef<HTMLElement>(null);
   const canSplit = useMinWidth(section, SIDE_BY_SIDE_MIN_WIDTH);
   const idBase = useId();
+
+  const [findOpen, setFindOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [options, setOptions] = useState<FindOptions>({ matchCase: false, wholeWord: false });
+  const [current, setCurrent] = useState(0);
+  const [count, setCount] = useState(0);
+  const findInput = useRef<HTMLInputElement>(null);
+
+  function focusFind() {
+    findInput.current?.focus();
+    findInput.current?.select();
+  }
+
+  function openFind() {
+    // A word picked out in the editor is most likely the one to look for.
+    const active = document.activeElement;
+    if (active instanceof HTMLTextAreaElement && section.current?.contains(active)) {
+      const picked = active.value.slice(active.selectionStart, active.selectionEnd);
+      if (picked !== "" && picked.length <= 200 && !/[\r\n]/.test(picked)) {
+        setQuery(picked);
+        setCurrent(0);
+      }
+    }
+    setFindOpen(true);
+    focusFind(); // already open; a find bar opening now is focused by the effect below
+  }
+
+  function closeFind() {
+    if (document.activeElement === findInput.current) section.current?.querySelector("textarea")?.focus();
+    setFindOpen(false);
+  }
+
+  useEffect(() => {
+    if (!findOpen) return;
+    findInput.current?.focus();
+    findInput.current?.select();
+  }, [findOpen]);
+
+  // Only the focused pane answers, so with several notes open Ctrl/Cmd+F searches the one being worked in.
+  useEffect(() => {
+    if (!focused) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "f" || event.altKey || event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault(); // Keep the browser's own find from opening over it.
+      openFind();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
+
+  const find = useMemo<FindState | undefined>(
+    () => (findOpen ? { query, options, current, onCount: setCount } : undefined),
+    [findOpen, query, options, current],
+  );
+  const shownCurrent = count === 0 ? 0 : Math.min(current, count - 1);
 
   return (
     <section
@@ -90,6 +150,17 @@ export function NotePane({
         <Button
           variant="ghost"
           size="icon-xs"
+          onClick={() => (findOpen ? closeFind() : openFind())}
+          aria-label="Find in note"
+          aria-pressed={findOpen}
+          title="Find in note (Ctrl/Cmd+F)"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <SearchIcon />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={onClose}
           aria-label={`Close ${title}`}
           title="Close"
@@ -99,7 +170,27 @@ export function NotePane({
         </Button>
       </header>
       <EditorTabs idBase={idBase} view={shownView(view, canSplit)} canSplit={canSplit} onChange={onViewChange} />
+      {findOpen && (
+        <FindBar
+          query={query}
+          options={options}
+          count={count}
+          current={shownCurrent}
+          inputRef={findInput}
+          onQueryChange={(next) => {
+            setQuery(next);
+            setCurrent(0);
+          }}
+          onOptionsChange={(next) => {
+            setOptions(next);
+            setCurrent(0);
+          }}
+          onStep={(delta) => count > 0 && setCurrent((shownCurrent + delta + count) % count)}
+          onClose={closeFind}
+        />
+      )}
       <MarkdownEditor
+        find={find}
         idBase={idBase}
         view={shownView(view, canSplit)}
         noteId={note.id}
