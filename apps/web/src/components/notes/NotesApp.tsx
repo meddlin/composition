@@ -177,6 +177,15 @@ function Workspace({
     });
   }
 
+  /** Follows a link in `fromId`'s preview: the note replaces that pane's, or opens to its right. */
+  function openLinkedNote(noteId: number, fromId: number, beside: boolean) {
+    if (!notes.some((n) => n.id === noteId)) return;
+    flushPendingSave();
+    setPaneState((prev) =>
+      beside ? dropNote(prev, noteId, fromId, "right") : openNote(focusPane(prev, fromId), noteId),
+    );
+  }
+
   function dropNoteOnPane(noteId: number, targetId: number, zone: DropZone) {
     setPaneState((prev) => dropNote(prev, noteId, targetId, zone));
   }
@@ -347,6 +356,7 @@ function Workspace({
             onClose={(id) => setPaneState((prev) => closePane(prev, id))}
             onChange={update}
             onDropNote={dropNoteOnPane}
+            onOpenNote={openLinkedNote}
             onResizePanes={(sizes) => setPaneState((prev) => withSizes(prev, sizes))}
           />
         ) : (

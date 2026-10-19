@@ -31,6 +31,10 @@ type Props = {
   onClose: () => void;
   onChange: (content: string) => void;
   onDropNote: (noteId: number, zone: DropZone) => void;
+  /** Every note, so the editor can offer them to link to. */
+  notes: readonly Note[];
+  /** A link in the preview was followed; `beside` asks for the note next to this one. */
+  onOpenNote: (noteId: number, beside: boolean) => void;
 };
 
 /**
@@ -54,6 +58,8 @@ export function NotePane({
   onClose,
   onChange,
   onDropNote,
+  notes,
+  onOpenNote,
 }: Props) {
   const drop = useNoteDrop({ edges: true, onDrop: onDropNote });
   const title = noteTitle(note);
@@ -193,6 +199,8 @@ export function NotePane({
         ratio={ratio}
         onRatioChange={onRatioChange}
         onRatioCommit={onRatioCommit}
+        notes={notes}
+        onOpenNote={onOpenNote}
       />
       <AttachmentsPanel key={note.id} noteId={note.id} />
       {drop.zone && <DropOverlay zone={drop.zone} />}

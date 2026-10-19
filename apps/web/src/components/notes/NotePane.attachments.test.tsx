@@ -45,6 +45,8 @@ describe("attachments in a note pane", () => {
         onClose={() => {}}
         onChange={() => {}}
         onDropNote={() => {}}
+        notes={[note]}
+        onOpenNote={() => {}}
       />,
     );
 
