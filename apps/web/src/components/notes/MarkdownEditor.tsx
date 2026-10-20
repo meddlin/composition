@@ -14,6 +14,7 @@ import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
 import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
+import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
@@ -196,8 +197,12 @@ export function MarkdownEditor({
 
     if (before !== after) {
       el.focus();
-      el.setSelectionRange(from, before.length - tail);
-      document.execCommand?.("insertText", false, replacement);
+      // A hidden editor (the preview alone is showing) can't take focus, and execCommand would then
+      // type into whatever else has it.
+      if (document.activeElement === el) {
+        el.setSelectionRange(from, before.length - tail);
+        document.execCommand?.("insertText", false, replacement);
+      }
       if (el.value !== after) {
         pendingSelection.current = result.selection;
         replaceText(from, before.length - tail, replacement);
@@ -310,7 +315,7 @@ export function MarkdownEditor({
             {imageError}
           </p>
         )}
-        {highlightError?.value === value && (
+        {showEditor && highlightError?.value === value && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
             {highlightError.reason}
           </p>
@@ -398,13 +403,24 @@ export function MarkdownEditor({
         className="flex min-h-0 flex-col"
       >
         {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
+        {showPreview && !showEditor && highlightError?.value === value && (
+          <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
+            {highlightError.reason}
+          </p>
+        )}
         {showPreview && (
-          <div ref={previewBox} className="prose max-w-none flex-1 overflow-y-auto p-4">
+          <PreviewHighlightMenu
+            boxRef={previewBox}
+            className="prose max-w-none flex-1 overflow-y-auto p-4"
+            text={value}
+            body={body}
+            onApply={applyHighlight}
+          >
             {fm && <FrontmatterCard fm={fm} />}
             <NoteLinksProvider value={noteLinks}>
               <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
             </NoteLinksProvider>
-          </div>
+          </PreviewHighlightMenu>
         )}
       </section>
     </div>

@@ -47,7 +47,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Images in notes: paste | ✅ | ✅ | ✅ | A terminal can't paste picture bytes. The CLI adds an image from a file: `ctrl+l` and a path, or dragging the file into the terminal. Copying a screenshot to the clipboard doesn't work in the CLI. [images.md](architecture/images.md#in-the-cli) |
 | Image size limit | None | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
-| `<Mark>` highlighted text, in five colors | ❌ | ✅ | ✅ | In the editor, `Cmd/Ctrl+Shift+H` picks the color; highlighting from the preview is not built yet. The CLI shows the text without the tint. [text-highlighting.md](ui/text-highlighting.md) |
+| `<Mark>` highlighted text, in five colors | ❌ | ✅ | ✅ | Web and desktop: `Cmd/Ctrl+Shift+H` in the editor, or select text in the preview and right-click. The CLI shows the text without the tint. [text-highlighting.md](ui/text-highlighting.md) |
 | Link to another note: `[[` or `Cmd/Ctrl+Shift+K` picker, click to open | ❌ | ✅ | ✅ | The CLI keeps the `[text](note:id)` Markdown but can't insert or follow one yet. [note-links.md](ui/note-links.md) |
 | **Attach any file to a note, listed in a table on the note** | ✅ | ✅ | ✅ | The web app uploads through the browser's file picker and downloads instead of "save a copy"; it has no "show in Finder". The CLI types paths where the desktop opens a file picker, and has no "show in Finder" either. [attachments.md](architecture/attachments.md) |
 
