@@ -24,7 +24,7 @@
     "@opentui/core": "0.6.3",
     "@opentui/react": "0.6.3",
     "better-sqlite3": "^13.0.3",
-    "js-yaml": "^4.3.2",
+    "js-yaml": "^5.4.3",
     "lowlight": "^3.3.0",
     "react": "19.3.0",
     "remark-gfm": "^4.0.1",
