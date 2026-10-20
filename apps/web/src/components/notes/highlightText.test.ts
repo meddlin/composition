@@ -96,6 +96,29 @@ describe("highlightRange", () => {
     expect(refused).toEqual({ ok: false, reason: expect.stringContaining("code") });
   });
 
+  it("keeps the tags clear of a quote's > when the selection starts or ends on a line break", () => {
+    const text = "> one\n> two\n> three";
+    const result = highlightRange(text, { start: text.indexOf("\n"), end: text.indexOf("\n", text.indexOf("two")) + 1 }, "yellow");
+
+    expect(result).toMatchObject({ ok: true, text: `> one\n> ${Y("two")}\n> three` });
+  });
+
+  it("keeps the tags clear of a list item's indent in the same way", () => {
+    const text = "- one\n  two\n- three";
+
+    expect(highlightRange(text, { start: 0, end: text.indexOf("\n", 6) }, "yellow")).toMatchObject({
+      ok: true,
+      text: `- ${Y("one\n  two")}\n- three`,
+    });
+  });
+
+  it("refuses when reading the note as MDX would change how it renders, as it does for indented code", () => {
+    // Plain Markdown shows the indented line as code; MDX has no indented code, so it would turn into a paragraph.
+    const text = "before text\n\n    indented code\n\nafter text";
+
+    expect(highlightRange(text, find(text, "before"), "yellow")).toEqual({ ok: false, reason: expect.stringContaining("render") });
+  });
+
   it("refuses an empty selection", () => {
     expect(highlightRange("hello", { start: 2, end: 2 }, "yellow")).toEqual({ ok: false, reason: expect.stringContaining("Select") });
     expect(highlightRange("hello  world", find("hello  world", "  "), "yellow").ok).toBe(false);

@@ -20,7 +20,7 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { parse as parseFrontmatter } from "@/lib/composition/frontmatter";
-import { mdxComponents } from "./mdx/components";
+import { mdxComponents, usesMdxComponent } from "./mdx/components";
 import { highlightColorOf, type HighlightColor } from "./mdx/highlightColors";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 
@@ -70,6 +70,9 @@ function parseMdx(body: string): Parsed {
   }
 }
 
+// A note with no component is shown as plain Markdown, which MDX reads differently in a few places.
+const plainProcessor = unified().use(remarkParse).use(remarkGfm);
+
 const unreadable = (message: string): HighlightResult => ({
   ok: false,
   reason: `This note can't hold highlights, because highlights make it MDX and MDX can't read it: ${message}`,
@@ -81,7 +84,9 @@ type Prepared = { body: string; frontmatterLength: number; tree: Node; from: num
 function prepare(text: string, range: TextRange): Prepared | { failure: HighlightResult } {
   const [, body] = parseFrontmatter(text);
   const frontmatterLength = text.length - body.length;
-  const parsed = parseMdx(body);
+  // The note as it is shown now: as MDX if it already has components, as plain Markdown if not. What
+  // a highlight must not change is that, so a note MDX would show differently is caught below.
+  const parsed: Parsed = usesMdxComponent(body) ? parseMdx(body) : { tree: plainProcessor.parse(body) as Node };
   if ("error" in parsed) return { failure: unreadable(parsed.error) };
   // A selection that begins in the frontmatter is taken from where the body begins.
   const from = Math.max(0, Math.min(range.start, range.end) - frontmatterLength);
@@ -113,7 +118,8 @@ const UNSPLITTABLE = /\\[!-/:-@[-`{-~]|&(?:#[0-9]+|#[xX][0-9a-fA-F]+|[A-Za-z][A-
 /**
  * Where a highlight of `[from, to)` inside the text run `[leafStart, leafEnd)` should go: widened to
  * take in any escape or character reference it would otherwise cut, then shrunk off the spaces at
- * either end. Null when only spaces were selected.
+ * either end, and off the `>` and indent a quote or list item puts at the start of a continued line
+ * (a tag in front of those would end the quote). Null when only such characters were selected.
  */
 function tighten(body: string, leafStart: number, leafEnd: number, from: number, to: number): TextRange | null {
   for (const unit of body.slice(leafStart, leafEnd).matchAll(UNSPLITTABLE)) {
@@ -122,8 +128,22 @@ function tighten(body: string, leafStart: number, leafEnd: number, from: number,
     if (from > unitStart && from < unitEnd) from = unitStart;
     if (to > unitStart && to < unitEnd) to = unitEnd;
   }
-  while (from < to && /\s/.test(body[from])) from++;
-  while (to > from && /\s/.test(body[to - 1])) to--;
+  let lineBroken = false;
+  while (from < to) {
+    const char = body[from];
+    if (char === "\n") lineBroken = true;
+    else if (!/\s/.test(char) && !(lineBroken && char === ">")) break;
+    from++;
+  }
+  while (to > from) {
+    if (/\s/.test(body[to - 1])) to--;
+    else if (body[to - 1] === ">") {
+      // The `>` of a quote at the start of a line that nothing else is on yet.
+      const lineStart = body.lastIndexOf("\n", to - 1) + 1;
+      if (lineStart <= from || !/^[ \t>]*$/.test(body.slice(lineStart, to))) break;
+      to = lineStart;
+    } else break;
+  }
   return from < to ? { start: from, end: to } : null;
 }
 
@@ -171,7 +191,11 @@ function apply(prepared: Prepared, edits: Edit[], text: string): HighlightResult
   const changed = parseMdx(out);
   if ("error" in changed) return unreadable(changed.error);
   if (skeleton(prepared.tree) !== skeleton(changed.tree)) {
-    return { ok: false, reason: "A highlight here would change the formatting around it, so it can't be added." };
+    return {
+      ok: false,
+      reason:
+        "A highlight here would change how the note renders: its tags would break the formatting around them, or the note holds something MDX reads differently (an indented code block, say).",
+    };
   }
   const prefix = text.slice(0, frontmatterLength);
   return { ok: true, text: prefix + out, selection: { start: frontmatterLength + selectionStart, end: frontmatterLength + selectionEnd } };
