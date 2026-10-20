@@ -6,9 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  PREVIEW_FONT_CHOICES,
+  previewFontStack,
+  type PreviewFontName,
+} from "@/lib/composition/previewFonts";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
   saveLocation,
+  savePreviewFont,
   saveSettings,
   saveTheme,
   type SaveLocationResult,
@@ -28,6 +34,7 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
 
 type Props = {
   currentTheme: ThemeName;
+  currentPreviewFont: PreviewFontName;
   currentCity: string;
   /** Today's times at the saved city, so the page can confirm the lookup worked. */
   currentSunTimes?: { sunrise?: string; sunset?: string };
@@ -70,6 +77,7 @@ function saveSettingsFromForm(_previous: SaveSettingsResult, formData: FormData)
 
 export function SettingsForm({
   currentTheme,
+  currentPreviewFont,
   currentCity,
   currentSunTimes,
   currentAppDataDir,
@@ -84,6 +92,9 @@ export function SettingsForm({
   const [theme, setTheme] = useState<ThemeName>(currentTheme);
   const [themeError, setThemeError] = useState<string>();
   const [, startThemeTransition] = useTransition();
+  const [previewFont, setPreviewFont] = useState<PreviewFontName>(currentPreviewFont);
+  const [previewFontError, setPreviewFontError] = useState<string>();
+  const [, startPreviewFontTransition] = useTransition();
 
   // Apply the scheme immediately rather than waiting for the server round trip.
   useEffect(() => {
@@ -104,6 +115,22 @@ export function SettingsForm({
       } else {
         // "auto" takes its starting point from the sun times; tell it to load them.
         window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
+      }
+    });
+  }
+
+  // Likewise for the preview font: show it straight away, save in the background.
+  function selectPreviewFont(next: PreviewFontName) {
+    const previous = previewFont;
+    setPreviewFont(next);
+    setPreviewFontError(undefined);
+    document.documentElement.style.setProperty("--preview-font", previewFontStack(next));
+    startPreviewFontTransition(async () => {
+      const result = await savePreviewFont(next);
+      if (result.error) {
+        setPreviewFont(previous);
+        setPreviewFontError(result.error);
+        document.documentElement.style.setProperty("--preview-font", previewFontStack(previous));
       }
     });
   }
@@ -137,6 +164,38 @@ export function SettingsForm({
           ))}
         </RadioGroup>
         {themeError && <FieldError>{themeError}</FieldError>}
+      </FieldSet>
+
+      <FieldSet className="gap-2 text-sm">
+        <FieldLegend variant="label">Preview font</FieldLegend>
+        <FieldDescription className="text-xs">
+          The typeface notes are shown in when previewed. Every option is an open-source font
+          (SIL Open Font License) bundled with the app.
+        </FieldDescription>
+        <RadioGroup
+          value={previewFont}
+          onValueChange={(next) => selectPreviewFont(next as PreviewFontName)}
+          aria-label="Preview font"
+          className="gap-2"
+        >
+          {PREVIEW_FONT_CHOICES.map(({ name, label, stack }) => (
+            <Field key={name} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={name} id={`preview-font-${name}`} />
+              <FieldLabel
+                htmlFor={`preview-font-${name}`}
+                className="cursor-pointer gap-3 font-normal"
+                style={{ fontFamily: stack }}
+              >
+                {label}
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+        <p className="preview-text rounded-md border bg-muted/40 px-3 py-2 text-base">
+          The quick brown fox jumps over the lazy dog. <em>Pack my box with five dozen liquor jugs.</em>{" "}
+          <code className="text-sm">0123456789</code>
+        </p>
+        {previewFontError && <FieldError>{previewFontError}</FieldError>}
       </FieldSet>
 
       <form action={locationAction} className="flex flex-col gap-2 text-sm">

@@ -33,6 +33,7 @@ export {
   saveLayout,
   saveLocation,
   saveNoteContent,
+  savePreviewFont,
   saveSettings,
   saveTheme,
   searchNotes,

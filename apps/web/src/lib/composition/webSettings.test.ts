@@ -40,9 +40,19 @@ describe("web settings layout", () => {
     expect(loadWebSettings()).toEqual({
       appDataDir: "/data",
       theme: "forest",
+      previewFont: "default",
       ...DEFAULT_LAYOUT,
       favorites: [],
     });
+  });
+
+  it("loads a saved preview font, and falls back to the default for one it doesn't know", async () => {
+    writeSettings({ appDataDir: "/data", previewFont: "literata" });
+    const { loadWebSettings } = await import("./webSettings");
+    expect(loadWebSettings().previewFont).toBe("literata");
+
+    writeSettings({ appDataDir: "/data", previewFont: "Comic Sans MS" });
+    expect(loadWebSettings().previewFont).toBe("default");
   });
 
   it("loads a saved layout", async () => {

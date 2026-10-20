@@ -1,21 +1,12 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
-import { Geist, Geist_Mono } from "next/font/google";
 import { SunThemeSync } from "@/components/SunThemeSync";
 import { loadSunSchedule } from "@/lib/composition/service";
+import { previewFontStack } from "@/lib/composition/previewFonts";
 import { sunThemeAttributes } from "@/lib/composition/sunSchedule";
 import { loadWebSettings } from "@/lib/composition/webSettings";
+import { fontVariables } from "./fonts";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Composition",
@@ -26,7 +17,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { theme } = loadWebSettings();
+  const { theme, previewFont } = loadWebSettings();
 
   // "Follow the sun" renders at the right point on the ramp up front, so there's
   // no flash of the wrong scheme; SunThemeSync then keeps it moving client-side.
@@ -38,8 +29,13 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       data-theme={theme}
       data-tone={attributes?.tone}
-      style={attributes && ({ "--auto-light": attributes.autoLight } as CSSProperties)}
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      style={
+        {
+          "--preview-font": previewFontStack(previewFont),
+          ...(attributes && { "--auto-light": attributes.autoLight }),
+        } as CSSProperties
+      }
+      className={`${fontVariables} h-full antialiased`}
     >
       <body className="h-full">
         <SunThemeSync initial={sun} />

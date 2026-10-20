@@ -188,6 +188,15 @@ export async function saveTheme(theme: string): Promise<{ error?: string }> {
   return result;
 }
 
+export async function savePreviewFont(font: string): Promise<{ error?: string }> {
+  const result = await service.savePreviewFont(font);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
 export async function saveLocation(city: string): Promise<SaveLocationResult> {
   const result = await service.saveLocation(city);
   if (!result.error) {

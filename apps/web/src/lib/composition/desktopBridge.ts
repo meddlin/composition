@@ -2,6 +2,7 @@ import type { CompositionApi } from "./api";
 import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
 import type { Layout } from "./layout";
+import type { PreviewFontName } from "./previewFonts";
 import type { ThemeName } from "./themes";
 import type { UpdatesApi, UpdateStateListener } from "./updatesApi";
 
@@ -19,6 +20,7 @@ export type DesktopBridge = CompositionApi &
     onUpdateState(listener: UpdateStateListener): () => void;
     readonly initial: {
       theme: ThemeName;
+      previewFont: PreviewFontName;
       layout: Layout;
       /** Present for the "auto" scheme: where on the sunrise/sunset ramp the first frame starts. */
       sun?: { tone: "light" | "dark"; autoLight: string };
