@@ -182,7 +182,10 @@ export function Pane({ note, size, view, focused, api, palette, syntax, flushes,
                 key.preventDefault();
                 editor.current?.insertText("\t");
               }
-              setTimeout(check, 0);
+              // The app may quit before this runs, and OpenTUI 0.6 throws when a destroyed editor is read.
+              setTimeout(() => {
+                if (!editor.current?.isDestroyed) check();
+              }, 0);
             }}
           />
         </box>

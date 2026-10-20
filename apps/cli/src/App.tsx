@@ -66,7 +66,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
     () => (sunLevel === null ? paletteFor(theme) : autoPalette(sunLevel, isTruecolor())),
     [theme, sunLevel],
   );
-  const syntax = useMemo(() => syntaxStyleFor(palette), [palette]);
+  const syntax = useMemo(() => syntaxStyleFor(palette, renderer.nativeScene), [palette, renderer]);
 
   const [notes, setNotes] = useState(initial.notes);
   const [groups, setGroups] = useState(initial.groups);
