@@ -3,10 +3,12 @@ import Markdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
+import { remarkIndentedCode } from "./mdx/remarkIndentedCode";
 import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 import { markdownComponents as imageComponents } from "./NoteImage";
 import { NoteAnchor, noteUrlTransform } from "./NoteLink";
+import { rehypeSourceSpans } from "./rehypeSourceSpans";
 
 type Props = {
   body: string;
@@ -21,6 +23,8 @@ const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"]> => [
   remarkGfm,
   remarkMdx,
+  // A note is Markdown first: keep its indented code as code.
+  remarkIndentedCode,
   [remarkRestrictMdx, { allowed: Object.keys(mdxComponents) }],
   [remarkHeadings, { idPrefix }],
 ];
@@ -36,7 +40,9 @@ const mdxRehypeOptions: NonNullable<Options["remarkRehypeOptions"]> = {
  * the MDX components in `mdxComponents` for notes that use any of them. The
  * headings of such a note get ids, which is what `<Toc />` links to.
  */
-export function NoteMarkdown({ body, rehypePlugins }: Props) {
+export function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props) {
+  // Every piece of text is wrapped to say where in the note it came from; that has to see the tree first.
+  const rehypePlugins = useMemo(() => [rehypeSourceSpans, ...extraRehypePlugins], [extraRehypePlugins]);
   // Heading ids are unique per preview, so a table of contents never scrolls a neighbouring pane.
   const idPrefix = `${useId()}-`;
   const remarkPlugins = useMemo(() => mdxRemarkPlugins(idPrefix), [idPrefix]);

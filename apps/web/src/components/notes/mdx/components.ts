@@ -2,6 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import type { Components } from "react-markdown";
 import { Image } from "./Image";
 import { Info } from "./Info";
+import { Mark } from "./Mark";
 import { renderKey } from "./remarkRestrictMdx";
 import { Toc } from "./Toc";
 import { Warning } from "./Warning";
@@ -20,8 +21,9 @@ export const mdxComponents: Record<
     title?: string;
     headings?: string;
     maxDepth?: string;
+    color?: string;
   }>
-> = { Info, Warning, Image, Toc };
+> = { Info, Warning, Image, Toc, Mark };
 
 const names = Object.keys(mdxComponents);
 

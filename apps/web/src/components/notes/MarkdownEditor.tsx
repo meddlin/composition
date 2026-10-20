@@ -10,7 +10,11 @@ import { caretCoordinates } from "./caretCoordinates";
 import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
+import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
+import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
+import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
+import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
@@ -18,6 +22,7 @@ import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
+import { useHighlightMenu } from "./useHighlightMenu";
 import type { Note } from "./types";
 import { usePreviewFind } from "./usePreviewFind";
 import { useMdxCompletion } from "./useMdxCompletion";
@@ -91,11 +96,18 @@ export function MarkdownEditor({
     latest.current = value;
   }, [value]);
   const pendingCaret = useRef<number | null>(null);
+  const pendingSelection = useRef<TextRange | null>(null);
   const uploads = useRef(0);
   const [imageError, setImageError] = useState<string | null>(null);
+  // Why a highlight was refused, and the text it was refused for: editing the note clears it.
+  const [highlightError, setHighlightError] = useState<{ reason: string; value: string } | null>(null);
 
   // A controlled textarea jumps its caret to the end when the text changes underneath it.
   useLayoutEffect(() => {
+    if (pendingSelection.current) {
+      textarea.current?.setSelectionRange(pendingSelection.current.start, pendingSelection.current.end);
+      pendingSelection.current = null;
+    }
     if (pendingCaret.current === null) return;
     textarea.current?.setSelectionRange(pendingCaret.current, pendingCaret.current);
     pendingCaret.current = null;
@@ -157,6 +169,50 @@ export function MarkdownEditor({
     pendingCaret.current = start + caret;
     replaceText(start, end, text);
   });
+
+  /**
+   * Highlights (or un-highlights) `range`. The change goes in as typing would, so the browser's undo
+   * history keeps it as one step; where that isn't possible (no `execCommand`, a hidden textarea)
+   * the text is replaced and undo starts over, as it does for a pasted image.
+   */
+  function applyHighlight(choice: HighlightChoice, range: TextRange) {
+    const el = textarea.current;
+    if (!el) return;
+    const before = el.value;
+    const result = choice === "remove" ? removeHighlight(before, range) : highlightRange(before, range, choice);
+    if (!result.ok) {
+      setHighlightError({ reason: result.reason, value: before });
+      return;
+    }
+    if (choice !== "remove") rememberHighlightColor(choice);
+    setHighlightError(null);
+
+    // Only the stretch that differs is replaced, so the scroll position and the rest of the undo stack are left alone.
+    const after = result.text;
+    let from = 0;
+    while (from < before.length && from < after.length && before[from] === after[from]) from++;
+    let tail = 0;
+    while (tail < before.length - from && tail < after.length - from && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
+    const replacement = after.slice(from, after.length - tail);
+
+    if (before !== after) {
+      el.focus();
+      // A hidden editor (the preview alone is showing) can't take focus, and execCommand would then
+      // type into whatever else has it.
+      if (document.activeElement === el) {
+        el.setSelectionRange(from, before.length - tail);
+        document.execCommand?.("insertText", false, replacement);
+      }
+      if (el.value !== after) {
+        pendingSelection.current = result.selection;
+        replaceText(from, before.length - tail, replacement);
+        return;
+      }
+    }
+    el.setSelectionRange(result.selection.start, result.selection.end);
+  }
+  const highlightMenu = useHighlightMenu(textarea, applyHighlight);
+
   const noteLinks = useMemo<NoteLinks>(
     () => ({ exists: (id) => notes.some((n) => n.id === id), open: onOpenNote ?? (() => {}) }),
     [notes, onOpenNote],
@@ -206,6 +262,8 @@ export function MarkdownEditor({
     noteLinkPicker.textareaProps.onKeyDown(event);
     if (event.defaultPrevented) return;
     completion.textareaProps.onKeyDown(event);
+    if (event.defaultPrevented) return;
+    highlightMenu.textareaProps.onKeyDown(event);
     if (event.defaultPrevented || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
@@ -257,6 +315,11 @@ export function MarkdownEditor({
             {imageError}
           </p>
         )}
+        {showEditor && highlightError?.value === value && (
+          <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
+            {highlightError.reason}
+          </p>
+        )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
           {highlight && (
@@ -276,15 +339,22 @@ export function MarkdownEditor({
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}
-            aria-controls={completion.textareaProps["aria-controls"] ?? noteLinkPicker.textareaProps["aria-controls"]}
+            aria-controls={
+              completion.textareaProps["aria-controls"] ??
+              noteLinkPicker.textareaProps["aria-controls"] ??
+              highlightMenu.textareaProps["aria-controls"]
+            }
             aria-activedescendant={
-              completion.textareaProps["aria-activedescendant"] ?? noteLinkPicker.textareaProps["aria-activedescendant"]
+              completion.textareaProps["aria-activedescendant"] ??
+              noteLinkPicker.textareaProps["aria-activedescendant"] ??
+              highlightMenu.textareaProps["aria-activedescendant"]
             }
             aria-keyshortcuts={noteLinkPicker.textareaProps["aria-keyshortcuts"]}
             onKeyDown={onKeyDown}
             onSelect={(event) => {
               completion.textareaProps.onSelect(event);
               noteLinkPicker.textareaProps.onSelect(event);
+              highlightMenu.textareaProps.onSelect(event);
             }}
             onFocus={(event) => {
               completion.textareaProps.onFocus(event);
@@ -293,10 +363,12 @@ export function MarkdownEditor({
             onBlur={() => {
               completion.textareaProps.onBlur();
               noteLinkPicker.textareaProps.onBlur();
+              highlightMenu.textareaProps.onBlur();
             }}
             onScroll={(event) => {
               completion.textareaProps.onScroll(event);
               noteLinkPicker.textareaProps.onScroll(event);
+              highlightMenu.textareaProps.onScroll();
               highlightLayer.sync();
             }}
             className={cn(
@@ -307,6 +379,7 @@ export function MarkdownEditor({
           />
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
           {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}
+          {highlightMenu.open && <HighlightMenu {...highlightMenu.menu} />}
         </div>
       </section>
       {view === "split" && (
@@ -330,13 +403,24 @@ export function MarkdownEditor({
         className="flex min-h-0 flex-col"
       >
         {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
+        {showPreview && !showEditor && highlightError?.value === value && (
+          <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
+            {highlightError.reason}
+          </p>
+        )}
         {showPreview && (
-          <div ref={previewBox} className="prose max-w-none flex-1 overflow-y-auto p-4">
+          <PreviewHighlightMenu
+            boxRef={previewBox}
+            className="prose max-w-none flex-1 overflow-y-auto p-4"
+            text={value}
+            body={body}
+            onApply={applyHighlight}
+          >
             {fm && <FrontmatterCard fm={fm} />}
             <NoteLinksProvider value={noteLinks}>
               <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
             </NoteLinksProvider>
-          </div>
+          </PreviewHighlightMenu>
         )}
       </section>
     </div>

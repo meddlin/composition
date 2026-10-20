@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from "react";
 import { cn } from "@/lib/utils";
 import { markMatches, type Match } from "./findMatches";
+import { markTints, tintSegments } from "./markTints";
 import { tokenizeMarkdown } from "./markdownTokens";
 
 const NO_MATCHES: Match[] = [];
@@ -14,7 +15,7 @@ export const MAX_HIGHLIGHT_CHARS = 100_000;
  * It therefore has to lay the text out exactly as the textarea does (same font, padding and
  * wrapping), and use only colour to tell tokens apart, since a heavier or wider glyph would
  * push everything after it out of line. The same goes for find-in-note: matches get a background
- * and nothing that changes a glyph's width.
+ * and nothing that changes a glyph's width. A `<Mark>`'s text gets its colour as a background too.
  */
 export function MarkdownHighlight({
   text,
@@ -30,16 +31,18 @@ export function MarkdownHighlight({
   current?: number;
 }) {
   const tokens = useMemo(() => tokenizeMarkdown(text), [text]);
-  const segments = useMemo(() => markMatches(tokens, matches, current), [tokens, matches, current]);
+  const tints = useMemo(() => markTints(text, tokens), [text, tokens]);
+  const segments = useMemo(() => tintSegments(markMatches(tokens, matches, current), tints), [tokens, matches, current, tints]);
   return (
     // Windows high-contrast mode forces the textarea's text visible, so the layer would only double it.
     <div ref={layer} aria-hidden className="pointer-events-none absolute inset-y-0 left-0 select-none overflow-hidden forced-colors:hidden">
       <pre className="m-0 whitespace-pre-wrap break-words p-4 font-mono text-sm leading-6">
         {segments.map((segment, index) =>
-          segment.kind || segment.match ? (
+          segment.kind || segment.match || segment.tint ? (
             <span
               key={index}
-              className={cn(segment.kind && `md-${segment.kind}`, segment.match && `find-${segment.match}`)}
+              className={cn(segment.kind && `md-${segment.kind}`, segment.tint && "md-mark", segment.match && `find-${segment.match}`)}
+              data-color={segment.tint ?? undefined}
             >
               {segment.text}
             </span>

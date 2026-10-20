@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -68,10 +68,27 @@ headings the note has when it is drawn, so it follows edits with no upkeep.
 `maxDepth` (a string, 1 to 6) stops the list at that heading level; without it, all six are listed.
 On the web and desktop each entry links to its heading.
 
+## `<Mark>`
+
+Highlighted text, like a highlighter pen. It is inline, so it sits inside a sentence, and Markdown
+inside it renders normally:
+
+```mdx
+Staging resets <Mark color="green">every night</Mark>, so **back up <Mark color="yellow">first</Mark>**.
+```
+
+`color` is `yellow`, `green`, `blue`, `pink` or `orange`; a missing or unknown one is yellow. The
+names are the same everywhere and each color scheme tints them to suit its own background, so a
+note reads in all of them. See [text-highlighting.md](text-highlighting.md) for how highlights
+are made and removed.
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
   Markdown, so a stray `<` or `{` in prose is still fine (MDX rejects both).
+- **Indented code is still code.** MDX switches that Markdown syntax off, so the preview turns it
+  back on after `remark-mdx` ([`remarkIndentedCode`](../../apps/web/src/components/notes/mdx/remarkIndentedCode.ts),
+  also used by the terminal app). HTML and autolinks stay off.
 - **Nothing is evaluated.** The preview parses with `remark-mdx` and renders through
   react-markdown, rather than compiling the note to JavaScript with `@mdx-js/mdx`. The
   desktop CSP has no `unsafe-eval`, and a note shouldn't be able to run code anyway.
@@ -97,6 +114,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Info>` | A rounded box in the color scheme's primary color, titled `Info`, with a tinted background, and the content rendered as Markdown inside. |
 | `<Warning>` | The same, in the scheme's warning color, titled `Warning`. |
 | `<Toc>` | A box titled `Contents` listing the headings, indented by nesting and cut off at `maxDepth`. It isn't clickable, and follows the note as it is edited. |
+| `<Mark>` | Its text, without the tags. The terminal draws a stretch of Markdown as one piece, so it has no way to tint a few words of it yet. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:
@@ -104,7 +122,7 @@ A few things follow from the terminal drawing Markdown in whole pieces:
 - A component can be nested in another (an `<Info>` in an `<Info>`), and a one-line
   `<Info>text</Info>` is a box too.
 - Inside a sentence, a list item or a quote, a component can't be a box. An `<Image>` still becomes its
-  Markdown form, shown as its alt text, an `<Info>` or `<Warning>` keeps its content without the box, and a `<Toc>` is left out.
+  Markdown form, shown as its alt text, an `<Info>` or `<Warning>` keeps its content without the box, a `<Mark>` is always just its content, and a `<Toc>` is left out.
 - The position in an MDX error counts from the first line below the frontmatter, as on the web.
 - The editor does not offer completion for `<` yet; that is web and desktop only.
 

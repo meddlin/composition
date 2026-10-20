@@ -36,6 +36,32 @@ describe("NoteMarkdown", () => {
     expect(container.querySelector("[role=note] del")?.textContent).toBe("gone");
   });
 
+  it("renders <Mark> inline, in its colour, with Markdown inside it", () => {
+    const { container } = renderNote('Staging resets <Mark color="green">every **night**</Mark>, so back up <Mark>first</Mark>.');
+
+    const marks = container.querySelectorAll("mark");
+    expect([...marks].map((m) => m.getAttribute("data-color"))).toEqual(["green", "yellow"]);
+    expect(marks[0].querySelector("strong")?.textContent).toBe("night");
+    expect(container.querySelector("p")?.textContent).toBe("Staging resets every night, so back up first.");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("renders what highlightRange wrote: a highlight across bold and a link", () => {
+    const { container } = renderNote('<Mark color="pink">a</Mark> **<Mark color="pink">b</Mark>** [<Mark color="pink">c</Mark>](https://example.com)');
+
+    expect(container.querySelectorAll("mark")).toHaveLength(3);
+    expect(container.querySelector("strong mark")?.textContent).toBe("b");
+    expect(container.querySelector("a mark")?.textContent).toBe("c");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("keeps indented code as code in a note that uses components, as plain Markdown does", () => {
+    const { container } = renderNote('before <Mark color="green">marked</Mark>\n\n    indented code\n\nafter');
+
+    expect(container.querySelector("pre code")?.textContent).toBe("indented code\n");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("renders a one-line <Info>", () => {
     renderNote("<Info>Short note</Info>");
 
@@ -69,7 +95,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],

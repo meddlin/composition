@@ -27,6 +27,8 @@ export function findMatches(text: string, query: string, { matchCase, wholeWord 
   const last = [...query].pop()!;
   const before = wholeWord && WORD_CHAR.test(first) ? "(?<![\\p{L}\\p{N}_])" : "";
   const after = wholeWord && WORD_CHAR.test(last) ? "(?![\\p{L}\\p{N}_])" : "";
+  // The query is escaped, so it can only match itself: no pattern the user types can run away (ReDoS).
+  // nosemgrep: detect-non-literal-regexp
   const pattern = new RegExp(`${before}${escapeRegExp(query)}${after}`, matchCase ? "gu" : "giu");
 
   const matches: Match[] = [];

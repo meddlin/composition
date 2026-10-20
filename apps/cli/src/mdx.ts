@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`), and may hold images. The terminal can't render
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`), and may hold images. The terminal can't render
  * those as React or as HTML, so this turns the note into a list of blocks the preview draws:
  * stretches of plain Markdown (still drawn by OpenTUI's `<markdown>`, exactly as before), panels
  * around other blocks, a table of contents, and images.
@@ -16,13 +16,13 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkRestrictMdx, renderKey, type TocHeading } from "./backend";
+import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -67,6 +67,7 @@ const mdxProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMdx)
+  .use(remarkIndentedCode)
   .use(remarkRestrictMdx, { allowed: MDX_COMPONENTS })
   .use(remarkHeadings);
 
@@ -159,7 +160,8 @@ function blockElement(node: Node): Node | null {
   if (node.type === "mdxJsxFlowElement") return node;
   if (node.type !== "paragraph") return null;
   const parts = (node.children ?? []).filter((child) => !(child.type === "text" && !child.value?.trim()));
-  return parts.length === 1 && parts[0].type === "mdxJsxTextElement" ? parts[0] : null;
+  // A highlight is text, not a block, however alone it stands.
+  return parts.length === 1 && parts[0].type === "mdxJsxTextElement" && componentOf(parts[0]) !== "Mark" ? parts[0] : null;
 }
 
 function elementBlocks(element: Node, source: string): Block[] {
@@ -181,6 +183,9 @@ function elementBlocks(element: Node, source: string): Block[] {
     }
     case "Toc":
       return [{ kind: "toc", entries: tocEntries(element) }];
+    case "Mark":
+      // On lines of its own, as a flow element: its content is what is drawn.
+      return blocksOf(element.children ?? [], source);
     default:
       return [];
   }
@@ -210,7 +215,8 @@ function outermostElements(nodes: Node[]): Node[] {
 
 /**
  * What stands in for a tag that can't be a block. An image is its Markdown form, which the
- * terminal shows as its alt text; a panel is dropped and its content kept; a table of contents
+ * terminal shows as its alt text; a panel or a highlight is dropped and its content kept (the
+ * terminal draws the Markdown as one piece, with no way to tint a few words of it); a table of contents
  * has no sensible place inside a sentence or a list item, so it is dropped.
  */
 function replacement(element: Node, source: string): string {
@@ -218,7 +224,8 @@ function replacement(element: Node, source: string): string {
     case "Image":
       return imageMarkdown(element);
     case "Info":
-    case "Warning": {
+    case "Warning":
+    case "Mark": {
       const children = element.children ?? [];
       return children.length ? substitute(source, start(children[0]), end(children[children.length - 1]), children) : "";
     }

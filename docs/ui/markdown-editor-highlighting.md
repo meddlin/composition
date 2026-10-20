@@ -21,9 +21,20 @@ from the textarea to the layer.
   so inline constructs never span lines and a line over 2000 characters is left plain. The runs it
   returns always concatenate back to the input; a test checks that.
 - **Colour only.** Both layers must wrap identically, so token styles set only `color`. Don't add
-  bold, italic or a different size to an `.md-*` class: the layer would drift from the caret.
+  bold, italic or a different size to an `.md-*` class: the layer would drift from the caret. A
+  background is fine, since it changes no glyph: find-in-note uses one, and so does a
+  `<Mark>`'s text (`.md-mark`, see below).
 - **Palette.** The `.md-*` classes reuse the `--syntax-*` tokens that colour code blocks in the
   preview, so every colour scheme gets editor colours with nothing extra.
+
+## Highlights (`<Mark>`)
+
+The text between `<Mark color="…">` and `</Mark>` is drawn with that colour behind it, the same tint
+the preview uses ([text-highlighting.md](text-highlighting.md)). `markTints` in
+[`markTints.ts`](../../apps/web/src/components/notes/markTints.ts) finds the stretches by scanning the
+text for the tags, not by reading the coloured runs: the tokenizer takes `**<Mark>b</Mark>**` and
+`[<Mark>c</Mark>](url)` as one run each, so the tags inside would be lost. Tags in code and
+frontmatter are not tags. Where highlights nest, the inner colour wins.
 
 ## Limits
 

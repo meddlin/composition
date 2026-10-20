@@ -330,8 +330,9 @@ describe("MarkdownEditor note links: the preview", () => {
     render(<Harness initial="See [old note](note:999)." onOpenNote={onOpenNote} />);
 
     expect(within(preview()).queryByRole("link", { name: "old note" })).toBeNull();
-    const dead = within(preview()).getByText("old note");
-    expect(dead.getAttribute("title")).toBe("This note no longer exists");
+    // The words sit in a span of the preview's own (see rehypeSourceSpans), inside the one that says the note is gone.
+    const dead = within(preview()).getByTitle("This note no longer exists");
+    expect(dead.textContent).toBe("old note");
 
     fireEvent.click(dead);
     expect(onOpenNote).not.toHaveBeenCalled();
