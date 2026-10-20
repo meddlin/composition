@@ -4,6 +4,7 @@ import path from "node:path";
 import { NO_FAVORITES, parseFavorites, type Favorites } from "./favorites";
 import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
+import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
 import type { SavedLocation } from "./sunTimes";
 import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
 
@@ -50,6 +51,8 @@ export type WebSettings = {
   appDataDir: string;
   dbPath?: string;
   theme: ThemeName;
+  /** Font of a note's preview. */
+  previewFont: PreviewFontName;
   /** City whose sunrise and sunset drive the "auto" color scheme. */
   location?: SavedLocation;
   sidebarWidth: number;
@@ -63,6 +66,7 @@ export type WebSettings = {
 const DEFAULT_SETTINGS: WebSettings = {
   appDataDir: DEFAULT_APP_DATA_DIR,
   theme: DEFAULT_THEME,
+  previewFont: DEFAULT_PREVIEW_FONT,
   ...DEFAULT_LAYOUT,
   favorites: NO_FAVORITES,
 };
@@ -96,6 +100,7 @@ export function parseWebSettings(data: unknown): WebSettings {
   const settings: WebSettings = {
     appDataDir: hasAppDataDir ? (value.appDataDir as string) : DEFAULT_APP_DATA_DIR,
     theme: isThemeName(value.theme) ? value.theme : DEFAULT_THEME,
+    previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     sidebarWidth: clampSidebarWidth(value.sidebarWidth),
     editorRatio: clampEditorRatio(value.editorRatio),
     favorites: parseFavorites(value.favorites),

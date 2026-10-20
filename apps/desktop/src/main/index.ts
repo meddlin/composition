@@ -162,8 +162,8 @@ async function main(): Promise<void> {
     updates: updates.manager,
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
-      const { theme, sidebarWidth, editorRatio } = loadWebSettings();
-      return { theme, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
+      const { theme, previewFont, sidebarWidth, editorRatio } = loadWebSettings();
+      return { theme, previewFont, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
     },
   });
 

@@ -411,7 +411,7 @@ export function MarkdownEditor({
         {showPreview && (
           <PreviewHighlightMenu
             boxRef={previewBox}
-            className="prose max-w-none flex-1 overflow-y-auto p-4"
+            className="prose preview-text max-w-none flex-1 overflow-y-auto p-4"
             text={value}
             body={body}
             onApply={applyHighlight}

@@ -2,6 +2,7 @@ import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Note } from "./notesRepo";
+import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 import type { RestoreResult, Trash } from "./trash";
@@ -39,6 +40,7 @@ export type Workspace = {
 /** What the Settings screen shows; computed where the files actually are. */
 export type SettingsSnapshot = {
   theme: ThemeName;
+  previewFont: PreviewFontName;
   appDataDir: string;
   /** The database file in use (override if set, otherwise derived). */
   dbPath: string;
@@ -127,6 +129,8 @@ export interface CompositionApi {
   saveFavorites(favorites: Favorites): Promise<void>;
   saveSettings(input: SaveSettingsInput): Promise<SaveSettingsResult>;
   saveTheme(theme: string): Promise<{ error?: string }>;
+  /** Chooses the font a note's preview is shown in; a name not in `PREVIEW_FONT_CHOICES` comes back as `error`. */
+  savePreviewFont(font: string): Promise<{ error?: string }>;
 
   /** Geocodes and saves the city that "Follow the sun" tracks; an empty string forgets it. */
   saveLocation(city: string): Promise<SaveLocationResult>;
@@ -163,6 +167,7 @@ export const API_METHODS = [
   "saveFavorites",
   "saveSettings",
   "saveTheme",
+  "savePreviewFont",
   "saveLocation",
   "loadSunSchedule",
 ] as const satisfies readonly (keyof CompositionApi)[];

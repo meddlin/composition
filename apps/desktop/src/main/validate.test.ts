@@ -98,6 +98,7 @@ describe("VALIDATORS", () => {
     ["saveSettings", [{ appDataDir: 1, dbPath: "" }]],
     ["saveSettings", ["nope"]],
     ["saveTheme", [{}]],
+    ["savePreviewFont", [{}]],
     ["saveImage", [null]],
     ["saveImage", [{ noteId: "3", fileName: "a.png", data: new Uint8Array(1) }]],
     ["saveImage", [{ noteId: 3, fileName: 1, data: new Uint8Array(1) }]],

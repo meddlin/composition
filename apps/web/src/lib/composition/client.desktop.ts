@@ -52,6 +52,8 @@ export const saveFavorites: CompositionApi["saveFavorites"] = (favorites) =>
 export const saveSettings: CompositionApi["saveSettings"] = (input) =>
   bridge().saveSettings(input);
 export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTheme(theme);
+export const savePreviewFont: CompositionApi["savePreviewFont"] = (font) =>
+  bridge().savePreviewFont(font);
 export const saveLocation: CompositionApi["saveLocation"] = (city) => bridge().saveLocation(city);
 export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
   bridge().loadSunSchedule();
@@ -95,6 +97,7 @@ const _implementsApi: CompositionApi = {
   saveFavorites,
   saveSettings,
   saveTheme,
+  savePreviewFont,
   saveLocation,
   loadSunSchedule,
 };

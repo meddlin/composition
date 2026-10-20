@@ -45,6 +45,7 @@ describe("saveSettings", () => {
     expect(loadWebSettings()).toEqual({
       appDataDir: path.join(home, "notes"),
       theme: "forest",
+      previewFont: "default",
       sidebarWidth: 320,
       editorRatio: 0.3,
       favorites: [],
@@ -127,6 +128,27 @@ describe("saveTheme", () => {
   });
 });
 
+describe("savePreviewFont", () => {
+  it("stores a known font and leaves the rest of the settings alone", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { savePreviewFont, saveTheme } = await import("./service");
+    await saveTheme("forest");
+
+    expect(await savePreviewFont("lora")).toEqual({});
+
+    expect(loadWebSettings()).toMatchObject({ previewFont: "lora", theme: "forest", ...DEFAULT_LAYOUT });
+  });
+
+  it("rejects an unknown font without writing it", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { savePreviewFont } = await import("./service");
+
+    expect(await savePreviewFont("Comic Sans MS")).toEqual({ error: "Unknown font." });
+
+    expect(loadWebSettings().previewFont).toBe("default");
+  });
+});
+
 describe("loadSettings", () => {
   it("reports the default location and that no database exists yet", async () => {
     const { loadSettings } = await import("./service");
@@ -135,6 +157,7 @@ describe("loadSettings", () => {
 
     expect(snapshot).toEqual({
       theme: "dark",
+      previewFont: "default",
       appDataDir: path.join(home, ".composition"),
       dbPath: path.join(home, ".composition", "composition.db"),
       dbPathOverride: "",

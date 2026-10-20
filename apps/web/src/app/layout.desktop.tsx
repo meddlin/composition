@@ -1,17 +1,8 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import { SunThemeSync } from "@/components/SunThemeSync";
+import { PREVIEW_FONT_CHOICES } from "@/lib/composition/previewFonts";
+import { fontVariables } from "./fonts";
 import "./globals.css";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   title: "Composition",
@@ -23,15 +14,19 @@ export const metadata: Metadata = {
 // page runs. Setting it here, synchronously in <head>, avoids a flash of the
 // wrong theme; the stylesheet's default is dark, so a missing value is safe.
 // "Follow the sun" also needs its starting tone and blend, which the snapshot
-// carries as `sun` (SunThemeSync takes over once the page is running).
-const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement;r.dataset.theme=i.theme||"dark";if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
+// carries as `sun` (SunThemeSync takes over once the page is running). The preview font is
+// applied the same way; without it the preview simply inherits the interface font.
+const PREVIEW_FONT_STACKS = JSON.stringify(
+  Object.fromEntries(PREVIEW_FONT_CHOICES.map(({ name, stack }) => [name, stack])),
+);
+const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement,f=${PREVIEW_FONT_STACKS}[i.previewFont];r.dataset.theme=i.theme||"dark";if(f)r.style.setProperty("--preview-font",f);if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${fontVariables} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: APPLY_THEME }} />

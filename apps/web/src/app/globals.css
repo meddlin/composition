@@ -323,6 +323,11 @@
   --mark-hue: #ff8a2b;
 }
 
+/* A note's preview is set in the font chosen in Settings; --preview-font is put on <html> by the layouts. */
+.preview-text {
+  font-family: var(--preview-font, inherit);
+}
+
 /* Rendered markdown follows the scheme instead of prose's fixed palettes. */
 .prose {
   --tw-prose-body: var(--foreground);

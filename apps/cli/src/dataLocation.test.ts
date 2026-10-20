@@ -19,6 +19,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
   return {
     appDataDir,
     theme: "forest",
+    previewFont: "default",
     sidebarWidth: 256,
     editorRatio: 0.5,
     favorites: [],
