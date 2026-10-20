@@ -22,6 +22,7 @@ import { unified } from "unified";
 import { parse as parseFrontmatter } from "@/lib/composition/frontmatter";
 import { mdxComponents, usesMdxComponent } from "./mdx/components";
 import { highlightColorOf, type HighlightColor } from "./mdx/highlightColors";
+import { remarkIndentedCode } from "./mdx/remarkIndentedCode";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 
 export type TextRange = { start: number; end: number };
@@ -48,6 +49,7 @@ const processor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMdx)
+  .use(remarkIndentedCode)
   .use(remarkRestrictMdx, { allowed: Object.keys(mdxComponents) });
 
 const start = (node: Node) => node.position?.start.offset ?? 0;
@@ -190,11 +192,16 @@ function apply(prepared: Prepared, edits: Edit[], text: string): HighlightResult
 
   const changed = parseMdx(out);
   if ("error" in changed) return unreadable(changed.error);
-  if (skeleton(prepared.tree) !== skeleton(changed.tree)) {
+  const shown = skeleton(prepared.tree);
+  if (shown !== skeleton(changed.tree)) {
+    // Is it the tags, or would the note read differently as MDX even with none?
+    const asMdx = parseMdx(prepared.body);
+    const mdxToo = "tree" in asMdx && skeleton(asMdx.tree) === shown;
     return {
       ok: false,
-      reason:
-        "A highlight here would change how the note renders: its tags would break the formatting around them, or the note holds something MDX reads differently (an indented code block, say).",
+      reason: mdxToo
+        ? "A highlight here would break the formatting around it, for example inside part of a word that is bold or italic. Select the whole word or phrase instead."
+        : "Highlighting would turn this note into MDX, which shows part of it differently from how it looks now, so the highlight wasn't added.",
     };
   }
   const prefix = text.slice(0, frontmatterLength);

@@ -16,7 +16,7 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkRestrictMdx, renderKey, type TocHeading } from "./backend";
+import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
@@ -67,6 +67,7 @@ const mdxProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkMdx)
+  .use(remarkIndentedCode)
   .use(remarkRestrictMdx, { allowed: MDX_COMPONENTS })
   .use(remarkHeadings);
 

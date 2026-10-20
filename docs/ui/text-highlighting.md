@@ -112,19 +112,24 @@ tags can change how formatting around them parses (`foo**<Mark>bar</Mark>**baz` 
 bold). So the result is parsed again, and if MDX can't read the note, or its structure (the
 highlights looked through) differs from before, nothing is changed and the reason is returned.
 A stray `{`, or an HTML tag like `<br>`, in a note is the usual cause: it has to be escaped or
-removed first.
+removed first. The two reasons that can come back after parsing are specific: the tags would break
+the formatting around them (inside part of a bold word, say: select the whole word), or the note
+would otherwise read differently as MDX.
 
 **It judges the note as it is shown.** A note with no component renders as plain Markdown, so that
-is what a highlight is checked against, not MDX: MDX has no indented code, so a note with one
-would silently turn it into a paragraph. Such a note is refused, with the reason (use a fenced
-block). And the tags are kept clear of a quote's `>` and a list's indent, which a highlight that
-starts or ends on a line break would otherwise land inside.
+is what a highlight is checked against, not MDX. After the edit the note is parsed as MDX and must
+come out the same, tags looked through. MDX switches off a few Markdown constructs (HTML,
+autolinks, and indented code), so the preview adds
+[`remarkIndentedCode`](../../apps/web/src/components/notes/mdx/remarkIndentedCode.ts) after `remarkMdx`
+to keep indented code as code: otherwise a note with a highlight, or with `<Info>`, would show it as a
+paragraph. HTML and autolinks stay off, since JSX needs the `<`; they are what makes a note unable to
+hold highlights (below). The tags are also kept clear of a quote's `>` and a list's indent, which a
+highlight that starts or ends on a line break would otherwise land inside.
 
 ## Limits
 
 - The terminal app shows a highlight's text without the tint; a stretch of Markdown is drawn by
   OpenTUI as one piece.
 - The preview can't highlight text with a character reference (`&amp;`) in it, or code.
-- A note with an indented code block can't hold highlights until it is a fenced one.
 - A hand-written `<Mark>` with an unknown color is yellow, and the first highlight made over it
   rewrites the color.

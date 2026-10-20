@@ -86,6 +86,9 @@ are made and removed.
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
   Markdown, so a stray `<` or `{` in prose is still fine (MDX rejects both).
+- **Indented code is still code.** MDX switches that Markdown syntax off, so the preview turns it
+  back on after `remark-mdx` ([`remarkIndentedCode`](../../apps/web/src/components/notes/mdx/remarkIndentedCode.ts),
+  also used by the terminal app). HTML and autolinks stay off.
 - **Nothing is evaluated.** The preview parses with `remark-mdx` and renders through
   react-markdown, rather than compiling the note to JavaScript with `@mdx-js/mdx`. The
   desktop CSP has no `unsafe-eval`, and a note shouldn't be able to run code anyway.

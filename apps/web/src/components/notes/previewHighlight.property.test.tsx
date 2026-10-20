@@ -36,7 +36,7 @@ const NOTES: Record<string, string> = {
   "escapes and breaks":
     "snake\\_case and \\*literal\\* stars and a \\\\ backslash.\n\nline one  \nline two after a break\\\nline three\n\nPrice is 5 > 3 and done.",
   table: "| Name | Value |\n| ---- | ----- |\n| alpha | one **two** |\n| beta | three |\n\nAfter the table.",
-  "code around text": "Before `inline` after.\n\n```js\nconst x = 1;\n```\n\nBetween blocks.\n\n~~~\ntilde fence\n~~~\n\nEnd text.",
+  "code around text": "Before `inline` after.\n\n```js\nconst x = 1;\n```\n\nBetween blocks.\n\n~~~\ntilde fence\n~~~\n\n    indented code\n\nEnd text.",
   "callouts": "Intro text.\n\n<Info>\n\nInside **the** callout with `code`.\n\n- item a\n- item b\n\n</Info>\n\n<Warning>\n\nCareful now.\n\n</Warning>\n\nOutro.",
   "reference style": "Setext Title\n============\n\nSee [the docs][ref] and ![alt text](img.png) here, or [inline *styled* link](https://x.y/z).\n\n[ref]: https://example.com\n\n* star item\n+ plus item\n- dash item\n\nSub heading\n-----------\n\nEnd.",
   "quote in list": "- item one\n\n  > quoted inside\n  > the item\n\n- item two with `code` and **bold**\n  continues here",

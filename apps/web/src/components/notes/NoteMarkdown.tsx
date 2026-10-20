@@ -3,6 +3,7 @@ import Markdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
+import { remarkIndentedCode } from "./mdx/remarkIndentedCode";
 import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 import { markdownComponents as imageComponents } from "./NoteImage";
@@ -22,6 +23,8 @@ const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"]> => [
   remarkGfm,
   remarkMdx,
+  // A note is Markdown first: keep its indented code as code.
+  remarkIndentedCode,
   [remarkRestrictMdx, { allowed: Object.keys(mdxComponents) }],
   [remarkHeadings, { idPrefix }],
 ];

@@ -117,6 +117,14 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("indented code", () => {
+    it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
+      const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
+
+      expect(parsePreview(body).blocks).toEqual([info(markdown("hi")), markdown("    <Info>\n    not a panel\n    </Info>\n\nafter")]);
+    });
+  });
+
   describe("<Mark>", () => {
     it("keeps a highlight's text inside a sentence, without its tags", () => {
       expect(parsePreview('A <Mark color="yellow">very</Mark> **old** note.').blocks).toEqual([markdown("A very **old** note.")]);

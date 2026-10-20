@@ -112,11 +112,18 @@ describe("highlightRange", () => {
     });
   });
 
-  it("refuses when reading the note as MDX would change how it renders, as it does for indented code", () => {
-    // Plain Markdown shows the indented line as code; MDX has no indented code, so it would turn into a paragraph.
+  it("highlights around an indented code block, which stays code", () => {
     const text = "before text\n\n    indented code\n\nafter text";
 
-    expect(highlightRange(text, find(text, "before"), "yellow")).toEqual({ ok: false, reason: expect.stringContaining("render") });
+    expect(highlighted(text, "before").text).toBe(`${Y("before")} text\n\n    indented code\n\nafter text`);
+    expect(highlighted(text, "after").text).toBe(`before text\n\n    indented code\n\n${Y("after")} text`);
+    expect(highlighted(text, text).text).toBe(`${Y("before text")}\n\n    indented code\n\n${Y("after text")}`);
+  });
+
+  it("does not highlight inside indented code", () => {
+    const text = "before\n\n    indented code\n\nafter";
+
+    expect(highlightRange(text, find(text, "indented"), "yellow")).toEqual({ ok: false, reason: expect.stringContaining("code") });
   });
 
   it("refuses an empty selection", () => {
@@ -188,7 +195,7 @@ describe("highlightRange", () => {
     // `foo**<Mark>bar</Mark>**baz` no longer reads as bold.
     expect(highlightRange("foo**bar**baz", find("foo**bar**baz", "bar"), "yellow")).toEqual({
       ok: false,
-      reason: expect.stringContaining("formatting"),
+      reason: expect.stringContaining("part of a word"),
     });
   });
 

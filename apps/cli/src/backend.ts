@@ -71,6 +71,7 @@ export * as panes from "../../web/src/components/notes/panes";
 // table of contents built, exactly as in the web preview. The components themselves (React) are not
 // shared; `mdx.ts` lists the same names and its test checks them against web's.
 export { remarkRestrictMdx, renderKey } from "../../web/src/components/notes/mdx/remarkRestrictMdx";
+export { remarkIndentedCode } from "../../web/src/components/notes/mdx/remarkIndentedCode";
 export { remarkHeadings, HEADINGS_PROP } from "../../web/src/components/notes/mdx/remarkHeadings";
 export type { TocHeading } from "../../web/src/components/notes/mdx/remarkHeadings";
 

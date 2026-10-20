@@ -55,6 +55,13 @@ describe("NoteMarkdown", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("keeps indented code as code in a note that uses components, as plain Markdown does", () => {
+    const { container } = renderNote('before <Mark color="green">marked</Mark>\n\n    indented code\n\nafter');
+
+    expect(container.querySelector("pre code")?.textContent).toBe("indented code\n");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("renders a one-line <Info>", () => {
     renderNote("<Info>Short note</Info>");
 
