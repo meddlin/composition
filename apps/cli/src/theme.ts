@@ -1,4 +1,4 @@
-import { SyntaxStyle } from "@opentui/core";
+import { SyntaxStyle, type NativeResourceOwner } from "@opentui/core";
 import { INK_FLIP_LEVEL } from "./backend";
 
 /**
@@ -246,7 +246,7 @@ export function autoPalette(level: number, truecolor = true): Palette {
  * names are tree-sitter captures (a name like `markup.heading.2` falls back to
  * `markup.heading`).
  */
-export function syntaxStyleFor(p: Palette): SyntaxStyle {
+export function syntaxStyleFor(p: Palette, owner: NativeResourceOwner): SyntaxStyle {
   return SyntaxStyle.fromStyles({
     default: { fg: p.foreground },
     // editor highlights
@@ -283,5 +283,5 @@ export function syntaxStyleFor(p: Palette): SyntaxStyle {
     "code.attr": { fg: p.syntax.attr },
     "code.emphasis": { fg: p.foreground, italic: true },
     "code.strong": { fg: p.foreground, bold: true },
-  });
+  }, owner);
 }
