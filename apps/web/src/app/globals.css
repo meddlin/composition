@@ -31,6 +31,8 @@
   --success: #4ebf71;
   /* Text-safe variants for small text on --background (contrast). */
   --link: #4aa3e8;
+  /* How strongly <Mark> tints its colour over the page (see .note-mark). */
+  --mark-alpha: 38%;
   /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
   --syntax-comment: #8b949e;
   --syntax-keyword: #ff7b72;
@@ -55,6 +57,7 @@
   --error: #c4314b;
   --success: #1a7f4b;
   --link: #0b62d6;
+  --mark-alpha: 55%;
   /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
   --syntax-comment: #5c6670;
   --syntax-keyword: #cf222e;
@@ -126,6 +129,7 @@
   --error: #b23a48;
   --success: #4f7a3a;
   --link: #8a4b1e;
+  --mark-alpha: 55%;
   /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
   --syntax-comment: #6b5c46;
   --syntax-keyword: #a8341f;
@@ -284,6 +288,35 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/*
+ * <Mark> highlights. Each colour is a hue mixed with transparency, so the page and the text
+ * keep their own colours and the tint reads on any scheme; --mark-alpha is set per scheme
+ * (stronger on light ones, where a tint is paler). The text colour is inherited, because the
+ * browser's own <mark> is black on yellow.
+ */
+.note-mark {
+  --mark-hue: #f5c518;
+  background-color: color-mix(in srgb, var(--mark-hue) var(--mark-alpha), transparent);
+  color: inherit;
+  border-radius: 0.2em;
+  padding: 0 0.1em;
+  /* A highlight that wraps lines keeps its rounded ends on each line. */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.note-mark[data-color="green"] {
+  --mark-hue: #3fb876;
+}
+.note-mark[data-color="blue"] {
+  --mark-hue: #3b9eff;
+}
+.note-mark[data-color="pink"] {
+  --mark-hue: #ff6fae;
+}
+.note-mark[data-color="orange"] {
+  --mark-hue: #ff8a2b;
 }
 
 /* Rendered markdown follows the scheme instead of prose's fixed palettes. */

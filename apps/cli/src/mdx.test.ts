@@ -117,6 +117,29 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Mark>", () => {
+    it("keeps a highlight's text inside a sentence, without its tags", () => {
+      expect(parsePreview('A <Mark color="yellow">very</Mark> **old** note.').blocks).toEqual([markdown("A very **old** note.")]);
+    });
+
+    it("keeps the text of a paragraph that is nothing but a highlight", () => {
+      expect(parsePreview('<Mark color="green">all of it</Mark>').blocks).toEqual([markdown("all of it")]);
+    });
+
+    it("keeps Markdown inside a highlight, and highlights in list items and panels", () => {
+      const body = '<Info>\n\n- <Mark color="pink">one</Mark> and [two](https://example.com)\n\n</Info>';
+      expect(parsePreview(body).blocks).toEqual([info(markdown("- one and [two](https://example.com)"))]);
+    });
+
+    it("keeps the content of a highlight written on lines of its own", () => {
+      expect(parsePreview('before\n\n<Mark color="blue">\n\nmiddle\n\n</Mark>\n\nafter').blocks).toEqual([
+        markdown("before"),
+        markdown("middle"),
+        markdown("after"),
+      ]);
+    });
+  });
+
   describe("Markdown images", () => {
     it("is an image block when a paragraph is just an image stored with the notes, which is what a paste inserts", () => {
       expect(parsePreview("# Trip\n\n![Route map](app_data/route-map-3f9c2a71b0de.png)\n\nAfter.").blocks).toEqual([
@@ -257,7 +280,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {
