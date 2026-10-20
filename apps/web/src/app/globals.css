@@ -294,11 +294,15 @@
  * <Mark> highlights. Each colour is a hue mixed with transparency, so the page and the text
  * keep their own colours and the tint reads on any scheme; --mark-alpha is set per scheme
  * (stronger on light ones, where a tint is paler). The text colour is inherited, because the
- * browser's own <mark> is black on yellow.
+ * browser's own <mark> is black on yellow. .md-mark is the same tint behind the editor's text
+ * (components/notes/MarkdownHighlight.tsx), where only the background may be set.
  */
-.note-mark {
+.note-mark,
+.md-mark {
   --mark-hue: #f5c518;
   background-color: color-mix(in srgb, var(--mark-hue) var(--mark-alpha), transparent);
+}
+.note-mark {
   color: inherit;
   border-radius: 0.2em;
   padding: 0 0.1em;
@@ -306,16 +310,16 @@
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
-.note-mark[data-color="green"] {
+:is(.note-mark, .md-mark)[data-color="green"] {
   --mark-hue: #3fb876;
 }
-.note-mark[data-color="blue"] {
+:is(.note-mark, .md-mark)[data-color="blue"] {
   --mark-hue: #3b9eff;
 }
-.note-mark[data-color="pink"] {
+:is(.note-mark, .md-mark)[data-color="pink"] {
   --mark-hue: #ff6fae;
 }
-.note-mark[data-color="orange"] {
+:is(.note-mark, .md-mark)[data-color="orange"] {
   --mark-hue: #ff8a2b;
 }
 

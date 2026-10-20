@@ -29,7 +29,7 @@ const blend = (top: number[], bottom: number[], alpha: number) =>
 
 const hueOf = (color: string) =>
   color === "yellow"
-    ? css.match(/\.note-mark \{[^}]*--mark-hue:\s*(#[0-9a-f]{6})/)?.[1]
+    ? css.match(/\.md-mark \{[^}]*--mark-hue:\s*(#[0-9a-f]{6})/)?.[1]
     : css.match(new RegExp(`\\[data-color="${color}"\\] \\{[^}]*--mark-hue:\\s*(#[0-9a-f]{6})`))?.[1];
 
 describe("<Mark> colours", () => {

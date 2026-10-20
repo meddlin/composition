@@ -96,10 +96,15 @@ export function useMdxCompletion(
 }
 
 /** Puts a menu `menuHeight` tall under the character at `start`, or above it when it would run off the bottom. */
-export function placeMenu(el: HTMLTextAreaElement, start: number, menuHeight = MENU_HEIGHT_PX): Position {
+export function placeMenu(
+  el: HTMLTextAreaElement,
+  start: number,
+  menuHeight = MENU_HEIGHT_PX,
+  menuWidth = MENU_WIDTH_PX,
+): Position {
   const { top, left, height } = caretCoordinates(el, start);
   const lineTop = top - el.scrollTop;
-  const maxLeft = Math.max(0, el.clientWidth - MENU_WIDTH_PX);
+  const maxLeft = Math.max(0, el.clientWidth - menuWidth);
   const x = Math.min(Math.max(0, left - el.scrollLeft), maxLeft);
   const fitsBelow = lineTop + height + GAP_PX + menuHeight <= el.clientHeight;
   return fitsBelow || lineTop < menuHeight

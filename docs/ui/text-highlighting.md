@@ -9,8 +9,30 @@ A highlight is text in the note: `<Mark color="yellow">like this</Mark>`, the [`
 component. There is no separate store of highlights, so they travel with the note through backup,
 trash, search and the other apps, and move with the text as it is edited.
 
-Status: the tags and their rendering work, and `highlightText.ts` can add, recolor and remove them.
-The menus that call it (a right-click in the preview, a shortcut in the editor) are not built yet.
+Status: highlighting from the editor works, and the tags render in both panes. Highlighting from
+the preview (select, right-click, "Highlight text") is not built yet: it needs the preview's
+selection translated into offsets in the note's text.
+
+## In the editor
+
+Select text and press **Cmd/Ctrl+Shift+H**. A menu opens beside the selection with the five colors;
+pick one with the arrow keys and Enter, a number key (`1`-`5`), or the mouse. It starts on the color
+you used last (kept until the app is reloaded), so `Cmd+Shift+H`, `Enter` repeats it.
+
+With only a caret, the menu opens only when the caret is inside a highlight, to recolor it
+or choose **Remove highlight** (`0`). Escape, moving the selection, scrolling, or typing closes it.
+If the note can't hold highlights (see below) a notice above the editor says why, until the note is
+edited.
+
+The change goes in through `execCommand("insertText")`, as Tab does, so Cmd/Ctrl+Z undoes a
+highlight in one step; only the stretch between the first and last tag is replaced. Where that is
+unavailable the text is replaced instead and the browser's undo history starts over. The editor's own
+right-click menu is left alone: replacing it would lose spelling suggestions.
+Source: [`useHighlightMenu.ts`](../../apps/web/src/components/notes/useHighlightMenu.ts),
+[`HighlightMenu.tsx`](../../apps/web/src/components/notes/HighlightMenu.tsx),
+`applyHighlight` in [`MarkdownEditor.tsx`](../../apps/web/src/components/notes/MarkdownEditor.tsx).
+The editor also draws a highlight's color behind its text, see
+[markdown-editor-highlighting.md](markdown-editor-highlighting.md#highlights-mark).
 
 ## Colors
 
