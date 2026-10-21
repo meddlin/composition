@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findImageRefs, imageAlt, imageMarkdown, imageNameFromRef, imageRef, isImageName } from "./imageRefs";
+import { findImageRefs, imageAlt, imageMarkdown, imageNameFromRef, imageRef, imageTag, isImageName } from "./imageRefs";
 
 describe("imageRef / imageNameFromRef", () => {
   it("round-trips a stored image's name", () => {
@@ -92,5 +92,18 @@ describe("imageMarkdown", () => {
 
   it("round-trips through findImageRefs", () => {
     expect([...findImageRefs(imageMarkdown("a-3f9c2a71b0de.png"))]).toEqual(["a-3f9c2a71b0de.png"]);
+  });
+});
+
+describe("imageTag", () => {
+  it("is the <Image> component for a stored image, and findImageRefs sees it", () => {
+    const tag = imageTag("a-3f9c2a71b0de.png");
+
+    expect(tag).toBe('<Image src="app_data/a-3f9c2a71b0de.png" alt="" />');
+    expect([...findImageRefs(tag)]).toEqual(["a-3f9c2a71b0de.png"]);
+  });
+
+  it("refuses a name that is not a stored image's", () => {
+    expect(() => imageTag('x.png" onload="y')).toThrow(/Not a stored image name/);
   });
 });

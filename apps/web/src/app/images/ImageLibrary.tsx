@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { ImageInfo } from "@/lib/composition/api";
-import { imageMarkdown, imageRef } from "@/lib/composition/imageRefs";
+import { imageMarkdown, imageTag } from "@/lib/composition/imageRefs";
 import { imageUrl } from "@/lib/composition/imageUrl";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +127,7 @@ function ImageDetails({ image }: { image: ImageInfo }) {
 
       <div className="flex flex-col gap-2">
         <CopyRow label="Markdown" text={imageMarkdown(image.name)} />
-        <CopyRow label="Component" text={`<Image src="${imageRef(image.name)}" alt="" />`} />
+        <CopyRow label="Component" text={imageTag(image.name)} />
       </div>
 
       <div>

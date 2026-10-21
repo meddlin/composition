@@ -762,15 +762,15 @@ describe("viewing a note as tabs", () => {
     });
 
     it("ignores a bare backslash, and changes only the pane in focus", () => {
-      openAlphaBesideBeta(); // Beta, just dropped, is the focused pane
+      openAlphaBesideBeta(); // Beta, just dropped, is the focused pane, and too narrow for Split
       const press = (init: KeyboardEventInit) =>
         fireEvent.keyDown(document.body, { code: "Backslash", key: "\\", ...init });
 
       press({});
-      expect(selected("Beta")).toEqual(["Split"]);
+      expect(selected("Beta")).toEqual(["Markdown"]);
 
       press({ ctrlKey: true });
-      expect(selected("Beta")).toEqual(["Markdown"]);
+      expect(selected("Beta")).toEqual(["Preview"]);
       expect(selected("Alpha")).toEqual(["Split"]);
     });
 

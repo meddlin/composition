@@ -58,6 +58,17 @@ export function findImageRefs(content: string): Set<string> {
   return names;
 }
 
+/**
+ * The `<Image>` tag that shows a stored image, to paste into a note. The tag is
+ * text for a note and the clipboard, never HTML a browser parses, and `name` is
+ * a validated file name that can't contain a quote or angle bracket.
+ */
+export function imageTag(name: string): string {
+  if (!isImageName(name)) throw new Error(`Not a stored image name: ${name}`);
+  // nosemgrep: html-in-template-string
+  return `<Image src="${imageRef(name)}" alt="" />`;
+}
+
 /** The `-<12 hex digits>` that images.ts puts before the extension. */
 const CONTENT_HASH = /-[0-9a-f]{12}$/;
 
