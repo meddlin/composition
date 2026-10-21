@@ -7,6 +7,7 @@ import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
 import type {
   CompositionApi,
+  ImageInfo,
   MoveGroupResult,
   SaveImageInput,
   SaveImageResult,
@@ -27,7 +28,7 @@ import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import * as images from "./images";
-import { MAX_IMAGE_BYTES } from "./imageRefs";
+import { findImageRefs, MAX_IMAGE_BYTES } from "./imageRefs";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
@@ -210,6 +211,23 @@ export async function saveImage({ noteId, fileName, data }: SaveImageInput): Pro
   const note = notesRepo.getNote(noteId);
   if (!note) return { error: "That note no longer exists." };
   return images.storeImage(loadWebSettings().appDataDir, { noteTitle: note.title, fileName, data }, maxImageBytes);
+}
+
+/**
+ * Every image in the application data directory's `app_data/`, newest first,
+ * each with the notes that refer to it. Images are never deleted along with the
+ * text that mentions them, so this is how one is found again.
+ */
+export async function listImages(): Promise<ImageInfo[]> {
+  const settings = loadWebSettings();
+  const files = await images.listImages(settings.appDataDir);
+  // Listing images must not be what creates a missing database file (see loadSettings).
+  const notes = files.length > 0 && fs.existsSync(resolvedDbPath(settings)) ? notesRepo.listNotes() : [];
+  const usedIn = new Map<string, ImageInfo["usedIn"]>();
+  for (const { id, title, content } of notes) {
+    for (const name of findImageRefs(content)) usedIn.set(name, [...(usedIn.get(name) ?? []), { id, title }]);
+  }
+  return files.map((file) => ({ ...file, usedIn: usedIn.get(file.name) ?? [] }));
 }
 
 /**
@@ -680,6 +698,7 @@ const _implementsApi: CompositionApi = {
   createNote,
   saveNoteContent,
   saveImage,
+  listImages,
   deleteNote,
   moveNoteToGroup,
   placeNote,

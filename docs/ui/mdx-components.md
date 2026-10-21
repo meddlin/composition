@@ -81,7 +81,7 @@ Pasting inserts Markdown, which is the right default: a note with no component i
 Markdown, and a stray `<` or `{` in its prose is fine. A note that uses a component is parsed as MDX,
 where those are errors. So the tag is opt-in, one image at a time:
 
-Press **Cmd+Shift+M** (macOS) or **Ctrl+Shift+M** in the editor with the caret on a Markdown
+Press **Cmd+Shift+X** (macOS) or **Ctrl+Shift+X** in the editor with the caret on a Markdown
 image, or with a selection that touches one or more, and each becomes an `<Image />` tag with the
 same `src`, `alt` and `title`. The caret lands at the end of the tag's last prop, so a space
 opens the prop menu (below) and `width` is two keystrokes away. It goes in as typing does, so

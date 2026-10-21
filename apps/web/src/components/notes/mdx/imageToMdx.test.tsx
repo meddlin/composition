@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { NoteMarkdown } from "../NoteMarkdown";
 import { imagesToMdx, isImageToMdxShortcut } from "./imageToMdx";
 
-const key = { key: "m", shiftKey: true, altKey: false, metaKey: true, ctrlKey: false };
+const key = { key: "x", shiftKey: true, altKey: false, metaKey: true, ctrlKey: false };
 
 /** Applies the conversion the way the editor would, for readable expectations. */
 function convert(text: string, from: number, to = from): string | null {
@@ -13,13 +13,13 @@ function convert(text: string, from: number, to = from): string | null {
 }
 
 describe("isImageToMdxShortcut", () => {
-  it("is Cmd+Shift+M or Ctrl+Shift+M", () => {
+  it("is Cmd+Shift+X or Ctrl+Shift+X", () => {
     expect(isImageToMdxShortcut(key)).toBe(true);
     expect(isImageToMdxShortcut({ ...key, metaKey: false, ctrlKey: true })).toBe(true);
-    expect(isImageToMdxShortcut({ ...key, key: "M" })).toBe(true);
+    expect(isImageToMdxShortcut({ ...key, key: "X" })).toBe(true);
   });
 
-  it.each([{ shiftKey: false }, { metaKey: false }, { altKey: true }, { key: "k" }])("is not %j", (change) => {
+  it.each([{ shiftKey: false }, { metaKey: false }, { altKey: true }, { key: "m" }])("is not %j", (change) => {
     expect(isImageToMdxShortcut({ ...key, ...change })).toBe(false);
   });
 });

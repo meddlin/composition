@@ -86,6 +86,21 @@ export type SaveImageInput = { noteId: number; fileName: string; data: Uint8Arra
 /** `name` is the stored file; the note refers to it as `imageRef(name)` (imageRefs.ts). */
 export type SaveImageResult = { name?: string; error?: string };
 
+/** A note that refers to a stored image. */
+export type ImageUse = { id: number; title: string };
+
+/** One image in `<application data>/app_data/`, and where it is still used. */
+export type ImageInfo = {
+  /** The stored file's name; a note refers to it as `imageRef(name)` (imageRefs.ts). */
+  name: string;
+  /** Size in bytes. */
+  size: number;
+  /** When the file was first stored (ISO 8601). */
+  modifiedAt: string;
+  /** The notes whose text points at it, which is empty once the last reference has been deleted. */
+  usedIn: ImageUse[];
+};
+
 export interface CompositionApi {
   loadWorkspace(): Promise<Workspace>;
   loadSettings(): Promise<SettingsSnapshot>;
@@ -96,6 +111,8 @@ export interface CompositionApi {
   saveNoteContent(noteId: number, content: string): Promise<Note>;
   /** Stores a pasted image in `<application data>/app_data/`. Served back by `app_data/<name>`, which is not part of this contract. */
   saveImage(input: SaveImageInput): Promise<SaveImageResult>;
+  /** Every stored image, newest first, with the notes that still refer to it. Lets an image be found again after the text that pointed at it is gone. */
+  listImages(): Promise<ImageInfo[]>;
   /** Moves the note to the Trash Can; it is not erased (see `permanentlyDeleteNote`). */
   deleteNote(id: number): Promise<void>;
   moveNoteToGroup(noteId: number, groupId: number | null): Promise<Note>;
@@ -150,6 +167,7 @@ export const API_METHODS = [
   "createNote",
   "saveNoteContent",
   "saveImage",
+  "listImages",
   "deleteNote",
   "moveNoteToGroup",
   "placeNote",

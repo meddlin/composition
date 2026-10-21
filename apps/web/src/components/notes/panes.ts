@@ -62,6 +62,15 @@ export function shownView(view: PaneView, wideEnough: boolean): PaneView {
   return view === "split" && !wideEnough ? "markdown" : view;
 }
 
+/**
+ * The view `delta` steps from the one shown, in the tabs' order (Markdown, Preview,
+ * Split) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
+ */
+export function stepView(shown: PaneView, canSplit: boolean, delta: 1 | -1): PaneView {
+  const order: PaneView[] = canSplit ? ["markdown", "preview", "split"] : ["markdown", "preview"];
+  return order[(order.indexOf(shown) + delta + order.length) % order.length];
+}
+
 export function focusPane(state: PaneState, noteId: number): PaneState {
   if (state.focusedId === noteId || !state.panes.some((p) => p.noteId === noteId)) return state;
   return { ...state, focusedId: noteId };

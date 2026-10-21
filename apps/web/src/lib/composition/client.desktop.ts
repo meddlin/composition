@@ -25,6 +25,7 @@ export const createNote: CompositionApi["createNote"] = (title, groupId) =>
 export const saveNoteContent: CompositionApi["saveNoteContent"] = (noteId, content) =>
   bridge().saveNoteContent(noteId, content);
 export const saveImage: CompositionApi["saveImage"] = (input) => bridge().saveImage(input);
+export const listImages: CompositionApi["listImages"] = () => bridge().listImages();
 export const deleteNote: CompositionApi["deleteNote"] = (id) => bridge().deleteNote(id);
 export const moveGroup: CompositionApi["moveGroup"] = (id, parentId) =>
   bridge().moveGroup(id, parentId);
@@ -59,6 +60,8 @@ export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
   bridge().loadSunSchedule();
 
 export type {
+  ImageInfo,
+  ImageUse,
   MoveGroupResult,
   SaveImageInput,
   SaveImageResult,
@@ -80,6 +83,7 @@ const _implementsApi: CompositionApi = {
   createNote,
   saveNoteContent,
   saveImage,
+  listImages,
   deleteNote,
   moveNoteToGroup,
   placeNote,

@@ -14,7 +14,7 @@ function Harness({ initial = "" }: { initial?: string }) {
 const editor = () => screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 const key = (name: string, init: object = {}) => fireEvent.keyDown(editor(), { key: name, ...init });
-const convert = (init: object = {}) => key("M", { shiftKey: true, metaKey: true, ...init });
+const convert = (init: object = {}) => key("X", { shiftKey: true, metaKey: true, ...init });
 
 /** Types by replacing the text and leaving the caret (or selection) where `|` is; no `|` means the end. */
 function type(marked: string) {
@@ -35,13 +35,13 @@ const TAG = '<Image src="app_data/trip-0123456789ab.png" alt="Route map" />';
 describe("MarkdownEditor: turning a Markdown image into <Image />", () => {
   afterEach(cleanup);
 
-  it("is announced on the editor, beside the note-link shortcut", () => {
+  it("is announced on the editor, beside the note-link and image-picker ones", () => {
     render(<Harness />);
 
-    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M");
+    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M Control+Shift+X Meta+Shift+X");
   });
 
-  it("converts the image at the caret with Cmd+Shift+M, leaving the caret ready for another prop", () => {
+  it("converts the image at the caret with Cmd+Shift+X, leaving the caret ready for another prop", () => {
     render(<Harness initial={`before\n\n${IMAGE}\n\nafter`} />);
     editor().setSelectionRange(12, 12);
 
@@ -52,7 +52,7 @@ describe("MarkdownEditor: turning a Markdown image into <Image />", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("also answers to Ctrl+Shift+M", () => {
+  it("also answers to Ctrl+Shift+X", () => {
     render(<Harness initial={IMAGE} />);
     editor().setSelectionRange(3, 3);
 

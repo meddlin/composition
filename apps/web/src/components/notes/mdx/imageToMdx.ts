@@ -1,10 +1,10 @@
 import { insideFence } from "./completions";
 
-/** Cmd+Shift+M on macOS, Ctrl+Shift+M elsewhere (M for MDX); `aria-keyshortcuts` says the same. */
-export const IMAGE_TO_MDX_SHORTCUT = "Control+Shift+M Meta+Shift+M";
+/** Cmd+Shift+X on macOS, Ctrl+Shift+X elsewhere (X for MDX; Shift+M is the image picker); `aria-keyshortcuts` says the same. */
+export const IMAGE_TO_MDX_SHORTCUT = "Control+Shift+X Meta+Shift+X";
 
 export function isImageToMdxShortcut(event: { key: string; shiftKey: boolean; altKey: boolean; metaKey: boolean; ctrlKey: boolean }) {
-  return event.key.toLowerCase() === "m" && event.shiftKey && !event.altKey && (event.metaKey || event.ctrlKey);
+  return event.key.toLowerCase() === "x" && event.shiftKey && !event.altKey && (event.metaKey || event.ctrlKey);
 }
 
 // `![alt](src)` and `![alt](src "title")`. An address with spaces or parentheses (or in `<…>`) is left alone.

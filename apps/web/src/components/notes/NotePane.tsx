@@ -11,7 +11,7 @@ import { EditorTabs } from "./EditorTabs";
 import { FindBar } from "./FindBar";
 import type { FindOptions } from "./findMatches";
 import { MarkdownEditor, type FindState } from "./MarkdownEditor";
-import { SIDE_BY_SIDE_MIN_WIDTH, shownView, type DropZone, type PaneView } from "./panes";
+import { SIDE_BY_SIDE_MIN_WIDTH, shownView, stepView, type DropZone, type PaneView } from "./panes";
 import { noteTitle, type Note } from "./types";
 import { useMinWidth } from "./useMinWidth";
 import { useNoteDrop } from "./useNoteDrop";
@@ -41,7 +41,7 @@ type Props = {
  * One open note: a header to drag it by or close it, tabs to see its editor,
  * its preview, or both beside each other, and that view of it. Ctrl/Cmd+F (or the
  * magnifier in the header) opens a find bar that highlights a word or phrase in
- * this note alone, separate from the app-wide search. In the desktop
+ * this note alone, separate from the app-wide search. Ctrl/Cmd+\ (or Cmd+Ctrl+Left/Right) switches the tab. In the desktop
  * app the note's attached files are listed below. Dragging another
  * note over it offers to open that note next to this one or in its place.
  */
@@ -113,6 +113,34 @@ export function NotePane({
       if (!(event.metaKey || event.ctrlKey)) return;
       event.preventDefault(); // Keep the browser's own find from opening over it.
       openFind();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
+
+  // Switching the focused pane's view: Ctrl/Cmd+\ steps on through Markdown, Preview and Split;
+  // Cmd+Ctrl+Left/Right (macOS) step back and on. `\` is matched on the physical key so it works
+  // on any layout that has one; Alt is left out as AltGr types `\` on some layouts.
+  useEffect(() => {
+    if (!focused) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.altKey || event.shiftKey) return;
+      let delta: 1 | -1;
+      if (event.code === "Backslash" && (event.metaKey || event.ctrlKey)) delta = 1;
+      else if (event.metaKey && event.ctrlKey && event.key === "ArrowRight") delta = 1;
+      else if (event.metaKey && event.ctrlKey && event.key === "ArrowLeft") delta = -1;
+      else return;
+      event.preventDefault();
+      const next = stepView(shownView(view, canSplit), canSplit, delta);
+      onViewChange(next);
+      // A hidden editor can't keep focus, and typing should carry on when it comes back.
+      if (next !== "preview") {
+        requestAnimationFrame(() => {
+          if (!document.activeElement || document.activeElement === document.body) {
+            section.current?.querySelector("textarea")?.focus();
+          }
+        });
+      }
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);

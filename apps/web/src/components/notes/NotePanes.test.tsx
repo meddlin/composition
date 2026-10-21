@@ -728,6 +728,52 @@ describe("viewing a note as tabs", () => {
       expect(selected("Alpha")).toEqual(["Split"]);
     });
 
+    it("cycles the view of the focused note with Ctrl+\\ or Cmd+\\", () => {
+      renderApp();
+      editorIn("Alpha").focus();
+      expect(selected("Alpha")).toEqual(["Split"]);
+
+      fireEvent.keyDown(document.activeElement!, { code: "Backslash", key: "\\", ctrlKey: true });
+      expect(selected("Alpha")).toEqual(["Markdown"]);
+      fireEvent.keyDown(document.activeElement!, { code: "Backslash", key: "\\", metaKey: true });
+      expect(selected("Alpha")).toEqual(["Preview"]);
+      fireEvent.keyDown(document.activeElement ?? document.body, { code: "Backslash", key: "\\", ctrlKey: true });
+      expect(selected("Alpha")).toEqual(["Split"]);
+    });
+
+    it("steps back and on with Cmd+Ctrl+Left and Cmd+Ctrl+Right", () => {
+      renderApp();
+      editorIn("Alpha").focus();
+      const press = (key: string, init: KeyboardEventInit = { metaKey: true, ctrlKey: true }) =>
+        fireEvent.keyDown(document.activeElement ?? document.body, { key, ...init });
+
+      press("ArrowLeft");
+      expect(selected("Alpha")).toEqual(["Preview"]);
+      press("ArrowRight");
+      expect(selected("Alpha")).toEqual(["Split"]);
+      press("ArrowRight");
+      expect(selected("Alpha")).toEqual(["Markdown"]);
+
+      // Cmd or Ctrl alone, or with Shift, is the arrow keys' own business (moving the caret).
+      press("ArrowRight", { metaKey: true });
+      press("ArrowRight", { ctrlKey: true });
+      press("ArrowRight", { metaKey: true, ctrlKey: true, shiftKey: true });
+      expect(selected("Alpha")).toEqual(["Markdown"]);
+    });
+
+    it("ignores a bare backslash, and changes only the pane in focus", () => {
+      openAlphaBesideBeta(); // Beta, just dropped, is the focused pane, and too narrow for Split
+      const press = (init: KeyboardEventInit) =>
+        fireEvent.keyDown(document.body, { code: "Backslash", key: "\\", ...init });
+
+      press({});
+      expect(selected("Beta")).toEqual(["Markdown"]);
+
+      press({ ctrlKey: true });
+      expect(selected("Beta")).toEqual(["Preview"]);
+      expect(selected("Alpha")).toEqual(["Split"]);
+    });
+
     it("keeps only the selected tab in the tab order", () => {
       renderApp();
       fireEvent.click(tab("Alpha", "Preview"));

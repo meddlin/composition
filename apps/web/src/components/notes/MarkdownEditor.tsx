@@ -10,6 +10,7 @@ import { caretCoordinates } from "./caretCoordinates";
 import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
+import { ImagePickerMenu } from "./ImagePickerMenu";
 import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
 import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
 import { rememberHighlightColor } from "./lastHighlightColor";
@@ -24,6 +25,7 @@ import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
 import { useHighlightMenu } from "./useHighlightMenu";
+import { useImagePicker } from "./useImagePicker";
 import type { Note } from "./types";
 import { usePreviewFind } from "./usePreviewFind";
 import { useMdxCompletion } from "./useMdxCompletion";
@@ -166,6 +168,11 @@ export function MarkdownEditor({
     replaceText(start, end, text);
   });
 
+  const imagePicker = useImagePicker(textarea, value, (start, end, text, caret) => {
+    pendingCaret.current = start + caret;
+    replaceText(start, end, text);
+  });
+
   const noteLinkPicker = useNoteLinkPicker(textarea, value, notes, noteId, (start, end, text, caret) => {
     pendingCaret.current = start + caret;
     replaceText(start, end, text);
@@ -289,11 +296,14 @@ export function MarkdownEditor({
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (isImageToMdxShortcut(event) && !event.nativeEvent.isComposing) {
-      event.preventDefault(); // Browsers claim Ctrl+Shift+M too (Firefox's responsive design mode).
+      event.preventDefault(); // Keep the browser from claiming it too.
       convertImagesToMdx(event.currentTarget);
       return;
     }
     // The menus take Tab while one is open. Shift+Tab stays free so the keyboard can still leave the editor.
+    // The image picker comes first: it swallows every key while open, which a menu opened by typing must not see.
+    if (imagePicker.open || !noteLinkPicker.open) imagePicker.textareaProps.onKeyDown(event);
+    if (event.defaultPrevented) return;
     noteLinkPicker.textareaProps.onKeyDown(event);
     if (event.defaultPrevented) return;
     completion.textareaProps.onKeyDown(event);
@@ -375,18 +385,21 @@ export function MarkdownEditor({
             placeholder="Start writing in Markdown…"
             {...completion.textareaProps}
             aria-controls={
+              imagePicker.textareaProps["aria-controls"] ??
               completion.textareaProps["aria-controls"] ??
               noteLinkPicker.textareaProps["aria-controls"] ??
               highlightMenu.textareaProps["aria-controls"]
             }
             aria-activedescendant={
+              imagePicker.textareaProps["aria-activedescendant"] ??
               completion.textareaProps["aria-activedescendant"] ??
               noteLinkPicker.textareaProps["aria-activedescendant"] ??
               highlightMenu.textareaProps["aria-activedescendant"]
             }
-            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT}`}
+            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${imagePicker.textareaProps["aria-keyshortcuts"]} ${IMAGE_TO_MDX_SHORTCUT}`}
             onKeyDown={onKeyDown}
             onSelect={(event) => {
+              imagePicker.textareaProps.onSelect(event);
               completion.textareaProps.onSelect(event);
               noteLinkPicker.textareaProps.onSelect(event);
               highlightMenu.textareaProps.onSelect(event);
@@ -396,11 +409,13 @@ export function MarkdownEditor({
               noteLinkPicker.textareaProps.onFocus(event);
             }}
             onBlur={() => {
+              imagePicker.textareaProps.onBlur();
               completion.textareaProps.onBlur();
               noteLinkPicker.textareaProps.onBlur();
               highlightMenu.textareaProps.onBlur();
             }}
             onScroll={(event) => {
+              imagePicker.textareaProps.onScroll(event);
               completion.textareaProps.onScroll(event);
               noteLinkPicker.textareaProps.onScroll(event);
               highlightMenu.textareaProps.onScroll();
@@ -412,6 +427,7 @@ export function MarkdownEditor({
               highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
             )}
           />
+          {imagePicker.open && <ImagePickerMenu {...imagePicker.menu} />}
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
           {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}
           {highlightMenu.open && <HighlightMenu {...highlightMenu.menu} />}

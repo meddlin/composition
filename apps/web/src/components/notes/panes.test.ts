@@ -10,6 +10,7 @@ import {
   openNoteBeside,
   setPaneView,
   shownView,
+  stepView,
   withSizes,
   type PaneState,
   type PaneView,
@@ -66,6 +67,26 @@ describe("shownView", () => {
   it("leaves a single-view choice alone however narrow the pane is", () => {
     expect(shownView("markdown", false)).toBe("markdown");
     expect(shownView("preview", false)).toBe("preview");
+  });
+});
+
+describe("stepView", () => {
+  it("steps through Markdown, Preview and Split, then wraps", () => {
+    expect(stepView("markdown", true, 1)).toBe("preview");
+    expect(stepView("preview", true, 1)).toBe("split");
+    expect(stepView("split", true, 1)).toBe("markdown");
+  });
+
+  it("steps back the other way, wrapping round", () => {
+    expect(stepView("split", true, -1)).toBe("preview");
+    expect(stepView("preview", true, -1)).toBe("markdown");
+    expect(stepView("markdown", true, -1)).toBe("split");
+  });
+
+  it("skips Split when there is no room for it", () => {
+    expect(stepView("markdown", false, 1)).toBe("preview");
+    expect(stepView("preview", false, 1)).toBe("markdown");
+    expect(stepView("markdown", false, -1)).toBe("preview");
   });
 });
 

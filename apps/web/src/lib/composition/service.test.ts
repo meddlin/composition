@@ -838,3 +838,54 @@ describe("saveImage", () => {
     expect(result.error).toMatch(/PNG, JPEG, GIF, and WebP/);
   });
 });
+
+describe("listImages", () => {
+  const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+  const OTHER_PNG = Uint8Array.from([...PNG, 9]);
+
+  it("is empty before anything has been pasted, and does not create the database", async () => {
+    const { loadWebSettings, resolvedDbPath } = await import("./webSettings");
+    const { listImages } = await import("./service");
+
+    expect(await listImages()).toEqual([]);
+    expect(fs.existsSync(resolvedDbPath(loadWebSettings()))).toBe(false);
+  });
+
+  it("says which notes still refer to each image", async () => {
+    const { createNote, saveImage, saveNoteContent, listImages } = await import("./service");
+    const trip = await createNote("Trip");
+    const other = await createNote("Other");
+    const { name } = await saveImage({ noteId: trip.id, fileName: "map.png", data: PNG });
+    await saveNoteContent(trip.id, `![map](app_data/${name})`);
+    await saveNoteContent(other.id, `<Image src="app_data/${name}" alt="" />`);
+
+    const [image] = await listImages();
+
+    expect(image.name).toBe(name);
+    expect(image.size).toBe(PNG.byteLength);
+    expect(image.usedIn.map((note) => note.id).sort()).toEqual([trip.id, other.id].sort());
+    expect(image.usedIn.find((note) => note.id === trip.id)?.title).toBe("Trip");
+  });
+
+  it("still lists an image once the text that referred to it has been deleted", async () => {
+    const { createNote, saveImage, saveNoteContent, listImages } = await import("./service");
+    const note = await createNote("Trip");
+    const { name } = await saveImage({ noteId: note.id, fileName: "map.png", data: PNG });
+    await saveNoteContent(note.id, `![map](app_data/${name})`);
+    await saveNoteContent(note.id, "I took it out again.");
+
+    expect(await listImages()).toEqual([expect.objectContaining({ name, usedIn: [] })]);
+  });
+
+  it("keeps each image's users apart", async () => {
+    const { createNote, saveImage, saveNoteContent, listImages } = await import("./service");
+    const note = await createNote("Trip");
+    const used = await saveImage({ noteId: note.id, fileName: "a.png", data: PNG });
+    const unused = await saveImage({ noteId: note.id, fileName: "b.png", data: OTHER_PNG });
+    await saveNoteContent(note.id, `![a](app_data/${used.name})`);
+
+    const byName = Object.fromEntries((await listImages()).map((image) => [image.name, image.usedIn.length]));
+
+    expect(byName).toEqual({ [used.name!]: 1, [unused.name!]: 0 });
+  });
+});
