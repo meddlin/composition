@@ -123,7 +123,9 @@ file name as it was.
 
 The preview renders Markdown images with `NoteImage`, which react-markdown uses in
 place of a plain `<img>`. The `<Image src alt />` [MDX component](../ui/mdx-components.md)
-is the same component written as a tag:
+is the same component written as a tag, and the one that can also say how wide to draw the picture
+(`width="50%"`; see [Resizing](../ui/mdx-components.md#resizing-width)). That changes only how it
+is drawn, never the file:
 
 | `src` in the note          | Shown from                                              |
 | -------------------------- | ------------------------------------------------------- |
@@ -200,6 +202,7 @@ picture's placement while the help overlay is open and puts it back when it clos
 - Changing **Application data location** in the web and desktop apps only points them
   at a new directory; nothing is moved. Images are then looked up in the new
   `app_data/`, so copy that folder along with `composition.db`.
+- An image is stored at the size it was pasted. `width` draws it smaller but the bytes stay the same.
 - Images can only be added by pasting, and only in the web and desktop apps; drag-and-drop and a
   file picker are not wired up, and the CLI cannot add one.
 - In the CLI, the block-character drawing is covered by tests, including one that compares what is

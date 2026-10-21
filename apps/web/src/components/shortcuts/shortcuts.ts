@@ -33,6 +33,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { combos: [["Mod", "Shift", "H"]], description: "Highlight the selection (or recolor or remove a highlight at the caret)" },
       { combos: [["Mod", "Shift", "K"]], description: "Link to another note" },
       { combos: [["Mod", "Shift", "M"]], description: "Insert an image that is already stored (type to filter by name)" },
+      { combos: [["Mod", "Shift", "X"]], description: "Turn the Markdown image at the caret (or in the selection) into an <Image /> tag, which can be resized" },
       { combos: [["Mod", "F"]], description: "Find in the note" },
       { combos: [["Tab"]], description: "Insert a tab (nested list items, code)" },
       { combos: [["Shift", "Tab"]], description: "Leave the editor" },

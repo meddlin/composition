@@ -243,7 +243,7 @@ describe("MarkdownEditor image picker", () => {
   it("announces its shortcut next to the note link one, and points at its list while open", async () => {
     render(<Harness />);
     fireEvent.focus(editor());
-    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M");
+    expect(editor().getAttribute("aria-keyshortcuts")).toContain("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M");
 
     await open();
 

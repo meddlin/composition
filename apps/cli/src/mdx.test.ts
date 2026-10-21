@@ -76,6 +76,12 @@ describe("parsePreview", () => {
       ]);
     });
 
+    it("is the same image when it also says how wide to draw it, which a terminal has no use for", () => {
+      expect(parsePreview('<Image src="app_data/route-map.png" alt="Route map" width="50%" />').blocks).toEqual([
+        image("route-map.png", "Route map"),
+      ]);
+    });
+
     it("carries a title", () => {
       expect(parsePreview(`<Image src="app_data/a.png" alt="A" title='The "A"' />`).blocks).toEqual([
         image("a.png", "A", 'The "A"'),

@@ -2,6 +2,8 @@ import type { mdxComponents } from "./components";
 
 export type MdxCompletion = {
   name: string;
+  /** How the menu shows it, when that isn't `<name>` (a prop or a value, rather than a component). */
+  label?: string;
   /** One line shown under the name in the menu. */
   description: string;
   /** What replaces the `<` and whatever was typed after it; `$0` marks where the caret lands. */

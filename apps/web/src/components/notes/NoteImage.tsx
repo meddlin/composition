@@ -2,6 +2,7 @@ import { useState, type ComponentPropsWithoutRef } from "react";
 import type { ExtraProps } from "react-markdown";
 import { imageNameFromRef } from "@/lib/composition/imageRefs";
 import { imageUrl } from "@/lib/composition/imageUrl";
+import { imageWidthCss } from "./mdx/imageWidth";
 
 /**
  * The preview's rendering of Markdown image syntax, `![alt](src)`. Wired in
@@ -11,8 +12,11 @@ import { imageUrl } from "@/lib/composition/imageUrl";
  * wherever this build serves them; any other source (an https URL, a data: URI)
  * is shown as written. A file that has gone missing shows its alt text instead
  * of the browser's broken-image icon.
+ *
+ * `width` (from `<Image width="50%" />`; Markdown's syntax has no way to say it) draws the image
+ * smaller or larger than its own size, but never wider than the note. See imageWidth.ts.
  */
-export function NoteImage({ src, alt, title }: ComponentPropsWithoutRef<"img"> & ExtraProps) {
+export function NoteImage({ src, alt, title, width }: ComponentPropsWithoutRef<"img"> & ExtraProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
   if (typeof src !== "string" || src === "") return null;
 
@@ -37,6 +41,7 @@ export function NoteImage({ src, alt, title }: ComponentPropsWithoutRef<"img"> &
       loading="lazy"
       decoding="async"
       onError={() => setFailedSrc(resolved)}
+      style={{ width: imageWidthCss(width) }}
       className="h-auto max-w-full"
     />
   );

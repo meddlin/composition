@@ -20,6 +20,7 @@ export const mdxComponents: Record<
     src?: string;
     alt?: string;
     title?: string;
+    width?: string;
     headings?: string;
     maxDepth?: string;
     color?: string;
