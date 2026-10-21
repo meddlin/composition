@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ShortcutsHelper } from "@/components/shortcuts/ShortcutsHelper";
 import { SunThemeSync } from "@/components/SunThemeSync";
 import { PREVIEW_FONT_CHOICES } from "@/lib/composition/previewFonts";
 import { fontVariables } from "./fonts";
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="h-full">
         <SunThemeSync />
-        {children}
+        <ShortcutsHelper>{children}</ShortcutsHelper>
       </body>
     </html>
   );
