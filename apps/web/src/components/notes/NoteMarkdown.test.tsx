@@ -32,6 +32,18 @@ describe("NoteMarkdown", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("shows a <Repo> card in the preview, on its own line or inside a sentence", () => {
+    const { container } = renderNote(
+      'See:\n\n<Repo url="https://github.com/meddlin/composition" description="Notes" />\n\nOr, inline <Repo url="gitlab.com/a/b" /> here.',
+    );
+
+    const links = screen.getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["https://github.com/meddlin/composition", "https://gitlab.com/a/b"]);
+    // Not a <div> in a <p>, which React warns about.
+    expect(container.querySelector("p div")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("renders <Warning> next to <Info>, each with its own label", () => {
     renderNote("<Info>\n\nfyi\n\n</Info>\n\n<Warning>\n\nSome **danger**.\n\n</Warning>");
 
@@ -107,7 +119,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],

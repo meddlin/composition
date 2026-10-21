@@ -66,6 +66,10 @@ const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
     },
     { name: "title", description: "Names the player for screen readers" },
   ],
+  Repo: [
+    { name: "url", description: "The repository's page or clone address (github.com/owner/repo, git@host:owner/repo.git)" },
+    { name: "description", description: "What the repository is for, shown under its name" },
+  ],
 };
 
 const componentNames = Object.keys(catalog);

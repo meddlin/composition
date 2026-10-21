@@ -155,6 +155,30 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Repo>", () => {
+    const href = "https://github.com/meddlin/composition";
+
+    it("is a Markdown link to the repository, with its description after it", () => {
+      expect(parsePreview(`<Repo url="${href}/tree/main" />`).blocks).toEqual([{ kind: "markdown", source: `[⎇ meddlin/composition](${href})` }]);
+      expect(parsePreview(`<Repo url="git@github.com:meddlin/composition.git" description="A [note] app" />`).blocks).toEqual([
+        { kind: "markdown", source: `[⎇ meddlin/composition](${href}) — A \\[note\\] app` },
+      ]);
+    });
+
+    it("says so when it isn't a repository, or has no url yet", () => {
+      expect(parsePreview('<Repo url="https://example.com/" />').blocks).toEqual([
+        { kind: "markdown", source: "Not a repository address: https://example.com/" },
+      ]);
+      expect(parsePreview("<Repo />").blocks).toEqual([{ kind: "markdown", source: "Repository: add a url" }]);
+    });
+
+    it("is the link inside a sentence", () => {
+      expect(parsePreview('See <Repo url="github.com/a/b" /> now.').blocks).toEqual([
+        { kind: "markdown", source: "See [⎇ a/b](https://github.com/a/b) now." },
+      ]);
+    });
+  });
+
   describe("indented code", () => {
     it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
       const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
@@ -409,7 +433,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {
