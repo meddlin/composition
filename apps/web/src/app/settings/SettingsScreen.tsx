@@ -2,8 +2,10 @@ import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { BackupRestore } from "./BackupRestore";
+import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { SettingsForm } from "./SettingsForm";
 import { TrashCan } from "./TrashCan";
 import { Updates } from "./Updates";
@@ -26,59 +28,73 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         </Button>
       </div>
 
-      <Card size="sm">
-        <CardHeader>
-          <CardTitle
-            role="heading"
-            aria-level={2}
-            className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-          >
-            Current configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="space-y-1">
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Application data directory</dt>
-              <dd className="truncate font-mono">{snapshot.appDataDir}</dd>
-            </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">
-                Database file {isOverride ? "(override)" : "(default)"}
-              </dt>
-              <dd className="truncate font-mono">{snapshot.dbPath}</dd>
-            </div>
-          </dl>
-          {!snapshot.dirWritable && (
-            <p className="mt-3 text-warning">
-              Warning: the application data directory doesn&apos;t exist yet or isn&apos;t
-              writable. It will be created when you save.
-            </p>
-          )}
-          {snapshot.dirWritable && !snapshot.dbExists && (
-            <p className="mt-3 text-muted-foreground">
-              No database file exists at this location yet — a fresh, empty one will be
-              created the first time a note is saved.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="general">
+        <TabsList aria-label="Settings sections">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
+        </TabsList>
 
-      <SettingsForm
-        currentTheme={snapshot.theme}
-        currentPreviewFont={snapshot.previewFont}
-        currentCity={snapshot.city}
-        currentSunTimes={snapshot.sunTimes}
-        currentAppDataDir={snapshot.appDataDir}
-        currentDbPath={snapshot.dbPathOverride}
-        derivedDbPathPlaceholder={snapshot.derivedDbPath}
-      />
+        {/* Kept mounted when hidden, so a half-edited form survives a look at the shortcuts. */}
+        <TabsContent value="general" forceMount>
+          <Card size="sm">
+            <CardHeader>
+              <CardTitle
+                role="heading"
+                aria-level={2}
+                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+              >
+                Current configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-1">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">Application data directory</dt>
+                  <dd className="truncate font-mono">{snapshot.appDataDir}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">
+                    Database file {isOverride ? "(override)" : "(default)"}
+                  </dt>
+                  <dd className="truncate font-mono">{snapshot.dbPath}</dd>
+                </div>
+              </dl>
+              {!snapshot.dirWritable && (
+                <p className="mt-3 text-warning">
+                  Warning: the application data directory doesn&apos;t exist yet or isn&apos;t
+                  writable. It will be created when you save.
+                </p>
+              )}
+              {snapshot.dirWritable && !snapshot.dbExists && (
+                <p className="mt-3 text-muted-foreground">
+                  No database file exists at this location yet — a fresh, empty one will be
+                  created the first time a note is saved.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-      <Updates />
+          <SettingsForm
+            currentTheme={snapshot.theme}
+            currentPreviewFont={snapshot.previewFont}
+            currentCity={snapshot.city}
+            currentSunTimes={snapshot.sunTimes}
+            currentAppDataDir={snapshot.appDataDir}
+            currentDbPath={snapshot.dbPathOverride}
+            derivedDbPathPlaceholder={snapshot.derivedDbPath}
+          />
 
-      <BackupRestore defaultBackupDir={snapshot.backupDir} />
+          <Updates />
 
-      <TrashCan initialTrash={snapshot.trash} />
+          <BackupRestore defaultBackupDir={snapshot.backupDir} />
+
+          <TrashCan initialTrash={snapshot.trash} />
+        </TabsContent>
+
+        <TabsContent value="shortcuts">
+          <KeyboardShortcuts />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

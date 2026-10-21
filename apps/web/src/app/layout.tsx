@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { CSSProperties } from "react";
+import { ShortcutsHelper } from "@/components/shortcuts/ShortcutsHelper";
 import { SunThemeSync } from "@/components/SunThemeSync";
 import { loadSunSchedule } from "@/lib/composition/service";
 import { previewFontStack } from "@/lib/composition/previewFonts";
@@ -39,7 +40,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="h-full">
         <SunThemeSync initial={sun} />
-        {children}
+        <ShortcutsHelper>{children}</ShortcutsHelper>
       </body>
     </html>
   );
