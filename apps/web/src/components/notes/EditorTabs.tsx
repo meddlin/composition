@@ -25,7 +25,8 @@ type Props = {
 
 /**
  * Switches a note between its editor, its preview, and both side by side.
- * Arrow keys move between the tabs (and select, as there is nothing to load).
+ * Ctrl/Cmd+\ and Cmd+Ctrl+Left/Right (handled by the pane) step through them. Arrow keys move between
+ * the tabs (and select, as there is nothing to load).
  */
 export function EditorTabs({ idBase, view, canSplit, onChange }: Props) {
   const tabs = canSplit ? TABS : TABS.filter((tab) => tab.view !== "split");
@@ -45,7 +46,14 @@ export function EditorTabs({ idBase, view, canSplit, onChange }: Props) {
   }
 
   return (
-    <div role="tablist" aria-label="View" onKeyDown={onKeyDown} className="flex shrink-0 border-b px-2">
+    <div
+      role="tablist"
+      aria-label="View"
+      aria-keyshortcuts="Control+Backslash Meta+Backslash Meta+Control+ArrowLeft Meta+Control+ArrowRight"
+      title="Switch view (Ctrl/Cmd+\, or Cmd+Ctrl+←/→ on a Mac)"
+      onKeyDown={onKeyDown}
+      className="flex shrink-0 border-b px-2"
+    >
       {tabs.map((tab) => {
         const selected = tab.view === view;
         return (
