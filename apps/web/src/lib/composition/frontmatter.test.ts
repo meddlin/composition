@@ -6,6 +6,7 @@ import {
   strip,
   tagsFromString,
   tagsToString,
+  withHeaderImage,
 } from "./frontmatter";
 
 // Notes must stay readable by whichever app (terminal, web or desktop) last wrote them,
@@ -133,5 +134,75 @@ describe("tags helpers", () => {
   it("tagsFromString trims and drops empty entries", () => {
     expect(tagsFromString("a, b ,,c")).toEqual(["a", "b", "c"]);
     expect(tagsFromString("")).toEqual([]);
+  });
+});
+
+describe("header image", () => {
+  const withImage = {
+    title: "My Note",
+    description: "",
+    tags: [],
+    createdAt: CREATED,
+    updatedAt: UPDATED,
+    headerImage: "app_data/trip-0123456789ab.png",
+    headerImageLayout: "centered" as const,
+  };
+
+  it("writes nothing for a note without one, so existing notes are byte-for-byte unchanged", () => {
+    const block = generate("My Note", opts);
+
+    expect(block).not.toContain("headerImage");
+    expect(render(parse(block)[0]!, "")).toBe(block);
+  });
+
+  it("round-trips the image and its layout after the keys every version writes", () => {
+    const block = render(withImage, "body");
+
+    expect(block).toContain("updatedAt: '2026-08-26T12:00:00+00:00'\nheaderImage: app_data/trip-0123456789ab.png\nheaderImageLayout: centered\n---\n");
+    expect(parse(block)).toEqual([withImage, "body"]);
+  });
+
+  it("writes the layout as full when none was given", () => {
+    expect(render({ ...withImage, headerImageLayout: undefined }, "")).toContain("headerImageLayout: full\n");
+  });
+
+  it.each([["wide"], ["CENTERED"], [""], ["3"]])("reads a layout of %j as full, or its case-insensitive match", (layout) => {
+    const [fm] = parse(`---\ntitle: t\nheaderImage: app_data/a.png\nheaderImageLayout: ${JSON.stringify(layout)}\n---\n`);
+
+    expect(fm?.headerImageLayout).toBe(layout === "CENTERED" ? "centered" : "full");
+  });
+
+  it("treats a blank or missing headerImage as none, and ignores its layout", () => {
+    expect(parse("---\ntitle: t\nheaderImage: ''\nheaderImageLayout: centered\n---\n")[0]).not.toHaveProperty("headerImage");
+    expect(parse("---\ntitle: t\nheaderImageLayout: centered\n---\n")[0]).not.toHaveProperty("headerImageLayout");
+  });
+
+  describe("withHeaderImage", () => {
+    const fallback = { title: "Fallback", createdAt: CREATED, updatedAt: UPDATED };
+    const header = { image: "app_data/b.png", layout: "full" as const };
+
+    it("sets the image in a note's frontmatter, keeping its body and other fields", () => {
+      const note = generate("My Note", { ...opts, description: "desc", tags: ["a"] }) + "# Body\n";
+
+      const [fm, body] = parse(withHeaderImage(note, header, fallback));
+
+      expect(fm).toMatchObject({ title: "My Note", description: "desc", tags: ["a"], headerImage: "app_data/b.png", headerImageLayout: "full" });
+      expect(body).toBe("# Body\n");
+    });
+
+    it("replaces an image already there, and removes it with null", () => {
+      const note = render(withImage, "body");
+
+      expect(parse(withHeaderImage(note, header, fallback))[0]).toMatchObject({ headerImage: "app_data/b.png", headerImageLayout: "full" });
+      expect(withHeaderImage(note, null, fallback)).toBe(render({ ...withImage, headerImage: undefined, headerImageLayout: undefined }, "body"));
+      expect(withHeaderImage(note, null, fallback)).not.toContain("headerImage");
+    });
+
+    it("makes a frontmatter block from the fallback for a note that has none", () => {
+      const [fm, body] = parse(withHeaderImage("just text", header, fallback));
+
+      expect(fm).toMatchObject({ title: "Fallback", createdAt: CREATED, headerImage: "app_data/b.png" });
+      expect(body).toBe("just text");
+    });
   });
 });

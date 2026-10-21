@@ -11,12 +11,25 @@ import yaml from "js-yaml";
 // anchored at the very start of the string (not per line).
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*\r?\n?/;
 
+/** How a note's header image sits above its title: across the whole note, or at its own size in the middle. */
+export type HeaderImageLayout = "full" | "centered";
+
+export const HEADER_IMAGE_LAYOUTS: readonly HeaderImageLayout[] = ["full", "centered"];
+
 export type Frontmatter = {
   title: string;
   description: string;
   tags: string[];
   createdAt: string;
   updatedAt: string;
+  /**
+   * A picture shown above the note's title in the preview: `app_data/<name>` for a stored image, or an
+   * `https://` address. Absent (not empty) when the note has none, so a note without one is written
+   * exactly as it was before this existed.
+   */
+  headerImage?: string;
+  /** Only meaningful with `headerImage`; a missing or unreadable value means `full`. */
+  headerImageLayout?: HeaderImageLayout;
 };
 
 export function generate(
@@ -59,12 +72,37 @@ export function parse(content: string): [Frontmatter | null, string] {
     createdAt: asString(record.createdAt),
     updatedAt: asString(record.updatedAt),
   };
+  const headerImage = asString(record.headerImage).trim();
+  if (headerImage !== "") {
+    fm.headerImage = headerImage;
+    fm.headerImageLayout = asLayout(record.headerImageLayout);
+  }
   return [fm, content.slice(match[0].length)];
 }
 
 /** Reassemble content from a (possibly edited) Frontmatter + body. */
 export function render(fm: Frontmatter, body: string): string {
   return serialize(fm) + body;
+}
+
+/**
+ * `content` with its header image set to `image` (null removes it), keeping everything else.
+ * A note that has no frontmatter block gets one made from `fallback`, which is why that is needed.
+ */
+export function withHeaderImage(
+  content: string,
+  header: { image: string; layout: HeaderImageLayout } | null,
+  fallback: Pick<Frontmatter, "title" | "createdAt" | "updatedAt">,
+): string {
+  const [parsed, body] = parse(content);
+  const fm: Frontmatter = parsed ?? { ...fallback, description: "", tags: [] };
+  delete fm.headerImage;
+  delete fm.headerImageLayout;
+  if (header) {
+    fm.headerImage = header.image;
+    fm.headerImageLayout = header.layout;
+  }
+  return render(fm, body);
 }
 
 /** Content with any leading frontmatter block removed, for the preview pane. */
@@ -90,13 +128,18 @@ export function tagsFromString(tags: string): string[] {
 }
 
 function serialize(fm: Frontmatter): string {
-  const data = {
+  const data: Record<string, unknown> = {
     title: fm.title,
     description: fm.description,
     tags: [...fm.tags],
     createdAt: fm.createdAt,
     updatedAt: fm.updatedAt,
   };
+  // After the keys every version has always written, and only when set.
+  if (fm.headerImage) {
+    data.headerImage = fm.headerImage;
+    data.headerImageLayout = fm.headerImageLayout ?? "full";
+  }
   // noArrayIndent matches PyYAML's default_flow_style=False rendering of a
   // block sequence directly under its key (no leading indent before "-"),
   // keeping a note's frontmatter byte-identical whichever app last saved it.
@@ -111,6 +154,11 @@ function asString(value: unknown): string {
   // back into the string the rest of the app expects.
   if (value instanceof Date) return value.toISOString();
   return String(value);
+}
+
+function asLayout(value: unknown): HeaderImageLayout {
+  const layout = asString(value).trim().toLowerCase();
+  return HEADER_IMAGE_LAYOUTS.find((known) => known === layout) ?? "full";
 }
 
 function asTagList(value: unknown): string[] {

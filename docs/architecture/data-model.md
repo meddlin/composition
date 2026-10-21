@@ -152,6 +152,8 @@ classDiagram
         +string[] tags
         +string createdAt
         +string updatedAt
+        +string? headerImage
+        +string? headerImageLayout
     }
     Note "1" ..> "0..1" Frontmatter : content embeds a\nrendered frontmatter block
     Frontmatter --> Note : tagsToString() / render()\nfeed Note.tags / Note.content
@@ -193,6 +195,21 @@ and `frontmatter.ts` and the repos are the only places that translate between th
 fixed (`title`, `description`, `tags`, `createdAt`, `updatedAt`), and the exact format, including
 the unindented list of tags, is pinned by `frontmatter.test.ts`, because every note already stored
 was written in it and must stay readable.
+
+Two optional keys follow those, written only for a note that has a header image, so every other note
+is serialized exactly as before:
+
+```
+headerImage: app_data/trip-plan-route-map-3f9c2a71b0de.png
+headerImageLayout: centered
+```
+
+`headerImage` is a stored image's `app_data/<name>` path or an `https://` address; `headerImageLayout`
+is `full` (a banner across the note, cropped) or `centered` (the whole picture at its own size), and
+anything else reads as `full`. They live in the frontmatter, not in a column, so they travel with the
+note's text in a backup. The pane's **Header image** button sets them from the stored images, and they
+can be typed by hand. The preview draws the picture above the title (see
+[images.md](images.md#header-image)). The terminal app keeps the keys when it saves but doesn't draw the picture.
 
 `frontmatter.parse` is designed to never throw: a note with no leading `---` block, a non-mapping
 YAML document, or invalid YAML simply parses to `[null, original content]`. This is what lets

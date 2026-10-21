@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import type { Frontmatter } from "@/lib/composition/frontmatter";
+import { HeaderImage } from "./HeaderImage";
 
 // Fixed-format (UTC) so server and client render the same text — a locale- or
 // timezone-dependent format would cause a hydration mismatch.
@@ -15,6 +16,7 @@ export function FrontmatterCard({ fm }: { fm: Frontmatter }) {
 
   return (
     <header className="not-prose mb-6 border-b pb-4">
+      {fm.headerImage && <HeaderImage image={fm.headerImage} layout={fm.headerImageLayout ?? "full"} />}
       <h1 className="text-2xl font-semibold tracking-tight">{fm.title.trim() || "Untitled"}</h1>
       {fm.description.trim() && (
         <p className="mt-2 text-sm text-muted-foreground">{fm.description}</p>

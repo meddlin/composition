@@ -177,6 +177,8 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
       tags: fm.tags,
       createdAt: fm.createdAt || previous.createdAt,
       updatedAt: new Date().toISOString(),
+      headerImage: fm.headerImage,
+      headerImageLayout: fm.headerImageLayout,
     };
     const rendered = frontmatter.render(reconciled, body);
     notesRepo.updateNote(noteId, rendered, {
