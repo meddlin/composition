@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -17,13 +17,13 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, type TocHeading } from "./backend";
+import { HEADINGS_PROP, imageNameFromRef, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes", "YouTube"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -213,6 +213,8 @@ function elementBlocks(element: Node, source: string): Block[] {
       return blocksOf(element.children ?? [], source);
     case "Footnotes":
       return [{ kind: "footnotes", entries: element.footnotes ?? [] }];
+    case "YouTube":
+      return [{ kind: "markdown", source: youtubeMarkdown(element) }];
     default:
       return [];
   }
@@ -254,6 +256,8 @@ function replacement(element: Node, source: string): string {
   switch (componentOf(element)) {
     case "Image":
       return imageMarkdown(element);
+    case "YouTube":
+      return youtubeMarkdown(element);
     case "Info":
     case "Warning":
     case "Mark": {
@@ -276,6 +280,19 @@ function imageMarkdown(element: Node): string {
   const target = /[\s()]/.test(src) ? `<${src}>` : src;
   const title = attribute(element, "title");
   return `![${alt}](${target}${title ? ` "${title.replace(/"/g, '\\"')}"` : ""})`;
+}
+
+/**
+ * `<YouTube url title />` as a Markdown link to the video, `[▶ title](https://www.youtube.com/watch?v=…)`:
+ * a terminal can't play it, but it can show where it is. A `url` that isn't a YouTube video is
+ * said so in words, as on the web.
+ */
+function youtubeMarkdown(element: Node): string {
+  const url = attribute(element, "url")?.trim();
+  const ref = parseYouTube(url, attribute(element, "start"));
+  if (!ref) return url ? `Not a YouTube video: ${url.replace(/[\\[\]<>`*_]/g, "\\$&")}` : "YouTube video: add a url";
+  const title = (attribute(element, "title")?.trim() || "YouTube video").replace(/[\\[\]]/g, "\\$&");
+  return `[▶ ${title}](${youtubeWatchUrl(ref)})`;
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {

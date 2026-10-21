@@ -123,6 +123,38 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<YouTube>", () => {
+    const watch = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+    it("is a Markdown link to the video, which the terminal can't play", () => {
+      expect(parsePreview('<YouTube url="https://youtu.be/dQw4w9WgXcQ" />').blocks).toEqual([
+        { kind: "markdown", source: `[▶ YouTube video](${watch})` },
+      ]);
+    });
+
+    it("uses the title and the start time", () => {
+      expect(parsePreview('<YouTube url="dQw4w9WgXcQ" start="1:30" title="The [demo]" />').blocks).toEqual([
+        { kind: "markdown", source: `[▶ The \\[demo\\]](${watch}&t=90s)` },
+      ]);
+    });
+
+    it("says so when it isn't a YouTube video, or has no url yet", () => {
+      expect(parsePreview('<YouTube url="https://example.com/x" />').blocks).toEqual([
+        { kind: "markdown", source: "Not a YouTube video: https://example.com/x" },
+      ]);
+      expect(parsePreview("<YouTube />").blocks).toEqual([{ kind: "markdown", source: "YouTube video: add a url" }]);
+    });
+
+    it("is the link inside a sentence, and the content of a panel", () => {
+      expect(parsePreview('See <YouTube url="dQw4w9WgXcQ" /> now.').blocks).toEqual([
+        { kind: "markdown", source: `See [▶ YouTube video](${watch}) now.` },
+      ]);
+      expect(parsePreview('<Info>\n\n<YouTube url="dQw4w9WgXcQ" />\n\n</Info>').blocks).toEqual([
+        { kind: "panel", tone: "info", blocks: [{ kind: "markdown", source: `[▶ YouTube video](${watch})` }] },
+      ]);
+    });
+  });
+
   describe("indented code", () => {
     it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
       const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
@@ -377,7 +409,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {

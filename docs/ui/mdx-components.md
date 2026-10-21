@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -149,6 +149,38 @@ Staging resets nightly[^runbook], and the cron job is documented elsewhere[^cron
 Source: [`mdx/Footnotes.tsx`](../../apps/web/src/components/notes/mdx/Footnotes.tsx) and
 [`mdx/rehypeFootnotes.ts`](../../apps/web/src/components/notes/mdx/rehypeFootnotes.ts), which moves the list to the tag.
 
+## `<YouTube>`
+
+A YouTube video you can watch in the preview, without leaving the note:
+
+```mdx
+<YouTube url="https://www.youtube.com/watch?v=dQw4w9WgXcQ" />
+
+<YouTube url="https://youtu.be/dQw4w9WgXcQ?t=90" title="Demo of the release" />
+
+<YouTube url="dQw4w9WgXcQ" start="1:30" />
+```
+
+- `url` is whatever you'd copy from YouTube: a watch link, a `youtu.be` link, an embed, shorts or live
+  link, or just the 11-character video id.
+- `start` begins playback part-way in: seconds (`90`), `1:30`, `1:02:03` or `1m30s`. It wins over a
+  start time in the link (`?t=90`), which is used otherwise. One that can't be read plays from the start.
+- `title` names the player for screen readers; it defaults to "YouTube video".
+- The player is YouTube's privacy-enhanced one (`youtube-nocookie.com`), which sets no cookies until
+  you press play, and is drawn full width at 16:9. Only the video id is read from `url`; the frame's
+  address is built from it, so a note can't point the player anywhere but a YouTube video.
+- A `url` that isn't a YouTube video (or isn't there yet, while typing) shows a short notice in place of
+  the player, so the rest of the note stays put. A playlist or channel link has no single video, so it is the same.
+- It needs the network to play. In the desktop app, the CSP's `frame-src` allows exactly that one
+  host, and [`embedReferer.ts`](../../apps/desktop/src/main/embedReferer.ts) gives the player a
+  referrer, since YouTube refuses to play for a page that sends none (the app's own `app://` pages
+  never do).
+- The terminal can't play video, so it shows a link to the video, `▶ title`, in its place.
+
+Source: [`mdx/YouTube.tsx`](../../apps/web/src/components/notes/mdx/YouTube.tsx) and
+[`mdx/youtubeRef.ts`](../../apps/web/src/components/notes/mdx/youtubeRef.ts), which reads the link
+(and is shared with the terminal app).
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -183,6 +215,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Toc>` | A box titled `Contents` listing the headings, indented by nesting and cut off at `maxDepth`. It isn't clickable, and follows the note as it is edited. |
 | `<Mark>` | Its text, without the tags. The terminal draws a stretch of Markdown as one piece, so it has no way to tint a few words of it yet. |
 | `<Footnotes>`, and the list at the end of a note without it | A box titled `Footnotes`, one numbered line per footnote; a link keeps its address in brackets after its words. Citations in the text are superscript digits (`¹`), since `[1]` would be read as a link. The definitions are not left where they were written. |
+| `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:
@@ -217,6 +250,8 @@ worth trying for that prop.
 | `<Image>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
 | `<Mark>` | `color` | the five highlight colors |
 | `<Toc>` | `maxDepth` | `1` to `6` |
+| `<YouTube>` | `url`, `title` | none (free text) |
+| `<YouTube>` | `start` | `30` `1:00` `5:00` |
 
 A value menu closes when nothing matches what's typed, since `width="320"` is as good as any
 preset. Picking a value replaces what was typed, closing quote included, and puts the caret past

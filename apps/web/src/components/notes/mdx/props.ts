@@ -53,6 +53,19 @@ const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
     },
   ],
   Footnotes: [],
+  YouTube: [
+    { name: "url", description: "The video's link (youtube.com/watch…, youtu.be/…) or its 11-character id" },
+    {
+      name: "start",
+      description: "Where to begin playing: seconds (90), or 1:30, 1m30s",
+      values: [
+        { value: "30", description: "30 seconds in" },
+        { value: "1:00", description: "One minute in" },
+        { value: "5:00", description: "Five minutes in" },
+      ],
+    },
+    { name: "title", description: "Names the player for screen readers" },
+  ],
 };
 
 const componentNames = Object.keys(catalog);

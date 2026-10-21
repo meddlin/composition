@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { usesMdxComponent } from "./components";
 
 describe("usesMdxComponent", () => {
-  it.each(["<Warning>hi</Warning>", "<Info>hi</Info>", "text\n\n<Info>\n\nhi\n\n</Info>", "<Info />", '<Info type="x">', 'a <Mark color="pink">b</Mark>'])(
+  it.each(["<Warning>hi</Warning>", "<Info>hi</Info>", "text\n\n<Info>\n\nhi\n\n</Info>", "<Info />", '<Info type="x">', 'a <Mark color="pink">b</Mark>', '<YouTube url="x" />'])(
     "detects %j",
     (md) => expect(usesMdxComponent(md)).toBe(true),
   );
 
-  it.each(["plain text", "a < b and {c}", "<Warnings>", "<warning>", "<Information>", "<info>", "<Marker>", "<mark>", "Info", "<https://example.com>"])(
+  it.each(["plain text", "a < b and {c}", "<Warnings>", "<warning>", "<Information>", "<info>", "<Marker>", "<mark>", "<YouTubeVideo>", "<youtube>", "Info", "<https://example.com>"])(
     "ignores %j",
     (md) => expect(usesMdxComponent(md)).toBe(false),
   );

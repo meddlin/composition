@@ -282,6 +282,7 @@ describe("MarkdownEditor component completion", () => {
       expect.stringContaining("<Toc>"),
       expect.stringContaining("<Mark>"),
       expect.stringContaining("<Footnotes>"),
+      expect.stringContaining("<YouTube>"),
     ]);
   });
 
@@ -378,8 +379,8 @@ describe("MarkdownEditor component completion", () => {
     key("ArrowUp");
     key("Enter");
 
-    expect(editor().value).toBe("<Footnotes />");
-    expect(editor().selectionStart).toBe("<Footnotes />".length);
+    expect(editor().value).toBe('<YouTube url="" />');
+    expect(editor().selectionStart).toBe('<YouTube url="'.length);
   });
 
   it("inserts a component picked with the mouse", () => {
