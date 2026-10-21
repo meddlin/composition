@@ -19,14 +19,16 @@ type Props = {
   label: string;
   favorite: boolean;
   onToggleFavorite: () => void;
+  /** Opens the note in a new pane next to the one being worked in. */
+  onOpenBeside: () => void;
 };
 
 /**
  * The "⋯" button on a note row (or a row in the Favorites section) and the menu
- * it opens. Its only action so far is pinning; the portaled popup can't be
+ * it opens: open the note to the side, and pin it. The portaled popup can't be
  * clipped by the sidebar's scroll container.
  */
-export function FavoriteMenu({ label, favorite, onToggleFavorite }: Props) {
+export function NoteMenu({ label, favorite, onToggleFavorite, onOpenBeside }: Props) {
   return (
     // Not modal, like GroupMenu: an outside click closes it and goes through.
     <DropdownMenu modal={false}>
@@ -36,6 +38,7 @@ export function FavoriteMenu({ label, favorite, onToggleFavorite }: Props) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" loop aria-label={`${label} actions`} className="w-48">
+        <DropdownMenuItem onSelect={onOpenBeside}>Open to the side</DropdownMenuItem>
         <DropdownMenuItem onSelect={onToggleFavorite}>{favoriteLabel(favorite)}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

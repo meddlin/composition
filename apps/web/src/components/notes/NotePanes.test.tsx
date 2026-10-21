@@ -151,16 +151,28 @@ describe("opening notes beside each other", () => {
     expect(paneTitles()).toEqual(["Beta", "Alpha"]);
   });
 
-  it("keeps editor and preview side by side inside every pane", () => {
+  it("opens the new pane on its editor, leaving the first note's view alone", () => {
     openAlphaBesideBeta();
 
-    for (const title of ["Alpha", "Beta"]) {
-      const scope = within(pane(title));
-      expect(scope.getByRole("tabpanel", { name: "Markdown" })).toBeTruthy();
-      expect(scope.getByRole("tabpanel", { name: "Preview" })).toBeTruthy();
-      expect(scope.getByRole("tab", { name: "Split" }).getAttribute("aria-selected")).toBe("true");
-      expect(scope.getByRole("separator", { name: "Resize editor and preview" })).toBeTruthy();
-    }
+    const alpha = within(pane("Alpha"));
+    expect(alpha.getByRole("tab", { name: "Split" }).getAttribute("aria-selected")).toBe("true");
+    expect(alpha.getByRole("tabpanel", { name: "Preview" })).toBeTruthy();
+
+    const beta = within(pane("Beta"));
+    expect(beta.getByRole("tab", { name: "Markdown" }).getAttribute("aria-selected")).toBe("true");
+    expect(beta.getByRole("tabpanel", { name: "Markdown" })).toBeTruthy();
+    expect(beta.queryByRole("tabpanel", { name: "Preview" })).toBeNull();
+  });
+
+  it("can still show editor and preview side by side inside the new pane", () => {
+    openAlphaBesideBeta();
+
+    const beta = within(pane("Beta"));
+    fireEvent.click(beta.getByRole("tab", { name: "Split" }));
+
+    expect(beta.getByRole("tabpanel", { name: "Markdown" })).toBeTruthy();
+    expect(beta.getByRole("tabpanel", { name: "Preview" })).toBeTruthy();
+    expect(beta.getByRole("separator", { name: "Resize editor and preview" })).toBeTruthy();
   });
 
   it("replaces the pane's note when the drop lands in its middle", () => {
@@ -205,6 +217,50 @@ describe("opening notes beside each other", () => {
     drag("drop", empty, dt);
 
     expect(paneTitles()).toEqual(["Beta"]);
+  });
+});
+
+describe("opening a note to the side from its menu", () => {
+  /** Radix opens its menu on a left-button pointerdown. */
+  async function chooseOpenToTheSide(title: string) {
+    const nav = within(screen.getByRole("navigation", { name: "Notes" }));
+    fireEvent.pointerDown(nav.getByRole("button", { name: `Actions for ${title}` }), { button: 0, ctrlKey: false });
+    await act(async () => {
+      fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: "Open to the side" }));
+    });
+  }
+
+  it("opens the note in a new pane beside the focused one, on its editor", async () => {
+    renderApp();
+
+    await chooseOpenToTheSide("Beta");
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+    expect(within(pane("Alpha")).getByRole("tab", { name: "Split" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane("Beta")).getByRole("tab", { name: "Markdown" }).getAttribute("aria-selected")).toBe("true");
+    expect(within(pane("Beta")).queryByRole("tabpanel", { name: "Preview" })).toBeNull();
+    expect(pane("Beta").getAttribute("aria-current")).toBe("true");
+  });
+
+  it("puts each further note beside the pane being worked in", async () => {
+    renderApp();
+    await chooseOpenToTheSide("Gamma");
+    fireEvent.click(sidebarRow("Alpha")); // focus Alpha again
+
+    await chooseOpenToTheSide("Beta");
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta", "Gamma"]);
+  });
+
+  it("moves a note that is already open instead of opening it twice", async () => {
+    renderApp();
+    await chooseOpenToTheSide("Beta");
+    await chooseOpenToTheSide("Gamma");
+    fireEvent.click(sidebarRow("Alpha")); // focus Alpha again
+
+    await chooseOpenToTheSide("Gamma");
+
+    expect(paneTitles()).toEqual(["Alpha", "Gamma", "Beta"]);
   });
 });
 
@@ -739,6 +795,7 @@ describe("viewing a note as tabs", () => {
 
     it("only narrows the pane that is narrow", () => {
       openAlphaBesideBeta();
+      fireEvent.click(tab("Beta", "Split"));
 
       resizePane("Alpha", 300);
 
@@ -767,14 +824,14 @@ describe("viewing a note as tabs", () => {
       expect(selected("Gamma")).toEqual(["Preview"]);
     });
 
-    it("starts a note opened in a new pane side by side", () => {
+    it("starts a note opened in a new pane on its editor", () => {
       openAlphaBesideBeta();
       fireEvent.click(tab("Alpha", "Preview"));
       sizePane("Alpha");
 
       drag("drop", pane("Alpha"), dragFromSidebar("Gamma", 3), 950);
 
-      expect(selected("Gamma")).toEqual(["Split"]);
+      expect(selected("Gamma")).toEqual(["Markdown"]);
     });
 
     it("sends each note's view along with it when two panes swap", () => {

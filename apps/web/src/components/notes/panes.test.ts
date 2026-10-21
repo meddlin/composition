@@ -7,6 +7,7 @@ import {
   focusPane,
   initialPanes,
   openNote,
+  openNoteBeside,
   setPaneView,
   shownView,
   withSizes,
@@ -138,12 +139,40 @@ describe("closePane", () => {
   });
 });
 
+describe("openNoteBeside", () => {
+  it("opens the note in a new editor pane to the right of the focused one", () => {
+    const next = openNoteBeside(state([1, 2], 1), 3);
+    expect(ids(next)).toEqual([1, 3, 2]);
+    expect(viewOf(next, 3)).toBe("markdown");
+    expect(next.focusedId).toBe(3);
+  });
+
+  it("falls back to the last pane when none is focused", () => {
+    expect(ids(openNoteBeside(state([1, 2], null), 3))).toEqual([1, 2, 3]);
+  });
+
+  it("opens a first pane, on the usual view, when nothing is open", () => {
+    expect(openNoteBeside(initialPanes(null), 3)).toEqual(initialPanes(3));
+  });
+
+  it("moves a note that is already open beside the focused pane, keeping its view", () => {
+    const next = openNoteBeside(withViews(state([1, 2, 3], 1), "split", "split", "preview"), 3);
+    expect(ids(next)).toEqual([1, 3, 2]);
+    expect(viewOf(next, 3)).toBe("preview");
+  });
+
+  it("just focuses the note when it is the focused pane", () => {
+    const s = state([1, 2], 2);
+    expect(openNoteBeside(s, 2)).toBe(s);
+  });
+});
+
 describe("dropNote beside a pane", () => {
   it("opens a new pane to the right, splitting the target's width", () => {
     const next = dropNote(state([1, 2]), 3, 1, "right");
     expect(next.panes).toEqual([
       { noteId: 1, size: 0.5, view: "split" },
-      { noteId: 3, size: 0.5, view: "split" },
+      { noteId: 3, size: 0.5, view: "markdown" },
       { noteId: 2, size: 1, view: "split" },
     ]);
     expect(next.focusedId).toBe(3);
@@ -160,9 +189,15 @@ describe("dropNote beside a pane", () => {
     expect(next.focusedId).toBe(1);
   });
 
-  it("opens a new pane side by side, whatever the target pane shows", () => {
+  it("opens a new pane on the editor, whatever the target pane shows", () => {
     const next = dropNote(withViews(state([1, 2]), "preview", "preview"), 3, 1, "right");
-    expect(viewOf(next, 3)).toBe("split");
+    expect(viewOf(next, 3)).toBe("markdown");
+  });
+
+  it("leaves the other panes' views alone", () => {
+    const next = dropNote(withViews(state([1, 2]), "split", "preview"), 3, 1, "right");
+    expect(viewOf(next, 1)).toBe("split");
+    expect(viewOf(next, 2)).toBe("preview");
   });
 
   it("keeps a moved pane's view", () => {
