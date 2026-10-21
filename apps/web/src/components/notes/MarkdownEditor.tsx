@@ -18,6 +18,7 @@ import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
@@ -26,7 +27,7 @@ import { useHighlightMenu } from "./useHighlightMenu";
 import type { Note } from "./types";
 import { usePreviewFind } from "./usePreviewFind";
 import { useMdxCompletion } from "./useMdxCompletion";
-import { useNoteLinkPicker } from "./useNoteLinkPicker";
+import { NOTE_LINK_SHORTCUT, useNoteLinkPicker } from "./useNoteLinkPicker";
 
 /** A search within this note: what to look for, which match is being looked at, and where to report how many there are. */
 export type FindState = {
@@ -99,8 +100,8 @@ export function MarkdownEditor({
   const pendingSelection = useRef<TextRange | null>(null);
   const uploads = useRef(0);
   const [imageError, setImageError] = useState<string | null>(null);
-  // Why a highlight was refused, and the text it was refused for: editing the note clears it.
-  const [highlightError, setHighlightError] = useState<{ reason: string; value: string } | null>(null);
+  // Why a highlight or an image conversion didn't happen, and the text it was refused for: editing the note clears it.
+  const [editNotice, setEditNotice] = useState<{ reason: string; value: string } | null>(null);
 
   // A controlled textarea jumps its caret to the end when the text changes underneath it.
   useLayoutEffect(() => {
@@ -181,11 +182,11 @@ export function MarkdownEditor({
     const before = el.value;
     const result = choice === "remove" ? removeHighlight(before, range) : highlightRange(before, range, choice);
     if (!result.ok) {
-      setHighlightError({ reason: result.reason, value: before });
+      setEditNotice({ reason: result.reason, value: before });
       return;
     }
     if (choice !== "remove") rememberHighlightColor(choice);
-    setHighlightError(null);
+    setEditNotice(null);
 
     // Only the stretch that differs is replaced, so the scroll position and the rest of the undo stack are left alone.
     const after = result.text;
@@ -212,6 +213,35 @@ export function MarkdownEditor({
     el.setSelectionRange(result.selection.start, result.selection.end);
   }
   const highlightMenu = useHighlightMenu(textarea, applyHighlight);
+
+  /**
+   * Turns the Markdown image at the caret (or every one the selection touches) into an `<Image />`
+   * tag, which can say how wide to be. Goes in as typing would, so undo takes it back in one step,
+   * and leaves the caret ready for another prop.
+   */
+  function convertImagesToMdx(el: HTMLTextAreaElement) {
+    const before = el.value;
+    const edit = imagesToMdx(before, el.selectionStart, el.selectionEnd);
+    if (!edit) {
+      setEditNotice({ reason: "Put the caret in a Markdown image, ![alt](src), or select some, to turn them into <Image /> tags.", value: before });
+      return;
+    }
+    setEditNotice(null);
+
+    const after = before.slice(0, edit.start) + edit.text + before.slice(edit.end);
+    const caret = edit.start + edit.caret;
+    el.focus();
+    if (document.activeElement === el) {
+      el.setSelectionRange(edit.start, edit.end);
+      document.execCommand?.("insertText", false, edit.text);
+    }
+    if (el.value === after) {
+      el.setSelectionRange(caret, caret);
+      return;
+    }
+    pendingCaret.current = caret;
+    replaceText(edit.start, edit.end, edit.text);
+  }
 
   const noteLinks = useMemo<NoteLinks>(
     () => ({ exists: (id) => notes.some((n) => n.id === id), open: onOpenNote ?? (() => {}) }),
@@ -258,6 +288,11 @@ export function MarkdownEditor({
 
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (isImageToMdxShortcut(event) && !event.nativeEvent.isComposing) {
+      event.preventDefault(); // Browsers claim Ctrl+Shift+M too (Firefox's responsive design mode).
+      convertImagesToMdx(event.currentTarget);
+      return;
+    }
     // The menus take Tab while one is open. Shift+Tab stays free so the keyboard can still leave the editor.
     noteLinkPicker.textareaProps.onKeyDown(event);
     if (event.defaultPrevented) return;
@@ -315,9 +350,9 @@ export function MarkdownEditor({
             {imageError}
           </p>
         )}
-        {showEditor && highlightError?.value === value && (
+        {showEditor && editNotice?.value === value && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
-            {highlightError.reason}
+            {editNotice.reason}
           </p>
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
@@ -349,7 +384,7 @@ export function MarkdownEditor({
               noteLinkPicker.textareaProps["aria-activedescendant"] ??
               highlightMenu.textareaProps["aria-activedescendant"]
             }
-            aria-keyshortcuts={noteLinkPicker.textareaProps["aria-keyshortcuts"]}
+            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT}`}
             onKeyDown={onKeyDown}
             onSelect={(event) => {
               completion.textareaProps.onSelect(event);
@@ -403,9 +438,9 @@ export function MarkdownEditor({
         className="flex min-h-0 flex-col"
       >
         {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
-        {showPreview && !showEditor && highlightError?.value === value && (
+        {showPreview && !showEditor && editNotice?.value === value && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
-            {highlightError.reason}
+            {editNotice.reason}
           </p>
         )}
         {showPreview && (

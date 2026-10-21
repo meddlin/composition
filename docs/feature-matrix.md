@@ -45,6 +45,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Tab types a tab in the editor, to indent nested lists | ✅ | ✅ | ✅ | |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
 | Images in notes: paste | ✅ | ✅ | ✅ | A terminal can't paste picture bytes. The CLI adds an image from a file: `ctrl+l` and a path, or dragging the file into the terminal. Copying a screenshot to the clipboard doesn't work in the CLI. [images.md](architecture/images.md#in-the-cli) |
+| `<Image width>`: draw a pasted image smaller, in pixels or % of the note | ❌ | ✅ | ✅ | `Cmd/Ctrl+Shift+M` turns a Markdown image into the tag, and the editor suggests `width` and its values. The file itself is not shrunk, and the CLI ignores the width. [mdx-components.md](ui/mdx-components.md#resizing-width) |
 | Image size limit | None | 10 MB | None | See [Image size limit](#image-size-limit) |
 | `<Info>`, `<Warning>`, `<Image>`, `<Toc>` components | ✅ | ✅ | ✅ | The CLI draws them as boxes, a contents list and a picture. [mdx-components.md](ui/mdx-components.md) |
 | Footnotes: `[^1]` citations and a `<Footnotes>` list | ✅ | ✅ | ✅ | Numbered by where they are cited, so adding one renumbers the rest. The CLI shows a citation as a superscript number and the list in a box. [mdx-components.md](ui/mdx-components.md#footnotes) |

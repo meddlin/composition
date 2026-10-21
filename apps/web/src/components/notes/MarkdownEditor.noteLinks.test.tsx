@@ -171,7 +171,7 @@ describe("MarkdownEditor note links: the shortcut", () => {
   it("is announced on the editor", () => {
     render(<Harness />);
 
-    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K");
+    expect(editor().getAttribute("aria-keyshortcuts")).toContain("Control+Shift+K Meta+Shift+K");
   });
 
   it("opens the picker at the caret and links the chosen note by its title", () => {

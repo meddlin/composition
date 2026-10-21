@@ -141,6 +141,39 @@ describe("NoteMarkdown", () => {
     expect(screen.getByRole("note", { name: "Info" })).toBeDefined();
   });
 
+  describe("<Image width>", () => {
+    const widthOf = (tag: string) => {
+      renderNote(tag);
+      return (screen.getByAltText("shot") as HTMLImageElement).style.width;
+    };
+
+    it("draws the image that wide in pixels", () => {
+      expect(widthOf('<Image src="app_data/a-0123456789ab.png" alt="shot" width="400" />')).toBe("400px");
+    });
+
+    it("takes a percentage of the note's width", () => {
+      expect(widthOf('<Image src="app_data/a-0123456789ab.png" alt="shot" width="50%" />')).toBe("50%");
+    });
+
+    it("leaves the image at full size without a width, or with one it can't read", () => {
+      expect(widthOf('<Image src="app_data/a-0123456789ab.png" alt="shot" />')).toBe("");
+      cleanup();
+      expect(widthOf('<Image src="app_data/a-0123456789ab.png" alt="shot" width="wide" />')).toBe("");
+    });
+
+    it("never lets the image outgrow the note", () => {
+      renderNote('<Image src="app_data/a-0123456789ab.png" alt="shot" width="4000" />');
+
+      expect(screen.getByAltText("shot").className).toContain("max-w-full");
+    });
+
+    it("rejects a width that is an expression, like any other prop", () => {
+      renderNote('<Image src="app_data/a-0123456789ab.png" alt="shot" width={400} />');
+
+      expect(screen.getByRole("alert").textContent).toMatch(/expressions/);
+    });
+  });
+
   it("rejects an <Image> whose src is an expression, like any other prop", () => {
     renderNote("<Image src={url} alt='x' />");
 

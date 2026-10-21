@@ -54,6 +54,43 @@ image into the editor inserts the Markdown form:
 `src` and `alt` are plain strings (an `{expression}` is rejected, like for any component).
 See [images.md](../architecture/images.md) for where pasted images live and how `app_data/` paths resolve.
 
+### Resizing: `width`
+
+Markdown's `![alt](src)` has nowhere to say how big to draw an image; the tag does:
+
+```mdx
+<Image src="app_data/trip-plan-route-map-3f9c2a71b0de.png" alt="Route map" width="50%" />
+
+<Image src="app_data/trip-plan-route-map-3f9c2a71b0de.png" alt="Route map" width="400" />
+```
+
+- `width="400"` (or `"400px"`) is pixels; `width="50%"` is a share of the note's width. The height
+  follows, keeping the proportions.
+- An image is never drawn wider than the note, so `width="4000"` and `width="100%"` look the same on a
+  narrow pane. Over `100%` counts as `100%`.
+- A width that can't be read (`width="wide"`, `0`, `-5`) is ignored and the image stays at full size,
+  so a half-typed value doesn't make it vanish.
+- This only changes how the picture is drawn. The file in `app_data/` is untouched and still
+  downloads, backs up and loads at its full size. The terminal app ignores `width`.
+
+Source: [`mdx/imageWidth.ts`](../../apps/web/src/components/notes/mdx/imageWidth.ts).
+
+### Turning a pasted image into an `<Image>`
+
+Pasting inserts Markdown, which is the right default: a note with no component in it is plain
+Markdown, and a stray `<` or `{` in its prose is fine. A note that uses a component is parsed as MDX,
+where those are errors. So the tag is opt-in, one image at a time:
+
+Press **Cmd+Shift+M** (macOS) or **Ctrl+Shift+M** in the editor with the caret on a Markdown
+image, or with a selection that touches one or more, and each becomes an `<Image />` tag with the
+same `src`, `alt` and `title`. The caret lands at the end of the tag's last prop, so a space
+opens the prop menu (below) and `width` is two keystrokes away. It goes in as typing does, so
+undo takes it back in one step. If there is no image at the caret, the editor says so and changes nothing.
+
+Code is left alone: an image inside a fenced block or a backtick span is text, not an image.
+The shortcut only goes one way; to go back, retype the Markdown form. Source:
+[`mdx/imageToMdx.ts`](../../apps/web/src/components/notes/mdx/imageToMdx.ts).
+
 ## `<Toc>`
 
 A table of contents for the note it is in: its headings as a nested list. It lists whatever
@@ -155,7 +192,7 @@ A few things follow from the terminal drawing Markdown in whole pieces:
 - Inside a sentence, a list item or a quote, a component can't be a box. An `<Image>` still becomes its
   Markdown form, shown as its alt text, an `<Info>` or `<Warning>` keeps its content without the box, a `<Mark>` is always just its content, and a `<Toc>` is left out.
 - The position in an MDX error counts from the first line below the frontmatter, as on the web.
-- The editor does not offer completion for `<` yet; that is web and desktop only.
+- The editor's completion (below) is web and desktop only.
 
 Every other Markdown stretch in a note is still drawn by OpenTUI's own `<markdown>`, from the note's
 own text, so a note without components renders exactly as it did before this existed: it isn't even
@@ -163,16 +200,34 @@ parsed as MDX.
 
 ## Completion in the editor
 
-Typing `<` in the editor opens a menu at the caret listing the components, like an IDE's
-completion. Keep typing to narrow it (`<wa` leaves `<Warning>`), then pick with ArrowUp/ArrowDown and
-Enter or Tab, or with the mouse; Escape dismisses it until the next `<`. Picking one inserts
-a ready-to-fill tag and puts the caret where you'd type next (between the blank lines of a
+**Components.** Typing `<` in the editor opens a menu at the caret listing the components, like an
+IDE's completion. Keep typing to narrow it (`<wa` leaves `<Warning>`), then pick with
+ArrowUp/ArrowDown and Enter or Tab, or with the mouse; Escape dismisses it until the next `<`. Picking
+one inserts a ready-to-fill tag and puts the caret where you'd type next (between the blank lines of a
 callout, inside `src=""` for an image).
 
-It stays out of the way of ordinary text: no menu for `a<b` or `<<`, or inside a fenced code
-block. Source: [`mdx/completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts)
-(the catalog and trigger rules) and
-[`useMdxCompletion.ts`](../../apps/web/src/components/notes/useMdxCompletion.ts).
+**Props.** Inside a component's open tag, a space opens a menu of the props the tag doesn't have
+yet, each with a one-line description. Typing narrows it (`<Image wi` leaves `width`). Picking
+one writes `width=""` with the caret between the quotes, and that opens the next menu: the values
+worth trying for that prop.
+
+| Component | Prop | Values offered |
+|---|---|---|
+| `<Image>` | `src`, `alt`, `title` | none (free text) |
+| `<Image>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
+| `<Mark>` | `color` | the five highlight colors |
+| `<Toc>` | `maxDepth` | `1` to `6` |
+
+A value menu closes when nothing matches what's typed, since `width="320"` is as good as any
+preset. Picking a value replaces what was typed, closing quote included, and puts the caret past
+the quote. Components that take no props (`<Info>`, `<Warning>`, `<Footnotes>`) never open a prop menu.
+
+It stays out of the way of ordinary text: no menu for `a<b` or `<<`, inside a fenced code block, hard
+against a tag's name or a closing quote, after the tag has closed, or past a blank line (MDX can't
+carry a tag across one, so the editor doesn't either). A value is read as ending on its own line.
+Source: [`mdx/completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts) (the component catalog and
+`<` trigger), [`mdx/props.ts`](../../apps/web/src/components/notes/mdx/props.ts) (the prop catalog and where the
+caret is in a tag) and [`useMdxCompletion.ts`](../../apps/web/src/components/notes/useMdxCompletion.ts).
 
 ## Adding a component
 
@@ -182,6 +237,8 @@ block. Source: [`mdx/completions.ts`](../../apps/web/src/components/notes/mdx/co
 3. Add its entry to `catalog` in [`completions.ts`](../../apps/web/src/components/notes/mdx/completions.ts):
    a one-line description and the template to insert (`$0` is where the caret goes). The type
    makes this a compile error to forget.
+   Then add the props it takes to `catalog` in [`props.ts`](../../apps/web/src/components/notes/mdx/props.ts) (an
+   empty list if none), with `values` for any worth suggesting. Also a compile error to forget.
 4. For the CLI, add the name to `MDX_COMPONENTS` in [`mdx.ts`](../../apps/cli/src/mdx.ts) and say how it
    is drawn: in `elementBlocks` (and `replacement`, for where it can't be a block), plus a
    `Block` kind and its drawing in [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) if it needs
