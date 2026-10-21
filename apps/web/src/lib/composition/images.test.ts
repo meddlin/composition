@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { imageDir, imageFileName, readImage, sniffImage, storeImage } from "./images";
+import { imageDir, imageFileName, listImages, readImage, sniffImage, storeImage } from "./images";
 import { MAX_IMAGE_BYTES } from "./imageRefs";
 
 const PNG = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
@@ -144,4 +144,45 @@ describe("readImage", () => {
       expect(await readImage(dir, name)).toBeNull();
     },
   );
+});
+
+describe("listImages", () => {
+  const place = (name: string, data: Uint8Array, modified: string) => {
+    fs.mkdirSync(path.join(dir, "app_data"), { recursive: true });
+    const file = path.join(dir, "app_data", name);
+    fs.writeFileSync(file, data);
+    fs.utimesSync(file, new Date(modified), new Date(modified));
+  };
+
+  it("lists the stored images, newest first, with their sizes", async () => {
+    place("old.png", PNG, "2026-01-01T00:00:00Z");
+    place("new.jpg", JPEG, "2026-03-01T00:00:00Z");
+    place("mid.gif", GIF, "2026-02-01T00:00:00Z");
+
+    expect(await listImages(dir)).toEqual([
+      { name: "new.jpg", size: JPEG.byteLength, modifiedAt: "2026-03-01T00:00:00.000Z" },
+      { name: "mid.gif", size: GIF.byteLength, modifiedAt: "2026-02-01T00:00:00.000Z" },
+      { name: "old.png", size: PNG.byteLength, modifiedAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+  });
+
+  it("includes an image that storeImage just wrote", async () => {
+    const { name } = storeImage(dir, { noteTitle: "Trip", fileName: "map.png", data: PNG });
+
+    expect((await listImages(dir)).map((image) => image.name)).toEqual([name]);
+  });
+
+  it("is empty when there is no app_data folder yet", async () => {
+    expect(await listImages(dir)).toEqual([]);
+  });
+
+  it("skips files that are not images, half-written ones and folders", async () => {
+    place("real.png", PNG, "2026-01-01T00:00:00Z");
+    place("notes.txt", new TextEncoder().encode("hi"), "2026-01-01T00:00:00Z");
+    place(".real.png.tmp", PNG, "2026-01-01T00:00:00Z");
+    place("vector.svg", new TextEncoder().encode("<svg/>"), "2026-01-01T00:00:00Z");
+    fs.mkdirSync(path.join(dir, "app_data", "folder.png"));
+
+    expect((await listImages(dir)).map((image) => image.name)).toEqual(["real.png"]);
+  });
 });

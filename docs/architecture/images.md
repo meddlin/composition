@@ -62,6 +62,40 @@ sequenceDiagram
 so both transports carry it. Reading images back is **not** in the contract; it is a
 plain URL (below).
 
+## Browsing and reusing images
+
+Deleting the text that refers to an image (or the note itself) leaves the file in `app_data/`, so
+an image is never lost, only unreferenced. Two ways to get one back, both listing what is in
+`app_data/` rather than what the notes mention:
+
+- **The Images page** (`/images`, next to Settings in the sidebar): every stored image as a thumbnail,
+  filtered by file name, with a **Not used** filter for the ones no note refers to. Opening one shows it
+  large, with its size and date, the notes that use it, and buttons that copy its Markdown
+  (`![alt](app_data/…)`) or its `<Image>` tag to paste into a note.
+- **`Cmd/Ctrl+Shift+M` in the editor**: a menu at the caret, like the note-link picker
+  ([note-links.md](../ui/note-links.md)), listing the images newest first with thumbnails. Typing narrows it
+  by file name (every word must appear; the name starts with the title of the note it was pasted into,
+  so `trip map` finds `trip-plan-route-map-…`), `↑` `↓` move, `Enter` or `Tab` insert, `Esc` closes. The
+  chosen image goes in as `![alt](app_data/<name>)` at the caret; with words selected they become the alt
+  text, otherwise it is made from the file name. The list is fetched again each time the menu opens, so an
+  image pasted a moment ago is there.
+
+Reusing the same file is also how to avoid duplicates: one image can be referenced from any number of
+notes, since a note only holds its path.
+
+`listImages` is part of the `CompositionApi` contract, so both transports carry it. It returns the
+files (name, size, when first stored) newest first, each with `usedIn`: the notes whose text mentions it,
+found by scanning the notes for `app_data/<name>` (`findImageRefs`, which sees `![](…)` and `<Image src="…" />`
+alike). Notes in the Trash Can don't count, so an image only a trashed note uses shows as not used.
+Source: [`ImageLibrary.tsx`](../../apps/web/src/app/images/ImageLibrary.tsx),
+[`useImagePicker.ts`](../../apps/web/src/components/notes/useImagePicker.ts),
+[`ImagePickerMenu.tsx`](../../apps/web/src/components/notes/ImagePickerMenu.tsx).
+
+The shortcut is `M` because `I` is the developer tools in a browser and in Electron's default menu, and
+`K` and `H` are taken by the note-link picker and highlighting. Like those, the editor cancels the
+keystroke; the web app's one risk is a browser that won't hand `Ctrl+Shift+M` over (Firefox opens its
+responsive design mode with it), and the Images page is the way in then.
+
 ## File names
 
 `<note title>-<image file name>-<content hash>.<ext>`, for example
@@ -159,7 +193,10 @@ picture's placement while the help overlay is open and puts it back when it clos
 ## Gaps
 
 - Images are never deleted: removing a note, or the image's line from it, leaves the
-  file in `app_data/`.
+  file in `app_data/`. The Images page lists them (and marks the unused ones) but cannot delete one yet.
+- Thumbnails are the full image scaled down by the browser; none are generated. A library of very large
+  screenshots loads slowly (lazily, and a cached image is not fetched again).
+- The CLI has no image browser or picker.
 - Changing **Application data location** in the web and desktop apps only points them
   at a new directory; nothing is moved. Images are then looked up in the new
   `app_data/`, so copy that folder along with `composition.db`.

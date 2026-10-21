@@ -126,6 +126,8 @@ See [architecture/backup-restore.md](architecture/backup-restore.md) for backing
 
 See [ui/markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) for how the Markdown tab colours text as you write, and the rules that keep the colours aligned with the caret.
 
+Stored images can be browsed and reused from the Images page or with `Cmd/Ctrl+Shift+M` in the editor; see [architecture/images.md](architecture/images.md#browsing-and-reusing-images).
+
 See [ui/note-links.md](ui/note-links.md) for linking one note to another (`[[`, the shortcut, and following links).
 
 See [ui/web-side-by-side.md](ui/web-side-by-side.md) for opening several notes side by side (the `⋯` menu's "Open to the side", dragging) and what each pane shows.

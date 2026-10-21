@@ -15,6 +15,7 @@ export {
   createNote,
   deleteGroup,
   deleteNote,
+  listImages,
   loadSettings,
   loadSunSchedule,
   loadTrash,
@@ -39,6 +40,8 @@ export {
   searchNotes,
 } from "./actions";
 export type {
+  ImageInfo,
+  ImageUse,
   MoveGroupResult,
   SaveImageInput,
   SaveImageResult,

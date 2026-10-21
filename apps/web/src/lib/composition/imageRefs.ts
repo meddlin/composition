@@ -43,3 +43,46 @@ export function imageNameFromRef(src: string): string | null {
   const rest = src.startsWith(`./${prefix}`) ? src.slice(2 + prefix.length) : src.startsWith(prefix) ? src.slice(prefix.length) : null;
   return rest !== null && isImageName(rest) ? rest : null;
 }
+
+// `app_data/` followed by what could be a file name; imageNameFromRef decides whether it is one.
+const IMAGE_REF = /(?<![\w/.-])(?:\.\/)?app_data\/[A-Za-z0-9][A-Za-z0-9._-]*/g;
+
+/** Every stored image a note's text refers to, by file name. Finds `![](app_data/x.png)` and `<Image src="app_data/x.png" />` alike. */
+export function findImageRefs(content: string): Set<string> {
+  const names = new Set<string>();
+  for (const [candidate] of content.matchAll(IMAGE_REF)) {
+    // A path at the end of a sentence picks up its full stop.
+    const name = imageNameFromRef(candidate.replace(/\.+$/, ""));
+    if (name) names.add(name);
+  }
+  return names;
+}
+
+/**
+ * The `<Image>` tag that shows a stored image, to paste into a note. The tag is
+ * text for a note and the clipboard, never HTML a browser parses, and `name` is
+ * a validated file name that can't contain a quote or angle bracket.
+ */
+export function imageTag(name: string): string {
+  if (!isImageName(name)) throw new Error(`Not a stored image name: ${name}`);
+  // nosemgrep: html-in-template-string
+  return `<Image src="${imageRef(name)}" alt="" />`;
+}
+
+/** The `-<12 hex digits>` that images.ts puts before the extension. */
+const CONTENT_HASH = /-[0-9a-f]{12}$/;
+
+/**
+ * Words for a stored image's alt text, from its file name:
+ * `trip-plan-route-map-3f9c2a71b0de.png` -> `trip plan route map`.
+ */
+export function imageAlt(name: string): string {
+  const stem = name.replace(/\.[^.]*$/, "").replace(CONTENT_HASH, "");
+  return stem.replace(/[^A-Za-z0-9]+/g, " ").trim() || "image";
+}
+
+/** The Markdown that shows a stored image. `alt` falls back to words from the file name; brackets and line breaks can't be in alt text. */
+export function imageMarkdown(name: string, alt?: string): string {
+  const cleaned = alt?.replace(/[[\]\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  return `![${cleaned || imageAlt(name)}](${imageRef(name)})`;
+}

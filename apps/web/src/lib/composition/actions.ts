@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type {
+  ImageInfo,
   MoveGroupResult,
   SaveImageInput,
   SaveImageResult,
@@ -49,6 +50,10 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
 // note's own content (which refers to it) is saved.
 export async function saveImage(input: SaveImageInput): Promise<SaveImageResult> {
   return service.saveImage(input);
+}
+
+export async function listImages(): Promise<ImageInfo[]> {
+  return service.listImages();
 }
 
 // Attachments are listed and removed through Server Actions; their bytes travel

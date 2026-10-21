@@ -32,6 +32,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     shortcuts: [
       { combos: [["Mod", "Shift", "H"]], description: "Highlight the selection (or recolor or remove a highlight at the caret)" },
       { combos: [["Mod", "Shift", "K"]], description: "Link to another note" },
+      { combos: [["Mod", "Shift", "M"]], description: "Insert an image that is already stored (type to filter by name)" },
       { combos: [["Mod", "F"]], description: "Find in the note" },
       { combos: [["Tab"]], description: "Insert a tab (nested list items, code)" },
       { combos: [["Shift", "Tab"]], description: "Leave the editor" },
@@ -40,7 +41,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
     title: "Menus while editing",
     shortcuts: [
-      { combos: [["↑"], ["↓"]], description: "Move through the choices (component, note link, highlight color)" },
+      { combos: [["↑"], ["↓"]], description: "Move through the choices (component, note link, image, highlight color)" },
       { combos: [["Enter"], ["Tab"]], description: "Pick the highlighted choice" },
       { combos: [["1–5"]], description: "Highlight menu: pick a color by its number" },
       { combos: [["0"]], description: "Highlight menu: remove the highlight" },
