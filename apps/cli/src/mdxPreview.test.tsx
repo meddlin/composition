@@ -110,6 +110,31 @@ describe("MDX components in the preview", () => {
     expect(frame(app)).not.toContain("<Image");
   });
 
+  it("draws footnotes in a box at the end of the note, numbered by citation, with links keeping their address", async () => {
+    const app = await open("Intro[^b] and more[^a].\n\n[^a]: Alpha.\n[^b]: See [the docs](https://example.com/docs).");
+    const screen = frame(app);
+
+    expect(screen).toContain("Intro¹ and more².");
+    expect(screen).toContain("─ Footnotes ");
+    expect(screen).toContain("1. See the docs (https://example.com/docs).");
+    expect(screen).toContain("2. Alpha.");
+    expect(screen).not.toContain("[^"); // neither a citation nor a definition is left as typed
+  });
+
+  it("draws <Footnotes /> where the note puts it", async () => {
+    const app = await open("Cited[^a].\n\n<Footnotes />\n\nAfter the list.\n\n[^a]: Alpha.");
+
+    const screen = frame(app);
+    expect(screen.indexOf("1. Alpha.")).toBeGreaterThan(screen.indexOf("Cited¹."));
+    expect(screen.indexOf("1. Alpha.")).toBeLessThan(screen.indexOf("After the list."));
+  });
+
+  it("says when <Footnotes /> has nothing to list", async () => {
+    const app = await open("<Footnotes />\n\nJust prose.");
+
+    expect(frame(app)).toContain("No footnotes yet.");
+  });
+
   it("leaves a note without components as plain Markdown, stray < and { included", async () => {
     const app = await open("Plain **text**, and if a < b then {x}.\n\n# Heading");
 
