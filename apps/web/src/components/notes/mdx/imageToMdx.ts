@@ -51,6 +51,8 @@ export function imagesToMdx(text: string, selectionStart: number, selectionEnd: 
       selectionStart === selectionEnd ? start <= selectionStart && selectionStart <= end : start < selectionEnd && selectionStart < end;
     if (!touched || insideCode(text, start)) continue;
     const [, alt, src, title] = match;
+    // The tag is note text (MDX source), never HTML a browser parses, and every value is escaped by `attribute`.
+    // nosemgrep: html-in-template-string
     const tag = `<Image src="${attribute(src)}" alt="${attribute(alt)}"${title === undefined ? "" : ` title="${attribute(title)}"`}${closingTag}`;
     found.push({ start, end, tag });
   }

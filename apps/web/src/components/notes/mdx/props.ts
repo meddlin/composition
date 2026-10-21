@@ -42,7 +42,7 @@ const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
     {
       name: "maxDepth",
       description: "Deepest heading level to list (1 to 6)",
-      values: [1, 2, 3, 4, 5, 6].map((level) => ({ value: String(level), description: `Stop at <h${level}> headings` })),
+      values: [1, 2, 3, 4, 5, 6].map((level) => ({ value: String(level), description: `Stop at level ${level} headings` })),
     },
   ],
   Mark: [
