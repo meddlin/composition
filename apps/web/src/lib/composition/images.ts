@@ -106,6 +106,38 @@ export async function readImage(appDataDir: string, name: string): Promise<Store
   }
 }
 
+export type ImageFile = {
+  name: string;
+  /** Size in bytes. */
+  size: number;
+  /** When the file was first written (ISO 8601); pasting the same image again leaves it alone. */
+  modifiedAt: string;
+};
+
+/** Every image in `app_data/`, newest first. A missing folder is no images; files that aren't images, and half-written ones, are skipped. */
+export async function listImages(appDataDir: string): Promise<ImageFile[]> {
+  const dir = imageDir(appDataDir);
+  let names: string[];
+  try {
+    names = await fs.promises.readdir(dir);
+  } catch {
+    return [];
+  }
+  const found = await Promise.all(
+    names.filter(isImageName).map(async (name): Promise<ImageFile | null> => {
+      try {
+        const stats = await fs.promises.stat(path.join(dir, name));
+        return stats.isFile() ? { name, size: stats.size, modifiedAt: stats.mtime.toISOString() } : null;
+      } catch {
+        return null; // Gone between the listing and the stat.
+      }
+    }),
+  );
+  return found
+    .filter((file): file is ImageFile => file !== null)
+    .sort((a, b) => b.modifiedAt.localeCompare(a.modifiedAt) || a.name.localeCompare(b.name));
+}
+
 /** Headers for serving a stored image. Names embed a content hash, so a cached copy never goes stale. */
 export const IMAGE_RESPONSE_HEADERS = {
   "cache-control": "private, max-age=31536000, immutable",

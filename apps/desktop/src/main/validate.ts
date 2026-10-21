@@ -62,6 +62,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
       },
     ];
   },
+  listImages: none,
   deleteNote: ([noteId]) => [id("deleteNote", noteId, "id")],
   moveNoteToGroup: ([noteId, groupId]) => [
     id("moveNoteToGroup", noteId, "noteId"),
