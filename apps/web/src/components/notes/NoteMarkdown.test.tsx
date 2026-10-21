@@ -20,6 +20,18 @@ describe("NoteMarkdown", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("plays a <YouTube> video in the preview, on its own line or inside a sentence", () => {
+    const { container } = renderNote(
+      'Watch this:\n\n<YouTube url="https://youtu.be/dQw4w9WgXcQ" title="Demo" />\n\nOr, inline <YouTube url="dQw4w9WgXcQ" start="1:30" /> here.',
+    );
+
+    expect(screen.getByTitle("Demo").getAttribute("src")).toBe("https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?rel=0");
+    expect(screen.getByTitle("YouTube video").getAttribute("src")).toContain("start=90");
+    // Not a <div> in a <p>, which React warns about.
+    expect(container.querySelector("p div")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("renders <Warning> next to <Info>, each with its own label", () => {
     renderNote("<Info>\n\nfyi\n\n</Info>\n\n<Warning>\n\nSome **danger**.\n\n</Warning>");
 
@@ -95,7 +107,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],

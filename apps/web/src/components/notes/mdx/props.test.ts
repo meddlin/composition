@@ -44,6 +44,7 @@ describe("findPropTarget: prop names", () => {
     expect(names('<Image\n  src="a.png"\n  |')).toEqual(["alt", "title", "width"]);
     expect(names("<Mark |")).toEqual(["color"]);
     expect(names("<Toc |/>")).toEqual(["maxDepth"]);
+    expect(names('<YouTube url="x" |/>')).toEqual(["start", "title"]);
   });
 
   it("finds the tag in the middle of a sentence", () => {
