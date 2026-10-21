@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -181,6 +181,38 @@ Source: [`mdx/YouTube.tsx`](../../apps/web/src/components/notes/mdx/YouTube.tsx)
 [`mdx/youtubeRef.ts`](../../apps/web/src/components/notes/mdx/youtubeRef.ts), which reads the link
 (and is shared with the terminal app).
 
+## `<Repo>`
+
+A git repository as a small card that opens it, instead of a bare URL:
+
+```mdx
+<Repo url="https://github.com/meddlin/composition" />
+
+<Repo url="https://gitlab.com/gitlab-org/gitlab" description="The DevSecOps platform" />
+
+<Repo url="git@git.example.com:team/tool.git" />
+```
+
+- `url` is whatever you'd copy: the repository's page (a link into it, like `…/tree/main/docs`, is
+  cut back to the repository), a clone address (`…/repo.git`, `git@host:owner/repo.git`,
+  `ssh://…`), with or without `https://`.
+- `description` says what the repository is for; it is shown under the name.
+- The card shows `owner/name`, with the host under it (named, for GitHub, GitLab, Bitbucket,
+  Codeberg and SourceHut), and opens the repository in the browser. GitLab's nested groups
+  (`group/subgroup/repo`) are kept whole. Any other host works too, when its addresses look like
+  `host/owner/repo`.
+- Nothing is fetched. The card is drawn from the address alone, so it works offline, makes no
+  request on its own and shows no stars or language; `description` is where to say what it is.
+- The link is built from the host and path that were read (`https://host/owner/name`), never taken
+  as written, so a login, a query string or a script address in `url` is dropped.
+- A `url` that isn't a repository (or isn't there yet, while typing) shows a short notice in place of
+  the card.
+- The terminal shows a link to it, `⎇ owner/name`, with the description after it.
+
+Source: [`mdx/Repo.tsx`](../../apps/web/src/components/notes/mdx/Repo.tsx) and
+[`mdx/repoRef.ts`](../../apps/web/src/components/notes/mdx/repoRef.ts), which reads the address
+(and is shared with the terminal app).
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -216,6 +248,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Mark>` | Its text, without the tags. The terminal draws a stretch of Markdown as one piece, so it has no way to tint a few words of it yet. |
 | `<Footnotes>`, and the list at the end of a note without it | A box titled `Footnotes`, one numbered line per footnote; a link keeps its address in brackets after its words. Citations in the text are superscript digits (`¹`), since `[1]` would be read as a link. The definitions are not left where they were written. |
 | `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
+| `<Repo>` | A link to the repository, `⎇ owner/name`, with the description after it. A `url` that isn't a repository is said so in words. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:
@@ -252,6 +285,7 @@ worth trying for that prop.
 | `<Toc>` | `maxDepth` | `1` to `6` |
 | `<YouTube>` | `url`, `title` | none (free text) |
 | `<YouTube>` | `start` | `30` `1:00` `5:00` |
+| `<Repo>` | `url`, `description` | none (free text) |
 
 A value menu closes when nothing matches what's typed, since `width="320"` is as good as any
 preset. Picking a value replaces what was typed, closing quote included, and puts the caret past

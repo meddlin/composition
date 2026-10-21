@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -17,13 +17,13 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { HEADINGS_PROP, imageNameFromRef, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, youtubeWatchUrl, type TocHeading } from "./backend";
+import { HEADINGS_PROP, imageNameFromRef, parseRepo, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes", "YouTube"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes", "YouTube", "Repo"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -215,6 +215,8 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "footnotes", entries: element.footnotes ?? [] }];
     case "YouTube":
       return [{ kind: "markdown", source: youtubeMarkdown(element) }];
+    case "Repo":
+      return [{ kind: "markdown", source: repoMarkdown(element) }];
     default:
       return [];
   }
@@ -258,6 +260,8 @@ function replacement(element: Node, source: string): string {
       return imageMarkdown(element);
     case "YouTube":
       return youtubeMarkdown(element);
+    case "Repo":
+      return repoMarkdown(element);
     case "Info":
     case "Warning":
     case "Mark": {
@@ -293,6 +297,19 @@ function youtubeMarkdown(element: Node): string {
   if (!ref) return url ? `Not a YouTube video: ${url.replace(/[\\[\]<>`*_]/g, "\\$&")}` : "YouTube video: add a url";
   const title = (attribute(element, "title")?.trim() || "YouTube video").replace(/[\\[\]]/g, "\\$&");
   return `[▶ ${title}](${youtubeWatchUrl(ref)})`;
+}
+
+/**
+ * `<Repo url description />` as a Markdown link to the repository, `[⎇ owner/name](https://host/owner/name)`,
+ * with the description after it. A terminal can't draw a card, but it can show where the repository is.
+ * A `url` that isn't a repository is said so in words, as on the web.
+ */
+function repoMarkdown(element: Node): string {
+  const url = attribute(element, "url")?.trim();
+  const ref = parseRepo(url);
+  if (!ref) return url ? `Not a repository address: ${url.replace(/[\\[\]<>`*_]/g, "\\$&")}` : "Repository: add a url";
+  const description = attribute(element, "description")?.trim().replace(/[\\[\]<>`*_]/g, "\\$&");
+  return `[⎇ ${repoLabel(ref).replace(/_/g, "\\_")}](${ref.href})${description ? ` — ${description}` : ""}`;
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {
