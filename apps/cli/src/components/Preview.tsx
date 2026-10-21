@@ -2,7 +2,7 @@ import { CodeRenderable, type MarkdownOptions, type SyntaxStyle } from "@opentui
 import { useMemo } from "react";
 import type { Api } from "../api";
 import { highlightCode } from "../codeHighlight";
-import { parsePreview, type Block, type TocEntry } from "../mdx";
+import { parsePreview, type Block, type FootnoteEntry, type TocEntry } from "../mdx";
 import { mix, type Palette } from "../theme";
 import { PreviewImage } from "./PreviewImage";
 
@@ -29,8 +29,8 @@ const renderNode: NonNullable<MarkdownOptions["renderNode"]> = Object.assign(
 
 /**
  * A note's rendered preview: its Markdown, drawn by OpenTUI, with the MDX components the web
- * and desktop apps also render (see mdx.ts) drawn as panels and a table of contents, and its
- * images drawn as images. A note that
+ * and desktop apps also render (see mdx.ts) drawn as panels, a table of contents and a list of
+ * footnotes, and its images drawn as images. A note that
  * isn't valid MDX, which it is for as long as a tag is half-typed, shows why above a plain
  * Markdown render of the note, and recovers as soon as it is valid again.
  */
@@ -73,6 +73,8 @@ function Blocks({ blocks, palette, syntax, api, background }: Look & { blocks: B
             return <Panel key={index} block={block} marginTop={marginTop} palette={palette} syntax={syntax} api={api} />;
           case "toc":
             return <Toc key={index} entries={block.entries} marginTop={marginTop} palette={palette} />;
+          case "footnotes":
+            return <Footnotes key={index} entries={block.entries} marginTop={marginTop} palette={palette} />;
           case "image":
             return <PreviewImage key={index} block={block} api={api} palette={palette} marginTop={marginTop} />;
         }
@@ -129,6 +131,29 @@ function Toc({ entries, marginTop, palette }: { entries: TocEntry[]; marginTop: 
         entries.map((entry, index) => (
           <text key={index} fg={palette.primary}>{`${"  ".repeat(entry.level)}• ${entry.text}`}</text>
         ))
+      )}
+    </box>
+  );
+}
+
+/** The note's footnotes, numbered by where they are cited; the text above shows each citation as a superscript number. */
+function Footnotes({ entries, marginTop, palette }: { entries: FootnoteEntry[]; marginTop: number; palette: Palette }) {
+  return (
+    <box
+      border
+      borderStyle="single"
+      borderColor={palette.border}
+      title=" Footnotes "
+      titleColor={palette.muted}
+      paddingLeft={1}
+      paddingRight={1}
+      marginTop={marginTop}
+      flexDirection="column"
+    >
+      {entries.length === 0 ? (
+        <text fg={palette.muted}>No footnotes yet.</text>
+      ) : (
+        entries.map((entry) => <text key={entry.number} fg={palette.foreground}>{`${entry.number}. ${entry.text}`}</text>)
       )}
     </box>
   );

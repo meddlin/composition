@@ -115,7 +115,7 @@ method at a time.
 | [`src/tree.ts`](../apps/cli/src/tree.ts) | Turns notes, groups, favorites and a search into the tree's rows. Pure. |
 | [`src/keymap.ts`](../apps/cli/src/keymap.ts) | Every binding, driving the handlers, the footer and the `?` overlay. See [cli-keybindings.md](ui/cli-keybindings.md). |
 | [`src/highlight.ts`](../apps/cli/src/highlight.ts) | Markdown highlighting for the editor, which OpenTUI's textarea does not do itself. Pure. |
-| [`src/mdx.ts`](../apps/cli/src/mdx.ts) | Turns a note's body into what the preview draws: stretches of Markdown, `<Info>`/`<Warning>` panels, a `<Toc>`, images. Parses with the web's MDX plugins. Pure. See [mdx-components.md](ui/mdx-components.md). |
+| [`src/mdx.ts`](../apps/cli/src/mdx.ts) | Turns a note's body into what the preview draws: stretches of Markdown, `<Info>`/`<Warning>` panels, a `<Toc>`, footnotes, images. Parses with the web's MDX plugins. Pure. See [mdx-components.md](ui/mdx-components.md). |
 | [`src/images.ts`](../apps/cli/src/images.ts) | Reads and decodes a stored image (shrunk, cached), and works out how many cells to draw it in. See [images.md](architecture/images.md#in-the-cli). |
 | [`src/theme.ts`](../apps/cli/src/theme.ts), [`src/useSunLevel.ts`](../apps/cli/src/useSunLevel.ts) | The six color schemes and the "follow the sun" blend. |
 | [`src/components/`](../apps/cli/src/components) | `Tree`, `Pane` (editor, preview, autosave), `Preview` and `PreviewImage` (the Markdown, MDX and image drawing), `TrashScreen`, `SettingsScreen` and the dialogs. |

@@ -2,10 +2,11 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`), and may hold images. The terminal can't render
- * those as React or as HTML, so this turns the note into a list of blocks the preview draws:
- * stretches of plain Markdown (still drawn by OpenTUI's `<markdown>`, exactly as before), panels
- * around other blocks, a table of contents, and images.
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`), and may hold images and
+ * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
+ * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
+ * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
+ * footnotes, and images.
  *
  * It parses with the web app's own pipeline (remark-mdx, then web's allowlist and heading
  * plugins), so a note is valid or invalid here exactly as it is there, with the same messages.
@@ -22,7 +23,7 @@ import { HEADINGS_PROP, imageNameFromRef, remarkHeadings, remarkIndentedCode, re
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -32,10 +33,18 @@ export type TocEntry = {
   text: string;
 };
 
+/** One footnote of the list: `number` is the order it is first cited in, not the label the note gave it. */
+export type FootnoteEntry = {
+  number: number;
+  /** Its text without Markdown, a link's address in brackets after the words it was on. */
+  text: string;
+};
+
 export type Block =
   | { kind: "markdown"; source: string }
   | { kind: "panel"; tone: "info" | "warning"; blocks: Block[] }
   | { kind: "toc"; entries: TocEntry[] }
+  | { kind: "footnotes"; entries: FootnoteEntry[] }
   /** An image stored with the notes: `name` is its file in `app_data/`. */
   | { kind: "image"; name: string; alt: string; title?: string };
 
@@ -57,6 +66,11 @@ type Node = {
   url?: string;
   title?: string | null;
   alt?: string | null;
+  /** On a `footnoteDefinition` or `footnoteReference`: what the note called the footnote. */
+  identifier?: string;
+  /** Set by `numberFootnotes`: on a citation, its footnote's number; on a `<Footnotes>` tag, the list it draws. */
+  number?: number;
+  footnotes?: FootnoteEntry[];
   attributes?: { type: string; name?: string; value?: unknown }[];
   children?: Node[];
   position?: { start: { offset?: number }; end: { offset?: number } };
@@ -77,20 +91,26 @@ const markdownProcessor = unified().use(remarkParse).use(remarkGfm);
 const USES_COMPONENT = new RegExp(`<(?:${MDX_COMPONENTS.join("|")})[\\s/>]`);
 // A cheap look before parsing: Markdown image syntax is `![alt](`.
 const MAY_HAVE_IMAGE = /!\[[^\]\n]*\]\(/;
+// ...and a footnote is cited as `[^label]`.
+const MAY_HAVE_FOOTNOTE = /\[\^[^\]\s]+\]/;
 
 /**
  * What to draw for a note's body (its text without the frontmatter). Only a note that mentions
  * a component is parsed as MDX; any other is plain Markdown, where a stray `<` or `{` is fine,
- * and one with no component and no image isn't parsed at all.
+ * and one with no component, image or footnote isn't parsed at all.
  */
 export function parsePreview(body: string): Preview {
   const plain: Block[] = [{ kind: "markdown", source: body }];
   const mdx = USES_COMPONENT.test(body);
-  if (!mdx && !MAY_HAVE_IMAGE.test(body)) return { blocks: plain };
+  if (!mdx && !MAY_HAVE_IMAGE.test(body) && !MAY_HAVE_FOOTNOTE.test(body)) return { blocks: plain };
   const processor = mdx ? mdxProcessor : markdownProcessor;
   try {
     const tree = processor.runSync(processor.parse(body)) as unknown as Node;
-    return { blocks: blocksOf(tree.children ?? [], body) };
+    const { footnotes, tagged } = numberFootnotes(tree);
+    const blocks = blocksOf(tree.children ?? [], body);
+    // As on the web: a note that doesn't say where its footnotes go gets them at the end.
+    if (!tagged && footnotes.length > 0) blocks.push({ kind: "footnotes", entries: footnotes });
+    return { blocks };
   } catch (error) {
     return { blocks: plain, error: error instanceof Error ? error.message : String(error) };
   }
@@ -123,6 +143,11 @@ function blocksOf(nodes: Node[], source: string): Block[] {
   };
 
   for (const node of nodes) {
+    // A footnote's text is listed with the others, not left where it was written.
+    if (node.type === "footnoteDefinition") {
+      flush();
+      continue;
+    }
     const element = blockElement(node);
     const images = element ? null : paragraphImages(node);
     if (!element && !images) {
@@ -186,6 +211,8 @@ function elementBlocks(element: Node, source: string): Block[] {
     case "Mark":
       // On lines of its own, as a flow element: its content is what is drawn.
       return blocksOf(element.children ?? [], source);
+    case "Footnotes":
+      return [{ kind: "footnotes", entries: element.footnotes ?? [] }];
     default:
       return [];
   }
@@ -209,17 +236,21 @@ function substitute(source: string, from: number, to: number, nodes: Node[]): st
 /** The tags under `nodes` that aren't under another tag, in document order. */
 function outermostElements(nodes: Node[]): Node[] {
   return nodes.flatMap((node) =>
-    node.type === "mdxJsxTextElement" || node.type === "mdxJsxFlowElement" ? [node] : outermostElements(node.children ?? []),
+    node.type === "mdxJsxTextElement" || node.type === "mdxJsxFlowElement" || node.type === "footnoteReference"
+      ? [node]
+      : outermostElements(node.children ?? []),
   );
 }
 
 /**
- * What stands in for a tag that can't be a block. An image is its Markdown form, which the
+ * What stands in for a tag that can't be a block. A citation is its number in superscript digits
+ * (not `[1]`, which Markdown would read as a link). An image is its Markdown form, which the
  * terminal shows as its alt text; a panel or a highlight is dropped and its content kept (the
  * terminal draws the Markdown as one piece, with no way to tint a few words of it); a table of contents
- * has no sensible place inside a sentence or a list item, so it is dropped.
+ * has no sensible place inside a sentence or a list item, so it is dropped, as is a list of footnotes.
  */
 function replacement(element: Node, source: string): string {
+  if (element.type === "footnoteReference") return superscript(element.number);
   switch (componentOf(element)) {
     case "Image":
       return imageMarkdown(element);
@@ -273,4 +304,79 @@ function tocEntries(element: Node): TocEntry[] {
       open.push(depth);
       return { level, text };
     });
+}
+
+/**
+ * Numbers the footnotes as the web does: by the order they are first cited in, whatever the note
+ * calls them (a citation of one with no definition is left as text, and a definition nobody cites
+ * is not listed). The citations in a footnote's own text come after those in the note, since the
+ * footnotes are listed after it. Each citation gets its footnote's `number`, and the first
+ * `<Footnotes>` tag gets the list to draw (a second is left empty).
+ */
+function numberFootnotes(tree: Node): { footnotes: FootnoteEntry[]; tagged: boolean } {
+  const definitions = new Map<string, Node>();
+  const tags: Node[] = [];
+  const order: string[] = [];
+
+  const find = (node: Node) => {
+    if (node.type === "footnoteDefinition" && node.identifier !== undefined && !definitions.has(node.identifier)) definitions.set(node.identifier, node);
+    if ((node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") && componentOf(node) === "Footnotes") tags.push(node);
+    node.children?.forEach(find);
+  };
+  find(tree);
+
+  const cite = (node: Node) => {
+    if (node.type === "footnoteReference" && node.identifier !== undefined && definitions.has(node.identifier)) {
+      if (!order.includes(node.identifier)) order.push(node.identifier);
+      node.number = order.indexOf(node.identifier) + 1;
+    }
+    // A definition is read when its turn comes, below, not where it was written.
+    if (node.type !== "footnoteDefinition") node.children?.forEach(cite);
+  };
+  cite(tree);
+  for (let i = 0; i < order.length; i++) definitions.get(order[i])?.children?.forEach(cite);
+
+  const footnotes = order.map((identifier, index) => ({ number: index + 1, text: plainText(definitions.get(identifier)!) }));
+  tags.forEach((tag, index) => {
+    tag.footnotes = index === 0 ? footnotes : [];
+  });
+  return { footnotes, tagged: tags.length > 0 };
+}
+
+const SUPERSCRIPT = "⁰¹²³⁴⁵⁶⁷⁸⁹";
+
+/** `12` as `¹²`: how the terminal, which can't raise text, marks a citation. */
+const superscript = (n: number | undefined) => (n === undefined ? "" : [...String(n)].map((digit) => SUPERSCRIPT[Number(digit)]).join(""));
+
+/** The words of a footnote on one line: a link keeps its address, an image its alt text, a citation its superscript number. */
+function plainText(node: Node): string {
+  return collapse(wordsOf(node));
+}
+
+const collapse = (text: string) => text.replace(/\s+/g, " ").trim();
+
+const BLOCK_CONTAINERS = new Set(["footnoteDefinition", "list", "listItem", "blockquote"]);
+
+function wordsOf(node: Node): string {
+  switch (node.type) {
+    case "text":
+    case "inlineCode":
+    case "code":
+      return node.value ?? "";
+    case "image":
+      return node.alt ?? "";
+    case "break":
+      return " ";
+    case "footnoteReference":
+      return superscript(node.number);
+    case "link": {
+      const text = collapse((node.children ?? []).map(wordsOf).join(""));
+      return text === "" || text === node.url ? (node.url ?? "") : `${text} (${node.url})`;
+    }
+    default: {
+      // The blocks inside a footnote, a list or a quote follow one another; inline pieces run together.
+      const separator = BLOCK_CONTAINERS.has(node.type) ? " " : "";
+      return (node.children ?? []).map(wordsOf).join(separator);
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { createContext, useContext, type ComponentPropsWithoutRef } from "react";
+import { createContext, useContext, type ComponentPropsWithoutRef, type MouseEvent } from "react";
 import { defaultUrlTransform, type ExtraProps, type Options } from "react-markdown";
 import { noteIdFromRef } from "@/lib/composition/noteRefs";
 
@@ -21,21 +21,34 @@ export const NoteLinksProvider = NoteLinksContext.Provider;
 export const noteUrlTransform: NonNullable<Options["urlTransform"]> = (url) =>
   noteIdFromRef(url) === null ? defaultUrlTransform(url) : url;
 
+function withoutNode({ node, ...attributes }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
+  void node;
+  return attributes;
+}
+
+function scrollToFragment(event: MouseEvent, id: string) {
+  // The id lives in the page, not the address bar: a hash change would leave the note in the desktop app.
+  event.preventDefault();
+  document.getElementById(id)?.scrollIntoView({ block: "start" });
+}
+
 /**
  * The preview's rendering of Markdown links, `[text](target)`. Wired in through
  * react-markdown's `components` map (see `markdownComponents`).
  *
  * A `note:<id>` target opens that note in the app, or beside this one with
  * Cmd/Ctrl held; one whose note is gone is shown as dead text. Any other link
- * is left as written.
+ * is left as written, except that one to a place in the note itself (`#id`, which
+ * is what footnotes use) scrolls there rather than changing the address.
  */
-export function NoteAnchor({ href, title, children }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
+export function NoteAnchor({ href, title, children, ...props }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
   const links = useContext(NoteLinksContext);
   const noteId = href ? noteIdFromRef(href) : null;
 
   if (noteId === null) {
     return (
-      <a href={href} title={title}>
+      // What react-markdown adds to a link besides these (a footnote's id, say) is kept; its `node` is not an attribute.
+      <a href={href} title={title} {...withoutNode(props)} onClick={href?.startsWith("#") ? (event) => scrollToFragment(event, href.slice(1)) : undefined}>
         {children}
       </a>
     );

@@ -95,7 +95,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],
@@ -231,6 +231,111 @@ describe("NoteMarkdown", () => {
       const ids = screen.getAllByRole("heading", { name: "Same" }).map((h) => h.id);
       expect(ids).toHaveLength(2);
       expect(ids[0]).not.toBe(ids[1]);
+    });
+  });
+
+  describe("footnotes", () => {
+    const cited = "Intro[^b] and more[^a].\n\n[^a]: Alpha [link](https://a.example).\n[^b]: Beta.";
+    const items = () => screen.getAllByRole("listitem").map((li) => li.textContent?.replace(/↩[\s\S]*$/, "").trim());
+    const refs = (container: HTMLElement) => [...container.querySelectorAll("p sup a")].map((a) => a.textContent);
+
+    it("lists a plain note's footnotes at its end, numbered by where they are cited, not by label", () => {
+      const { container } = renderNote(cited);
+
+      expect(refs(container)).toEqual(["1", "2"]);
+      expect(items()).toEqual(["Beta.", "Alpha link."]);
+      expect(container.lastElementChild?.tagName).toBe("SECTION");
+    });
+
+    it("renumbers when a footnote is added between existing ones", () => {
+      const { container, rerender } = renderNote("One[^1] two[^2].\n\n[^1]: First.\n[^2]: Second.");
+      expect(items()).toEqual(["First.", "Second."]);
+
+      rerender(<NoteMarkdown body={"One[^1] new[^3] two[^2].\n\n[^1]: First.\n[^2]: Second.\n[^3]: Inserted."} rehypePlugins={[]} />);
+
+      expect(refs(container)).toEqual(["1", "2", "3"]);
+      expect(items()).toEqual(["First.", "Inserted.", "Second."]);
+    });
+
+    it("scrolls between a citation and its footnote on click instead of changing the address", () => {
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+      const { container } = renderNote(cited);
+      const ref = container.querySelector<HTMLAnchorElement>("p sup a")!;
+      const target = container.querySelector(`li[id]`)!;
+
+      expect(ref.getAttribute("href")).toBe(`#${target.id}`);
+      expect(fireEvent.click(ref)).toBe(false); // default prevented: no hash change
+      expect(scrollIntoView).toHaveBeenCalledOnce();
+      expect(scrollIntoView.mock.contexts[0]).toBe(target);
+
+      const back = target.querySelector<HTMLAnchorElement>("a")!;
+      fireEvent.click(back);
+      expect(scrollIntoView.mock.contexts[1]).toBe(ref);
+    });
+
+    it("keeps footnote ids apart between two notes on screen", () => {
+      const first = renderNote(cited);
+      const second = renderNote(cited);
+
+      const ids = (c: HTMLElement) => [...c.querySelectorAll("[id]")].map((e) => e.id).filter((id) => id.includes("fn"));
+      expect(ids(first.container).length).toBeGreaterThan(0);
+      expect(ids(first.container).some((id) => ids(second.container).includes(id))).toBe(false);
+    });
+
+    describe("<Footnotes />", () => {
+      it("puts the list where the tag is, and nowhere else", () => {
+        const { container } = renderNote(`Cited[^a].\n\n<Footnotes />\n\nAfter the list.\n\n[^a]: Alpha.`);
+
+        const list = screen.getByRole("region", { name: "Footnotes" });
+        expect(list.textContent).toContain("Alpha.");
+        expect(container.querySelectorAll("section")).toHaveLength(1);
+        expect(container.querySelectorAll("ol")).toHaveLength(1);
+        expect(list.nextElementSibling?.textContent).toBe("After the list.");
+        expect(screen.queryByRole("alert")).toBeNull();
+      });
+
+      it("numbers by citation order and links both ways, like the list at the end", () => {
+        const { container } = renderNote(`Intro[^b] more[^a].\n\n[^a]: Alpha.\n[^b]: Beta.\n\n<Footnotes />`);
+
+        expect(refs(container)).toEqual(["1", "2"]);
+        expect(items()).toEqual(["Beta.", "Alpha."]);
+        const ref = container.querySelector("p sup a")!;
+        const target = container.querySelector(`[id="${ref.getAttribute("href")!.slice(1)}"]`)!;
+        expect(target.tagName).toBe("LI");
+        expect(target.querySelector("a")?.getAttribute("href")).toBe(`#${ref.id}`);
+      });
+
+      it("follows the note as it is edited", () => {
+        const { rerender } = renderNote("A[^a].\n\n[^a]: Alpha.\n\n<Footnotes />");
+        expect(items()).toEqual(["Alpha."]);
+
+        rerender(<NoteMarkdown body={"A[^a] B[^b].\n\n[^a]: Alpha.\n[^b]: Beta.\n\n<Footnotes />"} rehypePlugins={[]} />);
+
+        expect(items()).toEqual(["Alpha.", "Beta."]);
+      });
+
+      it("keeps Markdown and links inside a footnote working", () => {
+        renderNote("A[^a].\n\n[^a]: **Bold** and [a link](https://a.example).\n\n<Footnotes />");
+
+        const list = screen.getByRole("region", { name: "Footnotes" });
+        expect(list.querySelector("strong")?.textContent).toBe("Bold");
+        expect(list.querySelector("a[href='https://a.example']")?.textContent).toBe("a link");
+      });
+
+      it("says so when there are no footnotes", () => {
+        renderNote("Just text.\n\n<Footnotes />");
+
+        expect(screen.getByText("No footnotes yet.")).toBeDefined();
+      });
+
+      it("ignores a second tag, leaving it empty", () => {
+        renderNote("A[^a].\n\n[^a]: Alpha.\n\n<Footnotes />\n\n<Footnotes />");
+
+        const [first, second] = screen.getAllByRole("region", { name: "Footnotes" });
+        expect(first.textContent).toContain("Alpha.");
+        expect(second.textContent).toBe("No footnotes yet.");
+      });
     });
   });
 });

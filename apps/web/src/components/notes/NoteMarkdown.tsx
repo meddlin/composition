@@ -3,6 +3,7 @@ import Markdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import { mdxComponents, mdxComponentsByKey, usesMdxComponent } from "./mdx/components";
+import { rehypeFootnotes } from "./mdx/rehypeFootnotes";
 import { remarkIndentedCode } from "./mdx/remarkIndentedCode";
 import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
@@ -29,26 +30,35 @@ const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"
   [remarkHeadings, { idPrefix }],
 ];
 
+// Footnote ids get the same per-preview prefix as heading ids, so a footnote link never scrolls a neighbouring pane.
+const footnoteOptions = (idPrefix: string): NonNullable<Options["remarkRehypeOptions"]> => ({ clobberPrefix: idPrefix });
+
 // remark-rehype turns node types it doesn't know into <div>s; these are left
 // for react-markdown to render, using `mdxComponentsByKey`.
-const mdxRehypeOptions: NonNullable<Options["remarkRehypeOptions"]> = {
+const mdxRehypeOptions = (idPrefix: string): NonNullable<Options["remarkRehypeOptions"]> => ({
+  ...footnoteOptions(idPrefix),
   passThrough: ["mdxJsxFlowElement", "mdxJsxTextElement"],
-};
+});
 
 /**
  * A note's rendered preview: Markdown (with images shown by `NoteImage`), plus
  * the MDX components in `mdxComponents` for notes that use any of them. The
- * headings of such a note get ids, which is what `<Toc />` links to.
+ * headings of such a note get ids, which is what `<Toc />` links to. Footnotes
+ * (`[^1]`) are listed at the end of the note, or where it puts `<Footnotes />`.
  */
 export function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props) {
   // Every piece of text is wrapped to say where in the note it came from; that has to see the tree first.
   const rehypePlugins = useMemo(() => [rehypeSourceSpans, ...extraRehypePlugins], [extraRehypePlugins]);
+  const mdxRehypePlugins = useMemo(() => [rehypeSourceSpans, rehypeFootnotes, ...extraRehypePlugins], [extraRehypePlugins]);
   // Heading ids are unique per preview, so a table of contents never scrolls a neighbouring pane.
   const idPrefix = `${useId()}-`;
   const remarkPlugins = useMemo(() => mdxRemarkPlugins(idPrefix), [idPrefix]);
+  const mdxRehypeOpts = useMemo(() => mdxRehypeOptions(idPrefix), [idPrefix]);
+  const plainRehypeOpts = useMemo(() => footnoteOptions(idPrefix), [idPrefix]);
   const plain = (
     <Markdown
       remarkPlugins={[remarkGfm]}
+      remarkRehypeOptions={plainRehypeOpts}
       rehypePlugins={rehypePlugins}
       components={markdownComponents}
       urlTransform={noteUrlTransform}
@@ -62,8 +72,8 @@ export function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props)
     <MdxBoundary body={body} fallback={plain}>
       <Markdown
         remarkPlugins={remarkPlugins}
-        remarkRehypeOptions={mdxRehypeOptions}
-        rehypePlugins={rehypePlugins}
+        remarkRehypeOptions={mdxRehypeOpts}
+        rehypePlugins={mdxRehypePlugins}
         components={noteComponents}
         urlTransform={noteUrlTransform}
       >

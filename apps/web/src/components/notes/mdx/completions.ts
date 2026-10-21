@@ -34,6 +34,10 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "Highlighted text, in a colour",
     template: '<Mark color="yellow">$0</Mark>',
   },
+  Footnotes: {
+    description: "Footnotes list, numbered by where they are cited",
+    template: "<Footnotes />$0",
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));
