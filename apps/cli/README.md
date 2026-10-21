@@ -12,7 +12,7 @@ leaving the terminal. It opens the same notes as the web and desktop apps in thi
 
 - Write and edit notes in Markdown, directly in the terminal, with a live preview, side by side if
   you like: open several notes in panes next to each other
-- See the MDX components a note uses (`<Info>`, `<Warning>`, `<Toc>`, `<Image>`) drawn in the preview,
+- See the MDX components a note uses (`<Info>`, `<Warning>`, `<Toc>`, `<Image>`, `<Footnotes>`) drawn in the preview,
   written the same way as in the web and desktop apps ([docs/ui/mdx-components.md](../../docs/ui/mdx-components.md))
 - See fenced code blocks colored by language in the preview, with the same highlighter and colors as the
   web and desktop apps (a fence with no language stays plain; code inside a list item is not

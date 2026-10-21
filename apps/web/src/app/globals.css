@@ -348,6 +348,17 @@
   --tw-prose-td-borders: color-mix(in srgb, var(--foreground) 15%, transparent);
 }
 
+/* The footnotes a note lists at its end (GFM's section; <Footnotes /> styles its own): set apart and smaller. */
+.prose section[data-footnotes] {
+  margin-top: 2em;
+  padding-top: 0.75em;
+  border-top: 1px solid var(--tw-prose-hr);
+  font-size: 0.875em;
+}
+.prose section[data-footnotes] :where(ol, p) {
+  margin-block: 0;
+}
+
 /* Code block token colors (highlight.js scopes, emitted by rehype-highlight). */
 .prose pre code .hljs-comment,
 .prose pre code .hljs-quote {

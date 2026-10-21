@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Components } from "react-markdown";
+import { Footnotes } from "./Footnotes";
 import { Image } from "./Image";
 import { Info } from "./Info";
 import { Mark } from "./Mark";
@@ -23,7 +24,7 @@ export const mdxComponents: Record<
     maxDepth?: string;
     color?: string;
   }>
-> = { Info, Warning, Image, Toc, Mark };
+> = { Info, Warning, Image, Toc, Mark, Footnotes };
 
 const names = Object.keys(mdxComponents);
 

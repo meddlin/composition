@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -82,6 +82,36 @@ names are the same everywhere and each color scheme tints them to suit its own b
 note reads in all of them. See [text-highlighting.md](text-highlighting.md) for how highlights
 are made and removed.
 
+## Footnotes
+
+For a well-researched note with many links and references: cite a footnote with `[^label]` where it
+belongs, and write its text on a line of its own anywhere in the note with `[^label]: text`.
+
+```mdx
+Staging resets nightly[^runbook], and the cron job is documented elsewhere[^cron].
+
+[^runbook]: [Staging runbook](https://example.com/runbook), section 3.
+[^cron]: See the [scheduler docs](https://example.com/cron) and the _ops_ channel.
+
+<Footnotes />
+```
+
+- **The number is where it is cited, not the label.** Citations are numbered 1, 2, 3… in the order they
+  appear in the note, whatever they are called, so a footnote added between two existing ones takes its
+  place and the later ones renumber on their own. Nothing in the note's text is rewritten. Use any label
+  you like (`[^1]`, `[^runbook]`); it only has to match its definition.
+- **Where the list goes.** A note with footnotes lists them at the end, with a ↩ link from each back to
+  where it is cited. `<Footnotes />` puts the list where the tag is instead (the last line, usually), and
+  says "No footnotes yet." when there are none. It takes no props, and a second tag is left empty.
+  Footnotes work in a note that uses no other component, too: they are Markdown (GFM) first, and the
+  tag is for placing the list.
+- **Links.** On the web and desktop, clicking a citation scrolls to its footnote and ↩ scrolls back; neither
+  changes the address, and two notes open side by side never scroll each other.
+- A citation with no definition stays as typed (`[^x]`), and a definition nobody cites is not listed.
+
+Source: [`mdx/Footnotes.tsx`](../../apps/web/src/components/notes/mdx/Footnotes.tsx) and
+[`mdx/rehypeFootnotes.ts`](../../apps/web/src/components/notes/mdx/rehypeFootnotes.ts), which moves the list to the tag.
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -115,6 +145,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Warning>` | The same, in the scheme's warning color, titled `Warning`. |
 | `<Toc>` | A box titled `Contents` listing the headings, indented by nesting and cut off at `maxDepth`. It isn't clickable, and follows the note as it is edited. |
 | `<Mark>` | Its text, without the tags. The terminal draws a stretch of Markdown as one piece, so it has no way to tint a few words of it yet. |
+| `<Footnotes>`, and the list at the end of a note without it | A box titled `Footnotes`, one numbered line per footnote; a link keeps its address in brackets after its words. Citations in the text are superscript digits (`¹`), since `[1]` would be read as a link. The definitions are not left where they were written. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:

@@ -277,6 +277,89 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("footnotes", () => {
+    const footnotes = (body: string) => {
+      const block = parsePreview(body).blocks.find((b) => b.kind === "footnotes");
+      return block?.kind === "footnotes" ? block.entries : undefined;
+    };
+
+    it("lists them at the end of a plain note, numbered by where they are cited, with each citation as a superscript number", () => {
+      const body = "Intro[^b] and more[^a].\n\n[^a]: Alpha.\n[^b]: Beta.";
+      expect(parsePreview(body)).toEqual({
+        blocks: [
+          markdown("Intro¹ and more²."),
+          { kind: "footnotes", entries: [{ number: 1, text: "Beta." }, { number: 2, text: "Alpha." }] },
+        ],
+      });
+    });
+
+    it("renumbers when one is added between the others", () => {
+      expect(footnotes("One[^1] new[^3] two[^2].\n\n[^1]: First.\n[^2]: Second.\n[^3]: Inserted.")?.map((e) => e.text)).toEqual([
+        "First.",
+        "Inserted.",
+        "Second.",
+      ]);
+    });
+
+    it("puts them where <Footnotes /> is, and not also at the end", () => {
+      const body = "Cited[^a].\n\n<Footnotes />\n\nAfter.\n\n[^a]: Alpha.";
+      expect(parsePreview(body).blocks).toEqual([
+        markdown("Cited¹."),
+        { kind: "footnotes", entries: [{ number: 1, text: "Alpha." }] },
+        markdown("After."),
+      ]);
+    });
+
+    it("draws an empty list for <Footnotes /> in a note with none, and leaves a second tag empty", () => {
+      expect(parsePreview("Text.\n\n<Footnotes />").blocks).toEqual([markdown("Text."), { kind: "footnotes", entries: [] }]);
+      const blocks = parsePreview("A[^a].\n\n[^a]: Alpha.\n\n<Footnotes />\n\n<Footnotes />").blocks;
+      expect(blocks.filter((b) => b.kind === "footnotes")).toEqual([
+        { kind: "footnotes", entries: [{ number: 1, text: "Alpha." }] },
+        { kind: "footnotes", entries: [] },
+      ]);
+    });
+
+    it("keeps a link's address and reads the rest as plain words", () => {
+      expect(footnotes("A[^a] B[^b] C[^c].\n\n[^a]: See [the **docs**](https://a.example) and `code`.\n[^b]: <https://b.example>\n[^c]: ![chart](x.png) after.")).toEqual([
+        { number: 1, text: "See the docs (https://a.example) and code." },
+        { number: 2, text: "https://b.example" },
+        { number: 3, text: "chart after." },
+      ]);
+    });
+
+    it("numbers a citation inside a footnote after those in the note", () => {
+      expect(footnotes("First[^a] second[^c].\n\n[^a]: Alpha, see also[^b].\n[^b]: Beta.\n[^c]: Gamma.")).toEqual([
+        { number: 1, text: "Alpha, see also³." },
+        { number: 2, text: "Gamma." },
+        { number: 3, text: "Beta." },
+      ]);
+    });
+
+    it("counts citations in panels and list items, and leaves an undefined or uncited one alone", () => {
+      const body = "- item[^a]\n\n<Info>\n\nin a panel[^a] and[^missing]\n\n</Info>\n\n[^a]: Alpha.\n[^unused]: Never cited.";
+      expect(parsePreview(body).blocks).toEqual([
+        markdown("- item¹"),
+        info(markdown("in a panel¹ and[^missing]")),
+        { kind: "footnotes", entries: [{ number: 1, text: "Alpha." }] },
+      ]);
+    });
+
+    it("writes a number of more than one digit in superscript digits", () => {
+      const cites = Array.from({ length: 12 }, (_, i) => `x[^${i + 1}]`).join(" ");
+      const defs = Array.from({ length: 12 }, (_, i) => `[^${i + 1}]: n${i + 1}`).join("\n");
+      expect(parsePreview(`${cites}\n\n${defs}`).blocks[0]).toEqual(markdown("x¹ x² x³ x⁴ x⁵ x⁶ x⁷ x⁸ x⁹ x¹⁰ x¹¹ x¹²"));
+    });
+
+    it("is not drawn inside a sentence or a list item", () => {
+      expect(parsePreview("a <Footnotes /> b").blocks).toEqual([markdown("a  b")]);
+    });
+
+    it("leaves a note that cites nothing as it was written", () => {
+      const body = "no footnotes here, only [^ brackets]";
+      expect(parsePreview(body).blocks).toEqual([markdown(body)]);
+    });
+  });
+
   describe("invalid MDX", () => {
     it("says what is wrong, with its position, above the whole note as plain Markdown", () => {
       const body = "<Info>\n\nunfinished";
@@ -288,7 +371,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {
