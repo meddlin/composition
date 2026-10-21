@@ -38,6 +38,7 @@ import {
   focusPane,
   initialPanes,
   openNote,
+  openNoteBeside,
   setPaneView,
   withSizes,
   type DropZone,
@@ -133,6 +134,13 @@ function Workspace({
   function selectNote(id: number) {
     flushPendingSave();
     setPaneState((prev) => openNote(prev, id));
+    setViewedGroupId(null);
+  }
+
+  /** Opens the note in a new pane next to the focused one, rather than in it. */
+  function openBeside(id: number) {
+    flushPendingSave();
+    setPaneState((prev) => openNoteBeside(prev, id));
     setViewedGroupId(null);
   }
 
@@ -316,6 +324,7 @@ function Workspace({
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           onSelect={selectNote}
+          onOpenBeside={openBeside}
           onSelectGroup={selectGroup}
           onCreate={create}
           onDelete={(id) => setPendingDelete({ kind: "note", id })}

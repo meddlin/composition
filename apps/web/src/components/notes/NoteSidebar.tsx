@@ -21,6 +21,7 @@ type Props = {
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   onSelect: (id: number) => void;
+  onOpenBeside: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onCreate: (groupId: number | null) => void;
   onDelete: (id: number) => void;
@@ -43,6 +44,7 @@ export function NoteSidebar({
   favorites,
   onToggleFavorite,
   onSelect,
+  onOpenBeside,
   onSelectGroup,
   onCreate,
   onDelete,
@@ -71,6 +73,7 @@ export function NoteSidebar({
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
           onSelectNote={onSelect}
+          onOpenNoteBeside={onOpenBeside}
           onSelectGroup={onSelectGroup}
           onDeleteNote={onDelete}
           onCreateNote={onCreate}

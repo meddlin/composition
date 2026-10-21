@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { favoriteLabel } from "./FavoriteMenu";
+import { favoriteLabel } from "./NoteMenu";
 
 type Props = {
   groupName: string;

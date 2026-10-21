@@ -83,6 +83,8 @@ describe("following a note link in the preview", () => {
   it("focuses a linked note that is already open instead of opening it twice", () => {
     renderApp();
     fireEvent.click(link("Alpha", "Beta"), { metaKey: true });
+    // A pane opened beside another starts on its editor; Beta's links are in its preview.
+    fireEvent.click(within(screen.getByRole("region", { name: "Beta" })).getByRole("tab", { name: "Split" }));
 
     fireEvent.click(link("Beta", "Alpha"));
 
