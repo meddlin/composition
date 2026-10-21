@@ -106,7 +106,7 @@ export function ImageLibrary({ images }: { images: ImageInfo[] }) {
       )}
 
       <Dialog open={selected !== null} onOpenChange={(open) => !open && setSelectedName(null)}>
-        <DialogContent>{selected && <ImageDetails image={selected} />}</DialogContent>
+        <DialogContent className="max-w-2xl">{selected && <ImageDetails image={selected} />}</DialogContent>
       </Dialog>
     </div>
   );

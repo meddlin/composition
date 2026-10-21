@@ -91,7 +91,8 @@ The pane arrangement is the web app's, imported as-is ([`panes.ts`](../../apps/w
 - **`ctrl+x`** closes the pane, giving its width to its neighbour;
 - the arrangement is not saved: the next run starts with no panes, as on the web.
 
-A pane shows `split` (editor and preview side by side), `editor` or `preview`; `ctrl+t` cycles them.
+A pane shows `split` (editor and preview side by side), `editor` or `preview`; `ctrl+t` cycles them. The first
+pane starts on `split`; a pane opened beside another (`o`) starts on `editor`.
 A pane narrower than 80 columns shows the editor instead of `split`, rather than squeezing two
 columns into it, the same fallback the web app has.
 

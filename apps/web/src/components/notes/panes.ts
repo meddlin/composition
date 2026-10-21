@@ -35,6 +35,13 @@ export const SIDE_BY_SIDE_MIN_WIDTH = 480;
 /** The share of a pane's width, from each side, that counts as dropping beside it. */
 const EDGE_FRACTION = 0.3;
 
+/**
+ * What a pane added beside another one shows. A lone note starts on "split", but
+ * notes open together are there to be written in, and each has only a share of the
+ * row, so the editor is the default and the preview is a tab away.
+ */
+const BESIDE_VIEW: PaneView = "markdown";
+
 export function initialPanes(noteId: number | null): PaneState {
   return noteId === null
     ? { panes: [], focusedId: null }
@@ -53,6 +60,15 @@ export function setPaneView(state: PaneState, noteId: number, view: PaneView): P
  */
 export function shownView(view: PaneView, wideEnough: boolean): PaneView {
   return view === "split" && !wideEnough ? "markdown" : view;
+}
+
+/**
+ * The view `delta` steps from the one shown, in the tabs' order (Markdown, Preview,
+ * Split) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
+ */
+export function stepView(shown: PaneView, canSplit: boolean, delta: 1 | -1): PaneView {
+  const order: PaneView[] = canSplit ? ["markdown", "preview", "split"] : ["markdown", "preview"];
+  return order[(order.indexOf(shown) + delta + order.length) % order.length];
 }
 
 export function focusPane(state: PaneState, noteId: number): PaneState {
@@ -76,6 +92,18 @@ export function openNote(state: PaneState, noteId: number): PaneState {
   };
 }
 
+/**
+ * Opens a note in a new pane to the right of the focused one (the sidebar's "Open to
+ * the side"). Like picking it in the sidebar when nothing is open, it takes the only
+ * pane there is; and a note that is already open moves beside the focused pane
+ * instead of duplicating (see `dropNote`).
+ */
+export function openNoteBeside(state: PaneState, noteId: number): PaneState {
+  if (state.panes.length === 0) return initialPanes(noteId);
+  const target = state.panes.find((p) => p.noteId === state.focusedId) ?? state.panes[state.panes.length - 1];
+  return dropNote(state, noteId, target.noteId, "right");
+}
+
 /** Closes a pane; its width goes to the pane after it (or before it, for the last). */
 export function closePane(state: PaneState, noteId: number): PaneState {
   const at = state.panes.findIndex((p) => p.noteId === noteId);
@@ -94,7 +122,7 @@ export function closePane(state: PaneState, noteId: number): PaneState {
 
 /**
  * Drops a note on the pane showing `targetId`. Beside it, the note gets a new
- * pane that takes half the target's width. Onto it, the note replaces the
+ * pane that takes half the target's width and shows the editor. Onto it, the note replaces the
  * target's (keeping that pane's view). A note that was already open elsewhere
  * moves instead of duplicating, view and all: its pane is reordered beside the
  * target (every pane keeps its width), or, when dropped onto another pane,
@@ -130,7 +158,7 @@ export function dropNote(state: PaneState, noteId: number, targetId: number, zon
 
   const half = others[at].size / 2;
   const panes = others.map((p, i) => (i === at ? { ...p, size: half } : p));
-  panes.splice(beside, 0, { noteId, size: half, view: "split" });
+  panes.splice(beside, 0, { noteId, size: half, view: BESIDE_VIEW });
   return { panes, focusedId: noteId };
 }
 

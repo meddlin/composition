@@ -25,7 +25,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Drag and drop notes and groups | 🚫 | ✅ | ✅ | A terminal has no dragging worth the name; the CLI moves with keys instead (`m`, and `shift+↑` `shift+↓` below). [web-groups.md](ui/web-groups.md) |
 | Reorder notes and groups by hand | ✅ | ✅ | ✅ | Web and desktop: drag a row to the edge of a sibling. CLI: `shift+↑` `shift+↓` move the highlighted row one place. [groups.md](architecture/groups.md#ordering) |
 | Move an existing group under another | ✅ | ✅ | ✅ | CLI: the `m` key, which offers every group except the group itself and what is beneath it |
-| Several notes open side by side | ✅ | ✅ | ✅ | CLI: the `o` key opens a note in a new pane, `ctrl+o` moves between panes. Web and desktop: draggable panes. [screen-navigation.md](architecture/screen-navigation.md) |
+| Several notes open side by side | ✅ | ✅ | ✅ | CLI: the `o` key opens a note in a new pane, `ctrl+o` moves between panes. Web and desktop: draggable panes, or **Open to the side** in a note's `⋯` menu; a note opened beside another starts on its editor. [web-side-by-side.md](ui/web-side-by-side.md), [screen-navigation.md](architecture/screen-navigation.md) |
 | Favorites: pin groups and notes above the tree | ✅ | ✅ | ✅ | CLI: the `f` key. [groups.md](architecture/groups.md#favorites) |
 
 ## Search
@@ -62,6 +62,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Resizable columns, remembered | ✅ | ✅ | ✅ | Web and desktop: drag the dividers. CLI: `<` `>` for the tree and `[` `]` for the editor/preview split. The CLI's tree width is stored in its own field (`cliSidebarColumns`, in columns), so a backup restored from another app never resizes it; the split is the shared `editorRatio`. [keybindings](ui/cli-keybindings.md) |
 | Application data location setting | ✅ | ✅ | ✅ | Moving it in the CLI or the desktop app moves the other one too, through `~/.composition-location.json`. The web app keeps its own. The CLI moves the files; web and desktop only repoint. [product-builds.md](product-builds.md) |
 | Backup and restore everything from Settings | ✅ | ✅ | ✅ | Notes, groups, Trash Can, images, attachments, and the color scheme, city, column sizes and favorites, in one `.tar.gz`. The web and CLI type a path; the desktop uses file dialogs. [backup-restore.md](architecture/backup-restore.md) |
+| Keyboard shortcuts helper | ❌ | ✅ | ✅ | A list of every shortcut, in a Settings section and in a floating window opened with Cmd/Ctrl+/ (or `?` outside a text field) from any screen. The list is `components/shortcuts/shortcuts.ts`; add to it when adding a shortcut. The CLI has its own [keybindings](ui/cli-keybindings.md) |
 | Automatic updates | 🚫 | 🚫 | ✅ | Checks GitHub Releases at launch and every 6 hours, asks before downloading and again before restarting. Settings has the on/off toggle. [desktop-updates-plan.md](desktop-updates-plan.md) |
 | Developer docs viewer (`/docs`) | ❌ | ✅ | 🚫 | It reads this repo's docs from disk, which an installed app doesn't have |
 

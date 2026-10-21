@@ -10,9 +10,9 @@ import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { cn } from "@/lib/utils";
 import { dropEdge, type DropEdge } from "./dropEdge";
 import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
-import { FavoriteMenu } from "./FavoriteMenu";
 import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
+import { NoteMenu } from "./NoteMenu";
 import { noteTitle, type Group, type Note } from "./types";
 
 // Overlays a row's buttons instead of reserving space, so names can run right up to the edge.
@@ -29,6 +29,7 @@ type TreeProps = {
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   onSelectNote: (id: number) => void;
+  onOpenNoteBeside: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
   onCreateNote: (groupId: number) => void;
@@ -51,6 +52,7 @@ export function GroupTree({
   favorites,
   onToggleFavorite,
   onSelectNote,
+  onOpenNoteBeside,
   onSelectGroup,
   onDeleteNote,
   onCreateNote,
@@ -122,6 +124,7 @@ export function GroupTree({
     onDropGroup: dropGroup,
     onPlaceGroup: placeGroup,
     onSelectNote,
+    onOpenNoteBeside,
     onSelectGroup,
     canDeleteNotes: true,
     onDeleteNote,
@@ -175,6 +178,7 @@ export function GroupTree({
             onPlaceNote(noteId, null, edge === "before" ? note.id : (siblings[index + 1]?.id ?? null))
           }
           onSelect={() => onSelectNote(note.id)}
+          onOpenBeside={() => onOpenNoteBeside(note.id)}
           onDelete={() => onDeleteNote(note.id)}
           onToggleFavorite={() => onToggleFavorite("note", note.id)}
         />
@@ -201,7 +205,7 @@ function FavoritesSection({
   groupsById: Map<number, Group>;
   notesById: Map<number, Note>;
 }) {
-  const { favorites, activeId, onSelectNote, onToggleFavorite } = shared;
+  const { favorites, activeId, onSelectNote, onOpenNoteBeside, onToggleFavorite } = shared;
   // Notes are never deleted from here, including those inside a pinned group: the Favorites
   // section is for getting to things, and a stray click there shouldn't destroy a note.
   const favoritesShared: SharedProps = { ...shared, canDeleteNotes: false };
@@ -242,6 +246,7 @@ function FavoritesSection({
             active={row.note.id === activeId}
             favorite
             onSelect={() => onSelectNote(row.note.id)}
+            onOpenBeside={() => onOpenNoteBeside(row.note.id)}
             onToggleFavorite={() => onToggleFavorite("note", row.note.id)}
           />
         ),
@@ -267,6 +272,7 @@ type SharedProps = {
   onDropGroup: (id: number, parentId: number | null) => void;
   onPlaceGroup: (id: number, parentId: number | null, beforeGroupId: number | null) => void;
   onSelectNote: (id: number) => void;
+  onOpenNoteBeside: (id: number) => void;
   onSelectGroup: (id: number) => void;
   /** Whether note rows show a delete button; off inside the Favorites section. */
   canDeleteNotes: boolean;
@@ -297,6 +303,7 @@ function GroupNode({
   onDropGroup,
   onPlaceGroup,
   onSelectNote,
+  onOpenNoteBeside,
   onSelectGroup,
   canDeleteNotes,
   onDeleteNote,
@@ -480,6 +487,7 @@ function GroupNode({
             onDropGroup={onDropGroup}
             onPlaceGroup={onPlaceGroup}
             onSelectNote={onSelectNote}
+            onOpenNoteBeside={onOpenNoteBeside}
             onSelectGroup={onSelectGroup}
             canDeleteNotes={canDeleteNotes}
             onDeleteNote={onDeleteNote}
@@ -507,6 +515,7 @@ function GroupNode({
               )
             }
             onSelect={() => onSelectNote(note.id)}
+            onOpenBeside={() => onOpenNoteBeside(note.id)}
             onDelete={canDeleteNotes ? () => onDeleteNote(note.id) : undefined}
             onToggleFavorite={() => onToggleFavorite("note", note.id)}
           />
@@ -523,6 +532,7 @@ function NoteRow({
   favorite,
   onDropNote,
   onSelect,
+  onOpenBeside,
   onDelete,
   onToggleFavorite,
 }: {
@@ -533,6 +543,7 @@ function NoteRow({
   /** Called when a note is dropped above or below this row. Omitted for rows that aren't part of a sibling list (the pinned notes). */
   onDropNote?: (noteId: number, edge: DropEdge) => void;
   onSelect: () => void;
+  onOpenBeside: () => void;
   /** Omitted where notes mustn't be deleted from the row (the Favorites section): no delete button. */
   onDelete?: () => void;
   onToggleFavorite: () => void;
@@ -557,7 +568,12 @@ function NoteRow({
         <span className="truncate">{noteTitle(note)}</span>
       </Button>
       <div className={ROW_ACTIONS_CLASS}>
-        <FavoriteMenu label={noteTitle(note)} favorite={favorite} onToggleFavorite={onToggleFavorite} />
+        <NoteMenu
+          label={noteTitle(note)}
+          favorite={favorite}
+          onToggleFavorite={onToggleFavorite}
+          onOpenBeside={onOpenBeside}
+        />
         {onDelete && (
           <Button
             variant="ghost"

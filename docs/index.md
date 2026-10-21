@@ -129,3 +129,5 @@ See [ui/markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) for
 Stored images can be browsed and reused from the Images page or with `Cmd/Ctrl+Shift+M` in the editor; see [architecture/images.md](architecture/images.md#browsing-and-reusing-images).
 
 See [ui/note-links.md](ui/note-links.md) for linking one note to another (`[[`, the shortcut, and following links).
+
+See [ui/web-side-by-side.md](ui/web-side-by-side.md) for opening several notes side by side (the `⋯` menu's "Open to the side", dragging) and what each pane shows.
