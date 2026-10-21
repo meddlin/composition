@@ -1,8 +1,9 @@
 "use client";
 
-import { SearchIcon, XIcon } from "lucide-react";
+import { ImageIcon, SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
+import { parse, withHeaderImage } from "@/lib/composition/frontmatter";
 import { cn } from "@/lib/utils";
 import { AttachmentsPanel } from "./AttachmentsPanel";
 import { PANE_DRAG_TYPE } from "./dragTypes";
@@ -10,6 +11,7 @@ import { DropOverlay } from "./DropOverlay";
 import { EditorTabs } from "./EditorTabs";
 import { FindBar } from "./FindBar";
 import type { FindOptions } from "./findMatches";
+import { HeaderImageDialog, type HeaderImageChoice } from "./HeaderImageDialog";
 import { MarkdownEditor, type FindState } from "./MarkdownEditor";
 import { SIDE_BY_SIDE_MIN_WIDTH, shownView, stepView, type DropZone, type PaneView } from "./panes";
 import { noteTitle, type Note } from "./types";
@@ -67,6 +69,13 @@ export function NotePane({
   const section = useRef<HTMLElement>(null);
   const canSplit = useMinWidth(section, SIDE_BY_SIDE_MIN_WIDTH);
   const idBase = useId();
+
+  const [headerImageOpen, setHeaderImageOpen] = useState(false);
+  const [fm] = useMemo(() => parse(note.content), [note.content]);
+  const header = useMemo<HeaderImageChoice | null>(
+    () => (fm?.headerImage ? { image: fm.headerImage, layout: fm.headerImageLayout ?? "full" } : null),
+    [fm],
+  );
 
   const [findOpen, setFindOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -188,6 +197,16 @@ export function NotePane({
         </Button>
         <Button
           variant="ghost"
+          size="xs"
+          onClick={() => setHeaderImageOpen(true)}
+          title="Set the picture shown above this note's title"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ImageIcon />
+          Header image
+        </Button>
+        <Button
+          variant="ghost"
           size="icon-xs"
           onClick={onClose}
           aria-label={`Close ${title}`}
@@ -229,6 +248,15 @@ export function NotePane({
         onRatioCommit={onRatioCommit}
         notes={notes}
         onOpenNote={onOpenNote}
+      />
+      <HeaderImageDialog
+        noteId={note.id}
+        open={headerImageOpen}
+        onOpenChange={setHeaderImageOpen}
+        header={header}
+        onChange={(next) =>
+          onChange(withHeaderImage(note.content, next, { title: note.title, createdAt: note.createdAt, updatedAt: note.updatedAt }))
+        }
       />
       <AttachmentsPanel key={note.id} noteId={note.id} />
       {drop.zone && <DropOverlay zone={drop.zone} />}

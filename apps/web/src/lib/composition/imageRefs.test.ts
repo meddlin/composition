@@ -50,6 +50,12 @@ describe("findImageRefs", () => {
     );
   });
 
+  it("finds a note's header image in its frontmatter", () => {
+    const content = "---\ntitle: t\nheaderImage: app_data/hero-444444444444.png\nheaderImageLayout: full\n---\nbody";
+
+    expect(findImageRefs(content)).toEqual(new Set(["hero-444444444444.png"]));
+  });
+
   it("finds a bare path, including one that ends a sentence", () => {
     expect(findImageRefs("It was app_data/map-111111111111.png.")).toEqual(new Set(["map-111111111111.png"]));
   });
