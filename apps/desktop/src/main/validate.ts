@@ -86,6 +86,10 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     id("renameNotebook", notebookId, "id"),
     text("renameNotebook", name, "name"),
   ],
+  placeNotebook: ([notebookId, beforeNotebookId]) => [
+    id("placeNotebook", notebookId, "id"),
+    nullableId("placeNotebook", beforeNotebookId, "beforeNotebookId"),
+  ],
   deleteNotebook: ([notebookId]) => [id("deleteNotebook", notebookId, "id")],
   moveGroupToNotebook: ([groupId, notebookId]) => [
     id("moveGroupToNotebook", groupId, "id"),

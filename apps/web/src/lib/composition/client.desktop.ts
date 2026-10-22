@@ -41,6 +41,8 @@ export const createNotebook: CompositionApi["createNotebook"] = (name) =>
   bridge().createNotebook(name);
 export const renameNotebook: CompositionApi["renameNotebook"] = (id, name) =>
   bridge().renameNotebook(id, name);
+export const placeNotebook: CompositionApi["placeNotebook"] = (id, beforeNotebookId) =>
+  bridge().placeNotebook(id, beforeNotebookId);
 export const deleteNotebook: CompositionApi["deleteNotebook"] = (id) =>
   bridge().deleteNotebook(id);
 export const moveGroupToNotebook: CompositionApi["moveGroupToNotebook"] = (id, notebookId) =>
@@ -109,6 +111,7 @@ const _implementsApi: CompositionApi = {
   placeGroup,
   createNotebook,
   renameNotebook,
+  placeNotebook,
   deleteNotebook,
   moveGroupToNotebook,
   loadTrash,

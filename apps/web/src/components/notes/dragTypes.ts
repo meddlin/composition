@@ -4,6 +4,7 @@
  */
 export const NOTE_DRAG_TYPE = "application/x-composition-note-id";
 export const GROUP_DRAG_TYPE = "application/x-composition-group-id";
+export const NOTEBOOK_DRAG_TYPE = "application/x-composition-notebook-id";
 
 /**
  * A note dragged by the header of the pane it is open in. Kept apart from

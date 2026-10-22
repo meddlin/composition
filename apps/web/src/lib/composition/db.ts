@@ -130,6 +130,7 @@ function openConnection(dbPath: string): Database.Database {
   // Hand-set order among siblings; NULL until the item is dragged into place (see ordering.ts).
   ensureColumn(db, "notes", "position", "ALTER TABLE notes ADD COLUMN position INTEGER");
   ensureColumn(db, "groups", "position", "ALTER TABLE groups ADD COLUMN position INTEGER");
+  ensureColumn(db, "notebooks", "position", "ALTER TABLE notebooks ADD COLUMN position INTEGER");
   for (const table of ["notes", "groups", "trashed_notes", "trashed_groups"]) {
     ensureColumn(db, table, "notebook_id", `ALTER TABLE ${table} ADD COLUMN notebook_id INTEGER`);
   }

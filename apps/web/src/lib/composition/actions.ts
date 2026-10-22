@@ -107,6 +107,15 @@ export async function renameNotebook(id: number, name: string): Promise<Notebook
   return notebook;
 }
 
+export async function placeNotebook(
+  id: number,
+  beforeNotebookId: number | null,
+): Promise<Notebook[]> {
+  const notebooks = await service.placeNotebook(id, beforeNotebookId);
+  revalidatePath("/");
+  return notebooks;
+}
+
 export async function deleteNotebook(id: number): Promise<{ error?: string }> {
   const result = await service.deleteNotebook(id);
   if (!result.error) revalidatePath("/");

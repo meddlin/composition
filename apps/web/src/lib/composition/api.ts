@@ -167,6 +167,8 @@ export interface CompositionApi {
 
   createNotebook(name: string): Promise<Notebook>;
   renameNotebook(id: number, name: string): Promise<Notebook>;
+  /** Puts a notebook just before another in the list (last when `beforeNotebookId` is null); answers with the new order. */
+  placeNotebook(id: number, beforeNotebookId: number | null): Promise<Notebook[]>;
   /** Deletes an empty notebook for good; one with groups or notes in it, or the last one, comes back as `error`. */
   deleteNotebook(id: number): Promise<{ error?: string }>;
   /** Moves a group (or sub-group) with everything in it to the top level of another notebook. */
@@ -223,6 +225,7 @@ export const API_METHODS = [
   "placeGroup",
   "createNotebook",
   "renameNotebook",
+  "placeNotebook",
   "deleteNotebook",
   "moveGroupToNotebook",
   "loadTrash",

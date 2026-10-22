@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpenIcon, MoreHorizontalIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { NOTEBOOK_DRAG_TYPE } from "./dragTypes";
+import { dropEdge } from "./dropEdge";
 import { InlineTextInput } from "./GroupTree";
 import { COLLAPSED_NOTEBOOK_PANEL_WIDTH } from "./notebookPanelPrefs";
 import type { Notebook } from "./types";
@@ -27,6 +29,8 @@ type Props = {
   onCreate: (name: string) => void;
   onRename: (id: number, name: string) => void;
   onDelete: (id: number) => void;
+  /** Puts the notebook just before another (last when `beforeId` is null). */
+  onPlace: (id: number, beforeId: number | null) => void;
 };
 
 /**
@@ -45,9 +49,21 @@ export function NotebookPanel({
   onCreate,
   onRename,
   onDelete,
+  onPlace,
 }: Props) {
   const [creating, setCreating] = useState(false);
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  // Where the dragged notebook would land: just before this one (null: at the end).
+  const [dropBefore, setDropBefore] = useState<number | null | undefined>(undefined);
   const [renamingId, setRenamingId] = useState<number | null>(null);
+
+  function finishDrop(e: DragEvent, beforeId: number | null) {
+    e.preventDefault();
+    const id = Number(e.dataTransfer.getData(NOTEBOOK_DRAG_TYPE));
+    setDraggingId(null);
+    setDropBefore(undefined);
+    if (Number.isInteger(id) && notebooks.some((n) => n.id === id)) onPlace(id, beforeId);
+  }
 
   if (collapsed) {
     return (
@@ -90,9 +106,53 @@ export function NotebookPanel({
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto p-2">
-        <ul className="flex flex-col gap-0.5">
-          {notebooks.map((notebook) => (
-            <li key={notebook.id}>
+        <ul
+          className="flex flex-col gap-0.5"
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes(NOTEBOOK_DRAG_TYPE)) return;
+            // Below the last row, in the list's own padding: drop at the end.
+            if (e.target !== e.currentTarget) return;
+            e.preventDefault();
+            setDropBefore(null);
+          }}
+          onDrop={(e) => {
+            if (e.target !== e.currentTarget) return;
+            finishDrop(e, null);
+          }}
+        >
+          {notebooks.map((notebook, index) => (
+            <li
+              key={notebook.id}
+              className={cn(
+                "rounded-md",
+                dropBefore === notebook.id && "shadow-[0_-2px_0_0_var(--color-primary)]",
+                dropBefore === null && index === notebooks.length - 1 && draggingId !== null && "shadow-[0_2px_0_0_var(--color-primary)]",
+                draggingId === notebook.id && "opacity-50",
+              )}
+              draggable={renamingId !== notebook.id}
+              onDragStart={(e) => {
+                e.dataTransfer.setData(NOTEBOOK_DRAG_TYPE, String(notebook.id));
+                e.dataTransfer.effectAllowed = "move";
+                setDraggingId(notebook.id);
+              }}
+              onDragEnd={() => {
+                setDraggingId(null);
+                setDropBefore(undefined);
+              }}
+              onDragOver={(e) => {
+                if (!e.dataTransfer.types.includes(NOTEBOOK_DRAG_TYPE)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "move";
+                const rect = e.currentTarget.getBoundingClientRect();
+                const edge = dropEdge(e.clientY - rect.top, rect.height, ["before", "after"]);
+                setDropBefore(edge === "before" ? notebook.id : (notebooks[index + 1]?.id ?? null));
+              }}
+              onDrop={(e) => {
+                if (!e.dataTransfer.types.includes(NOTEBOOK_DRAG_TYPE)) return;
+                e.stopPropagation();
+                finishDrop(e, dropBefore ?? null);
+              }}
+            >
               {renamingId === notebook.id ? (
                 <InlineTextInput
                   depth={0}
