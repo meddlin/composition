@@ -35,6 +35,7 @@ export {
   restoreGroup,
   restoreNote,
   saveAssistantSettings,
+  saveEditorFont,
   saveFavorites,
   saveImage,
   saveLayout,

@@ -123,6 +123,7 @@ describe("VALIDATORS", () => {
     ["saveSettings", ["nope"]],
     ["saveTheme", [{}]],
     ["savePreviewFont", [{}]],
+    ["saveEditorFont", [{}]],
     ["saveAssistantSettings", [null]],
     ["saveAssistantSettings", ["http://nas:11434"]],
     ["saveAssistantSettings", [{ serverUrl: 11434, contextTokens: 8192 }]],

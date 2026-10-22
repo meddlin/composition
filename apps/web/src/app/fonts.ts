@@ -1,11 +1,22 @@
-import { Atkinson_Hyperlegible_Next, Geist, Geist_Mono, Inter, Literata, Lora, Source_Serif_4 } from "next/font/google";
+import {
+  Atkinson_Hyperlegible_Next,
+  Geist,
+  Geist_Mono,
+  IBM_Plex_Mono,
+  Inter,
+  JetBrains_Mono,
+  Literata,
+  Lora,
+  Source_Code_Pro,
+  Source_Serif_4,
+} from "next/font/google";
 
 /**
  * The fonts both root layouts (web and desktop) load. next/font downloads them while the app
  * is built and serves them from the app itself, so nothing is fetched at runtime.
  *
  * Geist is the interface font and the preview's default. The others are the preview fonts
- * offered in Settings (lib/composition/previewFonts.ts, which names these variables). They
+ * offered in Settings (lib/composition/previewFonts.ts and editorFonts.ts, which name these variables). They
  * aren't preloaded: the browser fetches a family only once something is shown in it.
  * All of them are open source (SIL Open Font License 1.1).
  */
@@ -45,7 +56,39 @@ const literata = Literata({
   preload: false,
 });
 
+// The editor's extra monospace choices. Its proportional choices reuse the preview fonts above.
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-editor-jetbrains-mono",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  preload: false,
+});
+const sourceCodePro = Source_Code_Pro({
+  variable: "--font-editor-source-code-pro",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  preload: false,
+});
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-editor-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  preload: false,
+});
+
 /** Class names that define every font's CSS variable; put them on <html>. */
-export const fontVariables = [geistSans, geistMono, inter, atkinson, sourceSerif, lora, literata]
+export const fontVariables = [
+  geistSans,
+  geistMono,
+  inter,
+  atkinson,
+  sourceSerif,
+  lora,
+  literata,
+  jetbrainsMono,
+  sourceCodePro,
+  ibmPlexMono,
+]
   .map((font) => font.variable)
   .join(" ");

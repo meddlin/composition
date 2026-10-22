@@ -235,6 +235,15 @@ export async function savePreviewFont(font: string): Promise<{ error?: string }>
   return result;
 }
 
+export async function saveEditorFont(font: string): Promise<{ error?: string }> {
+  const result = await service.saveEditorFont(font);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
 export async function saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult> {
   const result = await service.saveAssistantSettings(input);
   if (!result.error) revalidatePath("/settings");

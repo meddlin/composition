@@ -78,6 +78,7 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           <SettingsForm
             currentTheme={snapshot.theme}
             currentPreviewFont={snapshot.previewFont}
+            currentEditorFont={snapshot.editorFont}
             currentCity={snapshot.city}
             currentSunTimes={snapshot.sunTimes}
             currentAppDataDir={snapshot.appDataDir}

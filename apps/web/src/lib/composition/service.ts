@@ -50,6 +50,7 @@ import {
   type SunSchedule,
 } from "./sunTimes";
 import { sunThemeAttributes } from "./sunSchedule";
+import { isEditorFontName } from "./editorFonts";
 import { isPreviewFontName } from "./previewFonts";
 import { isThemeName } from "./themes";
 import { loadWebSettings, resolvedDbPath, saveWebSettings, type WebSettings } from "./webSettings";
@@ -106,6 +107,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
   return {
     theme: settings.theme,
     previewFont: settings.previewFont,
+    editorFont: settings.editorFont,
     appDataDir: settings.appDataDir,
     dbPath,
     dbPathOverride: settings.dbPath ?? "",
@@ -699,6 +701,14 @@ export async function savePreviewFont(font: string): Promise<{ error?: string }>
   return {};
 }
 
+export async function saveEditorFont(font: string): Promise<{ error?: string }> {
+  if (!isEditorFontName(font)) {
+    return { error: "Unknown font." };
+  }
+  saveWebSettings({ ...loadWebSettings(), editorFont: font });
+  return {};
+}
+
 export async function saveLocation(city: string): Promise<SaveLocationResult> {
   const query = city.trim();
 
@@ -776,6 +786,7 @@ const _implementsApi: CompositionApi = {
   saveSettings,
   saveTheme,
   savePreviewFont,
+  saveEditorFont,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

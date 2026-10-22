@@ -166,8 +166,8 @@ async function main(): Promise<void> {
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
-      const { theme, previewFont, sidebarWidth, editorRatio } = loadWebSettings();
-      return { theme, previewFont, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
+      const { theme, previewFont, editorFont, sidebarWidth, editorRatio } = loadWebSettings();
+      return { theme, previewFont, editorFont, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
     },
   });
 

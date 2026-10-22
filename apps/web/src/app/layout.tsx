@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { ShortcutsHelper } from "@/components/shortcuts/ShortcutsHelper";
 import { SunThemeSync } from "@/components/SunThemeSync";
 import { loadSunSchedule } from "@/lib/composition/service";
+import { editorFontStack } from "@/lib/composition/editorFonts";
 import { previewFontStack } from "@/lib/composition/previewFonts";
 import { sunThemeAttributes } from "@/lib/composition/sunSchedule";
 import { loadWebSettings } from "@/lib/composition/webSettings";
@@ -18,7 +19,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { theme, previewFont } = loadWebSettings();
+  const { theme, previewFont, editorFont } = loadWebSettings();
 
   // "Follow the sun" renders at the right point on the ramp up front, so there's
   // no flash of the wrong scheme; SunThemeSync then keeps it moving client-side.
@@ -33,6 +34,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       style={
         {
           "--preview-font": previewFontStack(previewFont),
+          "--editor-font": editorFontStack(editorFont),
           ...(attributes && { "--auto-light": attributes.autoLight }),
         } as CSSProperties
       }
