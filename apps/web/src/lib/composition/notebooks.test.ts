@@ -150,3 +150,16 @@ describe("notebooks", () => {
     expect((await service.loadWorkspace()).notes.find((n) => n.id === note.id)?.notebookId).toBe(home2.id);
   });
 });
+
+describe("notebook order", () => {
+  it("lists notebooks in the order they were dragged into", async () => {
+    const { service, work, home2 } = await setup();
+    const third = await service.createNotebook("Third");
+
+    let order = await service.placeNotebook(third.id, work.id);
+    expect(order.map((n) => n.name)).toEqual(["Third", "Notebook", "Home"]);
+    order = await service.placeNotebook(third.id, null);
+    expect(order.map((n) => n.id)).toEqual([work.id, home2.id, third.id]);
+    expect((await service.loadWorkspace()).notebooks.map((n) => n.id)).toEqual(order.map((n) => n.id));
+  });
+});

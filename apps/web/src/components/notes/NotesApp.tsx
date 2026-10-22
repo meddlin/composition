@@ -15,6 +15,7 @@ import {
   moveGroupToNotebook as moveGroupToNotebookAction,
   moveNoteToGroup as moveNoteToGroupAction,
   placeGroup as placeGroupAction,
+  placeNotebook as placeNotebookAction,
   placeNote as placeNoteAction,
   renameGroup as renameGroupAction,
   renameNotebook as renameNotebookAction,
@@ -312,6 +313,22 @@ function Workspace({
     });
   }
 
+  /** Puts the notebook just before another in the list (last when `beforeId` is null). */
+  function placeNotebook(id: number, beforeId: number | null) {
+    const ids = notebooks.map((n) => n.id);
+    const ordered = placeBefore(ids, id, beforeId);
+    if (ordered.every((orderedId, index) => orderedId === ids[index])) return;
+    const previous = notebooks;
+    setNotebooks(applyOrder(notebooks, ordered));
+    startTransition(async () => {
+      try {
+        setNotebooks(await placeNotebookAction(id, beforeId));
+      } catch {
+        setNotebooks(previous);
+      }
+    });
+  }
+
   /** Deletes the (empty) notebook for good. Call only once the user has confirmed. */
   function deleteNotebook(id: number) {
     setGroupError(null);
@@ -487,6 +504,7 @@ function Workspace({
           activeId={notebookId}
           emptyIds={emptyNotebookIds}
           onSelect={openNotebook}
+          onPlace={placeNotebook}
           onCreate={createNotebook}
           onRename={renameNotebook}
           onDelete={(id) => setPendingDelete({ kind: "notebook", id })}

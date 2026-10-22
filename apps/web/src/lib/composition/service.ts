@@ -487,6 +487,11 @@ export async function renameNotebook(id: number, name: string): Promise<Notebook
   return notebook;
 }
 
+export async function placeNotebook(id: number, beforeNotebookId: number | null): Promise<Notebook[]> {
+  notebooksRepo.placeNotebook(id, beforeNotebookId);
+  return notebooksRepo.listNotebooks();
+}
+
 /** Returns an error message instead of throwing, like `deleteGroup`, so a race shows up as inline feedback. */
 export async function deleteNotebook(id: number): Promise<{ error?: string }> {
   try {
@@ -764,6 +769,7 @@ const _implementsApi: CompositionApi = {
   placeGroup,
   createNotebook,
   renameNotebook,
+  placeNotebook,
   deleteNotebook,
   moveGroupToNotebook,
   loadTrash,

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createNotebook,
   deleteNotebook,
   moveGroupToNotebook,
+  placeNotebook,
   renameNotebook,
 } from "@/lib/composition/client";
 import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
@@ -24,6 +25,7 @@ vi.mock("@/lib/composition/client", () => ({
   moveNoteToGroup: vi.fn(),
   placeGroup: vi.fn(),
   placeNote: vi.fn(),
+  placeNotebook: vi.fn(),
   renameGroup: vi.fn(),
   renameNotebook: vi.fn(),
   saveFavorites: vi.fn(),
@@ -211,6 +213,38 @@ describe("NotesApp notebooks", () => {
 
     expect(renameNotebook).toHaveBeenCalledWith(1, "Job");
     expect(activeNotebook()).toBe("Job");
+  });
+
+  it("reorders notebooks by dragging one onto another", async () => {
+    vi.mocked(placeNotebook).mockResolvedValue([notebook(2, "Home"), notebook(1, "Work")]);
+    renderApp();
+
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      get types() {
+        return [...store.keys()];
+      },
+      setData: (type: string, value: string) => void store.set(type, value),
+      getData: (type: string) => store.get(type) ?? "",
+      effectAllowed: "",
+      dropEffect: "",
+    };
+    const row = (name: string) => panel().getByRole("button", { name }).closest("li")!;
+    fireEvent.dragStart(row("Home"), { dataTransfer });
+    // jsdom has no DragEvent, so the pointer position is set by hand: above the row's middle.
+    const dragAt = (type: "dragOver" | "drop") => {
+      const event = createEvent[type](row("Work"), { dataTransfer });
+      Object.defineProperty(event, "clientY", { value: -1 });
+      return event;
+    };
+    fireEvent(row("Work"), dragAt("dragOver"));
+    await act(async () => {
+      fireEvent(row("Work"), dragAt("drop"));
+    });
+
+    expect(placeNotebook).toHaveBeenCalledWith(2, 1);
+    const names = panel().getAllByRole("listitem").map((li) => li.textContent);
+    expect(names.indexOf("Home")).toBeLessThan(names.indexOf("Work"));
   });
 
   it("offers deleting a notebook only when it is empty, and asks first", async () => {

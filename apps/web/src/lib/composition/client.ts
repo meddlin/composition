@@ -29,6 +29,7 @@ export {
   permanentlyDeleteGroup,
   permanentlyDeleteNote,
   placeGroup,
+  placeNotebook,
   placeNote,
   renameGroup,
   renameNotebook,

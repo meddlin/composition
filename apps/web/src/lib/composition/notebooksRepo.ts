@@ -1,4 +1,5 @@
 import { adoptOrphans, getDb } from "./db";
+import { placeBefore } from "./ordering";
 
 export type Notebook = {
   id: number;
@@ -26,11 +27,13 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** In the order they were made, so the first one is the stable default. */
+const DISPLAY_ORDER = "position IS NULL, position, id";
+
+/** In the order they were dragged into (NULL until then: the order they were made). */
 export function listNotebooks(): Notebook[] {
   // Rows an older CLI wrote since the database was opened join the first notebook.
   adoptOrphans(getDb());
-  const rows = getDb().prepare("SELECT * FROM notebooks ORDER BY id").all() as NotebookRow[];
+  const rows = getDb().prepare(`SELECT * FROM notebooks ORDER BY ${DISPLAY_ORDER}`).all() as NotebookRow[];
   return rows.map(fromRow);
 }
 
@@ -56,6 +59,19 @@ export function createNotebook(name: string): Notebook {
   const notebook = getNotebook(Number(result.lastInsertRowid));
   if (!notebook) throw new Error("Failed to read back the notebook that was just created");
   return notebook;
+}
+
+/** Puts a notebook immediately before another (last when `beforeId` is null) and fixes the whole list's order. */
+export function placeNotebook(id: number, beforeId: number | null): void {
+  const db = getDb();
+  db.transaction(() => {
+    const ids = (
+      db.prepare(`SELECT id FROM notebooks ORDER BY ${DISPLAY_ORDER}`).all() as { id: number }[]
+    ).map((row) => row.id);
+    if (!ids.includes(id)) throw new Error(`Notebook ${id} not found`);
+    const setPosition = db.prepare("UPDATE notebooks SET position = ? WHERE id = ?");
+    placeBefore(ids, id, beforeId).forEach((notebookId, index) => setPosition.run(index, notebookId));
+  })();
 }
 
 export function renameNotebook(id: number, name: string): void {
