@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import type { Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type {
+  AssistantModels,
   ImageInfo,
   MoveGroupResult,
+  SaveAssistantSettingsInput,
+  SaveAssistantSettingsResult,
   SaveImageInput,
   SaveImageResult,
   SaveLocationResult,
@@ -200,6 +203,17 @@ export async function savePreviewFont(font: string): Promise<{ error?: string }>
     revalidatePath("/");
   }
   return result;
+}
+
+export async function saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult> {
+  const result = await service.saveAssistantSettings(input);
+  if (!result.error) revalidatePath("/settings");
+  return result;
+}
+
+// Not cached: it asks the server on the network, and the answer changes as models are pulled.
+export async function listAssistantModels(): Promise<AssistantModels> {
+  return service.listAssistantModels();
 }
 
 export async function saveLocation(city: string): Promise<SaveLocationResult> {

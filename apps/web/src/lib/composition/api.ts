@@ -1,3 +1,6 @@
+import type { ModelSummary } from "./assistant/models";
+import type { AssistantSettings } from "./assistant/settings";
+import type { ChatErrorKind } from "./assistant/types";
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
@@ -54,6 +57,8 @@ export type SettingsSnapshot = {
   backupDir: string;
   /** The Trash Can's contents (empty when there is no database yet). */
   trash: Trash;
+  /** The AI helper's saved Ollama server and context size (the defaults until some are saved). */
+  assistant: AssistantSettings;
   /** The saved city for the "Follow the sun" scheme, or "". */
   city: string;
   /** Today's sunrise and sunset there, formatted in its own timezone (when a city is saved and reachable). */
@@ -78,6 +83,24 @@ export type SaveSettingsResult = {
   success?: boolean;
   appDataDir?: string;
   dbPath?: string;
+};
+
+export type SaveAssistantSettingsInput = { serverUrl: string; contextTokens: number };
+
+/** `settings` is what was saved, normalized; absent with `error` when nothing was. */
+export type SaveAssistantSettingsResult = { error?: string; settings?: AssistantSettings };
+
+/** The models the saved Ollama server offers the AI helper. */
+export type AssistantModels = {
+  /** The address that was asked, so the UI can show where the text will go. */
+  serverUrl: string;
+  /** Whether that address is this machine; if not, notes sent there cross a network. */
+  local: boolean;
+  models: ModelSummary[];
+  /** How many models were left out because they would run on Ollama's cloud rather than that server. */
+  hiddenCloud: number;
+  /** Why the list could not be read, in a sentence a person can act on. */
+  error?: { kind: ChatErrorKind; message: string };
 };
 
 /** An image pasted into a note; `fileName` is the original name, used only to name the stored copy. */
@@ -149,6 +172,11 @@ export interface CompositionApi {
   /** Chooses the font a note's preview is shown in; a name not in `PREVIEW_FONT_CHOICES` comes back as `error`. */
   savePreviewFont(font: string): Promise<{ error?: string }>;
 
+  /** Saves where the AI helper finds Ollama and how large a context window it asks for; a bad value comes back as `error`. */
+  saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult>;
+  /** Asks the saved Ollama server which models the AI helper can use. The renderer never supplies the address. */
+  listAssistantModels(): Promise<AssistantModels>;
+
   /** Geocodes and saves the city that "Follow the sun" tracks; an empty string forgets it. */
   saveLocation(city: string): Promise<SaveLocationResult>;
   /** Sunrise/sunset events for the "auto" scheme, or null when another scheme is selected. */
@@ -186,6 +214,8 @@ export const API_METHODS = [
   "saveSettings",
   "saveTheme",
   "savePreviewFont",
+  "saveAssistantSettings",
+  "listAssistantModels",
   "saveLocation",
   "loadSunSchedule",
 ] as const satisfies readonly (keyof CompositionApi)[];

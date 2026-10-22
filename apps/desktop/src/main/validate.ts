@@ -1,3 +1,5 @@
+import { isRequestId, type AssistantMethod } from "../../../web/src/lib/composition/assistantApi";
+import { checkChatRequest } from "../../../web/src/lib/composition/assistant/chatRequest";
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
@@ -126,6 +128,17 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   },
   saveTheme: ([theme]) => [text("saveTheme", theme, "theme")],
   savePreviewFont: ([font]) => [text("savePreviewFont", font, "font")],
+  saveAssistantSettings: ([input]) => {
+    const value = record("saveAssistantSettings", input, "settings");
+    return [
+      {
+        serverUrl: text("saveAssistantSettings", value.serverUrl, "serverUrl"),
+        contextTokens: finite("saveAssistantSettings", value.contextTokens, "contextTokens"),
+      },
+    ];
+  },
+  // No arguments, on purpose: the address it asks is the saved one, never one the renderer names.
+  listAssistantModels: none,
   saveLocation: ([city]) => [text("saveLocation", city, "city")],
   loadSunSchedule: none,
 };
@@ -155,4 +168,15 @@ export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
     typeof enabled === "boolean" ? [enabled] : fail("setAutoCheckUpdates", "enabled"),
   setAllowPrerelease: ([enabled]) =>
     typeof enabled === "boolean" ? [enabled] : fail("setAllowPrerelease", "enabled"),
+};
+
+/** Arguments of the AI helper's chat calls. The request is checked by the same function the web route uses; a cloud model is refused here, by name. */
+export const ASSISTANT_VALIDATORS: Record<AssistantMethod, Validator> = {
+  assistantChat: ([requestId, request]) => {
+    if (!isRequestId(requestId)) fail("assistantChat", "requestId");
+    const checked = checkChatRequest(request);
+    if (!checked.ok) fail("assistantChat", `request (${checked.error})`);
+    return [requestId, checked.request];
+  },
+  assistantAbort: ([requestId]) => [isRequestId(requestId) ? requestId : fail("assistantAbort", "requestId")],
 };

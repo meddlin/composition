@@ -19,7 +19,7 @@ can list and unpack, so a backup never locks the user into this app:
 
 ```
 composition-backup.json   what this is, the format version, when, how many of each thing
-settings.json             color scheme, city, column sizes, favorites
+settings.json             color scheme, city, column sizes, favorites, the AI helper's server address and context size
 composition.db            a consistent snapshot of the database
 app_data/<image>          every pasted image
 attachments/<file>        every attached file
@@ -33,6 +33,10 @@ back too. Two things are deliberately **not** in it:
 - **The data location** (`appDataDir`, `dbPath`). Those say where *this machine* keeps its
   files. A backup made on another machine must not repoint the app, so a restore keeps the current
   location and puts the files there.
+
+The AI helper's settings travel with the rest of the settings. They name a server, not a file, so they
+are restored as they were; if a backup from another machine names a server this one cannot reach, the
+connection test on the Settings page says so. (Saved AI conversations are not part of this version.)
 
 The snapshot is taken with SQLite's `VACUUM INTO`, which is consistent even while the app is
 writing; copying a WAL-mode database file by hand is not.

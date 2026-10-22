@@ -1,0 +1,33 @@
+{
+  "_note": "Real responses from Ollama 0.40.4 (macOS), 2026-10-21. All are plain JSON bodies sent BEFORE any stream starts, so the HTTP status is the signal.",
+  "responses": {
+    "missingModel": {
+      "status": 404,
+      "contentType": "application/json; charset=utf-8",
+      "body": {
+        "error": "model 'nope:1b' not found"
+      }
+    },
+    "invalidJson": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": {
+        "error": "invalid character 'b' looking for beginning of object key string"
+      }
+    },
+    "modelCannotChat": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": {
+        "error": "\"nomic-embed-text\" does not support chat"
+      }
+    },
+    "modelCannotThink": {
+      "status": 400,
+      "contentType": "application/json; charset=utf-8",
+      "body": {
+        "error": "\"qwen2.5-coder:1.5b-base\" does not support thinking"
+      }
+    }
+  }
+}

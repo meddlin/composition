@@ -104,6 +104,19 @@ describe("createBackup", () => {
     expect(settings).not.toHaveProperty("dbPath");
   });
 
+  it("carries the AI helper's server address and context size, which are not tied to this machine's files", async () => {
+    const { service, settings } = await populate();
+    settings.saveWebSettings({
+      ...settings.loadWebSettings(),
+      assistant: { serverUrl: "http://nas:11434", contextTokens: 16384 },
+    });
+    const { file } = await service.createBackup(backups);
+
+    const saved = JSON.parse(execFileSync("tar", ["-xzOf", file!, "settings.json"], { encoding: "utf-8" }));
+
+    expect(saved.assistant).toEqual({ serverUrl: "http://nas:11434", contextTokens: 16384 });
+  });
+
   it("expands ~ and refuses a relative folder", async () => {
     const { service } = await populate();
 

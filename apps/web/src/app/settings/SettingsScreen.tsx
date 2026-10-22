@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsSnapshot } from "@/lib/composition/api";
+import { AssistantSettings } from "./AssistantSettings";
 import { BackupRestore } from "./BackupRestore";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { SettingsForm } from "./SettingsForm";
@@ -83,6 +84,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
             currentDbPath={snapshot.dbPathOverride}
             derivedDbPathPlaceholder={snapshot.derivedDbPath}
           />
+
+          <AssistantSettings initial={snapshot.assistant} />
 
           <Updates />
 

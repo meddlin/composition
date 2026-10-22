@@ -55,14 +55,20 @@ export const saveSettings: CompositionApi["saveSettings"] = (input) =>
 export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTheme(theme);
 export const savePreviewFont: CompositionApi["savePreviewFont"] = (font) =>
   bridge().savePreviewFont(font);
+export const saveAssistantSettings: CompositionApi["saveAssistantSettings"] = (input) =>
+  bridge().saveAssistantSettings(input);
+export const listAssistantModels: CompositionApi["listAssistantModels"] = () => bridge().listAssistantModels();
 export const saveLocation: CompositionApi["saveLocation"] = (city) => bridge().saveLocation(city);
 export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
   bridge().loadSunSchedule();
 
 export type {
+  AssistantModels,
   ImageInfo,
   ImageUse,
   MoveGroupResult,
+  SaveAssistantSettingsInput,
+  SaveAssistantSettingsResult,
   SaveImageInput,
   SaveImageResult,
   SaveLocationResult,
@@ -102,6 +108,8 @@ const _implementsApi: CompositionApi = {
   saveSettings,
   saveTheme,
   savePreviewFont,
+  saveAssistantSettings,
+  listAssistantModels,
   saveLocation,
   loadSunSchedule,
 };

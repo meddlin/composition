@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { API_METHODS } from "./backend";
-import { ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -48,6 +49,16 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.permanentlyDeleteNote([5])).toEqual([5]);
     expect(VALIDATORS.permanentlyDeleteGroup([6])).toEqual([6]);
     expect(VALIDATORS.loadTrash(["surprise"])).toEqual([]);
+  });
+
+  it("keeps only the address and context size of the AI helper's settings", () => {
+    expect(
+      VALIDATORS.saveAssistantSettings([{ serverUrl: "http://nas:11434", contextTokens: 8192, extra: true }]),
+    ).toEqual([{ serverUrl: "http://nas:11434", contextTokens: 8192 }]);
+  });
+
+  it("takes no arguments to list the AI helper's models, so the renderer cannot point it at an address", () => {
+    expect(VALIDATORS.listAssistantModels(["http://169.254.169.254/latest/meta-data/"])).toEqual([]);
   });
 
   it("drops arguments the method doesn't take", () => {
@@ -99,6 +110,11 @@ describe("VALIDATORS", () => {
     ["saveSettings", ["nope"]],
     ["saveTheme", [{}]],
     ["savePreviewFont", [{}]],
+    ["saveAssistantSettings", [null]],
+    ["saveAssistantSettings", ["http://nas:11434"]],
+    ["saveAssistantSettings", [{ serverUrl: 11434, contextTokens: 8192 }]],
+    ["saveAssistantSettings", [{ serverUrl: "", contextTokens: "8192" }]],
+    ["saveAssistantSettings", [{ serverUrl: "", contextTokens: Number.NaN }]],
     ["saveImage", [null]],
     ["saveImage", [{ noteId: "3", fileName: "a.png", data: new Uint8Array(1) }]],
     ["saveImage", [{ noteId: 3, fileName: 1, data: new Uint8Array(1) }]],
@@ -160,5 +176,35 @@ describe("UPDATE_VALIDATORS", () => {
 
   it.each([[[]], [["true"]], [[1]], [[null]]])("rejects %j for setAutoCheckUpdates", (args) => {
     expect(() => UPDATE_VALIDATORS.setAutoCheckUpdates(args)).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("ASSISTANT_VALIDATORS", () => {
+  const request = { model: "qwen3:0.6b", messages: [{ role: "user", content: "hi" }], numCtx: 8192 };
+
+  it("has a validator for every AI helper method, and no extras", () => {
+    expect(Object.keys(ASSISTANT_VALIDATORS).sort()).toEqual([...ASSISTANT_METHODS].sort());
+  });
+
+  it("passes a well-formed turn through, keeping only the known fields, and drops extra arguments", () => {
+    expect(
+      ASSISTANT_VALIDATORS.assistantChat(["req-1", { ...request, extra: 1, messages: [{ role: "user", content: "hi", x: 1 }] }, "http://evil/"]),
+    ).toEqual(["req-1", request]);
+    expect(ASSISTANT_VALIDATORS.assistantAbort(["req-1", "extra"])).toEqual(["req-1"]);
+  });
+
+  it.each([
+    ["assistantChat", [undefined, request]],
+    ["assistantChat", ["", request]],
+    ["assistantChat", ["has spaces", request]],
+    ["assistantChat", ["x".repeat(65), request]],
+    ["assistantChat", ["req-1", null]],
+    ["assistantChat", ["req-1", { ...request, messages: [] }]],
+    ["assistantChat", ["req-1", { ...request, numCtx: 3 }]],
+    ["assistantChat", ["req-1", { ...request, model: "gpt-oss:20b:cloud" }]],
+    ["assistantAbort", [5]],
+    ["assistantAbort", ["../x"]],
+  ] as const)("rejects %s(%j)", (method, args) => {
+    expect(() => ASSISTANT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });

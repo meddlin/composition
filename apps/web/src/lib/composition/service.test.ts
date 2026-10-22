@@ -166,8 +166,16 @@ describe("loadSettings", () => {
       dbExists: false,
       backupDir: path.join(home, "Composition Backups"),
       trash: { notes: [], groups: [] },
+      assistant: { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 },
       city: "",
     });
+  });
+
+  it("reports the AI helper's saved server and context size", async () => {
+    const { saveAssistantSettings, loadSettings } = await import("./service");
+    await saveAssistantSettings({ serverUrl: "http://nas:11434", contextTokens: 32768 });
+
+    expect((await loadSettings()).assistant).toEqual({ serverUrl: "http://nas:11434", contextTokens: 32768 });
   });
 
   it("reports an explicit database override separately from the derived path", async () => {

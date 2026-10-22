@@ -302,3 +302,34 @@ describe("data location shared between the desktop and terminal apps", () => {
     expect(readShared()).toEqual({ appDataDir: "/agreed" });
   });
 });
+
+describe("web settings AI helper", () => {
+  it("has none until some are saved, so a settings file from before the helper reads the same as ever", async () => {
+    writeSettings({ appDataDir: "/data", theme: "forest" });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings().assistant).toBeUndefined();
+  });
+
+  it("keeps them through a save, along with every other setting", async () => {
+    writeSettings({ appDataDir: "/data", theme: "forest", previewFont: "lora" });
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+
+    saveWebSettings({ ...loadWebSettings(), assistant: { serverUrl: "http://nas:11434", contextTokens: 16384 } });
+    // A later save of something else (the theme, say) starts from what was loaded, and must not lose them.
+    saveWebSettings({ ...loadWebSettings(), theme: "wine" });
+
+    expect(loadWebSettings()).toMatchObject({
+      theme: "wine",
+      previewFont: "lora",
+      assistant: { serverUrl: "http://nas:11434", contextTokens: 16384 },
+    });
+  });
+
+  it("repairs a hand-edited file one setting at a time", async () => {
+    writeSettings({ appDataDir: "/data", assistant: { serverUrl: "gopher://x", contextTokens: 4096 } });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings().assistant).toEqual({ serverUrl: "http://127.0.0.1:11434", contextTokens: 4096 });
+  });
+});

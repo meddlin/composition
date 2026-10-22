@@ -4,6 +4,7 @@ import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
+import { createAssistantHost } from "./assistant";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
@@ -160,6 +161,7 @@ async function main(): Promise<void> {
     attachments,
     backup,
     updates: updates.manager,
+    assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, previewFont, sidebarWidth, editorRatio } = loadWebSettings();

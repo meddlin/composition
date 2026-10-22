@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { parseAssistantSettings, type AssistantSettings } from "./assistant/settings";
 import { NO_FAVORITES, parseFavorites, type Favorites } from "./favorites";
 import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
@@ -61,6 +62,8 @@ export type WebSettings = {
   cliSidebarColumns?: number;
   /** Pinned groups and notes, in pin order. */
   favorites: Favorites;
+  /** The AI helper's Ollama server and context size; absent until they are first saved. */
+  assistant?: AssistantSettings;
 };
 
 const DEFAULT_SETTINGS: WebSettings = {
@@ -113,6 +116,7 @@ export function parseWebSettings(data: unknown): WebSettings {
   }
   const location = parseLocation(value.location);
   if (location) settings.location = location;
+  if (value.assistant !== undefined) settings.assistant = parseAssistantSettings(value.assistant);
   return settings;
 }
 
