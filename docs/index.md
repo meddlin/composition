@@ -37,6 +37,10 @@ See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the
 
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
 
+See [ai-helper-research.md](ai-helper-research.md) for research on an AI helper pane next to a note.
+
+See [ai-helper-plan.md](ai-helper-plan.md) for the step-by-step plan to build it.
+
 
 ## Features
 
