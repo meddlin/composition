@@ -13,7 +13,7 @@ import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
 import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
 import { NoteMenu } from "./NoteMenu";
-import { noteTitle, type Group, type Note } from "./types";
+import { noteTitle, type Group, type Note, type Notebook } from "./types";
 
 // Overlays a row's buttons instead of reserving space, so names can run right up to the edge.
 // Stays visible while a menu is open: its popup is portaled out, so the row is no longer
@@ -24,6 +24,9 @@ const ROW_ACTIONS_CLASS =
 type TreeProps = {
   groups: Group[];
   notes: Note[];
+  /** Every notebook, for "Move to notebook"; the tree itself shows only the groups and notes it is given. */
+  notebooks: Notebook[];
+  currentNotebookId: number;
   activeId: number | null;
   viewedGroupId: number | null;
   favorites: Favorites;
@@ -38,6 +41,8 @@ type TreeProps = {
   onDeleteGroup: (id: number) => void;
   onMoveGroup: (id: number, parentId: number | null) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+  /** Moves the group, with everything in it, to the top level of another notebook. */
+  onMoveGroupToNotebook: (id: number, notebookId: number) => void;
   /** Files the note in the group (null = ungrouped) just before a sibling note, or last when that is null. */
   onPlaceNote: (noteId: number, groupId: number | null, beforeNoteId: number | null) => void;
   /** Same for a group among its parent's sub-groups. */
@@ -47,6 +52,8 @@ type TreeProps = {
 export function GroupTree({
   groups,
   notes,
+  notebooks,
+  currentNotebookId,
   activeId,
   viewedGroupId,
   favorites,
@@ -61,6 +68,7 @@ export function GroupTree({
   onDeleteGroup,
   onMoveGroup,
   onMoveNoteToGroup,
+  onMoveGroupToNotebook,
   onPlaceNote,
   onPlaceGroup,
 }: TreeProps) {
@@ -133,6 +141,9 @@ export function GroupTree({
     onRenameGroup,
     onDeleteGroup,
     onMoveNoteToGroup,
+    notebooks,
+    currentNotebookId,
+    onMoveGroupToNotebook,
     onPlaceNote,
   };
 
@@ -282,6 +293,9 @@ type SharedProps = {
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
   onMoveNoteToGroup: (noteId: number, groupId: number | null) => void;
+  notebooks: Notebook[];
+  currentNotebookId: number;
+  onMoveGroupToNotebook: (id: number, notebookId: number) => void;
   onPlaceNote: (noteId: number, groupId: number | null, beforeNoteId: number | null) => void;
 };
 
@@ -312,6 +326,9 @@ function GroupNode({
   onRenameGroup,
   onDeleteGroup,
   onMoveNoteToGroup,
+  notebooks,
+  currentNotebookId,
+  onMoveGroupToNotebook,
   onPlaceNote,
   defaultCollapsed = false,
   nextSiblingId = null,
@@ -441,6 +458,8 @@ function GroupNode({
                   setAddingSubgroup(true);
                 }}
                 onToggleFavorite={() => onToggleFavorite("group", group.id)}
+                notebooks={notebooks.filter((n) => n.id !== currentNotebookId)}
+                onMoveToNotebook={(notebookId) => onMoveGroupToNotebook(group.id, notebookId)}
                 onDelete={() => onDeleteGroup(group.id)}
               />
             </div>
@@ -496,6 +515,9 @@ function GroupNode({
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
             onMoveNoteToGroup={onMoveNoteToGroup}
+            notebooks={notebooks}
+            currentNotebookId={currentNotebookId}
+            onMoveGroupToNotebook={onMoveGroupToNotebook}
             onPlaceNote={onPlaceNote}
           />
         ))}

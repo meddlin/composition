@@ -1,5 +1,6 @@
 export type { Group } from "@/lib/composition/groupsRepo";
 export type { Note } from "@/lib/composition/notesRepo";
+export type { Notebook } from "@/lib/composition/notebooksRepo";
 
 import type { Note } from "@/lib/composition/notesRepo";
 

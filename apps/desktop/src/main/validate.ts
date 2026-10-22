@@ -44,9 +44,10 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   loadWorkspace: none,
   loadSettings: none,
   searchNotes: ([query]) => [text("searchNotes", query, "query")],
-  createNote: ([title, groupId]) => [
+  createNote: ([title, groupId, notebookId]) => [
     text("createNote", title, "title"),
     groupId === undefined ? null : nullableId("createNote", groupId, "groupId"),
+    ...(notebookId === undefined ? [] : [nullableId("createNote", notebookId, "notebookId")]),
   ],
   saveNoteContent: ([noteId, content]) => [
     id("saveNoteContent", noteId, "noteId"),
@@ -73,9 +74,20 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     nullableId("placeNote", groupId, "groupId"),
     nullableId("placeNote", beforeNoteId, "beforeNoteId"),
   ],
-  createGroup: ([name, parentId]) => [
+  createGroup: ([name, parentId, notebookId]) => [
     text("createGroup", name, "name"),
     nullableId("createGroup", parentId, "parentId"),
+    ...(notebookId === undefined ? [] : [nullableId("createGroup", notebookId, "notebookId")]),
+  ],
+  createNotebook: ([name]) => [text("createNotebook", name, "name")],
+  renameNotebook: ([notebookId, name]) => [
+    id("renameNotebook", notebookId, "id"),
+    text("renameNotebook", name, "name"),
+  ],
+  deleteNotebook: ([notebookId]) => [id("deleteNotebook", notebookId, "id")],
+  moveGroupToNotebook: ([groupId, notebookId]) => [
+    id("moveGroupToNotebook", groupId, "id"),
+    id("moveGroupToNotebook", notebookId, "notebookId"),
   ],
   renameGroup: ([groupId, name]) => [
     id("renameGroup", groupId, "id"),

@@ -40,10 +40,11 @@ const makeNote = (id: number, title: string, groupId: number | null = null): Not
   createdAt: at,
   updatedAt: at,
   groupId,
+  notebookId: 1,
 });
 
 const notes = [makeNote(1, "Alpha"), makeNote(2, "Beta"), makeNote(3, "Gamma")];
-const group: Group = { id: 9, name: "Work", parentId: null, createdAt: at, updatedAt: at };
+const group: Group = { id: 9, name: "Work", parentId: null, notebookId: 1, createdAt: at, updatedAt: at };
 
 function renderApp(initialNotes: Note[] = notes, groups: Group[] = []) {
   render(<NotesApp initialNotes={initialNotes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);

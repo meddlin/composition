@@ -20,8 +20,8 @@ function bridge(): CompositionApi {
 export const loadWorkspace: CompositionApi["loadWorkspace"] = () => bridge().loadWorkspace();
 export const loadSettings: CompositionApi["loadSettings"] = () => bridge().loadSettings();
 export const searchNotes: CompositionApi["searchNotes"] = (query) => bridge().searchNotes(query);
-export const createNote: CompositionApi["createNote"] = (title, groupId) =>
-  bridge().createNote(title, groupId);
+export const createNote: CompositionApi["createNote"] = (title, groupId, notebookId) =>
+  bridge().createNote(title, groupId, notebookId);
 export const saveNoteContent: CompositionApi["saveNoteContent"] = (noteId, content) =>
   bridge().saveNoteContent(noteId, content);
 export const saveImage: CompositionApi["saveImage"] = (input) => bridge().saveImage(input);
@@ -35,8 +35,16 @@ export const placeNote: CompositionApi["placeNote"] = (noteId, groupId, beforeNo
   bridge().placeNote(noteId, groupId, beforeNoteId);
 export const placeGroup: CompositionApi["placeGroup"] = (id, parentId, beforeGroupId) =>
   bridge().placeGroup(id, parentId, beforeGroupId);
-export const createGroup: CompositionApi["createGroup"] = (name, parentId) =>
-  bridge().createGroup(name, parentId);
+export const createGroup: CompositionApi["createGroup"] = (name, parentId, notebookId) =>
+  bridge().createGroup(name, parentId, notebookId);
+export const createNotebook: CompositionApi["createNotebook"] = (name) =>
+  bridge().createNotebook(name);
+export const renameNotebook: CompositionApi["renameNotebook"] = (id, name) =>
+  bridge().renameNotebook(id, name);
+export const deleteNotebook: CompositionApi["deleteNotebook"] = (id) =>
+  bridge().deleteNotebook(id);
+export const moveGroupToNotebook: CompositionApi["moveGroupToNotebook"] = (id, notebookId) =>
+  bridge().moveGroupToNotebook(id, notebookId);
 export const renameGroup: CompositionApi["renameGroup"] = (id, name) =>
   bridge().renameGroup(id, name);
 export const deleteGroup: CompositionApi["deleteGroup"] = (id) => bridge().deleteGroup(id);
@@ -92,6 +100,10 @@ const _implementsApi: CompositionApi = {
   deleteGroup,
   moveGroup,
   placeGroup,
+  createNotebook,
+  renameNotebook,
+  deleteNotebook,
+  moveGroupToNotebook,
   loadTrash,
   restoreNote,
   restoreGroup,

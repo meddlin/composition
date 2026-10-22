@@ -16,6 +16,7 @@ const note = (id: number, title: string): Note => ({
   createdAt: "",
   updatedAt: "",
   groupId: null,
+  notebookId: 1,
 });
 
 // Note 7 is the one being edited.
