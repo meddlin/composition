@@ -69,8 +69,8 @@ export function parse(content: string): [Frontmatter | null, string] {
     title: asString(record.title),
     description: asString(record.description),
     tags: asTagList(record.tags),
-    createdAt: asString(record.createdAt),
-    updatedAt: asString(record.updatedAt),
+    createdAt: toDateOnly(asString(record.createdAt)),
+    updatedAt: toDateOnly(asString(record.updatedAt)),
   };
   const headerImage = asString(record.headerImage).trim();
   if (headerImage !== "") {
@@ -132,8 +132,8 @@ function serialize(fm: Frontmatter): string {
     title: fm.title,
     description: fm.description,
     tags: [...fm.tags],
-    createdAt: fm.createdAt,
-    updatedAt: fm.updatedAt,
+    createdAt: toDateOnly(fm.createdAt),
+    updatedAt: toDateOnly(fm.updatedAt),
   };
   // After the keys every version has always written, and only when set.
   if (fm.headerImage) {
@@ -143,8 +143,21 @@ function serialize(fm: Frontmatter): string {
   // noArrayIndent matches PyYAML's default_flow_style=False rendering of a
   // block sequence directly under its key (no leading indent before "-"),
   // keeping a note's frontmatter byte-identical whichever app last saved it.
-  const yamlText = yaml.dump(data, { sortKeys: false, noArrayIndent: true });
+  // A bare date would be read back as a timestamp, so js-yaml quotes it; unquote it so the editor shows plain dates.
+  const yamlText = yaml
+    .dump(data, { sortKeys: false, noArrayIndent: true })
+    .replace(/^(createdAt|updatedAt): '(\d{4}-\d{2}-\d{2})'$/gm, "$1: $2");
   return `---\n${yamlText}---\n`;
+}
+
+/**
+ * The frontmatter shows only the date; the full timestamp lives in the database.
+ * Takes the leading YYYY-MM-DD of an ISO string as written (no timezone conversion);
+ * anything else is left alone.
+ */
+function toDateOnly(value: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})(?:[T ]|$)/.exec(value.trim());
+  return match ? match[1] : value;
 }
 
 function asString(value: unknown): string {
