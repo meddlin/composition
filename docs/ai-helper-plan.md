@@ -2,7 +2,7 @@
 
 The order of work for the first version of the AI helper. The evidence and sources behind it are in
 [ai-helper-research.md](ai-helper-research.md); bracketed numbers like [36] point at that file's
-[Sources](ai-helper-research.md#sources). Status: **planned and agreed; Phases 0 to 4 done (2026-10-21 and 22); Phase 5 (docs, manual test) not started.** Anything marked **Inference**
+[Sources](ai-helper-research.md#sources). Status: **planned and agreed; all phases done (2026-10-21 and 22); the manual test has not been run by a person yet.** Anything marked **Inference**
 or **my pick** is a judgment, not something a source or the owner decided.
 
 ## Goal
@@ -484,6 +484,21 @@ driven by the smoke script, not by hand.
 4. **Packaging.** No new runtime dependencies are planned (`react-markdown` and `remark-gfm` are already in).
    If one is added after all, also add it to the roots in
    [`collect-licenses.mjs`](../apps/desktop/scripts/collect-licenses.mjs) ([`web-components.md`](ui/web-components.md)).
+
+### Built (2026-10-22)
+
+- **Docs:** [`ui/ai-helper.md`](ui/ai-helper.md) (set up, use, what is sent, why cloud models are left out, what an answer
+  cannot do, what is not there yet); a row in [`feature-matrix.md`](feature-matrix.md) (CLI ❌, web ✅, desktop ✅); the
+  entry in [`index.md`](index.md); a section in [`web-side-by-side.md`](ui/web-side-by-side.md) on how the dock changes
+  Split; the backup sentence was added in Phase 2.
+- **Manual test:** [`manual-tests/ai-helper.md`](manual-tests/ai-helper.md), a checklist by section (connect, ask,
+  selection, size, failure states, layout, an answer you should not trust, desktop). It is a plain checklist, not a
+  wizard script like the backup one: the things it checks are what a model says and how the panel looks and focuses.
+- **Smoke test:** extended in Phases 2 to 4 (15 checks against a stand-in Ollama), so item 3's "if it can drive the
+  bridge" was yes.
+- **Packaging:** no new runtime dependency was added, so nothing changed in `collect-licenses.mjs`.
+- **Final run:** web 1,542 tests, desktop 279, `tsc` and `eslint` clean (one older warning in `webSettings.ts`),
+  Opengrep 0 findings. `lint:actions` was not needed: no workflow changed.
 
 ## How to cut it into pull requests
 

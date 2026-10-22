@@ -38,3 +38,11 @@ other, with the divider between them shared by every pane).
 
 The arrangement, and each pane's tab, is not saved: a reload starts again with one pane.
 The terminal app shares the same pane logic, so a pane it opens with `o` also starts on the editor.
+
+## The AI helper takes room from the note
+
+A pane can open the [AI helper](ai-helper.md) to the right of its note. It sits inside the pane, so it shrinks the note's
+own column: the 480px rule above is applied to that column, which means **Split gives way to the Markdown tab sooner**
+while the helper is open, and comes back when it closes or the pane widens. Below about 600px the helper covers the note
+instead of sitting beside it. Each pane has its own helper, about its own note.
+
