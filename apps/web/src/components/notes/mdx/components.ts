@@ -4,9 +4,11 @@ import { Footnotes } from "./Footnotes";
 import { Image } from "./Image";
 import { Info } from "./Info";
 import { Mark } from "./Mark";
+import { Repo } from "./Repo";
 import { renderKey } from "./remarkRestrictMdx";
 import { Toc } from "./Toc";
 import { Warning } from "./Warning";
+import { YouTube } from "./YouTube";
 
 /**
  * The components a note may use as MDX tags, by tag name. This is the whole
@@ -24,8 +26,11 @@ export const mdxComponents: Record<
     headings?: string;
     maxDepth?: string;
     color?: string;
+    url?: string;
+    start?: string;
+    description?: string;
   }>
-> = { Info, Warning, Image, Toc, Mark, Footnotes };
+> = { Info, Warning, Image, Toc, Mark, Footnotes, YouTube, Repo };
 
 const names = Object.keys(mdxComponents);
 

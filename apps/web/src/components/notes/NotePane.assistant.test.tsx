@@ -20,7 +20,7 @@ vi.mock("@/lib/composition/assistantClient", () => ({ streamChat: vi.fn() }));
 
 const note: Note = {
   id: 1, title: "Trip plan", content: "Day one: Alfama.", tags: "", description: "",
-  createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", groupId: null,
+  createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z", groupId: null, notebookId: 1,
 };
 
 beforeEach(() => {

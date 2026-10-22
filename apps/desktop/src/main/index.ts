@@ -1,8 +1,9 @@
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
+import { installEmbedReferer } from "./embedReferer";
 import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
 import { isTrustedUrl, registerIpc } from "./ipc";
@@ -155,6 +156,7 @@ async function main(): Promise<void> {
   await app.whenReady();
 
   registerAppProtocol(path.join(__dirname, "renderer"), service.readImage);
+  installEmbedReferer(session.defaultSession.webRequest);
   registerIpc({
     ipcMain,
     api,

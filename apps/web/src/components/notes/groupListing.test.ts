@@ -6,6 +6,7 @@ const group = (id: number, name: string, parentId: number | null = null): Group 
   id,
   name,
   parentId,
+  notebookId: 1,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 });
@@ -19,6 +20,7 @@ const note = (id: number, groupId: number | null): Note => ({
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   groupId,
+  notebookId: 1,
 });
 
 const groups = [group(1, "Docs"), group(2, "API", 1), group(3, "Auth", 2), group(4, "Other")];

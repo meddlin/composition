@@ -25,7 +25,7 @@ vi.mock("@/lib/composition/assistantClient", () => ({ streamChat: vi.fn() }));
 
 const at = "2026-01-01T00:00:00.000Z";
 const source: Note = {
-  id: 1, title: "Trip", tags: "", description: "", createdAt: at, updatedAt: at, groupId: 7,
+  id: 1, title: "Trip", tags: "", description: "", createdAt: at, updatedAt: at, groupId: 7, notebookId: 1,
   content: frontmatter.generate("Trip", { createdAt: at, updatedAt: at }) + "Day one: Alfama.\n",
 };
 const group: Group = { id: 7, name: "Travel", parentId: null, createdAt: at, updatedAt: at } as Group;
@@ -39,12 +39,12 @@ beforeEach(() => {
     yield { type: "delta", text: "# Day two ideas\n\nVisit Sintra." };
     yield { type: "done" };
   });
-  vi.mocked(createNote).mockImplementation(async (title, groupId) => ({
-    id: 2, title, tags: "", description: "", createdAt: at, updatedAt: at, groupId: groupId ?? null,
+  vi.mocked(createNote).mockImplementation(async (title, groupId, notebookId) => ({
+    id: 2, title, tags: "", description: "", createdAt: at, updatedAt: at, groupId: groupId ?? null, notebookId: notebookId ?? 1,
     content: frontmatter.generate(title, { createdAt: at, updatedAt: at }),
   }));
   vi.mocked(saveNoteContent).mockImplementation(async (id, content) => ({
-    id, title: "Day two ideas", tags: "", description: "", createdAt: at, updatedAt: at, groupId: 7, content,
+    id, title: "Day two ideas", tags: "", description: "", createdAt: at, updatedAt: at, groupId: 7, notebookId: 1, content,
   }));
 });
 afterEach(() => {
@@ -69,7 +69,7 @@ describe("making a note from an AI helper answer", () => {
     await askAndMakeNote();
 
     await screen.findByRole("region", { name: "Day two ideas" });
-    expect(createNote).toHaveBeenCalledWith("Day two ideas", 7);
+    expect(createNote).toHaveBeenCalledWith("Day two ideas", 7, 1);
     const [id, content] = vi.mocked(saveNoteContent).mock.calls[0];
     expect(id).toBe(2);
     const [fm, body] = frontmatter.parse(content);

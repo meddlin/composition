@@ -12,11 +12,13 @@ const note = (id: number, title: string, groupId: number | null = null): Note =>
   createdAt: stamp,
   updatedAt: stamp,
   groupId,
+  notebookId: 1,
 });
 const group = (id: number, name: string, parentId: number | null = null): Group => ({
   id,
   name,
   parentId,
+  notebookId: 1,
   createdAt: stamp,
   updatedAt: stamp,
 });

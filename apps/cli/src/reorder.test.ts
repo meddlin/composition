@@ -6,7 +6,7 @@ import type { TreeRow } from "./tree";
 const stamp = "2026-01-01T00:00:00.000Z";
 const note = (id: number, groupId: number | null = null): Note =>
   ({ id, title: `Note ${id}`, content: "", groupId, createdAt: stamp, updatedAt: stamp }) as Note;
-const group = (id: number, parentId: number | null = null): Group => ({ id, name: `Group ${id}`, parentId, createdAt: stamp, updatedAt: stamp });
+const group = (id: number, parentId: number | null = null): Group => ({ id, name: `Group ${id}`, parentId, notebookId: 1, createdAt: stamp, updatedAt: stamp });
 
 const noteRow = (noteId: number, extra: Partial<TreeRow> = {}) =>
   ({ kind: "note", key: `note:${noteId}`, noteId, label: "", depth: 1, pinned: false, ...extra }) as TreeRow;

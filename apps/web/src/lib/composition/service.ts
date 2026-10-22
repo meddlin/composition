@@ -27,11 +27,14 @@ import { closeDb, getDb } from "./db";
 import { parseFavorites, type Favorites } from "./favorites";
 import * as frontmatter from "./frontmatter";
 import * as groupsRepo from "./groupsRepo";
-import { GroupNotEmptyError, InvalidGroupMoveError } from "./groupsRepo";
+import { GroupNotEmptyError, InvalidGroupMoveError, InvalidNotebookMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import * as images from "./images";
 import { findImageRefs, MAX_IMAGE_BYTES } from "./imageRefs";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
+import * as notebooksRepo from "./notebooksRepo";
+import { LastNotebookError, NotebookNotEmptyError } from "./notebooksRepo";
+import type { Notebook } from "./notebooksRepo";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
 import { defaultDatabasePath, expandHome } from "./paths";
@@ -73,9 +76,12 @@ export async function loadWorkspace(): Promise<Workspace> {
   const { sidebarWidth, editorRatio, favorites } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
   await purgeExpiredTrash();
+  // Listed first: it is also what gives anything an older CLI wrote a notebook.
+  const notebooks = notebooksRepo.listNotebooks();
   return {
     notes: notesRepo.listNotes(),
     groups: groupsRepo.listGroups(),
+    notebooks,
     layout: { sidebarWidth, editorRatio },
     favorites,
   };
@@ -180,6 +186,8 @@ export async function saveNoteContent(noteId: number, content: string): Promise<
       tags: fm.tags,
       createdAt: fm.createdAt || previous.createdAt,
       updatedAt: new Date().toISOString(),
+      headerImage: fm.headerImage,
+      headerImageLayout: fm.headerImageLayout,
     };
     const rendered = frontmatter.render(reconciled, body);
     notesRepo.updateNote(noteId, rendered, {
@@ -245,8 +253,9 @@ export async function readImage(name: string): Promise<images.StoredImage | null
 export async function createNote(
   title: string,
   groupId: number | null = null,
+  notebookId: number | null = null,
 ): Promise<Note> {
-  const note = notesRepo.createNote(title, "", groupId);
+  const note = notesRepo.createNote(title, "", groupId, notebookId);
   await bestEffortIndex(() => searchIndex.indexNote(note));
   return note;
 }
@@ -462,8 +471,48 @@ export async function restoreBackup(file: string): Promise<BackupResult> {
 export async function createGroup(
   name: string,
   parentId: number | null,
+  notebookId: number | null = null,
 ): Promise<Group> {
-  return groupsRepo.createGroup(name, parentId);
+  return groupsRepo.createGroup(name, parentId, notebookId);
+}
+
+export async function createNotebook(name: string): Promise<Notebook> {
+  return notebooksRepo.createNotebook(name);
+}
+
+export async function renameNotebook(id: number, name: string): Promise<Notebook> {
+  notebooksRepo.renameNotebook(id, name);
+  const notebook = notebooksRepo.getNotebook(id);
+  if (!notebook) throw new Error(`Notebook ${id} not found`);
+  return notebook;
+}
+
+/** Returns an error message instead of throwing, like `deleteGroup`, so a race shows up as inline feedback. */
+export async function deleteNotebook(id: number): Promise<{ error?: string }> {
+  try {
+    notebooksRepo.deleteNotebook(id);
+  } catch (error) {
+    if (error instanceof LastNotebookError) return { error: "The last notebook can't be deleted." };
+    if (error instanceof NotebookNotEmptyError) {
+      return { error: "This notebook still has groups or notes — empty it first." };
+    }
+    throw error;
+  }
+  return {};
+}
+
+export async function moveGroupToNotebook(id: number, notebookId: number): Promise<MoveGroupResult> {
+  try {
+    groupsRepo.moveGroupToNotebook(id, notebookId);
+  } catch (error) {
+    if (error instanceof InvalidNotebookMoveError) {
+      return { error: "That group can't be moved there." };
+    }
+    throw error;
+  }
+  const group = groupsRepo.getGroup(id);
+  if (!group) throw new Error(`Group ${id} not found`);
+  return { group };
 }
 
 export async function renameGroup(id: number, name: string): Promise<Group> {
@@ -713,6 +762,10 @@ const _implementsApi: CompositionApi = {
   deleteGroup,
   moveGroup,
   placeGroup,
+  createNotebook,
+  renameNotebook,
+  deleteNotebook,
+  moveGroupToNotebook,
   loadTrash,
   restoreNote,
   restoreGroup,

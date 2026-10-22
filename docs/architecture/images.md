@@ -146,6 +146,34 @@ an image extension (so `..` and other files in the directory are a 404) and look
 whichever application data directory is configured at that moment. Responses carry
 `nosniff` and a long `immutable` cache lifetime, safe because names embed a content hash.
 
+## Header image
+
+A note can have a picture above its title in the preview, for looks only. It is two optional
+[frontmatter](data-model.md#on-disk-note-content-format) keys, `headerImage` and `headerImageLayout`,
+which the labelled **Header image** button in a note pane's header edits for you, so the
+`app_data/…` path never has to be typed or looked up:
+
+- a dialog lists the stored images as thumbnails (listed afresh each time it opens); clicking one sets
+  it, and **Remove header image** clears it.
+- **Upload image…** takes a file from disk, stores it exactly as a pasted image is (named after the
+  note, the same size limit, the same byte check, never stored twice) and makes it the header, so there
+  is no need to paste it into a note first. A refused file says why in the dialog.
+- every choice is applied to the note at once, so the preview behind the dialog shows it.
+- **Full width** crops the picture to a banner as wide as the note (a fixed height, `object-cover`);
+  **Centered** shows the whole picture at its own size, shrunk to fit the note, in the middle.
+  The layout defaults to full width.
+- Either way the picture's lower edge fades out into the pane's background. It is a CSS mask on the
+  image's own alpha, not a color painted over it, so it blends into every color scheme.
+
+Typing the keys works too, and is the only way to use a picture that isn't stored: `headerImage` takes
+`app_data/<name>` or an `http(s)://` address. A `data:` URI or anything else shows nothing, as does a
+file that is missing, so a bad value never leaves a gap or a broken-image icon above the title.
+Source: [`HeaderImage.tsx`](../../apps/web/src/components/notes/HeaderImage.tsx),
+[`HeaderImageDialog.tsx`](../../apps/web/src/components/notes/HeaderImageDialog.tsx),
+[`headerImageSource.ts`](../../apps/web/src/components/notes/headerImageSource.ts).
+
+A header image counts as used on the Images page: the scan for `app_data/<name>` reads the whole note, frontmatter included.
+
 ## In the CLI
 
 The terminal app shows a note's stored images in its preview, and can add one from a file.

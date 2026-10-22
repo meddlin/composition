@@ -97,6 +97,36 @@ Every other table is a `CREATE TABLE IF NOT EXISTS`, for the same reason. `db.te
 databases as each earlier version created them and checks every column arrives with the data
 intact.
 
+## Notebooks
+
+A **notebook** holds groups, sub-groups and notes; the web and desktop sidebar shows one notebook's
+contents at a time (a second, slide-out sidebar beside it lists the notebooks and creates, renames, deletes and switches them).
+
+```sql
+CREATE TABLE notebooks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+`notes`, `groups`, `trashed_notes` and `trashed_groups` each gained a `notebook_id` column (added by
+`ensureColumn` like the others). It is stored on **every** group and note, not derived from the top
+of the tree, so listing a notebook is a plain filter. The invariant, kept by the repos: a sub-group
+and a note in a group are always in their group's notebook. Moving a group to another notebook
+(`moveGroupToNotebook`) makes it a top-level group there and carries its sub-groups and notes along;
+reparenting a group under one in another notebook does the same.
+
+On open, `adoptOrphans` creates a "Notebook" if there are none and gives every row with a `NULL`
+`notebook_id` to the first notebook. That is how a database from before notebooks upgrades, and how
+rows written since by an older CLI (which doesn't know the column) are picked up the next time the
+workspace is loaded. A notebook is deleted for good (it is not trashed) and only when it has no
+groups or notes; the last notebook cannot be deleted. Restoring a trashed item puts it back in its
+group's notebook, else the one it came from, else the first notebook. Ordering among top-level
+siblings is per notebook. Which notebook was open last is remembered in the browser's
+`localStorage`, not the database.
+
 Write-ahead logging is switched on when the file is opened. It is stored in the file itself, so it
 covers every app that opens it, and lets the terminal, web and desktop apps run side by side on one
 database.
@@ -152,6 +182,8 @@ classDiagram
         +string[] tags
         +string createdAt
         +string updatedAt
+        +string? headerImage
+        +string? headerImageLayout
     }
     Note "1" ..> "0..1" Frontmatter : content embeds a\nrendered frontmatter block
     Frontmatter --> Note : tagsToString() / render()\nfeed Note.tags / Note.content
@@ -193,6 +225,21 @@ and `frontmatter.ts` and the repos are the only places that translate between th
 fixed (`title`, `description`, `tags`, `createdAt`, `updatedAt`), and the exact format, including
 the unindented list of tags, is pinned by `frontmatter.test.ts`, because every note already stored
 was written in it and must stay readable.
+
+Two optional keys follow those, written only for a note that has a header image, so every other note
+is serialized exactly as before:
+
+```
+headerImage: app_data/trip-plan-route-map-3f9c2a71b0de.png
+headerImageLayout: centered
+```
+
+`headerImage` is a stored image's `app_data/<name>` path or an `https://` address; `headerImageLayout`
+is `full` (a banner across the note, cropped) or `centered` (the whole picture at its own size), and
+anything else reads as `full`. They live in the frontmatter, not in a column, so they travel with the
+note's text in a backup. The pane's **Header image** button sets them from the stored images, and they
+can be typed by hand. The preview draws the picture above the title (see
+[images.md](images.md#header-image)). The terminal app keeps the keys when it saves but doesn't draw the picture.
 
 `frontmatter.parse` is designed to never throw: a note with no leading `---` block, a non-mapping
 YAML document, or invalid YAML simply parses to `[null, original content]`. This is what lets

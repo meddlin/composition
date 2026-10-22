@@ -211,6 +211,18 @@ describe("notes", () => {
     expect(notes.map((n) => n.title)).toEqual(["Final"]);
   });
 
+  it("keeps a note's header image and layout when it is saved", async () => {
+    const service = await import("./service");
+    const created = await service.createNote("Pretty");
+
+    const saved = await service.saveNoteContent(
+      created.id,
+      created.content.replace("---\n", "---\nheaderImage: app_data/a-0123456789ab.png\nheaderImageLayout: centered\n") + "body",
+    );
+
+    expect(saved.content).toContain("headerImage: app_data/a-0123456789ab.png\nheaderImageLayout: centered\n");
+  });
+
   it("falls back to a raw content save when the frontmatter is mid-edit and invalid", async () => {
     const service = await import("./service");
     const created = await service.createNote("Keep me");

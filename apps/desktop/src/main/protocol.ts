@@ -12,7 +12,8 @@ export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
  * Content Security Policy for the UI. Next's static export inlines small
  * scripts and styles, so those need 'unsafe-inline'; everything else is
  * locked to our own origin. `https:` images stay allowed so Markdown images
- * behave as they do in the web app. There is no network access for scripts
+ * behave as they do in the web app, and a note's `<YouTube>` may frame YouTube's privacy-enhanced
+ * player (and nothing else; see embedReferer.ts). There is no network access for scripts
  * (`connect-src 'self'`): all data goes over IPC.
  */
 export const CONTENT_SECURITY_POLICY = [
@@ -21,6 +22,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
+  "frame-src https://www.youtube-nocookie.com",
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'none'",

@@ -69,12 +69,32 @@ describe("opening the database", () => {
     const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
       .map((t) => t.name)
       .filter((name) => !name.startsWith("sqlite_"));
-    expect(tables.sort()).toEqual(["attachments", "groups", "notes", "trashed_groups", "trashed_notes"]);
+    expect(tables.sort()).toEqual(["attachments", "groups", "notebooks", "notes", "trashed_groups", "trashed_notes"]);
     expect(columnsOf(db, "attachments").sort()).toEqual(
       ["created_at", "file_name", "id", "note_id", "size", "stored_name"].sort(),
     );
     const indexes = db.prepare("PRAGMA index_list(attachments)").all() as { name: string }[];
     expect(indexes.map((i) => i.name)).toContain("idx_attachments_note_id");
+  });
+
+  it("puts everything an older database held into one notebook", async () => {
+    writeOldDatabase([...NOTE_COLUMNS]);
+    const { getDb } = await import("./db");
+    const db = getDb();
+
+    const notebooks = db.prepare("SELECT id, name FROM notebooks").all() as { id: number; name: string }[];
+    expect(notebooks).toEqual([{ id: 1, name: "Notebook" }]);
+    expect(db.prepare("SELECT notebook_id FROM notes").get()).toEqual({ notebook_id: 1 });
+  });
+
+  it("gives rows written without a notebook (by an older CLI) to the first notebook when reopened", async () => {
+    const first = await import("./db");
+    const db = first.getDb();
+    db.prepare("INSERT INTO notes (title, created_at, updated_at) VALUES ('Late', 'x', 'x')").run();
+    first.closeDb();
+
+    expect(first.getDb().prepare("SELECT notebook_id FROM notes").get()).toEqual({ notebook_id: 1 });
+    expect(first.getDb().prepare("SELECT COUNT(*) AS n FROM notebooks").get()).toEqual({ n: 1 });
   });
 
   it("turns on write-ahead logging, which lets several apps share the file", async () => {
@@ -114,6 +134,7 @@ describe("opening the database", () => {
         "description",
         "group_id",
         "id",
+        "notebook_id",
         "position",
         "tags",
         "title",

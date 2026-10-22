@@ -40,6 +40,14 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "Footnotes list, numbered by where they are cited",
     template: "<Footnotes />$0",
   },
+  YouTube: {
+    description: "A YouTube video you can watch in the preview",
+    template: '<YouTube url="$0" />',
+  },
+  Repo: {
+    description: "A card linking to a git repository (GitHub, GitLab, …)",
+    template: '<Repo url="$0" />',
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));
