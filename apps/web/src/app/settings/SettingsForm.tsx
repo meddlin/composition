@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { EDITOR_FONT_CHOICES, editorFontStack, type EditorFontName } from "@/lib/composition/editorFonts";
 import {
   PREVIEW_FONT_CHOICES,
   previewFontStack,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/composition/previewFonts";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
+  saveEditorFont,
   saveLocation,
   savePreviewFont,
   saveSettings,
@@ -35,6 +37,7 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
 type Props = {
   currentTheme: ThemeName;
   currentPreviewFont: PreviewFontName;
+  currentEditorFont: EditorFontName;
   currentCity: string;
   /** Today's times at the saved city, so the page can confirm the lookup worked. */
   currentSunTimes?: { sunrise?: string; sunset?: string };
@@ -78,6 +81,7 @@ function saveSettingsFromForm(_previous: SaveSettingsResult, formData: FormData)
 export function SettingsForm({
   currentTheme,
   currentPreviewFont,
+  currentEditorFont,
   currentCity,
   currentSunTimes,
   currentAppDataDir,
@@ -95,6 +99,9 @@ export function SettingsForm({
   const [previewFont, setPreviewFont] = useState<PreviewFontName>(currentPreviewFont);
   const [previewFontError, setPreviewFontError] = useState<string>();
   const [, startPreviewFontTransition] = useTransition();
+  const [editorFont, setEditorFont] = useState<EditorFontName>(currentEditorFont);
+  const [editorFontError, setEditorFontError] = useState<string>();
+  const [, startEditorFontTransition] = useTransition();
 
   // Apply the scheme immediately rather than waiting for the server round trip.
   useEffect(() => {
@@ -131,6 +138,22 @@ export function SettingsForm({
         setPreviewFont(previous);
         setPreviewFontError(result.error);
         document.documentElement.style.setProperty("--preview-font", previewFontStack(previous));
+      }
+    });
+  }
+
+  // Same again for the editor font.
+  function selectEditorFont(next: EditorFontName) {
+    const previous = editorFont;
+    setEditorFont(next);
+    setEditorFontError(undefined);
+    document.documentElement.style.setProperty("--editor-font", editorFontStack(next));
+    startEditorFontTransition(async () => {
+      const result = await saveEditorFont(next);
+      if (result.error) {
+        setEditorFont(previous);
+        setEditorFontError(result.error);
+        document.documentElement.style.setProperty("--editor-font", editorFontStack(previous));
       }
     });
   }
@@ -196,6 +219,38 @@ export function SettingsForm({
           <code className="text-sm">0123456789</code>
         </p>
         {previewFontError && <FieldError>{previewFontError}</FieldError>}
+      </FieldSet>
+
+      <FieldSet className="gap-2 text-sm">
+        <FieldLegend variant="label">Editor font</FieldLegend>
+        <FieldDescription className="text-xs">
+          The typeface used while writing in the Markdown tab. Monospace keeps tables and code
+          lined up; the proportional fonts read more like prose. Every option is an open-source
+          font (SIL Open Font License) bundled with the app.
+        </FieldDescription>
+        <RadioGroup
+          value={editorFont}
+          onValueChange={(next) => selectEditorFont(next as EditorFontName)}
+          aria-label="Editor font"
+          className="gap-2"
+        >
+          {EDITOR_FONT_CHOICES.map(({ name, label, stack }) => (
+            <Field key={name} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={name} id={`editor-font-${name}`} />
+              <FieldLabel
+                htmlFor={`editor-font-${name}`}
+                className="cursor-pointer gap-3 font-normal"
+                style={{ fontFamily: stack }}
+              >
+                {label}
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+        <p className="editor-text whitespace-pre-wrap rounded-md border bg-muted/40 px-3 py-2 text-sm leading-6">
+          {"## Meeting notes\n- [ ] Send the **quarterly** summary to `ops@example.com`"}
+        </p>
+        {editorFontError && <FieldError>{editorFontError}</FieldError>}
       </FieldSet>
 
       <form action={locationAction} className="flex flex-col gap-2 text-sm">

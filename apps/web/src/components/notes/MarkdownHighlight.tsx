@@ -36,7 +36,7 @@ export function MarkdownHighlight({
   return (
     // Windows high-contrast mode forces the textarea's text visible, so the layer would only double it.
     <div ref={layer} aria-hidden className="pointer-events-none absolute inset-y-0 left-0 select-none overflow-hidden forced-colors:hidden">
-      <pre className="m-0 whitespace-pre-wrap break-words p-4 font-mono text-sm leading-6">
+      <pre className="m-0 whitespace-pre-wrap break-words p-4 editor-text text-sm leading-6">
         {segments.map((segment, index) =>
           segment.kind || segment.match || segment.tint ? (
             <span

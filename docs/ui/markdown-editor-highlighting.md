@@ -42,6 +42,15 @@ frontmatter are not tags. Where highlights nest, the inner colour wins.
 - Windows high-contrast mode (`forced-colors`) hides the layer; the browser forces the textarea's
   own text to be visible there.
 
+## Editor font
+
+Settings → Editor font picks the family (`EDITOR_FONT_CHOICES` in
+[`editorFonts.ts`](../../apps/web/src/lib/composition/editorFonts.ts)). It is not limited to
+monospace: the textarea and the coloured layer both use the `.editor-text` class, which reads
+`--editor-font`, and the caret measuring for the completion menus copies the textarea's computed
+font, so any family lines up. Ligatures are switched off in `.editor-text` because they cannot form
+across the layer's coloured spans. Keep both elements on that one class when editing either.
+
 ## Changing it
 
 If the layer and the text ever disagree, check that the textarea and the `<pre>` in

@@ -422,7 +422,7 @@ export function MarkdownEditor({
               highlightLayer.sync();
             }}
             className={cn(
-              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 font-mono text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
+              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 editor-text text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
               // The colours come from the layer underneath; the textarea only draws the caret and selection over it.
               highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
             )}

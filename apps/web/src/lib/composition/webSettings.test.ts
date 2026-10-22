@@ -41,6 +41,7 @@ describe("web settings layout", () => {
       appDataDir: "/data",
       theme: "forest",
       previewFont: "default",
+      editorFont: "default",
       ...DEFAULT_LAYOUT,
       favorites: [],
     });
@@ -53,6 +54,15 @@ describe("web settings layout", () => {
 
     writeSettings({ appDataDir: "/data", previewFont: "Comic Sans MS" });
     expect(loadWebSettings().previewFont).toBe("default");
+  });
+
+  it("loads a saved editor font, and falls back to the default for one it doesn't know", async () => {
+    writeSettings({ appDataDir: "/data", editorFont: "ibm-plex-mono" });
+    const { loadWebSettings } = await import("./webSettings");
+    expect(loadWebSettings().editorFont).toBe("ibm-plex-mono");
+
+    writeSettings({ appDataDir: "/data", editorFont: "Comic Sans MS" });
+    expect(loadWebSettings().editorFont).toBe("default");
   });
 
   it("loads a saved layout", async () => {

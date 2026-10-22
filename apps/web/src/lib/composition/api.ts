@@ -6,6 +6,7 @@ import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
 import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
+import type { EditorFontName } from "./editorFonts";
 import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
@@ -46,6 +47,7 @@ export type Workspace = {
 export type SettingsSnapshot = {
   theme: ThemeName;
   previewFont: PreviewFontName;
+  editorFont: EditorFontName;
   appDataDir: string;
   /** The database file in use (override if set, otherwise derived). */
   dbPath: string;
@@ -184,6 +186,8 @@ export interface CompositionApi {
   saveTheme(theme: string): Promise<{ error?: string }>;
   /** Chooses the font a note's preview is shown in; a name not in `PREVIEW_FONT_CHOICES` comes back as `error`. */
   savePreviewFont(font: string): Promise<{ error?: string }>;
+  /** Chooses the font the Markdown editor is set in; a name not in `EDITOR_FONT_CHOICES` comes back as `error`. */
+  saveEditorFont(font: string): Promise<{ error?: string }>;
 
   /** Saves where the AI helper finds Ollama and how large a context window it asks for; a bad value comes back as `error`. */
   saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult>;
@@ -231,6 +235,7 @@ export const API_METHODS = [
   "saveSettings",
   "saveTheme",
   "savePreviewFont",
+  "saveEditorFont",
   "saveAssistantSettings",
   "listAssistantModels",
   "saveLocation",

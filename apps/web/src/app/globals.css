@@ -323,6 +323,14 @@
   --mark-hue: #ff8a2b;
 }
 
+/* The Markdown editor's textarea and the coloured copy under it share this class so they always agree;
+   --editor-font is put on <html> by the layouts. Ligatures are off: a ligature can't form across the
+   layer's coloured spans, so the two layers would disagree about where glyphs fall. */
+.editor-text {
+  font-family: var(--editor-font, var(--font-mono));
+  font-variant-ligatures: none;
+}
+
 /* A note's preview is set in the font chosen in Settings; --preview-font is put on <html> by the layouts. */
 .preview-text {
   font-family: var(--preview-font, inherit);
