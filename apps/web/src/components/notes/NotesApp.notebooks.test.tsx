@@ -258,7 +258,8 @@ describe("NotesApp notebooks", () => {
       button: 0,
       ctrlKey: false,
     });
-    const target = screen.getByRole("menuitem", { name: "Move to Work" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Move to a notebook" }));
+    const target = await screen.findByRole("button", { name: "Work" });
     await act(async () => {
       fireEvent.click(target);
     });
@@ -282,7 +283,8 @@ describe("NotesApp notebooks", () => {
       button: 0,
       ctrlKey: false,
     });
-    const target = screen.getByRole("menuitem", { name: "Move to Work" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Move to a notebook" }));
+    const target = await screen.findByRole("button", { name: "Work" });
     await act(async () => {
       fireEvent.click(target);
     });
