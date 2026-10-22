@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { saveEditorFont, savePreviewFont } from "@/lib/composition/client";
 import { EDITOR_FONT_CHOICES, editorFontStack } from "@/lib/composition/editorFonts";
 import { PREVIEW_FONT_CHOICES, previewFontStack } from "@/lib/composition/previewFonts";
-import { SettingsForm } from "./SettingsForm";
+import { StylingSettings } from "./StylingSettings";
 
 vi.mock("@/lib/composition/client", () => ({
   saveLocation: vi.fn(async () => ({})),
@@ -23,14 +23,11 @@ afterEach(() => {
 
 function renderForm(currentPreviewFont: "default" | "lora" = "default", currentEditorFont: "default" | "lora" | "jetbrains-mono" = "default") {
   render(
-    <SettingsForm
+    <StylingSettings
       currentTheme="dark"
       currentPreviewFont={currentPreviewFont}
       currentEditorFont={currentEditorFont}
       currentCity=""
-      currentAppDataDir="/data"
-      currentDbPath=""
-      derivedDbPathPlaceholder="/data/composition.db"
     />,
   );
 }
