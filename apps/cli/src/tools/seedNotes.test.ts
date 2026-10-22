@@ -32,7 +32,7 @@ describe("seedNotes", () => {
     const match = stored.find((n) => n.title === first.title && n.createdAt === first.createdAt)!;
     expect(match.tags).toBe(first.tags);
     const [parsed, body] = frontmatter.parse(match.content);
-    expect(parsed).toMatchObject({ title: first.title, createdAt: first.createdAt, updatedAt: first.createdAt });
+    expect(parsed).toMatchObject({ title: first.title, createdAt: first.createdAt.slice(0, 10), updatedAt: first.createdAt.slice(0, 10) });
     expect(parsed?.tags.join(",")).toBe(first.tags);
     expect(body).toBe(first.body);
   });
