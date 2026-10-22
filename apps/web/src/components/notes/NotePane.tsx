@@ -1,10 +1,12 @@
 "use client";
 
-import { ImageIcon, SearchIcon, XIcon } from "lucide-react";
+import { ImageIcon, MessageSquareIcon, SearchIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { parse, withHeaderImage } from "@/lib/composition/frontmatter";
 import { cn } from "@/lib/utils";
+import { AssistantPanel } from "./AssistantPanel";
+import { DOCK_DEFAULT_WIDTH, dockLayout, dragDockWidth } from "./assistantDock";
 import { AttachmentsPanel } from "./AttachmentsPanel";
 import { PANE_DRAG_TYPE } from "./dragTypes";
 import { DropOverlay } from "./DropOverlay";
@@ -14,7 +16,10 @@ import type { FindOptions } from "./findMatches";
 import { HeaderImageDialog, type HeaderImageChoice } from "./HeaderImageDialog";
 import { MarkdownEditor, type FindState } from "./MarkdownEditor";
 import { SIDE_BY_SIDE_MIN_WIDTH, shownView, stepView, type DropZone, type PaneView } from "./panes";
+import { readPaneSelection } from "./paneSelection";
+import { ResizeHandle } from "./ResizeHandle";
 import { noteTitle, type Note } from "./types";
+import { useElementWidth } from "./useElementWidth";
 import { useMinWidth } from "./useMinWidth";
 import { useNoteDrop } from "./useNoteDrop";
 
@@ -37,6 +42,8 @@ type Props = {
   notes: readonly Note[];
   /** A link in the preview was followed; `beside` asks for the note next to this one. */
   onOpenNote: (noteId: number, beside: boolean) => void;
+  /** An answer from the AI helper to make into a separate new note. */
+  onNewNoteFromText: (text: string) => void;
 };
 
 /**
@@ -62,12 +69,23 @@ export function NotePane({
   onDropNote,
   notes,
   onOpenNote,
+  onNewNoteFromText,
 }: Props) {
   const drop = useNoteDrop({ edges: true, onDrop: onDropNote });
   const title = noteTitle(note);
 
   const section = useRef<HTMLElement>(null);
-  const canSplit = useMinWidth(section, SIDE_BY_SIDE_MIN_WIDTH);
+  // Whether the editor and preview fit beside each other is about the note's own column, which the AI helper's
+  // dock takes room from.
+  const noteColumn = useRef<HTMLDivElement>(null);
+  const canSplit = useMinWidth(noteColumn, SIDE_BY_SIDE_MIN_WIDTH);
+  const paneWidth = useElementWidth(section);
+
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [wantedDockWidth, setWantedDockWidth] = useState(DOCK_DEFAULT_WIDTH);
+  const dockDragStart = useRef(DOCK_DEFAULT_WIDTH);
+  const dock = dockLayout(paneWidth, wantedDockWidth);
+  const dockOver = assistantOpen && dock.mode === "over";
   const idBase = useId();
 
   const [headerImageOpen, setHeaderImageOpen] = useState(false);
@@ -126,6 +144,29 @@ export function NotePane({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   });
+
+  // Ctrl/Cmd+Shift+L opens or closes the AI helper in the focused pane; opening puts the cursor in its question box.
+  useEffect(() => {
+    if (!focused) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "l" || !event.shiftKey || event.altKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
+      event.preventDefault();
+      toggleAssistant();
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
+
+  function toggleAssistant() {
+    if (assistantOpen) {
+      setAssistantOpen(false);
+      requestAnimationFrame(() => section.current?.querySelector("textarea")?.focus());
+    } else {
+      setAssistantOpen(true);
+      requestAnimationFrame(() => section.current?.querySelector<HTMLElement>('[aria-label="Ask about this note"]')?.focus());
+    }
+  }
 
   // Switching the focused pane's view: Ctrl/Cmd+\ steps on through Markdown, Preview and Split;
   // Cmd+Ctrl+Left/Right (macOS) step back and on. `\` is matched on the physical key so it works
@@ -208,6 +249,18 @@ export function NotePane({
         <Button
           variant="ghost"
           size="icon-xs"
+          onClick={toggleAssistant}
+          aria-label="AI helper"
+          aria-pressed={assistantOpen}
+          aria-keyshortcuts="Control+Shift+L Meta+Shift+L"
+          title="AI helper (Ctrl/Cmd+Shift+L)"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <MessageSquareIcon />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
           onClick={onClose}
           aria-label={`Close ${title}`}
           title="Close"
@@ -236,19 +289,53 @@ export function NotePane({
           onClose={closeFind}
         />
       )}
-      <MarkdownEditor
-        find={find}
-        idBase={idBase}
-        view={shownView(view, canSplit)}
-        noteId={note.id}
-        value={note.content}
-        onChange={onChange}
-        ratio={ratio}
-        onRatioChange={onRatioChange}
-        onRatioCommit={onRatioCommit}
-        notes={notes}
-        onOpenNote={onOpenNote}
-      />
+      <div className="flex min-h-0 flex-1">
+        <div ref={noteColumn} hidden={dockOver} className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <MarkdownEditor
+          find={find}
+          idBase={idBase}
+          view={shownView(view, canSplit)}
+          noteId={note.id}
+          value={note.content}
+          onChange={onChange}
+          ratio={ratio}
+          onRatioChange={onRatioChange}
+          onRatioCommit={onRatioCommit}
+          notes={notes}
+          onOpenNote={onOpenNote}
+        />
+        </div>
+        {assistantOpen && (
+          <>
+            {!dockOver && (
+              <ResizeHandle
+                label="Resize AI helper"
+                valueNow={dock.mode === "beside" ? dock.width : 0}
+                valueMin={280}
+                valueMax={Math.round(paneWidth * 0.6)}
+                onResizeStart={() => {
+                  dockDragStart.current = dock.mode === "beside" ? dock.width : wantedDockWidth;
+                }}
+                onResize={(dx) => setWantedDockWidth(dragDockWidth(dockDragStart.current, dx))}
+                onResizeEnd={() => {}}
+              />
+            )}
+            <div
+              style={dock.mode === "beside" ? { width: dock.width } : undefined}
+              className={cn("min-h-0 shrink-0", dockOver && "w-full")}
+            >
+              <AssistantPanel
+                noteId={note.id}
+                noteContent={note.content}
+                getSelection={() => (section.current ? readPaneSelection(section.current) : "")}
+                onNewNoteFromText={onNewNoteFromText}
+                onClose={toggleAssistant}
+                onReturnFocus={() => section.current?.querySelector("textarea")?.focus()}
+              />
+            </div>
+          </>
+        )}
+      </div>
       <HeaderImageDialog
         noteId={note.id}
         open={headerImageOpen}

@@ -1,0 +1,10 @@
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.245061Z","message":{"role":"assistant","content":"Hello"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.269515Z","message":{"role":"assistant","content":"!"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.274489Z","message":{"role":"assistant","content":" How"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.2797Z","message":{"role":"assistant","content":" can"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.283956Z","message":{"role":"assistant","content":" I"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.288475Z","message":{"role":"assistant","content":" assist"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.293179Z","message":{"role":"assistant","content":" you"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.297922Z","message":{"role":"assistant","content":" today"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.302149Z","message":{"role":"assistant","content":"?"},"done":false}
+{"model":"qwen3:0.6b","created_at":"2026-10-22T04:18:51.306987Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","total_duration":1269277084,"load_duration":1063900792,"prompt_eval_count":22,"prompt_eval_cached_count":0,"prompt_eval_duration":140482000,"eval_count":10,"eval_duration":61964000}

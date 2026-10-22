@@ -21,6 +21,8 @@ type Props = {
   onDropNote: (noteId: number, targetId: number, zone: DropZone) => void;
   /** A link in `fromId`'s preview was followed; `beside` asks for the note next to that pane. */
   onOpenNote: (noteId: number, fromId: number, beside: boolean) => void;
+  /** The AI helper in `fromId`'s pane made an answer into a new note. */
+  onNewNoteFromText: (fromId: number, text: string) => void;
   onResizePanes: (sizes: number[]) => void;
 };
 
@@ -38,6 +40,7 @@ export function PaneArea({
   onChange,
   onDropNote,
   onOpenNote,
+  onNewNoteFromText,
   onResizePanes,
 }: Props) {
   const row = useRef<HTMLDivElement>(null);
@@ -87,6 +90,7 @@ export function PaneArea({
               onDropNote={(noteId, zone) => onDropNote(noteId, pane.noteId, zone)}
               notes={notes}
               onOpenNote={(noteId, beside) => onOpenNote(noteId, pane.noteId, beside)}
+              onNewNoteFromText={(text) => onNewNoteFromText(pane.noteId, text)}
             />
           </Fragment>
         );

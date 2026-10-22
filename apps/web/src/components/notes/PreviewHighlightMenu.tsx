@@ -10,6 +10,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { copyText } from "./clipboard";
 import type { HighlightChoice } from "./HighlightMenu";
 import { removeHighlight, type TextRange } from "./highlightText";
 import { lastHighlightColor } from "./lastHighlightColor";
@@ -30,15 +31,6 @@ const label = (color: HighlightColor) => color[0].toUpperCase() + color.slice(1)
 
 function Swatch({ color }: { color: HighlightColor }) {
   return <span aria-hidden data-color={color} className="md-mark size-4 shrink-0 rounded-sm border" />;
-}
-
-async function copy(text: string) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    // No clipboard API here (or no permission); the selection is still there to copy the old way.
-    document.execCommand?.("copy");
-  }
 }
 
 type Props = {
@@ -103,7 +95,7 @@ export function PreviewHighlightMenu({ boxRef, className, text, body, onApply, c
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div ref={boxRef} className={className} onContextMenuCapture={inspect}>
+        <div ref={boxRef} data-note-preview="" className={className} onContextMenuCapture={inspect}>
           {children}
         </div>
       </ContextMenuTrigger>
@@ -134,7 +126,7 @@ export function PreviewHighlightMenu({ boxRef, className, text, body, onApply, c
         {target?.text && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem onSelect={() => void copy(target.text)}>Copy</ContextMenuItem>
+            <ContextMenuItem onSelect={() => void copyText(target.text)}>Copy</ContextMenuItem>
           </>
         )}
       </ContextMenuContent>

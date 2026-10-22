@@ -8,6 +8,7 @@
 //   SMOKE_OUT=/some/dir  keeps screenshots there (default: a temp dir)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,12 +37,15 @@ const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/
 const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
 const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/backupApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
+const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
 const expectedBridge = [
   ...API_METHODS,
   ...ATTACHMENT_METHODS,
   ...BACKUP_METHODS,
   ...UPDATE_METHODS,
+  ...ASSISTANT_METHODS,
   "onUpdateState",
+  "onAssistantEvent",
   "initial",
   "platform",
 ].sort();
@@ -52,6 +56,64 @@ function check(name, ok, detail = "") {
   if (!ok) failures.push(name);
 }
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// A stand-in Ollama on a free local port, for the AI helper's settings: one chat model, one embedding model (which
+// cannot chat) and one cloud model (which the helper must hide). `requests` records what it was asked.
+function startFakeOllama() {
+  const requests = [];
+  const stats = { aborted: 0 };
+  const server = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (piece) => (body += piece));
+    req.on("end", () => {
+      requests.push(`${req.method} ${req.url}`);
+      res.setHeader("content-type", "application/json");
+      if (req.method === "GET" && req.url === "/api/tags") {
+        res.end(
+          JSON.stringify({
+            models: [
+              { name: "smoke-chat:latest", details: { parameter_size: "1B" } },
+              { name: "smoke-embed:latest", details: { parameter_size: "100M" } },
+              { name: "smoke-cloud:cloud", remote_host: "https://ollama.com:443", remote_model: "smoke-cloud", details: {} },
+            ],
+          }),
+        );
+      } else if (req.method === "POST" && req.url === "/api/show") {
+        const { model } = JSON.parse(body);
+        res.end(
+          JSON.stringify({
+            capabilities: model === "smoke-embed:latest" ? ["embedding"] : ["completion"],
+            model_info: { "general.architecture": "smoke", "smoke.context_length": 4096 },
+          }),
+        );
+      } else if (req.method === "POST" && req.url === "/api/chat") {
+        // "slow" keeps generating until the client goes away; anything else answers at once.
+        const { messages } = JSON.parse(body);
+        const slow = messages.some((m) => String(m.content).includes("slow"));
+        res.setHeader("content-type", "application/x-ndjson");
+        const line = (content, done = false) =>
+          JSON.stringify({ message: { role: "assistant", content }, done, ...(done && { prompt_eval_count: 7, eval_count: 2 }) }) + "\n";
+        res.on("close", () => {
+          if (!res.writableEnded) stats.aborted += 1;
+        });
+        if (slow) {
+          res.write(line("tick "));
+          const timer = setInterval(() => res.write(line("tick ")), 100);
+          res.on("close", () => clearInterval(timer));
+        } else {
+          res.write(line("Hello "));
+          res.end(line("there", false) + line("", true));
+        }
+      } else {
+        res.statusCode = 404;
+        res.end("{}");
+      }
+    });
+  });
+  return new Promise((resolve) =>
+    server.listen(0, "127.0.0.1", () => resolve({ url: `http://127.0.0.1:${server.address().port}`, requests, stats })),
+  );
+}
 
 async function waitFor(fn, { timeout = 20_000, interval = 250 } = {}) {
   const deadline = Date.now() + timeout;
@@ -300,6 +362,115 @@ try {
   check("client-side navigation to /settings works", page.url().includes("/settings"), page.url());
   check("settings show the database path", (await page.getByText(path.join(home, ".composition", "composition.db")).count()) > 0);
   await page.screenshot({ path: path.join(out, "3-settings-dark.png") });
+
+  // ---- AI helper (Settings). The server is a stand-in on a free local port; nothing leaves this machine.
+  const ollama = await startFakeOllama();
+  const decoy = await startFakeOllama();
+  const helper = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: "AI helper" }) });
+  await helper.waitFor();
+  await helper.getByLabel("Server address").fill(ollama.url);
+  await helper.getByRole("button", { name: "Save", exact: true }).click();
+  await helper.getByRole("status").filter({ hasText: "Found" }).waitFor();
+  const helperStatus = (await helper.getByRole("status").textContent()) ?? "";
+  check(
+    "the AI helper saves its server over IPC and lists only the models that can chat",
+    helperStatus.includes(`Found 1 model on ${ollama.url}: smoke-chat:latest (1B)`),
+    helperStatus,
+  );
+  check("and says how many cloud models it left out", ((await helper.textContent()) ?? "").includes("1 model that runs on ollama.com was left out"));
+  const desktopSettings = JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8"));
+  check(
+    "the server is stored in the desktop app's own settings file",
+    desktopSettings.assistant?.serverUrl === ollama.url && desktopSettings.assistant?.contextTokens === 8192,
+    JSON.stringify(desktopSettings.assistant),
+  );
+  const steered = await page.evaluate((url) => window.composition.listAssistantModels(url), decoy.url);
+  check(
+    "the page can't point the model list at another address",
+    steered.serverUrl === ollama.url && decoy.requests.length === 0,
+    `${steered.serverUrl}; the other server saw ${decoy.requests.length} requests`,
+  );
+  const refusedAddress = await page.evaluate(() => window.composition.saveAssistantSettings({ serverUrl: "ftp://nas", contextTokens: 8192 }));
+  check("an address that cannot work is refused with a reason", typeof refusedAddress.error === "string" && !refusedAddress.settings, refusedAddress.error);
+  const malformed = await page.evaluate(() =>
+    window.composition.saveAssistantSettings({ serverUrl: 5, contextTokens: 8192 }).then(
+      () => "accepted",
+      () => "rejected",
+    ),
+  );
+  check("arguments of the wrong type are rejected at the IPC boundary", malformed === "rejected");
+  check(
+    "after those refusals the saved server is still the good one",
+    (await page.evaluate(() => window.composition.loadSettings())).assistant.serverUrl === ollama.url,
+  );
+
+  // ---- AI helper chat: the main process makes the request, and pushes each event to this window.
+  const turn = (text, abortAfterFirst = false) =>
+    page.evaluate(
+      async ({ text, abortAfterFirst }) => {
+        const id = `smoke-${Math.random().toString(36).slice(2)}`;
+        const events = [];
+        const stop = window.composition.onAssistantEvent((m) => {
+          if (m.requestId !== id) return;
+          events.push(m.event);
+          if (abortAfterFirst && events.length === 1) void window.composition.assistantAbort(id);
+        });
+        const call = window.composition.assistantChat(id, { model: "smoke-chat:latest", messages: [{ role: "user", content: text }], numCtx: 8192 });
+        const outcome = await call.then(() => "resolved", (e) => `rejected: ${e.message}`);
+        stop();
+        return { events, outcome };
+      },
+      { text, abortAfterFirst },
+    );
+  const answered = await turn("hello");
+  check(
+    "a chat turn streams the reply to the window over IPC, ending with the token counts and done",
+    answered.events.filter((e) => e.type === "delta").map((e) => e.text).join("") === "Hello there" &&
+      JSON.stringify(answered.events.slice(-2)) === JSON.stringify([{ type: "usage", promptTokens: 7, outputTokens: 2 }, { type: "done" }]),
+    JSON.stringify(answered.events),
+  );
+  check("the request went to the saved server, after checking the model with /api/show", ollama.requests.slice(-2).join(" then ") === "POST /api/show then POST /api/chat", ollama.requests.slice(-3).join(" then "));
+  const stopped = await turn("slow", true);
+  await waitFor(async () => ollama.stats.aborted === 1);
+  check(
+    "stopping a turn ends it with an aborted event and drops the connection to Ollama",
+    stopped.events[stopped.events.length - 1]?.kind === "aborted" && stopped.outcome === "resolved" && ollama.stats.aborted === 1,
+    JSON.stringify(stopped.events.slice(-1)),
+  );
+  const cloud = await page.evaluate(() =>
+    window.composition
+      .assistantChat("smoke-cloud", { model: "gpt-oss:20b:cloud", messages: [{ role: "user", content: "hi" }], numCtx: 8192 })
+      .then(() => "accepted", () => "rejected"),
+  );
+  check("a cloud model is refused at the IPC boundary", cloud === "rejected" && !ollama.requests.some((r) => r.includes("cloud")));
+  const sneaky = await page.evaluate(
+    () => window.composition.assistantChat("smoke-url", { model: "smoke-chat:latest", messages: [{ role: "user", content: "hi" }], numCtx: 8192, baseUrl: "http://127.0.0.1:1" }, "http://127.0.0.1:1").then(() => "ok", () => "rejected"),
+  );
+  check("an address sent with the request is ignored", sneaky === "ok" && decoy.requests.length === 0, `${sneaky}; the other server saw ${decoy.requests.length} requests`);
+
+  // ---- AI helper panel, in a note pane: ask a question, read the answer beside the note, make a note from it.
+  await page.getByRole("link", { name: /Back to notes/ }).click();
+  const notePane = page.getByRole("region", { name: "Smoke note" });
+  await notePane.getByRole("button", { name: "AI helper" }).click();
+  const helperPanel = notePane.getByRole("complementary", { name: "AI helper" });
+  await helperPanel.getByRole("option", { name: /smoke-chat:latest/ }).waitFor({ state: "attached" });
+  check("the AI helper opens beside the note and lists the server's chat models", (await helperPanel.getByText("Runs on this computer").count()) === 1);
+  const noteBefore = await page.evaluate(() => window.composition.loadWorkspace().then((w) => w.notes.find((n) => n.title === "Smoke note").content));
+  await helperPanel.getByLabel("Ask about this note").fill("hello");
+  await helperPanel.getByLabel("Ask about this note").press("Enter");
+  await helperPanel.getByText("Hello there").waitFor();
+  check("a question typed in the panel is answered from the saved server, as it streams", ollama.requests.at(-1) === "POST /api/chat");
+  await helperPanel.getByRole("button", { name: "New note from this" }).click();
+  await page.getByRole("region", { name: "Hello there" }).waitFor();
+  const afterAnswer = await page.evaluate(() => window.composition.loadWorkspace());
+  check(
+    "'New note from this' makes a separate note holding the answer",
+    afterAnswer.notes.some((n) => n.title === "Hello there" && n.content.includes("Hello there")),
+    afterAnswer.notes.map((n) => n.title).join(","),
+  );
+  check("and leaves the note the answer was about unchanged", afterAnswer.notes.find((n) => n.title === "Smoke note").content === noteBefore);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("heading", { name: "Settings" }).waitFor();
 
   // ---- Updates (Settings). Nothing here reaches the network: the first automatic check is 30 s
   // after launch, and the toggle is only ever switched off.

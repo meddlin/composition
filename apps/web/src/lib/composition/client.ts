@@ -17,6 +17,7 @@ export {
   deleteGroup,
   deleteNote,
   deleteNotebook,
+  listAssistantModels,
   listImages,
   loadSettings,
   loadSunSchedule,
@@ -33,6 +34,7 @@ export {
   renameNotebook,
   restoreGroup,
   restoreNote,
+  saveAssistantSettings,
   saveFavorites,
   saveImage,
   saveLayout,
@@ -44,9 +46,12 @@ export {
   searchNotes,
 } from "./actions";
 export type {
+  AssistantModels,
   ImageInfo,
   ImageUse,
   MoveGroupResult,
+  SaveAssistantSettingsInput,
+  SaveAssistantSettingsResult,
   SaveImageInput,
   SaveImageResult,
   SaveLocationResult,

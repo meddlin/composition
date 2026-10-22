@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Readable } from "node:stream";
+import { DEFAULT_ASSISTANT_SETTINGS } from "./assistant/settings";
 import * as attachments from "./attachments";
 import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
+import { listAssistantModels, saveAssistantSettings, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
   ImageInfo,
@@ -112,6 +114,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     dbExists,
     backupDir: backup.defaultBackupDir(),
     trash,
+    assistant: settings.assistant ?? DEFAULT_ASSISTANT_SETTINGS,
     city: location?.name ?? "",
     sunTimes: location
       ? todaysSunTimes(await loadSunEvents(location), location.timezone)
@@ -739,6 +742,9 @@ export function initialSunTheme(): { tone: "light" | "dark"; autoLight: string }
   return theme === "auto" ? sunThemeAttributes(cachedSunSchedule(location).level) : undefined;
 }
 
+// The AI helper's settings and model list live in assistantService.ts; they are part of this module's surface.
+export { listAssistantModels, saveAssistantSettings, streamAssistantChat };
+
 // Compile-time proof that this module implements the whole contract.
 const _implementsApi: CompositionApi = {
   loadWorkspace,
@@ -770,6 +776,8 @@ const _implementsApi: CompositionApi = {
   saveSettings,
   saveTheme,
   savePreviewFont,
+  saveAssistantSettings,
+  listAssistantModels,
   saveLocation,
   loadSunSchedule,
 };

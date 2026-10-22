@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
+import type { AssistantHost } from "./assistant";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isTrustedUrl, registerIpc, type IpcEventLike } from "./ipc";
@@ -28,8 +30,10 @@ function setup() {
   const updates = Object.fromEntries(
     UPDATE_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof UpdatesApi]: ReturnType<typeof vi.fn> };
+  const assistant = { chat: vi.fn(async () => {}), abort: vi.fn(async () => {}) } satisfies AssistantHost;
   registerIpc({
     ipcMain,
+    assistant,
     api: api as unknown as CompositionApi,
     attachments: attachments as unknown as AttachmentsApi,
     backup: backup as unknown as DesktopBackupApi,
@@ -37,17 +41,59 @@ function setup() {
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup, updates };
+  return { handlers, listeners, api, attachments, backup, updates, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, backup and update method, and nothing else", () => {
+  it("registers one handler per API, attachment, backup, update and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
+  });
+
+  describe("the AI helper's chat", () => {
+    const request = { model: "qwen3:0.6b", messages: [{ role: "user", content: "hi" }], numCtx: 8192 };
+    const sender = { send: vi.fn(), isDestroyed: () => false, once: vi.fn() };
+    const ask: IpcEventLike = { senderFrame: { url: `${OWN}/` }, sender };
+
+    it("starts a turn for the window that asked, with the checked request", async () => {
+      const { handlers, assistant } = setup();
+      await handlers.get(channelFor("assistantChat"))!(ask, "req-1", { ...request, extra: 1 }, "http://evil.example/");
+      expect(assistant.chat).toHaveBeenCalledWith(sender, "req-1", request);
+    });
+
+    it("stops a turn for the window that asked", async () => {
+      const { handlers, assistant } = setup();
+      await handlers.get(channelFor("assistantAbort"))!(ask, "req-1");
+      expect(assistant.abort).toHaveBeenCalledWith(sender, "req-1");
+    });
+
+    it("refuses a frame that is not the app's own, without starting anything", async () => {
+      const { handlers, assistant } = setup();
+      const stranger: IpcEventLike = { senderFrame: { url: "https://evil.example/" }, sender };
+      await expect(handlers.get(channelFor("assistantChat"))!(stranger, "req-1", request)).rejects.toThrow(/untrusted/);
+      await expect(handlers.get(channelFor("assistantAbort"))!(stranger, "req-1")).rejects.toThrow(/untrusted/);
+      expect(assistant.chat).not.toHaveBeenCalled();
+      expect(assistant.abort).not.toHaveBeenCalled();
+    });
+
+    it("refuses arguments of the wrong shape, and a cloud model, without starting anything", async () => {
+      const { handlers, assistant } = setup();
+      const chat = handlers.get(channelFor("assistantChat"))!;
+      await expect(chat(ask, "req-1", { ...request, messages: [] })).rejects.toThrow();
+      await expect(chat(ask, "req-1", { ...request, model: "gpt-oss:20b:cloud" })).rejects.toThrow();
+      await expect(chat(ask, 5, request)).rejects.toThrow();
+      expect(assistant.chat).not.toHaveBeenCalled();
+    });
+
+    it("refuses a call that has no window to answer to", async () => {
+      const { handlers, assistant } = setup();
+      await expect(handlers.get(channelFor("assistantChat"))!({ senderFrame: { url: `${OWN}/` } }, "req-1", request)).rejects.toThrow();
+      expect(assistant.chat).not.toHaveBeenCalled();
+    });
   });
 
   it("starts a backup or restore without passing on any path the page sends", async () => {
