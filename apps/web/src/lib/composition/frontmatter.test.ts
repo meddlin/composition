@@ -12,8 +12,8 @@ import {
 // Notes must stay readable by whichever app (terminal, web or desktop) last wrote them,
 // including notes written by the Python CLI that preceded the terminal app, so the
 // format these cases pin down is not free to change.
-const CREATED = "2026-08-26T12:00:00+00:00";
-const UPDATED = "2026-08-26T12:00:00+00:00";
+const CREATED = "2026-08-26";
+const UPDATED = "2026-08-26";
 const opts = { createdAt: CREATED, updatedAt: UPDATED };
 
 describe("generate", () => {
@@ -80,7 +80,7 @@ describe("parse", () => {
     const [fm] = parse("---\ntitle: Note\ncreatedAt: 2026-08-26T12:00:00+00:00\n---\n");
 
     expect(typeof fm?.createdAt).toBe("string");
-    expect(new Date(fm!.createdAt).toISOString()).toBe("2026-08-26T12:00:00.000Z");
+    expect(fm!.createdAt).toBe("2026-08-26");
   });
 
   it("accepts tags given as a comma-separated scalar", () => {
@@ -158,7 +158,7 @@ describe("header image", () => {
   it("round-trips the image and its layout after the keys every version writes", () => {
     const block = render(withImage, "body");
 
-    expect(block).toContain("updatedAt: '2026-08-26T12:00:00+00:00'\nheaderImage: app_data/trip-0123456789ab.png\nheaderImageLayout: centered\n---\n");
+    expect(block).toContain("updatedAt: 2026-08-26\nheaderImage: app_data/trip-0123456789ab.png\nheaderImageLayout: centered\n---\n");
     expect(parse(block)).toEqual([withImage, "body"]);
   });
 
@@ -204,5 +204,17 @@ describe("header image", () => {
       expect(fm).toMatchObject({ title: "Fallback", createdAt: CREATED, headerImage: "app_data/b.png" });
       expect(body).toBe("just text");
     });
+  });
+});
+
+describe("date-only timestamps", () => {
+  it("writes createdAt/updatedAt as unquoted dates, trimming full timestamps", () => {
+    const block = generate("T", { createdAt: "2026-08-26T12:34:56.000Z", updatedAt: "2026-09-01T23:59:59.000Z" });
+    expect(block).toContain("createdAt: 2026-08-26\nupdatedAt: 2026-09-01\n");
+  });
+
+  it("round-trips a date-only value", () => {
+    const [fm] = parse(generate("T", { createdAt: "2026-08-26", updatedAt: "2026-08-27" }));
+    expect(fm).toMatchObject({ createdAt: "2026-08-26", updatedAt: "2026-08-27" });
   });
 });
