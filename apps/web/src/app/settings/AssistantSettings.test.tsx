@@ -20,6 +20,7 @@ const saved = { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 };
 const found = (overrides: Partial<AssistantModels> = {}): AssistantModels => ({
   serverUrl: "http://127.0.0.1:11434",
   local: true,
+  contextTokens: 8192,
   hiddenCloud: 0,
   models: [
     { name: "qwen3:0.6b", parameterSize: "751.63M", contextLength: 40960, capabilities: ["completion"] },

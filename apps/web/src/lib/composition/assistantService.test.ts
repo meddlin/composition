@@ -90,6 +90,19 @@ describe("listAssistantModels", () => {
     expect(result.hiddenCloud).toBe(1);
   });
 
+  it("also says what context size the helper will ask for, saved or not", async () => {
+    server = await startFakeOllama({ "GET /api/tags": { body: { models: [] } } });
+    const { listAssistantModels, saveAssistantSettings } = await load();
+    // Nothing saved yet: the default. The default address must not reach a real Ollama on this machine.
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    expect((await listAssistantModels()).contextTokens).toBe(8192);
+    vi.unstubAllGlobals();
+    await saveAssistantSettings({ serverUrl: server.url, contextTokens: 32768 });
+    expect((await listAssistantModels()).contextTokens).toBe(32768);
+  });
+
   it("asks Ollama's own address when nothing has been saved", async () => {
     const asked: string[] = [];
     vi.stubGlobal("fetch", async (url: string) => {

@@ -448,6 +448,30 @@ try {
   );
   check("an address sent with the request is ignored", sneaky === "ok" && decoy.requests.length === 0, `${sneaky}; the other server saw ${decoy.requests.length} requests`);
 
+  // ---- AI helper panel, in a note pane: ask a question, read the answer beside the note, make a note from it.
+  await page.getByRole("link", { name: /Back to notes/ }).click();
+  const notePane = page.getByRole("region", { name: "Smoke note" });
+  await notePane.getByRole("button", { name: "AI helper" }).click();
+  const helperPanel = notePane.getByRole("complementary", { name: "AI helper" });
+  await helperPanel.getByRole("option", { name: /smoke-chat:latest/ }).waitFor({ state: "attached" });
+  check("the AI helper opens beside the note and lists the server's chat models", (await helperPanel.getByText("Runs on this computer").count()) === 1);
+  const noteBefore = await page.evaluate(() => window.composition.loadWorkspace().then((w) => w.notes.find((n) => n.title === "Smoke note").content));
+  await helperPanel.getByLabel("Ask about this note").fill("hello");
+  await helperPanel.getByLabel("Ask about this note").press("Enter");
+  await helperPanel.getByText("Hello there").waitFor();
+  check("a question typed in the panel is answered from the saved server, as it streams", ollama.requests.at(-1) === "POST /api/chat");
+  await helperPanel.getByRole("button", { name: "New note from this" }).click();
+  await page.getByRole("region", { name: "Hello there" }).waitFor();
+  const afterAnswer = await page.evaluate(() => window.composition.loadWorkspace());
+  check(
+    "'New note from this' makes a separate note holding the answer",
+    afterAnswer.notes.some((n) => n.title === "Hello there" && n.content.includes("Hello there")),
+    afterAnswer.notes.map((n) => n.title).join(","),
+  );
+  check("and leaves the note the answer was about unchanged", afterAnswer.notes.find((n) => n.title === "Smoke note").content === noteBefore);
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("heading", { name: "Settings" }).waitFor();
+
   // ---- Updates (Settings). Nothing here reaches the network: the first automatic check is 30 s
   // after launch, and the toggle is only ever switched off.
   await page.getByRole("heading", { name: "Updates" }).waitFor();

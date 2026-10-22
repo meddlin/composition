@@ -28,6 +28,8 @@ import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
+import { AssistantProvider, useAssistant } from "./AssistantProvider";
+import { createNoteFromAnswer } from "./createNoteFromAnswer";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
 import { NoteSidebar } from "./NoteSidebar";
@@ -59,7 +61,11 @@ type Props = {
 };
 
 export function NotesApp(props: Props) {
-  return <Workspace {...props} />;
+  return (
+    <AssistantProvider>
+      <Workspace {...props} />
+    </AssistantProvider>
+  );
 }
 
 function Workspace({
@@ -68,6 +74,7 @@ function Workspace({
   initialLayout,
   initialFavorites = NO_FAVORITES,
 }: Props) {
+  const assistant = useAssistant();
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [groups, setGroups] = useState<Group[]>(initialGroups);
   // The open notes, side by side; the focused one is where sidebar picks and new notes open.
@@ -159,6 +166,20 @@ function Workspace({
     });
   }
 
+  /**
+   * Makes a separate new note from an answer of the AI helper, in the same group as the note it was asked about,
+   * and opens it beside that note. Nothing is written into the note the answer was about.
+   */
+  function newNoteFromText(fromId: number, text: string) {
+    flushPendingSave();
+    const groupId = notes.find((n) => n.id === fromId)?.groupId ?? null;
+    startTransition(async () => {
+      const note = await createNoteFromAnswer(text, groupId, { createNote, saveNoteContent });
+      setNotes((prev) => [note, ...prev]);
+      setPaneState((prev) => dropNote(prev, note.id, fromId, "right"));
+    });
+  }
+
   /** Moves the note to the Trash Can. Call only once the user has confirmed. */
   function remove(id: number) {
     // Nothing left to save for a note that is going away.
@@ -169,6 +190,7 @@ function Workspace({
     setNotes((prev) => prev.filter((n) => n.id !== id));
     setPaneState((prev) => closePane(prev, id));
     forgetFavorite("note", id);
+    assistant.forgetNote(id);
     startTransition(async () => {
       await deleteNote(id);
     });
@@ -366,6 +388,7 @@ function Workspace({
             onChange={update}
             onDropNote={dropNoteOnPane}
             onOpenNote={openLinkedNote}
+            onNewNoteFromText={newNoteFromText}
             onResizePanes={(sizes) => setPaneState((prev) => withSizes(prev, sizes))}
           />
         ) : (

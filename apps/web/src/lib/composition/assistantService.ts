@@ -19,13 +19,13 @@ export async function saveAssistantSettings(input: SaveAssistantSettingsInput): 
 
 /** `timeoutMs` is for tests; the contract takes no arguments. */
 export async function listAssistantModels(timeoutMs = LIST_TIMEOUT_MS): Promise<AssistantModels> {
-  const { serverUrl } = loadWebSettings().assistant ?? DEFAULT_ASSISTANT_SETTINGS;
+  const { serverUrl, contextTokens } = loadWebSettings().assistant ?? DEFAULT_ASSISTANT_SETTINGS;
   const local = isLoopback(serverUrl);
   const result = await listModels(serverUrl, AbortSignal.timeout(timeoutMs));
   if (!result.ok) {
-    return { serverUrl, local, models: [], hiddenCloud: 0, error: { kind: result.kind, message: result.message } };
+    return { serverUrl, local, contextTokens, models: [], hiddenCloud: 0, error: { kind: result.kind, message: result.message } };
   }
-  return { serverUrl, local, models: result.models, hiddenCloud: result.hiddenCloud };
+  return { serverUrl, local, contextTokens, models: result.models, hiddenCloud: result.hiddenCloud };
 }
 
 const OTHER_HOST = (model: string) =>

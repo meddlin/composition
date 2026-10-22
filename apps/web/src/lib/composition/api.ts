@@ -96,6 +96,8 @@ export type AssistantModels = {
   serverUrl: string;
   /** Whether that address is this machine; if not, notes sent there cross a network. */
   local: boolean;
+  /** The context size the helper asks the server for, from the saved settings. */
+  contextTokens: number;
   models: ModelSummary[];
   /** How many models were left out because they would run on Ollama's cloud rather than that server. */
   hiddenCloud: number;

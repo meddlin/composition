@@ -601,10 +601,15 @@ describe("viewing a note as tabs", () => {
     unobserve() {}
     disconnect() {}
   }
+  /** Tells everything watched inside the pane (the pane itself, and the column the note sits in) its new width. */
   function resizePane(title: string, width: number) {
     const element = pane(title);
     act(() => {
-      observed.get(element)!([{ contentRect: { width } } as ResizeObserverEntry], {} as ResizeObserver);
+      for (const [watched, callback] of observed) {
+        if (watched === element || element.contains(watched)) {
+          callback([{ contentRect: { width } } as ResizeObserverEntry], {} as ResizeObserver);
+        }
+      }
     });
   }
 

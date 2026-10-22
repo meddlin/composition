@@ -2,7 +2,7 @@
 
 The order of work for the first version of the AI helper. The evidence and sources behind it are in
 [ai-helper-research.md](ai-helper-research.md); bracketed numbers like [36] point at that file's
-[Sources](ai-helper-research.md#sources). Status: **planned and agreed; Phases 0 to 3 done (2026-10-21 and 22); Phases 4 and 5 not started.** Anything marked **Inference**
+[Sources](ai-helper-research.md#sources). Status: **planned and agreed; Phases 0 to 4 done (2026-10-21 and 22); Phase 5 (docs, manual test) not started.** Anything marked **Inference**
 or **my pick** is a judgment, not something a source or the owner decided.
 
 ## Goal
@@ -418,6 +418,52 @@ Build in this order so each step is testable alone.
 **Exit:** on web and desktop, against a real Ollama: open a note, ask about it and about a selection, see the
 answer stream beside the note, Stop, New chat, switch back to the earlier chat, Copy, make a new note from an
 answer, close and reopen the pane without losing the chat, and shrink the window until the dock goes "over".
+
+### Built (2026-10-22)
+
+Test-first, in the order above. **Web: 1,542 tests (99 files); desktop: 279**; `tsc` clean in both, `eslint` 0 errors,
+Opengrep 0 findings (new untracked files scanned directly). Where the build differs from the steps:
+
+- **State is a pure reducer** (`assistant/conversations.ts`): turns, conversations per note, `historyOf` (only turns
+  that finished are sent back), a stopped turn kept as "stopped" rather than failed, the `promptWasCut` check on the
+  server's token count. `AssistantProvider` owns the streams, so closing or moving a pane neither loses a chat nor
+  cuts an answer off, and ignores a second question on a note while one is streaming.
+- **`AssistantMarkdown`**: images are alt text only (nothing is fetched), links are text with the address in a
+  tooltip, HTML and the note components show as text, partial Markdown does not throw.
+- **`AssistantPanel`**: header (new chat, close, model, chat switcher, "Runs on this computer" or "Sends your notes to
+  *host*"), a `role="log"` message list, Copy and "New note from this" on each answer, Stop, the selection chip, the
+  size line (ok, "nearly fills", or "too large" with the remedy and sending blocked), and the failure and empty states.
+  **It has no `onChange`, and a `@ts-expect-error` test in the suite fails to compile if one is ever added.** The model
+  choice is remembered in `localStorage` (in a try/catch). The context size sent is the smaller of the setting and the
+  model's own window.
+- **`AssistantModels.contextTokens`** (small API addition) so the panel gets the setting and the model list in one call.
+- **`createNoteFromAnswer`**: creates the note (so it has a title block), then writes the answer under it, in the source
+  note's group; `NotesApp` opens it to the right of the source. The source note is not saved.
+- **Selection** is read when focus or a pointer enters the dock (`readPaneSelection`): the editor's selection from its
+  textarea, else the preview's from the page selection (`data-note-preview` marks the preview box).
+- **The dock** (`assistantDock.ts`): beside the note at 360 px by default, draggable (280 px up to 60% of the pane, the note
+  keeping 320 px), and over the note when the pane is under 600 px. The Split/Markdown decision is now made on the note's
+  own column, so Split gives way as the dock takes room; `NotePanes.test.tsx`'s width helper now notifies everything
+  watched inside a pane. The dock width is component state, so settings, backups and the IPC layout validator are untouched.
+- **Shortcut: Ctrl/Cmd+Shift+L**, matched on the typed letter like Find, for the focused pane only; opening it focuses the
+  question box and closing returns focus to the editor. Listed in `shortcuts.ts`. **Not checked against Safari, where
+  Cmd+Shift+L shows the sidebar**, nor against Firefox; the desktop app has no clash that I know of. If Safari refuses to
+  hand the key over, the header button does the same.
+- **`copyText`** (`clipboard.ts`) replaced the private copy in `PreviewHighlightMenu`, with a test.
+
+**Checked by hand, web dev server against your Ollama (browser, scratch home):** the shortcut opens the dock and puts the
+cursor in the question box; a real `qwen3:0.6b` answer streamed in as formatted Markdown; "New note from this" made a
+second note ("For day two, suggest:") and opened it to the right, and the first note was unchanged; with two panes the
+first pane's dock correctly covered its note, and closing the other pane put it back beside the note with the chat
+intact; triple-clicking a preview paragraph and then clicking into the question box produced the chip "Selection (113
+characters)"; and Stop ended a long answer with "Stopped." and kept the text.
+**Real desktop app (`pnpm smoke`):** four new checks pass: the panel opens beside the note and lists the server's models, a
+typed question is answered from the saved server as it streams, "New note from this" makes a separate note holding the
+answer, and the note it was about is unchanged. (The earlier development-run failure at "Check for updates
+automatically" still follows them.)
+
+**Not done in this phase:** the docs and manual test (Phase 5); no check in Safari or Firefox; the desktop panel was
+driven by the smoke script, not by hand.
 
 ## Phase 5: documentation and verification
 
