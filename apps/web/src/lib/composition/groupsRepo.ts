@@ -1,11 +1,14 @@
+import type Database from "better-sqlite3";
 import { getDb } from "./db";
 import { wouldCreateCycle } from "./groupMove";
+import { defaultNotebookId, getNotebook } from "./notebooksRepo";
 import { placeBefore } from "./ordering";
 
 export type Group = {
   id: number;
   name: string;
   parentId: number | null;
+  notebookId: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -14,6 +17,7 @@ type GroupRow = {
   id: number;
   name: string;
   parent_id: number | null;
+  notebook_id: number;
   created_at: string;
   updated_at: string;
 };
@@ -22,11 +26,14 @@ export class GroupNotEmptyError extends Error {}
 
 export class InvalidGroupMoveError extends Error {}
 
+export class InvalidNotebookMoveError extends Error {}
+
 function fromRow(row: GroupRow): Group {
   return {
     id: row.id,
     name: row.name,
     parentId: row.parent_id,
+    notebookId: row.notebook_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -53,13 +60,24 @@ export function getGroup(id: number): Group | null {
   return row ? fromRow(row) : null;
 }
 
-export function createGroup(name: string, parentId: number | null = null): Group {
+/**
+ * A sub-group is always in its parent's notebook; a top-level group goes in
+ * `notebookId` (the default notebook when none is given).
+ */
+export function createGroup(
+  name: string,
+  parentId: number | null = null,
+  notebookId: number | null = null,
+): Group {
   const now = nowIso();
+  const parent = parentId === null ? null : getGroup(parentId);
+  const inNotebook = parent?.notebookId ?? notebookId ?? defaultNotebookId();
   const result = getDb()
     .prepare(
-      "INSERT INTO groups (name, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
+      `INSERT INTO groups (name, parent_id, notebook_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
     )
-    .run(name, parentId, now, now);
+    .run(name, parentId, inNotebook, now, now);
   const group = getGroup(Number(result.lastInsertRowid));
   if (!group) throw new Error("Failed to read back the group that was just created");
   return group;
@@ -90,9 +108,52 @@ function assertCanMove(id: number, parentId: number | null): void {
  */
 export function moveGroup(id: number, parentId: number | null): void {
   assertCanMove(id, parentId);
-  getDb()
-    .prepare("UPDATE groups SET parent_id = ?, position = NULL, updated_at = ? WHERE id = ?")
-    .run(parentId, nowIso(), id);
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare("UPDATE groups SET parent_id = ?, position = NULL, updated_at = ? WHERE id = ?").run(
+      parentId,
+      nowIso(),
+      id,
+    );
+    adoptParentNotebook(db, id, parentId);
+  })();
+}
+
+/** A group moved under another one joins that group's notebook, taking everything in it along. */
+function adoptParentNotebook(db: Database.Database, id: number, parentId: number | null): void {
+  const parent = parentId === null ? null : getGroup(parentId);
+  if (parent) setSubtreeNotebook(db, id, parent.notebookId);
+}
+
+/** Puts group `id`, all its sub-groups and every note in any of them into `notebookId`. */
+function setSubtreeNotebook(db: Database.Database, id: number, notebookId: number): void {
+  const ids = [id];
+  for (let i = 0; i < ids.length; i++) {
+    const children = db.prepare("SELECT id FROM groups WHERE parent_id = ?").all(ids[i]) as {
+      id: number;
+    }[];
+    for (const child of children) if (!ids.includes(child.id)) ids.push(child.id);
+  }
+  const marks = ids.map(() => "?").join(", ");
+  db.prepare(`UPDATE groups SET notebook_id = ? WHERE id IN (${marks})`).run(notebookId, ...ids);
+  db.prepare(`UPDATE notes SET notebook_id = ? WHERE group_id IN (${marks})`).run(notebookId, ...ids);
+}
+
+/**
+ * Moves a group, with its sub-groups and notes, into another notebook, where it
+ * becomes a top-level group (last among them). Works the same for a sub-group,
+ * which leaves its parent behind.
+ */
+export function moveGroupToNotebook(id: number, notebookId: number): void {
+  if (!getGroup(id)) throw new InvalidNotebookMoveError(`Group ${id} not found.`);
+  if (!getNotebook(notebookId)) throw new InvalidNotebookMoveError(`Notebook ${notebookId} not found.`);
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare(
+      "UPDATE groups SET parent_id = NULL, position = NULL, updated_at = ? WHERE id = ?",
+    ).run(nowIso(), id);
+    setSubtreeNotebook(db, id, notebookId);
+  })();
 }
 
 /**
@@ -103,11 +164,15 @@ export function moveGroup(id: number, parentId: number | null): void {
 export function placeGroup(id: number, parentId: number | null, beforeId: number | null): void {
   assertCanMove(id, parentId);
   const db = getDb();
+  // The notebook it ends up in: its new parent's, or the one it is already top-level in.
+  const notebookId = (parentId === null ? getGroup(id) : getGroup(parentId))!.notebookId;
   db.transaction(() => {
     const siblings = (
       db
-        .prepare(`SELECT id FROM groups WHERE parent_id IS ? ORDER BY ${DISPLAY_ORDER}`)
-        .all(parentId) as { id: number }[]
+        .prepare(
+          `SELECT id FROM groups WHERE parent_id IS ? AND notebook_id = ? ORDER BY ${DISPLAY_ORDER}`,
+        )
+        .all(parentId, notebookId) as { id: number }[]
     ).map((row) => row.id);
     const ordered = placeBefore(siblings, id, beforeId);
     db.prepare("UPDATE groups SET parent_id = ?, updated_at = ? WHERE id = ?").run(
@@ -115,6 +180,7 @@ export function placeGroup(id: number, parentId: number | null, beforeId: number
       nowIso(),
       id,
     );
+    adoptParentNotebook(db, id, parentId);
     const setPosition = db.prepare("UPDATE groups SET position = ? WHERE id = ?");
     ordered.forEach((groupId, index) => setPosition.run(index, groupId));
   })();

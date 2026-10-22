@@ -97,6 +97,36 @@ Every other table is a `CREATE TABLE IF NOT EXISTS`, for the same reason. `db.te
 databases as each earlier version created them and checks every column arrives with the data
 intact.
 
+## Notebooks
+
+A **notebook** holds groups, sub-groups and notes; the web and desktop sidebar shows one notebook's
+contents at a time (a second, slide-out sidebar beside it lists the notebooks and creates, renames, deletes and switches them).
+
+```sql
+CREATE TABLE notebooks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+`notes`, `groups`, `trashed_notes` and `trashed_groups` each gained a `notebook_id` column (added by
+`ensureColumn` like the others). It is stored on **every** group and note, not derived from the top
+of the tree, so listing a notebook is a plain filter. The invariant, kept by the repos: a sub-group
+and a note in a group are always in their group's notebook. Moving a group to another notebook
+(`moveGroupToNotebook`) makes it a top-level group there and carries its sub-groups and notes along;
+reparenting a group under one in another notebook does the same.
+
+On open, `adoptOrphans` creates a "Notebook" if there are none and gives every row with a `NULL`
+`notebook_id` to the first notebook. That is how a database from before notebooks upgrades, and how
+rows written since by an older CLI (which doesn't know the column) are picked up the next time the
+workspace is loaded. A notebook is deleted for good (it is not trashed) and only when it has no
+groups or notes; the last notebook cannot be deleted. Restoring a trashed item puts it back in its
+group's notebook, else the one it came from, else the first notebook. Ordering among top-level
+siblings is per notebook. Which notebook was open last is remembered in the browser's
+`localStorage`, not the database.
+
 Write-ahead logging is switched on when the file is opened. It is stored in the file itself, so it
 covers every app that opens it, and lets the terminal, web and desktop apps run side by side on one
 database.

@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { defaultNotebookId } from "./notebooksRepo";
 import { GroupNotEmptyError, groupIsEmpty } from "./groupsRepo";
 import { expiryOf, retentionCutoff, type Trash } from "./trash";
 
@@ -21,8 +22,8 @@ export function trashNote(id: number): void {
   db.transaction(() => {
     db.prepare(
       `INSERT OR REPLACE INTO trashed_notes
-         (id, title, content, tags, description, created_at, updated_at, group_id, deleted_at)
-       SELECT id, title, content, tags, description, created_at, updated_at, group_id, ?
+         (id, title, content, tags, description, created_at, updated_at, group_id, notebook_id, deleted_at)
+       SELECT id, title, content, tags, description, created_at, updated_at, group_id, notebook_id, ?
        FROM notes WHERE id = ?`,
     ).run(nowIso(), id);
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
@@ -43,8 +44,8 @@ export function trashGroup(id: number): void {
     }
     db.prepare(
       `INSERT OR REPLACE INTO trashed_groups
-         (id, name, parent_id, created_at, updated_at, deleted_at)
-       SELECT id, name, parent_id, created_at, updated_at, ?
+         (id, name, parent_id, notebook_id, created_at, updated_at, deleted_at)
+       SELECT id, name, parent_id, notebook_id, created_at, updated_at, ?
        FROM groups WHERE id = ?`,
     ).run(nowIso(), id);
     db.prepare("DELETE FROM groups WHERE id = ?").run(id);
@@ -75,6 +76,14 @@ export function listTrash(): Trash {
   };
 }
 
+/** The notebook an item was trashed from if it still exists, else the default one. */
+function survivingNotebookId(notebookId: number | null): number {
+  const exists =
+    notebookId !== null &&
+    getDb().prepare("SELECT 1 FROM notebooks WHERE id = ?").get(notebookId);
+  return exists ? notebookId : defaultNotebookId();
+}
+
 /**
  * Puts a trashed note back, in its original group if that group still exists,
  * otherwise ungrouped. Returns null when the note isn't in the trash (already
@@ -93,19 +102,26 @@ export function restoreNote(id: number): { restoredToTopLevel: boolean } | null 
           created_at: string;
           updated_at: string;
           group_id: number | null;
+          notebook_id: number | null;
         }
       | undefined;
     if (!row) return null;
 
-    const groupExists =
-      row.group_id !== null && db.prepare("SELECT 1 FROM groups WHERE id = ?").get(row.group_id);
-    const groupId = groupExists ? row.group_id : null;
+    const group =
+      row.group_id === null
+        ? undefined
+        : (db.prepare("SELECT notebook_id FROM groups WHERE id = ?").get(row.group_id) as
+            | { notebook_id: number }
+            | undefined);
+    const groupId = group ? row.group_id : null;
+    // In its group's notebook if the group is still there, else the one it was in (if that survives).
+    const notebookId = group?.notebook_id ?? survivingNotebookId(row.notebook_id);
     // Ids are never reused (AUTOINCREMENT), so keeping it is safe; a clash would
     // mean the database was swapped underneath us, and a fresh id is still correct.
     const idTaken = db.prepare("SELECT 1 FROM notes WHERE id = ?").get(id);
     db.prepare(
-      `INSERT INTO notes (id, title, content, tags, description, created_at, updated_at, group_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO notes (id, title, content, tags, description, created_at, updated_at, group_id, notebook_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       idTaken ? null : id,
       row.title,
@@ -115,6 +131,7 @@ export function restoreNote(id: number): { restoredToTopLevel: boolean } | null 
       row.created_at,
       row.updated_at,
       groupId,
+      notebookId,
     );
     db.prepare("DELETE FROM trashed_notes WHERE id = ?").run(id);
     return { restoredToTopLevel: row.group_id !== null && groupId === null };
@@ -129,19 +146,29 @@ export function restoreGroup(id: number): { restoredToTopLevel: boolean } | null
   const db = getDb();
   return db.transaction(() => {
     const row = db.prepare("SELECT * FROM trashed_groups WHERE id = ?").get(id) as
-      | { name: string; parent_id: number | null; created_at: string; updated_at: string }
+      | {
+          name: string;
+          parent_id: number | null;
+          notebook_id: number | null;
+          created_at: string;
+          updated_at: string;
+        }
       | undefined;
     if (!row) return null;
 
-    const parentExists =
-      row.parent_id !== null &&
-      db.prepare("SELECT 1 FROM groups WHERE id = ?").get(row.parent_id);
-    const parentId = parentExists ? row.parent_id : null;
+    const parent =
+      row.parent_id === null
+        ? undefined
+        : (db.prepare("SELECT notebook_id FROM groups WHERE id = ?").get(row.parent_id) as
+            | { notebook_id: number }
+            | undefined);
+    const parentId = parent ? row.parent_id : null;
+    const notebookId = parent?.notebook_id ?? survivingNotebookId(row.notebook_id);
     const idTaken = db.prepare("SELECT 1 FROM groups WHERE id = ?").get(id);
     db.prepare(
-      `INSERT INTO groups (id, name, parent_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(idTaken ? null : id, row.name, parentId, row.created_at, row.updated_at);
+      `INSERT INTO groups (id, name, parent_id, notebook_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(idTaken ? null : id, row.name, parentId, notebookId, row.created_at, row.updated_at);
     db.prepare("DELETE FROM trashed_groups WHERE id = ?").run(id);
     return { restoredToTopLevel: row.parent_id !== null && parentId === null };
   })();

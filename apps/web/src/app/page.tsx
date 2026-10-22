@@ -7,11 +7,12 @@ import { loadWorkspace } from "@/lib/composition/service";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const { notes, groups, layout, favorites } = await loadWorkspace();
+  const { notes, groups, notebooks, layout, favorites } = await loadWorkspace();
   return (
     <NotesApp
       initialNotes={notes}
       initialGroups={groups}
+      initialNotebooks={notebooks}
       initialLayout={layout}
       initialFavorites={favorites}
     />

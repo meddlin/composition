@@ -1,5 +1,7 @@
 import { getDb } from "./db";
+import { defaultNotebookId } from "./notebooksRepo";
 import * as frontmatter from "./frontmatter";
+import { getGroup } from "./groupsRepo";
 import { placeBefore } from "./ordering";
 
 export type Note = {
@@ -11,6 +13,7 @@ export type Note = {
   createdAt: string;
   updatedAt: string;
   groupId: number | null;
+  notebookId: number;
 };
 
 type NoteRow = {
@@ -22,6 +25,7 @@ type NoteRow = {
   created_at: string;
   updated_at: string;
   group_id: number | null;
+  notebook_id: number;
 };
 
 function fromRow(row: NoteRow): Note {
@@ -34,6 +38,7 @@ function fromRow(row: NoteRow): Note {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     groupId: row.group_id,
+    notebookId: row.notebook_id,
   };
 }
 
@@ -66,6 +71,7 @@ export function createNote(
   title: string,
   tags = "",
   groupId: number | null = null,
+  notebookId: number | null = null,
 ): Note {
   const now = nowIso();
   const content = frontmatter.generate(title, {
@@ -73,12 +79,15 @@ export function createNote(
     updatedAt: now,
     tags: frontmatter.tagsFromString(tags),
   });
+  // A note in a group is in the group's notebook, whatever the caller thought.
+  const group = groupId === null ? null : getGroup(groupId);
+  const inNotebook = group?.notebookId ?? notebookId ?? defaultNotebookId();
   const result = getDb()
     .prepare(
-      `INSERT INTO notes (title, content, tags, description, created_at, updated_at, group_id)
-       VALUES (?, ?, ?, '', ?, ?, ?)`,
+      `INSERT INTO notes (title, content, tags, description, created_at, updated_at, group_id, notebook_id)
+       VALUES (?, ?, ?, '', ?, ?, ?, ?)`,
     )
-    .run(title, content, tags, now, now, groupId);
+    .run(title, content, tags, now, now, groupId, inNotebook);
   const note = getNote(Number(result.lastInsertRowid));
   if (!note) throw new Error("Failed to read back the note that was just created");
   return note;
@@ -111,9 +120,14 @@ export function updateNote(
  * note's hand-set position: it no longer means anything among new siblings.
  */
 export function setNoteGroup(id: number, groupId: number | null): void {
+  // Into a group means into its notebook; ungrouped, the note stays in the one it is in.
   getDb()
-    .prepare("UPDATE notes SET group_id = ?, position = NULL WHERE id = ?")
-    .run(groupId, id);
+    .prepare(
+      `UPDATE notes SET group_id = ?, position = NULL,
+         notebook_id = COALESCE((SELECT notebook_id FROM groups WHERE id = ?), notebook_id)
+       WHERE id = ?`,
+    )
+    .run(groupId, groupId, id);
 }
 
 /**
@@ -124,13 +138,24 @@ export function setNoteGroup(id: number, groupId: number | null): void {
 export function placeNote(id: number, groupId: number | null, beforeId: number | null): void {
   const db = getDb();
   db.transaction(() => {
+    const group = groupId === null ? null : getGroup(groupId);
+    const notebookId =
+      group?.notebookId ??
+      (db.prepare("SELECT notebook_id FROM notes WHERE id = ?").get(id) as { notebook_id: number } | undefined)
+        ?.notebook_id;
     const siblings = (
       db
-        .prepare(`SELECT id FROM notes WHERE group_id IS ? ORDER BY ${DISPLAY_ORDER}`)
-        .all(groupId) as { id: number }[]
+        .prepare(
+          `SELECT id FROM notes WHERE group_id IS ? AND notebook_id IS ? ORDER BY ${DISPLAY_ORDER}`,
+        )
+        .all(groupId, notebookId ?? null) as { id: number }[]
     ).map((row) => row.id);
     const ordered = placeBefore(siblings, id, beforeId);
-    db.prepare("UPDATE notes SET group_id = ? WHERE id = ?").run(groupId, id);
+    db.prepare("UPDATE notes SET group_id = ?, notebook_id = ? WHERE id = ?").run(
+      groupId,
+      notebookId ?? null,
+      id,
+    );
     const setPosition = db.prepare("UPDATE notes SET position = ? WHERE id = ?");
     ordered.forEach((noteId, index) => setPosition.run(index, noteId));
   })();

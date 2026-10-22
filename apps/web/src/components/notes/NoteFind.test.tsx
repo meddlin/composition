@@ -16,6 +16,7 @@ const note: Note = {
   createdAt: at,
   updatedAt: at,
   groupId: null,
+  notebookId: 1,
 };
 
 function renderPane(props: Partial<Parameters<typeof NotePane>[0]> = {}) {

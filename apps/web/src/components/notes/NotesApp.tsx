@@ -1,19 +1,23 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import {
   createGroup as createGroupAction,
   createNote,
+  createNotebook as createNotebookAction,
   deleteGroup as deleteGroupAction,
   deleteNote,
+  deleteNotebook as deleteNotebookAction,
   moveGroup as moveGroupAction,
+  moveGroupToNotebook as moveGroupToNotebookAction,
   moveNoteToGroup as moveNoteToGroupAction,
   placeGroup as placeGroupAction,
   placeNote as placeNoteAction,
   renameGroup as renameGroupAction,
+  renameNotebook as renameNotebookAction,
   saveFavorites,
   saveNoteContent,
 } from "@/lib/composition/client";
@@ -30,6 +34,14 @@ import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
+import { NotebookPanel } from "./NotebookPanel";
+import {
+  MAX_NOTEBOOK_PANEL_WIDTH,
+  MIN_NOTEBOOK_PANEL_WIDTH,
+  clampNotebookPanelWidth,
+  setNotebookPanelPrefs,
+  useNotebookPanelPrefs,
+} from "./notebookPanelPrefs";
 import { NoteSidebar } from "./NoteSidebar";
 import { PaneArea } from "./PaneArea";
 import {
@@ -45,15 +57,45 @@ import {
 } from "./panes";
 import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
-import { applySavedNote, noteTitle, type Group, type Note } from "./types";
+import { applySavedNote, noteTitle, type Group, type Note, type Notebook } from "./types";
 import { useLayout } from "./useLayout";
 import { useNoteDrop } from "./useNoteDrop";
 
 const AUTOSAVE_DELAY_MS = 500;
 
+// Which notebook was open last, so it is the one shown next time. A convenience only.
+const NOTEBOOK_STORAGE_KEY = "composition.notebook";
+
+// For a workspace given no notebooks (nothing in the database yet to ask for one).
+const NO_NOTEBOOKS: Notebook[] = [{ id: 1, name: "Notebook", createdAt: "", updatedAt: "" }];
+
+// Read through useSyncExternalStore: the server render can't know what the browser
+// remembers, and this lets the first client render agree with it before switching over.
+function subscribeToNothing(): () => void {
+  return () => {};
+}
+
+function rememberedNotebookId(): number | null {
+  try {
+    const stored = Number(window.localStorage.getItem(NOTEBOOK_STORAGE_KEY));
+    return Number.isSafeInteger(stored) && stored > 0 ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function rememberNotebookId(id: number): void {
+  try {
+    window.localStorage.setItem(NOTEBOOK_STORAGE_KEY, String(id));
+  } catch {
+    // Not remembered; the first notebook opens next time.
+  }
+}
+
 type Props = {
   initialNotes: Note[];
   initialGroups: Group[];
+  initialNotebooks?: Notebook[];
   initialLayout: Layout;
   initialFavorites?: Favorites;
 };
@@ -65,19 +107,38 @@ export function NotesApp(props: Props) {
 function Workspace({
   initialNotes,
   initialGroups,
+  initialNotebooks = NO_NOTEBOOKS,
   initialLayout,
   initialFavorites = NO_FAVORITES,
 }: Props) {
   const [notes, setNotes] = useState<Note[]>(initialNotes);
   const [groups, setGroups] = useState<Group[]>(initialGroups);
+  const [notebooks, setNotebooks] = useState<Notebook[]>(initialNotebooks);
+  const remembered = useSyncExternalStore(subscribeToNothing, rememberedNotebookId, () => null);
+  // The notebook chosen this session; until then, the one the browser remembers.
+  const [chosenNotebookId, setChosenNotebookId] = useState<number | null>(null);
+  // The sidebar shows one notebook at a time; everything else (open panes, search) spans all of them.
+  const wanted = chosenNotebookId ?? remembered;
+  const notebookId = notebooks.find((n) => n.id === wanted)?.id ?? notebooks[0].id;
+  const notebookNotes = notes.filter((n) => n.notebookId === notebookId);
+  const notebookGroups = groups.filter((g) => g.notebookId === notebookId);
+
+  function openNotebook(id: number) {
+    setChosenNotebookId(id);
+    // A group page belongs to the notebook that was open.
+    setViewedGroupId(null);
+    rememberNotebookId(id);
+  }
   // The open notes, side by side; the focused one is where sidebar picks and new notes open.
   const [paneState, setPaneState] = useState(() => initialPanes(initialNotes[0]?.id ?? null));
   const [groupError, setGroupError] = useState<string | null>(null);
   // Nothing is deleted until the user confirms in the dialog this drives.
   const [pendingDelete, setPendingDelete] = useState<
-    { kind: "note" | "group"; id: number } | null
+    { kind: "note" | "group" | "notebook"; id: number } | null
   >(null);
   // When set, the group's listing page replaces the panes.
+  const notebookPanel = useNotebookPanelPrefs();
+  const notebookPanelStart = useRef(notebookPanel.width);
   const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
   const layout = useLayout(initialLayout);
   const [favorites, setFavorites] = useState<Favorites>(initialFavorites);
@@ -128,11 +189,18 @@ function Workspace({
     if (next.length !== latestFavorites.current.length) updateFavorites(next);
   }
 
-  // A group deleted while its page is open falls back to the panes.
-  const viewedGroup = groups.find((g) => g.id === viewedGroupId) ?? null;
+  // A group deleted (or moved to another notebook) while its page is open falls back to the panes.
+  const viewedGroup = notebookGroups.find((g) => g.id === viewedGroupId) ?? null;
+
+  /** Shows the note's notebook, so a note picked from search is visible in the sidebar. */
+  function followNote(id: number) {
+    const notebook = notes.find((n) => n.id === id)?.notebookId;
+    if (notebook !== undefined && notebook !== notebookId) openNotebook(notebook);
+  }
 
   function selectNote(id: number) {
     flushPendingSave();
+    followNote(id);
     setPaneState((prev) => openNote(prev, id));
     setViewedGroupId(null);
   }
@@ -140,6 +208,7 @@ function Workspace({
   /** Opens the note in a new pane next to the focused one, rather than in it. */
   function openBeside(id: number) {
     flushPendingSave();
+    followNote(id);
     setPaneState((prev) => openNoteBeside(prev, id));
     setViewedGroupId(null);
   }
@@ -152,7 +221,7 @@ function Workspace({
   function create(groupId: number | null = null) {
     flushPendingSave();
     startTransition(async () => {
-      const note = await createNote("Untitled", groupId);
+      const note = await createNote("Untitled", groupId, notebookId);
       setNotes((prev) => [note, ...prev]);
       setPaneState((prev) => openNote(prev, note.id));
       setViewedGroupId(null);
@@ -200,8 +269,76 @@ function Workspace({
 
   function createGroup(name: string, parentId: number | null) {
     startTransition(async () => {
-      const group = await createGroupAction(name, parentId);
+      const group = await createGroupAction(name, parentId, notebookId);
       setGroups((prev) => [...prev, group]);
+    });
+  }
+
+  function createNotebook(name: string) {
+    startTransition(async () => {
+      const notebook = await createNotebookAction(name);
+      setNotebooks((prev) => [...prev, notebook]);
+      openNotebook(notebook.id);
+    });
+  }
+
+  function renameNotebook(id: number, name: string) {
+    setNotebooks((prev) => prev.map((n) => (n.id === id ? { ...n, name } : n)));
+    startTransition(async () => {
+      const notebook = await renameNotebookAction(id, name);
+      setNotebooks((prev) => prev.map((n) => (n.id === notebook.id ? notebook : n)));
+    });
+  }
+
+  /** Deletes the (empty) notebook for good. Call only once the user has confirmed. */
+  function deleteNotebook(id: number) {
+    setGroupError(null);
+    startTransition(async () => {
+      const result = await deleteNotebookAction(id);
+      if (result.error) {
+        setGroupError(result.error);
+        return;
+      }
+      setNotebooks((prev) => prev.filter((n) => n.id !== id));
+    });
+  }
+
+  /** Moves the group, its sub-groups and their notes to the top level of another notebook. */
+  function moveGroupToNotebook(id: number, targetNotebookId: number) {
+    setGroupError(null);
+    const previous = { groups, notes };
+    const moved = new Set([id]);
+    for (let changed = true; changed; ) {
+      changed = false;
+      for (const g of groups) {
+        if (g.parentId !== null && moved.has(g.parentId) && !moved.has(g.id)) {
+          moved.add(g.id);
+          changed = true;
+        }
+      }
+    }
+    setGroups((prev) =>
+      prev.map((g) =>
+        moved.has(g.id)
+          ? { ...g, notebookId: targetNotebookId, parentId: g.id === id ? null : g.parentId }
+          : g,
+      ),
+    );
+    setNotes((prev) =>
+      prev.map((n) =>
+        n.groupId !== null && moved.has(n.groupId) ? { ...n, notebookId: targetNotebookId } : n,
+      ),
+    );
+    startTransition(async () => {
+      const result = await moveGroupToNotebookAction(id, targetNotebookId);
+      if (result.group) {
+        const saved = result.group;
+        setGroups((prev) => prev.map((g) => (g.id === saved.id ? saved : g)));
+        return;
+      }
+      setGroups(previous.groups);
+      setNotes(previous.notes);
+      if (result.error) setGroupError(result.error);
     });
   }
 
@@ -256,7 +393,7 @@ function Workspace({
 
   /** Files the note in the group just before a sibling note (last when `beforeNoteId` is null). */
   function placeNote(noteId: number, groupId: number | null, beforeNoteId: number | null) {
-    const siblings = notes.filter((n) => n.groupId === groupId).map((n) => n.id);
+    const siblings = notebookNotes.filter((n) => n.groupId === groupId).map((n) => n.id);
     const ordered = placeBefore(siblings, noteId, beforeNoteId);
     const unchanged =
       notes.find((n) => n.id === noteId)?.groupId === groupId &&
@@ -277,7 +414,7 @@ function Workspace({
   /** Files the group under the parent just before a sibling group (last when `beforeGroupId` is null). */
   function placeGroup(id: number, parentId: number | null, beforeGroupId: number | null) {
     if (!canPlaceGroup(groups, id, parentId)) return;
-    const siblings = groups.filter((g) => g.parentId === parentId).map((g) => g.id);
+    const siblings = notebookGroups.filter((g) => g.parentId === parentId).map((g) => g.id);
     const ordered = placeBefore(siblings, id, beforeGroupId);
     const previous = groups;
     const unchanged =
@@ -298,13 +435,19 @@ function Workspace({
     });
   }
 
+  const emptyNotebookIds = new Set(notebooks.map((n) => n.id));
+  for (const item of [...notes, ...groups]) emptyNotebookIds.delete(item.notebookId);
+
   const pendingNote = pendingDelete?.kind === "note" ? notes.find((n) => n.id === pendingDelete.id) : undefined;
   const pendingGroup = pendingDelete?.kind === "group" ? groups.find((g) => g.id === pendingDelete.id) : undefined;
-  const pendingName = pendingNote ? noteTitle(pendingNote) : pendingGroup?.name;
+  const pendingNotebook =
+    pendingDelete?.kind === "notebook" ? notebooks.find((n) => n.id === pendingDelete.id) : undefined;
+  const pendingName = pendingNote ? noteTitle(pendingNote) : (pendingGroup?.name ?? pendingNotebook?.name);
 
   function confirmDelete() {
     if (pendingNote) remove(pendingNote.id);
     else if (pendingGroup) deleteGroup(pendingGroup.id);
+    else if (pendingNotebook) deleteNotebook(pendingNotebook.id);
     setPendingDelete(null);
   }
 
@@ -314,9 +457,44 @@ function Workspace({
         <SearchBar onSelect={selectNote} />
       </header>
       <div className="flex min-h-0 flex-1">
+        <NotebookPanel
+          collapsed={notebookPanel.collapsed}
+          width={notebookPanel.width}
+          onToggleCollapsed={() => setNotebookPanelPrefs({ collapsed: !notebookPanel.collapsed })}
+          notebooks={notebooks}
+          activeId={notebookId}
+          emptyIds={emptyNotebookIds}
+          onSelect={openNotebook}
+          onCreate={createNotebook}
+          onRename={renameNotebook}
+          onDelete={(id) => setPendingDelete({ kind: "notebook", id })}
+        />
+        {!notebookPanel.collapsed ? (
+          <ResizeHandle
+            label="Resize notebooks"
+            valueNow={notebookPanel.width}
+            valueMin={MIN_NOTEBOOK_PANEL_WIDTH}
+            valueMax={MAX_NOTEBOOK_PANEL_WIDTH}
+            onResizeStart={() => {
+              notebookPanelStart.current = notebookPanel.width;
+            }}
+            onResize={(dxPx) =>
+              setNotebookPanelPrefs({ width: clampNotebookPanelWidth(notebookPanelStart.current + dxPx) })
+            }
+            onResizeEnd={() => {}}
+          />
+        ) : (
+          <div aria-hidden className="w-px shrink-0 bg-border" />
+        )}
         <NoteSidebar
-          notes={notes}
-          groups={groups}
+          notes={notebookNotes}
+          groups={notebookGroups}
+          notebooks={notebooks}
+          notebookId={notebookId}
+          collapsedNotebookName={
+            notebookPanel.collapsed ? notebooks.find((n) => n.id === notebookId)?.name : undefined
+          }
+          onExpandNotebooks={() => setNotebookPanelPrefs({ collapsed: false })}
           activeId={viewedGroup ? null : focusedId}
           viewedGroupId={viewedGroup?.id ?? null}
           width={layout.sidebarWidth}
@@ -335,6 +513,7 @@ function Workspace({
           onMoveNoteToGroup={moveNoteToGroup}
           onPlaceNote={placeNote}
           onPlaceGroup={placeGroup}
+          onMoveGroupToNotebook={moveGroupToNotebook}
         />
         <ResizeHandle
           label="Resize sidebar"
@@ -375,8 +554,12 @@ function Workspace({
       <ConfirmDialog
         // Closes by itself if the item disappears (deleted elsewhere) while it is asking.
         open={pendingName !== undefined}
-        title={`Delete ${pendingGroup ? "group " : ""}“${pendingName ?? ""}”?`}
-        description={`It moves to the Trash Can in Settings, where you can restore it. Items in the Trash Can are permanently deleted after ${TRASH_RETENTION_DAYS} days.`}
+        title={`Delete ${pendingGroup ? "group " : pendingNotebook ? "notebook " : ""}“${pendingName ?? ""}”?`}
+        description={
+          pendingNotebook
+            ? "The notebook is empty. It is deleted for good; it doesn't go to the Trash Can."
+            : `It moves to the Trash Can in Settings, where you can restore it. Items in the Trash Can are permanently deleted after ${TRASH_RETENTION_DAYS} days.`
+        }
         confirmLabel="Delete"
         onConfirm={confirmDelete}
         onCancel={() => setPendingDelete(null)}

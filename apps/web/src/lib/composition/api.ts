@@ -1,6 +1,7 @@
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
+import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
@@ -33,6 +34,7 @@ export type SearchResult = { hits: SearchHit[]; error?: string };
 export type Workspace = {
   notes: Note[];
   groups: Group[];
+  notebooks: Notebook[];
   layout: Layout;
   favorites: Favorites;
 };
@@ -107,7 +109,8 @@ export interface CompositionApi {
 
   searchNotes(query: string): Promise<SearchResult>;
 
-  createNote(title: string, groupId?: number | null): Promise<Note>;
+  /** In `groupId`'s notebook when it has a group; otherwise in `notebookId` (the first notebook when that is omitted too). */
+  createNote(title: string, groupId?: number | null, notebookId?: number | null): Promise<Note>;
   saveNoteContent(noteId: number, content: string): Promise<Note>;
   /** Stores a pasted image in `<application data>/app_data/`. Served back by `app_data/<name>`, which is not part of this contract. */
   saveImage(input: SaveImageInput): Promise<SaveImageResult>;
@@ -122,7 +125,8 @@ export interface CompositionApi {
    */
   placeNote(noteId: number, groupId: number | null, beforeNoteId: number | null): Promise<Note>;
 
-  createGroup(name: string, parentId: number | null): Promise<Group>;
+  /** A sub-group joins its parent's notebook; a top-level group goes in `notebookId` (the first notebook when omitted). */
+  createGroup(name: string, parentId: number | null, notebookId?: number | null): Promise<Group>;
   renameGroup(id: number, name: string): Promise<Group>;
   /** Moves an empty group to the Trash Can; a group with notes or sub-groups comes back as `error`. */
   deleteGroup(id: number): Promise<{ error?: string }>;
@@ -133,6 +137,13 @@ export interface CompositionApi {
     parentId: number | null,
     beforeGroupId: number | null,
   ): Promise<MoveGroupResult>;
+
+  createNotebook(name: string): Promise<Notebook>;
+  renameNotebook(id: number, name: string): Promise<Notebook>;
+  /** Deletes an empty notebook for good; one with groups or notes in it, or the last one, comes back as `error`. */
+  deleteNotebook(id: number): Promise<{ error?: string }>;
+  /** Moves a group (or sub-group) with everything in it to the top level of another notebook. */
+  moveGroupToNotebook(id: number, notebookId: number): Promise<MoveGroupResult>;
 
   /** Recently deleted notes and groups. Anything older than `TRASH_RETENTION_DAYS` is permanently deleted first. */
   loadTrash(): Promise<Trash>;
@@ -176,6 +187,10 @@ export const API_METHODS = [
   "deleteGroup",
   "moveGroup",
   "placeGroup",
+  "createNotebook",
+  "renameNotebook",
+  "deleteNotebook",
+  "moveGroupToNotebook",
   "loadTrash",
   "restoreNote",
   "restoreGroup",

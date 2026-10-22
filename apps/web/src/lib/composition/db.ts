@@ -26,6 +26,20 @@ CREATE TABLE IF NOT EXISTS groups (
 `;
 
 /**
+ * Notebooks hold groups, sub-groups and notes; nothing in one is shown next to
+ * another's. Every group and note carries its notebook's id (a note in a group
+ * always shares the group's), so listing a notebook is a plain filter.
+ */
+const NOTEBOOKS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS notebooks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+`;
+
+/**
  * The Trash Can. Deleted items move into their own tables, keeping their
  * original ids, rather than being flagged in `notes`/`groups`: the CLI shares
  * this database file and lists every row of those two tables, so a flag would
@@ -72,6 +86,27 @@ function ensureColumn(db: Database.Database, table: string, column: string, ddl:
   }
 }
 
+/**
+ * Makes sure there is a notebook, and that every note and group is in one. A database
+ * from before notebooks gets a single "Notebook" holding everything it had; rows
+ * written by an older CLI (which knows nothing of notebooks) join the first notebook.
+ */
+export function adoptOrphans(db: Database.Database): void {
+  db.transaction(() => {
+    let first = db.prepare("SELECT MIN(id) AS id FROM notebooks").get() as { id: number | null };
+    if (first.id === null) {
+      const now = new Date().toISOString();
+      const result = db
+        .prepare("INSERT INTO notebooks (name, created_at, updated_at) VALUES ('Notebook', ?, ?)")
+        .run(now, now);
+      first = { id: Number(result.lastInsertRowid) };
+    }
+    for (const table of ["notes", "groups", "trashed_notes", "trashed_groups"]) {
+      db.prepare(`UPDATE ${table} SET notebook_id = ? WHERE notebook_id IS NULL`).run(first.id);
+    }
+  })();
+}
+
 function openConnection(dbPath: string): Database.Database {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
@@ -81,6 +116,7 @@ function openConnection(dbPath: string): Database.Database {
   db.pragma("journal_mode = WAL");
   db.exec(SCHEMA);
   db.exec(GROUPS_SCHEMA);
+  db.exec(NOTEBOOKS_SCHEMA);
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
   ensureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
@@ -94,6 +130,10 @@ function openConnection(dbPath: string): Database.Database {
   // Hand-set order among siblings; NULL until the item is dragged into place (see ordering.ts).
   ensureColumn(db, "notes", "position", "ALTER TABLE notes ADD COLUMN position INTEGER");
   ensureColumn(db, "groups", "position", "ALTER TABLE groups ADD COLUMN position INTEGER");
+  for (const table of ["notes", "groups", "trashed_notes", "trashed_groups"]) {
+    ensureColumn(db, table, "notebook_id", `ALTER TABLE ${table} ADD COLUMN notebook_id INTEGER`);
+  }
+  adoptOrphans(db);
   return db;
 }
 

@@ -17,6 +17,7 @@ import type {
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
+import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import * as service from "./service";
 import type { SunSchedule } from "./sunTimes";
@@ -69,8 +70,9 @@ export async function removeAttachment(id: number): Promise<AttachmentActionResu
 export async function createNote(
   title: string,
   groupId: number | null = null,
+  notebookId: number | null = null,
 ): Promise<Note> {
-  const note = await service.createNote(title, groupId);
+  const note = await service.createNote(title, groupId, notebookId);
   revalidatePath("/");
   return note;
 }
@@ -83,10 +85,38 @@ export async function deleteNote(id: number): Promise<void> {
 export async function createGroup(
   name: string,
   parentId: number | null,
+  notebookId: number | null = null,
 ): Promise<Group> {
-  const group = await service.createGroup(name, parentId);
+  const group = await service.createGroup(name, parentId, notebookId);
   revalidatePath("/");
   return group;
+}
+
+export async function createNotebook(name: string): Promise<Notebook> {
+  const notebook = await service.createNotebook(name);
+  revalidatePath("/");
+  return notebook;
+}
+
+export async function renameNotebook(id: number, name: string): Promise<Notebook> {
+  const notebook = await service.renameNotebook(id, name);
+  revalidatePath("/");
+  return notebook;
+}
+
+export async function deleteNotebook(id: number): Promise<{ error?: string }> {
+  const result = await service.deleteNotebook(id);
+  if (!result.error) revalidatePath("/");
+  return result;
+}
+
+export async function moveGroupToNotebook(
+  id: number,
+  notebookId: number,
+): Promise<MoveGroupResult> {
+  const result = await service.moveGroupToNotebook(id, notebookId);
+  if (result.group) revalidatePath("/");
+  return result;
 }
 
 export async function renameGroup(id: number, name: string): Promise<Group> {

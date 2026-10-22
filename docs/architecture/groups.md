@@ -7,7 +7,9 @@ Source: [`groupsRepo.ts`](../../apps/web/src/lib/composition/groupsRepo.ts),
 [`App.tsx`](../../apps/cli/src/App.tsx)
 
 Groups let a note be organized under a folder-like name in the UI. A note belongs to at most one
-group; groups themselves can nest.
+group; groups themselves can nest. Groups and notes live inside a **notebook**
+(see [data-model.md](data-model.md#notebooks)), and a group can be moved to another notebook from
+its "⋯" menu.
 
 ## Relationship
 

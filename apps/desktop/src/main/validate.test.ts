@@ -19,6 +19,12 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
     expect(VALIDATORS.placeNote([3, 2, null])).toEqual([3, 2, null]);
     expect(VALIDATORS.placeGroup([4, null, 7])).toEqual([4, null, 7]);
+    expect(VALIDATORS.createGroup(["Work", null, 2])).toEqual(["Work", null, 2]);
+    expect(VALIDATORS.createNote(["Untitled", null, 2])).toEqual(["Untitled", null, 2]);
+    expect(VALIDATORS.createNotebook(["Home"])).toEqual(["Home"]);
+    expect(VALIDATORS.renameNotebook([2, "Work"])).toEqual([2, "Work"]);
+    expect(VALIDATORS.deleteNotebook([2])).toEqual([2]);
+    expect(VALIDATORS.moveGroupToNotebook([4, 2])).toEqual([4, 2]);
   });
 
   it("passes a pasted image's bytes through and keeps only the known fields", () => {
@@ -84,6 +90,13 @@ describe("VALIDATORS", () => {
     ["placeNote", [1, null, "5"]],
     ["placeNote", ["1", null, null]],
     ["placeGroup", [4, undefined, null]],
+    ["createGroup", ["Work", null, "2"]],
+    ["createNotebook", [undefined]],
+    ["renameNotebook", ["2", "Work"]],
+    ["renameNotebook", [2, 5]],
+    ["deleteNotebook", [null]],
+    ["moveGroupToNotebook", [4, null]],
+    ["moveGroupToNotebook", ["4", 2]],
     ["placeGroup", [4, null, 1.5]],
     ["searchNotes", [null]],
     ["saveLayout", [null]],

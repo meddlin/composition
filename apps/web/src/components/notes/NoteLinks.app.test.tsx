@@ -38,6 +38,7 @@ const makeNote = (id: number, title: string, content: string): Note => ({
   createdAt: at,
   updatedAt: at,
   groupId: null,
+  notebookId: 1,
 });
 
 const notes = [

@@ -34,6 +34,7 @@ const note: Note = {
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
   groupId: null,
+  notebookId: 1,
 };
 
 // What the server hands back: the same text with its frontmatter re-stamped,
@@ -171,7 +172,7 @@ describe("NotesApp group note creation", () => {
   afterEach(cleanup);
 
   it("creates a note directly inside the group it was requested from", async () => {
-    const group = { id: 7, name: "Work", parentId: null, createdAt: "", updatedAt: "" };
+    const group = { id: 7, name: "Work", parentId: null, notebookId: 1, createdAt: "", updatedAt: "" };
     vi.mocked(createNote).mockResolvedValue({ ...note, id: 2, groupId: 7 });
     render(<NotesApp initialNotes={[]} initialGroups={[group]} initialLayout={DEFAULT_LAYOUT} />);
 
@@ -179,7 +180,7 @@ describe("NotesApp group note creation", () => {
       fireEvent.click(screen.getByLabelText("New note in Work"));
     });
 
-    expect(createNote).toHaveBeenCalledWith("Untitled", 7);
+    expect(createNote).toHaveBeenCalledWith("Untitled", 7, 1);
   });
 
   it("creates an ungrouped note from the empty-state button without leaking the click event", async () => {
@@ -194,7 +195,7 @@ describe("NotesApp group note creation", () => {
     });
 
     expect(createNote).toHaveBeenCalledTimes(1);
-    expect(createNote).toHaveBeenCalledWith("Untitled", null);
+    expect(createNote).toHaveBeenCalledWith("Untitled", null, 1);
   });
 
   it("keeps the New note / New group buttons below the note tree", () => {
@@ -214,8 +215,8 @@ describe("NotesApp group page", () => {
 
   const at = "2026-01-01T00:00:00.000Z";
   const groups = [
-    { id: 1, name: "Software Dev Docs", parentId: null, createdAt: at, updatedAt: at },
-    { id: 2, name: "Backend", parentId: 1, createdAt: at, updatedAt: at },
+    { id: 1, name: "Software Dev Docs", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 2, name: "Backend", parentId: 1, notebookId: 1, createdAt: at, updatedAt: at },
   ];
   const notes: Note[] = [
     { ...note, id: 1, title: "Top note", groupId: 1 },
@@ -350,8 +351,8 @@ describe("NotesApp group row menu", () => {
 
   const at = "2026-01-01T00:00:00.000Z";
   const groups = [
-    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
-    { id: 2, name: "Empty", parentId: null, createdAt: at, updatedAt: at },
+    { id: 1, name: "Work", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 2, name: "Empty", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
   ];
   const notes: Note[] = [{ ...note, id: 1, groupId: 1 }];
 
@@ -422,7 +423,7 @@ describe("NotesApp group row menu", () => {
   });
 
   it("creates a sub-group from the menu", async () => {
-    vi.mocked(createGroup).mockResolvedValue({ id: 3, name: "Sub", parentId: 1, createdAt: at, updatedAt: at });
+    vi.mocked(createGroup).mockResolvedValue({ id: 3, name: "Sub", parentId: 1, notebookId: 1, createdAt: at, updatedAt: at });
     renderApp();
 
     fireEvent.click(within(openMenu("Work")).getByRole("menuitem", { name: "New sub-group" }));
@@ -432,7 +433,7 @@ describe("NotesApp group row menu", () => {
       fireEvent.keyDown(input, { key: "Enter" });
     });
 
-    expect(createGroup).toHaveBeenCalledWith("Sub", 1);
+    expect(createGroup).toHaveBeenCalledWith("Sub", 1, 1);
   });
 
   it("leaves the new sub-group field focused once the menu has closed", async () => {
@@ -611,10 +612,10 @@ describe("NotesApp group drag-and-drop nesting", () => {
   const at = "2026-01-01T00:00:00.000Z";
   // Work ─ Projects ─ Alpha, plus a separate top-level Personal.
   const groups = [
-    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
-    { id: 2, name: "Projects", parentId: 1, createdAt: at, updatedAt: at },
-    { id: 3, name: "Alpha", parentId: 2, createdAt: at, updatedAt: at },
-    { id: 4, name: "Personal", parentId: null, createdAt: at, updatedAt: at },
+    { id: 1, name: "Work", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 2, name: "Projects", parentId: 1, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 3, name: "Alpha", parentId: 2, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 4, name: "Personal", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
   ];
 
   function renderApp() {
@@ -731,6 +732,7 @@ describe("NotesApp drag-and-drop reordering", () => {
     id,
     name,
     parentId,
+    notebookId: 1,
     createdAt: at,
     updatedAt: at,
   });
@@ -1016,8 +1018,8 @@ describe("NotesApp favorites", () => {
 
   const at = "2026-01-01T00:00:00.000Z";
   const groups = [
-    { id: 1, name: "Work", parentId: null, createdAt: at, updatedAt: at },
-    { id: 2, name: "Home", parentId: null, createdAt: at, updatedAt: at },
+    { id: 1, name: "Work", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
+    { id: 2, name: "Home", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
   ];
   const notes: Note[] = [
     { ...note, id: 1, title: "Plan", groupId: 1 },
@@ -1123,8 +1125,8 @@ describe("NotesApp favorites", () => {
 
   it("lets a pinned group be expanded to its sub-groups and notes", () => {
     const lawn = [
-      { id: 1, name: "Lawn Care", parentId: null, createdAt: at, updatedAt: at },
-      { id: 2, name: "Mowing", parentId: 1, createdAt: at, updatedAt: at },
+      { id: 1, name: "Lawn Care", parentId: null, notebookId: 1, createdAt: at, updatedAt: at },
+      { id: 2, name: "Mowing", parentId: 1, notebookId: 1, createdAt: at, updatedAt: at },
     ];
     const lawnNotes: Note[] = [
       { ...note, id: 1, title: "Fertilizer schedule", groupId: 1 },

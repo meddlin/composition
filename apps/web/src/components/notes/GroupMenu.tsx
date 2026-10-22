@@ -7,15 +7,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { favoriteLabel } from "./NoteMenu";
+import type { Notebook } from "./types";
 
 type Props = {
   groupName: string;
   /** Delete is only offered for a group with no sub-groups or notes. */
   canDelete: boolean;
   favorite: boolean;
+  /** The notebooks the group could move to (not the one it is in), each offered as a "Move to …" item. */
+  notebooks: Notebook[];
+  onMoveToNotebook: (notebookId: number) => void;
   onRename: () => void;
   onCreateSubgroup: () => void;
   onToggleFavorite: () => void;
@@ -30,6 +35,8 @@ export function GroupMenu({
   groupName,
   canDelete,
   favorite,
+  notebooks,
+  onMoveToNotebook,
   onRename,
   onCreateSubgroup,
   onToggleFavorite,
@@ -83,6 +90,12 @@ export function GroupMenu({
         <DropdownMenuItem onSelect={() => choose(onRename)}>Rename</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => choose(onCreateSubgroup)}>New sub-group</DropdownMenuItem>
         <DropdownMenuItem onSelect={onToggleFavorite}>{favoriteLabel(favorite)}</DropdownMenuItem>
+        {notebooks.map((notebook) => (
+          <DropdownMenuItem key={notebook.id} onSelect={() => onMoveToNotebook(notebook.id)}>
+            <span className="truncate">Move to {notebook.name}</span>
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
           disabled={!canDelete}
