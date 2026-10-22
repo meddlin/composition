@@ -8,6 +8,7 @@ import { AssistantSettings } from "./AssistantSettings";
 import { BackupRestore } from "./BackupRestore";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { SettingsForm } from "./SettingsForm";
+import { StylingSettings } from "./StylingSettings";
 import { TrashCan } from "./TrashCan";
 import { Updates } from "./Updates";
 
@@ -32,10 +33,12 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
       <Tabs defaultValue="general">
         <TabsList aria-label="Settings sections">
           <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="styling">Styling</TabsTrigger>
+          <TabsTrigger value="ai">AI Configuration</TabsTrigger>
           <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
         </TabsList>
 
-        {/* Kept mounted when hidden, so a half-edited form survives a look at the shortcuts. */}
+        {/* Kept mounted when hidden, so a half-edited form survives a look at another tab. */}
         <TabsContent value="general" forceMount>
           <Card size="sm">
             <CardHeader>
@@ -76,23 +79,30 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           </Card>
 
           <SettingsForm
-            currentTheme={snapshot.theme}
-            currentPreviewFont={snapshot.previewFont}
-            currentEditorFont={snapshot.editorFont}
-            currentCity={snapshot.city}
-            currentSunTimes={snapshot.sunTimes}
             currentAppDataDir={snapshot.appDataDir}
             currentDbPath={snapshot.dbPathOverride}
             derivedDbPathPlaceholder={snapshot.derivedDbPath}
           />
-
-          <AssistantSettings initial={snapshot.assistant} />
 
           <Updates />
 
           <BackupRestore defaultBackupDir={snapshot.backupDir} />
 
           <TrashCan initialTrash={snapshot.trash} />
+        </TabsContent>
+
+        <TabsContent value="styling" forceMount>
+          <StylingSettings
+            currentTheme={snapshot.theme}
+            currentPreviewFont={snapshot.previewFont}
+            currentEditorFont={snapshot.editorFont}
+            currentCity={snapshot.city}
+            currentSunTimes={snapshot.sunTimes}
+          />
+        </TabsContent>
+
+        <TabsContent value="ai">
+          <AssistantSettings initial={snapshot.assistant} />
         </TabsContent>
 
         <TabsContent value="shortcuts">
