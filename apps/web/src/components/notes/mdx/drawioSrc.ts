@@ -11,6 +11,9 @@ export function isDrawioShortcut(event: { key: string; shiftKey: boolean; altKey
 
 /** `<Drawio src="app_data/…" alt="Diagram" />` for a stored diagram. */
 export function diagramTag(name: string, alt: string = DIAGRAM_ALT): string {
+  // The tag is note text (MDX source), never HTML a browser parses; `name` is a stored image's file name, which
+  // can't hold a quote or angle bracket, and the alt text has them taken out.
+  // nosemgrep: html-in-template-string
   return `<Drawio src="${imageRef(name)}" alt="${alt.replace(/["<>&]/g, " ")}" />`;
 }
 
@@ -52,6 +55,8 @@ const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&
  * reference to the old file.
  */
 export function replaceDiagramSrc(text: string, from: string, to: string): string {
+  // `from` is escaped, so it can only match itself: nothing it holds can make the pattern run away (ReDoS).
+  // nosemgrep: detect-non-literal-regexp
   const src = new RegExp(`(["'])((?:\\./)?app_data/)${escapeRegExp(from)}\\1`);
   return text.replace(DRAWIO_TAG, (tag, offset: number) => {
     if (insideFence(text, text.lastIndexOf("\n", offset - 1) + 1)) return tag;
