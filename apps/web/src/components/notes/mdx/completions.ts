@@ -28,6 +28,10 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "An image, same as ![alt](src)",
     template: '<Image src="$0" alt="" />',
   },
+  Drawio: {
+    description: "A draw.io diagram you can edit from the preview (Ctrl/Cmd+Shift+D draws a new one)",
+    template: '<Drawio src="$0" alt="" />',
+  },
   Toc: {
     description: "Table of contents that follows the note's headings",
     template: "<Toc />$0",

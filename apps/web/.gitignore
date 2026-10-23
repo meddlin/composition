@@ -18,6 +18,9 @@
 /.next-desktop/
 /out/
 
+# the draw.io editor, vendored by `pnpm fetch:drawio` (see drawio.lock.json)
+/public/drawio/
+
 # production
 /build
 

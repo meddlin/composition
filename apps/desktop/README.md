@@ -34,7 +34,7 @@ Run `pnpm install` in `apps/web` first: the desktop build bundles code and style
 |---|---|
 | `pnpm dev` | `next dev` (hot reload) plus Electron. Uses your real notes; `COMPOSITION_DEV_HOME=/tmp/composition-dev pnpm dev` uses a scratch home instead. Needs `meilisearch` on `PATH` (`brew install meilisearch`) for search. |
 | `pnpm test` | Unit tests (Vitest). `pnpm typecheck` for types. |
-| `pnpm build` | Static renderer + main and preload bundles + license notices, into `dist/`. |
+| `pnpm build` | Static renderer + main and preload bundles + license notices, into `dist/`. Fetches the pinned draw.io editor first (`pnpm fetch:drawio` in `apps/web`; see [docs/architecture/diagrams.md](../../docs/architecture/diagrams.md)), which the renderer carries. |
 | `pnpm smoke` | Launches the built app and drives it end to end against a throwaway `HOME`. Never touches real notes. |
 | `pnpm package` | Unsigned, unpacked `.app` in `release/`. For checking a build. |
 | `pnpm dist` | Signed and notarized DMG and ZIP for this Mac's architecture. Needs the credentials below. |

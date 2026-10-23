@@ -6,6 +6,6 @@ export default defineConfig({
     // Pure modules run in node; component/hook tests opt into jsdom with a
     // `// @vitest-environment jsdom` docblock at the top of the file.
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
   },
 });

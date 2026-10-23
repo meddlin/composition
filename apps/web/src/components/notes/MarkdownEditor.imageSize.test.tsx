@@ -38,7 +38,7 @@ describe("MarkdownEditor: turning a Markdown image into <Image />", () => {
   it("is announced on the editor, beside the note-link and image-picker ones", () => {
     render(<Harness />);
 
-    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M Control+Shift+X Meta+Shift+X");
+    expect(editor().getAttribute("aria-keyshortcuts")).toBe("Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M Control+Shift+X Meta+Shift+X Control+Shift+D Meta+Shift+D");
   });
 
   it("converts the image at the caret with Cmd+Shift+X, leaving the caret ready for another prop", () => {

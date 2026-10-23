@@ -13,11 +13,21 @@ import { imageWidthCss } from "./mdx/imageWidth";
  * is shown as written. A file that has gone missing shows its alt text instead
  * of the browser's broken-image icon.
  *
+ * `density` says the picture has that many pixels per CSS pixel (a diagram is stored at 2x, so its text stays
+ * sharp); without a `width` it is drawn at its own size divided by that, rather than twice as large as drawn.
+ *
  * `width` (from `<Image width="50%" />`; Markdown's syntax has no way to say it) draws the image
  * smaller or larger than its own size, but never wider than the note. See imageWidth.ts.
  */
-export function NoteImage({ src, alt, title, width }: ComponentPropsWithoutRef<"img"> & ExtraProps) {
+export function NoteImage({
+  src,
+  alt,
+  title,
+  width,
+  density,
+}: ComponentPropsWithoutRef<"img"> & ExtraProps & { density?: number }) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [naturalWidth, setNaturalWidth] = useState(0);
   if (typeof src !== "string" || src === "") return null;
 
   const name = imageNameFromRef(src);
@@ -41,7 +51,8 @@ export function NoteImage({ src, alt, title, width }: ComponentPropsWithoutRef<"
       loading="lazy"
       decoding="async"
       onError={() => setFailedSrc(resolved)}
-      style={{ width: imageWidthCss(width) }}
+      onLoad={(event) => density && setNaturalWidth(event.currentTarget.naturalWidth)}
+      style={{ width: imageWidthCss(width) ?? (density && naturalWidth ? `${naturalWidth / density}px` : undefined) }}
       className="h-auto max-w-full"
     />
   );

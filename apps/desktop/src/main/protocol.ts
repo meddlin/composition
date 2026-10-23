@@ -2,18 +2,18 @@ import fs from "node:fs";
 import { protocol } from "electron";
 import { IMAGE_DIR_NAME, imageNameFromRef } from "../../../web/src/lib/composition/imageRefs";
 import { IMAGE_RESPONSE_HEADERS, type StoredImage } from "../../../web/src/lib/composition/images";
+import { APP_HOST, APP_ORIGIN, APP_SCHEME } from "./appScheme";
+import { DRAWIO_HOST, DRAWIO_ORIGIN, drawioContentSecurityPolicy } from "./drawioHost";
 import { mimeTypeFor, resolveRendererFile } from "./rendererFiles";
 
-export const APP_SCHEME = "app";
-export const APP_HOST = "composition";
-export const APP_ORIGIN = `${APP_SCHEME}://${APP_HOST}`;
+export { APP_HOST, APP_ORIGIN, APP_SCHEME };
 
 /**
  * Content Security Policy for the UI. Next's static export inlines small
  * scripts and styles, so those need 'unsafe-inline'; everything else is
  * locked to our own origin. `https:` images stay allowed so Markdown images
  * behave as they do in the web app, and a note's `<YouTube>` may frame YouTube's privacy-enhanced
- * player (and nothing else; see embedReferer.ts). There is no network access for scripts
+ * player (see embedReferer.ts) and a note's diagrams the draw.io editor (and nothing else; see drawioHost.ts). There is no network access for scripts
  * (`connect-src 'self'`): all data goes over IPC.
  */
 export const CONTENT_SECURITY_POLICY = [
@@ -22,7 +22,7 @@ export const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
-  "frame-src https://www.youtube-nocookie.com",
+  `frame-src https://www.youtube-nocookie.com ${DRAWIO_ORIGIN}`,
   "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'none'",
@@ -51,7 +51,14 @@ export function registerSchemePrivileges(): void {
 export function registerAppProtocol(
   rendererRoot: string,
   readImage: (name: string) => Promise<StoredImage | null>,
+  drawio: {
+    /** The folder the draw.io editor's files are in (`pnpm fetch:drawio`), served at app://drawio/. */
+    root: string;
+    /** The origins allowed to frame it: the app's own, plus the dev server's when there is one. */
+    parentOrigins: readonly string[];
+  },
 ): void {
+  const drawioCsp = drawioContentSecurityPolicy(drawio.parentOrigins);
   const isFile = (file: string) => {
     try {
       return fs.statSync(file).isFile();
@@ -77,6 +84,18 @@ export function registerAppProtocol(
       if (!image) return new Response("Not found", { status: 404 });
       return new Response(new Uint8Array(image.data), {
         headers: { "content-type": image.contentType, ...IMAGE_RESPONSE_HEADERS },
+      });
+    }
+
+    if (url.host === DRAWIO_HOST) {
+      const editorFile = resolveRendererFile(drawio.root, url.pathname, isFile);
+      if (!editorFile) return new Response("Not found", { status: 404 });
+      return new Response(await fs.promises.readFile(editorFile), {
+        headers: {
+          "content-type": mimeTypeFor(editorFile),
+          "content-security-policy": drawioCsp,
+          "x-content-type-options": "nosniff",
+        },
       });
     }
 

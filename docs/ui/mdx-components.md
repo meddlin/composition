@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -90,6 +90,36 @@ undo takes it back in one step. If there is no image at the caret, the editor sa
 Code is left alone: an image inside a fenced block or a backtick span is text, not an image.
 The shortcut only goes one way; to go back, retype the Markdown form. Source:
 [`mdx/imageToMdx.ts`](../../apps/web/src/components/notes/mdx/imageToMdx.ts).
+
+## `<Drawio>`
+
+A diagram drawn in [draw.io](https://www.drawio.com/), shown in the note as a picture and opened again from it
+to change. Web and desktop only; the terminal shows the picture.
+
+```mdx
+<Drawio src="app_data/trip-plan-diagram-3f9c2a71b0de.png" alt="Request flow" />
+
+<Drawio src="app_data/trip-plan-diagram-3f9c2a71b0de.png" alt="Request flow" width="60%" />
+```
+
+- **Drawing one.** The **Diagram** button in a note's header, or **Cmd+Shift+D** (macOS) / **Ctrl+Shift+D**
+  in the editor, opens the draw.io editor in a dialog. **Save diagram** stores it and puts the tag in the
+  note at the caret, as a paragraph of its own (the end of the note if the caret was never placed, never in the
+  frontmatter). With a selection, the diagram replaces it. Cancelling asks first if anything was drawn.
+- **Changing one.** In the preview, hovering over the picture shows an **Edit diagram** button. It opens the
+  editor on the stored drawing, and saving points every `<Drawio>` of that diagram in the note at the new file.
+- `src`, `alt`, `title` and `width` are as for [`<Image>`](#image), and so is the editor's completion for them.
+  `src` has to be a diagram stored with the notes (`app_data/…`) to be editable; one from a web address is
+  just shown, with no Edit button.
+- A diagram is drawn at half the pixels it is stored with (it is saved at 2x so text stays sharp), unless
+  `width` says how wide.
+- The file is an ordinary stored image, a PNG with the drawing inside it, so it is also on the Images page and in
+  backups. How it works, and what it cannot do yet: [diagrams.md](../architecture/diagrams.md).
+- The editor is vendored (`pnpm fetch:drawio` in `apps/web`; the desktop build does it) and works offline.
+
+Source: [`mdx/Drawio.tsx`](../../apps/web/src/components/notes/mdx/Drawio.tsx),
+[`DrawioDialog.tsx`](../../apps/web/src/components/notes/DrawioDialog.tsx) and
+[`mdx/drawioSrc.ts`](../../apps/web/src/components/notes/mdx/drawioSrc.ts), which writes and rewrites the tag.
 
 ## `<Toc>`
 
@@ -250,6 +280,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
 | `<Repo>` | A link to the repository, `⎇ owner/name`, with the description after it. A `url` that isn't a repository is said so in words. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
+| `<Drawio>` | The same as `<Image>`: the diagram's picture, which is a PNG. The terminal has no editor, so it cannot change one. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:
 
@@ -279,8 +310,8 @@ worth trying for that prop.
 
 | Component | Prop | Values offered |
 |---|---|---|
-| `<Image>` | `src`, `alt`, `title` | none (free text) |
-| `<Image>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
+| `<Image>`, `<Drawio>` | `src`, `alt`, `title` | none (free text) |
+| `<Image>`, `<Drawio>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
 | `<Mark>` | `color` | the five highlight colors |
 | `<Toc>` | `maxDepth` | `1` to `6` |
 | `<YouTube>` | `url`, `title` | none (free text) |
