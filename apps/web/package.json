@@ -7,6 +7,7 @@
     "dev:all": "concurrently --kill-others --names next,meili --prefix-colors cyan,magenta \"pnpm dev\" \"pnpm meili\"",
     "build": "next build",
     "start": "next start",
+    "fetch:drawio": "node scripts/fetch-drawio.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -12,6 +12,26 @@ export type PropSpec = {
   values?: PropValue[];
 };
 
+const IMAGE_PROPS: PropSpec[] = [
+  { name: "src", description: "Where the picture is: app_data/… or a web address" },
+  { name: "alt", description: "Text for when it can't be seen, and for screen readers" },
+  { name: "title", description: "Tooltip shown when hovering over it" },
+  {
+    name: "width",
+    description: "How wide to draw it: pixels (400) or a share of the note (50%)",
+    values: [
+      { value: "25%", description: "A quarter of the note's width" },
+      { value: "50%", description: "Half the note's width" },
+      { value: "75%", description: "Three quarters of the note's width" },
+      { value: "100%", description: "The note's full width" },
+      { value: "200", description: "200 pixels wide" },
+      { value: "400", description: "400 pixels wide" },
+      { value: "600", description: "600 pixels wide" },
+      { value: "800", description: "800 pixels wide" },
+    ],
+  },
+];
+
 /**
  * The props each component takes, for the editor to offer inside an open tag. Typed against
  * `mdxComponents` so a new component can't ship without saying what it takes (even if that is nothing).
@@ -19,24 +39,10 @@ export type PropSpec = {
 const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
   Info: [],
   Warning: [],
-  Image: [
-    { name: "src", description: "Where the picture is: app_data/… or a web address" },
-    { name: "alt", description: "Text for when it can't be seen, and for screen readers" },
-    { name: "title", description: "Tooltip shown when hovering over it" },
-    {
-      name: "width",
-      description: "How wide to draw it: pixels (400) or a share of the note (50%)",
-      values: [
-        { value: "25%", description: "A quarter of the note's width" },
-        { value: "50%", description: "Half the note's width" },
-        { value: "75%", description: "Three quarters of the note's width" },
-        { value: "100%", description: "The note's full width" },
-        { value: "200", description: "200 pixels wide" },
-        { value: "400", description: "400 pixels wide" },
-        { value: "600", description: "600 pixels wide" },
-        { value: "800", description: "800 pixels wide" },
-      ],
-    },
+  Image: IMAGE_PROPS,
+  Drawio: [
+    { name: "src", description: "The stored diagram: app_data/…" },
+    ...IMAGE_PROPS.filter(({ name }) => name !== "src"),
   ],
   Toc: [
     {

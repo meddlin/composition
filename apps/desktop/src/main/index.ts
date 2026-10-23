@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 import { createAttachmentsApi } from "./attachments";
@@ -155,7 +156,12 @@ async function main(): Promise<void> {
 
   await app.whenReady();
 
-  registerAppProtocol(path.join(__dirname, "renderer"), service.readImage);
+  // Built, the editor is part of the renderer export; under `pnpm dev` there is none, so it is read from where it was fetched.
+  const builtEditor = path.join(__dirname, "renderer", "drawio");
+  registerAppProtocol(path.join(__dirname, "renderer"), service.readImage, {
+    root: fs.existsSync(builtEditor) ? builtEditor : path.resolve(__dirname, "..", "..", "web", "public", "drawio"),
+    parentOrigins: [APP_ORIGIN, ...(devOrigin ? [devOrigin] : [])],
+  });
   installEmbedReferer(session.defaultSession.webRequest);
   registerIpc({
     ipcMain,

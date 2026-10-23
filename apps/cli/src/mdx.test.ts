@@ -69,6 +69,29 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Drawio>", () => {
+    it("is the stored picture of the diagram, which a terminal can show but has no editor to change", () => {
+      expect(parsePreview('<Drawio src="app_data/flow-3f9c2a71b0de.png" alt="Request flow" />').blocks).toEqual([
+        image("flow-3f9c2a71b0de.png", "Request flow"),
+      ]);
+    });
+
+    it("is the same picture with a width, which a terminal has no use for", () => {
+      expect(parsePreview('<Drawio src="app_data/a.png" alt="A" width="50%" />').blocks).toEqual([image("a.png", "A")]);
+    });
+
+    it("is the Markdown form, as text, inside a sentence or for a source that isn't stored with the notes", () => {
+      expect(parsePreview('see <Drawio src="app_data/a.png" alt="A" /> here').blocks).toEqual([markdown("see ![A](app_data/a.png) here")]);
+      expect(parsePreview('<Drawio src="https://example.com/a.png" alt="Remote" />').blocks).toEqual([
+        markdown("![Remote](https://example.com/a.png)"),
+      ]);
+    });
+
+    it("shows nothing without a src, as on the web", () => {
+      expect(parsePreview('before\n\n<Drawio alt="x" />\n\nafter').blocks).toEqual([markdown("before"), markdown("after")]);
+    });
+  });
+
   describe("<Image>", () => {
     it("is an image block when the source is an image stored with the notes", async () => {
       expect(parsePreview('<Image src="app_data/route-map.png" alt="Route map" />').blocks).toEqual([
@@ -433,7 +456,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {

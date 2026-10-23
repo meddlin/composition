@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
@@ -7,6 +7,8 @@ import { maxImageBytes } from "@/lib/composition/imageLimit";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { cn } from "@/lib/utils";
 import { caretCoordinates } from "./caretCoordinates";
+import { DrawioDialog, type DrawioSource } from "./DrawioDialog";
+import { DrawioEditContext, type DrawioEditing } from "./DrawioEdit";
 import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
@@ -19,6 +21,7 @@ import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import { DRAWIO_SHORTCUT, diagramRange, insertDiagram, isDrawioShortcut, replaceDiagramSrc } from "./mdx/drawioSrc";
 import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
@@ -37,6 +40,12 @@ export type FindState = {
   options: FindOptions;
   current: number;
   onCount: (count: number) => void;
+};
+
+/** What the pane around the editor can ask of it. */
+export type MarkdownEditorControls = {
+  /** Opens the draw.io editor to draw a diagram, which goes into the note at the caret. */
+  insertDiagram: () => void;
 };
 
 const NO_MATCHES: Match[] = [];
@@ -60,6 +69,8 @@ type Props = {
   onOpenNote?: (noteId: number, beside: boolean) => void;
   /** Highlights this phrase in whichever of the editor and preview are showing. */
   find?: FindState;
+  /** Set to a ref to get the editor's controls (see `MarkdownEditorControls`). */
+  controls?: Ref<MarkdownEditorControls>;
 };
 
 const NO_NOTES: readonly Note[] = [];
@@ -79,6 +90,7 @@ export function MarkdownEditor({
   notes = NO_NOTES,
   onOpenNote,
   find,
+  controls,
 }: Props) {
   const ownIdBase = useId();
   const ids = idBase ?? ownIdBase;
@@ -161,6 +173,42 @@ export function MarkdownEditor({
     }
     if (failure) setImageError(failure);
     resolvePlaceholder(placeholder, markdown);
+  }
+
+  // The draw.io editor: opened for a new diagram (where in the note it goes) or on one already stored.
+  const [diagram, setDiagram] = useState<{ source: DrawioSource; at: { start: number; end: number } } | null>(null);
+
+  function startDiagram() {
+    const el = textarea.current;
+    const text = latest.current;
+    const bodyStart = text.length - parse(text)[1].length;
+    const end = text.length;
+    setDiagram({ source: { kind: "new" }, at: diagramRange(text, el?.selectionStart ?? end, el?.selectionEnd ?? end, bodyStart) });
+  }
+  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram }));
+
+  const drawioEditing = useMemo<DrawioEditing>(
+    () => ({ edit: (name) => setDiagram({ source: { kind: "edit", name }, at: { start: 0, end: 0 } }) }),
+    [],
+  );
+
+  /** The diagram was saved as stored image `name`: a new one goes in at the caret, an edited one replaces the old in every tag that showed it. */
+  function diagramSaved(name: string) {
+    const saved = diagram;
+    setDiagram(null);
+    if (!saved) return;
+    const text = latest.current;
+    if (saved.source.kind === "new") {
+      const start = Math.min(saved.at.start, text.length);
+      const edit = insertDiagram(text, start, Math.min(Math.max(saved.at.end, start), text.length), name);
+      pendingCaret.current = edit.start + edit.caret;
+      replaceText(edit.start, edit.end, edit.text);
+      return;
+    }
+    const next = replaceDiagramSrc(text, saved.source.name, name);
+    if (next === text) return;
+    latest.current = next;
+    onChange(next);
   }
 
   const completion = useMdxCompletion(textarea, value, (start, end, text, caret) => {
@@ -295,6 +343,11 @@ export function MarkdownEditor({
 
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (isDrawioShortcut(event) && !event.nativeEvent.isComposing) {
+      event.preventDefault(); // Keep the browser from claiming it too (it bookmarks all tabs).
+      startDiagram();
+      return;
+    }
     if (isImageToMdxShortcut(event) && !event.nativeEvent.isComposing) {
       event.preventDefault(); // Keep the browser from claiming it too.
       convertImagesToMdx(event.currentTarget);
@@ -396,7 +449,7 @@ export function MarkdownEditor({
               noteLinkPicker.textareaProps["aria-activedescendant"] ??
               highlightMenu.textareaProps["aria-activedescendant"]
             }
-            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${imagePicker.textareaProps["aria-keyshortcuts"]} ${IMAGE_TO_MDX_SHORTCUT}`}
+            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${imagePicker.textareaProps["aria-keyshortcuts"]} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`}
             onKeyDown={onKeyDown}
             onSelect={(event) => {
               imagePicker.textareaProps.onSelect(event);
@@ -469,11 +522,20 @@ export function MarkdownEditor({
           >
             {fm && <FrontmatterCard fm={fm} />}
             <NoteLinksProvider value={noteLinks}>
-              <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+              <DrawioEditContext.Provider value={drawioEditing}>
+                <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+              </DrawioEditContext.Provider>
             </NoteLinksProvider>
           </PreviewHighlightMenu>
         )}
       </section>
+      <DrawioDialog
+        open={diagram !== null}
+        noteId={noteId}
+        source={diagram?.source ?? { kind: "new" }}
+        onClose={() => setDiagram(null)}
+        onSaved={diagramSaved}
+      />
     </div>
   );
 }

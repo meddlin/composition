@@ -35,7 +35,8 @@ See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys
 
 See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the three apps share into one package.
 
-See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use.
+See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use, and
+[architecture/diagrams.md](architecture/diagrams.md) for draw.io diagrams in a note (`<Drawio>`).
 
 See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside a note that talks to your own Ollama server, and
 [manual-tests/ai-helper.md](manual-tests/ai-helper.md) for checking it by hand. Its research and build plan are

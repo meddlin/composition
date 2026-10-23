@@ -146,6 +146,13 @@ an image extension (so `..` and other files in the directory are a 404) and look
 whichever application data directory is configured at that moment. Responses carry
 `nosniff` and a long `immutable` cache lifetime, safe because names embed a content hash.
 
+## Diagrams
+
+A diagram drawn with draw.io (`<Drawio>`, see [diagrams.md](diagrams.md)) is stored as an ordinary image here: a PNG with the
+drawing inside it, named `<note title>-diagram-<hash>.png`, through the same `saveImage`. It shows up on the Images page,
+in backups and in the terminal app like any other. Saving an edited diagram stores a new file and leaves the old one in
+`app_data/`, unused.
+
 ## Header image
 
 A note can have a picture above its title in the preview, for looks only. It is two optional

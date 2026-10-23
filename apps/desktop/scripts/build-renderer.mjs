@@ -15,6 +15,11 @@ if (!fs.existsSync(path.join(webDir, "node_modules"))) {
   process.exit(1);
 }
 
+// The draw.io editor lives in the web app's public/ folder, so the export carries it (to dist/renderer/drawio,
+// served at app://drawio/). A no-op when it is already there and matches drawio.lock.json.
+const fetchDrawio = spawnSync("pnpm", ["run", "fetch:drawio"], { cwd: webDir, stdio: "inherit" });
+if (fetchDrawio.status !== 0) process.exit(fetchDrawio.status ?? 1);
+
 fs.rmSync(exportDir, { recursive: true, force: true });
 const build = spawnSync("pnpm", ["exec", "next", "build"], {
   cwd: webDir,
@@ -25,6 +30,10 @@ if (build.status !== 0) process.exit(build.status ?? 1);
 
 if (!fs.existsSync(path.join(exportDir, "index.html"))) {
   console.error(`Expected a static export at ${exportDir}, but index.html is missing.`);
+  process.exit(1);
+}
+if (!fs.existsSync(path.join(exportDir, "drawio", "index.html"))) {
+  console.error(`Expected the draw.io editor at ${path.join(exportDir, "drawio")}: run \`pnpm fetch:drawio\` in apps/web.`);
   process.exit(1);
 }
 fs.rmSync(target, { recursive: true, force: true });

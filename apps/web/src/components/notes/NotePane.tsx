@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, MessageSquareIcon, SearchIcon, XIcon } from "lucide-react";
+import { ImageIcon, MessageSquareIcon, SearchIcon, ShapesIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { parse, withHeaderImage } from "@/lib/composition/frontmatter";
@@ -14,7 +14,7 @@ import { EditorTabs } from "./EditorTabs";
 import { FindBar } from "./FindBar";
 import type { FindOptions } from "./findMatches";
 import { HeaderImageDialog, type HeaderImageChoice } from "./HeaderImageDialog";
-import { MarkdownEditor, type FindState } from "./MarkdownEditor";
+import { MarkdownEditor, type FindState, type MarkdownEditorControls } from "./MarkdownEditor";
 import { SIDE_BY_SIDE_MIN_WIDTH, shownView, stepView, type DropZone, type PaneView } from "./panes";
 import { readPaneSelection } from "./paneSelection";
 import { ResizeHandle } from "./ResizeHandle";
@@ -78,6 +78,7 @@ export function NotePane({
   // Whether the editor and preview fit beside each other is about the note's own column, which the AI helper's
   // dock takes room from.
   const noteColumn = useRef<HTMLDivElement>(null);
+  const editor = useRef<MarkdownEditorControls>(null);
   const canSplit = useMinWidth(noteColumn, SIDE_BY_SIDE_MIN_WIDTH);
   const paneWidth = useElementWidth(section);
 
@@ -239,6 +240,17 @@ export function NotePane({
         <Button
           variant="ghost"
           size="xs"
+          onClick={() => editor.current?.insertDiagram()}
+          aria-keyshortcuts="Control+Shift+D Meta+Shift+D"
+          title="Draw a diagram with draw.io and put it in the note (Ctrl/Cmd+Shift+D)"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ShapesIcon />
+          Diagram
+        </Button>
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => setHeaderImageOpen(true)}
           title="Set the picture shown above this note's title"
           className="shrink-0 text-muted-foreground hover:text-foreground"
@@ -292,6 +304,7 @@ export function NotePane({
       <div className="flex min-h-0 flex-1">
         <div ref={noteColumn} hidden={dockOver} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <MarkdownEditor
+          controls={editor}
           find={find}
           idBase={idBase}
           view={shownView(view, canSplit)}

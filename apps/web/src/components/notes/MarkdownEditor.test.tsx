@@ -279,6 +279,7 @@ describe("MarkdownEditor component completion", () => {
       expect.stringContaining("<Info>"),
       expect.stringContaining("<Warning>"),
       expect.stringContaining("<Image>"),
+      expect.stringContaining("<Drawio>"),
       expect.stringContaining("<Toc>"),
       expect.stringContaining("<Mark>"),
       expect.stringContaining("<Footnotes>"),

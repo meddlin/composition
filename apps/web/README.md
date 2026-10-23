@@ -26,6 +26,19 @@ already running needs no restart.
 The first search rebuilds the index from SQLite if it is empty. If Meilisearch is
 unreachable, the search dropdown says so and editing is unaffected.
 
+## Diagrams (draw.io)
+
+A note's `<Drawio>` diagrams are drawn in a vendored copy of draw.io, which the web app serves from `public/drawio/`.
+It is gitignored, so fetch it once after cloning (and again when `drawio.lock.json` changes):
+
+```bash
+pnpm fetch:drawio                    # checksum-verified; a no-op when it is already there
+pnpm fetch:drawio --update v33.0.0   # move the pin to another release
+```
+
+Without it, the diagram dialog stays on "Loading the editor…". See
+[docs/architecture/diagrams.md](../../docs/architecture/diagrams.md).
+
 ## Getting Started
 
 First, run the development server:

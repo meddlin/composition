@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -23,7 +23,7 @@ import { HEADINGS_PROP, imageNameFromRef, parseRepo, parseYouTube, remarkHeading
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Toc", "Mark", "Footnotes", "YouTube", "Repo"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -195,7 +195,9 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "panel", tone: "info", blocks: blocksOf(element.children ?? [], source) }];
     case "Warning":
       return [{ kind: "panel", tone: "warning", blocks: blocksOf(element.children ?? [], source) }];
-    case "Image": {
+    // A diagram is a stored picture to the terminal, which has no editor to draw it in.
+    case "Image":
+    case "Drawio": {
       const src = attribute(element, "src");
       const name = src ? imageNameFromRef(src) : null;
       if (name) {
@@ -257,6 +259,7 @@ function replacement(element: Node, source: string): string {
   if (element.type === "footnoteReference") return superscript(element.number);
   switch (componentOf(element)) {
     case "Image":
+    case "Drawio":
       return imageMarkdown(element);
     case "YouTube":
       return youtubeMarkdown(element);

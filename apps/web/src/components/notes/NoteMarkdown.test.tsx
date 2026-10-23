@@ -119,7 +119,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],

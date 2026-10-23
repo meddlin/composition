@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // The desktop build's static export (next.config.ts, COMPOSITION_TARGET=desktop).
     ".next-desktop/**",
+    // draw.io, vendored by `pnpm fetch:drawio`: minified third-party code.
+    "public/drawio/**",
   ]),
 ]);
 
