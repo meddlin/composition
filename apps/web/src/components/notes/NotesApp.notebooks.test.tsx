@@ -327,3 +327,17 @@ describe("NotesApp notebooks", () => {
     expect(screen.getByText("That group can't be moved there.")).toBeTruthy();
   });
 });
+
+describe("NotesApp home page", () => {
+  it("shows notebooks and recent notes from the header button, and leaves when one is picked", () => {
+    renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Home page" }));
+
+    const home = within(screen.getByRole("main", { name: "Home" }));
+    expect(home.getByRole("heading", { name: "Notebooks" })).toBeTruthy();
+    expect(home.getByRole("heading", { name: "Recently updated" })).toBeTruthy();
+
+    fireEvent.click(home.getAllByRole("button")[0]);
+    expect(screen.queryByRole("main", { name: "Home" })).toBeNull();
+  });
+});

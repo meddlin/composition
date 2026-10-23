@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { HomeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import {
@@ -37,6 +38,7 @@ import { AssistantProvider, useAssistant } from "./AssistantProvider";
 import { createNoteFromAnswer } from "./createNoteFromAnswer";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
+import { HomePage } from "./HomePage";
 import { NotebookPanel } from "./NotebookPanel";
 import {
   MAX_NOTEBOOK_PANEL_WIDTH,
@@ -131,7 +133,11 @@ function Workspace({
   const notebookNotes = notes.filter((n) => n.notebookId === notebookId);
   const notebookGroups = groups.filter((g) => g.notebookId === notebookId);
 
+  // When set, the Home overview replaces the panes.
+  const [homeOpen, setHomeOpen] = useState(false);
+
   function openNotebook(id: number) {
+    setHomeOpen(false);
     setChosenNotebookId(id);
     // A group page belongs to the notebook that was open.
     setViewedGroupId(null);
@@ -207,6 +213,7 @@ function Workspace({
   }
 
   function selectNote(id: number) {
+    setHomeOpen(false);
     flushPendingSave();
     followNote(id);
     setPaneState((prev) => openNote(prev, id));
@@ -215,6 +222,7 @@ function Workspace({
 
   /** Opens the note in a new pane next to the focused one, rather than in it. */
   function openBeside(id: number) {
+    setHomeOpen(false);
     flushPendingSave();
     followNote(id);
     setPaneState((prev) => openNoteBeside(prev, id));
@@ -222,6 +230,7 @@ function Workspace({
   }
 
   function selectGroup(id: number) {
+    setHomeOpen(false);
     flushPendingSave();
     setViewedGroupId(id);
   }
@@ -233,6 +242,7 @@ function Workspace({
       setNotes((prev) => [note, ...prev]);
       setPaneState((prev) => openNote(prev, note.id));
       setViewedGroupId(null);
+      setHomeOpen(false);
     });
   }
 
@@ -492,8 +502,20 @@ function Workspace({
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="shrink-0 border-b p-2">
-        <SearchBar onSelect={selectNote} />
+      <header className="flex shrink-0 items-center gap-2 border-b p-2">
+        <Button
+          variant={homeOpen ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setHomeOpen(true)}
+          aria-label="Home page"
+          aria-pressed={homeOpen}
+          title="Home page"
+        >
+          <HomeIcon /> Home
+        </Button>
+        <div className="min-w-0 flex-1">
+          <SearchBar onSelect={selectNote} />
+        </div>
       </header>
       <div className="flex min-h-0 flex-1">
         <NotebookPanel
@@ -562,7 +584,9 @@ function Workspace({
           valueMax={MAX_SIDEBAR_WIDTH}
           {...layout.sidebarResize}
         />
-        {viewedGroup ? (
+        {homeOpen ? (
+          <HomePage notebooks={notebooks} notes={notes} onSelectNotebook={openNotebook} onSelectNote={selectNote} />
+        ) : viewedGroup ? (
           <GroupPage
             groupId={viewedGroup.id}
             groups={groups}
