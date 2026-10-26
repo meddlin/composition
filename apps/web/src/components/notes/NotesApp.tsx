@@ -34,7 +34,9 @@ import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { AssistantProvider, useAssistant } from "./AssistantProvider";
+import { WritingProvider } from "./WritingProvider";
 import { createNoteFromAnswer } from "./createNoteFromAnswer";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
@@ -103,12 +105,16 @@ type Props = {
   initialNotebooks?: Notebook[];
   initialLayout: Layout;
   initialFavorites?: Favorites;
+  /** The editor's ruler and reflow; the defaults (both off) when not given. */
+  initialWriting?: WritingSettings;
 };
 
-export function NotesApp(props: Props) {
+export function NotesApp({ initialWriting = DEFAULT_WRITING_SETTINGS, ...props }: Props) {
   return (
     <AssistantProvider>
-      <Workspace {...props} />
+      <WritingProvider value={initialWriting}>
+        <Workspace {...props} />
+      </WritingProvider>
     </AssistantProvider>
   );
 }

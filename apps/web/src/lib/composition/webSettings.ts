@@ -8,6 +8,7 @@ import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./editorFonts";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
 import type { SavedLocation } from "./sunTimes";
+import { DEFAULT_WRITING_SETTINGS, parseWritingSettings, type WritingSettings } from "./writing";
 import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
 
 /**
@@ -57,6 +58,8 @@ export type WebSettings = {
   previewFont: PreviewFontName;
   /** Font of the Markdown editor. */
   editorFont: EditorFontName;
+  /** The editor's ruler and reflow. */
+  writing: WritingSettings;
   /** City whose sunrise and sunset drive the "auto" color scheme. */
   location?: SavedLocation;
   sidebarWidth: number;
@@ -74,6 +77,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   theme: DEFAULT_THEME,
   previewFont: DEFAULT_PREVIEW_FONT,
   editorFont: DEFAULT_EDITOR_FONT,
+  writing: DEFAULT_WRITING_SETTINGS,
   ...DEFAULT_LAYOUT,
   favorites: NO_FAVORITES,
 };
@@ -109,6 +113,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     theme: isThemeName(value.theme) ? value.theme : DEFAULT_THEME,
     previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
+    writing: parseWritingSettings(value.writing),
     sidebarWidth: clampSidebarWidth(value.sidebarWidth),
     editorRatio: clampEditorRatio(value.editorRatio),
     favorites: parseFavorites(value.favorites),

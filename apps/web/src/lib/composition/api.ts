@@ -11,6 +11,7 @@ import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 import type { RestoreResult, Trash } from "./trash";
+import type { WritingSettings } from "./writing";
 
 /**
  * The contract between the notes UI and whatever stores the data. Two
@@ -41,6 +42,8 @@ export type Workspace = {
   notebooks: Notebook[];
   layout: Layout;
   favorites: Favorites;
+  /** How the editor draws its ruler and breaks lines (Settings > Writing). */
+  writing: WritingSettings;
 };
 
 /** What the Settings screen shows; computed where the files actually are. */
@@ -48,6 +51,7 @@ export type SettingsSnapshot = {
   theme: ThemeName;
   previewFont: PreviewFontName;
   editorFont: EditorFontName;
+  writing: WritingSettings;
   appDataDir: string;
   /** The database file in use (override if set, otherwise derived). */
   dbPath: string;
@@ -190,6 +194,8 @@ export interface CompositionApi {
   savePreviewFont(font: string): Promise<{ error?: string }>;
   /** Chooses the font the Markdown editor is set in; a name not in `EDITOR_FONT_CHOICES` comes back as `error`. */
   saveEditorFont(font: string): Promise<{ error?: string }>;
+  /** Saves the editor's ruler and reflow; a column outside the allowed range comes back as `error`. */
+  saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
 
   /** Saves where the AI helper finds Ollama and how large a context window it asks for; a bad value comes back as `error`. */
   saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult>;
@@ -239,6 +245,7 @@ export const API_METHODS = [
   "saveTheme",
   "savePreviewFont",
   "saveEditorFont",
+  "saveWritingSettings",
   "saveAssistantSettings",
   "listAssistantModels",
   "saveLocation",

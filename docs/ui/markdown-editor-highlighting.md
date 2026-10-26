@@ -51,6 +51,24 @@ monospace: the textarea and the coloured layer both use the `.editor-text` class
 font, so any family lines up. Ligatures are switched off in `.editor-text` because they cannot form
 across the layer's coloured spans. Keep both elements on that one class when editing either.
 
+## Ruler and reflow
+
+Settings → Writing holds two aids, both off by default (`WritingSettings` in
+[`writing.ts`](../../apps/web/src/lib/composition/writing.ts)). The workspace hands them to every
+editor through `WritingProvider`, so a change applies when the user goes back to their notes.
+
+- **Ruler.** A 1px line over the textarea (`pointer-events-none`, clipped to the editor) at
+  `calc(1rem + <column>ch)`. `ch` is measured in `.editor-text` at the textarea's size, so it is
+  exact in a monospace font and approximate in a proportional one. It never touches the text.
+- **Reflow.** While typing (`inputType === "insertText"` only, so paste, drop, delete and undo are
+  left alone), [`reflowAtCaret`](../../apps/web/src/components/notes/reflowText.ts) breaks the
+  caret's line at the last space before the column. Only that line changes. Continuation lines keep
+  the indent and `>` marks and sit under a list item's text. Frontmatter, code fences, indented
+  code, headings and HTML/JSX lines are never broken, nor are table rows while "Keep Markdown tables
+  intact" is on (a row must stay on one line to stay a table). The break goes in through
+  `execCommand("insertText")` so it is its own undo step, falling back to replacing the text where
+  that is unavailable.
+
 ## Changing it
 
 If the layer and the text ever disagree, check that the textarea and the `<pre>` in

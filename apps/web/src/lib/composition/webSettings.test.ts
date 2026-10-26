@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_EDITOR_RATIO } from "./layout";
 import { DEFAULT_THEME } from "./themes";
+import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // The default settings path is fixed from the home directory at import time, so point
 // HOME at a temp dir and import a fresh copy of the module for every test.
@@ -42,8 +43,25 @@ describe("web settings layout", () => {
       theme: "forest",
       previewFont: "default",
       editorFont: "default",
+      writing: DEFAULT_WRITING_SETTINGS,
       ...DEFAULT_LAYOUT,
       favorites: [],
+    });
+  });
+
+  it("loads saved writing settings, repairing any part that is invalid", async () => {
+    writeSettings({
+      appDataDir: "/data",
+      writing: { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 3, reflowKeepsTables: "yes" },
+    });
+    const { loadWebSettings } = await import("./webSettings");
+
+    expect(loadWebSettings().writing).toEqual({
+      rulerEnabled: true,
+      rulerColumn: 100,
+      reflowEnabled: true,
+      reflowColumn: 80,
+      reflowKeepsTables: true,
     });
   });
 

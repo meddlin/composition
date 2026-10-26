@@ -21,6 +21,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     theme: "forest",
     previewFont: "default",
     editorFont: "default",
+    writing: { rulerEnabled: false, rulerColumn: 80, reflowEnabled: false, reflowColumn: 80, reflowKeepsTables: true },
     sidebarWidth: 256,
     editorRatio: 0.5,
     favorites: [],

@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT } from "./layout";
+import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // Meilisearch isn't running in tests; indexing is best-effort in the service,
 // so a stub keeps the suite quiet and fast without changing what's under test.
@@ -47,6 +48,7 @@ describe("saveSettings", () => {
       theme: "forest",
       previewFont: "default",
       editorFont: "default",
+      writing: DEFAULT_WRITING_SETTINGS,
       sidebarWidth: 320,
       editorRatio: 0.3,
       favorites: [],
@@ -171,6 +173,40 @@ describe("saveEditorFont", () => {
   });
 });
 
+describe("saveWritingSettings", () => {
+  const writing = {
+    rulerEnabled: true,
+    rulerColumn: 100,
+    reflowEnabled: true,
+    reflowColumn: 72,
+    reflowKeepsTables: false,
+  };
+
+  it("stores the settings and leaves the rest alone", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveWritingSettings, savePreviewFont, loadSettings, loadWorkspace } = await import("./service");
+    await savePreviewFont("lora");
+
+    expect(await saveWritingSettings(writing)).toEqual({});
+
+    expect(loadWebSettings()).toMatchObject({ writing, previewFont: "lora", ...DEFAULT_LAYOUT });
+    expect((await loadSettings()).writing).toEqual(writing);
+    expect((await loadWorkspace()).writing).toEqual(writing);
+  });
+
+  it("rejects a column outside the allowed range without writing anything", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveWritingSettings } = await import("./service");
+
+    for (const reflowColumn of [5, 500, 80.5, Number.NaN]) {
+      const result = await saveWritingSettings({ ...writing, reflowColumn });
+      expect(result.error).toMatch(/whole number of characters from 20 to 200/);
+    }
+
+    expect(loadWebSettings().writing).toEqual(DEFAULT_WRITING_SETTINGS);
+  });
+});
+
 describe("loadSettings", () => {
   it("reports the default location and that no database exists yet", async () => {
     const { loadSettings } = await import("./service");
@@ -181,6 +217,7 @@ describe("loadSettings", () => {
       theme: "dark",
       previewFont: "default",
       editorFont: "default",
+      writing: DEFAULT_WRITING_SETTINGS,
       appDataDir: path.join(home, ".composition"),
       dbPath: path.join(home, ".composition", "composition.db"),
       dbPathOverride: "",

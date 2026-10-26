@@ -1,4 +1,4 @@
-import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
@@ -18,6 +18,8 @@ import { highlightRange, removeHighlight, type TextRange } from "./highlightText
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
+import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
+import { useWriting } from "./WritingProvider";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
@@ -92,6 +94,7 @@ export function MarkdownEditor({
   find,
   controls,
 }: Props) {
+  const writing = useWriting();
   const ownIdBase = useId();
   const ids = idBase ?? ownIdBase;
   const showEditor = view !== "preview";
@@ -341,6 +344,38 @@ export function MarkdownEditor({
     }
   }, [editorMatches, currentMatch, findQuery, matchCase, wholeWord]);
 
+  /**
+   * Reflow: a line that typing has pushed past the column is broken there. The break goes in as
+   * typing would, so undo takes it back as a step of its own; where that isn't possible the text is
+   * replaced and undo starts over, as it does for a pasted image.
+   */
+  function reflowTyping(event: ChangeEvent<HTMLTextAreaElement>) {
+    if (!writing.reflowEnabled) return;
+    // Only typing reflows: pasting, dropping, deleting and undoing leave the text as it is.
+    if ((event.nativeEvent as InputEvent).inputType !== "insertText") return;
+    const el = event.target;
+    const edit = reflowAtCaret(el.value, el.selectionStart, {
+      column: writing.reflowColumn,
+      keepTables: writing.reflowKeepsTables,
+    });
+    if (edit) applyReflow(el, edit);
+  }
+
+  function applyReflow(el: HTMLTextAreaElement, edit: ReflowEdit) {
+    const { start, end, insert } = changedSpan(el.value, edit.text);
+    if (document.activeElement === el) {
+      el.setSelectionRange(start, end);
+      document.execCommand?.("insertText", false, insert);
+    }
+    if (el.value === edit.text) {
+      el.setSelectionRange(edit.caret, edit.caret);
+      return;
+    }
+    pendingCaret.current = edit.caret;
+    latest.current = edit.text;
+    onChange(edit.text);
+  }
+
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (isDrawioShortcut(event) && !event.nativeEvent.isComposing) {
@@ -428,6 +463,7 @@ export function MarkdownEditor({
             value={value}
             onChange={(e) => {
               onChange(e.target.value);
+              reflowTyping(e);
               completion.sync(e.target);
               noteLinkPicker.sync(e.target);
             }}
@@ -480,6 +516,16 @@ export function MarkdownEditor({
               highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
             )}
           />
+          {writing.rulerEnabled && (
+            // Clipped to the editor, so a ruler past its right edge doesn't widen the page.
+            <div aria-hidden data-testid="editor-ruler" className="pointer-events-none absolute inset-0 overflow-hidden">
+              {/* Measured in the editor's own characters (`ch`), after its 1rem of padding; the font and size match the textarea's. */}
+              <div
+                className="editor-text absolute inset-y-0 w-px bg-foreground/20 text-sm"
+                style={{ left: `calc(1rem + ${writing.rulerColumn}ch)` }}
+              />
+            </div>
+          )}
           {imagePicker.open && <ImagePickerMenu {...imagePicker.menu} />}
           {completion.open && <MdxCompletionMenu {...completion.menu} />}
           {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}

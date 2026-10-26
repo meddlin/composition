@@ -25,6 +25,7 @@ import type { Note } from "./notesRepo";
 import * as service from "./service";
 import type { SunSchedule } from "./sunTimes";
 import type { RestoreResult, Trash } from "./trash";
+import type { WritingSettings } from "./writing";
 
 /**
  * The web app's transport for CompositionApi (see api.ts): Server Actions that
@@ -246,6 +247,15 @@ export async function savePreviewFont(font: string): Promise<{ error?: string }>
 
 export async function saveEditorFont(font: string): Promise<{ error?: string }> {
   const result = await service.saveEditorFont(font);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
+export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
+  const result = await service.saveWritingSettings(writing);
   if (!result.error) {
     revalidatePath("/settings");
     revalidatePath("/");

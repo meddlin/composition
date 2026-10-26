@@ -45,6 +45,7 @@ export {
   savePreviewFont,
   saveSettings,
   saveTheme,
+  saveWritingSettings,
   searchNotes,
 } from "./actions";
 export type {
