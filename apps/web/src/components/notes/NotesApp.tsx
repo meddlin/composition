@@ -21,6 +21,7 @@ import {
   renameGroup as renameGroupAction,
   renameNotebook as renameNotebookAction,
   saveFavorites,
+  saveHomeSettings,
   saveNoteContent,
 } from "@/lib/composition/client";
 import {
@@ -34,6 +35,7 @@ import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type Layout } from "@/lib/composition/layout";
+import { DEFAULT_HOME_SETTINGS, toggleNotebookPin, type HomeSettings } from "@/lib/composition/home";
 import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { AssistantProvider, useAssistant } from "./AssistantProvider";
 import { WritingProvider } from "./WritingProvider";
@@ -41,6 +43,7 @@ import { createNoteFromAnswer } from "./createNoteFromAnswer";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
 import { HomePage } from "./HomePage";
+import { recordOpened } from "./openedNotes";
 import { NotebookPanel } from "./NotebookPanel";
 import {
   MAX_NOTEBOOK_PANEL_WIDTH,
@@ -107,6 +110,8 @@ type Props = {
   initialFavorites?: Favorites;
   /** The editor's ruler and reflow; the defaults (both off) when not given. */
   initialWriting?: WritingSettings;
+  /** How the home page is laid out; the side rail when not given. */
+  initialHome?: HomeSettings;
 };
 
 export function NotesApp({ initialWriting = DEFAULT_WRITING_SETTINGS, ...props }: Props) {
@@ -125,6 +130,7 @@ function Workspace({
   initialNotebooks = NO_NOTEBOOKS,
   initialLayout,
   initialFavorites = NO_FAVORITES,
+  initialHome = DEFAULT_HOME_SETTINGS,
 }: Props) {
   const assistant = useAssistant();
   const [notes, setNotes] = useState<Note[]>(initialNotes);
@@ -139,8 +145,8 @@ function Workspace({
   const notebookNotes = notes.filter((n) => n.notebookId === notebookId);
   const notebookGroups = groups.filter((g) => g.notebookId === notebookId);
 
-  // When set, the Home overview replaces the panes.
-  const [homeOpen, setHomeOpen] = useState(false);
+  // When set, the Home overview replaces the panes. It starts set for anyone who chose to open on it.
+  const [homeOpen, setHomeOpen] = useState(initialHome.startup === "home");
 
   function openNotebook(id: number) {
     setHomeOpen(false);
@@ -161,6 +167,9 @@ function Workspace({
   const notebookPanelStart = useRef(notebookPanel.width);
   const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
   const layout = useLayout(initialLayout);
+  const [home, setHome] = useState<HomeSettings>(initialHome);
+  // Mirrors `home` so two quick pins never build on a stale list.
+  const latestHome = useRef(home);
   const [favorites, setFavorites] = useState<Favorites>(initialFavorites);
   // Mirrors `favorites` so two quick toggles never build on a stale list.
   const latestFavorites = useRef(favorites);
@@ -191,12 +200,29 @@ function Workspace({
 
   const { panes, focusedId } = paneState;
 
+  // A note in front of the user counts as opened, for the home page's "recently opened" order.
+  useEffect(() => {
+    if (focusedId !== null && !homeOpen && !viewedGroupId) recordOpened(focusedId);
+  }, [focusedId, homeOpen, viewedGroupId]);
+
   function updateFavorites(next: Favorites) {
     latestFavorites.current = next;
     setFavorites(next);
     startTransition(async () => {
       await saveFavorites(next);
     });
+  }
+
+  function updateHome(next: HomeSettings) {
+    latestHome.current = next;
+    setHome(next);
+    startTransition(async () => {
+      await saveHomeSettings(next);
+    });
+  }
+
+  function toggleNotebookPinned(id: number) {
+    updateHome(toggleNotebookPin(latestHome.current, id));
   }
 
   function toggleFavorite(type: FavoriteType, id: number) {
@@ -238,6 +264,19 @@ function Workspace({
   function selectGroup(id: number) {
     setHomeOpen(false);
     flushPendingSave();
+    setViewedGroupId(id);
+  }
+
+  /** Opens a group's page, in whichever notebook the group belongs to. */
+  function openGroup(id: number) {
+    const target = groups.find((g) => g.id === id);
+    if (!target) return;
+    setHomeOpen(false);
+    flushPendingSave();
+    if (target.notebookId !== notebookId) {
+      setChosenNotebookId(target.notebookId);
+      rememberNotebookId(target.notebookId);
+    }
     setViewedGroupId(id);
   }
 
@@ -355,6 +394,8 @@ function Workspace({
         return;
       }
       setNotebooks((prev) => prev.filter((n) => n.id !== id));
+      // A deleted notebook is unpinned, so the saved list doesn't collect dead entries.
+      if (latestHome.current.pinnedNotebooks.includes(id)) updateHome(toggleNotebookPin(latestHome.current, id));
     });
   }
 
@@ -591,7 +632,18 @@ function Workspace({
           {...layout.sidebarResize}
         />
         {homeOpen ? (
-          <HomePage notebooks={notebooks} notes={notes} onSelectNotebook={openNotebook} onSelectNote={selectNote} />
+          <HomePage
+            notebooks={notebooks}
+            notes={notes}
+            groups={groups}
+            favorites={favorites}
+            settings={home}
+            onToggleFavorite={toggleFavorite}
+            onToggleNotebookPin={toggleNotebookPinned}
+            onSelectNotebook={openNotebook}
+            onSelectGroup={openGroup}
+            onSelectNote={selectNote}
+          />
         ) : viewedGroup ? (
           <GroupPage
             groupId={viewedGroup.id}

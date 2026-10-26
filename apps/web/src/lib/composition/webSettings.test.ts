@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_EDITOR_RATIO } from "./layout";
 import { DEFAULT_THEME } from "./themes";
+import { DEFAULT_HOME_SETTINGS } from "./home";
 import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // The default settings path is fixed from the home directory at import time, so point
@@ -44,6 +45,7 @@ describe("web settings layout", () => {
       previewFont: "default",
       editorFont: "default",
       writing: DEFAULT_WRITING_SETTINGS,
+      home: DEFAULT_HOME_SETTINGS,
       ...DEFAULT_LAYOUT,
       favorites: [],
     });
@@ -63,6 +65,20 @@ describe("web settings layout", () => {
       reflowColumn: 80,
       reflowKeepsTables: true,
     });
+  });
+
+  it("loads the saved home page settings, and repairs a choice it doesn't know", async () => {
+    writeSettings({ appDataDir: "/data", home: { layout: "strip", pinnedNotebooks: [2], header: { show: false } } });
+    const { loadWebSettings } = await import("./webSettings");
+    expect(loadWebSettings().home).toEqual({
+      ...DEFAULT_HOME_SETTINGS,
+      layout: "strip",
+      pinnedNotebooks: [2],
+      header: { show: false, title: "" },
+    });
+
+    writeSettings({ appDataDir: "/data", home: { layout: "mosaic" } });
+    expect(loadWebSettings().home).toEqual(DEFAULT_HOME_SETTINGS);
   });
 
   it("loads a saved preview font, and falls back to the default for one it doesn't know", async () => {

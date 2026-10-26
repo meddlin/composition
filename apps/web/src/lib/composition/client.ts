@@ -38,6 +38,7 @@ export {
   saveAssistantSettings,
   saveEditorFont,
   saveFavorites,
+  saveHomeSettings,
   saveImage,
   saveLayout,
   saveLocation,

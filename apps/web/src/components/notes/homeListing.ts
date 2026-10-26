@@ -1,11 +1,75 @@
 import { strip } from "@/lib/composition/frontmatter";
-import type { Note } from "./types";
+import type { Favorites } from "@/lib/composition/favorites";
+import type { RecentSort } from "@/lib/composition/home";
+import type { Group, Note, Notebook } from "./types";
 
 export const RECENT_NOTE_LIMIT = 12;
 
-/** The most recently updated notes, newest first. */
-export function recentNotes(notes: Note[], limit = RECENT_NOTE_LIMIT): Note[] {
-  return [...notes].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id).slice(0, limit);
+type RecentOptions = {
+  sort?: RecentSort;
+  /** When each note was last opened, in milliseconds; read for the "opened" order. */
+  opened?: Record<number, number>;
+  /** Only the notes of this notebook; all of them when absent. */
+  notebookId?: number | null;
+};
+
+const byEdited = (a: Note, b: Note) => b.updatedAt.localeCompare(a.updatedAt) || b.id - a.id;
+
+/**
+ * The most recent notes, newest first: by the last edit, or by the last time they were opened. A note
+ * that was never opened comes after every one that was, in order of its last edit.
+ */
+export function recentNotes(notes: Note[], limit = RECENT_NOTE_LIMIT, options: RecentOptions = {}): Note[] {
+  const { sort = "edited", opened = {}, notebookId = null } = options;
+  const pool = notebookId === null ? [...notes] : notes.filter((n) => n.notebookId === notebookId);
+  if (sort === "edited") return pool.sort(byEdited).slice(0, limit);
+  return pool
+    .sort((a, b) => {
+      const x = opened[a.id];
+      const y = opened[b.id];
+      if (x !== undefined && y !== undefined) return y - x || byEdited(a, b);
+      if (x !== undefined) return -1;
+      if (y !== undefined) return 1;
+      return byEdited(a, b);
+    })
+    .slice(0, limit);
+}
+
+/** One thing pinned to the top of the home page. */
+export type PinnedItem =
+  | { kind: "notebook"; notebook: Notebook }
+  | { kind: "group"; group: Group }
+  | { kind: "note"; note: Note };
+
+/**
+ * What is pinned: the notebooks first, in the order they were pinned, then the notes and groups in the order
+ * they were pinned. A pin whose notebook, group or note is gone is skipped.
+ */
+export function pinnedItems(
+  notebooks: Notebook[],
+  groups: Group[],
+  notes: Note[],
+  favorites: Favorites,
+  pinnedNotebooks: number[],
+): PinnedItem[] {
+  const notebookById = new Map(notebooks.map((n) => [n.id, n]));
+  const groupById = new Map(groups.map((g) => [g.id, g]));
+  const noteById = new Map(notes.map((n) => [n.id, n]));
+  const items: PinnedItem[] = [];
+  for (const id of pinnedNotebooks) {
+    const notebook = notebookById.get(id);
+    if (notebook) items.push({ kind: "notebook", notebook });
+  }
+  for (const favorite of favorites) {
+    if (favorite.type === "group") {
+      const group = groupById.get(favorite.id);
+      if (group) items.push({ kind: "group", group });
+    } else {
+      const note = noteById.get(favorite.id);
+      if (note) items.push({ kind: "note", note });
+    }
+  }
+  return items;
 }
 
 /** A one-line plain-text preview of a note's body: no frontmatter, headings or markup. */

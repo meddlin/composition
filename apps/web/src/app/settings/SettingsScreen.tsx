@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { AssistantSettings } from "./AssistantSettings";
 import { BackupRestore } from "./BackupRestore";
+import { HomeSettings } from "./HomeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { SettingsForm } from "./SettingsForm";
 import { StylingSettings } from "./StylingSettings";
@@ -36,6 +37,7 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="styling">Styling</TabsTrigger>
           <TabsTrigger value="writing">Writing</TabsTrigger>
+          <TabsTrigger value="home">Home page</TabsTrigger>
           <TabsTrigger value="ai">AI Configuration</TabsTrigger>
           <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
         </TabsList>
@@ -105,6 +107,10 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
 
         <TabsContent value="writing" forceMount>
           <WritingSettings initial={snapshot.writing} />
+        </TabsContent>
+
+        <TabsContent value="home" forceMount>
+          <HomeSettings initial={snapshot.home} notebooks={snapshot.notebooks} />
         </TabsContent>
 
         <TabsContent value="ai">
