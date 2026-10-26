@@ -15,7 +15,7 @@ export function WorkspaceLoader() {
   if (workspace.status === "loading") {
     return <div aria-busy="true" className="h-screen" />;
   }
-  const { notes, groups, notebooks, layout, favorites, writing } = workspace.value;
+  const { notes, groups, notebooks, layout, favorites, writing, home } = workspace.value;
   return (
     <NotesApp
       initialNotes={notes}
@@ -24,6 +24,7 @@ export function WorkspaceLoader() {
       initialLayout={layout}
       initialFavorites={favorites}
       initialWriting={writing}
+      initialHome={home}
     />
   );
 }

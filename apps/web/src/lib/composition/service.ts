@@ -51,6 +51,7 @@ import {
 } from "./sunTimes";
 import { sunThemeAttributes } from "./sunSchedule";
 import { isEditorFontName } from "./editorFonts";
+import { validateHomeSettings, type HomeSettings } from "./home";
 import { validateWritingSettings, type WritingSettings } from "./writing";
 import { isPreviewFontName } from "./previewFonts";
 import { isThemeName } from "./themes";
@@ -75,7 +76,7 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const { sidebarWidth, editorRatio, favorites, writing } = loadWebSettings();
+  const { sidebarWidth, editorRatio, favorites, writing, home } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
   await purgeExpiredTrash();
   // Listed first: it is also what gives anything an older CLI wrote a notebook.
@@ -87,6 +88,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     layout: { sidebarWidth, editorRatio },
     favorites,
     writing,
+    home,
   };
 }
 
@@ -111,6 +113,8 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     previewFont: settings.previewFont,
     editorFont: settings.editorFont,
     writing: settings.writing,
+    home: settings.home,
+    notebooks: dbExists ? notebooksRepo.listNotebooks().map(({ id, name }) => ({ id, name })) : [],
     appDataDir: settings.appDataDir,
     dbPath,
     dbPathOverride: settings.dbPath ?? "",
@@ -724,6 +728,13 @@ export async function saveWritingSettings(writing: WritingSettings): Promise<{ e
   return {};
 }
 
+export async function saveHomeSettings(home: HomeSettings): Promise<{ error?: string }> {
+  const checked = validateHomeSettings(home);
+  if (!checked.settings) return { error: checked.error };
+  saveWebSettings({ ...loadWebSettings(), home: checked.settings });
+  return {};
+}
+
 export async function saveLocation(city: string): Promise<SaveLocationResult> {
   const query = city.trim();
 
@@ -804,6 +815,7 @@ const _implementsApi: CompositionApi = {
   savePreviewFont,
   saveEditorFont,
   saveWritingSettings,
+  saveHomeSettings,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

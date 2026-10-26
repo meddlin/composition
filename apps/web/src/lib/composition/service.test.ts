@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_HOME_SETTINGS, type HomeSettings } from "./home";
 import { DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
@@ -49,6 +50,7 @@ describe("saveSettings", () => {
       previewFont: "default",
       editorFont: "default",
       writing: DEFAULT_WRITING_SETTINGS,
+      home: DEFAULT_HOME_SETTINGS,
       sidebarWidth: 320,
       editorRatio: 0.3,
       favorites: [],
@@ -173,6 +175,47 @@ describe("saveEditorFont", () => {
   });
 });
 
+describe("saveHomeSettings", () => {
+  const home: HomeSettings = {
+    layout: "strip",
+    sections: [
+      { id: "recent", visible: true },
+      { id: "pinned", visible: false },
+      { id: "notebooks", visible: true },
+    ],
+    recentCount: 24,
+    density: "list",
+    startup: "home",
+    pinnedNotebooks: [1],
+    notebookColors: { "1": "error" },
+    recentSort: "opened",
+    recentNotebook: 1,
+    header: { show: false, title: "Hello" },
+  };
+
+  it("stores the layout and leaves the rest alone", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveHomeSettings, savePreviewFont, loadSettings, loadWorkspace } = await import("./service");
+    await savePreviewFont("lora");
+
+    expect(await saveHomeSettings(home)).toEqual({});
+
+    expect(loadWebSettings()).toMatchObject({ home, previewFont: "lora", ...DEFAULT_LAYOUT });
+    expect((await loadSettings()).home).toEqual(home);
+    expect((await loadWorkspace()).home).toEqual(home);
+  });
+
+  it("rejects a layout it doesn't offer without writing anything", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveHomeSettings } = await import("./service");
+
+    const result = await saveHomeSettings({ ...home, layout: "mosaic" as never });
+
+    expect(result.error).toBeTruthy();
+    expect(loadWebSettings().home).toEqual(DEFAULT_HOME_SETTINGS);
+  });
+});
+
 describe("saveWritingSettings", () => {
   const writing = {
     rulerEnabled: true,
@@ -218,6 +261,8 @@ describe("loadSettings", () => {
       previewFont: "default",
       editorFont: "default",
       writing: DEFAULT_WRITING_SETTINGS,
+      home: DEFAULT_HOME_SETTINGS,
+      notebooks: [],
       appDataDir: path.join(home, ".composition"),
       dbPath: path.join(home, ".composition", "composition.db"),
       dbPathOverride: "",

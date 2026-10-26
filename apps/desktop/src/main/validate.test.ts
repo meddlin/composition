@@ -15,6 +15,19 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.saveNoteContent([3, "text"])).toEqual([3, "text"]);
     expect(VALIDATORS.moveNoteToGroup([3, null])).toEqual([3, null]);
     expect(VALIDATORS.createGroup(["Work", 2])).toEqual(["Work", 2]);
+    const home = {
+      layout: "strip",
+      sections: [{ id: "pinned", visible: false }],
+      recentCount: 6,
+      density: "list",
+      startup: "home",
+      pinnedNotebooks: [2, 5],
+      notebookColors: { "2": "success" },
+      recentSort: "opened",
+      recentNotebook: null,
+      header: { show: false, title: "Hi" },
+    };
+    expect(VALIDATORS.saveHomeSettings([{ ...home, extra: 1 }])).toEqual([home]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
@@ -128,6 +141,22 @@ describe("VALIDATORS", () => {
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
+    ["saveHomeSettings", [null]],
+    ["saveHomeSettings", [{ layout: 1 }]],
+    ["saveHomeSettings", [{ layout: "rail", sections: "all", recentCount: 12, density: "standard", startup: "note" }]],
+    ["saveHomeSettings", [{ layout: "rail", sections: [null], recentCount: 12, density: "standard", startup: "note" }]],
+    ["saveHomeSettings", [{ layout: "rail", sections: [{ id: "recent", visible: "yes" }], recentCount: 12, density: "standard", startup: "note" }]],
+    ["saveHomeSettings", [{ layout: "rail", sections: [], recentCount: "12", density: "standard", startup: "note" }]],
+    ["saveHomeSettings", [{ layout: "rail", sections: [], recentCount: 12, density: 1, startup: "note" }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, pinnedNotebooks: "all" }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, pinnedNotebooks: ["1"] }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, notebookColors: ["brand"] }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, notebookColors: { "1": 3 } }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, recentSort: 1 }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, recentNotebook: "1" }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, header: null }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, header: { show: "yes", title: "" } }]],
+    ["saveHomeSettings", [{ ...{ layout: "rail", sections: [], recentCount: 12, density: "standard", startup: "note", pinnedNotebooks: [], notebookColors: {}, recentSort: "edited", recentNotebook: null, header: { show: true, title: "" } }, header: { show: true, title: 4 } }]],
     ["saveAssistantSettings", [null]],
     ["saveAssistantSettings", ["http://nas:11434"]],
     ["saveAssistantSettings", [{ serverUrl: 11434, contextTokens: 8192 }]],

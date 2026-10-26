@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { parseAssistantSettings, type AssistantSettings } from "./assistant/settings";
 import { NO_FAVORITES, parseFavorites, type Favorites } from "./favorites";
+import { DEFAULT_HOME_SETTINGS, parseHomeSettings, type HomeSettings } from "./home";
 import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./editorFonts";
@@ -60,6 +61,8 @@ export type WebSettings = {
   editorFont: EditorFontName;
   /** The editor's ruler and reflow. */
   writing: WritingSettings;
+  /** The home page's layout. */
+  home: HomeSettings;
   /** City whose sunrise and sunset drive the "auto" color scheme. */
   location?: SavedLocation;
   sidebarWidth: number;
@@ -78,6 +81,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   previewFont: DEFAULT_PREVIEW_FONT,
   editorFont: DEFAULT_EDITOR_FONT,
   writing: DEFAULT_WRITING_SETTINGS,
+  home: DEFAULT_HOME_SETTINGS,
   ...DEFAULT_LAYOUT,
   favorites: NO_FAVORITES,
 };
@@ -114,6 +118,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
     writing: parseWritingSettings(value.writing),
+    home: parseHomeSettings(value.home),
     sidebarWidth: clampSidebarWidth(value.sidebarWidth),
     editorRatio: clampEditorRatio(value.editorRatio),
     favorites: parseFavorites(value.favorites),

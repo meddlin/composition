@@ -11,6 +11,7 @@ import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 import type { RestoreResult, Trash } from "./trash";
+import type { HomeSettings } from "./home";
 import type { WritingSettings } from "./writing";
 
 /**
@@ -44,6 +45,8 @@ export type Workspace = {
   favorites: Favorites;
   /** How the editor draws its ruler and breaks lines (Settings > Writing). */
   writing: WritingSettings;
+  /** How the home page is laid out (Settings > Home page). */
+  home: HomeSettings;
 };
 
 /** What the Settings screen shows; computed where the files actually are. */
@@ -52,6 +55,9 @@ export type SettingsSnapshot = {
   previewFont: PreviewFontName;
   editorFont: EditorFontName;
   writing: WritingSettings;
+  home: HomeSettings;
+  /** The notebooks, for choosing their colors; empty until the database exists. */
+  notebooks: { id: number; name: string }[];
   appDataDir: string;
   /** The database file in use (override if set, otherwise derived). */
   dbPath: string;
@@ -196,6 +202,8 @@ export interface CompositionApi {
   saveEditorFont(font: string): Promise<{ error?: string }>;
   /** Saves the editor's ruler and reflow; a column outside the allowed range comes back as `error`. */
   saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
+  /** Saves how the home page is laid out; a layout it doesn't offer comes back as `error`. */
+  saveHomeSettings(settings: HomeSettings): Promise<{ error?: string }>;
 
   /** Saves where the AI helper finds Ollama and how large a context window it asks for; a bad value comes back as `error`. */
   saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult>;
@@ -246,6 +254,7 @@ export const API_METHODS = [
   "savePreviewFont",
   "saveEditorFont",
   "saveWritingSettings",
+  "saveHomeSettings",
   "saveAssistantSettings",
   "listAssistantModels",
   "saveLocation",

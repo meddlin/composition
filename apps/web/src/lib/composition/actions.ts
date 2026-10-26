@@ -25,6 +25,7 @@ import type { Note } from "./notesRepo";
 import * as service from "./service";
 import type { SunSchedule } from "./sunTimes";
 import type { RestoreResult, Trash } from "./trash";
+import type { HomeSettings } from "./home";
 import type { WritingSettings } from "./writing";
 
 /**
@@ -256,6 +257,15 @@ export async function saveEditorFont(font: string): Promise<{ error?: string }> 
 
 export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
   const result = await service.saveWritingSettings(writing);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
+export async function saveHomeSettings(home: HomeSettings): Promise<{ error?: string }> {
+  const result = await service.saveHomeSettings(home);
   if (!result.error) {
     revalidatePath("/settings");
     revalidatePath("/");

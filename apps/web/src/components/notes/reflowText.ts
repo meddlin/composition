@@ -23,6 +23,9 @@ const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
 const HEADING = /^\s{0,3}#{1,6}(\s|$)/;
 const TABLE_DELIMITER = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 
+// Runs on one line of a note at a time, as it is typed. The only ambiguity is whitespace around the first pipe,
+// which can't grow beyond the width of a line.
+// nosemgrep: detect-redos
 const isDelimiterRow = (line: string) => line.includes("|") && TABLE_DELIMITER.test(line);
 
 /** Whether line `i` is inside the frontmatter block at the top of the note. */

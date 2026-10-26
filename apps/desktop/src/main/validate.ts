@@ -160,6 +160,40 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
       },
     ];
   },
+  saveHomeSettings: ([input]) => {
+    const value = record("saveHomeSettings", input, "settings");
+    if (!Array.isArray(value.sections)) fail("saveHomeSettings", "sections");
+    return [
+      {
+        layout: text("saveHomeSettings", value.layout, "layout"),
+        sections: value.sections.map((entry) => {
+          const section = record("saveHomeSettings", entry, "section");
+          return {
+            id: text("saveHomeSettings", section.id, "id"),
+            visible: flag("saveHomeSettings", section.visible, "visible"),
+          };
+        }),
+        recentCount: finite("saveHomeSettings", value.recentCount, "recentCount"),
+        density: text("saveHomeSettings", value.density, "density"),
+        startup: text("saveHomeSettings", value.startup, "startup"),
+        pinnedNotebooks: Array.isArray(value.pinnedNotebooks)
+          ? value.pinnedNotebooks.map((notebook) => id("saveHomeSettings", notebook, "pinnedNotebooks"))
+          : fail("saveHomeSettings", "pinnedNotebooks"),
+        notebookColors: Object.fromEntries(
+          Object.entries(record("saveHomeSettings", value.notebookColors, "notebookColors")).map(([notebook, color]) => [
+            notebook,
+            text("saveHomeSettings", color, "notebookColors"),
+          ]),
+        ),
+        recentSort: text("saveHomeSettings", value.recentSort, "recentSort"),
+        recentNotebook: nullableId("saveHomeSettings", value.recentNotebook, "recentNotebook"),
+        header: {
+          show: flag("saveHomeSettings", record("saveHomeSettings", value.header, "header").show, "header"),
+          title: text("saveHomeSettings", (value.header as Record<string, unknown>).title, "header"),
+        },
+      },
+    ];
+  },
   saveAssistantSettings: ([input]) => {
     const value = record("saveAssistantSettings", input, "settings");
     return [
