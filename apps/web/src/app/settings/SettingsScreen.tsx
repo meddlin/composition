@@ -11,6 +11,7 @@ import { SettingsForm } from "./SettingsForm";
 import { StylingSettings } from "./StylingSettings";
 import { TrashCan } from "./TrashCan";
 import { Updates } from "./Updates";
+import { WritingSettings } from "./WritingSettings";
 
 /**
  * The Settings screen, rendered from a snapshot. The web page builds the
@@ -34,6 +35,7 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         <TabsList aria-label="Settings sections">
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="styling">Styling</TabsTrigger>
+          <TabsTrigger value="writing">Writing</TabsTrigger>
           <TabsTrigger value="ai">AI Configuration</TabsTrigger>
           <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
         </TabsList>
@@ -99,6 +101,10 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
             currentCity={snapshot.city}
             currentSunTimes={snapshot.sunTimes}
           />
+        </TabsContent>
+
+        <TabsContent value="writing" forceMount>
+          <WritingSettings initial={snapshot.writing} />
         </TabsContent>
 
         <TabsContent value="ai">

@@ -66,6 +66,8 @@ export const saveTheme: CompositionApi["saveTheme"] = (theme) => bridge().saveTh
 export const savePreviewFont: CompositionApi["savePreviewFont"] = (font) =>
   bridge().savePreviewFont(font);
 export const saveEditorFont: CompositionApi["saveEditorFont"] = (font) => bridge().saveEditorFont(font);
+export const saveWritingSettings: CompositionApi["saveWritingSettings"] = (writing) =>
+  bridge().saveWritingSettings(writing);
 export const saveAssistantSettings: CompositionApi["saveAssistantSettings"] = (input) =>
   bridge().saveAssistantSettings(input);
 export const listAssistantModels: CompositionApi["listAssistantModels"] = () => bridge().listAssistantModels();
@@ -125,6 +127,7 @@ const _implementsApi: CompositionApi = {
   saveTheme,
   savePreviewFont,
   saveEditorFont,
+  saveWritingSettings,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

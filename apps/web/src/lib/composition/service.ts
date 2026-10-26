@@ -51,6 +51,7 @@ import {
 } from "./sunTimes";
 import { sunThemeAttributes } from "./sunSchedule";
 import { isEditorFontName } from "./editorFonts";
+import { validateWritingSettings, type WritingSettings } from "./writing";
 import { isPreviewFontName } from "./previewFonts";
 import { isThemeName } from "./themes";
 import { loadWebSettings, resolvedDbPath, saveWebSettings, type WebSettings } from "./webSettings";
@@ -74,7 +75,7 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const { sidebarWidth, editorRatio, favorites } = loadWebSettings();
+  const { sidebarWidth, editorRatio, favorites, writing } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
   await purgeExpiredTrash();
   // Listed first: it is also what gives anything an older CLI wrote a notebook.
@@ -85,6 +86,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     notebooks,
     layout: { sidebarWidth, editorRatio },
     favorites,
+    writing,
   };
 }
 
@@ -108,6 +110,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     theme: settings.theme,
     previewFont: settings.previewFont,
     editorFont: settings.editorFont,
+    writing: settings.writing,
     appDataDir: settings.appDataDir,
     dbPath,
     dbPathOverride: settings.dbPath ?? "",
@@ -714,6 +717,13 @@ export async function saveEditorFont(font: string): Promise<{ error?: string }> 
   return {};
 }
 
+export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
+  const checked = validateWritingSettings(writing);
+  if (!checked.settings) return { error: checked.error };
+  saveWebSettings({ ...loadWebSettings(), writing: checked.settings });
+  return {};
+}
+
 export async function saveLocation(city: string): Promise<SaveLocationResult> {
   const query = city.trim();
 
@@ -793,6 +803,7 @@ const _implementsApi: CompositionApi = {
   saveTheme,
   savePreviewFont,
   saveEditorFont,
+  saveWritingSettings,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

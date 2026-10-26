@@ -30,6 +30,9 @@ const text = (method: string, value: unknown, name: string): string =>
 const finite = (method: string, value: unknown, name: string): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fail(method, name);
 
+const flag = (method: string, value: unknown, name: string): boolean =>
+  typeof value === "boolean" ? value : fail(method, name);
+
 function record(method: string, value: unknown, name: string): Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -145,6 +148,18 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   saveTheme: ([theme]) => [text("saveTheme", theme, "theme")],
   savePreviewFont: ([font]) => [text("savePreviewFont", font, "font")],
   saveEditorFont: ([font]) => [text("saveEditorFont", font, "font")],
+  saveWritingSettings: ([input]) => {
+    const value = record("saveWritingSettings", input, "settings");
+    return [
+      {
+        rulerEnabled: flag("saveWritingSettings", value.rulerEnabled, "rulerEnabled"),
+        rulerColumn: finite("saveWritingSettings", value.rulerColumn, "rulerColumn"),
+        reflowEnabled: flag("saveWritingSettings", value.reflowEnabled, "reflowEnabled"),
+        reflowColumn: finite("saveWritingSettings", value.reflowColumn, "reflowColumn"),
+        reflowKeepsTables: flag("saveWritingSettings", value.reflowKeepsTables, "reflowKeepsTables"),
+      },
+    ];
+  },
   saveAssistantSettings: ([input]) => {
     const value = record("saveAssistantSettings", input, "settings");
     return [
