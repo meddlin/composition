@@ -4,6 +4,7 @@ import { MENU_WIDTH_PX, optionId } from "./MdxCompletionMenu";
 import { expandCompletion, findTrigger, matchCompletions, type MdxCompletion } from "./mdx/completions";
 import { findFrontmatterTarget } from "./mdx/frontmatterProps";
 import { findPropTarget, type PropTarget } from "./mdx/props";
+import { findSnippetTarget } from "./mdx/snippets";
 
 const NO_ITEMS: MdxCompletion[] = [];
 
@@ -20,7 +21,7 @@ type Target = PropTarget;
 function findTarget(text: string, caret: number): Target | null {
   const tag = findTrigger(text, caret);
   if (tag) return { start: tag.start, end: caret, query: tag.query, items: matchCompletions(tag.query), label: "MDX components" };
-  return findPropTarget(text, caret) ?? findFrontmatterTarget(text, caret);
+  return findPropTarget(text, caret) ?? findFrontmatterTarget(text, caret) ?? findSnippetTarget(text, caret);
 }
 
 /**
