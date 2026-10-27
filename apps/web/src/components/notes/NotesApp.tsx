@@ -52,6 +52,7 @@ import {
   setNotebookPanelPrefs,
   useNotebookPanelPrefs,
 } from "./notebookPanelPrefs";
+import type { RevealRequest } from "./GroupTree";
 import { NoteSidebar } from "./NoteSidebar";
 import { PaneArea } from "./PaneArea";
 import {
@@ -166,6 +167,7 @@ function Workspace({
   const notebookPanel = useNotebookPanelPrefs();
   const notebookPanelStart = useRef(notebookPanel.width);
   const [viewedGroupId, setViewedGroupId] = useState<number | null>(null);
+  const [reveal, setReveal] = useState<RevealRequest | null>(null);
   const layout = useLayout(initialLayout);
   const [home, setHome] = useState<HomeSettings>(initialHome);
   // Mirrors `home` so two quick pins never build on a stale list.
@@ -242,6 +244,12 @@ function Workspace({
   function followNote(id: number) {
     const notebook = notes.find((n) => n.id === id)?.notebookId;
     if (notebook !== undefined && notebook !== notebookId) openNotebook(notebook);
+  }
+
+  /** Opens a note picked from search and brings its sidebar row into view. */
+  function selectNoteFromSearch(id: number) {
+    selectNote(id);
+    setReveal((prev) => ({ noteId: id, nonce: (prev?.nonce ?? 0) + 1 }));
   }
 
   function selectNote(id: number) {
@@ -561,7 +569,7 @@ function Workspace({
           <HomeIcon /> Home
         </Button>
         <div className="min-w-0 flex-1">
-          <SearchBar onSelect={selectNote} />
+          <SearchBar onSelect={selectNoteFromSearch} />
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
@@ -606,6 +614,8 @@ function Workspace({
           onExpandNotebooks={() => setNotebookPanelPrefs({ collapsed: false })}
           activeId={viewedGroup ? null : focusedId}
           viewedGroupId={viewedGroup?.id ?? null}
+          reveal={reveal}
+          onRevealed={() => setReveal(null)}
           width={layout.sidebarWidth}
           groupError={groupError}
           favorites={favorites}
