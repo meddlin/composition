@@ -358,7 +358,7 @@ export function NotePane({
           onChange(withHeaderImage(note.content, next, { title: note.title, createdAt: note.createdAt, updatedAt: note.updatedAt }))
         }
       />
-      <AttachmentsPanel key={note.id} noteId={note.id} />
+      <AttachmentsPanel key={note.id} noteId={note.id} content={note.content} />
       {drop.zone && <DropOverlay zone={drop.zone} />}
     </section>
   );

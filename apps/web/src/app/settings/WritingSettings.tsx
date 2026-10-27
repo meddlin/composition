@@ -20,6 +20,7 @@ type Draft = {
   reflowEnabled: boolean;
   reflowColumn: string;
   reflowKeepsTables: boolean;
+  wordCountEnabled: boolean;
 };
 
 const toDraft = (settings: Settings): Draft => ({
@@ -161,6 +162,24 @@ export function WritingSettings({ initial }: { initial: Settings }) {
               like any other line.
             </FieldDescription>
           </div>
+        </Field>
+      </FieldSet>
+
+      <FieldSet className="gap-2">
+        <FieldLegend variant="label">Word count</FieldLegend>
+        <FieldDescription className="text-xs">
+          A live count of the words in the note you are writing, shown in the bar below it beside the attachments. The
+          note&apos;s frontmatter is not counted.
+        </FieldDescription>
+        <Field orientation="horizontal" className="w-fit gap-3">
+          <Checkbox
+            id="word-count-enabled"
+            checked={draft.wordCountEnabled}
+            onCheckedChange={(checked) => edit({ wordCountEnabled: checked === true })}
+          />
+          <FieldLabel htmlFor="word-count-enabled" className="cursor-pointer font-normal">
+            Show the word count
+          </FieldLabel>
         </Field>
       </FieldSet>
 

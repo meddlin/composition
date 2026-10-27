@@ -1,9 +1,12 @@
 "use client";
 
 import { DownloadIcon, FolderOpenIcon, PaperclipIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { parse } from "@/lib/composition/frontmatter";
+import { countWords } from "@/lib/composition/writing";
+import { useWriting } from "./WritingProvider";
 import { formatBytes } from "@/lib/composition/attachmentNames";
 import {
   addAttachments,
@@ -36,7 +39,12 @@ function formatDate(iso: string): string {
  * Loads once per mount, so the parent keys it by note: switching a pane to
  * another note remounts it with that note's files.
  */
-export function AttachmentsPanel({ noteId }: { noteId: number }) {
+export function AttachmentsPanel({ noteId, content }: { noteId: number; content?: string }) {
+  const { wordCountEnabled } = useWriting();
+  const words = useMemo(
+    () => (wordCountEnabled && content !== undefined ? countWords(parse(content)[1]) : null),
+    [wordCountEnabled, content],
+  );
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -97,7 +105,12 @@ export function AttachmentsPanel({ noteId }: { noteId: number }) {
         <h3 id={headingId} className="text-xs font-medium text-muted-foreground">
           {attachments.length > 0 ? `Attachments (${attachments.length})` : "Attachments"}
         </h3>
-        <Button variant="ghost" size="xs" onClick={attach} disabled={busy} className="ml-auto">
+        {words !== null && (
+          <p role="status" aria-label="Word count" className="ml-auto text-xs text-muted-foreground tabular-nums">
+            {words.toLocaleString()} {words === 1 ? "word" : "words"}
+          </p>
+        )}
+        <Button variant="ghost" size="xs" onClick={attach} disabled={busy} className={words === null ? "ml-auto" : undefined}>
           <PlusIcon data-icon="inline-start" />
           Attach files
         </Button>

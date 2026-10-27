@@ -64,6 +64,7 @@ describe("web settings layout", () => {
       reflowEnabled: true,
       reflowColumn: 80,
       reflowKeepsTables: true,
+      wordCountEnabled: false,
     });
   });
 
