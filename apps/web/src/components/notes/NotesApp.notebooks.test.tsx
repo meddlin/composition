@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, createEvent, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createNotebook,
@@ -8,6 +8,7 @@ import {
   placeNotebook,
   renameNotebook,
   saveFavorites,
+  searchNotes,
   saveHomeSettings,
 } from "@/lib/composition/client";
 import type { Favorites } from "@/lib/composition/favorites";
@@ -583,5 +584,25 @@ describe("NotesApp home page", () => {
 
     expect(JSON.parse(window.localStorage.getItem("composition.opened")!)).toHaveProperty("1");
     window.localStorage.clear();
+  });
+});
+
+describe("NotesApp search", () => {
+  it("opens the collapsed group and scrolls the sidebar to a note picked from search", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.mocked(searchNotes).mockResolvedValueOnce({
+      hits: [{ id: 1, title: "Spec", description: "", groupPath: ["Projects"] }],
+    });
+    renderApp();
+    fireEvent.click(nav().getByRole("button", { name: "Collapse Projects" }));
+    expect(nav().queryByText("Spec")).toBeNull();
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Search notes" }), { target: { value: "spec" } });
+    fireEvent.click(await screen.findByRole("option", { name: /Spec/ }));
+
+    await waitFor(() => expect(nav().getByText("Spec")).toBeTruthy());
+    expect(scrollIntoView).toHaveBeenCalledOnce();
+    expect(scrollIntoView.mock.contexts[0]).toBe(nav().getByText("Spec").closest("div.group\\/row"));
   });
 });
