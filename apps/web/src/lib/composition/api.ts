@@ -4,6 +4,7 @@ import type { ChatErrorKind } from "./assistant/types";
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
+import type { Metrics } from "./metrics";
 import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import type { EditorFontName } from "./editorFonts";
@@ -71,6 +72,8 @@ export type SettingsSnapshot = {
   backupDir: string;
   /** The Trash Can's contents (empty when there is no database yet). */
   trash: Trash;
+  /** The "just for fun" numbers: words written, notes, and space used. */
+  metrics: Metrics;
   /** The AI helper's saved Ollama server and context size (the defaults until some are saved). */
   assistant: AssistantSettings;
   /** The saved city for the "Follow the sun" scheme, or "". */

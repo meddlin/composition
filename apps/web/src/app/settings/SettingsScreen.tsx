@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { AssistantSettings } from "./AssistantSettings";
 import { BackupRestore } from "./BackupRestore";
+import { FunMetrics } from "./FunMetrics";
 import { HomeSettings } from "./HomeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { SettingsForm } from "./SettingsForm";
@@ -93,6 +94,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           <BackupRestore defaultBackupDir={snapshot.backupDir} />
 
           <TrashCan initialTrash={snapshot.trash} />
+
+          <FunMetrics metrics={snapshot.metrics} />
         </TabsContent>
 
         <TabsContent value="styling" forceMount>

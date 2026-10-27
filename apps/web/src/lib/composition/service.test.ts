@@ -271,6 +271,15 @@ describe("loadSettings", () => {
       dbExists: false,
       backupDir: path.join(home, "Composition Backups"),
       trash: { notes: [], groups: [] },
+      metrics: {
+        noteCount: 0,
+        words: 0,
+        characters: 0,
+        averageWords: 0,
+        databaseBytes: 0,
+        assetsBytes: 0,
+        mediaBytes: 0,
+      },
       assistant: { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 },
       city: "",
     });
