@@ -1,11 +1,20 @@
 "use client";
 
-import { BookOpenIcon } from "lucide-react";
+import { BookOpenIcon, CalendarIcon } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Favorites, FavoriteType } from "@/lib/composition/favorites";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { GroupTree, InlineTextInput, type RevealRequest } from "./GroupTree";
+import { setNoteDatePrefs, useNoteDatePrefs } from "./noteDatePrefs";
 import type { Group, Note, Notebook } from "./types";
 
 type Props = {
@@ -70,6 +79,7 @@ export function NoteSidebar({
   onMoveGroupToNotebook,
 }: Props) {
   const [addingGroup, setAddingGroup] = useState(false);
+  const dates = useNoteDatePrefs();
 
   return (
     <nav
@@ -92,6 +102,31 @@ export function NoteSidebar({
           </Button>
         </div>
       )}
+      <div className="flex justify-end px-2 pt-1">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-xs" aria-label="Note display options" title="Display">
+              <CalendarIcon className="text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-48">
+            <DropdownMenuLabel>Show under note name</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuCheckboxItem
+              checked={dates.updated}
+              onCheckedChange={(checked) => setNoteDatePrefs({ updated: checked === true })}
+            >
+              Last updated
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={dates.created}
+              onCheckedChange={(checked) => setNoteDatePrefs({ created: checked === true })}
+            >
+              Created
+            </DropdownMenuCheckboxItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       <div className="flex-1 overflow-y-auto pb-2 pl-2 pr-[7px]">
         <GroupTree
           groups={groups}

@@ -1092,7 +1092,8 @@ describe("NotesApp favorites", () => {
     const section = favoritesSection()!;
     const names = within(section)
       .getAllByRole("button")
-      .map((b) => b.textContent)
+      // The row also carries a date line, so read just the title.
+      .map((b) => b.querySelector("span > span")?.textContent ?? b.textContent)
       .filter((name) => name && name !== "+ note");
     expect(names).toEqual(["Groceries", "Home"]);
     expect(section.compareDocumentPosition(screen.getByText("Ungrouped")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

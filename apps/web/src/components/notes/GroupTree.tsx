@@ -12,6 +12,8 @@ import { dropEdge, type DropEdge } from "./dropEdge";
 import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
 import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
+import { relativeTime } from "./homeListing";
+import { noteDateLine, useNoteDatePrefs } from "./noteDatePrefs";
 import { NoteMenu } from "./NoteMenu";
 import { noteTitle, type Group, type Note, type Notebook } from "./types";
 
@@ -619,6 +621,7 @@ function NoteRow({
   onDelete?: () => void;
   onToggleFavorite: () => void;
 }) {
+  const dateLine = noteDateLine(note, useNoteDatePrefs(), relativeTime);
   const rowRef = useRef<HTMLDivElement>(null);
   const revealNonce = reveal?.nonce;
   useEffect(() => {
@@ -644,7 +647,12 @@ function NoteRow({
           active && "bg-accent font-medium",
         )}
       >
-        <span className="truncate">{noteTitle(note)}</span>
+        <span className="flex min-w-0 flex-col items-start">
+          <span className="max-w-full truncate">{noteTitle(note)}</span>
+          {dateLine && (
+            <span className="max-w-full truncate text-xs font-normal text-muted-foreground">{dateLine}</span>
+          )}
+        </span>
       </Button>
       <div className={ROW_ACTIONS_CLASS}>
         <NoteMenu
