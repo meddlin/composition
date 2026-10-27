@@ -1,15 +1,11 @@
 "use client";
 
 import { BookOpenIcon } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Favorites, FavoriteType } from "@/lib/composition/favorites";
-import { Separator } from "@/components/ui/separator";
 import { GroupTree, InlineTextInput } from "./GroupTree";
-import { NAV_LINKS } from "./navLinks";
-import { UpdateDot } from "./UpdateDot";
 import type { Group, Note, Notebook } from "./types";
 
 type Props = {
@@ -115,49 +111,31 @@ export function NoteSidebar({
           onPlaceNote={onPlaceNote}
           onPlaceGroup={onPlaceGroup}
         />
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-2 p-3">
-        <Button size="lg" className="w-full" onClick={() => onCreate(null)}>
-          + New note
-        </Button>
-        {addingGroup ? (
-          <InlineTextInput
-            depth={0}
-            placeholder="Group name"
-            onSubmit={(name) => {
-              onCreateGroup(name, null);
-              setAddingGroup(false);
-            }}
-            onCancel={() => setAddingGroup(false)}
-          />
-        ) : (
-          <Button variant="outline" size="lg" className="w-full" onClick={() => setAddingGroup(true)}>
-            + New group
+        <div className="flex flex-col gap-1 py-2">
+          <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => onCreate(null)}>
+            + New note
           </Button>
-        )}
-        {groupError && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs text-destructive">{groupError}</AlertDescription>
-          </Alert>
-        )}
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-1 p-3">
-        {NAV_LINKS.map(({ href, label }) => (
-          <Button
-            key={href}
-            asChild
-            variant="ghost"
-            size="lg"
-            className="justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <Link href={href}>
-              {label}
-              {href === "/settings" && <UpdateDot />}
-            </Link>
-          </Button>
-        ))}
+          {addingGroup ? (
+            <InlineTextInput
+              depth={0}
+              placeholder="Group name"
+              onSubmit={(name) => {
+                onCreateGroup(name, null);
+                setAddingGroup(false);
+              }}
+              onCancel={() => setAddingGroup(false)}
+            />
+          ) : (
+            <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => setAddingGroup(true)}>
+              + New group
+            </Button>
+          )}
+          {groupError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs text-destructive">{groupError}</AlertDescription>
+            </Alert>
+          )}
+        </div>
       </div>
     </nav>
   );
