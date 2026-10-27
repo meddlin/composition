@@ -69,8 +69,9 @@ const pane = (title: string) => screen.getByRole("region", { name: title });
 // A pane is the region named by its aria-label; the Attachments section below each editor is a region too.
 const paneRegions = () => screen.queryAllByRole("region").filter((r) => r.hasAttribute("aria-label"));
 const paneTitles = () => paneRegions().map((p) => p.getAttribute("aria-label"));
+// A row's name is its title followed by its date line, so match the title as the start of it.
 const sidebarRow = (title: string) =>
-  within(screen.getByRole("navigation", { name: "Notes" })).getByRole("button", { name: title });
+  within(screen.getByRole("navigation", { name: "Notes" })).getByRole("button", { name: new RegExp(`^${title}( ?Updated .*)?$`) });
 const editorIn = (title: string) => within(pane(title)).getByLabelText<HTMLTextAreaElement>("Markdown editor");
 
 /** jsdom lays nothing out, so give a pane the 1000px-wide box that the drop zones are read from. */
