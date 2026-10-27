@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpenIcon, MoreHorizontalIcon, PanelLeftCloseIcon, PanelLeftOpenIcon } from "lucide-react";
+import Link from "next/link";
 import { useRef, useState, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,8 +14,10 @@ import { cn } from "@/lib/utils";
 import { NOTEBOOK_DRAG_TYPE } from "./dragTypes";
 import { dropEdge } from "./dropEdge";
 import { InlineTextInput } from "./GroupTree";
+import { NAV_LINKS } from "./navLinks";
 import { COLLAPSED_NOTEBOOK_PANEL_WIDTH } from "./notebookPanelPrefs";
 import type { Notebook } from "./types";
+import { UpdateDot } from "./UpdateDot";
 
 type Props = {
   collapsed: boolean;
@@ -82,6 +85,16 @@ export function NotebookPanel({
         >
           <PanelLeftOpenIcon />
         </Button>
+        <nav aria-label="App" className="mt-auto flex flex-col items-center gap-1">
+          {NAV_LINKS.map(({ href, label, icon: Icon }) => (
+            <Button key={href} asChild variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
+              <Link href={href} aria-label={label} title={label}>
+                <Icon />
+                {href === "/settings" && <UpdateDot className="absolute right-1 top-1" />}
+              </Link>
+            </Button>
+          ))}
+        </nav>
       </aside>
     );
   }
@@ -177,24 +190,46 @@ export function NotebookPanel({
             </li>
           ))}
         </ul>
+        <div className="mt-1">
+          {creating ? (
+            <InlineTextInput
+              depth={0}
+              placeholder="Notebook name"
+              onSubmit={(name) => {
+                onCreate(name);
+                setCreating(false);
+              }}
+              onCancel={() => setCreating(false)}
+            />
+          ) : (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              onClick={() => setCreating(true)}
+            >
+              + New notebook
+            </Button>
+          )}
+        </div>
       </div>
-      <div className="p-2">
-        {creating ? (
-          <InlineTextInput
-            depth={0}
-            placeholder="Notebook name"
-            onSubmit={(name) => {
-              onCreate(name);
-              setCreating(false);
-            }}
-            onCancel={() => setCreating(false)}
-          />
-        ) : (
-          <Button variant="outline" size="lg" className="w-full" onClick={() => setCreating(true)}>
-            + New notebook
+      <nav aria-label="App" className="flex flex-col gap-1 border-t p-2">
+        {NAV_LINKS.map(({ href, label, icon: Icon }) => (
+          <Button
+            key={href}
+            asChild
+            variant="ghost"
+            size="sm"
+            className="justify-start px-2 text-muted-foreground hover:text-foreground"
+          >
+            <Link href={href}>
+              <Icon />
+              {label}
+              {href === "/settings" && <UpdateDot />}
+            </Link>
           </Button>
-        )}
-      </div>
+        ))}
+      </nav>
     </aside>
   );
 }

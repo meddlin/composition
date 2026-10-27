@@ -35,6 +35,7 @@ import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notebooksRepo from "./notebooksRepo";
 import { LastNotebookError, NotebookNotEmptyError } from "./notebooksRepo";
 import type { Notebook } from "./notebooksRepo";
+import { computeMetrics } from "./metrics";
 import * as notesRepo from "./notesRepo";
 import type { Note } from "./notesRepo";
 import { defaultDatabasePath, expandHome } from "./paths";
@@ -123,6 +124,11 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     dbExists,
     backupDir: backup.defaultBackupDir(),
     trash,
+    metrics: computeMetrics({
+      contents: dbExists ? notesRepo.listNotes().map((note) => note.content) : [],
+      dbPath,
+      appDataDir: settings.appDataDir,
+    }),
     assistant: settings.assistant ?? DEFAULT_ASSISTANT_SETTINGS,
     city: location?.name ?? "",
     sunTimes: location

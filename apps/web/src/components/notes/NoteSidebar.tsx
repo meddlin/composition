@@ -1,7 +1,6 @@
 "use client";
 
 import { BookOpenIcon, CalendarIcon } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,11 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Separator } from "@/components/ui/separator";
-import { GroupTree, InlineTextInput } from "./GroupTree";
-import { NAV_LINKS } from "./navLinks";
+import { GroupTree, InlineTextInput, type RevealRequest } from "./GroupTree";
 import { setNoteDatePrefs, useNoteDatePrefs } from "./noteDatePrefs";
-import { UpdateDot } from "./UpdateDot";
 import type { Group, Note, Notebook } from "./types";
 
 type Props = {
@@ -31,6 +27,9 @@ type Props = {
   onExpandNotebooks: () => void;
   activeId: number | null;
   viewedGroupId: number | null;
+  /** Opens the groups above a note and scrolls it into view, e.g. after picking it from search. */
+  reveal: RevealRequest | null;
+  onRevealed: () => void;
   width: number;
   groupError: string | null;
   favorites: Favorites;
@@ -59,6 +58,8 @@ export function NoteSidebar({
   onExpandNotebooks,
   activeId,
   viewedGroupId,
+  reveal,
+  onRevealed,
   width,
   groupError,
   favorites,
@@ -135,6 +136,8 @@ export function NoteSidebar({
           onMoveGroupToNotebook={onMoveGroupToNotebook}
           activeId={activeId}
           viewedGroupId={viewedGroupId}
+          reveal={reveal}
+          onRevealed={onRevealed}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
           onSelectNote={onSelect}
@@ -150,49 +153,31 @@ export function NoteSidebar({
           onPlaceNote={onPlaceNote}
           onPlaceGroup={onPlaceGroup}
         />
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-2 p-3">
-        <Button size="lg" className="w-full" onClick={() => onCreate(null)}>
-          + New note
-        </Button>
-        {addingGroup ? (
-          <InlineTextInput
-            depth={0}
-            placeholder="Group name"
-            onSubmit={(name) => {
-              onCreateGroup(name, null);
-              setAddingGroup(false);
-            }}
-            onCancel={() => setAddingGroup(false)}
-          />
-        ) : (
-          <Button variant="outline" size="lg" className="w-full" onClick={() => setAddingGroup(true)}>
-            + New group
+        <div className="flex flex-col gap-1 py-2">
+          <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => onCreate(null)}>
+            + New note
           </Button>
-        )}
-        {groupError && (
-          <Alert variant="destructive">
-            <AlertDescription className="text-xs text-destructive">{groupError}</AlertDescription>
-          </Alert>
-        )}
-      </div>
-      <Separator />
-      <div className="flex flex-col gap-1 p-3">
-        {NAV_LINKS.map(({ href, label }) => (
-          <Button
-            key={href}
-            asChild
-            variant="ghost"
-            size="lg"
-            className="justify-start px-3 text-muted-foreground hover:text-foreground"
-          >
-            <Link href={href}>
-              {label}
-              {href === "/settings" && <UpdateDot />}
-            </Link>
-          </Button>
-        ))}
+          {addingGroup ? (
+            <InlineTextInput
+              depth={0}
+              placeholder="Group name"
+              onSubmit={(name) => {
+                onCreateGroup(name, null);
+                setAddingGroup(false);
+              }}
+              onCancel={() => setAddingGroup(false)}
+            />
+          ) : (
+            <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => setAddingGroup(true)}>
+              + New group
+            </Button>
+          )}
+          {groupError && (
+            <Alert variant="destructive">
+              <AlertDescription className="text-xs text-destructive">{groupError}</AlertDescription>
+            </Alert>
+          )}
+        </div>
       </div>
     </nav>
   );

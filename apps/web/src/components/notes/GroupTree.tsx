@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRightIcon, StarIcon, XIcon } from "lucide-react";
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,18 @@ import { noteTitle, type Group, type Note, type Notebook } from "./types";
 const ROW_ACTIONS_CLASS =
   "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-md bg-surface opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-data-[state=open]:pointer-events-auto has-data-[state=open]:opacity-100";
 
+/** A request to bring a note's row into view; a new `nonce` is a new request, even for the same note. */
+export type RevealRequest = { noteId: number; nonce: number };
+
+type Reveal = {
+  noteId: number;
+  nonce: number;
+  /** The groups the note sits in, which must be open for its row to exist. */
+  ancestorIds: ReadonlySet<number>;
+  /** Called once the row has been scrolled to, which ends the request. */
+  done: () => void;
+};
+
 type TreeProps = {
   groups: Group[];
   notes: Note[];
@@ -31,6 +43,10 @@ type TreeProps = {
   currentNotebookId: number;
   activeId: number | null;
   viewedGroupId: number | null;
+  /** When set, opens the groups above the note and scrolls its row into view. */
+  reveal?: RevealRequest | null;
+  /** Called when the revealed note's row has been scrolled to, so the request can be dropped. */
+  onRevealed?: () => void;
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   onSelectNote: (id: number) => void;
@@ -58,6 +74,8 @@ export function GroupTree({
   currentNotebookId,
   activeId,
   viewedGroupId,
+  reveal: revealRequest = null,
+  onRevealed,
   favorites,
   onToggleFavorite,
   onSelectNote,
@@ -118,11 +136,28 @@ export function GroupTree({
     );
   }
 
+  let reveal: Reveal | null = null;
+  if (revealRequest) {
+    const ancestorIds = new Set<number>();
+    const groupsById = new Map(groups.map((g) => [g.id, g]));
+    let parentId = notes.find((n) => n.id === revealRequest.noteId)?.groupId ?? null;
+    while (parentId !== null && !ancestorIds.has(parentId)) {
+      ancestorIds.add(parentId);
+      parentId = groupsById.get(parentId)?.parentId ?? null;
+    }
+    reveal = {
+      ...revealRequest,
+      ancestorIds,
+      done: () => onRevealed?.(),
+    };
+  }
+
   const shared: SharedProps = {
     childGroupsByParent,
     notesByGroup,
     activeId,
     viewedGroupId,
+    reveal,
     favorites,
     onToggleFavorite,
     isGroupEmpty,
@@ -186,6 +221,7 @@ export function GroupTree({
           note={note}
           depth={1}
           active={note.id === activeId}
+          reveal={reveal?.noteId === note.id ? reveal : null}
           favorite={isFavorite(favorites, "note", note.id)}
           onDropNote={(noteId, edge) =>
             onPlaceNote(noteId, null, edge === "before" ? note.id : (siblings[index + 1]?.id ?? null))
@@ -221,7 +257,7 @@ function FavoritesSection({
   const { favorites, activeId, onSelectNote, onOpenNoteBeside, onToggleFavorite } = shared;
   // Notes are never deleted from here, including those inside a pinned group: the Favorites
   // section is for getting to things, and a stray click there shouldn't destroy a note.
-  const favoritesShared: SharedProps = { ...shared, canDeleteNotes: false };
+  const favoritesShared: SharedProps = { ...shared, canDeleteNotes: false, reveal: null };
   const rows = favorites.flatMap((favorite): FavoriteRow[] => {
     if (favorite.type === "group") {
       const group = groupsById.get(favorite.id);
@@ -273,6 +309,7 @@ type SharedProps = {
   notesByGroup: Map<number | null, Note[]>;
   activeId: number | null;
   viewedGroupId: number | null;
+  reveal: Reveal | null;
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   isGroupEmpty: (id: number) => boolean;
@@ -308,6 +345,7 @@ function GroupNode({
   notesByGroup,
   activeId,
   viewedGroupId,
+  reveal,
   favorites,
   onToggleFavorite,
   isGroupEmpty,
@@ -347,6 +385,12 @@ function GroupNode({
   const [renaming, setRenaming] = useState(false);
   const [addingSubgroup, setAddingSubgroup] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  // Opens this group, once per request, when the note being revealed is somewhere inside it.
+  const [seenRevealNonce, setSeenRevealNonce] = useState<number>();
+  if (reveal && reveal.nonce !== seenRevealNonce) {
+    setSeenRevealNonce(reveal.nonce);
+    if (reveal.ancestorIds.has(group.id)) setCollapsed(false);
+  }
   const isTopLevel = depth === 0;
   const empty = isGroupEmpty(group.id);
   const childGroups = childGroupsByParent.get(group.id) ?? [];
@@ -497,6 +541,7 @@ function GroupNode({
             notesByGroup={notesByGroup}
             activeId={activeId}
             viewedGroupId={viewedGroupId}
+            reveal={reveal}
             favorites={favorites}
             onToggleFavorite={onToggleFavorite}
             isGroupEmpty={isGroupEmpty}
@@ -530,6 +575,7 @@ function GroupNode({
             note={note}
             depth={depth + 1}
             active={note.id === activeId}
+            reveal={reveal?.noteId === note.id ? reveal : null}
             favorite={isFavorite(favorites, "note", note.id)}
             onDropNote={(noteId, edge) =>
               onPlaceNote(
@@ -553,6 +599,7 @@ function NoteRow({
   note,
   depth,
   active,
+  reveal = null,
   favorite,
   onDropNote,
   onSelect,
@@ -563,6 +610,8 @@ function NoteRow({
   note: Note;
   depth: number;
   active: boolean;
+  /** Set while this row is the one to bring into view. */
+  reveal?: Reveal | null;
   favorite: boolean;
   /** Called when a note is dropped above or below this row. Omitted for rows that aren't part of a sibling list (the pinned notes). */
   onDropNote?: (noteId: number, edge: DropEdge) => void;
@@ -573,8 +622,16 @@ function NoteRow({
   onToggleFavorite: () => void;
 }) {
   const dateLine = noteDateLine(note, useNoteDatePrefs(), relativeTime);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const revealNonce = reveal?.nonce;
+  useEffect(() => {
+    if (revealNonce === undefined) return;
+    rowRef.current?.scrollIntoView?.({ block: "nearest" });
+    reveal?.done();
+  }, [revealNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const row = (
-    <div className="group/row relative">
+    <div ref={rowRef} className="group/row relative">
       <Button
         variant="ghost"
         draggable
