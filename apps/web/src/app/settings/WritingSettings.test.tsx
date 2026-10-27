@@ -67,6 +67,7 @@ describe("writing settings", () => {
       reflowEnabled: true,
       reflowColumn: 72,
       reflowKeepsTables: false,
+      wordCountEnabled: false,
     });
     expect(screen.getByRole("status").textContent).toContain("Saved");
   });

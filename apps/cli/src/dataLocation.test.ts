@@ -21,7 +21,14 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     theme: "forest",
     previewFont: "default",
     editorFont: "default",
-    writing: { rulerEnabled: false, rulerColumn: 80, reflowEnabled: false, reflowColumn: 80, reflowKeepsTables: true },
+    writing: {
+      rulerEnabled: false,
+      rulerColumn: 80,
+      reflowEnabled: false,
+      reflowColumn: 80,
+      reflowKeepsTables: true,
+      wordCountEnabled: false,
+    },
     home: {
       layout: "rail",
       sections: [

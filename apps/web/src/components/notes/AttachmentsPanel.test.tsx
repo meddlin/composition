@@ -10,7 +10,9 @@ import {
   saveAttachmentCopy,
   type Attachment,
 } from "@/lib/composition/attachmentsClient";
+import { DEFAULT_WRITING_SETTINGS } from "@/lib/composition/writing";
 import { AttachmentsPanel } from "./AttachmentsPanel";
+import { WritingProvider } from "./WritingProvider";
 
 // The desktop build's capabilities; a test below swaps in the web build's.
 const desktopCapabilities = vi.hoisted(() => ({
@@ -193,5 +195,26 @@ describe("AttachmentsPanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download report.pdf" }));
 
     await waitFor(() => expect(saveAttachmentCopy).toHaveBeenCalledWith(7));
+  });
+
+  it("shows a live word count, without the frontmatter, only when the setting is on", () => {
+    const content = "---\ntitle: Hello there\n---\nOne two  three\nfour-five";
+    const on = { ...DEFAULT_WRITING_SETTINGS, wordCountEnabled: true };
+    const { rerender } = render(<AttachmentsPanel noteId={1} content={content} />);
+    expect(screen.queryByRole("status", { name: "Word count" })).toBeNull();
+
+    rerender(
+      <WritingProvider value={on}>
+        <AttachmentsPanel noteId={1} content={content} />
+      </WritingProvider>,
+    );
+    expect(screen.getByRole("status", { name: "Word count" }).textContent).toBe("4 words");
+
+    rerender(
+      <WritingProvider value={on}>
+        <AttachmentsPanel noteId={1} content={content + " six"} />
+      </WritingProvider>,
+    );
+    expect(screen.getByRole("status", { name: "Word count" }).textContent).toBe("5 words");
   });
 });

@@ -22,6 +22,8 @@ export type WritingSettings = {
    * this on reflow leaves table rows alone; off, they are broken like any other line.
    */
   reflowKeepsTables: boolean;
+  /** Show a live word count for the active note in the bar under it. */
+  wordCountEnabled: boolean;
 };
 
 export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
@@ -30,6 +32,7 @@ export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
   reflowEnabled: false,
   reflowColumn: DEFAULT_WRITING_COLUMN,
   reflowKeepsTables: true,
+  wordCountEnabled: false,
 };
 
 /** Whether `value` is a whole number of columns the editor can use. */
@@ -60,6 +63,7 @@ export function parseWritingSettings(data: unknown): WritingSettings {
     reflowEnabled: flag(value.reflowEnabled, defaults.reflowEnabled),
     reflowColumn: column(value.reflowColumn),
     reflowKeepsTables: flag(value.reflowKeepsTables, defaults.reflowKeepsTables),
+    wordCountEnabled: flag(value.wordCountEnabled, defaults.wordCountEnabled),
   };
 }
 
@@ -71,7 +75,7 @@ export function validateWritingSettings(
   data: unknown,
 ): { settings: WritingSettings; error?: undefined } | { error: string; settings?: undefined } {
   const value = (data ?? {}) as Record<string, unknown>;
-  for (const key of ["rulerEnabled", "reflowEnabled", "reflowKeepsTables"] as const) {
+  for (const key of ["rulerEnabled", "reflowEnabled", "reflowKeepsTables", "wordCountEnabled"] as const) {
     if (typeof value[key] !== "boolean") return { error: "Unknown writing setting." };
   }
   for (const key of ["rulerColumn", "reflowColumn"] as const) {
@@ -80,4 +84,10 @@ export function validateWritingSettings(
     }
   }
   return { settings: parseWritingSettings(value) };
+}
+
+/** The number of words in `text`: runs of non-whitespace, so `well-known` is one word. */
+export function countWords(text: string): number {
+  const words = text.match(/\S+/g);
+  return words ? words.length : 0;
 }

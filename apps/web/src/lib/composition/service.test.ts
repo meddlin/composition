@@ -223,6 +223,7 @@ describe("saveWritingSettings", () => {
     reflowEnabled: true,
     reflowColumn: 72,
     reflowKeepsTables: false,
+    wordCountEnabled: true,
   };
 
   it("stores the settings and leaves the rest alone", async () => {
