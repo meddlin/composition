@@ -12,3 +12,7 @@ Tags and branches are mutable, so every `uses:` in `.github/workflows/` (and `.g
 - Resolve the SHA of the **commit**, not the tag object. Annotated tags (e.g. `pnpm/action-setup`) point at a tag object; use `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`.
 - Local actions (`./...`) are exempt. `docker://` images must be pinned to `@sha256:<digest>`.
 - Enforced by `pnpm lint:actions` ([scripts/lint-github-actions.mjs](scripts/lint-github-actions.mjs)), which also runs in CI. Run it after touching any workflow.
+
+## Previewing UI changes
+
+After changing the web app's UI, start the `web` server from `.claude/launch.json` (`preview_start`) and check the change in the browser pane instead of relying on tests alone.

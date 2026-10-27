@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenIcon, CalendarIcon } from "lucide-react";
+import { ArrowDownUpIcon, BookOpenIcon, CalendarIcon } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,11 +10,14 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { GroupTree, InlineTextInput, type RevealRequest } from "./GroupTree";
 import { setNoteDatePrefs, useNoteDatePrefs } from "./noteDatePrefs";
+import { isNoteSort, NOTE_SORT_LABELS, NOTE_SORTS, setNoteSort, useNoteSort } from "./noteSort";
 import type { Group, Note, Notebook } from "./types";
 
 type Props = {
@@ -80,6 +83,7 @@ export function NoteSidebar({
 }: Props) {
   const [addingGroup, setAddingGroup] = useState(false);
   const dates = useNoteDatePrefs();
+  const sort = useNoteSort();
 
   return (
     <nav
@@ -102,7 +106,33 @@ export function NoteSidebar({
           </Button>
         </div>
       )}
-      <div className="flex justify-end px-2 pt-1">
+      <div className="flex items-center justify-end gap-1 px-2 pt-1">
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="xs"
+              aria-label={`Sort notes: ${NOTE_SORT_LABELS[sort]}`}
+              title="Sort notes"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ArrowDownUpIcon />
+              {NOTE_SORT_LABELS[sort]}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" aria-label="Sort notes">
+            <DropdownMenuRadioGroup
+              value={sort}
+              onValueChange={(value) => isNoteSort(value) && setNoteSort(value)}
+            >
+              {NOTE_SORTS.map((option) => (
+                <DropdownMenuRadioItem key={option} value={option}>
+                  {NOTE_SORT_LABELS[option]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-xs" aria-label="Note display options" title="Display">

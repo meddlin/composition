@@ -11,12 +11,14 @@ export type GroupListing = {
 /**
  * The full subtree under `groupId`: each group's sub-groups (in the order
  * `groups` lists them) and direct notes (in the order `notes` lists them).
- * Returns null when the group doesn't exist.
+ * `orderNotes` reorders each group's direct notes (the notes are still listed in `notes`
+ * order without it). Returns null when the group doesn't exist.
  */
 export function buildGroupListing(
   groupId: number,
   groups: Group[],
   notes: Note[],
+  orderNotes: (notes: Note[]) => Note[] = (own) => own,
 ): GroupListing | null {
   const root = groups.find((g) => g.id === groupId);
   if (!root) return null;
@@ -28,7 +30,7 @@ export function buildGroupListing(
     const subgroups = groups
       .filter((g) => g.parentId === group.id && !visited.has(g.id))
       .map(build);
-    const own = notes.filter((n) => n.groupId === group.id);
+    const own = orderNotes(notes.filter((n) => n.groupId === group.id));
     const totalNotes = own.length + subgroups.reduce((sum, s) => sum + s.totalNotes, 0);
     return { group, subgroups, notes: own, totalNotes };
   }

@@ -7,6 +7,7 @@ import { Empty, EmptyDescription } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { FolderIcon } from "./FolderIcon";
 import { buildGroupListing, groupPath, type GroupListing } from "./groupListing";
+import { sortNotes, useNoteSort } from "./noteSort";
 import { noteTitle, type Group, type Note } from "./types";
 
 type Props = {
@@ -23,7 +24,8 @@ type Props = {
  * is the one editable part — it renames the group.
  */
 export function GroupPage({ groupId, groups, notes, onSelectNote, onSelectGroup, onRenameGroup }: Props) {
-  const listing = buildGroupListing(groupId, groups, notes);
+  const sort = useNoteSort();
+  const listing = buildGroupListing(groupId, groups, notes, (own) => sortNotes(own, sort));
   if (!listing) return null;
 
   const ancestors = groupPath(groupId, groups).slice(0, -1);

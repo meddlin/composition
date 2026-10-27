@@ -15,6 +15,7 @@ import { GroupMenu } from "./GroupMenu";
 import { relativeTime } from "./homeListing";
 import { noteDateLine, useNoteDatePrefs } from "./noteDatePrefs";
 import { NoteMenu } from "./NoteMenu";
+import { sortNotes, useNoteSort } from "./noteSort";
 import { noteTitle, type Group, type Note, type Notebook } from "./types";
 
 // Overlays a row's buttons instead of reserving space, so names can run right up to the edge.
@@ -122,12 +123,17 @@ export function GroupTree({
     childGroupsByParent.set(group.parentId, list);
   }
 
+  // Notes keep to their groups whatever the sort; only the order inside each group changes.
+  // Placing a note among its siblings means nothing once they're ordered by date.
+  const sort = useNoteSort();
+  const reorderNotes = sort === "custom";
   const notesByGroup = new Map<number | null, Note[]>();
   for (const note of notes) {
     const list = notesByGroup.get(note.groupId) ?? [];
     list.push(note);
     notesByGroup.set(note.groupId, list);
   }
+  for (const [groupId, list] of notesByGroup) notesByGroup.set(groupId, sortNotes(list, sort));
 
   function isGroupEmpty(id: number): boolean {
     return (
@@ -182,6 +188,7 @@ export function GroupTree({
     currentNotebookId,
     onMoveGroupToNotebook,
     onPlaceNote,
+    reorderNotes,
   };
 
   const groupsById = new Map(groups.map((g) => [g.id, g]));
@@ -223,8 +230,11 @@ export function GroupTree({
           active={note.id === activeId}
           reveal={reveal?.noteId === note.id ? reveal : null}
           favorite={isFavorite(favorites, "note", note.id)}
-          onDropNote={(noteId, edge) =>
-            onPlaceNote(noteId, null, edge === "before" ? note.id : (siblings[index + 1]?.id ?? null))
+          onDropNote={
+            reorderNotes
+              ? (noteId, edge) =>
+                  onPlaceNote(noteId, null, edge === "before" ? note.id : (siblings[index + 1]?.id ?? null))
+              : undefined
           }
           onSelect={() => onSelectNote(note.id)}
           onOpenBeside={() => onOpenNoteBeside(note.id)}
@@ -336,6 +346,8 @@ type SharedProps = {
   currentNotebookId: number;
   onMoveGroupToNotebook: (id: number, notebookId: number) => void;
   onPlaceNote: (noteId: number, groupId: number | null, beforeNoteId: number | null) => void;
+  /** Whether notes can be dropped between their siblings: only in custom order. */
+  reorderNotes: boolean;
 };
 
 function GroupNode({
@@ -370,6 +382,7 @@ function GroupNode({
   currentNotebookId,
   onMoveGroupToNotebook,
   onPlaceNote,
+  reorderNotes,
   defaultCollapsed = false,
   nextSiblingId = null,
   reorderable = true,
@@ -566,6 +579,7 @@ function GroupNode({
             currentNotebookId={currentNotebookId}
             onMoveGroupToNotebook={onMoveGroupToNotebook}
             onPlaceNote={onPlaceNote}
+            reorderNotes={reorderNotes}
           />
         ))}
 
@@ -577,12 +591,15 @@ function GroupNode({
             active={note.id === activeId}
             reveal={reveal?.noteId === note.id ? reveal : null}
             favorite={isFavorite(favorites, "note", note.id)}
-            onDropNote={(noteId, edge) =>
-              onPlaceNote(
-                noteId,
-                group.id,
-                edge === "before" ? note.id : (childNotes[index + 1]?.id ?? null),
-              )
+            onDropNote={
+              reorderNotes
+                ? (noteId, edge) =>
+                    onPlaceNote(
+                      noteId,
+                      group.id,
+                      edge === "before" ? note.id : (childNotes[index + 1]?.id ?? null),
+                    )
+                : undefined
             }
             onSelect={() => onSelectNote(note.id)}
             onOpenBeside={() => onOpenNoteBeside(note.id)}
