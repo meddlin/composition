@@ -26,7 +26,7 @@
     "better-sqlite3": "^13.0.3",
     "js-yaml": "^4.3.2",
     "lowlight": "^3.3.0",
-    "react": "19.3.0",
+    "react": "19.3.1",
     "remark-gfm": "^4.0.1",
     "remark-mdx": "^3.1.1",
     "remark-parse": "^11.0.0",
