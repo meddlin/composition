@@ -7,7 +7,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { Favorites, FavoriteType } from "@/lib/composition/favorites";
 import { Separator } from "@/components/ui/separator";
-import { GroupTree, InlineTextInput } from "./GroupTree";
+import { GroupTree, InlineTextInput, type RevealRequest } from "./GroupTree";
 import { NAV_LINKS } from "./navLinks";
 import { UpdateDot } from "./UpdateDot";
 import type { Group, Note, Notebook } from "./types";
@@ -22,6 +22,9 @@ type Props = {
   onExpandNotebooks: () => void;
   activeId: number | null;
   viewedGroupId: number | null;
+  /** Opens the groups above a note and scrolls it into view, e.g. after picking it from search. */
+  reveal: RevealRequest | null;
+  onRevealed: () => void;
   width: number;
   groupError: string | null;
   favorites: Favorites;
@@ -50,6 +53,8 @@ export function NoteSidebar({
   onExpandNotebooks,
   activeId,
   viewedGroupId,
+  reveal,
+  onRevealed,
   width,
   groupError,
   favorites,
@@ -100,6 +105,8 @@ export function NoteSidebar({
           onMoveGroupToNotebook={onMoveGroupToNotebook}
           activeId={activeId}
           viewedGroupId={viewedGroupId}
+          reveal={reveal}
+          onRevealed={onRevealed}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
           onSelectNote={onSelect}
