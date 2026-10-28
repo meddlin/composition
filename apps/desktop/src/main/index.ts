@@ -7,7 +7,7 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
 import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
@@ -226,6 +226,7 @@ async function main(): Promise<void> {
     attachments,
     backup,
     panels: panelsService,
+    todos: todosService,
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),

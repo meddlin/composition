@@ -1,6 +1,6 @@
 "use client";
 
-import { FolderTreeIcon, LayoutDashboardIcon, LinkIcon, MessageSquareIcon, StickyNoteIcon } from "lucide-react";
+import { FolderTreeIcon, LayoutDashboardIcon, ListTodoIcon, LinkIcon, MessageSquareIcon, StickyNoteIcon } from "lucide-react";
 import { Fragment, useRef, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
@@ -11,9 +11,10 @@ import type { WorkspaceSnapshot, WorkspaceStore } from "../notes/workspaceStore"
 import { AiPanel } from "./AiPanel";
 import { EmptyPanel } from "./EmptyPanel";
 import type { PanelHost } from "./host";
-import { KINDS, type AssistantPanelState, type NotePanelState, type NotesBrowserState } from "./kinds";
+import { KINDS, type AssistantPanelState, type NotePanelState, type NotesBrowserState, type TodoPanelState } from "./kinds";
 import { NotesBrowserPanel } from "./NotesBrowserPanel";
 import { dragSizes, minExtent, panelIds, type Direction, type LayoutNode, type PanelId, type SplitPath } from "./layoutTree";
+import { TodoPanel } from "./TodoPanel";
 import { PanelFrame } from "./PanelFrame";
 import { PanelMenu } from "./PanelMenu";
 import { MAIN_WINDOW, focusedPanelId, type KindId, type PanelsState, type WindowId } from "./panelsState";
@@ -29,12 +30,13 @@ type Props = {
 /** The least height, in px, a panel can be dragged down to: its header and a few lines. */
 const MIN_PANEL_HEIGHT = 120;
 
-const KIND_LABEL: Record<KindId, string> = { empty: "Empty panel", note: "Note", "notes-browser": "Notes browser", ai: "AI helper" };
+const KIND_LABEL: Record<KindId, string> = { empty: "Empty panel", note: "Note", "notes-browser": "Notes browser", ai: "AI helper", todo: "To-do" };
 const KIND_ICON: Record<KindId, typeof StickyNoteIcon> = {
   empty: LayoutDashboardIcon,
   note: StickyNoteIcon,
   "notes-browser": FolderTreeIcon,
   ai: MessageSquareIcon,
+  todo: ListTodoIcon,
 };
 
 type Shared = {
@@ -114,6 +116,7 @@ function PanelView({ panelId, shared }: { panelId: PanelId; shared: Shared }) {
       {record.kind === "empty" && <EmptyPanel store={store} panelId={panelId} />}
       {record.kind === "note" && <AwaitingNote onCreateNote={shared.host.onCreateNote} />}
       {record.kind === "ai" && <AiPanel store={store} panelId={panelId} snapshot={shared.snapshot} host={shared.host} />}
+      {record.kind === "todo" && <TodoPanel store={store} panelId={panelId} state={record.state as TodoPanelState} />}
       {record.kind === "notes-browser" && (
         <NotesBrowserPanel
           store={store}

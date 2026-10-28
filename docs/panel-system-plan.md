@@ -57,8 +57,9 @@ From the owner, 2026-10-28 (the reasons are in [Settled by the owner](#settled-b
 - **Third-party panel plugins** loaded at runtime. They would need a sandbox, an API surface and signing.
 - **Dragging a panel out of the window** to pop it out. The `⋯` menu does it in v1.
 - **Native-menu entries** for the panel commands. The commands, their keys and a command palette exist.
-- **The to-do panel.** Its schema and bridge methods are designed when it is built. The panel system promises only
-  that a kind can use `window.composition` and may add a slice to the store.
+- **The full to-do panel.** A basic one is built (see [panels.md](ui/panels.md#the-to-do-panel)): a `todos` table, five bridge
+  methods (`TodosApi`) and a `todos` store on the workspace store, so every to-do panel in any window shares one list. What the
+  Taskfile project has beyond that is future work.
 - **Pop-outs that outlive the main window.** That needs the store to live somewhere other than the main window, for
   example a hidden host window.
 - **Anything for the web app or the CLI.**

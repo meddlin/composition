@@ -14,6 +14,9 @@ export type NotesBrowserState = { notebookId: number | null };
  */
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
+/** What a to-do panel saves: the items whose sub-items are folded away in it. The items themselves, and the panels' background, are the workspace's. */
+export type TodoPanelState = { collapsed: number[] };
+
 /** What a kind may check a saved state against: the workspace as it is now. */
 export type RestoreContext = {
   hasNote(noteId: number): boolean;
@@ -73,6 +76,14 @@ export const KINDS: Record<
       const { noteId } = saved;
       if (!(typeof noteId === "number" && Number.isInteger(noteId) && context.hasNote(noteId))) return null;
       return { noteId, follow: false } satisfies AssistantPanelState;
+    },
+  },
+  todo: {
+    minWidth: MIN_PANEL_WIDTH,
+    initialState: (): TodoPanelState => ({ collapsed: [] }),
+    restore(saved) {
+      if (!isRecord(saved) || !Array.isArray(saved.collapsed)) return null;
+      return { collapsed: saved.collapsed.filter((id): id is number => Number.isSafeInteger(id)) } satisfies TodoPanelState;
     },
   },
 };

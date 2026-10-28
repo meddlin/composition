@@ -24,6 +24,7 @@ A panel shows one thing, its *kind*:
 | **Note** | A note, with its Markdown / Preview / Split tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. |
 | **Notes browser** | A second tree of a notebook's groups and notes, with its own chosen notebook (a menu at the top). Picking a note opens it in the note panel used last, or in a new one beside the browser. |
 | **AI helper** | The [AI helper](ai-helper.md)'s chat about one note. See below. |
+| **To-do** | A to-do list. See below. |
 
 A window always has at least one panel. Closing the last one leaves a new empty panel; an empty panel that is already alone has no close button.
 
@@ -94,6 +95,27 @@ closed like any other.
   following. Chats are not saved, as before.
 - **The web app** keeps the dock inside the note pane; only the desktop app has panels.
 
+## The to-do panel
+
+A plain to-do list in a panel of its own (choose **To-do** in an empty panel). Source: [`TodoPanel.tsx`](../../apps/web/src/components/panels/TodoPanel.tsx),
+[`todosStore.ts`](../../apps/web/src/lib/composition/todosStore.ts) (the list and the background, shared by every window) and
+[`todosService.ts`](../../apps/web/src/lib/composition/todosService.ts) (the `todos` table in the notes database).
+
+- **Adding.** Type in the box at the top and press Enter; the box stays for the next one. The **+** on an item adds a **sub-item** under it
+  (sub-items nest without limit, and the box stays open for more; Escape closes it).
+- **Renaming.** The pencil on an item, or double-click its title. Enter saves, Escape gives up.
+- **Done.** The checkbox ticks an item off and its text is struck through and dimmed. Ticking an item does not tick its sub-items.
+- **Deleting.** The bin on an item. An item with sub-items asks first, because they go with it.
+- **Folding.** The arrow beside an item with sub-items hides or shows them; which are folded is saved with the panel's layout.
+- **Background.** **Settings > Styling > To-do background** (desktop app only) gives the to-do panels a **pattern** (*Same as notes*, *Plain*, *Grid*,
+  *Dots* or *Ruled lines*) and a **color** (a few presets, any color from the picker, or the color scheme's own), with a small preview. It is
+  **one setting for every to-do panel**, in any window, and is separate from the note background above it: *Same as notes* follows that
+  setting, and the other patterns draw whatever you pick, whatever it says. It applies at once, including in pop-outs, and is saved in the
+  settings file (`todoLook`). A chosen color also sets the text color to light or dark, whichever reads better on it, so it works under every
+  color scheme. **Reset to default** undoes both.
+- **One list.** The items belong to the workspace, not the panel: any number of to-do panels, in any window, show and change the same list,
+  and it is saved in the database as you go, so closing a panel loses nothing.
+
 ## Panel commands and the command palette
 
 Every panel command can be run from the **command palette**, and the ones that are used most have keys. Both act on the **focused panel
@@ -145,4 +167,4 @@ read from the database again and merged in.
 
 ## Not built yet
 
-Dragging a panel header out of the window to pop it out, native-menu entries for the panel commands, and the to-do panel. See [panel-system-plan.md](../panel-system-plan.md#build-order).
+Dragging a panel header out of the window to pop it out, and native-menu entries for the panel commands. The to-do panel is the basic version: no due dates, tags, ordering by hand or the other things the Taskfile project has yet. See [panel-system-plan.md](../panel-system-plan.md#build-order).

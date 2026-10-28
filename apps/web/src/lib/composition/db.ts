@@ -79,6 +79,22 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
 `;
 
+/**
+ * The to-do panel's items. `parent_id` makes a tree; deleting an item deletes its sub-items too (todosRepo.ts does
+ * that, so no foreign key is declared). The CLI shares this file and ignores the table.
+ */
+const TODOS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    parent_id INTEGER,
+    title TEXT NOT NULL,
+    done INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_todos_parent_id ON todos (parent_id);
+`;
+
 function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -119,6 +135,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(NOTEBOOKS_SCHEMA);
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
+  db.exec(TODOS_SCHEMA);
   ensureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,
