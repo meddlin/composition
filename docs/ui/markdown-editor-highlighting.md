@@ -53,15 +53,19 @@ across the layer's coloured spans. Keep both elements on that one class when edi
 
 ## Note background
 
-Settings → Note background picks a pattern behind the text (`NOTE_BACKGROUND_CHOICES` in
+Settings → Note background picks a pattern behind the window (`NOTE_BACKGROUND_CHOICES` in
 [`noteBackgrounds.ts`](../../apps/web/src/lib/composition/noteBackgrounds.ts)): "plain" (the
 default) or "architect", a faint quad-ruled notebook grid. The choice is `data-note-background` on
-`<html>` (set by both layouts, and by Settings on click), and `globals.css` draws the grid on
-`.note-surface`, which the textarea and the preview pane carry. The lines are the scheme's
-`--foreground` at a few percent, so every scheme (and the sun blend) gets a matching, quiet grid.
+`<html>` (set by both layouts, and by Settings on click). `globals.css` draws the grid on `body`,
+which shows through everything without a background of its own (the home page, Settings, the
+header and tab rows), and again on `.note-surface`, which the textarea and the preview pane carry.
+The sidebars keep their solid `bg-surface`. The lines are the scheme's `--foreground` at a few
+percent, so every scheme (and the sun blend) gets a matching, quiet grid.
 
-The grid is drawn on the textarea itself with `background-attachment: local`, so it scrolls with
-the text. Its square is `1.5rem`, the editor's `leading-6`, anchored at the `1rem` padding, which
+The pane grid is drawn on the textarea itself with `background-attachment: local`, so it scrolls
+with the text. `.note-pane` is a solid backing that hides the window's grid behind a pane; it sits
+on the editor's wrapper rather than the textarea, which has to stay see-through over the coloured
+layer beneath it. Its square is `1.5rem`, the editor's `leading-6`, anchored at the `1rem` padding, which
 makes each line of text sit on a rule. That alignment holds only while the textarea's line height
 and padding stay `leading-6` and `p-4`; change either and change `--grid-square` and
 `background-position` with it. The preview's text does not follow the grid (headings and prose

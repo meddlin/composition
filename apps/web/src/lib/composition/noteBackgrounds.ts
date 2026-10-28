@@ -1,5 +1,5 @@
 /**
- * Backgrounds the user can choose for the editor and preview panes in Settings.
+ * Backgrounds the user can choose for the app window in Settings.
  *
  * A background is only a pattern drawn behind the text; the colors still come from the
  * selected color scheme, so every one of them works with every scheme (including the sun
@@ -7,7 +7,8 @@
  * on <html>:
  *   plain     -> nothing, the scheme's own background (the default)
  *   architect -> a quad-ruled architect's notebook: a faint square grid, with a slightly
- *                firmer line every fifth square
+ *                firmer line every fifth square, behind the whole window (the sidebars keep
+ *                their solid panels) and lined up to the text in the editor and preview
  */
 
 export const NOTE_BACKGROUND_CHOICES = [

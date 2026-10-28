@@ -60,7 +60,7 @@ export type WebSettings = {
   previewFont: PreviewFontName;
   /** Font of the Markdown editor. */
   editorFont: EditorFontName;
-  /** Pattern drawn behind the editor and the preview. */
+  /** Pattern drawn behind the window. */
   noteBackground: NoteBackgroundName;
   /** The editor's ruler and reflow. */
   writing: WritingSettings;

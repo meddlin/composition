@@ -261,8 +261,9 @@ export function StylingSettings({
       <FieldSet className="gap-2 text-sm">
         <FieldLegend variant="label">Note background</FieldLegend>
         <FieldDescription className="text-xs">
-          A pattern behind the text in the editor and the preview. It is drawn in the color
-          scheme&rsquo;s own colors and kept faint, so it never competes with what you write.
+          A pattern behind the whole window, and lined up to the text in the editor and the preview.
+          It is drawn in the color scheme&rsquo;s own colors and kept faint, so it never competes
+          with what you write.
         </FieldDescription>
         <RadioGroup
           value={noteBackground}
@@ -279,7 +280,7 @@ export function StylingSettings({
             </Field>
           ))}
         </RadioGroup>
-        <p className="note-surface editor-text whitespace-pre-wrap rounded-md border px-4 py-4 text-sm leading-6">
+        <p className="note-pane note-surface editor-text whitespace-pre-wrap rounded-md border px-4 py-4 text-sm leading-6">
           {"## Site visit, Tuesday\n- Check the **load path** at gridline C"}
         </p>
         {noteBackgroundError && <FieldError>{noteBackgroundError}</FieldError>}

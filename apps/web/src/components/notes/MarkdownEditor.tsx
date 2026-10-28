@@ -454,7 +454,7 @@ export function MarkdownEditor({
           </p>
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="note-pane relative flex min-h-0 flex-1 flex-col">
           {highlight && (
             <MarkdownHighlight text={value} layer={highlightLayer.layer} matches={editorMatches} current={currentMatch} />
           )}
@@ -561,7 +561,7 @@ export function MarkdownEditor({
         {showPreview && (
           <PreviewHighlightMenu
             boxRef={previewBox}
-            className="prose preview-text note-surface max-w-none flex-1 overflow-y-auto p-4"
+            className="prose preview-text note-pane note-surface max-w-none flex-1 overflow-y-auto p-4"
             text={value}
             body={body}
             onApply={applyHighlight}

@@ -205,7 +205,7 @@ export interface CompositionApi {
   savePreviewFont(font: string): Promise<{ error?: string }>;
   /** Chooses the font the Markdown editor is set in; a name not in `EDITOR_FONT_CHOICES` comes back as `error`. */
   saveEditorFont(font: string): Promise<{ error?: string }>;
-  /** Chooses the pattern behind the editor and preview; a name not in `NOTE_BACKGROUND_CHOICES` comes back as `error`. */
+  /** Chooses the pattern behind the window; a name not in `NOTE_BACKGROUND_CHOICES` comes back as `error`. */
   saveNoteBackground(background: string): Promise<{ error?: string }>;
   /** Saves the editor's ruler and reflow; a column outside the allowed range comes back as `error`. */
   saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
