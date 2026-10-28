@@ -24,3 +24,21 @@ describe("THEME_BACKGROUND", () => {
     }
   });
 });
+
+describe("mainWindowPreferences", () => {
+  it("keeps the page isolated, and keeps its timers running when the window is hidden or minimised", async () => {
+    const { mainWindowPreferences } = await import("./window");
+
+    expect(mainWindowPreferences("/app/preload.js")).toEqual({
+      preload: "/app/preload.js",
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      spellcheck: true,
+      // The workspace's autosave timers run in this page for every window, pop-outs included: a minimised main window
+      // that throttled them to about one tick a second would delay saving what is typed in a pop-out.
+      backgroundThrottling: false,
+    });
+  });
+});

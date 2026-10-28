@@ -73,6 +73,11 @@ export type WebSettings = {
   favorites: Favorites;
   /** The AI helper's Ollama server and context size; absent until they are first saved. */
   assistant?: AssistantSettings;
+  /**
+   * How the desktop app's panels were arranged when it last ran, as the renderer saved it (its own versioned document,
+   * which only the renderer reads: see components/panels/panelsDocument.ts). Absent until first saved.
+   */
+  panels?: Record<string, unknown>;
 };
 
 const DEFAULT_SETTINGS: WebSettings = {
@@ -85,6 +90,10 @@ const DEFAULT_SETTINGS: WebSettings = {
   ...DEFAULT_LAYOUT,
   favorites: NO_FAVORITES,
 };
+
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function parseLocation(value: unknown): SavedLocation | undefined {
   const data = value as Partial<Record<keyof SavedLocation, unknown>> | null;
@@ -132,6 +141,7 @@ export function parseWebSettings(data: unknown): WebSettings {
   const location = parseLocation(value.location);
   if (location) settings.location = location;
   if (value.assistant !== undefined) settings.assistant = parseAssistantSettings(value.assistant);
+  if (isPlainObject(value.panels)) settings.panels = value.panels;
   return settings;
 }
 

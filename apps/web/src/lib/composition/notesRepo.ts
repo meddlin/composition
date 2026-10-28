@@ -16,7 +16,7 @@ export type Note = {
   notebookId: number;
 };
 
-type NoteRow = {
+export type NoteRow = {
   id: number;
   title: string;
   content: string;
@@ -28,7 +28,7 @@ type NoteRow = {
   notebook_id: number;
 };
 
-function fromRow(row: NoteRow): Note {
+export function fromRow(row: NoteRow): Note {
   return {
     id: row.id,
     title: row.title,

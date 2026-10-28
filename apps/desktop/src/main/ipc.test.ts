@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
+import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
 import type { AssistantHost } from "./assistant";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
@@ -27,6 +28,9 @@ function setup() {
   const backup = Object.fromEntries(
     BACKUP_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof DesktopBackupApi]: ReturnType<typeof vi.fn> };
+  const panels = Object.fromEntries(
+    PANELS_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
+  ) as unknown as { [K in keyof PanelsApi]: ReturnType<typeof vi.fn> };
   const updates = Object.fromEntries(
     UPDATE_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof UpdatesApi]: ReturnType<typeof vi.fn> };
@@ -37,20 +41,21 @@ function setup() {
     api: api as unknown as CompositionApi,
     attachments: attachments as unknown as AttachmentsApi,
     backup: backup as unknown as DesktopBackupApi,
+    panels: panels as unknown as PanelsApi,
     updates: updates as unknown as UpdatesApi,
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup, updates, assistant };
+  return { handlers, listeners, api, attachments, backup, panels, updates, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, backup, update and AI helper method, and nothing else", () => {
+  it("registers one handler per API, attachment, backup, panels, update and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...UPDATE_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
   });
 
@@ -94,6 +99,15 @@ describe("registerIpc", () => {
       await expect(handlers.get(channelFor("assistantChat"))!({ senderFrame: { url: `${OWN}/` } }, "req-1", request)).rejects.toThrow();
       expect(assistant.chat).not.toHaveBeenCalled();
     });
+  });
+
+  it("saves the panels the page sends, as sent", async () => {
+    const { handlers, panels } = setup();
+    const saved = { version: 1, windows: {} };
+
+    await handlers.get(channelFor("savePanels"))!(own, saved);
+
+    expect(panels.savePanels).toHaveBeenCalledWith(saved);
   });
 
   it("starts a backup or restore without passing on any path the page sends", async () => {
@@ -155,8 +169,12 @@ describe("registerIpc", () => {
     ["a missing frame", { senderFrame: null }],
     ["an unparsable url", { senderFrame: { url: "not a url" } }],
   ])("refuses every method from %s", async (_name, event) => {
-    const { handlers, api, attachments, backup, updates } = setup();
+    const { handlers, api, attachments, backup, panels, updates } = setup();
 
+    for (const method of PANELS_METHODS) {
+      await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(/untrusted sender/);
+      expect(panels[method]).not.toHaveBeenCalled();
+    }
     for (const method of API_METHODS) {
       await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(
         /untrusted sender/,

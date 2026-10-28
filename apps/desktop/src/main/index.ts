@@ -1,18 +1,23 @@
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
+import { broadcastAppearance, notifyAppearanceChanges, type AppearanceMessage } from "./appearance";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
+import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, searchIndex, service, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
+import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
-import { createMainWindow } from "./window";
+import { createPopoutManager } from "./popoutManager";
+import { createWindowState } from "./windowState";
+import { createMainWindow, THEME_BACKGROUND } from "./window";
 
 app.setName("Composition");
 app.setAboutPanelOptions({
@@ -55,15 +60,25 @@ const sidecar = new SearchSidecar({
   log: (message, detail) => console.log(message, detail ?? ""),
 });
 
-// The data location can change in Settings; the search index follows it.
-const api: CompositionApi = {
-  ...service,
-  async saveSettings(input) {
-    const result = await service.saveSettings(input);
-    if (result.success) void sidecar.reindex();
-    return result;
+/** How the app looks now: what a window's first paint is given, and what the others are told when Settings changes it. */
+function currentAppearance(): AppearanceMessage {
+  const { theme, previewFont, editorFont } = loadWebSettings();
+  return { theme, previewFont, editorFont, sun: service.initialSunTheme() };
+}
+
+// The data location can change in Settings; the search index follows it. So does the look of every window: Settings
+// is a page in one window, and pop-outs and the rest follow what is chosen there.
+const api: CompositionApi = notifyAppearanceChanges(
+  {
+    ...service,
+    async saveSettings(input) {
+      const result = await service.saveSettings(input);
+      if (result.success) void sidecar.reindex();
+      return result;
+    },
   },
-};
+  () => broadcastAppearance(BrowserWindow.getAllWindows(), currentAppearance()),
+);
 
 // Files are chosen and saved in native dialogs, over the window that asked.
 const attachments = createAttachmentsApi(service, {
@@ -110,6 +125,9 @@ const backup = createBackupApi(service, {
   },
 });
 
+/** How long quitting waits for the pages to send their unsaved text before it goes ahead without them. */
+const FLUSH_TIMEOUT_MS = 2000;
+
 // Stopping Meilisearch and closing the database, once, whichever way the app quits: Cmd+Q, the
 // last window closing, or restarting into an update (which calls this itself, ahead of
 // quitAndInstall, so the installer never meets a prevented `before-quit`).
@@ -118,6 +136,12 @@ let shutdownDone = false;
 function shutDown(): Promise<void> {
   shutdown ??= (async () => {
     try {
+      // The pages go first: once the database is closed, what they still hold (text typed in the last moments, which
+      // waits half a second to be saved) could no longer be, as their own unload comes too late.
+      await flushRenderers(BrowserWindow.getAllWindows(), FLUSH_TIMEOUT_MS);
+      // Quitting closes every window, and a pop-out that is closed (rather than destroyed) tells the workspace its
+      // window is gone, which would drop it from the saved layout. Destroyed, it comes back at the next launch.
+      popouts.destroyAll();
       await sidecar.stop();
     } finally {
       closeDb();
@@ -131,13 +155,30 @@ const updates = createElectronUpdates({ userData, prepareToQuit: shutDown });
 
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
+// "auto" opens as the dark or light end of its ramp, per the cached sun times.
+const currentTheme = () => service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme);
+
+// Pop-outs: a panel pulled into a window of its own. The main window's page opens them; this decides that they may be
+// opened, remembers where each was put (in a file only this process writes) and closes them with the main window.
+const popouts = createPopoutManager({
+  allowedOrigins,
+  preloadPath: path.join(__dirname, "preload.js"),
+  backgroundColor: () => THEME_BACKGROUND[currentTheme()] ?? THEME_BACKGROUND.dark,
+  windowState: createWindowState({
+    file: path.join(userData, "window-state.json"),
+    displays: () => screen.getAllDisplays().map((display) => display.workArea),
+  }),
+  openExternal: (url) => void shell.openExternal(url),
+  installContextMenu,
+});
+
 function openMainWindow(): BrowserWindow {
   return createMainWindow({
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
-    // "auto" opens as the dark or light end of its ramp, per the cached sun times.
-    theme: service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme),
+    theme: currentTheme(),
+    popouts,
   });
 }
 
@@ -168,12 +209,13 @@ async function main(): Promise<void> {
     api,
     attachments,
     backup,
+    panels: panelsService,
     updates: updates.manager,
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
-      const { theme, previewFont, editorFont, sidebarWidth, editorRatio } = loadWebSettings();
-      return { theme, previewFont, editorFont, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
+      const { sidebarWidth, editorRatio } = loadWebSettings();
+      return { ...currentAppearance(), layout: { sidebarWidth, editorRatio } };
     },
   });
 

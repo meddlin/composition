@@ -1,12 +1,13 @@
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import type { AssistantHost, AssistantSender } from "./assistant";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isAllowedOrigin } from "./origin";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, PANELS_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
 
 /** The slice of Electron's `ipcMain` this module uses, so tests don't need Electron. */
 export type IpcMainLike = {
@@ -25,7 +26,7 @@ export class UntrustedSenderError extends Error {}
 
 /**
  * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi,
- * DesktopBackupApi, UpdatesApi and AI helper chat calls, over IPC, one channel per method.
+ * DesktopBackupApi, PanelsApi, UpdatesApi and AI helper chat calls, over IPC, one channel per method.
  *
  * Every call is checked twice: the sender must be a frame of our own UI (a
  * navigated-away or injected frame must never reach the notes database), and
@@ -36,6 +37,7 @@ export function registerIpc(options: {
   api: CompositionApi;
   attachments: AttachmentsApi;
   backup: DesktopBackupApi;
+  panels: PanelsApi;
   updates: UpdatesApi;
   /** Runs the AI helper's chat turns. Not a plain method: it needs the window that asked. */
   assistant: AssistantHost;
@@ -43,7 +45,7 @@ export function registerIpc(options: {
   /** Synchronous snapshot for the preload, taken before the page paints. */
   initial: () => unknown;
 }): void {
-  const { ipcMain, api, attachments, backup, updates, assistant, isTrustedUrl, initial } = options;
+  const { ipcMain, api, attachments, backup, panels, updates, assistant, isTrustedUrl, initial } = options;
 
   const trusted = (event: IpcEventLike): boolean => {
     const url = event.senderFrame?.url;
@@ -66,6 +68,7 @@ export function registerIpc(options: {
   for (const method of API_METHODS) expose(method, VALIDATORS[method], api);
   for (const method of ATTACHMENT_METHODS) expose(method, ATTACHMENT_VALIDATORS[method], attachments);
   for (const method of BACKUP_METHODS) expose(method, BACKUP_VALIDATORS[method], backup);
+  for (const method of PANELS_METHODS) expose(method, PANELS_VALIDATORS[method], panels);
   for (const method of UPDATE_METHODS) expose(method, UPDATE_VALIDATORS[method], updates);
 
   // The AI helper's calls need the window that asked (`event.sender`), which `expose` does not pass on.
