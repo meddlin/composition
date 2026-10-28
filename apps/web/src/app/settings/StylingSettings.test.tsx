@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { saveEditorFont, savePreviewFont } from "@/lib/composition/client";
+import { saveEditorFont, saveNoteBackground, savePreviewFont } from "@/lib/composition/client";
 import { EDITOR_FONT_CHOICES, editorFontStack } from "@/lib/composition/editorFonts";
+import { NOTE_BACKGROUND_CHOICES } from "@/lib/composition/noteBackgrounds";
 import { PREVIEW_FONT_CHOICES, previewFontStack } from "@/lib/composition/previewFonts";
 import { StylingSettings } from "./StylingSettings";
 
@@ -10,6 +11,7 @@ vi.mock("@/lib/composition/client", () => ({
   saveLocation: vi.fn(async () => ({})),
   savePreviewFont: vi.fn(async () => ({})),
   saveEditorFont: vi.fn(async () => ({})),
+  saveNoteBackground: vi.fn(async () => ({})),
   saveSettings: vi.fn(async () => ({})),
   saveTheme: vi.fn(async () => ({})),
 }));
@@ -19,14 +21,20 @@ afterEach(() => {
   vi.clearAllMocks();
   document.documentElement.style.removeProperty("--preview-font");
   document.documentElement.style.removeProperty("--editor-font");
+  delete document.documentElement.dataset.noteBackground;
 });
 
-function renderForm(currentPreviewFont: "default" | "lora" = "default", currentEditorFont: "default" | "lora" | "jetbrains-mono" = "default") {
+function renderForm(
+  currentPreviewFont: "default" | "lora" = "default",
+  currentEditorFont: "default" | "lora" | "jetbrains-mono" = "default",
+  currentNoteBackground: "plain" | "architect" = "plain",
+) {
   render(
     <StylingSettings
       currentTheme="dark"
       currentPreviewFont={currentPreviewFont}
       currentEditorFont={currentEditorFont}
+      currentNoteBackground={currentNoteBackground}
       currentCity=""
     />,
   );
@@ -105,5 +113,42 @@ describe("editor font setting", () => {
     expect(rootEditorFont()).toBe(editorFontStack("default"));
     expect(screen.getByText("Unknown font.")).toBeTruthy();
     expect(within(editorGroup()).getByRole("radio", { name: "Geist Mono (default)" }).getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+const rootBackground = () => document.documentElement.dataset.noteBackground;
+const backgroundGroup = () => screen.getByRole("radiogroup", { name: "Note background" });
+
+describe("note background setting", () => {
+  it("offers every background, with the saved one selected", () => {
+    renderForm("default", "default", "architect");
+
+    expect(backgroundGroup().querySelectorAll('[role="radio"]')).toHaveLength(NOTE_BACKGROUND_CHOICES.length);
+    expect(within(backgroundGroup()).getByRole("radio", { name: /Architect/ }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("applies a chosen background straight away and saves it", async () => {
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(within(backgroundGroup()).getByRole("radio", { name: /Architect/ }));
+    });
+
+    expect(rootBackground()).toBe("architect");
+    expect(saveNoteBackground).toHaveBeenCalledWith("architect");
+  });
+
+  it("puts the previous background back and says why when the save fails", async () => {
+    vi.mocked(saveNoteBackground).mockResolvedValueOnce({ error: "Unknown background." });
+    renderForm();
+    document.documentElement.dataset.noteBackground = "plain";
+
+    await act(async () => {
+      fireEvent.click(within(backgroundGroup()).getByRole("radio", { name: /Architect/ }));
+    });
+
+    expect(rootBackground()).toBe("plain");
+    expect(screen.getByText("Unknown background.")).toBeTruthy();
+    expect(within(backgroundGroup()).getByRole("radio", { name: "Plain" }).getAttribute("aria-checked")).toBe("true");
   });
 });

@@ -146,6 +146,7 @@ describe("VALIDATORS", () => {
     ["saveTheme", [{}]],
     ["savePreviewFont", [{}]],
     ["saveEditorFont", [{}]],
+    ["saveNoteBackground", [{}]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],

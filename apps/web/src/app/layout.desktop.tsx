@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 // wrong theme; the stylesheet's default is dark, so a missing value is safe.
 // "Follow the sun" also needs its starting tone and blend, which the snapshot
 // carries as `sun` (SunThemeSync takes over once the page is running). The preview and editor
-// fonts are applied the same way; without them the preview inherits the interface font and the
+// fonts, and the note background, are applied the same way; without them the preview inherits the interface font and the
 // editor falls back to Geist Mono (see globals.css).
 const PREVIEW_FONT_STACKS = JSON.stringify(
   Object.fromEntries(PREVIEW_FONT_CHOICES.map(({ name, stack }) => [name, stack])),
@@ -25,7 +25,7 @@ const PREVIEW_FONT_STACKS = JSON.stringify(
 const EDITOR_FONT_STACKS = JSON.stringify(
   Object.fromEntries(EDITOR_FONT_CHOICES.map(({ name, stack }) => [name, stack])),
 );
-const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement,f=${PREVIEW_FONT_STACKS}[i.previewFont],e=${EDITOR_FONT_STACKS}[i.editorFont];r.dataset.theme=i.theme||"dark";if(f)r.style.setProperty("--preview-font",f);if(e)r.style.setProperty("--editor-font",e);if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
+const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement,f=${PREVIEW_FONT_STACKS}[i.previewFont],e=${EDITOR_FONT_STACKS}[i.editorFont];r.dataset.theme=i.theme||"dark";r.dataset.noteBackground=i.noteBackground||"plain";if(f)r.style.setProperty("--preview-font",f);if(e)r.style.setProperty("--editor-font",e);if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

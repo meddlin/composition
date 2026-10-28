@@ -255,6 +255,15 @@ export async function saveEditorFont(font: string): Promise<{ error?: string }> 
   return result;
 }
 
+export async function saveNoteBackground(background: string): Promise<{ error?: string }> {
+  const result = await service.saveNoteBackground(background);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
 export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
   const result = await service.saveWritingSettings(writing);
   if (!result.error) {
