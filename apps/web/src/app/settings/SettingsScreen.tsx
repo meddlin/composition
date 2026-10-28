@@ -9,6 +9,7 @@ import { BackupRestore } from "./BackupRestore";
 import { FunMetrics } from "./FunMetrics";
 import { HomeSettings } from "./HomeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
+import { PanelSettings } from "./PanelSettings";
 import { SettingsForm } from "./SettingsForm";
 import { StylingSettings } from "./StylingSettings";
 import { TrashCan } from "./TrashCan";
@@ -90,6 +91,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           />
 
           <Updates />
+
+          <PanelSettings />
 
           <BackupRestore defaultBackupDir={snapshot.backupDir} />
 

@@ -27,3 +27,19 @@ export function draggedNoteId(data: Pick<DataTransfer, "types" | "getData">): nu
   }
   return null;
 }
+
+/**
+ * A panel dragged by its header (the desktop app's grid). It carries the panel's id, not a note's, and works within
+ * one window.
+ */
+export const PANEL_DRAG_TYPE = "application/x-composition-panel-id";
+
+export function hasDraggedPanel(types: readonly string[]): boolean {
+  return types.includes(PANEL_DRAG_TYPE);
+}
+
+/** The panel id in a drop's payload; null if there is none. */
+export function draggedPanelId(data: Pick<DataTransfer, "types" | "getData">): string | null {
+  if (!Array.from(data.types).includes(PANEL_DRAG_TYPE)) return null;
+  return data.getData(PANEL_DRAG_TYPE) || null;
+}

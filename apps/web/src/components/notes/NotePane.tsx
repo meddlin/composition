@@ -1,14 +1,16 @@
 "use client";
 
 import { ImageIcon, MessageSquareIcon, SearchIcon, ShapesIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { parse, withHeaderImage } from "@/lib/composition/frontmatter";
 import { cn } from "@/lib/utils";
 import { AssistantPanel } from "./AssistantPanel";
 import { DOCK_DEFAULT_WIDTH, dockLayout, dragDockWidth } from "./assistantDock";
 import { AttachmentsPanel } from "./AttachmentsPanel";
-import { PANE_DRAG_TYPE } from "./dragTypes";
+import type { DropZone as PanelDropZone, PanelId } from "../panels/layoutTree";
+import { usePanelDrop } from "../panels/usePanelDrop";
+import { PANEL_DRAG_TYPE, PANE_DRAG_TYPE } from "./dragTypes";
 import { DropOverlay } from "./DropOverlay";
 import { EditorTabs } from "./EditorTabs";
 import { FindBar } from "./FindBar";
@@ -22,6 +24,19 @@ import { noteTitle, type Note } from "./types";
 import { useElementWidth } from "./useElementWidth";
 import { useMinWidth } from "./useMinWidth";
 import { useNoteDrop } from "./useNoteDrop";
+
+/** What a note shown in a panel of the desktop app's grid gets, and does without, compared with a pane in a row. */
+export type PanelMode = {
+  panelId: PanelId;
+  /** The note was deleted while it is on screen: shown struck through and grayed out, to be read and closed. */
+  deleted: boolean;
+  /** The buttons at the end of the header (new panel, menu, close), which the panel supplies in place of a pane's close button. */
+  actions: ReactNode;
+  onDropNote: (noteId: number, zone: PanelDropZone) => void;
+  onDropPanel: (panelId: PanelId, zone: PanelDropZone) => void;
+  /** The AI helper button and shortcut: in a panel the helper is a panel of its own, not a dock inside this one. */
+  onOpenAssistant: () => void;
+};
 
 type Props = {
   note: Note;
@@ -44,6 +59,8 @@ type Props = {
   onOpenNote: (noteId: number, beside: boolean) => void;
   /** An answer from the AI helper to make into a separate new note. */
   onNewNoteFromText: (text: string) => void;
+  /** Set when the note is in a panel of the desktop app's grid: its own controls replace the close button, and drops mean panels. */
+  panel?: PanelMode;
 };
 
 /**
@@ -70,8 +87,12 @@ export function NotePane({
   notes,
   onOpenNote,
   onNewNoteFromText,
+  panel,
 }: Props) {
-  const drop = useNoteDrop({ edges: true, onDrop: onDropNote });
+  const noteDrop = useNoteDrop({ edges: true, onDrop: onDropNote });
+  const panelDrop = usePanelDrop({ onNote: panel?.onDropNote ?? (() => {}), onPanel: panel?.onDropPanel ?? (() => {}) });
+  const drop = panel ? panelDrop : noteDrop;
+  const deleted = panel?.deleted ?? false;
   const title = noteTitle(note);
 
   const section = useRef<HTMLElement>(null);
@@ -146,7 +167,8 @@ export function NotePane({
     return () => document.removeEventListener("keydown", onKeyDown);
   });
 
-  // Ctrl/Cmd+Shift+L opens or closes the AI helper in the focused pane; opening puts the cursor in its question box.
+  // Ctrl/Cmd+Shift+L opens or closes the AI helper in the focused pane (in a panel, opens or focuses its panel);
+  // opening puts the cursor in its question box.
   useEffect(() => {
     if (!focused) return;
     function onKeyDown(event: KeyboardEvent) {
@@ -160,6 +182,10 @@ export function NotePane({
   });
 
   function toggleAssistant() {
+    if (panel) {
+      panel.onOpenAssistant();
+      return;
+    }
     if (assistantOpen) {
       setAssistantOpen(false);
       requestAnimationFrame(() => section.current?.querySelector("textarea")?.focus());
@@ -208,8 +234,10 @@ export function NotePane({
       ref={section}
       aria-label={title}
       aria-current={focused ? "true" : undefined}
+      data-panel-id={panel?.panelId}
       style={style}
-      className="relative flex min-h-0 min-w-0 flex-col"
+      // A panel can be narrow: whatever does not fit is clipped, rather than drawn over the panel beside it.
+      className={cn("relative flex min-h-0 min-w-0 flex-col", panel && "overflow-hidden")}
       onFocusCapture={onFocus}
       onPointerDownCapture={onFocus}
       {...drop.handlers}
@@ -217,13 +245,17 @@ export function NotePane({
       <header
         draggable
         onDragStart={(e) => {
-          e.dataTransfer.setData(PANE_DRAG_TYPE, String(note.id));
+          if (panel) e.dataTransfer.setData(PANEL_DRAG_TYPE, panel.panelId);
+          else e.dataTransfer.setData(PANE_DRAG_TYPE, String(note.id));
           e.dataTransfer.effectAllowed = "move";
         }}
-        title="Drag to move this note beside another"
-        className="flex shrink-0 cursor-grab items-center gap-2 border-b py-1 pl-4 pr-2 active:cursor-grabbing"
+        title={panel ? "Drag to move this panel" : "Drag to move this note beside another"}
+        className={cn("flex shrink-0 cursor-grab items-center border-b py-1 pl-4 pr-2 active:cursor-grabbing", panel ? "gap-1" : "gap-2")}
       >
-        <span className={cn("min-w-0 flex-1 truncate text-sm font-medium", !focused && "text-muted-foreground")}>
+        <span
+          title={deleted ? "Deleted — in the Trash Can" : undefined}
+          className={cn("min-w-0 flex-1 truncate text-sm font-medium", !focused && "text-muted-foreground", deleted && "line-through")}
+        >
           {title}
         </span>
         <Button
@@ -239,47 +271,54 @@ export function NotePane({
         </Button>
         <Button
           variant="ghost"
-          size="xs"
+          size={panel ? "icon-xs" : "xs"}
           onClick={() => editor.current?.insertDiagram()}
+          disabled={deleted}
           aria-keyshortcuts="Control+Shift+D Meta+Shift+D"
           title="Draw a diagram with draw.io and put it in the note (Ctrl/Cmd+Shift+D)"
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <ShapesIcon />
-          Diagram
+          {/* In a panel, which has little room, only the icon shows. */}
+          <span className={panel ? "sr-only" : undefined}>Diagram</span>
         </Button>
         <Button
           variant="ghost"
-          size="xs"
+          size={panel ? "icon-xs" : "xs"}
           onClick={() => setHeaderImageOpen(true)}
+          disabled={deleted}
           title="Set the picture shown above this note's title"
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <ImageIcon />
-          Header image
+          <span className={panel ? "sr-only" : undefined}>Header image</span>
         </Button>
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={toggleAssistant}
           aria-label="AI helper"
-          aria-pressed={assistantOpen}
+          aria-pressed={panel ? undefined : assistantOpen}
           aria-keyshortcuts="Control+Shift+L Meta+Shift+L"
           title="AI helper (Ctrl/Cmd+Shift+L)"
           className="text-muted-foreground hover:text-foreground"
         >
           <MessageSquareIcon />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          onClick={onClose}
-          aria-label={`Close ${title}`}
-          title="Close"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <XIcon />
-        </Button>
+        {panel ? (
+          panel.actions
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={onClose}
+            aria-label={`Close ${title}`}
+            title="Close"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <XIcon />
+          </Button>
+        )}
       </header>
       <EditorTabs idBase={idBase} view={shownView(view, canSplit)} canSplit={canSplit} onChange={onViewChange} />
       {findOpen && (
@@ -302,7 +341,12 @@ export function NotePane({
         />
       )}
       <div className="flex min-h-0 flex-1">
-        <div ref={noteColumn} hidden={dockOver} className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <div
+          ref={noteColumn}
+          hidden={dockOver}
+          data-deleted={deleted ? "" : undefined}
+          className={cn("flex min-h-0 min-w-0 flex-1 flex-col", deleted && "opacity-60")}
+        >
         <MarkdownEditor
           controls={editor}
           find={find}
@@ -316,6 +360,7 @@ export function NotePane({
           onRatioCommit={onRatioCommit}
           notes={notes}
           onOpenNote={onOpenNote}
+          readOnly={deleted}
         />
         </div>
         {assistantOpen && (

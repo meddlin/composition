@@ -36,15 +36,19 @@ const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/
 // The desktop-only attachment and backup methods (attachmentsApi.ts, backupApi.ts) ride on the same bridge.
 const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
 const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/backupApi.ts"));
+const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
 const expectedBridge = [
   ...API_METHODS,
   ...ATTACHMENT_METHODS,
   ...BACKUP_METHODS,
+  ...PANELS_METHODS,
   ...UPDATE_METHODS,
   ...ASSISTANT_METHODS,
   "onUpdateState",
+  "onAppearance",
+  "onPopoutClosed",
   "onAssistantEvent",
   "initial",
   "platform",
@@ -151,6 +155,8 @@ const app = await electron.launch({
 });
 
 const consoleProblems = [];
+// Typed into a pop-out just before the app quits, and looked for after the relaunch.
+let quitText = "";
 try {
   const page = await app.firstWindow();
   page.on("console", (message) => {
@@ -176,7 +182,7 @@ try {
   const missing = expectedBridge.filter((name) => !posture.methods.includes(name));
   const unexpected = posture.methods.filter((name) => !expectedBridge.includes(name));
   check(
-    "the bridge exposes only the API (+ attachments, backup, updates, initial, platform)",
+    "the bridge exposes only the API (+ attachments, backup, panels, updates, initial, platform)",
     API_METHODS.length > 0 && missing.length === 0 && unexpected.length === 0,
     missing.length || unexpected.length
       ? `missing: ${missing.join(",") || "none"}; unexpected: ${unexpected.join(",") || "none"}`
@@ -366,6 +372,7 @@ try {
   // ---- AI helper (Settings). The server is a stand-in on a free local port; nothing leaves this machine.
   const ollama = await startFakeOllama();
   const decoy = await startFakeOllama();
+  await page.getByRole("tab", { name: "AI Configuration" }).click();
   const helper = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: "AI helper" }) });
   await helper.waitFor();
   await helper.getByLabel("Server address").fill(ollama.url);
@@ -417,6 +424,11 @@ try {
         });
         const call = window.composition.assistantChat(id, { model: "smoke-chat:latest", messages: [{ role: "user", content: text }], numCtx: 8192 });
         const outcome = await call.then(() => "resolved", (e) => `rejected: ${e.message}`);
+        // The call's answer and the events travel separately, so an event can still be on its way when the call returns
+        // (the page waits for the one that ends the turn in the same way).
+        for (const deadline = Date.now() + 1000; !events.some((e) => e.type === "done" || e.type === "error") && Date.now() < deadline; ) {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
         stop();
         return { events, outcome };
       },
@@ -448,18 +460,35 @@ try {
   );
   check("an address sent with the request is ignored", sneaky === "ok" && decoy.requests.length === 0, `${sneaky}; the other server saw ${decoy.requests.length} requests`);
 
-  // ---- AI helper panel, in a note pane: ask a question, read the answer beside the note, make a note from it.
+  // ---- AI helper, as a panel beside a note: ask a question, read the answer in the panel, make a note from it.
   await page.getByRole("link", { name: /Back to notes/ }).click();
   const notePane = page.getByRole("region", { name: "Smoke note" });
   await notePane.getByRole("button", { name: "AI helper" }).click();
-  const helperPanel = notePane.getByRole("complementary", { name: "AI helper" });
+  const helperPanel = page.getByRole("region", { name: "AI helper" });
   await helperPanel.getByRole("option", { name: /smoke-chat:latest/ }).waitFor({ state: "attached" });
-  check("the AI helper opens beside the note and lists the server's chat models", (await helperPanel.getByText("Runs on this computer").count()) === 1);
+  check(
+    "the AI helper button opens a panel of its own, not a dock inside the note",
+    (await helperPanel.count()) === 1 && (await notePane.getByRole("complementary").count()) === 0,
+  );
+  check(
+    "which is about the note it was opened from, and lists the server's chat models",
+    (await helperPanel.getByText("Smoke note").count()) === 1 && (await helperPanel.getByText("Runs on this computer").count()) === 1,
+  );
+  check("and has the cursor in its question box", await helperPanel.getByLabel("Ask about this note").evaluate((el) => el === document.activeElement));
   const noteBefore = await page.evaluate(() => window.composition.loadWorkspace().then((w) => w.notes.find((n) => n.title === "Smoke note").content));
+  // Text selected in the note is offered to the helper as the user moves into its panel.
+  await notePane.getByLabel("Markdown editor").evaluate((el) => {
+    el.focus();
+    el.setSelectionRange(0, 5);
+  });
+  await helperPanel.getByLabel("Ask about this note").focus();
+  check("text selected in the note is offered to the helper as a selection", (await helperPanel.getByText("Selection (5 characters)").count()) === 1);
   await helperPanel.getByLabel("Ask about this note").fill("hello");
   await helperPanel.getByLabel("Ask about this note").press("Enter");
   await helperPanel.getByText("Hello there").waitFor();
   check("a question typed in the panel is answered from the saved server, as it streams", ollama.requests.at(-1) === "POST /api/chat");
+  check("and the question went with the selection", (await helperPanel.getByText("with a selection (5 characters)").count()) === 1);
+  await page.screenshot({ path: path.join(out, "3a-ai-panel.png") });
   await helperPanel.getByRole("button", { name: "New note from this" }).click();
   await page.getByRole("region", { name: "Hello there" }).waitFor();
   const afterAnswer = await page.evaluate(() => window.composition.loadWorkspace());
@@ -471,6 +500,142 @@ try {
   check("and leaves the note the answer was about unchanged", afterAnswer.notes.find((n) => n.title === "Smoke note").content === noteBefore);
   await page.getByRole("link", { name: "Settings" }).click();
   await page.getByRole("heading", { name: "Settings" }).waitFor();
+
+  // ---- The workspace is kept while Settings is open: coming back, the open panels and the AI helper's chat are still there.
+  await page.getByRole("link", { name: /Back to notes/ }).click();
+  await page.waitForSelector('nav[aria-label="Notes"]');
+  await page.getByRole("region", { name: "Smoke note" }).waitFor({ timeout: 5_000 }).catch(() => {});
+  check(
+    "the open panels survive a visit to Settings",
+    (await page.getByRole("region", { name: "Smoke note" }).count()) === 1 && (await page.getByRole("region", { name: "Hello there" }).count()) === 1,
+  );
+  const keptNotePane = page.getByRole("region", { name: "Smoke note" });
+  check(
+    "and so does the AI helper's panel, with its chat about the note",
+    (await helperPanel.count()) === 1 && (await helperPanel.getByText("Hello there").count()) > 0,
+  );
+  // Closing the panel does not lose the chat: it belongs to the note, and comes back with the next panel opened for it.
+  await helperPanel.getByRole("button", { name: "Panel options" }).click();
+  await page.getByRole("menuitem", { name: "Close", exact: true }).click();
+  check("the AI helper's panel closes from its menu", (await page.getByRole("region", { name: "AI helper" }).count()) === 0);
+  await keptNotePane.getByRole("button", { name: "AI helper" }).click();
+  await helperPanel.waitFor();
+  check("and opening it again brings the chat back", (await helperPanel.getByText("Hello there").count()) > 0);
+  await helperPanel.getByRole("button", { name: "Panel options" }).click();
+  await page.getByRole("menuitem", { name: "Close", exact: true }).click();
+
+  // ---- The panel grid: a new panel is added beside, filled with a notes browser, and a deleted note's panel stays.
+  await keptNotePane.getByRole("button", { name: "New panel" }).click();
+  await page.getByRole("region", { name: "Empty panel" }).waitFor();
+  await page.getByRole("region", { name: "Empty panel" }).getByRole("button", { name: "Notes browser" }).click();
+  const browserPanel = page.getByRole("region", { name: "Notes browser" });
+  await browserPanel.waitFor();
+  check("+ adds a panel, which can be turned into a notes browser", (await browserPanel.getByRole("navigation", { name: "Notes" }).count()) === 1);
+  check("panels have a divider between each pair", (await page.getByRole("separator", { name: /^Resize panels/ }).count()) === 2);
+  await page.screenshot({ path: path.join(out, "3b-panels.png") });
+
+  await browserPanel.getByRole("navigation", { name: "Notes" }).getByText("Smoke note").first().click();
+  check(
+    "picking a note in a notes browser shows it in a note panel, not in the browser",
+    (await page.getByRole("region", { name: "Smoke note" }).count()) === 1 && (await browserPanel.count()) === 1,
+  );
+
+  await page.getByRole("navigation", { name: "Notes" }).first().getByRole("button", { name: "Delete Hello there" }).click({ force: true });
+  await page.getByRole("alertdialog").getByRole("button", { name: "Delete" }).click();
+  const deletedPanel = page.getByRole("region", { name: "Hello there" });
+  await deletedPanel.locator("header span.line-through").waitFor({ timeout: 5_000 }).catch(() => {});
+  check(
+    "a note deleted while it is open stays in its panel, struck through and read-only",
+    (await deletedPanel.locator("header span.line-through").count()) === 1 &&
+      (await deletedPanel.getByLabel("Markdown editor").evaluate((el) => el.readOnly)),
+  );
+  await page.waitForTimeout(300);
+
+  // ---- Pop-outs: a panel in a window of its own, over the one workspace the main window holds.
+  const popoutPage = () => app.windows().find((window) => window.url().includes("/popout/") && !window.isClosed());
+  const opened = app.waitForEvent("window");
+  await page.getByRole("region", { name: "Smoke note" }).getByRole("button", { name: "Panel options" }).click();
+  await page.getByRole("menuitem", { name: "Move to new window" }).click();
+  const popout = await opened;
+  await popout.getByRole("region", { name: "Smoke note" }).waitFor({ timeout: 15_000 });
+  check(
+    "Move to new window opens a window with that panel, which leaves the main window",
+    /\/popout\/\?w=w1$/.test(popout.url()) && (await page.getByRole("region", { name: "Smoke note" }).count()) === 0,
+    popout.url(),
+  );
+  const link = await popout.evaluate(() => ({
+    opener: typeof window.opener,
+    store: typeof window.opener?.__workspace?.store?.getSnapshot,
+    bridge: typeof window.composition,
+    require: typeof window.require,
+    process: typeof window.process,
+  }));
+  check("the pop-out reaches the main window's workspace through window.opener", link.opener === "object" && link.store === "function", JSON.stringify(link));
+  check("and is as isolated as the main window: the bridge, and no Node", link.bridge === "object" && link.require === "undefined" && link.process === "undefined");
+
+  const popoutToken = `popout${Date.now()}`;
+  await popout.getByLabel("Markdown editor").fill(`${popoutToken} typed in the pop-out`);
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadWorkspace())).notes.some((n) => n.content.includes(popoutToken)));
+  check("text typed in the pop-out is saved to the database", true);
+  check(
+    "and is the main window's own copy of the note",
+    await page.evaluate((token) => window.__workspace.store.getSnapshot().notes.some((n) => n.content.includes(token)), popoutToken),
+  );
+
+  await popout.getByRole("button", { name: "Panel options" }).click();
+  await popout.getByRole("menu").waitFor({ timeout: 5_000 }).catch(() => {});
+  const menuOpened = (await popout.getByRole("menu").count()) === 1;
+  // Radix starts listening for an outside click on the next tick after a menu opens; a person is slower than that.
+  await popout.waitForTimeout(300);
+  await popout.mouse.click(5, 300);
+  await popout.getByRole("menu").waitFor({ state: "detached", timeout: 3_000 }).catch(() => {});
+  const menusAfter = await popout.getByRole("menu").count();
+  check("a menu in the pop-out closes on a click outside it", menuOpened && menusAfter === 0, `opened: ${menuOpened}, still there after the click: ${menusAfter}`);
+
+  // The AI helper in a pop-out: a panel beside the note there, holding the chat the workspace keeps for the note.
+  await popout.getByRole("region", { name: "Smoke note" }).getByRole("button", { name: "AI helper" }).click();
+  const popoutHelper = popout.getByRole("region", { name: "AI helper" });
+  await popoutHelper.waitFor({ timeout: 10_000 });
+  await popoutHelper.getByRole("option", { name: /smoke-chat:latest/ }).waitFor({ state: "attached" });
+  check(
+    "the AI helper opens in the pop-out as a panel about its note, with the chat the main window's workspace holds",
+    (await popoutHelper.getByText("Smoke note").count()) === 1 && (await popoutHelper.getByText("Hello there").count()) > 0,
+  );
+
+  // A second pop-out, sent back to the main window: its real window closes.
+  const secondOpened = app.waitForEvent("window");
+  await page.getByRole("region", { name: "Notes browser" }).getByRole("button", { name: "Panel options" }).click();
+  await page.getByRole("menuitem", { name: "Move to new window" }).click();
+  const second = await secondOpened;
+  await second.getByRole("region", { name: "Notes browser" }).waitFor({ timeout: 15_000 });
+  const secondClosed = second.waitForEvent("close");
+  await second.getByRole("button", { name: "Panel options" }).click();
+  await second.getByRole("menuitem", { name: "Move back to main window" }).click();
+  await secondClosed;
+  check(
+    "Move back to main window returns the panel and closes the pop-out",
+    (await page.getByRole("region", { name: "Notes browser" }).count()) === 1 && app.windows().filter((w) => !w.isClosed()).length === 2,
+  );
+
+  // Reloading the main window loses the workspace the pop-out shows, so it closes; the saved layout brings it back.
+  await page.reload();
+  await page.waitForSelector('nav[aria-label="Notes"]');
+  await waitFor(async () => popout.isClosed());
+  check("reloading the main window closes the pop-out", popout.isClosed());
+  const reopened = await waitFor(async () => {
+    const window = popoutPage();
+    return window && (await window.getByRole("region", { name: "Smoke note" }).count()) === 1 ? window : null;
+  }, { timeout: 30_000 });
+  check("and the saved layout opens it again, with its panel", Boolean(reopened));
+  check(
+    "which shows the text typed in it before the reload",
+    (await reopened.getByLabel("Markdown editor").inputValue()).includes(popoutToken),
+  );
+
+  await page.getByRole("link", { name: "Settings" }).click();
+  await page.getByRole("heading", { name: "Settings" }).waitFor();
+  check("a visit to Settings leaves the pop-out open", Boolean(popoutPage()) && (await popoutPage().getByRole("region", { name: "Smoke note" }).count()) === 1);
+  check("Settings has a switch for the duplicate-note warning", (await page.getByRole("checkbox", { name: /Warn when a note is opened in more than one panel/ }).count()) === 1);
 
   // ---- Updates (Settings). Nothing here reaches the network: the first automatic check is 30 s
   // after launch, and the toggle is only ever switched off.
@@ -484,22 +649,31 @@ try {
   );
   check("automatic checking starts on", updateState.autoCheck === true);
   check("pre-release versions start off", updateState.allowPrerelease === false);
-  // click(), not uncheck(): the box is driven by the main process's state, so it flips a moment after the click.
-  await page.getByLabel("Check for updates automatically").click();
-  const updatePrefsFile = path.join(userData, "updates.json");
-  await waitFor(async () => fs.existsSync(updatePrefsFile));
-  check("switching it off is stored in the updater's own file", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).autoCheck === false);
-  check("and the pre-release choice is kept beside it, still off", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).allowPrerelease === false);
-  const settingsFile = path.join(userData, "settings.json"); // only exists once something has been saved to it
-  check("and not in the shared settings file", !fs.existsSync(settingsFile) || !("autoCheck" in JSON.parse(fs.readFileSync(settingsFile, "utf-8"))));
-  check("the page can't make an update install that isn't ready", (await page.evaluate(() => window.composition.installUpdate())).phase === "idle");
+  // The update toggles are only on the page in the installed app ("Updates only work in the installed app, not in a development run").
+  if (packaged) {
+    // click(), not uncheck(): the box is driven by the main process's state, so it flips a moment after the click.
+    await page.getByLabel("Check for updates automatically").click();
+    const updatePrefsFile = path.join(userData, "updates.json");
+    await waitFor(async () => fs.existsSync(updatePrefsFile));
+    check("switching it off is stored in the updater's own file", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).autoCheck === false);
+    check("and the pre-release choice is kept beside it, still off", JSON.parse(fs.readFileSync(updatePrefsFile, "utf-8")).allowPrerelease === false);
+    const settingsFile = path.join(userData, "settings.json"); // only exists once something has been saved to it
+    check("and not in the shared settings file", !fs.existsSync(settingsFile) || !("autoCheck" in JSON.parse(fs.readFileSync(settingsFile, "utf-8"))));
+    check("the page can't make an update install that isn't ready", (await page.evaluate(() => window.composition.installUpdate())).phase === "idle");
+  } else {
+    console.log("SKIP  the update toggles  (development build: they are not shown)");
+  }
 
+  await page.getByRole("tab", { name: "Styling" }).click();
   await page.getByLabel("Light", { exact: true }).check();
   await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).theme === "light");
   check("changing the theme applies it immediately", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
+  await waitFor(async () => (await popoutPage().evaluate(() => document.documentElement.dataset.theme)) === "light").catch(() => {});
+  check("a pop-out follows the color scheme chosen in Settings", (await popoutPage().evaluate(() => document.documentElement.dataset.theme)) === "light");
   check("the theme is stored in the app's own settings file", fs.existsSync(path.join(userData, "settings.json")) && JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).theme === "light");
   check("the web app's settings file was not touched", !fs.existsSync(path.join(home, ".composition-web", "settings.json")));
   await page.screenshot({ path: path.join(out, "4-settings-light.png") });
+  await page.getByRole("tab", { name: "General" }).click();
 
   // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real
   // main-process code and the real files are exercised; only the OS picker is not.
@@ -598,6 +772,16 @@ try {
   }
   check("the bridge has no extra methods", isolation.evilMethod === "undefined");
 
+  // ---- Quitting: what was typed in the last moments is not lost, and the pop-out is remembered where it was put.
+  await app.evaluate(({ BrowserWindow }) => {
+    const popout = BrowserWindow.getAllWindows().find((window) => window.webContents.getURL().includes("/popout/"));
+    popout.setBounds({ x: 120, y: 140, width: 720, height: 520 });
+  });
+  await sleep(700); // the main process writes a window's place a moment after it stops moving
+  quitText = `quit${Date.now()}`;
+  await popoutPage().getByLabel("Markdown editor").fill(`${quitText} typed just before quitting`);
+  // No wait: the app quits inside the half second the text waits to be autosaved.
+
 } catch (error) {
   console.error(error);
   failures.push(`unexpected error: ${error.message}`);
@@ -609,6 +793,61 @@ try {
   }
 } finally {
   await Promise.race([app.close().catch(() => {}), sleep(15_000)]);
+}
+
+// ---- Relaunch: the panels come back as they were left, a deleted note's panel included.
+const relaunched = await electron.launch({
+  executablePath: packaged ?? electronPath,
+  args: packaged ? [`--user-data-dir=${userData}`] : [desktopDir, `--user-data-dir=${userData}`],
+  env: { ...process.env, HOME: home },
+  cwd: "/",
+});
+try {
+  const page = await relaunched.firstWindow();
+  await page.waitForSelector('nav[aria-label="Notes"]', { timeout: 30_000 });
+  await page.getByRole("region", { name: "Notes browser" }).waitFor({ timeout: 10_000 }).catch(() => {});
+  const regions = async (name) => page.getByRole("region", { name }).count();
+  check(
+    "the main window's panels come back after a relaunch: the notes browser, not the note that is in a pop-out",
+    (await regions("Notes browser")) === 1 && (await regions("Smoke note")) === 0,
+  );
+  check(
+    "and the panel of the note that was deleted, still struck through",
+    (await page.getByRole("region", { name: "Hello there" }).locator("header span.line-through").count()) === 1,
+  );
+  check("and their divider", (await page.getByRole("separator", { name: /^Resize panels/ }).count()) === 1);
+
+  const popoutAgain = await waitFor(async () => {
+    const window = relaunched.windows().find((w) => w.url().includes("/popout/") && !w.isClosed());
+    return window && (await window.getByRole("region", { name: "Smoke note" }).count()) === 1 ? window : null;
+  }, { timeout: 30_000 }).catch(() => null);
+  check("the pop-out comes back after a relaunch, with its panel", Boolean(popoutAgain));
+  check(
+    "and the AI helper's panel in it, still about the note",
+    Boolean(popoutAgain) &&
+      (await popoutAgain.getByRole("region", { name: "AI helper" }).getByText("Smoke note").count()) === 1,
+  );
+  const placed = await relaunched.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes("/popout/"));
+    return window?.getBounds();
+  });
+  check(
+    "where the user had put it",
+    Boolean(placed) && placed.x === 120 && placed.y === 140 && placed.width === 720 && placed.height === 520,
+    JSON.stringify(placed),
+  );
+  const saved = await page.evaluate(() => window.composition.loadWorkspace());
+  check(
+    "and what was typed in it a moment before the app quit was saved",
+    saved.notes.some((n) => n.content.includes(quitText)),
+    quitText,
+  );
+  await page.screenshot({ path: path.join(out, "6-relaunched.png") });
+} catch (error) {
+  console.error(error);
+  failures.push(`unexpected error after the relaunch: ${error.message}`);
+} finally {
+  await Promise.race([relaunched.close().catch(() => {}), sleep(15_000)]);
 }
 
 // ---- Shutdown must leave nothing behind
