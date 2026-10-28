@@ -4,6 +4,7 @@ import { NO_FAVORITES, removeFavorite, toggleFavorite as toggleFavoriteIn, type 
 import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { DEFAULT_HOME_SETTINGS, toggleNotebookPin as toggleNotebookPinIn, type HomeSettings } from "@/lib/composition/home";
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
+import { createTodosStore, unavailableTodos, type TodosStore } from "@/lib/composition/todosStore";
 import type { WritingSettings } from "@/lib/composition/writing";
 import type { DropZone, Edge, PanelId, SplitPath } from "../panels/layoutTree";
 import { aboutNoteId } from "../panels/kinds";
@@ -102,6 +103,8 @@ export type WorkspaceSnapshot = {
 
 /** What makes a workspace's open notes a grid of panels (the desktop app) rather than the single row of panes. */
 export type WorkspaceOptions = {
+  /** The to-do items the to-do panels show, one list for every window. Without it, loading them reports that they are unavailable. */
+  todos?: TodosStore;
   panels?: {
     /** What was saved of the panels last time (read from the settings file); one this version can't read is ignored. */
     saved?: unknown;
@@ -115,6 +118,8 @@ export type WorkspaceOptions = {
 export type WorkspaceStore = {
   /** The AI helper's chats, which live with the workspace so they outlast any one screen or window. */
   readonly assistant: ChatsStore;
+  /** The to-do items, which live with the workspace so every to-do panel, in any window, shows one list. */
+  readonly todos: TodosStore;
   subscribe(listener: () => void): () => void;
   getSnapshot(): WorkspaceSnapshot;
   /** Shows the text at once and saves it after a pause; each note has its own pause. */
@@ -561,6 +566,7 @@ export function createWorkspaceStore(
 
   return {
     assistant,
+    todos: options.todos ?? createTodosStore(unavailableTodos),
     subscribe(listener) {
       listeners.add(listener);
       return () => void listeners.delete(listener);

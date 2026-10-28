@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { TODO_METHODS } from "../../../web/src/lib/composition/todosApi";
 import { PANELS_METHODS } from "../../../web/src/lib/composition/panelsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -312,5 +313,55 @@ describe("ASSISTANT_VALIDATORS", () => {
     ["assistantAbort", ["../x"]],
   ] as const)("rejects %s(%j)", (method, args) => {
     expect(() => ASSISTANT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("TODO_VALIDATORS", () => {
+  it("has a validator for every method of the to-do API, and no extras", () => {
+    expect(Object.keys(TODO_VALIDATORS).sort()).toEqual([...TODO_METHODS].sort());
+  });
+
+  it("reads the look without taking anything from the page", () => {
+    expect(TODO_VALIDATORS.loadTodoLook(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes on a look rebuilt from its two fields, and nothing else the page sent", () => {
+    expect(TODO_VALIDATORS.saveTodoLook([{ background: "dots", color: "#14202b", extra: "x" }, "extra"])).toEqual([
+      { background: "dots", color: "#14202b" },
+    ]);
+    expect(TODO_VALIDATORS.saveTodoLook([{ background: "notes", color: null }])).toEqual([{ background: "notes", color: null }]);
+  });
+
+  it.each([[undefined], [null], ["dots"], [{ background: "paisley", color: null }], [{ background: "grid", color: "red" }], [{ background: "grid" }]])(
+    "refuses %j as a look to save",
+    (value) => {
+      expect(() => TODO_VALIDATORS.saveTodoLook([value])).toThrow(InvalidArgumentsError);
+    },
+  );
+
+  it("lists the items without taking anything from the page", () => {
+    expect(TODO_VALIDATORS.listTodos(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes on exactly the arguments each method takes", () => {
+    expect(TODO_VALIDATORS.createTodo(["Buy milk", null, "extra"])).toEqual(["Buy milk", null]);
+    expect(TODO_VALIDATORS.createTodo(["Oat milk", 3])).toEqual(["Oat milk", 3]);
+    expect(TODO_VALIDATORS.renameTodo([4, "Buy oat milk"])).toEqual([4, "Buy oat milk"]);
+    expect(TODO_VALIDATORS.setTodoDone([4, true])).toEqual([4, true]);
+    expect(TODO_VALIDATORS.deleteTodo([4, "extra"])).toEqual([4]);
+  });
+
+  it.each([
+    ["createTodo", [7, null]],
+    ["createTodo", ["x", undefined]],
+    ["createTodo", ["x", "1"]],
+    ["createTodo", ["x".repeat(5000), null]],
+    ["renameTodo", ["4", "x"]],
+    ["renameTodo", [4, null]],
+    ["setTodoDone", [4, "true"]],
+    ["setTodoDone", [1.5, true]],
+    ["deleteTodo", [null]],
+  ] as const)("refuses %s with %j", (method, args) => {
+    expect(() => TODO_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });

@@ -69,7 +69,7 @@ describe("opening the database", () => {
     const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
       .map((t) => t.name)
       .filter((name) => !name.startsWith("sqlite_"));
-    expect(tables.sort()).toEqual(["attachments", "groups", "notebooks", "notes", "trashed_groups", "trashed_notes"]);
+    expect(tables.sort()).toEqual(["attachments", "groups", "notebooks", "notes", "todos", "trashed_groups", "trashed_notes"]);
     expect(columnsOf(db, "attachments").sort()).toEqual(
       ["created_at", "file_name", "id", "note_id", "size", "stored_name"].sort(),
     );

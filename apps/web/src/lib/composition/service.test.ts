@@ -50,6 +50,7 @@ describe("saveSettings", () => {
       previewFont: "default",
       editorFont: "default",
       noteBackground: "plain",
+      todoLook: { background: "notes", color: null },
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       sidebarWidth: 320,

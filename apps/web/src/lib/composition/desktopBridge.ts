@@ -4,13 +4,14 @@ import type { AppearanceListener, AppearanceMessage } from "./appearanceApi";
 import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
 import type { PanelsApi } from "./panelsApi";
+import type { TodosApi } from "./todosApi";
 import type { Layout } from "./layout";
 import type { UpdatesApi, UpdateStateListener } from "./updatesApi";
 import type { WindowApi } from "./windowApi";
 
 /**
  * What Electron's preload script exposes on `window.composition` (apps/desktop).
- * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, UpdatesApi, WindowApi and AssistantStreamApi, plus a
+ * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, UpdatesApi, WindowApi and AssistantStreamApi, plus a
  * synchronous snapshot taken before the page paints so the first frame already
  * has the right color scheme.
  */
@@ -18,6 +19,7 @@ export type DesktopBridge = CompositionApi &
   AttachmentsApi &
   DesktopBackupApi &
   PanelsApi &
+  TodosApi &
   UpdatesApi &
   WindowApi &
   AssistantStreamApi & {

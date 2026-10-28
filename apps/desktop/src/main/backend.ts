@@ -14,5 +14,6 @@ export { listNotes } from "../../../web/src/lib/composition/notesRepo";
 export * as searchIndex from "../../../web/src/lib/composition/searchIndex";
 export * as service from "../../../web/src/lib/composition/service";
 export * as panelsService from "../../../web/src/lib/composition/panelsService";
+export * as todosService from "../../../web/src/lib/composition/todosService";
 export { defaultSharedLocationPath, loadWebSettings } from "../../../web/src/lib/composition/webSettings";
 export type { ThemeName } from "../../../web/src/lib/composition/themes";

@@ -22,6 +22,7 @@ import {
   saveTheme,
   type SaveLocationResult,
 } from "@/lib/composition/client";
+import { TodoLookSettings } from "./TodoLookSettings";
 import { WindowSettings } from "./WindowSettings";
 
 // Preview swatches (background, foreground, primary); must match the palettes in globals.css.
@@ -288,6 +289,8 @@ export function StylingSettings({
         </p>
         {noteBackgroundError && <FieldError>{noteBackgroundError}</FieldError>}
       </FieldSet>
+
+      <TodoLookSettings />
 
       <form action={locationAction} className="flex flex-col gap-2 text-sm">
         <Field className="gap-1">

@@ -45,11 +45,22 @@ describe("web settings layout", () => {
       previewFont: "default",
       editorFont: "default",
       noteBackground: "plain",
+      todoLook: { background: "notes", color: null },
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       ...DEFAULT_LAYOUT,
       favorites: [],
     });
+  });
+
+  it("loads the saved to-do look, repairing any part that is invalid", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+
+    writeSettings({ appDataDir: "/data", todoLook: { background: "dots", color: "#14202B" } });
+    expect(loadWebSettings().todoLook).toEqual({ background: "dots", color: "#14202b" });
+
+    writeSettings({ appDataDir: "/data", todoLook: { background: "paisley", color: "navy" } });
+    expect(loadWebSettings().todoLook).toEqual({ background: "notes", color: null });
   });
 
   it("loads saved writing settings, repairing any part that is invalid", async () => {

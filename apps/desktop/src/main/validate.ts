@@ -3,6 +3,8 @@ import { checkChatRequest } from "../../../web/src/lib/composition/assistant/cha
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
+import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
+import { MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
 import type { ApiMethod } from "./backend";
@@ -245,6 +247,23 @@ export const PANELS_VALIDATORS: Record<PanelsMethod, Validator> = {
     if (!Array.isArray(noteIds) || noteIds.length > MAX_TRASHED_LOOKUPS) fail("loadTrashedNotes", "noteIds");
     return [noteIds.map((noteId) => id("loadTrashedNotes", noteId, "noteId"))];
   },
+};
+
+const todoTitle = (method: string, value: unknown): string =>
+  typeof value === "string" && value.length <= MAX_TODO_TITLE_LENGTH * 4 ? value : fail(method, "title");
+
+/** The to-do methods take ids, booleans, titles and the panels' look; the service trims and limits a title, this only keeps absurd ones out. */
+export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
+  loadTodoLook: none,
+  saveTodoLook: ([look]) => {
+    // Rebuilt from the two checked fields, so nothing else the page sends is saved.
+    return isTodoLook(look) ? [{ background: look.background, color: look.color }] : fail("saveTodoLook", "look");
+  },
+  listTodos: none,
+  createTodo: ([title, parentId]) => [todoTitle("createTodo", title), nullableId("createTodo", parentId, "parentId")],
+  renameTodo: ([todoId, title]) => [id("renameTodo", todoId, "id"), todoTitle("renameTodo", title)],
+  setTodoDone: ([todoId, done]) => [id("setTodoDone", todoId, "id"), flag("setTodoDone", done, "done")],
+  deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
 };
 
 /** The update methods take nothing from the page except a boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */

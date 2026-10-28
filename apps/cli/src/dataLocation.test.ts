@@ -21,6 +21,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     theme: "forest",
     previewFont: "default",
     noteBackground: "plain",
+    todoLook: { background: "notes", color: null },
     editorFont: "default",
     writing: {
       rulerEnabled: false,

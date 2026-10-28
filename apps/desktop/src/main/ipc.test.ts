@@ -3,6 +3,7 @@ import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/co
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
+import { TODO_METHODS, type TodosApi } from "../../../web/src/lib/composition/todosApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS, type WindowApi } from "../../../web/src/lib/composition/windowApi";
 import type { AssistantHost } from "./assistant";
@@ -32,6 +33,9 @@ function setup() {
   const panels = Object.fromEntries(
     PANELS_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof PanelsApi]: ReturnType<typeof vi.fn> };
+  const todos = Object.fromEntries(
+    TODO_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
+  ) as unknown as { [K in keyof TodosApi]: ReturnType<typeof vi.fn> };
   const updates = Object.fromEntries(
     UPDATE_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof UpdatesApi]: ReturnType<typeof vi.fn> };
@@ -46,21 +50,22 @@ function setup() {
     attachments: attachments as unknown as AttachmentsApi,
     backup: backup as unknown as DesktopBackupApi,
     panels: panels as unknown as PanelsApi,
+    todos: todos as unknown as TodosApi,
     updates: updates as unknown as UpdatesApi,
     window: window as unknown as WindowApi,
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup, panels, updates, window, assistant };
+  return { handlers, listeners, api, attachments, backup, panels, todos, updates, window, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, backup, panels, update, window and AI helper method, and nothing else", () => {
+  it("registers one handler per API, attachment, backup, panels, to-do, update, window and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
   });
 
@@ -174,8 +179,12 @@ describe("registerIpc", () => {
     ["a missing frame", { senderFrame: null }],
     ["an unparsable url", { senderFrame: { url: "not a url" } }],
   ])("refuses every method from %s", async (_name, event) => {
-    const { handlers, api, attachments, backup, panels, updates } = setup();
+    const { handlers, api, attachments, backup, panels, todos, updates } = setup();
 
+    for (const method of TODO_METHODS) {
+      await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(/untrusted sender/);
+      expect(todos[method]).not.toHaveBeenCalled();
+    }
     for (const method of PANELS_METHODS) {
       await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(/untrusted sender/);
       expect(panels[method]).not.toHaveBeenCalled();

@@ -7,6 +7,7 @@ import { DEFAULT_HOME_SETTINGS, parseHomeSettings, type HomeSettings } from "./h
 import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./editorFonts";
+import { DEFAULT_TODO_LOOK, readTodoLook, type TodoLook } from "./todoLook";
 import { DEFAULT_NOTE_BACKGROUND, isNoteBackgroundName, type NoteBackgroundName } from "./noteBackgrounds";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
 import type { SavedLocation } from "./sunTimes";
@@ -62,6 +63,8 @@ export type WebSettings = {
   editorFont: EditorFontName;
   /** Pattern drawn behind the window. */
   noteBackground: NoteBackgroundName;
+  /** The background of the desktop app's to-do panels, apart from the notes' (all of them share it). */
+  todoLook: TodoLook;
   /** The editor's ruler and reflow. */
   writing: WritingSettings;
   /** The home page's layout. */
@@ -89,6 +92,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   previewFont: DEFAULT_PREVIEW_FONT,
   editorFont: DEFAULT_EDITOR_FONT,
   noteBackground: DEFAULT_NOTE_BACKGROUND,
+  todoLook: DEFAULT_TODO_LOOK,
   writing: DEFAULT_WRITING_SETTINGS,
   home: DEFAULT_HOME_SETTINGS,
   ...DEFAULT_LAYOUT,
@@ -131,6 +135,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
     noteBackground: isNoteBackgroundName(value.noteBackground) ? value.noteBackground : DEFAULT_NOTE_BACKGROUND,
+    todoLook: readTodoLook(value.todoLook),
     writing: parseWritingSettings(value.writing),
     home: parseHomeSettings(value.home),
     sidebarWidth: clampSidebarWidth(value.sidebarWidth),

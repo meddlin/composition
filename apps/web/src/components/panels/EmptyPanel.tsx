@@ -11,6 +11,7 @@ const CHOICES: { kind: Exclude<KindId, "empty">; label: string }[] = [
   { kind: "note", label: "Note" },
   { kind: "notes-browser", label: "Notes browser" },
   { kind: "ai", label: "AI helper" },
+  { kind: "todo", label: "To-do" },
 ];
 
 /**
