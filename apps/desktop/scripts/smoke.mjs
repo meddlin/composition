@@ -39,12 +39,14 @@ const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../w
 const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
+const { WINDOW_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/windowApi.ts"));
 const expectedBridge = [
   ...API_METHODS,
   ...ATTACHMENT_METHODS,
   ...BACKUP_METHODS,
   ...PANELS_METHODS,
   ...UPDATE_METHODS,
+  ...WINDOW_METHODS,
   ...ASSISTANT_METHODS,
   "onUpdateState",
   "onAppearance",
