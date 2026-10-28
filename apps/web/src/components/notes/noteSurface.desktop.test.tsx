@@ -55,6 +55,29 @@ const noteIds = (store: WorkspaceStore) =>
   });
 const click = (name: string) => act(() => void fireEvent.click(screen.getByRole("button", { name })));
 
+describe("the panel commands in the notes surface of the desktop app", () => {
+  const press = (code: string) => fireEvent.keyDown(document.body, { code, key: "", metaKey: true, shiftKey: true });
+
+  it("are offered in a palette that Cmd/Ctrl+Shift+P opens", () => {
+    setup();
+    expect(screen.queryByRole("dialog", { name: "Command palette" })).toBeNull();
+
+    act(() => void press("KeyP"));
+
+    expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
+    expect(screen.getAllByRole("option")).toHaveLength(7);
+  });
+
+  it("have keys that act on the window the surface is for", () => {
+    const store = setup();
+    expect(panelIds(store.getSnapshot().panels.windows.main.layout)).toHaveLength(1);
+
+    act(() => void press("Backslash"));
+
+    expect(panelIds(store.getSnapshot().panels.windows.main.layout)).toHaveLength(2);
+  });
+});
+
 describe("the notes surface of the desktop app", () => {
   it("reports the note in the focused panel, or in the one used last when a panel of another kind is focused", () => {
     const store = setup();

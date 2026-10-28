@@ -56,6 +56,24 @@ function setup({ opener = true, path = "/popout/?w=w1" } = {}) {
   return { store, popout, b, a, saveNoteContent };
 }
 
+describe("a pop-out's panel commands", () => {
+  const press = (code: string) => fireEvent.keyDown(document.body, { code, key: "", metaKey: true, shiftKey: true });
+
+  it("are in its own palette, which acts on its own window's panels", async () => {
+    const { store, popout } = setup();
+    render(<PopoutApp />);
+    const mainBefore = panelIds(store.getSnapshot().panels.windows.main.layout);
+
+    act(() => void press("KeyP"));
+    expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: "Search commands" }), { target: { value: "split right" } });
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Search commands" }), { key: "Enter" });
+
+    expect(panelIds(store.getSnapshot().panels.windows[popout].layout)).toHaveLength(2);
+    expect(panelIds(store.getSnapshot().panels.windows.main.layout)).toEqual(mainBefore);
+  });
+});
+
 describe("a pop-out's page", () => {
   it("shows the panels of its window from the main window's workspace", async () => {
     setup();

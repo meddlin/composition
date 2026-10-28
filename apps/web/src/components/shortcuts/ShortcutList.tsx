@@ -2,13 +2,15 @@
 
 import { Fragment } from "react";
 import { cn } from "@/lib/utils";
-import { SHORTCUT_GROUPS, type Combo } from "./shortcuts";
+import { shortcutGroups, type Combo } from "./shortcuts";
+import { useIsDesktop } from "./useIsDesktop";
 import { useIsMac } from "./useIsMac";
 
 const MAC_KEYS: Record<string, string> = { Mod: "⌘", Shift: "⇧", Alt: "⌥", Enter: "↵", Tab: "⇥" };
 const OTHER_KEYS: Record<string, string> = { Mod: "Ctrl" };
 
-function Keys({ combo, isMac }: { combo: Combo; isMac: boolean }) {
+/** One combination, as key caps: ⌘⇧L on a Mac, Ctrl + Shift + L elsewhere. */
+export function Keys({ combo, isMac }: { combo: Combo; isMac: boolean }) {
   const glyphs = isMac ? MAC_KEYS : OTHER_KEYS;
   return (
     <span className="inline-flex items-center gap-1">
@@ -31,9 +33,10 @@ function Keys({ combo, isMac }: { combo: Combo; isMac: boolean }) {
 /** Every shortcut, grouped. Shared by the Settings section and the floating helper. */
 export function ShortcutList({ className }: { className?: string }) {
   const isMac = useIsMac();
+  const groups = shortcutGroups(useIsDesktop());
   return (
     <div className={cn("space-y-5", className)}>
-      {SHORTCUT_GROUPS.map((group) => (
+      {groups.map((group) => (
         <section key={group.title} aria-label={group.title}>
           <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">{group.title}</h3>
           <dl className="space-y-1.5">

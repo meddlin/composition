@@ -6,6 +6,7 @@ import { noteIdOf } from "../panels/kinds";
 import type { DropZone, PanelId } from "../panels/layoutTree";
 import { setWarnDuplicateNotePanels, useWarnDuplicateNotePanels } from "../panels/panelPrefs";
 import { MAIN_WINDOW, isNoteShown, type WindowId } from "../panels/panelsState";
+import { PanelCommandPalette } from "../panels/PanelCommandPalette";
 import { PanelGrid } from "../panels/PanelGrid";
 import type { NoteAreaProps, NoteSurface } from "./noteSurfaceTypes";
 import { noteTitle } from "./types";
@@ -15,7 +16,8 @@ export type { NoteAreaProps, NoteSurface };
 
 /**
  * The desktop app's notes surface: panels in a grid. Showing a note in a second panel on purpose (Open to the side,
- * or a drop on a panel) asks first, unless the user turned that warning off.
+ * or a drop on a panel) asks first, unless the user turned that warning off. It also carries the window's panel
+ * commands (see PanelCommandPalette).
  */
 export function useNoteSurface(store: WorkspaceStore, windowId: WindowId = MAIN_WINDOW): NoteSurface {
   const { panels, notes, deleted } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
@@ -44,18 +46,23 @@ export function useNoteSurface(store: WorkspaceStore, windowId: WindowId = MAIN_
       unlessDuplicate(noteId, isNoteShown(store.getSnapshot().panels, noteId, zone === "center" ? panelId : undefined), () =>
         store.dropNote(noteId, panelId, zone),
       ),
-    dialog:
-      asking && askedNote ? (
-        <DuplicateNoteDialog
-          title={noteTitle(askedNote)}
-          onCancel={() => setAsking(null)}
-          onOpenAnyway={(dontWarnAgain) => {
-            if (dontWarnAgain) setWarnDuplicateNotePanels(false);
-            asking.proceed();
-            setAsking(null);
-          }}
-        />
-      ) : null,
+    dialog: (
+      <>
+        {asking && askedNote && (
+          <DuplicateNoteDialog
+            title={noteTitle(askedNote)}
+            onCancel={() => setAsking(null)}
+            onOpenAnyway={(dontWarnAgain) => {
+              if (dontWarnAgain) setWarnDuplicateNotePanels(false);
+              asking.proceed();
+              setAsking(null);
+            }}
+          />
+        )}
+        {/* The panel commands (their keys and the palette) are for this window, whichever kind of window it is. */}
+        <PanelCommandPalette store={store} windowId={windowId} />
+      </>
+    ),
   };
 }
 
