@@ -119,6 +119,11 @@ A plain to-do list in a panel of its own (choose **To-do** in an empty panel). S
   setting, and the other patterns draw whatever you pick, whatever it says. It applies at once, including in pop-outs, and is saved in the
   settings file (`todoLook`). A chosen color also sets the text color to light or dark, whichever reads better on it, so it works under every
   color scheme. **Reset to default** undoes both.
+- **A plugin.** The to-do list is a built-in plugin, on by default, switched in **Settings > Plugins** (`plugins` in the settings file; registry in
+  [`plugins.ts`](../../apps/web/src/lib/composition/plugins.ts)). While it is **off**, an empty panel does not offer **To-do**, **Settings > Styling > To-do
+  background** is hidden, and a to-do panel that is already open stays in its place saying the plugin is off, with a **Turn on To-do** button. Nothing is
+  deleted: the items stay in the database and the panel keeps its folded items, so turning it back on restores everything. The change applies at
+  once in every window. The app's IPC and the `todos` table are unchanged by it. The web app lists the plugin but cannot turn it on or off, as it has no panels.
 - **One list.** The items belong to the workspace, not the panel: any number of to-do panels, in any window, show and change the same list,
   and it is saved in the database as you go, so closing a panel loses nothing.
 

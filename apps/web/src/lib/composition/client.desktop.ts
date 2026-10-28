@@ -71,6 +71,7 @@ export const saveNoteBackground: CompositionApi["saveNoteBackground"] = (backgro
 export const saveWritingSettings: CompositionApi["saveWritingSettings"] = (writing) =>
   bridge().saveWritingSettings(writing);
 export const saveHomeSettings: CompositionApi["saveHomeSettings"] = (home) => bridge().saveHomeSettings(home);
+export const savePluginSettings: CompositionApi["savePluginSettings"] = (plugins) => bridge().savePluginSettings(plugins);
 export const saveAssistantSettings: CompositionApi["saveAssistantSettings"] = (input) =>
   bridge().saveAssistantSettings(input);
 export const listAssistantModels: CompositionApi["listAssistantModels"] = () => bridge().listAssistantModels();
@@ -133,6 +134,7 @@ const _implementsApi: CompositionApi = {
   saveNoteBackground,
   saveWritingSettings,
   saveHomeSettings,
+  savePluginSettings,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

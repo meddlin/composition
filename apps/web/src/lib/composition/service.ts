@@ -54,6 +54,7 @@ import { sunThemeAttributes } from "./sunSchedule";
 import { isEditorFontName } from "./editorFonts";
 import { isNoteBackgroundName } from "./noteBackgrounds";
 import { validateHomeSettings, type HomeSettings } from "./home";
+import { validatePluginSettings, type PluginSettings } from "./plugins";
 import { validateWritingSettings, type WritingSettings } from "./writing";
 import { isPreviewFontName } from "./previewFonts";
 import { isThemeName } from "./themes";
@@ -78,7 +79,7 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
-  const { sidebarWidth, editorRatio, favorites, writing, home } = loadWebSettings();
+  const { sidebarWidth, editorRatio, favorites, writing, home, plugins } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
   await purgeExpiredTrash();
   // Listed first: it is also what gives anything an older CLI wrote a notebook.
@@ -91,6 +92,7 @@ export async function loadWorkspace(): Promise<Workspace> {
     favorites,
     writing,
     home,
+    plugins,
   };
 }
 
@@ -117,6 +119,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     noteBackground: settings.noteBackground,
     writing: settings.writing,
     home: settings.home,
+    plugins: settings.plugins,
     notebooks: dbExists ? notebooksRepo.listNotebooks().map(({ id, name }) => ({ id, name })) : [],
     appDataDir: settings.appDataDir,
     dbPath,
@@ -744,6 +747,13 @@ export async function saveWritingSettings(writing: WritingSettings): Promise<{ e
   return {};
 }
 
+export async function savePluginSettings(plugins: PluginSettings): Promise<{ error?: string }> {
+  const checked = validatePluginSettings(plugins);
+  if (!checked.settings) return { error: checked.error };
+  saveWebSettings({ ...loadWebSettings(), plugins: checked.settings });
+  return {};
+}
+
 export async function saveHomeSettings(home: HomeSettings): Promise<{ error?: string }> {
   const checked = validateHomeSettings(home);
   if (!checked.settings) return { error: checked.error };
@@ -833,6 +843,7 @@ const _implementsApi: CompositionApi = {
   saveNoteBackground,
   saveWritingSettings,
   saveHomeSettings,
+  savePluginSettings,
   saveAssistantSettings,
   listAssistantModels,
   saveLocation,

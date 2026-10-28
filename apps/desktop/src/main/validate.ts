@@ -3,6 +3,7 @@ import { checkChatRequest } from "../../../web/src/lib/composition/assistant/cha
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
+import { PLUGINS } from "../../../web/src/lib/composition/plugins";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
 import { isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
@@ -165,6 +166,10 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
         wordCountEnabled: flag("saveWritingSettings", value.wordCountEnabled, "wordCountEnabled"),
       },
     ];
+  },
+  savePluginSettings: ([input]) => {
+    const value = record("savePluginSettings", input, "settings");
+    return [Object.fromEntries(PLUGINS.map(({ id }) => [id, flag("savePluginSettings", value[id], id)]))];
   },
   saveHomeSettings: ([input]) => {
     const value = record("saveHomeSettings", input, "settings");

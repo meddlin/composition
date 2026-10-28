@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_HOME_SETTINGS, type HomeSettings } from "./home";
 import { DEFAULT_LAYOUT } from "./layout";
+import { DEFAULT_PLUGIN_SETTINGS } from "./plugins";
 import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // Meilisearch isn't running in tests; indexing is best-effort in the service,
@@ -51,6 +52,7 @@ describe("saveSettings", () => {
       editorFont: "default",
       noteBackground: "plain",
       todoLook: { background: "notes", color: null },
+      plugins: DEFAULT_PLUGIN_SETTINGS,
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       sidebarWidth: 320,
@@ -287,6 +289,7 @@ describe("loadSettings", () => {
       noteBackground: "plain",
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
+      plugins: DEFAULT_PLUGIN_SETTINGS,
       notebooks: [],
       appDataDir: path.join(home, ".composition"),
       dbPath: path.join(home, ".composition", "composition.db"),
