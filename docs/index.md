@@ -136,3 +136,7 @@ Stored images can be browsed and reused from the Images page or with `Cmd/Ctrl+S
 See [ui/note-links.md](ui/note-links.md) for linking one note to another (`[[`, the shortcut, and following links).
 
 See [ui/web-side-by-side.md](ui/web-side-by-side.md) for opening several notes side by side (the `⋯` menu's "Open to the side", dragging) and what each pane shows.
+
+See [ui/panels.md](ui/panels.md) for how the desktop app's panels behave (a resizable grid of notes and notes browsers, saved between launches),
+[panel-system-plan.md](panel-system-plan.md) for the design, the build order and what is still to come (dragging a panel out of the window, keyboard shortcuts and menu entries),
+and [panel-system-research.md](panel-system-research.md) for the pop-out spike and the facts behind it.

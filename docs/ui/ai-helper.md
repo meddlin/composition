@@ -45,6 +45,8 @@ Drag the divider to resize it. In a pane narrower than 600 px it covers the note
   the answer's first line, and opens it beside the note you asked about. Nothing is ever inserted into the note you are
   writing.
 - **Several notes open.** Each pane has its own panel, about its own note.
+- **In the desktop app** the helper is a panel of its own beside the note rather than a dock inside it, about the note it was
+  opened from or following the note you are in. See [panels.md](panels.md#the-ai-helper-as-a-panel).
 
 ## What is sent
 
