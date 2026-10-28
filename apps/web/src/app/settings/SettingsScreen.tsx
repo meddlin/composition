@@ -11,6 +11,8 @@ import { FunMetrics } from "./FunMetrics";
 import { HomeSettings } from "./HomeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
 import { PanelSettings } from "./PanelSettings";
+import { PluginsProvider } from "./PluginsProvider";
+import { PluginsSettings } from "./PluginsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { StylingSettings } from "./StylingSettings";
 import { TrashCan } from "./TrashCan";
@@ -36,100 +38,107 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
         </Button>
       </div>
 
-      <Tabs defaultValue="general">
-        <TabsList aria-label="Settings sections">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="styling">Styling</TabsTrigger>
-          <TabsTrigger value="writing">Writing</TabsTrigger>
-          <TabsTrigger value="home">Home page</TabsTrigger>
-          <TabsTrigger value="ai">AI Configuration</TabsTrigger>
-          <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
-        </TabsList>
+      <PluginsProvider initial={snapshot.plugins}>
+        <Tabs defaultValue="general">
+          <TabsList aria-label="Settings sections">
+            <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="styling">Styling</TabsTrigger>
+            <TabsTrigger value="writing">Writing</TabsTrigger>
+            <TabsTrigger value="home">Home page</TabsTrigger>
+            <TabsTrigger value="plugins">Plugins</TabsTrigger>
+            <TabsTrigger value="ai">AI Configuration</TabsTrigger>
+            <TabsTrigger value="shortcuts">Keyboard shortcuts</TabsTrigger>
+          </TabsList>
 
-        {/* Kept mounted when hidden, so a half-edited form survives a look at another tab. */}
-        <TabsContent value="general" forceMount>
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle
-                role="heading"
-                aria-level={2}
-                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              >
-                Current configuration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <dl className="space-y-1">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Application data directory</dt>
-                  <dd className="truncate font-mono">{snapshot.appDataDir}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">
-                    Database file {isOverride ? "(override)" : "(default)"}
-                  </dt>
-                  <dd className="truncate font-mono">{snapshot.dbPath}</dd>
-                </div>
-              </dl>
-              {!snapshot.dirWritable && (
-                <p className="mt-3 text-warning">
-                  Warning: the application data directory doesn&apos;t exist yet or isn&apos;t
-                  writable. It will be created when you save.
-                </p>
-              )}
-              {snapshot.dirWritable && !snapshot.dbExists && (
-                <p className="mt-3 text-muted-foreground">
-                  No database file exists at this location yet — a fresh, empty one will be
-                  created the first time a note is saved.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          {/* Kept mounted when hidden, so a half-edited form survives a look at another tab. */}
+          <TabsContent value="general" forceMount>
+            <Card size="sm">
+              <CardHeader>
+                <CardTitle
+                  role="heading"
+                  aria-level={2}
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Current configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <dl className="space-y-1">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Application data directory</dt>
+                    <dd className="truncate font-mono">{snapshot.appDataDir}</dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">
+                      Database file {isOverride ? "(override)" : "(default)"}
+                    </dt>
+                    <dd className="truncate font-mono">{snapshot.dbPath}</dd>
+                  </div>
+                </dl>
+                {!snapshot.dirWritable && (
+                  <p className="mt-3 text-warning">
+                    Warning: the application data directory doesn&apos;t exist yet or isn&apos;t
+                    writable. It will be created when you save.
+                  </p>
+                )}
+                {snapshot.dirWritable && !snapshot.dbExists && (
+                  <p className="mt-3 text-muted-foreground">
+                    No database file exists at this location yet — a fresh, empty one will be
+                    created the first time a note is saved.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
-          <SettingsForm
-            currentAppDataDir={snapshot.appDataDir}
-            currentDbPath={snapshot.dbPathOverride}
-            derivedDbPathPlaceholder={snapshot.derivedDbPath}
-          />
+            <SettingsForm
+              currentAppDataDir={snapshot.appDataDir}
+              currentDbPath={snapshot.dbPathOverride}
+              derivedDbPathPlaceholder={snapshot.derivedDbPath}
+            />
 
-          <Updates />
+            <Updates />
 
-          <PanelSettings />
+            <PanelSettings />
 
-          <BackupRestore defaultBackupDir={snapshot.backupDir} />
+            <BackupRestore defaultBackupDir={snapshot.backupDir} />
 
-          <TrashCan initialTrash={snapshot.trash} />
+            <TrashCan initialTrash={snapshot.trash} />
 
-          <FunMetrics metrics={snapshot.metrics} />
-        </TabsContent>
+            <FunMetrics metrics={snapshot.metrics} />
+          </TabsContent>
 
-        <TabsContent value="styling" forceMount>
-          <StylingSettings
-            currentTheme={snapshot.theme}
-            currentPreviewFont={snapshot.previewFont}
-            currentEditorFont={snapshot.editorFont}
-            currentNoteBackground={snapshot.noteBackground}
-            currentCity={snapshot.city}
-            currentSunTimes={snapshot.sunTimes}
-          />
-        </TabsContent>
+          <TabsContent value="styling" forceMount>
+            <StylingSettings
+              currentTheme={snapshot.theme}
+              currentPreviewFont={snapshot.previewFont}
+              currentEditorFont={snapshot.editorFont}
+              currentNoteBackground={snapshot.noteBackground}
+              currentCity={snapshot.city}
+              currentSunTimes={snapshot.sunTimes}
+            />
+          </TabsContent>
 
-        <TabsContent value="writing" forceMount>
-          <WritingSettings initial={snapshot.writing} />
-        </TabsContent>
+          <TabsContent value="writing" forceMount>
+            <WritingSettings initial={snapshot.writing} />
+          </TabsContent>
 
-        <TabsContent value="home" forceMount>
-          <HomeSettings initial={snapshot.home} notebooks={snapshot.notebooks} />
-        </TabsContent>
+          <TabsContent value="home" forceMount>
+            <HomeSettings initial={snapshot.home} notebooks={snapshot.notebooks} />
+          </TabsContent>
 
-        <TabsContent value="ai">
-          <AssistantSettings initial={snapshot.assistant} />
-        </TabsContent>
+          <TabsContent value="plugins">
+            <PluginsSettings />
+          </TabsContent>
 
-        <TabsContent value="shortcuts">
-          <KeyboardShortcuts />
-        </TabsContent>
-      </Tabs>
+          <TabsContent value="ai">
+            <AssistantSettings initial={snapshot.assistant} />
+          </TabsContent>
+
+          <TabsContent value="shortcuts">
+            <KeyboardShortcuts />
+          </TabsContent>
+        </Tabs>
+      </PluginsProvider>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/composition/todoLook";
 import { loadTodoLook, saveTodoLook } from "@/lib/composition/todosClient";
 import { cn } from "@/lib/utils";
+import { useSettingsPluginEnabled } from "./PluginsProvider";
 
 /** The color the picker starts on when no color is chosen yet (a picker cannot show "none"). */
 const PICKER_START = "#fbf3d9";
@@ -36,9 +37,14 @@ async function saveLook(look: TodoLook): Promise<{ error?: string }> {
 
 /**
  * Settings > Styling: the background of the to-do panels, one setting for all of them, apart from the note background.
- * (The web app has no to-do panels; see `TodoLookSettings.tsx`.)
+ * It belongs to the To-do plugin, so it is not shown while the plugin is off. (The web app has no to-do panels; see
+ * `TodoLookSettings.tsx`.)
  */
 export function TodoLookSettings() {
+  return useSettingsPluginEnabled("todo") ? <TodoLookForm /> : null;
+}
+
+function TodoLookForm() {
   const [look, setLook] = useState<TodoLook>(DEFAULT_TODO_LOOK);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string>();

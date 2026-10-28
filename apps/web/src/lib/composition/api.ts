@@ -14,6 +14,7 @@ import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 import type { RestoreResult, Trash } from "./trash";
 import type { HomeSettings } from "./home";
+import type { PluginSettings } from "./plugins";
 import type { WritingSettings } from "./writing";
 
 /**
@@ -49,6 +50,8 @@ export type Workspace = {
   writing: WritingSettings;
   /** How the home page is laid out (Settings > Home page). */
   home: HomeSettings;
+  /** Which built-in plugins are on (Settings > Plugins). */
+  plugins: PluginSettings;
 };
 
 /** What the Settings screen shows; computed where the files actually are. */
@@ -59,6 +62,8 @@ export type SettingsSnapshot = {
   noteBackground: NoteBackgroundName;
   writing: WritingSettings;
   home: HomeSettings;
+  /** Which built-in plugins are on. */
+  plugins: PluginSettings;
   /** The notebooks, for choosing their colors; empty until the database exists. */
   notebooks: { id: number; name: string }[];
   appDataDir: string;
@@ -211,6 +216,8 @@ export interface CompositionApi {
   saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
   /** Saves how the home page is laid out; a layout it doesn't offer comes back as `error`. */
   saveHomeSettings(settings: HomeSettings): Promise<{ error?: string }>;
+  /** Saves which built-in plugins are on; a plugin that is missing, or not known, comes back as `error`. */
+  savePluginSettings(settings: PluginSettings): Promise<{ error?: string }>;
 
   /** Saves where the AI helper finds Ollama and how large a context window it asks for; a bad value comes back as `error`. */
   saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult>;
@@ -263,6 +270,7 @@ export const API_METHODS = [
   "saveNoteBackground",
   "saveWritingSettings",
   "saveHomeSettings",
+  "savePluginSettings",
   "saveAssistantSettings",
   "listAssistantModels",
   "saveLocation",

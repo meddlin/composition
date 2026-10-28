@@ -118,6 +118,33 @@ describe("a window of panels", () => {
     expect(screen.queryAllByRole("separator")).toEqual([]);
   });
 
+  it("offers the To-do plugin's panel while the plugin is on, and not while it is off", async () => {
+    const { store } = setup();
+    expect(within(emptyPanels()[0]).getByRole("button", { name: "To-do" })).toBeTruthy();
+
+    await act(async () => void store.plugins.setEnabled("todo", false));
+
+    expect(within(emptyPanels()[0]).queryByRole("button", { name: "To-do" })).toBeNull();
+    expect(within(emptyPanels()[0]).getByRole("button", { name: "Note" })).toBeTruthy();
+  });
+
+  it("keeps a to-do panel whose plugin is turned off, saying so, and brings the list back when it is turned on again", async () => {
+    const { store } = setup();
+    fireEvent.click(within(emptyPanels()[0]).getByRole("button", { name: "To-do" }));
+    expect(kinds(store)).toEqual(["todo"]);
+
+    await act(async () => void store.plugins.setEnabled("todo", false));
+
+    expect(kinds(store)).toEqual(["todo"]);
+    expect(screen.getByText("The To-do plugin is turned off.")).toBeTruthy();
+    expect(screen.queryByLabelText(/new to-do/i)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Turn on To-do" }));
+
+    expect(screen.queryByText("The To-do plugin is turned off.")).toBeNull();
+    expect(store.plugins.getSnapshot().enabled.todo).toBe(true);
+  });
+
   it("turns an empty panel into the kind chosen in it", () => {
     const { store } = setup();
 

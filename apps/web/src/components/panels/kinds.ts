@@ -1,5 +1,6 @@
 import { DOCK_MIN_WIDTH } from "../notes/assistantDock";
 import type { PaneView } from "../notes/panes";
+import type { PluginId } from "@/lib/composition/plugins";
 import type { KindId, PanelRecord } from "./panelsState";
 
 /** What a note panel saves: the note it shows (none yet, for one just made from the empty panel) and its tab. */
@@ -43,6 +44,8 @@ export const KINDS: Record<
   {
     /** The least width, in px, a panel of this kind can be dragged down to. */
     minWidth: number;
+    /** The plugin this kind belongs to: while it is off the kind is not offered, and its panels say so instead of showing. */
+    plugin?: PluginId;
     initialState: () => unknown;
     restore: (saved: unknown, context: RestoreContext) => unknown | null;
   }
@@ -80,6 +83,7 @@ export const KINDS: Record<
   },
   todo: {
     minWidth: MIN_PANEL_WIDTH,
+    plugin: "todo",
     initialState: (): TodoPanelState => ({ collapsed: [] }),
     restore(saved) {
       if (!isRecord(saved) || !Array.isArray(saved.collapsed)) return null;

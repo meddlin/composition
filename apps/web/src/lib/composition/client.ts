@@ -39,6 +39,7 @@ export {
   saveEditorFont,
   saveFavorites,
   saveHomeSettings,
+  savePluginSettings,
   saveImage,
   saveLayout,
   saveLocation,
