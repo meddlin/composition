@@ -2,6 +2,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createChatsStore } from "@/lib/composition/assistant/chatsStore";
 import { activeConversation } from "@/lib/composition/assistant/conversations";
 import type { ChatEvent, ChatRequest } from "@/lib/composition/assistant/types";
 import { streamChat } from "@/lib/composition/assistantClient";
@@ -140,5 +141,40 @@ describe("AssistantProvider", () => {
     await act(async () => result.current.send({ ...input, noteId: 2, userText: "other note" }));
     expect(turnsOf(result, 1).map((t) => t.userText)).toEqual(["What next?"]);
     expect(turnsOf(result, 2).map((t) => t.userText)).toEqual(["other note"]);
+  });
+});
+
+describe("AssistantProvider on a shared store", () => {
+  const sharedWrapper = (store: ReturnType<typeof createChatsStore>) =>
+    function Shared({ children }: { children: ReactNode }) {
+      return <AssistantProvider store={store}>{children}</AssistantProvider>;
+    };
+  const newStore = () => createChatsStore({ streamChat: (request, signal) => streamChat(request, signal) });
+
+  it("shows the same chats to everything that shares the store", async () => {
+    controlledStream();
+    const store = newStore();
+    const first = renderHook(() => useAssistant(), { wrapper: sharedWrapper(store) });
+    const second = renderHook(() => useAssistant(), { wrapper: sharedWrapper(store) });
+
+    await act(async () => first.result.current.send(input));
+
+    expect(turnsOf(second.result)).toHaveLength(1);
+    expect(second.result.current.isStreaming(1)).toBe(true);
+  });
+
+  it("lets an answer finish when the screen that asked goes away, but cuts off one the provider owns", async () => {
+    const shared = controlledStream();
+    const store = newStore();
+    const sharedHook = renderHook(() => useAssistant(), { wrapper: sharedWrapper(store) });
+    await act(async () => sharedHook.result.current.send(input));
+    sharedHook.unmount();
+    expect(shared.signals[0]?.aborted).toBe(false);
+
+    const owned = controlledStream();
+    const ownedHook = renderHook(() => useAssistant(), { wrapper });
+    await act(async () => ownedHook.result.current.send(input));
+    ownedHook.unmount();
+    expect(owned.signals[0]?.aborted).toBe(true);
   });
 });
