@@ -1,6 +1,6 @@
 import { cleanTodoTitle } from "./todos";
 import { isTodoLook } from "./todoLook";
-import type { TodosApi } from "./todosApi";
+import { isTodoStatus, type TodosApi } from "./todosApi";
 import * as todosRepo from "./todosRepo";
 import { loadWebSettings, saveWebSettings } from "./webSettings";
 
@@ -36,6 +36,13 @@ export const renameTodo: TodosApi["renameTodo"] = async (id, title) => {
 
 export const setTodoDone: TodosApi["setTodoDone"] = async (id, done) => {
   const todo = todosRepo.updateTodo(id, { done });
+  if (!todo) throw new Error("That to-do no longer exists.");
+  return todo;
+};
+
+export const setTodoStatus: TodosApi["setTodoStatus"] = async (id, status) => {
+  if (!isTodoStatus(status)) throw new Error("That is not a to-do status.");
+  const todo = todosRepo.updateTodo(id, { status });
   if (!todo) throw new Error("That to-do no longer exists.");
   return todo;
 };

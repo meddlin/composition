@@ -4,7 +4,7 @@ import type { AttachmentMethod } from "../../../web/src/lib/composition/attachme
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
-import { MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
+import { isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
 import type { ApiMethod } from "./backend";
@@ -263,6 +263,10 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
   createTodo: ([title, parentId]) => [todoTitle("createTodo", title), nullableId("createTodo", parentId, "parentId")],
   renameTodo: ([todoId, title]) => [id("renameTodo", todoId, "id"), todoTitle("renameTodo", title)],
   setTodoDone: ([todoId, done]) => [id("setTodoDone", todoId, "id"), flag("setTodoDone", done, "done")],
+  setTodoStatus: ([todoId, status]) => [
+    id("setTodoStatus", todoId, "id"),
+    isTodoStatus(status) ? status : fail("setTodoStatus", "status"),
+  ],
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
 };
 

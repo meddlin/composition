@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Todo, TodosApi } from "./todosApi";
+import type { Todo, TodosApi, TodoStatus } from "./todosApi";
 import type { TodoLook } from "./todoLook";
+import { withDone, withStatus } from "./todos";
 import { createTodosStore } from "./todosStore";
 
-const make = (id: number, parentId: number | null, title: string, done = false): Todo => ({ id, parentId, title, done, createdAt: "", updatedAt: "" });
+const make = (id: number, parentId: number | null, title: string, done = false): Todo => ({ id, parentId, title, status: done ? "done" : "todo", done, createdAt: "", updatedAt: "" });
 
 /** A backend that keeps its items in memory, like the real one does in a database. */
 function fakeBackend(initial: Todo[] = []) {
@@ -26,7 +27,11 @@ function fakeBackend(initial: Todo[] = []) {
       return items.find((t) => t.id === id)!;
     }),
     setTodoDone: vi.fn(async (id: number, done: boolean) => {
-      items = items.map((t) => (t.id === id ? { ...t, done } : t));
+      items = items.map((t) => (t.id === id ? withDone(t, done) : t));
+      return items.find((t) => t.id === id)!;
+    }),
+    setTodoStatus: vi.fn(async (id: number, status: TodoStatus) => {
+      items = items.map((t) => (t.id === id ? withStatus(t, status) : t));
       return items.find((t) => t.id === id)!;
     }),
     deleteTodo: vi.fn(async (id: number) => {
@@ -175,5 +180,31 @@ describe("the to-do store", () => {
     stop();
     await store.add("x", null);
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("moves an item to a status at once, and keeps done in step", async () => {
+    const api = fakeBackend([make(1, null, "a")]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const moving = store.setStatus(1, "in_progress");
+    expect(store.getSnapshot().todos[0]).toMatchObject({ status: "in_progress", done: false });
+    await moving;
+
+    await store.setStatus(1, "done");
+    expect(store.getSnapshot().todos[0]).toMatchObject({ status: "done", done: true });
+    expect(api.setTodoStatus).toHaveBeenLastCalledWith(1, "done");
+  });
+
+  it("puts the stored status back when the backend refuses a move", async () => {
+    const api = fakeBackend([make(1, null, "a")]);
+    api.setTodoStatus.mockRejectedValueOnce(new Error("no disk"));
+    const store = createTodosStore(api);
+    await store.load();
+
+    const result = await store.setStatus(1, "backlog");
+
+    expect(result.error).toBe("no disk");
+    expect(store.getSnapshot()).toMatchObject({ todos: [{ status: "todo" }], error: "no disk" });
   });
 });

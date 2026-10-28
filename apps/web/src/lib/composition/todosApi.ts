@@ -5,11 +5,22 @@
 
 import type { TodoLook } from "./todoLook";
 
-/** One to-do item. An item with a `parentId` is a sub-item of that item; sub-items nest without limit. */
+/** Where an item stands, in the order the board shows them. */
+export const TODO_STATUSES = ["backlog", "todo", "in_progress", "done"] as const;
+
+export type TodoStatus = (typeof TODO_STATUSES)[number];
+
+export const isTodoStatus = (value: unknown): value is TodoStatus => TODO_STATUSES.includes(value as TodoStatus);
+
+/**
+ * One to-do item. An item with a `parentId` is a sub-item of that item; sub-items nest without limit. `done` is
+ * `status === "done"`, kept as a field because the list view ticks items off.
+ */
 export type Todo = {
   id: number;
   parentId: number | null;
   title: string;
+  status: TodoStatus;
   done: boolean;
   createdAt: string;
   updatedAt: string;
@@ -29,8 +40,10 @@ export interface TodosApi {
   createTodo(title: string, parentId: number | null): Promise<Todo>;
   /** Rejects an empty title or a missing item. */
   renameTodo(id: number, title: string): Promise<Todo>;
-  /** Marks the item done or not done. Its sub-items are left as they are. */
+  /** Marks the item done or not done. Unticking a done item puts it back to "todo"; sub-items are left as they are. */
   setTodoDone(id: number, done: boolean): Promise<Todo>;
+  /** Moves the item to a status ("done" is the same as ticking it). Its sub-items are left as they are. Rejects a missing item. */
+  setTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
   /** Deletes the item and everything under it, for good. Deleting an item that is already gone is not an error. */
   deleteTodo(id: number): Promise<void>;
 }
@@ -43,6 +56,7 @@ export const TODO_METHODS = [
   "createTodo",
   "renameTodo",
   "setTodoDone",
+  "setTodoStatus",
   "deleteTodo",
 ] as const satisfies readonly (keyof TodosApi)[];
 

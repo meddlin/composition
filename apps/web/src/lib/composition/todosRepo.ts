@@ -1,21 +1,27 @@
 import { getDb } from "./db";
-import type { Todo } from "./todosApi";
+import { withDone, withStatus } from "./todos";
+import { isTodoStatus, type Todo, type TodoStatus } from "./todosApi";
 
 type TodoRow = {
   id: number;
   parent_id: number | null;
   title: string;
   done: number;
+  status: string;
   created_at: string;
   updated_at: string;
 };
 
 function fromRow(row: TodoRow): Todo {
+  // `done` is the one a row from an older version is sure to have right; a status that isn't one of ours falls back to it.
+  const done = row.done === 1;
+  const status: TodoStatus = isTodoStatus(row.status) ? row.status : done ? "done" : "todo";
   return {
     id: row.id,
     parentId: row.parent_id,
     title: row.title,
-    done: row.done === 1,
+    status,
+    done: status === "done",
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -33,19 +39,23 @@ export function getTodo(id: number): Todo | null {
 export function addTodo(title: string, parentId: number | null): Todo {
   const now = new Date().toISOString();
   const result = getDb()
-    .prepare("INSERT INTO todos (parent_id, title, done, created_at, updated_at) VALUES (?, ?, 0, ?, ?)")
+    .prepare("INSERT INTO todos (parent_id, title, done, status, created_at, updated_at) VALUES (?, ?, 0, 'todo', ?, ?)")
     .run(parentId, title, now, now);
   const todo = getTodo(Number(result.lastInsertRowid));
   if (!todo) throw new Error("Failed to read back the to-do that was just added");
   return todo;
 }
 
-export function updateTodo(id: number, change: { title?: string; done?: boolean }): Todo | null {
+/** A change to an item: a new title, and/or ticking it (`done`) or moving it (`status`; wins over `done` if both are given). */
+export function updateTodo(id: number, change: { title?: string; done?: boolean; status?: TodoStatus }): Todo | null {
   const current = getTodo(id);
   if (!current) return null;
+  let next = current;
+  if (change.done !== undefined) next = withDone(next, change.done);
+  if (change.status !== undefined) next = withStatus(next, change.status);
   getDb()
-    .prepare("UPDATE todos SET title = ?, done = ?, updated_at = ? WHERE id = ?")
-    .run(change.title ?? current.title, (change.done ?? current.done) ? 1 : 0, new Date().toISOString(), id);
+    .prepare("UPDATE todos SET title = ?, done = ?, status = ?, updated_at = ? WHERE id = ?")
+    .run(change.title ?? current.title, next.done ? 1 : 0, next.status, new Date().toISOString(), id);
   return getTodo(id);
 }
 

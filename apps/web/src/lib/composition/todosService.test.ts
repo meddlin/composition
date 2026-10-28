@@ -79,6 +79,55 @@ describe("the to-do service", () => {
     await expect(setTodoDone(999, true)).rejects.toThrow(/no longer exists/);
   });
 
+  it("starts an item at to-do, and moves it between statuses", async () => {
+    const { createTodo, setTodoStatus, setTodoDone, listTodos } = await import("./todosService");
+    const item = await createTodo("Buy milk", null);
+    expect(item).toMatchObject({ status: "todo", done: false });
+
+    expect(await setTodoStatus(item.id, "backlog")).toMatchObject({ status: "backlog", done: false });
+    expect(await setTodoStatus(item.id, "in_progress")).toMatchObject({ status: "in_progress", done: false });
+    expect(await setTodoStatus(item.id, "done")).toMatchObject({ status: "done", done: true });
+    // Unticking a done item puts it back to "todo"; ticking and unticking one that is in progress keeps nothing of it.
+    expect(await setTodoDone(item.id, false)).toMatchObject({ status: "todo", done: false });
+    expect(await setTodoDone(item.id, true)).toMatchObject({ status: "done", done: true });
+    expect((await listTodos())[0]).toMatchObject({ status: "done", done: true });
+  });
+
+  it("refuses a status that is not one, and an item that is not there", async () => {
+    const { createTodo, setTodoStatus } = await import("./todosService");
+    const item = await createTodo("a", null);
+
+    await expect(setTodoStatus(item.id, "later" as never)).rejects.toThrow(/not a to-do status/);
+    await expect(setTodoStatus(999, "done")).rejects.toThrow(/no longer exists/);
+  });
+
+  it("keeps a status that was set, through a rename", async () => {
+    const { createTodo, setTodoStatus, renameTodo } = await import("./todosService");
+    const item = await createTodo("a", null);
+    await setTodoStatus(item.id, "in_progress");
+
+    expect(await renameTodo(item.id, "b")).toMatchObject({ title: "b", status: "in_progress" });
+  });
+
+  it("reads items from a database that had no statuses: ticked ones are done, the rest to-do", async () => {
+    const { default: Database } = await import("better-sqlite3");
+    const { resolvedDbPath, loadWebSettings } = await import("./webSettings");
+    const dbPath = resolvedDbPath(loadWebSettings());
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    const old = new Database(dbPath);
+    old.exec(`CREATE TABLE todos (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER, title TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    old.prepare("INSERT INTO todos (title, done, created_at, updated_at) VALUES ('open', 0, '', ''), ('closed', 1, '', '')").run();
+    old.close();
+
+    const { listTodos } = await import("./todosService");
+
+    expect((await listTodos()).map((t) => [t.title, t.status, t.done])).toEqual([
+      ["open", "todo", false],
+      ["closed", "done", true],
+    ]);
+  });
+
   it("deletes an item with everything under it, and nothing else", async () => {
     const { createTodo, deleteTodo, listTodos } = await import("./todosService");
     const a = await createTodo("a", null);

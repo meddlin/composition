@@ -1,6 +1,6 @@
-import { cleanTodoTitle, subtreeIds } from "./todos";
+import { cleanTodoTitle, subtreeIds, withDone, withStatus } from "./todos";
 import { DEFAULT_TODO_LOOK, type TodoLook } from "./todoLook";
-import type { Todo, TodosApi } from "./todosApi";
+import type { Todo, TodosApi, TodoStatus } from "./todosApi";
 
 /** What the store reaches outside for: the to-do items' backend. */
 export type TodosDeps = TodosApi;
@@ -29,6 +29,8 @@ export type TodosStore = {
   rename(id: number, title: string): Promise<TodoResult>;
   /** Shows the change at once. */
   setDone(id: number, done: boolean): Promise<TodoResult>;
+  /** Shows the move at once. "done" is the same as ticking the item. */
+  setStatus(id: number, status: TodoStatus): Promise<TodoResult>;
   /** Removes the item and everything under it, at once. */
   remove(id: number): Promise<TodoResult>;
   /** Shows the look at once, in every to-do panel of every window, and saves it. */
@@ -105,9 +107,19 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
   }
 
   async function setDone(id: number, done: boolean): Promise<TodoResult> {
-    set({ todos: state.todos.map((t) => (t.id === id ? { ...t, done } : t)), error: null });
+    set({ todos: state.todos.map((t) => (t.id === id ? withDone(t, done) : t)), error: null });
     try {
       replace(await deps.setTodoDone(id, done));
+      return {};
+    } catch (error) {
+      return undo(error);
+    }
+  }
+
+  async function setStatus(id: number, status: TodoStatus): Promise<TodoResult> {
+    set({ todos: state.todos.map((t) => (t.id === id ? withStatus(t, status) : t)), error: null });
+    try {
+      replace(await deps.setTodoStatus(id, status));
       return {};
     } catch (error) {
       return undo(error);
@@ -147,6 +159,7 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
     add,
     rename,
     setDone,
+    setStatus,
     remove,
     setLook,
   };
@@ -160,5 +173,6 @@ export const unavailableTodos: TodosDeps = {
   createTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   renameTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   setTodoDone: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
+  setTodoStatus: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   deleteTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
 };

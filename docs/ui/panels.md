@@ -106,6 +106,12 @@ A plain to-do list in a panel of its own (choose **To-do** in an empty panel). S
 - **Renaming.** The pencil on an item, or double-click its title. Enter saves, Escape gives up.
 - **Done.** The checkbox ticks an item off and its text is struck through and dimmed. Ticking an item does not tick its sub-items.
 - **Deleting.** The bin on an item. An item with sub-items asks first, because they go with it.
+- **List or board.** The two buttons beside the add box switch the panel between the nested **list** and a **board** with a column per status:
+  **Backlog**, **To-do**, **In progress** and **Done** ([`TodoBoard.tsx`](../../apps/web/src/components/panels/TodoBoard.tsx)). A new item starts
+  in *To-do*. Move a card with the arrows on it, or drag it to another column. Every item is a card, sub-items too (a sub-item says which
+  item it is under), and moving a card does not move the cards under it. *Done* is the same state as the list's checkbox: moving a card to
+  *Done* ticks it, and unticking a done item puts it back in *To-do*. Which view a panel is on is saved with the panel's layout (a panel saved
+  before the board existed opens on the list). Items ticked off before statuses existed show up in *Done*.
 - **Folding.** The arrow beside an item with sub-items hides or shows them; which are folded is saved with the panel's layout.
 - **Background.** **Settings > Styling > To-do background** (desktop app only) gives the to-do panels a **pattern** (*Same as notes*, *Plain*, *Grid*,
   *Dots* or *Ruled lines*) and a **color** (a few presets, any color from the picker, or the color scheme's own), with a small preview. It is

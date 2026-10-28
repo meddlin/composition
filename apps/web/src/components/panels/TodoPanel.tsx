@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRightIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -11,8 +11,9 @@ import type { TodoResult } from "@/lib/composition/todosStore";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "../ConfirmDialog";
 import type { WorkspaceStore } from "../notes/workspaceStore";
-import type { TodoPanelState } from "./kinds";
+import type { TodoPanelState, TodoView } from "./kinds";
 import type { PanelId } from "./layoutTree";
+import { TodoBoard } from "./TodoBoard";
 import { todoLookStyle } from "./todoLookStyle";
 
 /** How far, in px, each level of sub-items is pushed in. */
@@ -188,9 +189,10 @@ function TodoRow(props: RowProps) {
 }
 
 /**
- * A to-do list: items with sub-items, to add, rename, delete and tick off (a done item is struck through). The items
- * are the workspace's, so every to-do panel, in any window, shows the same list; the panel itself saves only which
- * items it has folded away.
+ * A to-do list: items with sub-items, to add, rename, delete and tick off (a done item is struck through). It can be
+ * shown as that list or as a board with a column per status (backlog, to-do, in progress, done). The items are the
+ * workspace's, so every to-do panel, in any window, shows the same items; the panel itself saves only which items it
+ * has folded away and which view it is on.
  */
 export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; panelId: PanelId; state: TodoPanelState }) {
   const todosStore = store.todos;
@@ -212,6 +214,10 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     store.setPanelState(panelId, { ...state, collapsed: next } satisfies TodoPanelState);
   }
 
+  function setView(view: TodoView) {
+    if (view !== state.view) store.setPanelState(panelId, { ...state, view } satisfies TodoPanelState);
+  }
+
   function askToDelete(todo: Todo) {
     // An item with nothing under it is quick to type again; one with sub-items is not.
     if (countDescendants(todos, todo.id) === 0) void todosStore.remove(todo.id);
@@ -224,18 +230,42 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col gap-2 p-2", look.className)} style={look.style}>
-      <TitleInput
-        label="New to-do"
-        placeholder="Add a to-do"
-        keepOpen
-        onSubmit={(title) => todosStore.add(title, null)}
-      />
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 flex-1">
+          <TitleInput
+            label="New to-do"
+            placeholder="Add a to-do"
+            keepOpen
+            onSubmit={(title) => todosStore.add(title, null)}
+          />
+        </div>
+        <div role="group" aria-label="View" className="flex shrink-0 gap-0.5 rounded-lg border p-0.5">
+          {(
+            [
+              ["list", "List", ListIcon],
+              ["board", "Board", KanbanIcon],
+            ] as const
+          ).map(([view, label, Icon]) => (
+            <Button
+              key={view}
+              variant={state.view === view ? "secondary" : "ghost"}
+              size="icon-xs"
+              aria-label={`${label} view`}
+              aria-pressed={state.view === view}
+              title={`${label} view`}
+              onClick={() => setView(view)}
+            >
+              <Icon />
+            </Button>
+          ))}
+        </div>
+      </div>
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className={cn("min-h-0 flex-1", state.view === "list" && "overflow-y-auto")}>
         {status === "error" ? (
           <div className="flex flex-col items-start gap-2 p-1 text-sm text-muted-foreground">
             <span>The to-do list could not be loaded.</span>
@@ -247,6 +277,8 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
           <p className="p-1 text-sm text-muted-foreground">Loading…</p>
         ) : tree.length === 0 ? (
           <p className="p-1 text-sm text-muted-foreground">Nothing to do yet.</p>
+        ) : state.view === "board" ? (
+          <TodoBoard todos={todos} onMove={(id, next) => void todosStore.setStatus(id, next)} onDelete={askToDelete} />
         ) : (
           <ul aria-label="To-dos">
             {tree.map((node) => (

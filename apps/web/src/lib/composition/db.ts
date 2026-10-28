@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS todos (
     parent_id INTEGER,
     title TEXT NOT NULL,
     done INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'todo',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -136,6 +137,12 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
   db.exec(TODOS_SCHEMA);
+  // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
+  const todoColumns = db.prepare("PRAGMA table_info(todos)").all() as { name: string }[];
+  if (!todoColumns.some((c) => c.name === "status")) {
+    db.exec("ALTER TABLE todos ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'");
+    db.exec("UPDATE todos SET status = 'done' WHERE done = 1");
+  }
   ensureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,

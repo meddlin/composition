@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildTodoTree, cleanTodoTitle, countDescendants, subtreeIds } from "./todos";
+import { buildTodoTree, cleanTodoTitle, countDescendants, subtreeIds, withDone, withStatus } from "./todos";
 import type { Todo } from "./todosApi";
 
 const todo = (id: number, parentId: number | null, title = `t${id}`): Todo => ({
   id,
   parentId,
   title,
+  status: "todo",
   done: false,
   createdAt: "",
   updatedAt: "",
@@ -48,5 +49,22 @@ describe("cleanTodoTitle", () => {
     expect(cleanTodoTitle("   ")).toBeNull();
     expect(cleanTodoTitle("x".repeat(501))).toBeNull();
     expect(cleanTodoTitle("x".repeat(500))).not.toBeNull();
+  });
+});
+
+describe("withStatus and withDone", () => {
+  it("keeps done in step with the status", () => {
+    expect(withStatus(todo(1, null), "done")).toMatchObject({ status: "done", done: true });
+    expect(withStatus({ ...todo(1, null), status: "done", done: true }, "in_progress")).toMatchObject({ status: "in_progress", done: false });
+  });
+
+  it("ticks an item to done, and unticks a done item back to to-do", () => {
+    const ticked = withDone({ ...todo(1, null), status: "in_progress" }, true);
+    expect(ticked).toMatchObject({ status: "done", done: true });
+    expect(withDone(ticked, false)).toMatchObject({ status: "todo", done: false });
+  });
+
+  it("leaves an item that is not done where it is when unticked", () => {
+    expect(withDone({ ...todo(1, null), status: "backlog" }, false)).toMatchObject({ status: "backlog", done: false });
   });
 });
