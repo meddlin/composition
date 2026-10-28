@@ -1,7 +1,9 @@
-import { BrowserWindow, shell } from "electron";
+import { BrowserWindow, shell, type WebPreferences } from "electron";
 import type { ThemeName } from "./backend";
 import { installContextMenu } from "./contextMenu";
 import { isAllowedOrigin } from "./origin";
+import { isExternalUrl } from "./popoutWindows";
+import type { createPopoutManager, WindowLike } from "./popoutManager";
 import { TRANSLUCENT_BACKGROUND, WINDOW_VIBRANCY } from "./translucency";
 
 /**
@@ -18,13 +20,21 @@ export const THEME_BACKGROUND: Record<Exclude<ThemeName, "auto">, string> = {
   cream: "#f6f0e1",
 };
 
-function isExternalUrl(url: string): boolean {
-  try {
-    const { protocol } = new URL(url);
-    return protocol === "https:" || protocol === "http:" || protocol === "mailto:";
-  } catch {
-    return false;
-  }
+/** What the main window's page is given: exactly the window.composition bridge, and its timers kept running. */
+export function mainWindowPreferences(preloadPath: string): WebPreferences {
+  return {
+    preload: preloadPath,
+    // The UI gets exactly the window.composition bridge and nothing else.
+    contextIsolation: true,
+    sandbox: true,
+    nodeIntegration: false,
+    webSecurity: true,
+    // Underlines misspelled words in the editor (the OS dictionary on macOS); contextMenu.ts offers the fixes.
+    spellcheck: true,
+    // The workspace's autosave timers run in this page for every window, pop-outs included: a minimised main window
+    // that throttled them to about one tick a second would delay saving what is typed in a pop-out.
+    backgroundThrottling: false,
+  };
 }
 
 export function createMainWindow(options: {
@@ -32,10 +42,12 @@ export function createMainWindow(options: {
   entryUrl: string;
   allowedOrigins: readonly string[];
   theme: Exclude<ThemeName, "auto">;
+  /** Decides which windows its page may open (pop-outs, and nothing else), and looks after them. */
+  popouts: ReturnType<typeof createPopoutManager>;
   /** Blur what is behind the window (macOS) and let the page show it through. */
   translucent: boolean;
 }): BrowserWindow {
-  const { preloadPath, entryUrl, allowedOrigins, theme, translucent } = options;
+  const { preloadPath, entryUrl, allowedOrigins, theme, popouts, translucent } = options;
 
   const window = new BrowserWindow({
     width: 1280,
@@ -46,30 +58,17 @@ export function createMainWindow(options: {
     title: "Composition",
     ...(translucent ? { vibrancy: WINDOW_VIBRANCY } : {}),
     backgroundColor: translucent ? TRANSLUCENT_BACKGROUND : (THEME_BACKGROUND[theme] ?? THEME_BACKGROUND.dark),
-    webPreferences: {
-      preload: preloadPath,
-      // The UI gets exactly the window.composition bridge and nothing else.
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      webSecurity: true,
-      // Underlines misspelled words in the editor (the OS dictionary on macOS); contextMenu.ts offers the fixes.
-      spellcheck: true,
-    },
+    webPreferences: mainWindowPreferences(preloadPath),
   });
   installContextMenu(window.webContents);
 
   window.once("ready-to-show", () => window.show());
 
-  // Links in rendered notes open in the user's browser; the app window never
-  // navigates away from its own UI.
-  const isOurs = (url: string) => isAllowedOrigin(url, allowedOrigins);
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (isExternalUrl(url)) void shell.openExternal(url);
-    return { action: "deny" };
-  });
+  // Links in rendered notes open in the user's browser; the app window never navigates away from its own UI. The
+  // one window it may open is a pop-out, which the manager allows and looks after.
+  popouts.attach(window as unknown as WindowLike);
   window.webContents.on("will-navigate", (event, url) => {
-    if (isOurs(url)) return;
+    if (isAllowedOrigin(url, allowedOrigins)) return;
     event.preventDefault();
     if (isExternalUrl(url)) void shell.openExternal(url);
   });

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AppearanceSync } from "@/components/desktop/AppearanceSync";
 import { ShortcutsHelper } from "@/components/shortcuts/ShortcutsHelper";
 import { SunThemeSync } from "@/components/SunThemeSync";
 import { EDITOR_FONT_CHOICES } from "@/lib/composition/editorFonts";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: APPLY_THEME }} />
       </head>
       <body className="h-full">
+        <AppearanceSync />
         <SunThemeSync />
         <ShortcutsHelper>{children}</ShortcutsHelper>
       </body>

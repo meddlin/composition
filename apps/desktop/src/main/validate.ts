@@ -2,6 +2,7 @@ import { isRequestId, type AssistantMethod } from "../../../web/src/lib/composit
 import { checkChatRequest } from "../../../web/src/lib/composition/assistant/chatRequest";
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
+import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
 import type { ApiMethod } from "./backend";
@@ -225,6 +226,25 @@ export const ATTACHMENT_VALIDATORS: Record<AttachmentMethod, Validator> = {
 export const BACKUP_VALIDATORS: Record<BackupMethod, Validator> = {
   createBackup: none,
   restoreBackup: none,
+};
+
+/** The most a saved arrangement of panels can weigh. A real one is a few kilobytes; this stops a page from filling the settings file. */
+const MAX_PANELS_JSON_LENGTH = 256 * 1024;
+
+/** Most notes the page may ask about at once. A window has a few panels. */
+const MAX_TRASHED_LOOKUPS = 100;
+
+/** The panels' arrangement is the page's own document: it only has to be an object of a sane size, and is read back by the page. */
+export const PANELS_VALIDATORS: Record<PanelsMethod, Validator> = {
+  loadPanels: none,
+  savePanels: ([document]) => {
+    const value = record("savePanels", document, "document");
+    return JSON.stringify(value).length <= MAX_PANELS_JSON_LENGTH ? [value] : fail("savePanels", "document");
+  },
+  loadTrashedNotes: ([noteIds]) => {
+    if (!Array.isArray(noteIds) || noteIds.length > MAX_TRASHED_LOOKUPS) fail("loadTrashedNotes", "noteIds");
+    return [noteIds.map((noteId) => id("loadTrashedNotes", noteId, "noteId"))];
+  },
 };
 
 /** The update methods take nothing from the page except a boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */

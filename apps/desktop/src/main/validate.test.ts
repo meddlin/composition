@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { PANELS_METHODS } from "../../../web/src/lib/composition/panelsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -213,6 +214,37 @@ describe("BACKUP_VALIDATORS", () => {
   it("takes no arguments at all, so a page can't name a path", () => {
     expect(BACKUP_VALIDATORS.createBackup(["/etc/cron.d/evil"])).toEqual([]);
     expect(BACKUP_VALIDATORS.restoreBackup(["/tmp/x.tar.gz", 1])).toEqual([]);
+  });
+});
+
+describe("PANELS_VALIDATORS", () => {
+  it("has a validator for every method of the panels API, and no extras", () => {
+    expect(Object.keys(PANELS_VALIDATORS).sort()).toEqual([...PANELS_METHODS].sort());
+  });
+
+  it("loads the arrangement without taking anything from the page", () => {
+    expect(PANELS_VALIDATORS.loadPanels(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes a saved arrangement through whole", () => {
+    const saved = { version: 1, windows: { main: { layout: { type: "panel", id: "p1" }, panels: {} } } };
+    expect(PANELS_VALIDATORS.savePanels([saved, "extra"])).toEqual([saved]);
+  });
+
+  it.each([[undefined], [null], ["panels"], [7], [["a"]]])("refuses %j as an arrangement to save", (value) => {
+    expect(() => PANELS_VALIDATORS.savePanels([value])).toThrow(InvalidArgumentsError);
+  });
+
+  it("refuses an arrangement too large to be one", () => {
+    expect(() => PANELS_VALIDATORS.savePanels([{ junk: "x".repeat(300_000) }])).toThrow(InvalidArgumentsError);
+  });
+
+  it("takes whole numbers to look up in the Trash Can, and not many of them", () => {
+    expect(PANELS_VALIDATORS.loadTrashedNotes([[1, 2, 3], "extra"])).toEqual([[1, 2, 3]]);
+    expect(PANELS_VALIDATORS.loadTrashedNotes([[]])).toEqual([[]]);
+    for (const bad of [undefined, "1", [1.5], ["1"], [null], Array.from({ length: 101 }, (_, i) => i)]) {
+      expect(() => PANELS_VALIDATORS.loadTrashedNotes([bad]), JSON.stringify(bad)?.slice(0, 20)).toThrow(InvalidArgumentsError);
+    }
   });
 });
 

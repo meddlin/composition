@@ -26,9 +26,12 @@ type Props = {
   getSelection: () => string;
   /** Makes a separate new note from an answer. */
   onNewNoteFromText: (text: string) => void;
-  onClose: () => void;
+  /** Closes the dock; a panel of the desktop app's grid is closed by its own header, and passes none. */
+  onClose?: () => void;
   /** Escape in the composer: give focus back to the note. */
   onReturnFocus: () => void;
+  /** Set when this is a panel of its own, which says which note it is about where a dock says "AI helper". */
+  panel?: { noteTitle: string; /** The note was deleted: its chat can still be read, but nothing can be asked. */ deleted: boolean };
 };
 
 function readStoredModel(): string | null {
@@ -108,8 +111,9 @@ function TurnView({ turn, onNewNote }: { turn: Turn; onNewNote: (text: string) =
  * read and has no way to change the note (there is no `onChange`); the only things that leave it are a copy of an
  * answer and a request for a separate new note.
  */
-export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFromText, onClose, onReturnFocus }: Props) {
+export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFromText, onClose, onReturnFocus, panel }: Props) {
   const assistant = useAssistant();
+  const deleted = panel?.deleted ?? false;
   const [found, setFound] = useState<AssistantModels | null>(null);
   const [picked, setPicked] = useState<string | null>(readStoredModel);
   const [draft, setDraft] = useState("");
@@ -147,7 +151,7 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
   }, [noteContent, conversation, selection, deferredDraft]);
   const fit = fitsContext(estimate, numCtx);
 
-  const canSend = Boolean(model) && !streaming && draft.trim() !== "" && fit !== "over";
+  const canSend = Boolean(model) && !deleted && !streaming && draft.trim() !== "" && fit !== "over";
 
   function send() {
     if (!model || !canSend) return;
@@ -189,21 +193,32 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
     >
       <header className="flex shrink-0 flex-col gap-1 border-b px-3 py-2">
         <div className="flex items-center gap-2">
-          <MessageSquareIcon className="size-4 text-muted-foreground" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-sm font-medium">AI helper</span>
+          {panel ? (
+            <span className="min-w-0 flex-1 truncate text-sm" title={deleted ? "Deleted — in the Trash Can" : undefined}>
+              <span className="text-muted-foreground">About </span>
+              <span className={cn("font-medium", deleted && "line-through")}>{panel.noteTitle}</span>
+            </span>
+          ) : (
+            <>
+              <MessageSquareIcon className="size-4 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-sm font-medium">AI helper</span>
+            </>
+          )}
           <Button
             variant="ghost"
             size="icon-xs"
             aria-label="New chat"
             title="New chat"
-            disabled={turns.length === 0 || streaming}
+            disabled={turns.length === 0 || streaming || deleted}
             onClick={() => assistant.newChat(noteId)}
           >
             <PlusIcon />
           </Button>
-          <Button variant="ghost" size="icon-xs" aria-label="Close AI helper" title="Close" onClick={onClose}>
-            <XIcon />
-          </Button>
+          {onClose && (
+            <Button variant="ghost" size="icon-xs" aria-label="Close AI helper" title="Close" onClick={onClose}>
+              <XIcon />
+            </Button>
+          )}
         </div>
         {found && !found.error && found.models.length > 0 && (
           <select
@@ -274,7 +289,10 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
             </Button>
           </div>
         )}
-        {found && !found.error && found.models.length > 0 && turns.length === 0 && (
+        {deleted && turns.length === 0 && (
+          <p className="text-sm text-muted-foreground">This note was deleted, so there is nothing to ask about.</p>
+        )}
+        {!deleted && found && !found.error && found.models.length > 0 && turns.length === 0 && (
           <p className="text-sm text-muted-foreground">
             Ask for guidance on this note. Select some text first to ask about just that part. Answers appear here;
             nothing is written into your note.
@@ -297,16 +315,17 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
         <textarea
           aria-label="Ask about this note"
           value={draft}
-          disabled={!model}
+          // Typing can start while the models are still being looked for; sending waits for one.
+          disabled={deleted || (found !== null && !model)}
           rows={3}
-          placeholder="Ask about this note…"
+          placeholder={deleted ? "This note was deleted." : "Ask about this note…"}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onComposerKeyDown}
           className="w-full resize-none rounded-md border bg-background px-2 py-1.5 text-sm disabled:opacity-50"
         />
         <div className="flex items-center gap-2">
           <p className={cn("min-w-0 flex-1 text-xs", fit === "ok" ? "text-muted-foreground" : "text-warning")}>
-            {model && `Sends this note (about ${estimate.toLocaleString("en-US")} tokens)`}
+            {model && !deleted && `Sends this note (about ${estimate.toLocaleString("en-US")} tokens)`}
             {fit === "tight" && <span className="block">This nearly fills the model&apos;s window.</span>}
             {fit === "over" && (
               <span className="block">

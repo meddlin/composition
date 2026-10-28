@@ -33,7 +33,8 @@ type Props = {
   /** Opens the groups above a note and scrolls it into view, e.g. after picking it from search. */
   reveal: RevealRequest | null;
   onRevealed: () => void;
-  width: number;
+  /** A width in px, or "fill" to take all the room it is given (a notes browser in a panel). */
+  width: number | "fill";
   groupError: string | null;
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
@@ -88,8 +89,8 @@ export function NoteSidebar({
   return (
     <nav
       aria-label="Notes"
-      style={{ width }}
-      className="flex shrink-0 flex-col bg-surface"
+      style={width === "fill" ? undefined : { width }}
+      className={width === "fill" ? "flex min-h-0 min-w-0 flex-1 flex-col bg-surface" : "flex shrink-0 flex-col bg-surface"}
     >
       {collapsedNotebookName !== undefined && (
         <div className="p-2">

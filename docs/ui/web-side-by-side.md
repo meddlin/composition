@@ -6,6 +6,8 @@ Source: [`panes.ts`](../../apps/web/src/components/notes/panes.ts),
 [`NotePane.tsx`](../../apps/web/src/components/notes/NotePane.tsx),
 [`NotesApp.tsx`](../../apps/web/src/components/notes/NotesApp.tsx) (web and desktop; the terminal app has its own keys, see [cli-keybindings.md](cli-keybindings.md))
 
+**The desktop app no longer works this way:** it shows its open notes in a grid of panels, described in [panels.md](panels.md). What follows is the web app's row of panes.
+
 The workspace shows its open notes in a single row of panes. Each note is open in at most one pane,
 and the pane that was last clicked or typed in is the *focused* one: it is where a note picked in
 the sidebar opens, replacing the note that was there.
@@ -36,7 +38,8 @@ other, with the divider between them shared by every pane).
 - A pane narrower than 480px has no Split tab and shows the editor if it was on Split; widening it
   brings Split back.
 
-The arrangement, and each pane's tab, is not saved: a reload starts again with one pane.
+The arrangement, and each pane's tab, is not saved: a reload starts again with one pane. In the desktop app the open panes (and the AI helper's chats) are kept while you are in Settings or Images, and are
+there when you come back; the web app, which loads the page afresh, starts again with one pane.
 The terminal app shares the same pane logic, so a pane it opens with `o` also starts on the editor.
 
 ## The AI helper takes room from the note
@@ -44,5 +47,5 @@ The terminal app shares the same pane logic, so a pane it opens with `o` also st
 A pane can open the [AI helper](ai-helper.md) to the right of its note. It sits inside the pane, so it shrinks the note's
 own column: the 480px rule above is applied to that column, which means **Split gives way to the Markdown tab sooner**
 while the helper is open, and comes back when it closes or the pane widens. Below about 600px the helper covers the note
-instead of sitting beside it. Each pane has its own helper, about its own note.
+instead of sitting beside it. Each pane has its own helper, about its own note. (In the desktop app's [panels](panels.md#the-ai-helper-as-a-panel) the helper is a panel of its own, not a dock.)
 

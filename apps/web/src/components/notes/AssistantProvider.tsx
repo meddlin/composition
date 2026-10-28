@@ -1,27 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { buildMessages, estimateTokens } from "@/lib/composition/assistant/context";
-import {
-  activeConversation,
-  chatsReducer,
-  historyOf,
-  NO_CHATS,
-  type ChatsAction,
-  type ChatsState,
-  type Turn,
-} from "@/lib/composition/assistant/conversations";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createChatsStore, type ChatsStore, type SendInput } from "@/lib/composition/assistant/chatsStore";
+import { activeConversation, type ChatsState } from "@/lib/composition/assistant/conversations";
 import { streamChat } from "@/lib/composition/assistantClient";
 
-export type SendInput = {
-  noteId: number;
-  /** The note as it is now, including text not yet saved. */
-  noteContent: string;
-  selection?: string;
-  userText: string;
-  model: string;
-  numCtx: number;
-};
+export type { SendInput };
 
 type Assistant = {
   chats: ChatsState;
@@ -44,83 +28,24 @@ export function useAssistant(): Assistant {
   return value;
 }
 
-const newId = () => crypto.randomUUID();
-
 /**
- * Holds the AI helper's conversations for every open note, above the panes, so that closing, moving or re-opening
- * a pane does not lose a chat or cut off an answer that is still streaming. Nothing is saved: a reload starts empty.
+ * Gives the AI helper's conversations for every open note to the panes below it, so that closing, moving or
+ * re-opening a pane does not lose a chat or cut off an answer that is still streaming. Nothing is saved: a reload
+ * starts empty.
+ *
+ * With no `store` it keeps its own and cuts off any answer still streaming when it goes away. Given one (the
+ * workspace's, which outlives the screen), it only reads it: an answer keeps arriving into the store.
  */
-export function AssistantProvider({ children }: { children: ReactNode }) {
-  const [chats, setChats] = useState<ChatsState>(NO_CHATS);
-  // The latest state, readable straight after a dispatch (a question's history must include the last answer).
-  const latest = useRef<ChatsState>(NO_CHATS);
-  const running = useRef(new Map<number, AbortController>());
+export function AssistantProvider({ children, store }: { children: ReactNode; store?: ChatsStore }) {
+  const [owned] = useState(() => (store ? null : createChatsStore({ streamChat: (request, signal) => streamChat(request, signal) })));
+  const chatsStore = (store ?? owned)!;
+  const chats = useSyncExternalStore(chatsStore.subscribe, chatsStore.getSnapshot, chatsStore.getSnapshot);
 
-  const dispatch = useCallback((action: ChatsAction) => {
-    latest.current = chatsReducer(latest.current, action);
-    setChats(latest.current);
-  }, []);
-
-  const send = useCallback(
-    (input: SendInput) => {
-      const { noteId } = input;
-      if (running.current.has(noteId)) return;
-
-      const conversation = activeConversation(latest.current, noteId);
-      const conversationId = conversation?.id ?? newId();
-      const built = buildMessages({
-        noteContent: input.noteContent,
-        history: conversation ? historyOf(conversation) : [],
-        selection: input.selection,
-        userText: input.userText,
-      });
-      const turn: Turn = {
-        id: newId(),
-        model: input.model,
-        userText: input.userText,
-        userMessage: built.userMessage,
-        selectionChars: input.selection?.trim() ? Math.min(input.selection.length, 8000) : 0,
-        selectionCut: built.selectionCut,
-        estimatedTokens: estimateTokens(built.messages),
-        answer: "",
-        thinking: false,
-        status: "streaming",
-        promptCut: false,
-      };
-      dispatch({ type: "turn-started", noteId, conversationId, turn });
-
-      const controller = new AbortController();
-      running.current.set(noteId, controller);
-      void (async () => {
-        try {
-          for await (const event of streamChat({ model: input.model, messages: built.messages, numCtx: input.numCtx }, controller.signal)) {
-            dispatch({ type: "event", noteId, conversationId, turnId: turn.id, event });
-          }
-        } finally {
-          if (running.current.get(noteId) === controller) running.current.delete(noteId);
-        }
-      })();
-    },
-    [dispatch],
-  );
-
-  const stop = useCallback((noteId: number) => running.current.get(noteId)?.abort(), []);
-
-  const newChat = useCallback((noteId: number) => dispatch({ type: "new-chat", noteId, conversationId: newId() }), [dispatch]);
-
-  const select = useCallback(
-    (noteId: number, conversationId: string) => dispatch({ type: "select", noteId, conversationId }),
-    [dispatch],
-  );
-
-  const forgetNote = useCallback(
-    (noteId: number) => {
-      running.current.get(noteId)?.abort();
-      running.current.delete(noteId);
-      dispatch({ type: "note-removed", noteId });
-    },
-    [dispatch],
-  );
+  // Leaving the app's screen (or a test ending) must not leave a request running that nothing will read.
+  useEffect(() => {
+    if (!owned) return;
+    return () => owned.abortAll();
+  }, [owned]);
 
   const isStreaming = useCallback(
     (noteId: number) => {
@@ -130,15 +55,17 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     [chats],
   );
 
-  // Leaving the app's screen (or a test ending) must not leave a request running.
-  useEffect(() => {
-    const controllers = running.current;
-    return () => controllers.forEach((c) => c.abort());
-  }, []);
-
   const value = useMemo(
-    () => ({ chats, send, stop, newChat, select, forgetNote, isStreaming }),
-    [chats, send, stop, newChat, select, forgetNote, isStreaming],
+    () => ({
+      chats,
+      send: chatsStore.send,
+      stop: chatsStore.stop,
+      newChat: chatsStore.newChat,
+      select: chatsStore.select,
+      forgetNote: chatsStore.forgetNote,
+      isStreaming,
+    }),
+    [chats, chatsStore, isStreaming],
   );
   return <AssistantContext.Provider value={value}>{children}</AssistantContext.Provider>;
 }

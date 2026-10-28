@@ -1,3 +1,5 @@
+import { PALETTE_SHORTCUT, PANEL_COMMANDS } from "../panels/panelCommands";
+
 /**
  * Every keyboard shortcut the app answers to, for the shortcuts helper to list. This is
  * documentation, not wiring: each handler lives beside the thing it controls (SearchBar,
@@ -37,7 +39,7 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { combos: [["Mod", "Shift", "M"]], description: "Insert an image that is already stored (type to filter by name)" },
       { combos: [["Mod", "Shift", "X"]], description: "Turn the Markdown image at the caret (or in the selection) into an <Image /> tag, which can be resized" },
       { combos: [["Mod", "F"]], description: "Find in the note" },
-      { combos: [["Mod", "Shift", "L"]], description: "Open or close the AI helper beside the note" },
+      { combos: [["Mod", "Shift", "L"]], description: "Open the AI helper beside the note (on the web, again to close it)" },
       { combos: [["Tab"]], description: "Insert a tab (nested list items, code)" },
       { combos: [["Shift", "Tab"]], description: "Leave the editor" },
     ],
@@ -84,3 +86,24 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
     ],
   },
 ];
+
+/**
+ * The desktop app's panel commands, from the same table the keys are handled from, so the list cannot drift from them.
+ * The commands with no key of their own are reached through the palette, which says so.
+ */
+const PANEL_GROUP: ShortcutGroup = {
+  title: "Panels",
+  shortcuts: [
+    { combos: [PALETTE_SHORTCUT.keys], description: "Open the command palette, to run any panel command by name" },
+    ...PANEL_COMMANDS.flatMap((command) =>
+      command.shortcut ? [{ combos: [command.shortcut.keys], description: command.label }] : [],
+    ),
+  ],
+};
+
+/** The groups to list: the web app has no panels, so only the desktop app lists their commands. */
+export function shortcutGroups(desktop: boolean): readonly ShortcutGroup[] {
+  if (!desktop) return SHORTCUT_GROUPS;
+  const at = SHORTCUT_GROUPS.findIndex((group) => group.title === "Views and layout") + 1;
+  return [...SHORTCUT_GROUPS.slice(0, at), PANEL_GROUP, ...SHORTCUT_GROUPS.slice(at)];
+}

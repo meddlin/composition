@@ -12,6 +12,8 @@ type Props = {
   valueMin: number;
   valueMax: number;
   className?: string;
+  /** "vertical" (the default) is a vertical line, dragged left and right; "horizontal" is a line between stacked panels, dragged up and down. */
+  orientation?: "vertical" | "horizontal";
   onResizeStart: () => void;
   /** Distance in px from where the drag (or key press) started. */
   onResize: (dxPx: number) => void;
@@ -29,11 +31,13 @@ export function ResizeHandle({
   valueMin,
   valueMax,
   className = "",
+  orientation = "vertical",
   onResizeStart,
   onResize,
   onResizeEnd,
 }: Props) {
-  const startX = useRef<number | null>(null);
+  const horizontal = orientation === "horizontal";
+  const start = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
   // Capture routes moves to the handle, but not every browser keeps the resize
@@ -41,51 +45,52 @@ export function ResizeHandle({
   useEffect(() => {
     if (!dragging) return;
     const { cursor, userSelect } = document.body.style;
-    document.body.style.cursor = "col-resize";
+    document.body.style.cursor = horizontal ? "row-resize" : "col-resize";
     document.body.style.userSelect = "none";
     return () => {
       document.body.style.cursor = cursor;
       document.body.style.userSelect = userSelect;
     };
-  }, [dragging]);
+  }, [dragging, horizontal]);
 
   function onPointerDown(e: PointerEvent<HTMLDivElement>) {
     if (e.button !== 0) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture?.(e.pointerId);
-    startX.current = e.clientX;
+    start.current = horizontal ? e.clientY : e.clientX;
     setDragging(true);
     onResizeStart();
   }
 
   function onPointerMove(e: PointerEvent<HTMLDivElement>) {
-    if (startX.current === null) return;
-    onResize(e.clientX - startX.current);
+    if (start.current === null) return;
+    onResize((horizontal ? e.clientY : e.clientX) - start.current);
   }
 
   function endDrag() {
-    if (startX.current === null) return;
-    startX.current = null;
+    if (start.current === null) return;
+    start.current = null;
     setDragging(false);
     onResizeEnd();
   }
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const [less, more] = horizontal ? ["ArrowUp", "ArrowDown"] : ["ArrowLeft", "ArrowRight"];
+    if (e.key !== less && e.key !== more) return;
     e.preventDefault();
     // Restart on every press so held-key repeats keep stepping from the latest size.
     onResizeStart();
-    onResize(e.key === "ArrowLeft" ? -KEY_STEP_PX : KEY_STEP_PX);
+    onResize(e.key === less ? -KEY_STEP_PX : KEY_STEP_PX);
   }
 
   function onKeyUp(e: KeyboardEvent<HTMLDivElement>) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowRight") onResizeEnd();
+    if (horizontal ? e.key === "ArrowUp" || e.key === "ArrowDown" : e.key === "ArrowLeft" || e.key === "ArrowRight") onResizeEnd();
   }
 
   return (
     <div
       role="separator"
-      aria-orientation="vertical"
+      aria-orientation={orientation}
       aria-label={label}
       aria-valuenow={valueNow}
       aria-valuemin={valueMin}
@@ -99,7 +104,10 @@ export function ResizeHandle({
       onKeyUp={onKeyUp}
       // The 1px line is the divider; the ::before widens the grab area onto the panes beside it.
       className={cn(
-        "relative w-px shrink-0 cursor-col-resize touch-none select-none outline-none transition-colors before:absolute before:inset-y-0 before:-inset-x-1 hover:bg-brand/60 focus-visible:bg-brand",
+        "relative shrink-0 touch-none select-none outline-none transition-colors hover:bg-brand/60 focus-visible:bg-brand",
+        horizontal
+          ? "h-px cursor-row-resize before:absolute before:inset-x-0 before:-inset-y-1"
+          : "w-px cursor-col-resize before:absolute before:inset-y-0 before:-inset-x-1",
         dragging ? "bg-brand" : "bg-border",
         className,
       )}

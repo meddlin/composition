@@ -73,6 +73,8 @@ type Props = {
   find?: FindState;
   /** Set to a ref to get the editor's controls (see `MarkdownEditorControls`). */
   controls?: Ref<MarkdownEditorControls>;
+  /** The text can be read and copied but not changed (a note that was deleted while it is on screen). */
+  readOnly?: boolean;
 };
 
 const NO_NOTES: readonly Note[] = [];
@@ -93,6 +95,7 @@ export function MarkdownEditor({
   onOpenNote,
   find,
   controls,
+  readOnly = false,
 }: Props) {
   const writing = useWriting();
   const ownIdBase = useId();
@@ -467,7 +470,8 @@ export function MarkdownEditor({
               completion.sync(e.target);
               noteLinkPicker.sync(e.target);
             }}
-            onPaste={onPaste}
+            readOnly={readOnly}
+            onPaste={readOnly ? undefined : onPaste}
             // The text is drawn by the highlight layer, but the browser's squiggles still land on the textarea's own text.
             spellCheck
             aria-label="Markdown editor"

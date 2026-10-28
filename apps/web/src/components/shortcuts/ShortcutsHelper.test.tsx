@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ShortcutsHelper, useShortcutsHelper } from "./ShortcutsHelper";
 import { SHORTCUT_GROUPS } from "./shortcuts";
 
@@ -83,5 +83,56 @@ describe("ShortcutsHelper", () => {
     fireEvent.keyDown(document.body, { key: "?" });
     const search = screen.getByText("Search notes").closest("div");
     expect([...search!.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Ctrl", "K"]);
+  });
+
+  it("says what the AI helper shortcut does on the web, where it is a dock, which the same key closes", () => {
+    render(<ShortcutsHelper />);
+    fireEvent.keyDown(document.body, { key: "?" });
+
+    expect(screen.getByRole("dialog").textContent).toContain("Open the AI helper beside the note (on the web, again to close it)");
+  });
+
+  it("has no panel shortcuts on the web, which has no panels", () => {
+    render(<ShortcutsHelper />);
+    fireEvent.keyDown(document.body, { key: "?" });
+
+    expect(screen.queryByRole("region", { name: "Panels" })).toBeNull();
+    expect(screen.getByRole("dialog").textContent).not.toContain("Command palette");
+  });
+
+  describe("in the desktop app", () => {
+    beforeEach(() => {
+      // The preload script's bridge is what tells the page it is in the desktop app.
+      Object.defineProperty(window, "composition", { value: {}, configurable: true });
+    });
+    afterEach(() => {
+      Reflect.deleteProperty(window, "composition");
+    });
+
+    /** The keys shown beside a description, for the one entry with it. */
+    const keysOf = (description: string) =>
+      [...screen.getByText(description).closest("div")!.querySelectorAll("kbd")].map((k) => k.textContent);
+
+    it("adds the panel commands that have keys, and the palette that has them all", () => {
+      render(<ShortcutsHelper />);
+      fireEvent.keyDown(document.body, { key: "?" });
+      const panels = within(screen.getByRole("region", { name: "Panels" }));
+
+      expect(keysOf("Open the command palette, to run any panel command by name")).toEqual(["Ctrl", "Shift", "P"]);
+      expect(panels.getByText("Split Right")).toBeTruthy();
+      expect(keysOf("Split Right")).toEqual(["Ctrl", "Shift", "\\"]);
+      expect(keysOf("Close Panel")).toEqual(["Ctrl", "Shift", "W"]);
+      expect(keysOf("Next Panel")).toEqual(["Ctrl", "Shift", "]"]);
+      expect(keysOf("Previous Panel")).toEqual(["Ctrl", "Shift", "["]);
+    });
+
+    it("lists no command that has no key of its own", () => {
+      render(<ShortcutsHelper />);
+      fireEvent.keyDown(document.body, { key: "?" });
+
+      const panels = screen.getByRole("region", { name: "Panels" });
+      expect(panels.textContent).not.toContain("Split Down");
+      expect(panels.textContent).not.toContain("Move to New Window");
+    });
   });
 });

@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { fromRow as noteFromRow, type Note, type NoteRow } from "./notesRepo";
 import { defaultNotebookId } from "./notebooksRepo";
 import { GroupNotEmptyError, groupIsEmpty } from "./groupsRepo";
 import { expiryOf, retentionCutoff, type Trash } from "./trash";
@@ -74,6 +75,15 @@ export function listTrash(): Trash {
       expiresAt: expiryOf(g.deleted_at),
     })),
   };
+}
+
+/** The notes with these ids that are in the trash, as they were when deleted, without taking them out of it. */
+export function getTrashedNotes(ids: number[]): Note[] {
+  if (ids.length === 0) return [];
+  const rows = getDb()
+    .prepare(`SELECT * FROM trashed_notes WHERE id IN (${ids.map(() => "?").join(", ")}) ORDER BY id`)
+    .all(...ids) as NoteRow[];
+  return rows.map(noteFromRow);
 }
 
 /** The notebook an item was trashed from if it still exists, else the default one. */
