@@ -94,6 +94,32 @@ closed like any other.
   following. Chats are not saved, as before.
 - **The web app** keeps the dock inside the note pane; only the desktop app has panels.
 
+## Panel commands and the command palette
+
+Every panel command can be run from the **command palette**, and the ones that are used most have keys. Both act on the **focused panel
+of the window you are in**, so in a pop-out they act on the pop-out's panels.
+
+| Command | Keys | What it does |
+|---|---|---|
+| **Split Right** | `Mod+Shift+\` | A new empty panel to the right of the focused one. |
+| **Split Down** | | The same, below. |
+| **Close Panel** | `Mod+Shift+W` | Closes the focused panel (as its `⋯` menu does). |
+| **Next Panel** / **Previous Panel** | `Mod+Shift+]` / `Mod+Shift+[` | Moves to the panel after or before this one, **in the order they are laid out** (left to right, top to bottom), wrapping round. |
+| **Move to New Window** | | Pulls the focused panel into a window of its own. |
+| **Move to Main Window** | | Brings the focused panel of a pop-out back. Does nothing in the main window. |
+
+- **The palette.** `Mod+Shift+P` opens it, from anywhere in a window, with the cursor in its search box. Type to narrow the list (every
+  word has to match; a name's initials such as `sr` work, and so do other words such as *pop out* or *below*), **↑ ↓** to move,
+  **Enter** to run, **Esc** to close. Each command shows its key. `Mod+Shift+P` again closes it. Each window has its own palette.
+- **After a command the cursor goes into the panel it left focused**, not back to the one it was typing in, so typing carries on there.
+- **The keys** are matched by the **physical key** (and with Cmd or Ctrl and Shift, never Alt, which AltGr types characters with on
+  some layouts), so they work wherever the layout puts the characters. A key held down does not repeat a command. Keys do nothing while the
+  palette is open.
+- **Not in the native menu.** The commands are not in the menu bar, so a clash with a macOS shortcut can only be seen by hand (the smoke
+  test's key presses reach the page, not the menu).
+- Also listed under **Keyboard shortcuts** (`Mod+/`) in the desktop app, from the same table the keys are handled from. The AI helper keeps its
+  own key, `Mod+Shift+L`.
+
 ## The same note in more than one panel
 
 Allowed, and both panels edit one copy of the note, so nothing is lost. **Open to the side**, and dropping a note that is already open
@@ -119,5 +145,4 @@ read from the database again and merged in.
 
 ## Not built yet
 
-Dragging a panel header out of the window to pop it out, keyboard
-shortcuts and menu entries for panel commands, and the to-do panel. See [panel-system-plan.md](../panel-system-plan.md#build-order).
+Dragging a panel header out of the window to pop it out, native-menu entries for the panel commands, and the to-do panel. See [panel-system-plan.md](../panel-system-plan.md#build-order).

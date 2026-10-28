@@ -56,7 +56,7 @@ From the owner, 2026-10-28 (the reasons are in [Settled by the owner](#settled-b
   extra trees beside the grid.
 - **Third-party panel plugins** loaded at runtime. They would need a sandbox, an API surface and signing.
 - **Dragging a panel out of the window** to pop it out. The `⋯` menu does it in v1.
-- **Keyboard shortcuts and native-menu entries** for panel commands.
+- **Native-menu entries** for the panel commands. The commands, their keys and a command palette exist.
 - **The to-do panel.** Its schema and bridge methods are designed when it is built. The panel system promises only
   that a kind can use `window.composition` and may add a slice to the store.
 - **Pop-outs that outlive the main window.** That needs the store to live somewhere other than the main window, for
@@ -479,9 +479,56 @@ a real Ollama (the smoke test uses a stand-in).
 
 ### After that
 
-Dragging a panel header out of the window to pop it out; keyboard shortcuts and native-menu entries; docs
-(`docs/ui/panels.md` for the behavior, which does not exist yet, and a row in
-[feature-matrix.md](feature-matrix.md)) as each step lands.
+Dragging a panel header out of the window to pop it out, and native-menu entries for the panel commands (the commands, their keys and a
+command palette are built: see below). Docs (`docs/ui/panels.md` for the behavior, and a row in [feature-matrix.md](feature-matrix.md))
+as each step lands.
+
+### Follow-up: panel commands and a command palette
+
+Asked for as "keyboard shortcuts and menu entries for panel commands". A command palette was investigated as an alternative to a native
+menu, found much easier, and built **instead of** the menu: no main-process, preload or IPC work; each window (the main one and every
+pop-out) has its own palette and key handler over the shared store; and the real-app test can press the keys, which it cannot for a
+native menu's accelerators. A menu can still be added later from the same table.
+
+#### Built (2026-10-28, uncommitted on the worktree branch)
+
+How it behaves is in [ui/panels.md](ui/panels.md#panel-commands-and-the-command-palette). Where it lives:
+
+- [`panelCommands.ts`](../apps/web/src/components/panels/panelCommands.ts): the one table (id, label, search keywords, key), the palette's
+  search (every word must match; name start, word start, keyword, substring, letters in order), and matching a key event to a command
+  by its **physical key** (`event.code`) with Cmd or Ctrl and Shift, never Alt, never a held-down repeat.
+- [`runPanelCommand.ts`](../apps/web/src/components/panels/runPanelCommand.ts): what each command does to a window's focused panel, over the
+  store. The store gained `focusNeighbour(delta, windowId)` (layout order, wrapping).
+- [`PanelCommandPalette.tsx`](../apps/web/src/components/panels/PanelCommandPalette.tsx) and `focusPanelElement.ts`: one document key
+  handler and the palette dialog, mounted through the desktop notes surface's `dialog`, which the main window and the pop-out page
+  already render. After a command the cursor is put in the window's focused panel (the dialog's own focus restore is cancelled, or it would
+  put the cursor back in the panel the command moved away from, and focusing that panel would undo the command).
+- The shortcuts helper lists a desktop-only **Panels** group from the same table (`shortcutGroups(desktop)`, `useIsDesktop`), and its AI
+  entry now reads "Open the AI helper beside the note (on the web, again to close it)".
+- Tests: 17 in `panelCommands.test.ts`, 13 in `runPanelCommand.test.ts`, 16 in `PanelCommandPalette.test.tsx`, 6 for `focusNeighbour`
+  in `workspaceStore.panels.test.ts`, 3 for the mounting (`noteSurface.desktop`, `PopoutApp`), 4 for the helper. Every behavior was
+  mutation-checked. [`smoke.mjs`](../apps/desktop/scripts/smoke.mjs) presses the keys in the real app, in the main window and in a pop-out.
+
+Verified: web suite 143 files and 2301 tests; typecheck and lint clean (the same two warnings as before); the desktop production export;
+and the whole real-app smoke test, 115 checks (six new: the palette opens from inside a note and lists all seven commands; a command run
+from it leaves the cursor in the panel it moved to; `]` and `[` walk the panels in layout order and wrap; `\` splits and the new panel
+takes the cursor; `W` closes it and the cursor goes back; the palette and keys work in a pop-out on that window's own panels), run
+against a scratch copy of the app, so the build the owner has open was not touched. A first run failed three of those checks because the
+smoke helper looked for the panel's name on the nearest `<section>`, and an editor sits inside an unnamed one of its own; the product
+was right (reproduced with a small script that logged the key events and the cursor). Mutation-checked: the focus rule, the table's
+search and key matching, the dispatcher, and the palette's focus handling.
+
+**By hand (passed 2026-10-28):** the owner rebuilt `apps/desktop/dist` and tried the palette, the keys (including with the cursor in an
+editor and in the AI helper's question box), a pop-out, and the shortcuts list, and reported that all of it passes, which includes the
+check the smoke test cannot make: that no macOS menu shortcut takes `Mod+Shift+W`, `\`, `[`, `]` or `P` before the page sees it.
+**Not covered:** a non-US keyboard layout (the keys are matched by physical key, but only a US layout was used) and the palette at the
+narrowest window width.
+
+Differences from the design confirmed first:
+
+- **No native menu** (see above): Q3 and Q6 were answered by the palette.
+- **A file name** `PanelCommandPalette.tsx`, not `PanelCommands.tsx`, which differs from `panelCommands.ts` only by case and resolved to the
+  wrong file on macOS.
 
 ## Testing
 
