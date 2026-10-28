@@ -11,6 +11,7 @@ import { fromDocument, highestPanelNumber, highestWindowNumber, toDocument, type
 import {
   closePanel as closePanelIn,
   closeWindow as closeWindowIn,
+  focusNeighbour as focusNeighbourIn,
   focusPanel as focusPanelIn,
   initialPanels,
   MAIN_WINDOW,
@@ -131,6 +132,8 @@ export type WorkspaceStore = {
   splitPanel(panelId: PanelId, edge: Edge): PanelId | null;
   /** Makes the panel the one the user is working in. */
   focusPanel(panelId: PanelId): void;
+  /** Focuses the next (1) or previous (-1) panel of the window, in layout order, wrapping round. */
+  focusNeighbour(delta: 1 | -1, windowId?: WindowId): void;
   /** Closes the panel. A window keeps one, so closing its last leaves a new empty panel. */
   closePanel(panelId: PanelId): void;
   /**
@@ -572,6 +575,7 @@ export function createWorkspaceStore(
     updatePanes: (update) => set({ panes: update(state.panes) }),
     splitPanel,
     focusPanel: (panelId) => updatePanels((panels) => focusPanelIn(panels, panelId)),
+    focusNeighbour: (delta, windowId = MAIN_WINDOW) => updatePanels((panels) => focusNeighbourIn(panels, windowId, delta)),
     closePanel: (panelId) => updatePanels((panels) => closePanelIn(panels, panelId, { id: newPanelId(), kind: "empty", state: null })),
     setPanelKind: (panelId, kind) => updatePanels((panels) => setPanelKindIn(panels, panelId, kind)),
     setPanelState: (panelId, panelState) => updatePanels((panels) => setPanelStateIn(panels, panelId, panelState)),

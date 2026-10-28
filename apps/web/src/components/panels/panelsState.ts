@@ -78,6 +78,20 @@ export function focusPanel(panels: PanelsState, panelId: PanelId): PanelsState {
 }
 
 /**
+ * Focuses the panel after the focused one (`delta` 1) or before it (-1) in the order the window's panels are laid out,
+ * left to right and top to bottom, wrapping round at either end. Unchanged for a window with one panel or none.
+ */
+export function focusNeighbour(panels: PanelsState, windowId: WindowId, delta: 1 | -1): PanelsState {
+  const window = panels.windows[windowId];
+  if (!window) return panels;
+
+  const ids = panelIds(window.layout);
+  if (ids.length < 2) return panels;
+  const at = ids.indexOf(focusedPanelId(window));
+  return focusPanel(panels, ids[(at + delta + ids.length) % ids.length]);
+}
+
+/**
  * Closes a panel and focuses the one used before it. The main window always has a panel, so closing its last one leaves
  * a new empty panel, `replacement` (and closing an only panel that is already empty changes nothing); closing the last
  * panel of a pop-out closes the pop-out.

@@ -926,6 +926,88 @@ describe("notes made in a pop-out", () => {
   });
 });
 
+describe("moving focus to the next or previous panel", () => {
+  /** Three panels side by side, [a, b, c], in that order; c is focused. */
+  function three() {
+    const store = gridStore();
+    const [a] = panelIds(mainWindow(store).layout);
+    const b = store.splitPanel(a, "right")!;
+    const c = store.splitPanel(b, "right")!;
+    return { store, a, b, c };
+  }
+
+  it("goes to the panel after the focused one, in the order they are laid out, and wraps round", () => {
+    const { store, a, b, c } = three();
+    store.focusPanel(a);
+
+    store.focusNeighbour(1);
+    expect(focused(store)).toBe(b);
+    store.focusNeighbour(1);
+    expect(focused(store)).toBe(c);
+    store.focusNeighbour(1);
+    expect(focused(store)).toBe(a);
+  });
+
+  it("goes to the one before, wrapping from the first to the last", () => {
+    const { store, a, b, c } = three();
+    store.focusPanel(a);
+
+    store.focusNeighbour(-1);
+    expect(focused(store)).toBe(c);
+    store.focusNeighbour(-1);
+    expect(focused(store)).toBe(b);
+  });
+
+  it("follows the layout, not the order the panels were last used in", () => {
+    const { store, a, b, c } = three();
+    store.focusPanel(a);
+    store.focusPanel(c); // used c, then a, then b
+
+    store.focusNeighbour(1);
+
+    expect(focused(store)).toBe(a);
+    expect(mainWindow(store).focusOrder).toEqual([a, c, b]);
+  });
+
+  it("follows rows and columns the way they read: left to right, top to bottom", () => {
+    const store = gridStore();
+    const [a] = panelIds(mainWindow(store).layout);
+    const b = store.splitPanel(a, "right")!;
+    const c = store.splitPanel(a, "bottom")!; // a over c, then b to their right
+    store.focusPanel(a);
+
+    store.focusNeighbour(1);
+    expect(focused(store)).toBe(c);
+    store.focusNeighbour(1);
+    expect(focused(store)).toBe(b);
+  });
+
+  it("leaves a window with one panel as it is", () => {
+    const store = gridStore();
+    const before = store.getSnapshot().panels;
+
+    store.focusNeighbour(1);
+    store.focusNeighbour(-1);
+
+    expect(store.getSnapshot().panels).toBe(before);
+  });
+
+  it("stays within the window it was asked about, and ignores one that is not there", () => {
+    const { store, a, c } = three();
+    const popout = store.movePanelToNewWindow(c)!;
+    store.focusPanel(a);
+    store.splitPanel(c, "right"); // a second panel in the pop-out, which is focused
+
+    store.focusNeighbour(1, popout);
+    expect(store.getSnapshot().panels.windows[popout].focusOrder[0]).toBe(c);
+    expect(focused(store)).toBe(a); // the main window did not move
+
+    const before = store.getSnapshot().panels;
+    store.focusNeighbour(1, "w99");
+    expect(store.getSnapshot().panels).toBe(before);
+  });
+});
+
 describe("the AI helper as a panel", () => {
   const aiState = (store: WorkspaceStore, panelId: string) => store.getSnapshot().panels.byId[panelId].state as { noteId: number | null; follow: boolean };
 
