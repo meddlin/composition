@@ -4,8 +4,9 @@ import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
 import { PANELS_METHODS } from "../../../web/src/lib/composition/panelsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
+import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -29,6 +30,15 @@ describe("VALIDATORS", () => {
       header: { show: false, title: "Hi" },
     };
     expect(VALIDATORS.saveHomeSettings([{ ...home, extra: 1 }])).toEqual([home]);
+    const writing = {
+      rulerEnabled: true,
+      rulerColumn: 72,
+      reflowEnabled: false,
+      reflowColumn: 100,
+      reflowKeepsTables: true,
+      wordCountEnabled: true,
+    };
+    expect(VALIDATORS.saveWritingSettings([{ ...writing, extra: 1 }])).toEqual([writing]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
@@ -138,10 +148,12 @@ describe("VALIDATORS", () => {
     ["saveTheme", [{}]],
     ["savePreviewFont", [{}]],
     ["saveEditorFont", [{}]],
+    ["saveNoteBackground", [{}]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
-    ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
-    ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
+    ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
+    ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
+    ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["saveHomeSettings", [null]],
     ["saveHomeSettings", [{ layout: 1 }]],
     ["saveHomeSettings", [{ layout: "rail", sections: "all", recentCount: 12, density: "standard", startup: "note" }]],
@@ -233,6 +245,21 @@ describe("PANELS_VALIDATORS", () => {
     for (const bad of [undefined, "1", [1.5], ["1"], [null], Array.from({ length: 101 }, (_, i) => i)]) {
       expect(() => PANELS_VALIDATORS.loadTrashedNotes([bad]), JSON.stringify(bad)?.slice(0, 20)).toThrow(InvalidArgumentsError);
     }
+  });
+});
+
+describe("WINDOW_VALIDATORS", () => {
+  it("has exactly one validator per window method", () => {
+    expect(Object.keys(WINDOW_VALIDATORS).sort()).toEqual([...WINDOW_METHODS].sort());
+  });
+
+  it("passes only the boolean on", () => {
+    expect(WINDOW_VALIDATORS.getWindowTranslucency(["extra"])).toEqual([]);
+    expect(WINDOW_VALIDATORS.setWindowTranslucency([false, "extra"])).toEqual([false]);
+  });
+
+  it.each([[[]], [["yes"]], [[1]], [[null]]])("refuses %j", (args) => {
+    expect(() => WINDOW_VALIDATORS.setWindowTranslucency(args)).toThrow(InvalidArgumentsError);
   });
 });
 

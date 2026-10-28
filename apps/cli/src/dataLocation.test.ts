@@ -20,6 +20,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     appDataDir,
     theme: "forest",
     previewFont: "default",
+    noteBackground: "plain",
     editorFont: "default",
     writing: {
       rulerEnabled: false,

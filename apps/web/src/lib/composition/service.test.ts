@@ -49,6 +49,7 @@ describe("saveSettings", () => {
       theme: "forest",
       previewFont: "default",
       editorFont: "default",
+      noteBackground: "plain",
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       sidebarWidth: 320,
@@ -175,6 +176,27 @@ describe("saveEditorFont", () => {
   });
 });
 
+describe("saveNoteBackground", () => {
+  it("stores a known background and leaves the rest of the settings alone", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveNoteBackground, savePreviewFont } = await import("./service");
+    await savePreviewFont("lora");
+
+    expect(await saveNoteBackground("architect")).toEqual({});
+
+    expect(loadWebSettings()).toMatchObject({ noteBackground: "architect", previewFont: "lora", ...DEFAULT_LAYOUT });
+  });
+
+  it("rejects an unknown background without writing it", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveNoteBackground } = await import("./service");
+
+    expect(await saveNoteBackground("polka-dots")).toEqual({ error: "Unknown background." });
+
+    expect(loadWebSettings().noteBackground).toBe("plain");
+  });
+});
+
 describe("saveHomeSettings", () => {
   const home: HomeSettings = {
     layout: "strip",
@@ -261,6 +283,7 @@ describe("loadSettings", () => {
       theme: "dark",
       previewFont: "default",
       editorFont: "default",
+      noteBackground: "plain",
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       notebooks: [],

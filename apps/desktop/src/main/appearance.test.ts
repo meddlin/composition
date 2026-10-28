@@ -2,7 +2,14 @@ import { describe, expect, it, vi } from "vitest";
 import { APPEARANCE_CHANNEL } from "../shared/channels";
 import { broadcastAppearance, notifyAppearanceChanges, type AppearanceMessage } from "./appearance";
 
-const appearance: AppearanceMessage = { theme: "forest", previewFont: "default", editorFont: "default", sun: { tone: "dark", autoLight: "0.2" } };
+const appearance: AppearanceMessage = {
+  theme: "forest",
+  previewFont: "default",
+  editorFont: "default",
+  noteBackground: "plain",
+  translucent: false,
+  sun: { tone: "dark", autoLight: "0.2" },
+};
 
 const window_ = (destroyed = false) => ({ isDestroyed: () => destroyed, webContents: { send: vi.fn() } });
 

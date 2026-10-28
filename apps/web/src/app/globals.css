@@ -252,10 +252,24 @@
   --ring: var(--brand);
 }
 
+/*
+ * The translucent desktop window (macOS): the main process blurs what is behind the window
+ * and Settings, or the first-paint snapshot, sets `data-translucent` on <html>. The three
+ * surface fills then let the blur through; the fallbacks in `@theme inline` below keep them
+ * solid everywhere else. Only fills are affected: text, borders and the inverted primary
+ * button still use the solid palette, and popovers and menus stay opaque so they read over
+ * any desktop.
+ */
+:root[data-translucent] {
+  --glass-background: color-mix(in srgb, var(--background) 78%, transparent);
+  --glass-surface: color-mix(in srgb, var(--surface) 82%, transparent);
+  --glass-panel: color-mix(in srgb, var(--panel) 82%, transparent);
+}
+
 @theme inline {
-  --color-background: var(--background);
+  --color-background: var(--glass-background, var(--background));
   --color-foreground: var(--foreground);
-  --color-card: var(--card);
+  --color-card: var(--glass-surface, var(--card));
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
@@ -271,8 +285,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-surface: var(--surface);
-  --color-panel: var(--panel);
+  --color-surface: var(--glass-surface, var(--surface));
+  --color-panel: var(--glass-panel, var(--panel));
   --color-brand: var(--brand);
   --color-highlight: var(--highlight);
   --color-warning: var(--warning);
@@ -329,6 +343,54 @@
 .editor-text {
   font-family: var(--editor-font, var(--font-mono));
   font-variant-ligatures: none;
+}
+
+/*
+ * Note backgrounds (Settings > Styling), selected by `data-note-background` on <html>. Only
+ * "architect" draws anything: a quad-ruled notebook grid across the whole window (the body,
+ * which everything without a background of its own shows) and, lined up to the text, in the
+ * editor and the preview. It is meant to be felt rather than seen, so the lines are the
+ * scheme's foreground at a few percent and recolor with it. The sidebars keep their solid
+ * panel color, so the navigation stays calm.
+ *
+ * Every fifth line is a little firmer, as on printed quad paper, so the eye can count squares
+ * without the grid getting busier.
+ */
+[data-note-background="architect"] {
+  --grid-square: 1.5rem;
+  --grid-line: color-mix(in srgb, var(--foreground) 4.5%, transparent);
+  --grid-line-major: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --grid-image:
+    linear-gradient(to right, transparent calc(100% - 1px), var(--grid-line-major) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--grid-line-major) 0),
+    linear-gradient(to right, transparent calc(100% - 1px), var(--grid-line) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--grid-line) 0);
+  --grid-size:
+    calc(var(--grid-square) * 5) calc(var(--grid-square) * 5),
+    calc(var(--grid-square) * 5) calc(var(--grid-square) * 5),
+    var(--grid-square) var(--grid-square),
+    var(--grid-square) var(--grid-square);
+}
+[data-note-background="architect"] :is(body, .note-surface) {
+  background-image: var(--grid-image);
+  background-size: var(--grid-size);
+}
+/*
+ * The editor and the preview draw their own grid, lined up to their text: one square is 1.5rem,
+ * the editor's line height, and the lines run along the bottom and right edge of each square,
+ * starting 1rem in (the panes' padding), so each line of text sits on a rule. `local`
+ * attachment makes it scroll with the text. .note-pane is the solid backing that hides the
+ * window's grid behind a pane, which would otherwise show a second, differently placed grid.
+ * It goes on the editor's wrapper, not the textarea: the textarea must stay see-through over
+ * the coloured copy of the text under it.
+ */
+[data-note-background="architect"] .note-surface {
+  background-position: 1rem 1rem;
+  background-attachment: local;
+}
+[data-note-background="architect"] .note-pane {
+  /* Follows the translucent window's fill (see :root[data-translucent]), solid everywhere else. */
+  background-color: var(--glass-background, var(--background));
 }
 
 /* A note's preview is set in the font chosen in Settings; --preview-font is put on <html> by the layouts. */

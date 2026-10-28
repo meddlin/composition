@@ -457,7 +457,7 @@ export function MarkdownEditor({
           </p>
         )}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
-        <div className="relative flex min-h-0 flex-1 flex-col">
+        <div className="note-pane relative flex min-h-0 flex-1 flex-col">
           {highlight && (
             <MarkdownHighlight text={value} layer={highlightLayer.layer} matches={editorMatches} current={currentMatch} />
           )}
@@ -515,7 +515,7 @@ export function MarkdownEditor({
               highlightLayer.sync();
             }}
             className={cn(
-              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 editor-text text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
+              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 editor-text note-surface text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
               // The colours come from the layer underneath; the textarea only draws the caret and selection over it.
               highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
             )}
@@ -565,7 +565,7 @@ export function MarkdownEditor({
         {showPreview && (
           <PreviewHighlightMenu
             boxRef={previewBox}
-            className="prose preview-text max-w-none flex-1 overflow-y-auto p-4"
+            className="prose preview-text note-pane note-surface max-w-none flex-1 overflow-y-auto p-4"
             text={value}
             body={body}
             onApply={applyHighlight}

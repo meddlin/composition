@@ -16,6 +16,7 @@ import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./pro
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
 import { createPopoutManager } from "./popoutManager";
+import { createWindowPrefsStore, createWindowTranslucency } from "./translucency";
 import { createWindowState } from "./windowState";
 import { createMainWindow, THEME_BACKGROUND } from "./window";
 
@@ -62,8 +63,8 @@ const sidecar = new SearchSidecar({
 
 /** How the app looks now: what a window's first paint is given, and what the others are told when Settings changes it. */
 function currentAppearance(): AppearanceMessage {
-  const { theme, previewFont, editorFont } = loadWebSettings();
-  return { theme, previewFont, editorFont, sun: service.initialSunTheme() };
+  const { theme, previewFont, editorFont, noteBackground } = loadWebSettings();
+  return { theme, previewFont, editorFont, noteBackground, translucent: translucency.isActive(), sun: service.initialSunTheme() };
 }
 
 // The data location can change in Settings; the search index follows it. So does the look of every window: Settings
@@ -156,14 +157,22 @@ const updates = createElectronUpdates({ userData, prepareToQuit: shutDown });
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
 // "auto" opens as the dark or light end of its ramp, per the cached sun times.
-const currentTheme = () => service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme);
+const currentThemeKey = () => service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme);
+
+// The macOS see-through look of the windows (a setting; see translucency.ts).
+const translucency = createWindowTranslucency({
+  platform: process.platform,
+  prefs: createWindowPrefsStore(path.join(userData, "window.json")),
+  windows: () => BrowserWindow.getAllWindows(),
+  solidBackground: () => THEME_BACKGROUND[currentThemeKey()] ?? THEME_BACKGROUND.dark,
+});
 
 // Pop-outs: a panel pulled into a window of its own. The main window's page opens them; this decides that they may be
 // opened, remembers where each was put (in a file only this process writes) and closes them with the main window.
 const popouts = createPopoutManager({
   allowedOrigins,
   preloadPath: path.join(__dirname, "preload.js"),
-  backgroundColor: () => THEME_BACKGROUND[currentTheme()] ?? THEME_BACKGROUND.dark,
+  backgroundColor: () => THEME_BACKGROUND[currentThemeKey()] ?? THEME_BACKGROUND.dark,
   windowState: createWindowState({
     file: path.join(userData, "window-state.json"),
     displays: () => screen.getAllDisplays().map((display) => display.workArea),
@@ -177,7 +186,8 @@ function openMainWindow(): BrowserWindow {
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
-    theme: currentTheme(),
+    theme: currentThemeKey(),
+    translucent: translucency.isActive(),
     popouts,
   });
 }
@@ -211,6 +221,7 @@ async function main(): Promise<void> {
     backup,
     panels: panelsService,
     updates: updates.manager,
+    window: translucency,
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {

@@ -8,6 +8,7 @@ import type { Metrics } from "./metrics";
 import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import type { EditorFontName } from "./editorFonts";
+import type { NoteBackgroundName } from "./noteBackgrounds";
 import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
@@ -55,6 +56,7 @@ export type SettingsSnapshot = {
   theme: ThemeName;
   previewFont: PreviewFontName;
   editorFont: EditorFontName;
+  noteBackground: NoteBackgroundName;
   writing: WritingSettings;
   home: HomeSettings;
   /** The notebooks, for choosing their colors; empty until the database exists. */
@@ -203,6 +205,8 @@ export interface CompositionApi {
   savePreviewFont(font: string): Promise<{ error?: string }>;
   /** Chooses the font the Markdown editor is set in; a name not in `EDITOR_FONT_CHOICES` comes back as `error`. */
   saveEditorFont(font: string): Promise<{ error?: string }>;
+  /** Chooses the pattern behind the window; a name not in `NOTE_BACKGROUND_CHOICES` comes back as `error`. */
+  saveNoteBackground(background: string): Promise<{ error?: string }>;
   /** Saves the editor's ruler and reflow; a column outside the allowed range comes back as `error`. */
   saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
   /** Saves how the home page is laid out; a layout it doesn't offer comes back as `error`. */
@@ -256,6 +260,7 @@ export const API_METHODS = [
   "saveTheme",
   "savePreviewFont",
   "saveEditorFont",
+  "saveNoteBackground",
   "saveWritingSettings",
   "saveHomeSettings",
   "saveAssistantSettings",

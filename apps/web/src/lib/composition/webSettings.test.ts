@@ -44,6 +44,7 @@ describe("web settings layout", () => {
       theme: "forest",
       previewFont: "default",
       editorFont: "default",
+      noteBackground: "plain",
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       ...DEFAULT_LAYOUT,
@@ -98,6 +99,15 @@ describe("web settings layout", () => {
 
     writeSettings({ appDataDir: "/data", editorFont: "Comic Sans MS" });
     expect(loadWebSettings().editorFont).toBe("default");
+  });
+
+  it("loads a saved note background, and falls back to plain for one it doesn't know", async () => {
+    writeSettings({ appDataDir: "/data", noteBackground: "architect" });
+    const { loadWebSettings } = await import("./webSettings");
+    expect(loadWebSettings().noteBackground).toBe("architect");
+
+    writeSettings({ appDataDir: "/data", noteBackground: "polka-dots" });
+    expect(loadWebSettings().noteBackground).toBe("plain");
   });
 
   it("loads a saved layout", async () => {

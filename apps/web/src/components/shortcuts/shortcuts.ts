@@ -27,6 +27,8 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { combos: [["Mod", "K"]], description: "Search notes" },
       { combos: [["Mod", "/"], ["?"]], description: "Show or hide this list of shortcuts" },
       { combos: [["Mod", "Click"]], description: "Open a linked note beside the current one" },
+      { combos: [["Mouse Back"], ["Cmd", "["], ["Alt", "←"]], description: "Go back to the note or page you were just looking at (Cmd is for Mac, Alt for other systems)" },
+      { combos: [["Mouse Forward"], ["Cmd", "]"], ["Alt", "→"]], description: "Go forward again after going back" },
     ],
   },
   {

@@ -52,6 +52,7 @@ import {
 } from "./sunTimes";
 import { sunThemeAttributes } from "./sunSchedule";
 import { isEditorFontName } from "./editorFonts";
+import { isNoteBackgroundName } from "./noteBackgrounds";
 import { validateHomeSettings, type HomeSettings } from "./home";
 import { validateWritingSettings, type WritingSettings } from "./writing";
 import { isPreviewFontName } from "./previewFonts";
@@ -113,6 +114,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     theme: settings.theme,
     previewFont: settings.previewFont,
     editorFont: settings.editorFont,
+    noteBackground: settings.noteBackground,
     writing: settings.writing,
     home: settings.home,
     notebooks: dbExists ? notebooksRepo.listNotebooks().map(({ id, name }) => ({ id, name })) : [],
@@ -727,6 +729,14 @@ export async function saveEditorFont(font: string): Promise<{ error?: string }> 
   return {};
 }
 
+export async function saveNoteBackground(background: string): Promise<{ error?: string }> {
+  if (!isNoteBackgroundName(background)) {
+    return { error: "Unknown background." };
+  }
+  saveWebSettings({ ...loadWebSettings(), noteBackground: background });
+  return {};
+}
+
 export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
   const checked = validateWritingSettings(writing);
   if (!checked.settings) return { error: checked.error };
@@ -820,6 +830,7 @@ const _implementsApi: CompositionApi = {
   saveTheme,
   savePreviewFont,
   saveEditorFont,
+  saveNoteBackground,
   saveWritingSettings,
   saveHomeSettings,
   saveAssistantSettings,

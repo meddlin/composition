@@ -6,10 +6,11 @@ import type { DesktopBackupApi } from "./backupApi";
 import type { PanelsApi } from "./panelsApi";
 import type { Layout } from "./layout";
 import type { UpdatesApi, UpdateStateListener } from "./updatesApi";
+import type { WindowApi } from "./windowApi";
 
 /**
  * What Electron's preload script exposes on `window.composition` (apps/desktop).
- * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, UpdatesApi and AssistantStreamApi, plus a
+ * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, UpdatesApi, WindowApi and AssistantStreamApi, plus a
  * synchronous snapshot taken before the page paints so the first frame already
  * has the right color scheme.
  */
@@ -18,6 +19,7 @@ export type DesktopBridge = CompositionApi &
   DesktopBackupApi &
   PanelsApi &
   UpdatesApi &
+  WindowApi &
   AssistantStreamApi & {
     /** Calls `listener` with each event of the AI helper's chat turns the app pushes; returns the function that stops listening. */
     onAssistantEvent(listener: AssistantEventListener): () => void;

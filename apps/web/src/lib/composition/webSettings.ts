@@ -7,6 +7,7 @@ import { DEFAULT_HOME_SETTINGS, parseHomeSettings, type HomeSettings } from "./h
 import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./editorFonts";
+import { DEFAULT_NOTE_BACKGROUND, isNoteBackgroundName, type NoteBackgroundName } from "./noteBackgrounds";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
 import type { SavedLocation } from "./sunTimes";
 import { DEFAULT_WRITING_SETTINGS, parseWritingSettings, type WritingSettings } from "./writing";
@@ -59,6 +60,8 @@ export type WebSettings = {
   previewFont: PreviewFontName;
   /** Font of the Markdown editor. */
   editorFont: EditorFontName;
+  /** Pattern drawn behind the window. */
+  noteBackground: NoteBackgroundName;
   /** The editor's ruler and reflow. */
   writing: WritingSettings;
   /** The home page's layout. */
@@ -85,6 +88,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   theme: DEFAULT_THEME,
   previewFont: DEFAULT_PREVIEW_FONT,
   editorFont: DEFAULT_EDITOR_FONT,
+  noteBackground: DEFAULT_NOTE_BACKGROUND,
   writing: DEFAULT_WRITING_SETTINGS,
   home: DEFAULT_HOME_SETTINGS,
   ...DEFAULT_LAYOUT,
@@ -126,6 +130,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     theme: isThemeName(value.theme) ? value.theme : DEFAULT_THEME,
     previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
+    noteBackground: isNoteBackgroundName(value.noteBackground) ? value.noteBackground : DEFAULT_NOTE_BACKGROUND,
     writing: parseWritingSettings(value.writing),
     home: parseHomeSettings(value.home),
     sidebarWidth: clampSidebarWidth(value.sidebarWidth),

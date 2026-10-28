@@ -32,7 +32,9 @@ afterEach(() => {
   root.removeAttribute("style");
 });
 
-const tell = (appearance: AppearanceMessage) => listeners.forEach((listener) => listener(appearance));
+/** Tells the window how the app looks; the note background and see-through look are the plain, opaque ones unless said. */
+const tell = (appearance: Omit<AppearanceMessage, "noteBackground" | "translucent"> & Partial<Pick<AppearanceMessage, "noteBackground" | "translucent">>) =>
+  listeners.forEach((listener) => listener({ noteBackground: "plain", translucent: false, ...appearance }));
 const root = () => document.documentElement;
 
 describe("AppearanceSync", () => {

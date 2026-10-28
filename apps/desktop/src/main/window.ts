@@ -4,6 +4,7 @@ import { installContextMenu } from "./contextMenu";
 import { isAllowedOrigin } from "./origin";
 import { isExternalUrl } from "./popoutWindows";
 import type { createPopoutManager, WindowLike } from "./popoutManager";
+import { TRANSLUCENT_BACKGROUND, WINDOW_VIBRANCY } from "./translucency";
 
 /**
  * Window background per color scheme, so the very first frame matches the UI
@@ -43,8 +44,10 @@ export function createMainWindow(options: {
   theme: Exclude<ThemeName, "auto">;
   /** Decides which windows its page may open (pop-outs, and nothing else), and looks after them. */
   popouts: ReturnType<typeof createPopoutManager>;
+  /** Blur what is behind the window (macOS) and let the page show it through. */
+  translucent: boolean;
 }): BrowserWindow {
-  const { preloadPath, entryUrl, allowedOrigins, theme, popouts } = options;
+  const { preloadPath, entryUrl, allowedOrigins, theme, popouts, translucent } = options;
 
   const window = new BrowserWindow({
     width: 1280,
@@ -53,7 +56,8 @@ export function createMainWindow(options: {
     minHeight: 480,
     show: false,
     title: "Composition",
-    backgroundColor: THEME_BACKGROUND[theme] ?? THEME_BACKGROUND.dark,
+    ...(translucent ? { vibrancy: WINDOW_VIBRANCY } : {}),
+    backgroundColor: translucent ? TRANSLUCENT_BACKGROUND : (THEME_BACKGROUND[theme] ?? THEME_BACKGROUND.dark),
     webPreferences: mainWindowPreferences(preloadPath),
   });
   installContextMenu(window.webContents);
