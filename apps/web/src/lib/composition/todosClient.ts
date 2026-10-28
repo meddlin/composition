@@ -20,4 +20,5 @@ export const listTodos: TodosApi["listTodos"] = () => bridge().listTodos();
 export const createTodo: TodosApi["createTodo"] = (title, parentId) => bridge().createTodo(title, parentId);
 export const renameTodo: TodosApi["renameTodo"] = (id, title) => bridge().renameTodo(id, title);
 export const setTodoDone: TodosApi["setTodoDone"] = (id, done) => bridge().setTodoDone(id, done);
+export const setTodoStatus: TodosApi["setTodoStatus"] = (id, status) => bridge().setTodoStatus(id, status);
 export const deleteTodo: TodosApi["deleteTodo"] = (id) => bridge().deleteTodo(id);

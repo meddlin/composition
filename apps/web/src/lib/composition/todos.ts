@@ -1,4 +1,4 @@
-import { MAX_TODO_TITLE_LENGTH, type Todo } from "./todosApi";
+import { MAX_TODO_TITLE_LENGTH, type Todo, type TodoStatus } from "./todosApi";
 
 /** An item with its sub-items, in order. */
 export type TodoNode = { todo: Todo; children: TodoNode[] };
@@ -34,6 +34,17 @@ export function subtreeIds(todos: readonly Todo[], id: number): Set<number> {
 /** How many items are under this one, at any depth. */
 export function countDescendants(todos: readonly Todo[], id: number): number {
   return subtreeIds(todos, id).size - 1;
+}
+
+/** The item moved to a status. Ticking and the board both go through here, so `done` can't drift from `status`. */
+export function withStatus(todo: Todo, status: TodoStatus): Todo {
+  return { ...todo, status, done: status === "done" };
+}
+
+/** The item ticked or unticked: done goes to "done"; unticking a done item puts it back to "todo", and any other status is kept. */
+export function withDone(todo: Todo, done: boolean): Todo {
+  if (done) return withStatus(todo, "done");
+  return withStatus(todo, todo.status === "done" ? "todo" : todo.status);
 }
 
 /** A title as it is stored: trimmed, on one line. Null when nothing is left, or it is too long to keep. */

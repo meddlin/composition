@@ -15,8 +15,11 @@ export type NotesBrowserState = { notebookId: number | null };
  */
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
-/** What a to-do panel saves: the items whose sub-items are folded away in it. The items themselves, and the panels' background, are the workspace's. */
-export type TodoPanelState = { collapsed: number[] };
+/** How a to-do panel shows the items: as the nested list, or as a board with a column per status. */
+export type TodoView = "list" | "board";
+
+/** What a to-do panel saves: the items whose sub-items are folded away in it, and which view it is on. The items themselves, and the panels' background, are the workspace's. */
+export type TodoPanelState = { collapsed: number[]; view: TodoView };
 
 /** What a kind may check a saved state against: the workspace as it is now. */
 export type RestoreContext = {
@@ -84,10 +87,14 @@ export const KINDS: Record<
   todo: {
     minWidth: MIN_PANEL_WIDTH,
     plugin: "todo",
-    initialState: (): TodoPanelState => ({ collapsed: [] }),
+    initialState: (): TodoPanelState => ({ collapsed: [], view: "list" }),
     restore(saved) {
       if (!isRecord(saved) || !Array.isArray(saved.collapsed)) return null;
-      return { collapsed: saved.collapsed.filter((id): id is number => Number.isSafeInteger(id)) } satisfies TodoPanelState;
+      return {
+        collapsed: saved.collapsed.filter((id): id is number => Number.isSafeInteger(id)),
+        // Panels saved before the board existed have no view.
+        view: saved.view === "board" ? "board" : "list",
+      } satisfies TodoPanelState;
     },
   },
 };

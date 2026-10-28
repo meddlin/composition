@@ -352,6 +352,7 @@ describe("TODO_VALIDATORS", () => {
     expect(TODO_VALIDATORS.createTodo(["Oat milk", 3])).toEqual(["Oat milk", 3]);
     expect(TODO_VALIDATORS.renameTodo([4, "Buy oat milk"])).toEqual([4, "Buy oat milk"]);
     expect(TODO_VALIDATORS.setTodoDone([4, true])).toEqual([4, true]);
+    expect(TODO_VALIDATORS.setTodoStatus([4, "in_progress", "extra"])).toEqual([4, "in_progress"]);
     expect(TODO_VALIDATORS.deleteTodo([4, "extra"])).toEqual([4]);
   });
 
@@ -364,6 +365,9 @@ describe("TODO_VALIDATORS", () => {
     ["renameTodo", [4, null]],
     ["setTodoDone", [4, "true"]],
     ["setTodoDone", [1.5, true]],
+    ["setTodoStatus", [4, "later"]],
+    ["setTodoStatus", ["4", "done"]],
+    ["setTodoStatus", [4]],
     ["deleteTodo", [null]],
   ] as const)("refuses %s with %j", (method, args) => {
     expect(() => TODO_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
