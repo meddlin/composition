@@ -157,6 +157,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
         reflowEnabled: flag("saveWritingSettings", value.reflowEnabled, "reflowEnabled"),
         reflowColumn: finite("saveWritingSettings", value.reflowColumn, "reflowColumn"),
         reflowKeepsTables: flag("saveWritingSettings", value.reflowKeepsTables, "reflowKeepsTables"),
+        wordCountEnabled: flag("saveWritingSettings", value.wordCountEnabled, "wordCountEnabled"),
       },
     ];
   },
