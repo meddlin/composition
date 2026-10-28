@@ -551,6 +551,58 @@ try {
   );
   await page.waitForTimeout(300);
 
+  // ---- Panel commands: their keys and the command palette. Playwright's key presses reach the page, not the native
+  // menu, which is why these are page handlers (and why a native-menu clash can only be seen by hand).
+  const chord = (key) => `${process.platform === "darwin" ? "Meta" : "Control"}+Shift+${key}`;
+  const settled = (fn) => waitFor(fn, { timeout: 5_000 }).then(() => true, () => false);
+  // The panel's own section: an editor sits inside a plain, unnamed one of its own.
+  const panelWithCursor = (where) =>
+    where.evaluate(() => document.activeElement?.closest("section[data-panel-id]")?.getAttribute("aria-label") ?? "");
+  const panelCount = (where) => where.locator("section[data-panel-id]").count();
+  const palette = (where) => where.getByRole("dialog", { name: "Command palette" });
+
+  await page.getByRole("region", { name: "Smoke note" }).getByLabel("Markdown editor").click();
+  await page.keyboard.press(chord("P"));
+  await palette(page).waitFor({ timeout: 5_000 }).catch(() => {});
+  check(
+    "Cmd/Ctrl+Shift+P opens the command palette from inside a note, with the cursor in its search box and every panel command listed",
+    (await palette(page).count()) === 1 &&
+      (await page.getByRole("combobox", { name: "Search commands" }).evaluate((el) => el === document.activeElement)) &&
+      (await palette(page).getByRole("option").count()) === 7,
+  );
+  await page.keyboard.type("next");
+  await page.keyboard.press("Enter");
+  check(
+    "a command run from the palette closes it and leaves the cursor in the panel it moved to, not the one it was opened from",
+    (await settled(async () => (await palette(page).count()) === 0 && (await panelWithCursor(page)) === "Notes browser")),
+    await panelWithCursor(page),
+  );
+
+  await page.keyboard.press(chord("BracketRight"));
+  await settled(async () => (await panelWithCursor(page)) === "Hello there");
+  const afterNext = await panelWithCursor(page);
+  await page.keyboard.press(chord("BracketRight"));
+  await settled(async () => (await panelWithCursor(page)) === "Smoke note");
+  const afterWrap = await panelWithCursor(page);
+  await page.keyboard.press(chord("BracketLeft"));
+  await settled(async () => (await panelWithCursor(page)) === "Hello there");
+  const afterPrevious = await panelWithCursor(page);
+  check(
+    "Cmd/Ctrl+Shift+] and [ move the cursor through the panels in layout order, wrapping round",
+    afterNext === "Hello there" && afterWrap === "Smoke note" && afterPrevious === "Hello there",
+    `${afterNext} / ${afterWrap} / ${afterPrevious}`,
+  );
+
+  await page.getByRole("region", { name: "Smoke note" }).getByLabel("Markdown editor").click();
+  const panelsBefore = await panelCount(page);
+  await page.keyboard.press(chord("Backslash"));
+  const split = await settled(async () => (await panelCount(page)) === panelsBefore + 1 && (await panelWithCursor(page)) === "Empty panel");
+  check("Cmd/Ctrl+Shift+\\ splits right from inside the editor, and the new panel takes the cursor", split, await panelWithCursor(page));
+  await page.keyboard.press(chord("W"));
+  const closed = await settled(async () => (await panelCount(page)) === panelsBefore && (await panelWithCursor(page)) === "Smoke note");
+  check("Cmd/Ctrl+Shift+W closes it again, and the cursor goes back to the panel used before", closed, await panelWithCursor(page));
+  await page.waitForTimeout(300);
+
   // ---- Pop-outs: a panel in a window of its own, over the one workspace the main window holds.
   const popoutPage = () => app.windows().find((window) => window.url().includes("/popout/") && !window.isClosed());
   const opened = app.waitForEvent("window");
@@ -600,6 +652,22 @@ try {
   check(
     "the AI helper opens in the pop-out as a panel about its note, with the chat the main window's workspace holds",
     (await popoutHelper.getByText("Smoke note").count()) === 1 && (await popoutHelper.getByText("Hello there").count()) > 0,
+  );
+
+  // The same keys and palette work in the pop-out, on its own panels (the Smoke note and the AI helper beside it).
+  await popout.getByLabel("Markdown editor").click();
+  await popout.keyboard.press(chord("P"));
+  await palette(popout).waitFor({ timeout: 5_000 }).catch(() => {});
+  const popoutPaletteOpened = (await palette(popout).count()) === 1;
+  await popout.keyboard.type("next");
+  await popout.keyboard.press("Enter");
+  const popoutMoved = await settled(async () => (await palette(popout).count()) === 0 && (await panelWithCursor(popout)) === "AI helper");
+  await popout.keyboard.press(chord("BracketLeft"));
+  const popoutBack = await settled(async () => (await panelWithCursor(popout)) === "Smoke note");
+  check(
+    "the command palette and the panel keys work in a pop-out, on that window's own panels",
+    popoutPaletteOpened && popoutMoved && popoutBack,
+    `${popoutPaletteOpened} / ${popoutMoved} / ${popoutBack}`,
   );
 
   // A second pop-out, sent back to the main window: its real window closes.
