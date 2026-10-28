@@ -43,6 +43,8 @@ See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside 
 [ai-helper-research.md](ai-helper-research.md) and [ai-helper-plan.md](ai-helper-plan.md).
 
 
+See [reading-list-plan.md](reading-list-plan.md) for the plan for a Reading List plugin: a list of article links beside a webview that shows the one you pick.
+
 ## Features
 
 - [x] Create note
