@@ -4,6 +4,7 @@ import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
 import type { Layout } from "./layout";
 import type { EditorFontName } from "./editorFonts";
+import type { NoteBackgroundName } from "./noteBackgrounds";
 import type { PreviewFontName } from "./previewFonts";
 import type { ThemeName } from "./themes";
 import type { UpdatesApi, UpdateStateListener } from "./updatesApi";
@@ -29,6 +30,7 @@ export type DesktopBridge = CompositionApi &
       theme: ThemeName;
       previewFont: PreviewFontName;
       editorFont: EditorFontName;
+      noteBackground: NoteBackgroundName;
       layout: Layout;
       /** Whether the window is translucent, so the first frame already lets it show through. */
       translucent: boolean;

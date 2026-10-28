@@ -149,6 +149,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   saveTheme: ([theme]) => [text("saveTheme", theme, "theme")],
   savePreviewFont: ([font]) => [text("savePreviewFont", font, "font")],
   saveEditorFont: ([font]) => [text("saveEditorFont", font, "font")],
+  saveNoteBackground: ([background]) => [text("saveNoteBackground", background, "background")],
   saveWritingSettings: ([input]) => {
     const value = record("saveWritingSettings", input, "settings");
     return [

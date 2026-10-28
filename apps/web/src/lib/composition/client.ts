@@ -42,6 +42,7 @@ export {
   saveImage,
   saveLayout,
   saveLocation,
+  saveNoteBackground,
   saveNoteContent,
   savePreviewFont,
   saveSettings,

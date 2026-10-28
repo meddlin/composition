@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { theme, previewFont, editorFont } = loadWebSettings();
+  const { theme, previewFont, editorFont, noteBackground } = loadWebSettings();
 
   // "Follow the sun" renders at the right point on the ramp up front, so there's
   // no flash of the wrong scheme; SunThemeSync then keeps it moving client-side.
@@ -30,6 +30,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       data-theme={theme}
+      data-note-background={noteBackground}
       data-tone={attributes?.tone}
       style={
         {

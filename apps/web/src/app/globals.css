@@ -345,6 +345,54 @@
   font-variant-ligatures: none;
 }
 
+/*
+ * Note backgrounds (Settings > Styling), selected by `data-note-background` on <html>. Only
+ * "architect" draws anything: a quad-ruled notebook grid across the whole window (the body,
+ * which everything without a background of its own shows) and, lined up to the text, in the
+ * editor and the preview. It is meant to be felt rather than seen, so the lines are the
+ * scheme's foreground at a few percent and recolor with it. The sidebars keep their solid
+ * panel color, so the navigation stays calm.
+ *
+ * Every fifth line is a little firmer, as on printed quad paper, so the eye can count squares
+ * without the grid getting busier.
+ */
+[data-note-background="architect"] {
+  --grid-square: 1.5rem;
+  --grid-line: color-mix(in srgb, var(--foreground) 4.5%, transparent);
+  --grid-line-major: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --grid-image:
+    linear-gradient(to right, transparent calc(100% - 1px), var(--grid-line-major) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--grid-line-major) 0),
+    linear-gradient(to right, transparent calc(100% - 1px), var(--grid-line) 0),
+    linear-gradient(to bottom, transparent calc(100% - 1px), var(--grid-line) 0);
+  --grid-size:
+    calc(var(--grid-square) * 5) calc(var(--grid-square) * 5),
+    calc(var(--grid-square) * 5) calc(var(--grid-square) * 5),
+    var(--grid-square) var(--grid-square),
+    var(--grid-square) var(--grid-square);
+}
+[data-note-background="architect"] :is(body, .note-surface) {
+  background-image: var(--grid-image);
+  background-size: var(--grid-size);
+}
+/*
+ * The editor and the preview draw their own grid, lined up to their text: one square is 1.5rem,
+ * the editor's line height, and the lines run along the bottom and right edge of each square,
+ * starting 1rem in (the panes' padding), so each line of text sits on a rule. `local`
+ * attachment makes it scroll with the text. .note-pane is the solid backing that hides the
+ * window's grid behind a pane, which would otherwise show a second, differently placed grid.
+ * It goes on the editor's wrapper, not the textarea: the textarea must stay see-through over
+ * the coloured copy of the text under it.
+ */
+[data-note-background="architect"] .note-surface {
+  background-position: 1rem 1rem;
+  background-attachment: local;
+}
+[data-note-background="architect"] .note-pane {
+  /* Follows the translucent window's fill (see :root[data-translucent]), solid everywhere else. */
+  background-color: var(--glass-background, var(--background));
+}
+
 /* A note's preview is set in the font chosen in Settings; --preview-font is put on <html> by the layouts. */
 .preview-text {
   font-family: var(--preview-font, inherit);

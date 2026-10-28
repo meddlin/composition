@@ -12,10 +12,12 @@ import {
   previewFontStack,
   type PreviewFontName,
 } from "@/lib/composition/previewFonts";
+import { NOTE_BACKGROUND_CHOICES, type NoteBackgroundName } from "@/lib/composition/noteBackgrounds";
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
   saveEditorFont,
   saveLocation,
+  saveNoteBackground,
   savePreviewFont,
   saveTheme,
   type SaveLocationResult,
@@ -37,6 +39,7 @@ type Props = {
   currentTheme: ThemeName;
   currentPreviewFont: PreviewFontName;
   currentEditorFont: EditorFontName;
+  currentNoteBackground: NoteBackgroundName;
   currentCity: string;
   /** Today's times at the saved city, so the page can confirm the lookup worked. */
   currentSunTimes?: { sunrise?: string; sunset?: string };
@@ -69,6 +72,7 @@ export function StylingSettings({
   currentTheme,
   currentPreviewFont,
   currentEditorFont,
+  currentNoteBackground,
   currentCity,
   currentSunTimes,
 }: Props) {
@@ -85,6 +89,9 @@ export function StylingSettings({
   const [editorFont, setEditorFont] = useState<EditorFontName>(currentEditorFont);
   const [editorFontError, setEditorFontError] = useState<string>();
   const [, startEditorFontTransition] = useTransition();
+  const [noteBackground, setNoteBackground] = useState<NoteBackgroundName>(currentNoteBackground);
+  const [noteBackgroundError, setNoteBackgroundError] = useState<string>();
+  const [, startNoteBackgroundTransition] = useTransition();
 
   // Apply the scheme immediately rather than waiting for the server round trip.
   useEffect(() => {
@@ -137,6 +144,22 @@ export function StylingSettings({
         setEditorFont(previous);
         setEditorFontError(result.error);
         document.documentElement.style.setProperty("--editor-font", editorFontStack(previous));
+      }
+    });
+  }
+
+  // And the note background: it's an attribute on <html> that globals.css draws from.
+  function selectNoteBackground(next: NoteBackgroundName) {
+    const previous = noteBackground;
+    setNoteBackground(next);
+    setNoteBackgroundError(undefined);
+    document.documentElement.dataset.noteBackground = next;
+    startNoteBackgroundTransition(async () => {
+      const result = await saveNoteBackground(next);
+      if (result.error) {
+        setNoteBackground(previous);
+        setNoteBackgroundError(result.error);
+        document.documentElement.dataset.noteBackground = previous;
       }
     });
   }
@@ -236,6 +259,34 @@ export function StylingSettings({
           {"## Meeting notes\n- [ ] Send the **quarterly** summary to `ops@example.com`"}
         </p>
         {editorFontError && <FieldError>{editorFontError}</FieldError>}
+      </FieldSet>
+
+      <FieldSet className="gap-2 text-sm">
+        <FieldLegend variant="label">Note background</FieldLegend>
+        <FieldDescription className="text-xs">
+          A pattern behind the whole window, and lined up to the text in the editor and the preview.
+          It is drawn in the color scheme&rsquo;s own colors and kept faint, so it never competes
+          with what you write.
+        </FieldDescription>
+        <RadioGroup
+          value={noteBackground}
+          onValueChange={(next) => selectNoteBackground(next as NoteBackgroundName)}
+          aria-label="Note background"
+          className="gap-2"
+        >
+          {NOTE_BACKGROUND_CHOICES.map(({ name, label }) => (
+            <Field key={name} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={name} id={`note-background-${name}`} />
+              <FieldLabel htmlFor={`note-background-${name}`} className="cursor-pointer gap-3 font-normal">
+                {label}
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+        <p className="note-pane note-surface editor-text whitespace-pre-wrap rounded-md border px-4 py-4 text-sm leading-6">
+          {"## Site visit, Tuesday\n- Check the **load path** at gridline C"}
+        </p>
+        {noteBackgroundError && <FieldError>{noteBackgroundError}</FieldError>}
       </FieldSet>
 
       <form action={locationAction} className="flex flex-col gap-2 text-sm">
