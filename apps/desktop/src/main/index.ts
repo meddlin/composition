@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
-import { broadcastAppearance, notifyAppearanceChanges, type AppearanceMessage } from "./appearance";
+import { broadcastAppearance, notifyAppearanceChanges, notifyTranslucencyChange, type AppearanceMessage } from "./appearance";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
@@ -67,6 +67,11 @@ function currentAppearance(): AppearanceMessage {
   return { theme, previewFont, editorFont, noteBackground, translucent: translucency.isActive(), sun: service.initialSunTheme() };
 }
 
+/** Tells every open window how the app looks now. */
+function announceAppearance(): void {
+  broadcastAppearance(BrowserWindow.getAllWindows(), currentAppearance());
+}
+
 // The data location can change in Settings; the search index follows it. So does the look of every window: Settings
 // is a page in one window, and pop-outs and the rest follow what is chosen there.
 const api: CompositionApi = notifyAppearanceChanges(
@@ -78,7 +83,7 @@ const api: CompositionApi = notifyAppearanceChanges(
       return result;
     },
   },
-  () => broadcastAppearance(BrowserWindow.getAllWindows(), currentAppearance()),
+  announceAppearance,
 );
 
 // Files are chosen and saved in native dialogs, over the window that asked.
@@ -172,7 +177,8 @@ const translucency = createWindowTranslucency({
 const popouts = createPopoutManager({
   allowedOrigins,
   preloadPath: path.join(__dirname, "preload.js"),
-  backgroundColor: () => THEME_BACKGROUND[currentThemeKey()] ?? THEME_BACKGROUND.dark,
+  backgroundColor: () => translucency.backgroundColor(),
+  translucent: () => translucency.isActive(),
   windowState: createWindowState({
     file: path.join(userData, "window-state.json"),
     displays: () => screen.getAllDisplays().map((display) => display.workArea),
@@ -221,7 +227,7 @@ async function main(): Promise<void> {
     backup,
     panels: panelsService,
     updates: updates.manager,
-    window: translucency,
+    window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {

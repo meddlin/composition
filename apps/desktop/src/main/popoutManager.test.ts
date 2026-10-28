@@ -49,7 +49,7 @@ function fakeState(known: Record<string, Bounds> = {}) {
   return state;
 }
 
-function setup(known: Record<string, Bounds> = {}) {
+function setup(known: Record<string, Bounds> = {}, translucent = false) {
   const main = fakeWindow({ x: 200, y: 150, width: 1280, height: 820 });
   const state = fakeState(known);
   const openExternal = vi.fn();
@@ -58,6 +58,7 @@ function setup(known: Record<string, Bounds> = {}) {
     allowedOrigins: [OWN],
     preloadPath: "/app/preload.js",
     backgroundColor: () => "#121212",
+    translucent: () => translucent,
     windowState: state,
     openExternal,
     installContextMenu,
@@ -90,6 +91,14 @@ describe("the main window's rule for opening windows", () => {
       width: 700,
       height: 500,
     });
+  });
+
+  it("opens a pop-out see-through when the windows are, and solid when they are not", () => {
+    const options = (translucent: boolean) =>
+      (setup({}, translucent).open("w1").decision as { overrideBrowserWindowOptions: Record<string, unknown> }).overrideBrowserWindowOptions;
+
+    expect(options(true)).toMatchObject({ vibrancy: "under-window" });
+    expect(options(false)).not.toHaveProperty("vibrancy");
   });
 
   it("puts a pop-out it has not seen before beside the main window, each one a little further along", () => {

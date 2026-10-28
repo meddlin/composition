@@ -1,5 +1,6 @@
 import type { BrowserWindowConstructorOptions } from "electron";
 import { isAllowedOrigin } from "./origin";
+import { WINDOW_VIBRANCY } from "./translucency";
 
 /** The page a pop-out shows (the renderer's `app/popout` route; see `page.desktop.tsx`), reached with `?w=<window id>`. */
 export const POPOUT_PATH = "/popout/";
@@ -54,10 +55,12 @@ export function decideWindowOpen(input: {
   allowedOrigins: readonly string[];
   preloadPath: string;
   backgroundColor: string;
+  /** Whether windows are see-through now (macOS): a pop-out blurs what is behind it, as the main window does. */
+  translucent: boolean;
   /** Where this pop-out was last, if that is known and still on a display. */
   bounds?: Bounds;
 }): WindowOpenDecision {
-  const { url, openedByPopout, allowedOrigins, preloadPath, backgroundColor, bounds } = input;
+  const { url, openedByPopout, allowedOrigins, preloadPath, backgroundColor, translucent, bounds } = input;
 
   const windowId = openedByPopout ? null : popoutWindowId(url, allowedOrigins);
   if (windowId === null) {
@@ -74,6 +77,7 @@ export function decideWindowOpen(input: {
       minHeight: 280,
       show: false,
       title: "Composition",
+      ...(translucent ? { vibrancy: WINDOW_VIBRANCY } : {}),
       backgroundColor,
       webPreferences: {
         preload: preloadPath,

@@ -9,6 +9,10 @@ import { previewFontStack } from "@/lib/composition/previewFonts";
 /** Puts how the app looks on a document, as the layout's first-paint script does (and Settings, in its own window). */
 function applyAppearance(root: HTMLElement, appearance: AppearanceMessage): void {
   root.dataset.theme = appearance.theme;
+  root.dataset.noteBackground = appearance.noteBackground;
+  // A flag, as the layout's first-paint script sets it: present means see-through.
+  if (appearance.translucent) root.dataset.translucent = "";
+  else delete root.dataset.translucent;
   root.style.setProperty("--preview-font", previewFontStack(appearance.previewFont));
   root.style.setProperty("--editor-font", editorFontStack(appearance.editorFont));
   if (appearance.sun) {

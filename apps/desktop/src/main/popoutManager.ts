@@ -33,8 +33,10 @@ const CASCADE_STEP_PX = 30;
 type Options = {
   allowedOrigins: readonly string[];
   preloadPath: string;
-  /** The color a new window shows before its page paints, for the color scheme now. */
+  /** The color a new window shows before its page paints: for the color scheme now, or clear when windows are see-through. */
   backgroundColor: () => string;
+  /** Whether windows are see-through now (macOS). */
+  translucent: () => boolean;
   windowState: WindowState;
   openExternal: (url: string) => void;
   /** Attaches the right-click menu (spelling, editing) to a window's page. */
@@ -51,7 +53,7 @@ type Options = {
  * mistaken for one the user closed: the saved layout still has it, and it comes back with the main window.
  */
 export function createPopoutManager(options: Options) {
-  const { allowedOrigins, preloadPath, backgroundColor, windowState, openExternal, installContextMenu } = options;
+  const { allowedOrigins, preloadPath, backgroundColor, translucent, windowState, openExternal, installContextMenu } = options;
   const open = new Map<string, WindowLike>();
   const destroying = new Set<string>();
 
@@ -68,7 +70,7 @@ export function createPopoutManager(options: Options) {
     installContextMenu(window.webContents);
     // A pop-out opens nothing of its own: links in its notes go to the browser, as in the main window.
     window.webContents.setWindowOpenHandler(({ url }) => {
-      const decision = decideWindowOpen({ url, openedByPopout: true, allowedOrigins, preloadPath, backgroundColor: backgroundColor() });
+      const decision = decideWindowOpen({ url, openedByPopout: true, allowedOrigins, preloadPath, backgroundColor: backgroundColor(), translucent: translucent() });
       if (decision.action === "deny" && decision.openExternally) openExternal(decision.openExternally);
       return { action: "deny" };
     });
@@ -104,7 +106,7 @@ export function createPopoutManager(options: Options) {
     /** Takes charge of what the main window may open, and of pop-outs for as long as it lasts. */
     attach(main: WindowLike): void {
       main.webContents.setWindowOpenHandler(({ url }) => {
-        const common = { url, openedByPopout: false, allowedOrigins, preloadPath, backgroundColor: backgroundColor() };
+        const common = { url, openedByPopout: false, allowedOrigins, preloadPath, backgroundColor: backgroundColor(), translucent: translucent() };
         const decision = decideWindowOpen(common);
         if (decision.action === "deny") {
           if (decision.openExternally) openExternal(decision.openExternally);

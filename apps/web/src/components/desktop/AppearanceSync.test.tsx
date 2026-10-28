@@ -29,6 +29,8 @@ afterEach(() => {
   const root = document.documentElement;
   root.removeAttribute("data-theme");
   root.removeAttribute("data-tone");
+  root.removeAttribute("data-note-background");
+  root.removeAttribute("data-translucent");
   root.removeAttribute("style");
 });
 
@@ -46,6 +48,26 @@ describe("AppearanceSync", () => {
     expect(root().dataset.theme).toBe("forest");
     expect(root().style.getPropertyValue("--preview-font")).toBe(previewFontStack("lora"));
     expect(root().style.getPropertyValue("--editor-font")).toBe(editorFontStack("jetbrains-mono"));
+  });
+
+  it("gives the window the note background it is told of", () => {
+    render(<AppearanceSync />);
+
+    tell({ theme: "dark", previewFont: "default", editorFont: "default", noteBackground: "architect" });
+    expect(root().dataset.noteBackground).toBe("architect");
+
+    tell({ theme: "dark", previewFont: "default", editorFont: "default", noteBackground: "plain" });
+    expect(root().dataset.noteBackground).toBe("plain");
+  });
+
+  it("makes the window see-through, or solid again, as it is told", () => {
+    render(<AppearanceSync />);
+
+    tell({ theme: "dark", previewFont: "default", editorFont: "default", translucent: true });
+    expect(root().hasAttribute("data-translucent")).toBe(true);
+
+    tell({ theme: "dark", previewFont: "default", editorFont: "default", translucent: false });
+    expect(root().hasAttribute("data-translucent")).toBe(false);
   });
 
   it("gives it where it is on the sunrise and sunset ramp, when it follows the sun", () => {

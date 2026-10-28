@@ -8,6 +8,7 @@ const base = {
   allowedOrigins: [OWN],
   preloadPath: "/app/preload.js",
   backgroundColor: "#121212",
+  translucent: false,
 };
 
 describe("decideWindowOpen", () => {
@@ -25,6 +26,15 @@ describe("decideWindowOpen", () => {
       spellcheck: true,
     });
     expect(decision.options).toMatchObject({ show: false, backgroundColor: "#121212", title: "Composition" });
+  });
+
+  it("makes the window see-through, as the main window is, when the see-through look is on (macOS), and solid when it is off", () => {
+    const see = decideWindowOpen({ ...base, translucent: true });
+    const solid = decideWindowOpen({ ...base, translucent: false });
+    if (see.action !== "allow" || solid.action !== "allow") throw new Error("not allowed");
+
+    expect(see.options.vibrancy).toBe("under-window");
+    expect(solid.options).not.toHaveProperty("vibrancy");
   });
 
   it("puts the window where it was last, when that is known, and in a default place and size when not", () => {
