@@ -1,5 +1,6 @@
 import { ArrowLeftIcon } from "lucide-react";
 import Link from "next/link";
+import { RouteBackNav } from "@/components/RouteBackNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,6 +25,7 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-2xl flex-col gap-6 p-6">
+      <RouteBackNav />
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Settings</h1>
         <Button asChild variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
