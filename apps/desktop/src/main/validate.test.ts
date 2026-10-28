@@ -3,8 +3,9 @@ import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachments
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
+import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -211,6 +212,21 @@ describe("BACKUP_VALIDATORS", () => {
   it("takes no arguments at all, so a page can't name a path", () => {
     expect(BACKUP_VALIDATORS.createBackup(["/etc/cron.d/evil"])).toEqual([]);
     expect(BACKUP_VALIDATORS.restoreBackup(["/tmp/x.tar.gz", 1])).toEqual([]);
+  });
+});
+
+describe("WINDOW_VALIDATORS", () => {
+  it("has exactly one validator per window method", () => {
+    expect(Object.keys(WINDOW_VALIDATORS).sort()).toEqual([...WINDOW_METHODS].sort());
+  });
+
+  it("passes only the boolean on", () => {
+    expect(WINDOW_VALIDATORS.getWindowTranslucency(["extra"])).toEqual([]);
+    expect(WINDOW_VALIDATORS.setWindowTranslucency([false, "extra"])).toEqual([false]);
+  });
+
+  it.each([[[]], [["yes"]], [[1]], [[null]]])("refuses %j", (args) => {
+    expect(() => WINDOW_VALIDATORS.setWindowTranslucency(args)).toThrow(InvalidArgumentsError);
   });
 });
 

@@ -2,6 +2,7 @@ import { BrowserWindow, shell } from "electron";
 import type { ThemeName } from "./backend";
 import { installContextMenu } from "./contextMenu";
 import { isAllowedOrigin } from "./origin";
+import { TRANSLUCENT_BACKGROUND, WINDOW_VIBRANCY } from "./translucency";
 
 /**
  * Window background per color scheme, so the very first frame matches the UI
@@ -31,8 +32,10 @@ export function createMainWindow(options: {
   entryUrl: string;
   allowedOrigins: readonly string[];
   theme: Exclude<ThemeName, "auto">;
+  /** Blur what is behind the window (macOS) and let the page show it through. */
+  translucent: boolean;
 }): BrowserWindow {
-  const { preloadPath, entryUrl, allowedOrigins, theme } = options;
+  const { preloadPath, entryUrl, allowedOrigins, theme, translucent } = options;
 
   const window = new BrowserWindow({
     width: 1280,
@@ -41,7 +44,8 @@ export function createMainWindow(options: {
     minHeight: 480,
     show: false,
     title: "Composition",
-    backgroundColor: THEME_BACKGROUND[theme] ?? THEME_BACKGROUND.dark,
+    ...(translucent ? { vibrancy: WINDOW_VIBRANCY } : {}),
+    backgroundColor: translucent ? TRANSLUCENT_BACKGROUND : (THEME_BACKGROUND[theme] ?? THEME_BACKGROUND.dark),
     webPreferences: {
       preload: preloadPath,
       // The UI gets exactly the window.composition bridge and nothing else.

@@ -3,6 +3,7 @@ import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/co
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
+import { WINDOW_METHODS, type WindowApi } from "../../../web/src/lib/composition/windowApi";
 import type { AssistantHost } from "./assistant";
 import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import { API_METHODS, type CompositionApi } from "./backend";
@@ -30,6 +31,9 @@ function setup() {
   const updates = Object.fromEntries(
     UPDATE_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof UpdatesApi]: ReturnType<typeof vi.fn> };
+  const window = Object.fromEntries(
+    WINDOW_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
+  ) as unknown as { [K in keyof WindowApi]: ReturnType<typeof vi.fn> };
   const assistant = { chat: vi.fn(async () => {}), abort: vi.fn(async () => {}) } satisfies AssistantHost;
   registerIpc({
     ipcMain,
@@ -38,19 +42,20 @@ function setup() {
     attachments: attachments as unknown as AttachmentsApi,
     backup: backup as unknown as DesktopBackupApi,
     updates: updates as unknown as UpdatesApi,
+    window: window as unknown as WindowApi,
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup, updates, assistant };
+  return { handlers, listeners, api, attachments, backup, updates, window, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, backup, update and AI helper method, and nothing else", () => {
+  it("registers one handler per API, attachment, backup, update, window and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
   });
 

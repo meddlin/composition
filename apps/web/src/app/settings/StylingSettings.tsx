@@ -20,6 +20,7 @@ import {
   saveTheme,
   type SaveLocationResult,
 } from "@/lib/composition/client";
+import { WindowSettings } from "./WindowSettings";
 
 // Preview swatches (background, foreground, primary); must match the palettes in globals.css.
 const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
@@ -170,6 +171,8 @@ export function StylingSettings({
         </RadioGroup>
         {themeError && <FieldError>{themeError}</FieldError>}
       </FieldSet>
+
+      <WindowSettings />
 
       <FieldSet className="gap-2 text-sm">
         <FieldLegend variant="label">Preview font</FieldLegend>
