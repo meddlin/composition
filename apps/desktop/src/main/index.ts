@@ -12,7 +12,8 @@ import { originOf } from "./origin";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
-import { createMainWindow } from "./window";
+import { createWindowPrefsStore, createWindowTranslucency } from "./translucency";
+import { createMainWindow, THEME_BACKGROUND } from "./window";
 
 app.setName("Composition");
 app.setAboutPanelOptions({
@@ -131,13 +132,23 @@ const updates = createElectronUpdates({ userData, prepareToQuit: shutDown });
 
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
+// "auto" opens as the dark or light end of its ramp, per the cached sun times.
+const currentThemeKey = () => service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme);
+
+const translucency = createWindowTranslucency({
+  platform: process.platform,
+  prefs: createWindowPrefsStore(path.join(userData, "window.json")),
+  windows: () => BrowserWindow.getAllWindows(),
+  solidBackground: () => THEME_BACKGROUND[currentThemeKey()],
+});
+
 function openMainWindow(): BrowserWindow {
   return createMainWindow({
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
-    // "auto" opens as the dark or light end of its ramp, per the cached sun times.
-    theme: service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme),
+    theme: currentThemeKey(),
+    translucent: translucency.isActive(),
   });
 }
 
@@ -169,11 +180,20 @@ async function main(): Promise<void> {
     attachments,
     backup,
     updates: updates.manager,
+    window: translucency,
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
     isTrustedUrl: (url) => isTrustedUrl(url, allowedOrigins),
     initial: () => {
       const { theme, previewFont, editorFont, noteBackground, sidebarWidth, editorRatio } = loadWebSettings();
-      return { theme, previewFont, editorFont, noteBackground, layout: { sidebarWidth, editorRatio }, sun: service.initialSunTheme() };
+      return {
+        theme,
+        previewFont,
+        editorFont,
+        noteBackground,
+        layout: { sidebarWidth, editorRatio },
+        translucent: translucency.isActive(),
+        sun: service.initialSunTheme(),
+      };
     },
   });
 

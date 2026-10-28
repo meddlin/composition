@@ -3,6 +3,7 @@ import { checkChatRequest } from "../../../web/src/lib/composition/assistant/cha
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
+import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
 import type { ApiMethod } from "./backend";
 
 /**
@@ -236,6 +237,13 @@ export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
     typeof enabled === "boolean" ? [enabled] : fail("setAutoCheckUpdates", "enabled"),
   setAllowPrerelease: ([enabled]) =>
     typeof enabled === "boolean" ? [enabled] : fail("setAllowPrerelease", "enabled"),
+};
+
+/** The window methods take nothing from the page except a boolean. */
+export const WINDOW_VALIDATORS: Record<WindowMethod, Validator> = {
+  getWindowTranslucency: none,
+  setWindowTranslucency: ([enabled]) =>
+    typeof enabled === "boolean" ? [enabled] : fail("setWindowTranslucency", "enabled"),
 };
 
 /** Arguments of the AI helper's chat calls. The request is checked by the same function the web route uses; a cloud model is refused here, by name. */
