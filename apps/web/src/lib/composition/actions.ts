@@ -26,6 +26,7 @@ import * as service from "./service";
 import type { SunSchedule } from "./sunTimes";
 import type { RestoreResult, Trash } from "./trash";
 import type { HomeSettings } from "./home";
+import type { PluginSettings } from "./plugins";
 import type { WritingSettings } from "./writing";
 
 /**
@@ -275,6 +276,15 @@ export async function saveWritingSettings(writing: WritingSettings): Promise<{ e
 
 export async function saveHomeSettings(home: HomeSettings): Promise<{ error?: string }> {
   const result = await service.saveHomeSettings(home);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
+export async function savePluginSettings(plugins: PluginSettings): Promise<{ error?: string }> {
+  const result = await service.savePluginSettings(plugins);
   if (!result.error) {
     revalidatePath("/settings");
     revalidatePath("/");

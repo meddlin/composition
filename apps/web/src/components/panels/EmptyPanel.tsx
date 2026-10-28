@@ -3,6 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import type { PanelId } from "./layoutTree";
+import { KINDS } from "./kinds";
+import { usePlugins } from "../plugins/usePlugins";
 import type { KindId } from "./panelsState";
 import type { WorkspaceStore } from "../notes/workspaceStore";
 
@@ -19,13 +21,19 @@ const CHOICES: { kind: Exclude<KindId, "empty">; label: string }[] = [
  * into that kind; a note dropped on it, or picked in the sidebar while it is focused, fills it too.
  */
 export function EmptyPanel({ store, panelId }: { store: WorkspaceStore; panelId: PanelId }) {
+  const { enabled } = usePlugins(store.plugins);
+  // A kind that belongs to a plugin that is off is not offered.
+  const choices = CHOICES.filter(({ kind }) => {
+    const plugin = KINDS[kind].plugin;
+    return plugin === undefined || enabled[plugin];
+  });
   return (
     <Empty>
       <EmptyHeader>
         <EmptyDescription>What should this panel show?</EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">
-        {CHOICES.map(({ kind, label }) => (
+        {choices.map(({ kind, label }) => (
           <Button key={kind} variant="outline" size="sm" onClick={() => store.setPanelKind(panelId, kind)}>
             {label}
           </Button>

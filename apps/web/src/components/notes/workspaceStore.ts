@@ -4,6 +4,8 @@ import { NO_FAVORITES, removeFavorite, toggleFavorite as toggleFavoriteIn, type 
 import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { DEFAULT_HOME_SETTINGS, toggleNotebookPin as toggleNotebookPinIn, type HomeSettings } from "@/lib/composition/home";
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
+import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/composition/pluginsStore";
+import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
 import { createTodosStore, unavailableTodos, type TodosStore } from "@/lib/composition/todosStore";
 import type { WritingSettings } from "@/lib/composition/writing";
 import type { DropZone, Edge, PanelId, SplitPath } from "../panels/layoutTree";
@@ -76,6 +78,8 @@ export type WorkspaceData = {
   home?: HomeSettings;
   /** The editor's ruler and reflow. Not the store's business: it is carried along for the windows that show editors. */
   writing?: WritingSettings;
+  /** Which built-in plugins are on. */
+  plugins?: PluginSettings;
 };
 
 export type WorkspaceInitial = WorkspaceData;
@@ -105,6 +109,8 @@ export type WorkspaceSnapshot = {
 export type WorkspaceOptions = {
   /** The to-do items the to-do panels show, one list for every window. Without it, loading them reports that they are unavailable. */
   todos?: TodosStore;
+  /** Which plugins are on, one answer for every window. Without it, all are on and a change is only remembered while the page is open. */
+  plugins?: PluginsStore;
   panels?: {
     /** What was saved of the panels last time (read from the settings file); one this version can't read is ignored. */
     saved?: unknown;
@@ -120,6 +126,8 @@ export type WorkspaceStore = {
   readonly assistant: ChatsStore;
   /** The to-do items, which live with the workspace so every to-do panel, in any window, shows one list. */
   readonly todos: TodosStore;
+  /** Which built-in plugins are on, which live with the workspace so every panel, in any window, agrees. */
+  readonly plugins: PluginsStore;
   subscribe(listener: () => void): () => void;
   getSnapshot(): WorkspaceSnapshot;
   /** Shows the text at once and saves it after a pause; each note has its own pause. */
@@ -227,6 +235,7 @@ export function createWorkspaceStore(
   options: WorkspaceOptions = {},
 ): WorkspaceStore {
   const grid = options.panels !== undefined;
+  const plugins = options.plugins ?? createPluginsStore(unsavedPlugins, initial.plugins ?? DEFAULT_PLUGIN_SETTINGS);
   let panelCount = 0;
   const newPanelId = () => `p${++panelCount}`;
   let windowCount = 0;
@@ -416,6 +425,7 @@ export function createWorkspaceStore(
       home: fresh.home ?? state.home,
       panes,
     });
+    if (fresh.plugins) plugins.replace(fresh.plugins);
   }
 
   function toggleFavorite(type: FavoriteType, id: number) {
@@ -567,6 +577,7 @@ export function createWorkspaceStore(
   return {
     assistant,
     todos: options.todos ?? createTodosStore(unavailableTodos),
+    plugins,
     subscribe(listener) {
       listeners.add(listener);
       return () => void listeners.delete(listener);

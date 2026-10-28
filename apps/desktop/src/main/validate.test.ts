@@ -40,6 +40,7 @@ describe("VALIDATORS", () => {
       wordCountEnabled: true,
     };
     expect(VALIDATORS.saveWritingSettings([{ ...writing, extra: 1 }])).toEqual([writing]);
+    expect(VALIDATORS.savePluginSettings([{ todo: false, extra: 1 }])).toEqual([{ todo: false }]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
@@ -155,6 +156,9 @@ describe("VALIDATORS", () => {
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
     ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
+    ["savePluginSettings", [null]],
+    ["savePluginSettings", [{}]],
+    ["savePluginSettings", [{ todo: "off" }]],
     ["saveHomeSettings", [null]],
     ["saveHomeSettings", [{ layout: 1 }]],
     ["saveHomeSettings", [{ layout: "rail", sections: "all", recentCount: 12, density: "standard", startup: "note" }]],

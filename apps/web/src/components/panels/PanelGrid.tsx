@@ -16,6 +16,8 @@ import { NotesBrowserPanel } from "./NotesBrowserPanel";
 import { dragSizes, minExtent, panelIds, type Direction, type LayoutNode, type PanelId, type SplitPath } from "./layoutTree";
 import { TodoPanel } from "./TodoPanel";
 import { PanelFrame } from "./PanelFrame";
+import { PluginOffPanel } from "./PluginOffPanel";
+import { usePlugins } from "../plugins/usePlugins";
 import { PanelMenu } from "./PanelMenu";
 import { MAIN_WINDOW, focusedPanelId, type KindId, type PanelsState, type WindowId } from "./panelsState";
 
@@ -92,12 +94,15 @@ function NodeView({ node, path, shared }: { node: LayoutNode; path: SplitPath; s
 function PanelView({ panelId, shared }: { panelId: PanelId; shared: Shared }) {
   const { store, panels, focusedId, canCloseLast } = shared;
   const record = panels.byId[panelId];
+  const { enabled } = usePlugins(store.plugins);
   if (record.kind === "note") {
     const state = record.state as NotePanelState;
     if (state.noteId !== null) return <NoteView panelId={panelId} state={state} shared={shared} />;
   }
 
   const Icon = KIND_ICON[record.kind];
+  const plugin = KINDS[record.kind].plugin;
+  const off = plugin !== undefined && !enabled[plugin];
   return (
     <PanelFrame
       store={store}
@@ -113,11 +118,12 @@ function PanelView({ panelId, shared }: { panelId: PanelId; shared: Shared }) {
       title={KIND_LABEL[record.kind].replace(" panel", "")}
       extras={record.kind === "ai" && <FollowToggle store={store} panelId={panelId} following={(record.state as AssistantPanelState).follow} />}
     >
-      {record.kind === "empty" && <EmptyPanel store={store} panelId={panelId} />}
-      {record.kind === "note" && <AwaitingNote onCreateNote={shared.host.onCreateNote} />}
-      {record.kind === "ai" && <AiPanel store={store} panelId={panelId} snapshot={shared.snapshot} host={shared.host} />}
-      {record.kind === "todo" && <TodoPanel store={store} panelId={panelId} state={record.state as TodoPanelState} />}
-      {record.kind === "notes-browser" && (
+      {off && plugin && <PluginOffPanel store={store} plugin={plugin} />}
+      {!off && record.kind === "empty" && <EmptyPanel store={store} panelId={panelId} />}
+      {!off && record.kind === "note" && <AwaitingNote onCreateNote={shared.host.onCreateNote} />}
+      {!off && record.kind === "ai" && <AiPanel store={store} panelId={panelId} snapshot={shared.snapshot} host={shared.host} />}
+      {!off && record.kind === "todo" && <TodoPanel store={store} panelId={panelId} state={record.state as TodoPanelState} />}
+      {!off && record.kind === "notes-browser" && (
         <NotesBrowserPanel
           store={store}
           panelId={panelId}
