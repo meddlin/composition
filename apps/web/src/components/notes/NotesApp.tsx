@@ -43,6 +43,13 @@ import { createNoteFromAnswer } from "./createNoteFromAnswer";
 import { DropOverlay } from "./DropOverlay";
 import { GroupPage } from "./GroupPage";
 import { HomePage } from "./HomePage";
+import {
+  EMPTY_NAV_HISTORY,
+  back as stepBack,
+  forward as stepForward,
+  record as recordLocation,
+  type NavLocation,
+} from "./navHistory";
 import { recordOpened } from "./openedNotes";
 import { NotebookPanel } from "./NotebookPanel";
 import {
@@ -70,6 +77,7 @@ import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
 import { applySavedNote, noteTitle, type Group, type Note, type Notebook } from "./types";
 import { useLayout } from "./useLayout";
+import { useBackForward } from "./useBackForward";
 import { useNoteDrop } from "./useNoteDrop";
 
 const AUTOSAVE_DELAY_MS = 500;
@@ -246,7 +254,7 @@ function Workspace({
     if (notebook !== undefined && notebook !== notebookId) openNotebook(notebook);
   }
 
-  /** Opens a note picked from search and brings its sidebar row into view. */
+  /** Opens a note picked from somewhere other than the sidebar (search, the history) and brings its sidebar row into view. */
   function selectNoteFromSearch(id: number) {
     selectNote(id);
     setReveal((prev) => ({ noteId: id, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -287,6 +295,49 @@ function Workspace({
     }
     setViewedGroupId(id);
   }
+
+  // Where the user is, as the history sees it. Not state of its own: it follows the state above.
+  const here: NavLocation | null = homeOpen
+    ? { kind: "home" }
+    : viewedGroup
+      ? { kind: "group", id: viewedGroup.id }
+      : focusedId !== null
+        ? { kind: "note", id: focusedId }
+        : null;
+  const hereKey = here && `${here.kind}:${"id" in here ? here.id : ""}`;
+
+  // A ref, since nothing is drawn from it. Recording the place a step back just went to
+  // changes nothing (see `record`), so every way of getting somewhere is covered here.
+  const navHistory = useRef(EMPTY_NAV_HISTORY);
+  useEffect(() => {
+    if (here) navHistory.current = recordLocation(navHistory.current, here);
+    // `hereKey` stands for `here`, which is a new object on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hereKey]);
+
+  /** Whether the place still exists: a note or group deleted since is passed over. */
+  function stillExists(target: NavLocation): boolean {
+    if (target.kind === "home") return true;
+    return target.kind === "note" ? notes.some((n) => n.id === target.id) : groups.some((g) => g.id === target.id);
+  }
+
+  function stepHistory(step: typeof stepBack) {
+    const result = step(navHistory.current, stillExists);
+    if (!result) return;
+    navHistory.current = result.history;
+    const { location: target } = result;
+    if (target.kind === "note") selectNoteFromSearch(target.id);
+    else if (target.kind === "group") openGroup(target.id);
+    else {
+      flushPendingSave();
+      setHomeOpen(true);
+    }
+  }
+
+  useBackForward(
+    () => stepHistory(stepBack),
+    () => stepHistory(stepForward),
+  );
 
   function create(groupId: number | null = null) {
     flushPendingSave();
