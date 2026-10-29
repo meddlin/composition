@@ -19,3 +19,4 @@ export const WINDOW_SETTINGS_AVAILABLE = true;
 
 export const getWindowTranslucency = (): Promise<WindowTranslucency> => bridge().getWindowTranslucency();
 export const setWindowTranslucency = (enabled: boolean): Promise<WindowTranslucency> => bridge().setWindowTranslucency(enabled);
+export const setWindowOpacity = (opacity: number): Promise<WindowTranslucency> => bridge().setWindowOpacity(opacity);

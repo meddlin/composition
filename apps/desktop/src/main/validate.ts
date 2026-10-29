@@ -275,7 +275,7 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
 };
 
-/** The update methods take nothing from the page except a boolean: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
+/** The update methods take nothing from the page except a boolean or a number: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
 export const UPDATE_VALIDATORS: Record<UpdateMethod, Validator> = {
   getUpdateState: none,
   checkForUpdates: none,
@@ -292,6 +292,8 @@ export const WINDOW_VALIDATORS: Record<WindowMethod, Validator> = {
   getWindowTranslucency: none,
   setWindowTranslucency: ([enabled]) =>
     typeof enabled === "boolean" ? [enabled] : fail("setWindowTranslucency", "enabled"),
+  setWindowOpacity: ([opacity]) =>
+    typeof opacity === "number" && Number.isFinite(opacity) ? [opacity] : fail("setWindowOpacity", "opacity"),
 };
 
 /** Arguments of the AI helper's chat calls. The request is checked by the same function the web route uses; a cloud model is refused here, by name. */

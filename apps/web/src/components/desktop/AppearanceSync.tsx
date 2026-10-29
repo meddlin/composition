@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
 import type { AppearanceMessage } from "@/lib/composition/appearanceApi";
+import { applyWindowOpacity } from "@/lib/composition/windowOpacity";
 import { editorFontStack } from "@/lib/composition/editorFonts";
 import { previewFontStack } from "@/lib/composition/previewFonts";
 
@@ -13,6 +14,7 @@ function applyAppearance(root: HTMLElement, appearance: AppearanceMessage): void
   // A flag, as the layout's first-paint script sets it: present means see-through.
   if (appearance.translucent) root.dataset.translucent = "";
   else delete root.dataset.translucent;
+  applyWindowOpacity(root, appearance.opacity);
   root.style.setProperty("--preview-font", previewFontStack(appearance.previewFont));
   root.style.setProperty("--editor-font", editorFontStack(appearance.editorFont));
   if (appearance.sun) {

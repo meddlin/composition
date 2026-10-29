@@ -8,6 +8,7 @@ const appearance: AppearanceMessage = {
   editorFont: "default",
   noteBackground: "plain",
   translucent: false,
+  opacity: 0.8,
   sun: { tone: "dark", autoLight: "0.2" },
 };
 
@@ -83,8 +84,9 @@ describe("notifyAppearanceChanges", () => {
 
 describe("notifyTranslucencyChange", () => {
   const api = () => ({
-    getWindowTranslucency: vi.fn(async () => ({ supported: true, enabled: true })),
-    setWindowTranslucency: vi.fn(async (enabled: boolean) => ({ supported: true, enabled })),
+    getWindowTranslucency: vi.fn(async () => ({ supported: true, enabled: true, opacity: 0.8 })),
+    setWindowTranslucency: vi.fn(async (enabled: boolean) => ({ supported: true, enabled, opacity: 0.8 })),
+    setWindowOpacity: vi.fn(async (opacity: number) => ({ supported: true, enabled: true, opacity })),
   });
 
   it("announces the new appearance once the see-through look has been changed, and returns the state it returned", async () => {
@@ -93,7 +95,7 @@ describe("notifyTranslucencyChange", () => {
 
     const state = await notifyTranslucencyChange(inner, announce).setWindowTranslucency(false);
 
-    expect(state).toEqual({ supported: true, enabled: false });
+    expect(state).toEqual({ supported: true, enabled: false, opacity: 0.8 });
     expect(inner.setWindowTranslucency).toHaveBeenCalledWith(false);
     expect(announce).toHaveBeenCalledTimes(1);
   });
@@ -103,12 +105,19 @@ describe("notifyTranslucencyChange", () => {
     const inner = api();
     inner.setWindowTranslucency.mockImplementation(async (enabled) => {
       order.push("changed");
-      return { supported: true, enabled };
+      return { supported: true, enabled, opacity: 0.8 };
     });
 
     await notifyTranslucencyChange(inner, () => order.push("announced")).setWindowTranslucency(true);
 
     expect(order).toEqual(["changed", "announced"]);
+  });
+
+  it("announces a new opacity too", async () => {
+    const announce = vi.fn();
+    const state = await notifyTranslucencyChange(api(), announce).setWindowOpacity(0.5);
+    expect(state.opacity).toBe(0.5);
+    expect(announce).toHaveBeenCalledTimes(1);
   });
 
   it("announces nothing for a read, or when the change failed", async () => {

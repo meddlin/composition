@@ -16,6 +16,8 @@ export type AppearanceMessage = {
   noteBackground: NoteBackgroundName;
   /** Whether the window lets what is behind it show through, so the first frame already does. */
   translucent: boolean;
+  /** How solid the page's fills are while translucent (see `WindowTranslucency.opacity`). */
+  opacity: number;
   /** Present for the "auto" scheme. */
   sun?: { tone: "light" | "dark"; autoLight: string };
 };
