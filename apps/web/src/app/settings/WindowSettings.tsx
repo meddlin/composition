@@ -3,9 +3,12 @@
 import { useEffect, useState, useTransition } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { isTranslucent, type WindowTranslucency } from "@/lib/composition/windowApi";
+import { Slider } from "@/components/ui/slider";
+import { isTranslucent, MIN_WINDOW_OPACITY, type WindowTranslucency } from "@/lib/composition/windowApi";
+import { applyWindowOpacity } from "@/lib/composition/windowOpacity";
 import {
   getWindowTranslucency,
+  setWindowOpacity,
   setWindowTranslucency,
   WINDOW_SETTINGS_AVAILABLE,
 } from "@/lib/composition/windowClient";
@@ -13,7 +16,12 @@ import {
 /** The attribute on <html> that makes the stylesheet's surfaces see-through (see globals.css). */
 function showTranslucent(state: WindowTranslucency) {
   document.documentElement.toggleAttribute("data-translucent", isTranslucent(state));
+  applyWindowOpacity(document.documentElement, state.opacity);
 }
+
+/** The slider speaks of transparency; the stylesheet and the saved setting, of opacity. */
+const toTransparencyPercent = (opacity: number) => Math.round((1 - opacity) * 100);
+const toOpacity = (transparencyPercent: number) => 1 - transparencyPercent / 100;
 
 /**
  * The window's see-through look. Desktop only, and only where the OS can blur what is behind
@@ -53,6 +61,26 @@ export function WindowSettings() {
     });
   }
 
+  // The page follows the thumb as it moves; the setting is saved (and other windows told) when it is let go.
+  function preview(percent: number) {
+    const opacity = toOpacity(percent);
+    setState((current) => current && { ...current, opacity });
+    applyWindowOpacity(document.documentElement, opacity);
+  }
+
+  function commit(percent: number) {
+    setError(undefined);
+    startTransition(async () => {
+      try {
+        const next = await setWindowOpacity(toOpacity(percent));
+        setState(next);
+        showTranslucent(next);
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : String(failure));
+      }
+    });
+  }
+
   return (
     <FieldSet className="gap-2 text-sm">
       <FieldLegend variant="label">Window</FieldLegend>
@@ -70,6 +98,25 @@ export function WindowSettings() {
         <FieldLabel htmlFor="window-translucent" className="cursor-pointer font-normal">
           Translucent window
         </FieldLabel>
+      </Field>
+      <Field className="w-64 gap-2">
+        <div className="flex justify-between">
+          <span aria-hidden>Transparency</span>
+          <span className="tabular-nums text-muted-foreground">
+            {state ? `${toTransparencyPercent(state.opacity)}%` : ""}
+          </span>
+        </div>
+        <Slider
+          aria-label="Transparency"
+          min={0}
+          max={Math.round((1 - MIN_WINDOW_OPACITY) * 100)}
+          step={1}
+          value={[state ? toTransparencyPercent(state.opacity) : 0]}
+          disabled={!state || !state.enabled}
+          onValueChange={([percent]) => preview(percent)}
+          onValueCommit={([percent]) => commit(percent)}
+        />
+        <FieldDescription className="text-xs">Recommended: 70%.</FieldDescription>
       </Field>
       {error && <FieldError>{error}</FieldError>}
     </FieldSet>

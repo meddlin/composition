@@ -11,4 +11,5 @@ export const WINDOW_SETTINGS_AVAILABLE = false;
 const unavailable = <T>(): Promise<T> => Promise.reject(new Error("Window translucency is only available in the desktop app."));
 
 export const getWindowTranslucency = (): Promise<WindowTranslucency> => unavailable();
+export const setWindowOpacity = (opacity: number): Promise<WindowTranslucency> => (void opacity, unavailable());
 export const setWindowTranslucency = (enabled: boolean): Promise<WindowTranslucency> => (void enabled, unavailable());

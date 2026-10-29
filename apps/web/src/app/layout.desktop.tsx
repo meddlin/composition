@@ -27,7 +27,7 @@ const PREVIEW_FONT_STACKS = JSON.stringify(
 const EDITOR_FONT_STACKS = JSON.stringify(
   Object.fromEntries(EDITOR_FONT_CHOICES.map(({ name, stack }) => [name, stack])),
 );
-const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement,f=${PREVIEW_FONT_STACKS}[i.previewFont],e=${EDITOR_FONT_STACKS}[i.editorFont];r.dataset.theme=i.theme||"dark";r.dataset.noteBackground=i.noteBackground||"plain";if(i.translucent)r.dataset.translucent="";if(f)r.style.setProperty("--preview-font",f);if(e)r.style.setProperty("--editor-font",e);if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
+const APPLY_THEME = `try{var i=(window.composition||{}).initial||{},r=document.documentElement,f=${PREVIEW_FONT_STACKS}[i.previewFont],e=${EDITOR_FONT_STACKS}[i.editorFont];r.dataset.theme=i.theme||"dark";r.dataset.noteBackground=i.noteBackground||"plain";if(i.translucent)r.dataset.translucent="";if(typeof i.opacity==="number")r.style.setProperty("--glass-alpha",String(Math.round(i.opacity*100)));if(f)r.style.setProperty("--preview-font",f);if(e)r.style.setProperty("--editor-font",e);if(i.sun){r.dataset.tone=i.sun.tone;r.style.setProperty("--auto-light",i.sun.autoLight)}}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

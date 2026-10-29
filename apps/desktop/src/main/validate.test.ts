@@ -266,6 +266,13 @@ describe("WINDOW_VALIDATORS", () => {
   it.each([[[]], [["yes"]], [[1]], [[null]]])("refuses %j", (args) => {
     expect(() => WINDOW_VALIDATORS.setWindowTranslucency(args)).toThrow(InvalidArgumentsError);
   });
+
+  it("passes only the number on for the opacity, and refuses anything else", () => {
+    expect(WINDOW_VALIDATORS.setWindowOpacity([0.5, "extra"])).toEqual([0.5]);
+    for (const args of [[], ["0.5"], [null], [Number.NaN], [Infinity]]) {
+      expect(() => WINDOW_VALIDATORS.setWindowOpacity(args)).toThrow(InvalidArgumentsError);
+    }
+  });
 });
 
 describe("UPDATE_VALIDATORS", () => {

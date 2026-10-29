@@ -16,27 +16,33 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe("createWindowPrefsStore", () => {
   it("is translucent when there is no file yet", () => {
-    expect(createWindowPrefsStore(path.join(dir, "window.json")).load()).toEqual({ translucent: true });
+    expect(createWindowPrefsStore(path.join(dir, "window.json")).load()).toEqual({ translucent: true, opacity: 0.3 });
   });
 
   it("remembers the choice, creating the folder if needed", () => {
     const file = path.join(dir, "nested", "window.json");
-    createWindowPrefsStore(file).save({ translucent: false });
-    expect(createWindowPrefsStore(file).load()).toEqual({ translucent: false });
+    createWindowPrefsStore(file).save({ translucent: false, opacity: 0.5 });
+    expect(createWindowPrefsStore(file).load()).toEqual({ translucent: false, opacity: 0.5 });
     expect(fs.readdirSync(path.dirname(file))).toEqual(["window.json"]);
   });
 
   it.each([["not json"], ["null"], ["[]"], ['{"translucent":"no"}'], ["{}"]])("falls back to translucent for %s", (contents) => {
     const file = path.join(dir, "window.json");
     fs.writeFileSync(file, contents);
-    expect(createWindowPrefsStore(file).load()).toEqual({ translucent: true });
+    expect(createWindowPrefsStore(file).load()).toEqual({ translucent: true, opacity: 0.3 });
+  });
+
+  it.each([[-1, 0], [5, 1], ["x", 0.3]])("brings an opacity of %j into range", (opacity, expected) => {
+    const file = path.join(dir, "window.json");
+    fs.writeFileSync(file, JSON.stringify({ translucent: true, opacity }));
+    expect(createWindowPrefsStore(file).load().opacity).toBe(expected);
   });
 });
 
 function setup(options: { platform?: string; translucent?: boolean } = {}) {
   const saved: boolean[] = [];
   const prefs: WindowPrefsStore = {
-    load: () => ({ translucent: options.translucent ?? true }),
+    load: () => ({ translucent: options.translucent ?? true, opacity: 0.8 }),
     save: ({ translucent }) => void saved.push(translucent),
   };
   const window = { setVibrancy: vi.fn(), setBackgroundColor: vi.fn() };
@@ -54,14 +60,14 @@ describe("createWindowTranslucency", () => {
     const { controller } = setup();
     expect(controller.isActive()).toBe(true);
     expect(controller.backgroundColor()).toBe(TRANSLUCENT_BACKGROUND);
-    expect(await controller.getWindowTranslucency()).toEqual({ supported: true, enabled: true });
+    expect(await controller.getWindowTranslucency()).toEqual({ supported: true, enabled: true, opacity: 0.8 });
   });
 
   it("is never active elsewhere, whatever was saved, and says it is unsupported", async () => {
     const { controller, window } = setup({ platform: "linux" });
     expect(controller.isActive()).toBe(false);
     expect(controller.backgroundColor()).toBe("#121212");
-    expect(await controller.setWindowTranslucency(true)).toEqual({ supported: false, enabled: true });
+    expect(await controller.setWindowTranslucency(true)).toEqual({ supported: false, enabled: true, opacity: 0.8 });
     expect(window.setVibrancy).not.toHaveBeenCalled();
   });
 
@@ -73,7 +79,7 @@ describe("createWindowTranslucency", () => {
 
   it("turns an open window solid at once, and saves the choice", async () => {
     const { controller, window, saved } = setup();
-    expect(await controller.setWindowTranslucency(false)).toEqual({ supported: true, enabled: false });
+    expect(await controller.setWindowTranslucency(false)).toEqual({ supported: true, enabled: false, opacity: 0.8 });
     expect(window.setVibrancy).toHaveBeenCalledWith(null);
     expect(window.setBackgroundColor).toHaveBeenCalledWith("#121212");
     expect(saved).toEqual([false]);
@@ -84,6 +90,18 @@ describe("createWindowTranslucency", () => {
     await controller.setWindowTranslucency(true);
     expect(window.setVibrancy).toHaveBeenCalledWith(WINDOW_VIBRANCY);
     expect(window.setBackgroundColor).toHaveBeenCalledWith(TRANSLUCENT_BACKGROUND);
+  });
+
+  it("remembers a new opacity without touching the windows, and keeps it in range", async () => {
+    const prefs = { load: () => ({ translucent: true, opacity: 0.8 }), save: vi.fn() };
+    const window = { setVibrancy: vi.fn(), setBackgroundColor: vi.fn() };
+    const controller = createWindowTranslucency({ platform: "darwin", prefs, windows: () => [window], solidBackground: () => "#121212" });
+
+    expect(await controller.setWindowOpacity(0.5)).toEqual({ supported: true, enabled: true, opacity: 0.5 });
+    expect(prefs.save).toHaveBeenCalledWith({ translucent: true, opacity: 0.5 });
+    expect((await controller.setWindowOpacity(-1)).opacity).toBe(0);
+    expect(controller.opacity()).toBe(0);
+    expect(window.setVibrancy).not.toHaveBeenCalled();
   });
 
   it("does nothing when the choice has not changed", async () => {

@@ -64,7 +64,7 @@ const sidecar = new SearchSidecar({
 /** How the app looks now: what a window's first paint is given, and what the others are told when Settings changes it. */
 function currentAppearance(): AppearanceMessage {
   const { theme, previewFont, editorFont, noteBackground } = loadWebSettings();
-  return { theme, previewFont, editorFont, noteBackground, translucent: translucency.isActive(), sun: service.initialSunTheme() };
+  return { theme, previewFont, editorFont, noteBackground, translucent: translucency.isActive(), opacity: translucency.opacity(), sun: service.initialSunTheme() };
 }
 
 /** Tells every open window how the app looks now. */

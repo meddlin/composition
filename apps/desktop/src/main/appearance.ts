@@ -54,5 +54,10 @@ export function notifyTranslucencyChange<T extends WindowApi>(api: T, announce: 
       announce();
       return state;
     },
+    async setWindowOpacity(opacity: number) {
+      const state = await api.setWindowOpacity(opacity);
+      announce();
+      return state;
+    },
   };
 }

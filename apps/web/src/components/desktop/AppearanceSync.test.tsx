@@ -35,8 +35,8 @@ afterEach(() => {
 });
 
 /** Tells the window how the app looks; the note background and see-through look are the plain, opaque ones unless said. */
-const tell = (appearance: Omit<AppearanceMessage, "noteBackground" | "translucent"> & Partial<Pick<AppearanceMessage, "noteBackground" | "translucent">>) =>
-  listeners.forEach((listener) => listener({ noteBackground: "plain", translucent: false, ...appearance }));
+const tell = (appearance: Omit<AppearanceMessage, "noteBackground" | "translucent" | "opacity"> & Partial<Pick<AppearanceMessage, "noteBackground" | "translucent" | "opacity">>) =>
+  listeners.forEach((listener) => listener({ noteBackground: "plain", translucent: false, opacity: 0.8, ...appearance }));
 const root = () => document.documentElement;
 
 describe("AppearanceSync", () => {
@@ -68,6 +68,13 @@ describe("AppearanceSync", () => {
 
     tell({ theme: "dark", previewFont: "default", editorFont: "default", translucent: false });
     expect(root().hasAttribute("data-translucent")).toBe(false);
+  });
+
+  it("sets how solid the see-through fills are, as a percentage", () => {
+    render(<AppearanceSync />);
+
+    tell({ theme: "dark", previewFont: "default", editorFont: "default", translucent: true, opacity: 0.55 });
+    expect(root().style.getPropertyValue("--glass-alpha")).toBe("55");
   });
 
   it("gives it where it is on the sunrise and sunset ramp, when it follows the sun", () => {

@@ -12,16 +12,30 @@ export type WindowTranslucency = {
   supported: boolean;
   /** Whether the person wants it. The window is translucent only when this and `supported` are both true. */
   enabled: boolean;
+  /** How solid the page's background fills are while translucent: 0 (fully see-through) to 1 (solid). */
+  opacity: number;
 };
+
+/** The default fill opacity: 70% transparent, a happy medium between the desktop showing through and text staying easy to read. */
+export const DEFAULT_WINDOW_OPACITY = 0.3;
+/** Fully see-through is allowed; it is the person's call. */
+export const MIN_WINDOW_OPACITY = 0;
+
+/** A number from the page or a file, brought into range; anything else is the default. */
+export const clampWindowOpacity = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value)
+    ? Math.min(1, Math.max(MIN_WINDOW_OPACITY, value))
+    : DEFAULT_WINDOW_OPACITY;
 
 /** The desktop app's contract. */
 export interface WindowApi {
   getWindowTranslucency(): Promise<WindowTranslucency>;
   setWindowTranslucency(enabled: boolean): Promise<WindowTranslucency>;
+  setWindowOpacity(opacity: number): Promise<WindowTranslucency>;
 }
 
 /** Every method of WindowApi, as data; the check below fails to compile if one is missing (see API_METHODS in api.ts). */
-export const WINDOW_METHODS = ["getWindowTranslucency", "setWindowTranslucency"] as const satisfies readonly (keyof WindowApi)[];
+export const WINDOW_METHODS = ["getWindowTranslucency", "setWindowTranslucency", "setWindowOpacity"] as const satisfies readonly (keyof WindowApi)[];
 
 export type WindowMethod = (typeof WINDOW_METHODS)[number];
 

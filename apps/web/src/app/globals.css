@@ -261,9 +261,11 @@
  * any desktop.
  */
 :root[data-translucent] {
-  --glass-background: color-mix(in srgb, var(--background) 78%, transparent);
-  --glass-surface: color-mix(in srgb, var(--surface) 82%, transparent);
-  --glass-panel: color-mix(in srgb, var(--panel) 82%, transparent);
+  /* `--glass-alpha` (a percentage, set from the Window setting) is the background's opacity; surfaces sit a little above it. */
+  --glass-alpha: 30;
+  --glass-background: color-mix(in srgb, var(--background) calc(var(--glass-alpha) * 1%), transparent);
+  --glass-surface: color-mix(in srgb, var(--surface) min(100%, calc((var(--glass-alpha) + 2) * 1%)), transparent);
+  --glass-panel: color-mix(in srgb, var(--panel) min(100%, calc((var(--glass-alpha) + 2) * 1%)), transparent);
 }
 
 @theme inline {
