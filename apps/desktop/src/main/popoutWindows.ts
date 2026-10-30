@@ -86,6 +86,8 @@ export function decideWindowOpen(input: {
         nodeIntegration: false,
         webSecurity: true,
         spellcheck: true,
+        // As in the main window: the Reading List panel can be pulled out, and its web view needs the tag here too.
+        webviewTag: true,
       },
     },
   };

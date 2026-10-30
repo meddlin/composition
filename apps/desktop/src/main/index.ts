@@ -7,14 +7,16 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, readingListService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
 import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
+import { READING_LIST_PARTITION } from "../../../web/src/lib/composition/readingListApi";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
+import { clearReadingData, installReadingListGuard } from "./readingListGuard";
 import { createPopoutManager } from "./popoutManager";
 import { createWindowPrefsStore, createWindowTranslucency } from "./translucency";
 import { createWindowState } from "./windowState";
@@ -172,6 +174,19 @@ const translucency = createWindowTranslucency({
   solidBackground: () => THEME_BACKGROUND[currentThemeKey()] ?? THEME_BACKGROUND.dark,
 });
 
+// The Reading List's pages live in a session of their own, apart from the app's UI (cookies, cache, storage).
+const readingSession = () => session.fromPartition(READING_LIST_PARTITION);
+
+/** What every window gets so its page may hold a Reading List web view, and only while the plugin is on. */
+function attachReadingListGuard(webContents: Parameters<typeof installReadingListGuard>[0]): void {
+  installReadingListGuard(webContents, {
+    // Read from the settings file at each attach, so switching the plugin off takes effect without a restart.
+    pluginEnabled: () => loadWebSettings().plugins["reading-list"],
+    openExternal: (url) => void shell.openExternal(url),
+    readingSession,
+  });
+}
+
 // Pop-outs: a panel pulled into a window of its own. The main window's page opens them; this decides that they may be
 // opened, remembers where each was put (in a file only this process writes) and closes them with the main window.
 const popouts = createPopoutManager({
@@ -185,6 +200,7 @@ const popouts = createPopoutManager({
   }),
   openExternal: (url) => void shell.openExternal(url),
   installContextMenu,
+  installReadingListGuard: attachReadingListGuard,
 });
 
 function openMainWindow(): BrowserWindow {
@@ -195,6 +211,7 @@ function openMainWindow(): BrowserWindow {
     theme: currentThemeKey(),
     translucent: translucency.isActive(),
     popouts,
+    installReadingListGuard: attachReadingListGuard,
   });
 }
 
@@ -227,6 +244,8 @@ async function main(): Promise<void> {
     backup,
     panels: panelsService,
     todos: todosService,
+    // Clearing is the one call that needs a browser session, which only this process has.
+    readingList: { ...readingListService, clearReadingData: () => clearReadingData(readingSession()) },
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),

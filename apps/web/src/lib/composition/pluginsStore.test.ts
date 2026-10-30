@@ -13,7 +13,7 @@ describe("the plugins store", () => {
     expect(store.getSnapshot().enabled.todo).toBe(false);
     expect(listener).toHaveBeenCalled();
     expect(await pending).toEqual({});
-    expect(savePluginSettings).toHaveBeenCalledWith({ todo: false });
+    expect(savePluginSettings).toHaveBeenCalledWith({ todo: false, "reading-list": false });
   });
 
   it("saves nothing when the plugin is already as asked", async () => {
@@ -30,7 +30,7 @@ describe("the plugins store", () => {
 
     expect(await store.setEnabled("todo", false)).toEqual({ error: "Disk is full." });
 
-    expect(store.getSnapshot()).toEqual({ enabled: { todo: true }, error: "Disk is full." });
+    expect(store.getSnapshot()).toEqual({ enabled: { todo: true, "reading-list": false }, error: "Disk is full." });
   });
 
   it("puts the change back when the save fails outright", async () => {
@@ -38,7 +38,7 @@ describe("the plugins store", () => {
 
     await store.setEnabled("todo", false);
 
-    expect(store.getSnapshot()).toEqual({ enabled: { todo: true }, error: "The bridge is gone." });
+    expect(store.getSnapshot()).toEqual({ enabled: { todo: true, "reading-list": false }, error: "The bridge is gone." });
   });
 
   it("takes the saved version without saving it again, and only announces a real change", () => {
@@ -47,10 +47,10 @@ describe("the plugins store", () => {
     const listener = vi.fn();
     store.subscribe(listener);
 
-    store.replace({ todo: true });
+    store.replace({ todo: true, "reading-list": false });
     expect(listener).not.toHaveBeenCalled();
 
-    store.replace({ todo: false });
+    store.replace({ todo: false, "reading-list": false });
     expect(listener).toHaveBeenCalledTimes(1);
     expect(store.getSnapshot().enabled.todo).toBe(false);
     expect(savePluginSettings).not.toHaveBeenCalled();

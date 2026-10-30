@@ -54,6 +54,7 @@ function setup(known: Record<string, Bounds> = {}, translucent = false) {
   const state = fakeState(known);
   const openExternal = vi.fn();
   const installContextMenu = vi.fn();
+  const installReadingListGuard = vi.fn();
   const manager = createPopoutManager({
     allowedOrigins: [OWN],
     preloadPath: "/app/preload.js",
@@ -62,6 +63,7 @@ function setup(known: Record<string, Bounds> = {}, translucent = false) {
     windowState: state,
     openExternal,
     installContextMenu,
+    installReadingListGuard,
   });
   manager.attach(main as unknown as WindowLike);
 
@@ -72,7 +74,7 @@ function setup(known: Record<string, Bounds> = {}, translucent = false) {
     if (decision.action === "allow") from.webContents.emit("did-create-window", child, { url: popoutUrl(id) });
     return { decision, child };
   }
-  return { main, state, openExternal, installContextMenu, manager, open };
+  return { main, state, openExternal, installContextMenu, installReadingListGuard, manager, open };
 }
 
 beforeEach(() => vi.useFakeTimers());
@@ -123,11 +125,13 @@ describe("the main window's rule for opening windows", () => {
 
 describe("a pop-out that was opened", () => {
   it("gets the context menu, and is shown once it is ready", () => {
-    const { open, installContextMenu } = setup();
+    const { open, installContextMenu, installReadingListGuard } = setup();
 
     const { child } = open("w1");
 
     expect(installContextMenu).toHaveBeenCalledWith(child.webContents);
+    // A pop-out can hold a Reading List web view, so it gets the same guard as the main window.
+    expect(installReadingListGuard).toHaveBeenCalledWith(child.webContents);
     expect(child.show).not.toHaveBeenCalled();
     child.emit("ready-to-show");
     expect(child.show).toHaveBeenCalledTimes(1);

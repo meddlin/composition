@@ -1,4 +1,4 @@
-import { BrowserWindow, shell, type WebPreferences } from "electron";
+import { BrowserWindow, shell, type WebContents, type WebPreferences } from "electron";
 import type { ThemeName } from "./backend";
 import { installContextMenu } from "./contextMenu";
 import { isAllowedOrigin } from "./origin";
@@ -34,6 +34,9 @@ export function mainWindowPreferences(preloadPath: string): WebPreferences {
     // The workspace's autosave timers run in this page for every window, pop-outs included: a minimised main window
     // that throttled them to about one tick a second would delay saving what is typed in a pop-out.
     backgroundThrottling: false,
+    // Lets the Reading List panel show a page in a `<webview>`. It is static for the window, so it cannot follow the plugin
+    // switch; `readingListGuard.ts` refuses every attach while the plugin is off, and forces the guest's isolation.
+    webviewTag: true,
   };
 }
 
@@ -46,8 +49,10 @@ export function createMainWindow(options: {
   popouts: ReturnType<typeof createPopoutManager>;
   /** Blur what is behind the window (macOS) and let the page show it through. */
   translucent: boolean;
+  /** Attaches the guard that decides what web views the window's page may hold (the Reading List's). */
+  installReadingListGuard: (webContents: WebContents) => void;
 }): BrowserWindow {
-  const { preloadPath, entryUrl, allowedOrigins, theme, popouts, translucent } = options;
+  const { preloadPath, entryUrl, allowedOrigins, theme, popouts, translucent, installReadingListGuard } = options;
 
   const window = new BrowserWindow({
     width: 1280,
@@ -61,6 +66,7 @@ export function createMainWindow(options: {
     webPreferences: mainWindowPreferences(preloadPath),
   });
   installContextMenu(window.webContents);
+  installReadingListGuard(window.webContents);
 
   window.once("ready-to-show", () => window.show());
 

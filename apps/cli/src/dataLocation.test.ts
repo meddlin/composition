@@ -22,7 +22,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     previewFont: "default",
     noteBackground: "plain",
     todoLook: { background: "notes", color: null },
-    plugins: { todo: true },
+    plugins: { todo: true, "reading-list": false },
     editorFont: "default",
     writing: {
       rulerEnabled: false,

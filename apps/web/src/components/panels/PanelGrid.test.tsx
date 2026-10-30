@@ -9,6 +9,7 @@ import { NOTE_DRAG_TYPE, PANEL_DRAG_TYPE } from "../notes/dragTypes";
 import type { Note, Notebook } from "../notes/types";
 import { createWorkspaceStore, type WorkspaceDeps, type WorkspaceStore } from "../notes/workspaceStore";
 import { panelIds } from "./layoutTree";
+import { fromDocument, toDocument } from "./panelsDocument";
 import { PanelGrid, type PanelHost } from "./PanelGrid";
 
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -21,6 +22,13 @@ vi.mock("@/lib/composition/attachmentsClient", () => ({
 }));
 
 vi.mock("@/lib/composition/client", async (importOriginal) => ({ ...(await importOriginal<object>()), listAssistantModels: vi.fn() }));
+
+// jsdom has no ResizeObserver; the Reading List panel measures itself with one.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
 
 beforeEach(() => {
   vi.mocked(listAssistantModels).mockResolvedValue({
@@ -143,6 +151,52 @@ describe("a window of panels", () => {
 
     expect(screen.queryByText("The To-do plugin is turned off.")).toBeNull();
     expect(store.plugins.getSnapshot().enabled.todo).toBe(true);
+  });
+
+  it("offers the Reading List panel only once its plugin is turned on, and not again when it is turned off", async () => {
+    const { store } = setup();
+    // It ships off, so a window that has never chosen does not offer it.
+    expect(within(emptyPanels()[0]).queryByRole("button", { name: "Reading List" })).toBeNull();
+
+    await act(async () => void store.plugins.setEnabled("reading-list", true));
+    expect(within(emptyPanels()[0]).getByRole("button", { name: "Reading List" })).toBeTruthy();
+
+    await act(async () => void store.plugins.setEnabled("reading-list", false));
+    expect(within(emptyPanels()[0]).queryByRole("button", { name: "Reading List" })).toBeNull();
+  });
+
+  it("keeps a Reading List panel whose plugin is turned off, with no page in it, and brings it back when it is turned on again", async () => {
+    const { store } = setup();
+    await act(async () => void store.plugins.setEnabled("reading-list", true));
+    fireEvent.click(within(emptyPanels()[0]).getByRole("button", { name: "Reading List" }));
+    expect(kinds(store)).toEqual(["reading-list"]);
+    expect(screen.getByRole("textbox", { name: "Add a link" })).toBeTruthy();
+
+    await act(async () => void store.plugins.setEnabled("reading-list", false));
+
+    expect(kinds(store)).toEqual(["reading-list"]);
+    expect(screen.getByText("The Reading List plugin is turned off.")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "Add a link" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Turn on Reading List" }));
+
+    expect(store.plugins.getSnapshot().enabled["reading-list"]).toBe(true);
+    expect(await screen.findByRole("textbox", { name: "Add a link" })).toBeTruthy();
+  });
+
+  it("saves a Reading List panel in the layout and reads it back", async () => {
+    const { store } = setup();
+    await act(async () => void store.plugins.setEnabled("reading-list", true));
+    fireEvent.click(within(emptyPanels()[0]).getByRole("button", { name: "Reading List" }));
+    const panels = store.getSnapshot().panels;
+    const [id] = panelIds(layoutOf(store));
+    store.setPanelState(id, { selectedId: 7, listWidth: 300 });
+
+    const saved = JSON.parse(JSON.stringify(toDocument(store.getSnapshot().panels)));
+    const restored = fromDocument(saved, { hasNote: () => true, hasNotebook: () => true });
+
+    expect(panels.byId[id].kind).toBe("reading-list");
+    expect(Object.values(restored!.byId).map((p) => [p.kind, p.state])).toEqual([["reading-list", { selectedId: 7, listWidth: 300 }]]);
   });
 
   it("turns an empty panel into the kind chosen in it", () => {

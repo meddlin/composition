@@ -39,6 +39,28 @@ describe("mainWindowPreferences", () => {
       // The workspace's autosave timers run in this page for every window, pop-outs included: a minimised main window
       // that throttled them to about one tick a second would delay saving what is typed in a pop-out.
       backgroundThrottling: false,
+      webviewTag: true,
     });
+  });
+});
+
+describe("the main window and a pop-out", () => {
+  it("are given the same isolation and the same web view switch, since each builds its own preferences", async () => {
+    const { mainWindowPreferences } = await import("./window");
+    const { decideWindowOpen } = await import("./popoutWindows");
+    const decision = decideWindowOpen({
+      url: "app://composition/popout/?w=w1",
+      openedByPopout: false,
+      allowedOrigins: ["app://composition"],
+      preloadPath: "/app/preload.js",
+      backgroundColor: "#121212",
+      translucent: false,
+    });
+    if (decision.action !== "allow") throw new Error("not allowed");
+
+    // A pop-out can hold a Reading List web view, so `webviewTag` has to be on in both; the rest is what keeps the page isolated.
+    for (const key of ["preload", "contextIsolation", "sandbox", "nodeIntegration", "webSecurity", "spellcheck", "webviewTag"] as const) {
+      expect(decision.options.webPreferences?.[key], key).toEqual(mainWindowPreferences("/app/preload.js")[key]);
+    }
   });
 });

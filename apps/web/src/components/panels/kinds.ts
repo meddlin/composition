@@ -21,6 +21,14 @@ export type TodoView = "list" | "board";
 /** What a to-do panel saves: the items whose sub-items are folded away in it, and which view it is on. The items themselves, and the panels' background, are the workspace's. */
 export type TodoPanelState = { collapsed: number[]; view: TodoView };
 
+/** The least width, in px, the list beside a Reading List page can be dragged to, and the least the page keeps. */
+export const READING_LIST_MIN_WIDTH = 160;
+export const READING_PAGE_MIN_WIDTH = 240;
+export const DEFAULT_READING_LIST_WIDTH = 260;
+
+/** What a Reading List panel saves: the link it has open (none yet, or one since deleted), and how wide its list is. The links themselves are the workspace's. */
+export type ReadingListPanelState = { selectedId: number | null; listWidth: number };
+
 /** What a kind may check a saved state against: the workspace as it is now. */
 export type RestoreContext = {
   hasNote(noteId: number): boolean;
@@ -95,6 +103,21 @@ export const KINDS: Record<
         // Panels saved before the board existed have no view.
         view: saved.view === "board" ? "board" : "list",
       } satisfies TodoPanelState;
+    },
+  },
+  "reading-list": {
+    minWidth: 480,
+    plugin: "reading-list",
+    initialState: (): ReadingListPanelState => ({ selectedId: null, listWidth: DEFAULT_READING_LIST_WIDTH }),
+    restore(saved) {
+      if (!isRecord(saved)) return null;
+      const { selectedId, listWidth } = saved;
+      // The link may have been deleted since; the panel then asks for another to be picked, so it is not checked here.
+      return {
+        selectedId: Number.isSafeInteger(selectedId) ? (selectedId as number) : null,
+        listWidth:
+          typeof listWidth === "number" && Number.isFinite(listWidth) ? Math.max(READING_LIST_MIN_WIDTH, Math.round(listWidth)) : DEFAULT_READING_LIST_WIDTH,
+      } satisfies ReadingListPanelState;
     },
   },
 };
