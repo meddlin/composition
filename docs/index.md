@@ -45,6 +45,8 @@ See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside 
 
 See [reading-list-plan.md](reading-list-plan.md) for the Reading List plugin (desktop only, off until switched on): a list of article links beside a webview that shows the one you pick; [ui/panels.md](ui/panels.md#the-reading-list-panel) describes it and [manual-tests/reading-list.md](manual-tests/reading-list.md) checks it by hand.
 
+See [rss-reader-plan.md](rss-reader-plan.md) for the proposed RSS Reader plugin (desktop only, off until switched on): subscribe to feeds, read their entries and unsubscribe. Not built yet.
+
 ## Features
 
 - [x] Create note
