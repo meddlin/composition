@@ -7,6 +7,7 @@ import { usePlugins } from "@/components/plugins/usePlugins";
 import { PLUGINS, pluginRunsIn } from "@/lib/composition/plugins";
 import { PLUGIN_HOST } from "@/lib/composition/pluginHost";
 import { usePluginsStore } from "./PluginsProvider";
+import { ReadingListSettings } from "./ReadingListSettings";
 
 /**
  * Settings > Plugins: the built-in plugins, each on or off. A change shows at once and is saved in the background, like
@@ -28,21 +29,24 @@ export function PluginsSettings() {
           const { id, name, description } = plugin;
           const available = pluginRunsIn(plugin, PLUGIN_HOST);
           return (
-            <Field key={id} orientation="horizontal">
-              <Checkbox
-                id={`plugin-${id}`}
-                checked={enabled[id]}
-                disabled={!available}
-                onCheckedChange={(checked) => void store.setEnabled(id, checked === true)}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor={`plugin-${id}`}>{name}</FieldLabel>
-                <FieldDescription>
-                  {description}
-                  {!available && <> Only available in the desktop app.</>}
-                </FieldDescription>
-              </FieldContent>
-            </Field>
+            <div key={id} className="flex flex-col gap-3">
+              <Field orientation="horizontal">
+                <Checkbox
+                  id={`plugin-${id}`}
+                  checked={enabled[id]}
+                  disabled={!available}
+                  onCheckedChange={(checked) => void store.setEnabled(id, checked === true)}
+                />
+                <FieldContent>
+                  <FieldLabel htmlFor={`plugin-${id}`}>{name}</FieldLabel>
+                  <FieldDescription>
+                    {description}
+                    {!available && <> Only available in the desktop app.</>}
+                  </FieldDescription>
+                </FieldContent>
+              </Field>
+              {id === "reading-list" && <ReadingListSettings />}
+            </div>
           );
         })}
         {error && <FieldError>{error}</FieldError>}

@@ -96,6 +96,21 @@ CREATE TABLE IF NOT EXISTS todos (
 CREATE INDEX IF NOT EXISTS idx_todos_parent_id ON todos (parent_id);
 `;
 
+/**
+ * The Reading List plugin's links. `url` is unique because the list refuses a link it already has; `title` is empty until
+ * the page has been opened and named itself. The CLI shares this file and ignores the table.
+ */
+const READING_LIST_SCHEMA = `
+CREATE TABLE IF NOT EXISTS reading_list (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+`;
+
 function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -137,6 +152,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
   db.exec(TODOS_SCHEMA);
+  db.exec(READING_LIST_SCHEMA);
   // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
   const todoColumns = db.prepare("PRAGMA table_info(todos)").all() as { name: string }[];
   if (!todoColumns.some((c) => c.name === "status")) {

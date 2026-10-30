@@ -13,7 +13,7 @@ import {
 } from "./layoutTree";
 
 /** What a panel can show. A kind is added here and in `kinds.ts`, which says how its state is made and read back. */
-export type KindId = "empty" | "note" | "notes-browser" | "ai" | "todo";
+export type KindId = "empty" | "note" | "notes-browser" | "ai" | "todo" | "reading-list";
 
 export type WindowId = string;
 export const MAIN_WINDOW: WindowId = "main";

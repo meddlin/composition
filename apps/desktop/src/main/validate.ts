@@ -4,6 +4,8 @@ import type { AttachmentMethod } from "../../../web/src/lib/composition/attachme
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import { PLUGINS } from "../../../web/src/lib/composition/plugins";
+import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingList";
+import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
 import { isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
@@ -273,6 +275,26 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     isTodoStatus(status) ? status : fail("setTodoStatus", "status"),
   ],
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
+};
+
+const readingTitle = (method: string, value: unknown): string =>
+  typeof value === "string" && value.length <= MAX_READING_TITLE_LENGTH * 20 ? value : fail(method, "title");
+
+/**
+ * The Reading List methods take ids, booleans, a title a page offered, and a link. The link is checked with the same rule the
+ * panel and the service use (web addresses only) and passed on as that rule writes it, so a `javascript:` or `file:` address
+ * never reaches the database, from where it would become a navigation.
+ */
+export const READING_LIST_VALIDATORS: Record<ReadingListMethod, Validator> = {
+  listReadingItems: none,
+  addReadingItem: ([url]) => {
+    const checked = typeof url === "string" ? normalizeReadingUrl(url) : null;
+    return checked?.url !== undefined ? [checked.url] : fail("addReadingItem", "url");
+  },
+  setReadingItemTitle: ([itemId, title]) => [id("setReadingItemTitle", itemId, "id"), readingTitle("setReadingItemTitle", title)],
+  setReadingItemRead: ([itemId, read]) => [id("setReadingItemRead", itemId, "id"), flag("setReadingItemRead", read, "read")],
+  deleteReadingItem: ([itemId]) => [id("deleteReadingItem", itemId, "id")],
+  clearReadingData: none,
 };
 
 /** The update methods take nothing from the page except a boolean or a number: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */

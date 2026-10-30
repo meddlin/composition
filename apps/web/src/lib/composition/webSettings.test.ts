@@ -46,7 +46,7 @@ describe("web settings layout", () => {
       editorFont: "default",
       noteBackground: "plain",
       todoLook: { background: "notes", color: null },
-      plugins: { todo: true },
+      plugins: { todo: true, "reading-list": false },
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       ...DEFAULT_LAYOUT,
@@ -54,17 +54,17 @@ describe("web settings layout", () => {
     });
   });
 
-  it("loads which plugins are on, treating any that is missing or invalid as on", async () => {
+  it("loads which plugins are on, treating any that is missing or invalid as its default (the Reading List's is off)", async () => {
     const { loadWebSettings } = await import("./webSettings");
 
     writeSettings({ appDataDir: "/data", plugins: { todo: false, unknown: false } });
-    expect(loadWebSettings().plugins).toEqual({ todo: false });
+    expect(loadWebSettings().plugins).toEqual({ todo: false, "reading-list": false });
 
-    writeSettings({ appDataDir: "/data", plugins: { todo: "no" } });
-    expect(loadWebSettings().plugins).toEqual({ todo: true });
+    writeSettings({ appDataDir: "/data", plugins: { todo: "no", "reading-list": true } });
+    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": true });
 
     writeSettings({ appDataDir: "/data" });
-    expect(loadWebSettings().plugins).toEqual({ todo: true });
+    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": false });
   });
 
   it("loads the saved to-do look, repairing any part that is invalid", async () => {

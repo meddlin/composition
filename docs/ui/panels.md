@@ -127,6 +127,39 @@ A plain to-do list in a panel of its own (choose **To-do** in an empty panel). S
 - **One list.** The items belong to the workspace, not the panel: any number of to-do panels, in any window, show and change the same list,
   and it is saved in the database as you go, so closing a panel loses nothing.
 
+## The Reading List panel
+
+A list of article links on the left and, on the right, the page of the one you picked, so a reading list can be read without leaving
+the app (choose **Reading List** in an empty panel). It is a **built-in plugin that is off until you turn it on** in **Settings > Plugins**,
+because it lets the app load web pages. Plan and decisions: [reading-list-plan.md](../reading-list-plan.md). Source:
+[`ReadingListPanel.tsx`](../../apps/web/src/components/panels/ReadingListPanel.tsx), [`ReadingWebview.tsx`](../../apps/web/src/components/panels/ReadingWebview.tsx)
+(the only file that knows about Electron's `<webview>`), [`readingListStore.ts`](../../apps/web/src/lib/composition/readingListStore.ts) (the links, shared by
+every window), [`readingListService.ts`](../../apps/web/src/lib/composition/readingListService.ts) (the `reading_list` table in the notes database) and
+[`readingListGuard.ts`](../../apps/desktop/src/main/readingListGuard.ts) (the main-process rules).
+
+- **Adding.** Paste a link in the box at the top and press Enter; the box stays for the next one. A link with no scheme gets `https://`; only `http` and
+  `https` are accepted (`javascript:`, `file:`, `app:` and the like are refused), and the `#fragment` is dropped. A link already in the list is not added twice:
+  the panel says so and opens the one that is there ([`normalizeReadingUrl`](../../apps/web/src/lib/composition/readingList.ts) is the one rule the panel, the
+  bridge and the service all use).
+- **Reading.** Clicking a row opens its page. Over the page: **Back**, **Forward**, **Reload** (the view's own history; they do not change the list), the address, **Open in browser**
+  and **Mark read**. A row shows the page's title (the host name until the page has loaded once, then the title is saved and kept) and a dot while it is unread.
+  Read links are dimmed and listed below the unread ones; each group is oldest first. Nothing is marked read by itself.
+- **A row's `⋯`.** Open in browser, Copy link, Mark read/unread, Delete. **Delete asks first** (the link is not sent to the Trash Can; pasting it again puts it back), and
+  Cancel holds the focus.
+- **Narrow panels.** From a panel width of 640 px the list and page sit side by side with a draggable divider (its width is saved with the layout). Below that the
+  panel shows the list or the page, with **Back to list** over the page.
+- **Links in the page.** A click inside the page navigates it. A request for a new window (`target="_blank"`, `window.open`) opens your browser; no window of ours opens.
+  A page cannot send the view to `app://` or `file://` addresses.
+- **A page that fails.** It says why and offers **Open in browser**, instead of a blank rectangle.
+- **Keys.** The panel keys (`Mod+Shift+\`, `W`, `]`, `[` and `P`) still work while a page has focus: the main process sees them first and hands them to the app's page.
+- **Isolation.** Pages live in their own session (`persist:reading-list`): no bridge, no Node, sandboxed, every permission refused, downloads blocked, and cookies apart from the
+  app's. Sign-ins to paywalled sites last until **Settings > Plugins > Reading List > Clear browsing data** (asks first; it wipes cookies and cache, not links). The main window and
+  pop-outs both allow `<webview>`, and the main process refuses to attach one while the plugin is off, and one that names any other session.
+- **Off.** Turning the plugin off hides the panel's page (an open Reading List panel says the plugin is off, with **Turn on Reading List**), loads nothing, and refuses every web view. The links and the
+  signed-in session are kept.
+- **Pop-outs.** The panel's page is made again in the pop-out, so it reloads; the link that is open is kept.
+- **Not in the web app or the CLI.** A browser tab already is a browser. Importing from a note, tags and folders are future work.
+
 ## Panel commands and the command palette
 
 Every panel command can be run from the **command palette**, and the ones that are used most have keys. Both act on the **focused panel

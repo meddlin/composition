@@ -47,9 +47,12 @@ export function ResizeHandle({
     const { cursor, userSelect } = document.body.style;
     document.body.style.cursor = horizontal ? "row-resize" : "col-resize";
     document.body.style.userSelect = "none";
+    // Pages shown in a web view swallow pointer events; they watch for this and let them through while a divider is held.
+    document.body.setAttribute("data-resizing", "");
     return () => {
       document.body.style.cursor = cursor;
       document.body.style.userSelect = userSelect;
+      document.body.removeAttribute("data-resizing");
     };
   }, [dragging, horizontal]);
 
