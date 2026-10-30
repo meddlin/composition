@@ -51,8 +51,12 @@ const server = http.createServer((req, res) => {
   res.setHeader("content-type", "text/html");
   res.setHeader("x-frame-options", "DENY");
   res.setHeader("content-security-policy", "frame-ancestors 'none'");
-  res.end(`<!doctype html><title>Fixture article ${req.url}</title><body><h1>Fixture</h1><a id="next" href="/second">next</a>
-<script>document.cookie = "reading=1; path=/"; document.body.dataset.probe = JSON.stringify({ composition: typeof window.composition, require: typeof require, process: typeof process });</script>`);
+  // The path is echoed into the title, so it is escaped as any page that does so must.
+  const title = "Fixture article " + String(req.url).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  res.end(
+    "<!doctype html><title>" + title + "</title><body><h1>Fixture</h1><a id=\"next\" href=\"/second\">next</a>\n" +
+      "<script>document.cookie = \"reading=1; path=/\"; document.body.dataset.probe = JSON.stringify({ composition: typeof window.composition, require: typeof require, process: typeof process });</script>",
+  );
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
 const site = `http://127.0.0.1:${server.address().port}`;
