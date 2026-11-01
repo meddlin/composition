@@ -1,19 +1,26 @@
 "use client";
 
-import { ChevronRightIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { ArchiveIcon, ChevronRightIcon, FileTextIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { buildTodoTree, countDescendants, type TodoNode } from "@/lib/composition/todos";
-import { MAX_TODO_TITLE_LENGTH, type Todo } from "@/lib/composition/todosApi";
+import { reportSections } from "@/lib/composition/todoReportList";
+import { archiveGroups, countDescendants, subtreeIds, todoSections, type TodoNode } from "@/lib/composition/todos";
+import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoMissingReport, type TodoReportEntry } from "@/lib/composition/todosApi";
+import type { ReportKind } from "@/lib/composition/todoReports";
 import type { TodoResult } from "@/lib/composition/todosStore";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { TODO_DRAG_TYPE } from "../notes/dragTypes";
 import type { WorkspaceStore } from "../notes/workspaceStore";
-import type { TodoPanelState, TodoView } from "./kinds";
+import type { TodoPanelState, TodoSection, TodoView } from "./kinds";
 import type { PanelId } from "./layoutTree";
+import { RolledEntry } from "./RolledOver";
+import { TodoArchive } from "./TodoArchive";
 import { TodoBoard } from "./TodoBoard";
+import { TodoMenu } from "./TodoMenu";
+import { TodoReports } from "./TodoReports";
 import { todoLookStyle } from "./todoLookStyle";
 
 /** How far, in px, each level of sub-items is pushed in. */
@@ -21,7 +28,8 @@ const INDENT = 20;
 
 /**
  * A text box for a to-do's title. Enter sends it, Escape gives up. `keepOpen` is for adding several in a row: the box
- * clears and stays instead of closing after each one.
+ * clears and stays instead of closing after each one. `addLabel` gives it a small Add button beside it (named by the label),
+ * for a box that has no other way to say it takes Enter; it is off while there is nothing to add.
  */
 function TitleInput({
   initial = "",
@@ -29,6 +37,7 @@ function TitleInput({
   placeholder,
   keepOpen = false,
   autoFocus = false,
+  addLabel,
   onSubmit,
   onCancel,
 }: {
@@ -37,10 +46,12 @@ function TitleInput({
   placeholder?: string;
   keepOpen?: boolean;
   autoFocus?: boolean;
+  addLabel?: string;
   onSubmit: (title: string) => Promise<TodoResult>;
   onCancel?: () => void;
 }) {
   const [value, setValue] = useState(initial);
+  const box = useRef<HTMLInputElement>(null);
   // Enter closes a box that is leaving, and the blur that follows must not send the title a second time.
   const finished = useRef(false);
 
@@ -50,11 +61,16 @@ function TitleInput({
     if (!keepOpen) finished.current = true;
     const { error } = await onSubmit(title);
     if (error) finished.current = false;
-    else if (keepOpen) setValue("");
+    else if (keepOpen) {
+      setValue("");
+      // Back in the box, so the next one can be typed straight away (the Add button has taken the focus).
+      box.current?.focus();
+    }
   }
 
-  return (
+  const input = (
     <Input
+      ref={box}
       aria-label={label}
       placeholder={placeholder}
       value={value}
@@ -83,6 +99,15 @@ function TitleInput({
       }}
     />
   );
+  if (!addLabel) return input;
+  return (
+    <div className="flex items-center gap-1">
+      <div className="min-w-0 flex-1">{input}</div>
+      <Button type="button" size="sm" variant="secondary" aria-label={addLabel} disabled={value.trim() === ""} onClick={() => void submit()}>
+        Add
+      </Button>
+    </div>
+  );
 }
 
 type RowProps = {
@@ -95,17 +120,24 @@ type RowProps = {
   onEdit: (id: number | null) => void;
   addingTo: number | null;
   onAddTo: (id: number | null) => void;
-  onDelete: (todo: Todo) => void;
+  onRemove: (todo: Todo) => void;
+  onDeleteForGood: (todo: Todo) => void;
+  /** Makes a top-level row something to drag to another section (sub-items come along with it), or not, for the ones that cannot. */
+  drag?: (todo: Todo) => DragHandlers | undefined;
 };
 
+type DragHandlers = { onDragStart: (event: DragEvent<HTMLElement>) => void; onDragEnd: () => void };
+
 function TodoRow(props: RowProps) {
-  const { node, depth, store, collapsed, onToggleCollapsed, editing, onEdit, addingTo, onAddTo, onDelete } = props;
+  const { node, depth, store, collapsed, onToggleCollapsed, editing, onEdit, addingTo, onAddTo, onRemove, onDeleteForGood, drag } = props;
   const { todo, children } = node;
   const folded = collapsed.has(todo.id);
   const shownChildren = children.length > 0 && !folded;
+  // A box being typed in is not a handle: dragging inside it should select text.
+  const handlers = depth === 0 && editing !== todo.id ? drag?.(todo) : undefined;
 
   return (
-    <li>
+    <li draggable={handlers ? true : undefined} onDragStart={handlers?.onDragStart} onDragEnd={handlers?.onDragEnd}>
       <div
         className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-muted/50 focus-within:bg-muted/50"
         style={{ paddingLeft: depth * INDENT }}
@@ -161,9 +193,10 @@ function TodoRow(props: RowProps) {
             <Button variant="ghost" size="icon-xs" aria-label={`Rename ${todo.title}`} onClick={() => onEdit(todo.id)}>
               <PencilIcon />
             </Button>
-            <Button variant="ghost" size="icon-xs" aria-label={`Delete ${todo.title}`} onClick={() => onDelete(todo)}>
+            <Button variant="ghost" size="icon-xs" aria-label={`Remove ${todo.title}`} title="Remove" onClick={() => onRemove(todo)}>
               <Trash2Icon />
             </Button>
+            <TodoMenu title={todo.title} onDeleteForGood={() => onDeleteForGood(todo)} />
           </div>
         )}
       </div>
@@ -188,25 +221,125 @@ function TodoRow(props: RowProps) {
   );
 }
 
+/** The sections an item is dragged from, and the two that take a drop. */
+type DragFrom = "backlog" | "rolled-over" | "this-week";
+type DragTarget = "this-week" | "backlog";
+
+/** What a section needs to take a drop: how it looks while something can be dropped (or is about to be), and the three events. */
+type DropZone = {
+  state: "ready" | "over" | undefined;
+  onDragOver: (event: DragEvent<HTMLElement>) => void;
+  onDragLeave: (event: DragEvent<HTMLElement>) => void;
+  onDrop: (event: DragEvent<HTMLElement>) => void;
+};
+
+/** A section of the list: a heading that folds it away, and what is in it. */
+function Section({
+  title,
+  count,
+  folded,
+  onToggle,
+  dropZone,
+  children,
+}: {
+  title: string;
+  count?: number;
+  folded: boolean;
+  onToggle: () => void;
+  dropZone?: DropZone;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      aria-label={title}
+      className="flex flex-col gap-1 rounded-md data-[drop-target]:outline-1 data-[drop-target]:outline-dashed data-[drop-target]:outline-offset-2 data-[drop-target=ready]:outline-muted-foreground/40 data-[drop-target=over]:bg-accent data-[drop-target=over]:outline-ring"
+      data-drop-target={dropZone?.state}
+      onDragOver={dropZone?.onDragOver}
+      onDragLeave={dropZone?.onDragLeave}
+      onDrop={dropZone?.onDrop}
+    >
+      <h3>
+        <Button
+          variant="ghost"
+          size="xs"
+          className="gap-1 px-1 font-medium text-muted-foreground"
+          aria-expanded={!folded}
+          aria-label={folded ? `Show the ${title} section` : `Hide the ${title} section`}
+          onClick={onToggle}
+        >
+          <ChevronRightIcon className={cn("transition-transform", !folded && "rotate-90")} />
+          {title}
+          {count !== undefined && count > 0 && <span>({count})</span>}
+        </Button>
+      </h3>
+      {!folded && children}
+    </section>
+  );
+}
+
+/** How long the Undo stays after an item is removed. */
+const UNDO_MS = 8000;
+
 /**
- * A to-do list: items with sub-items, to add, rename, delete and tick off (a done item is struck through). It can be
- * shown as that list or as a board with a column per status (backlog, to-do, in progress, done). The items are the
- * workspace's, so every to-do panel, in any window, shows the same items; the panel itself saves only which items it
- * has folded away and which view it is on.
+ * A to-do list: items with sub-items, to add, rename, remove and tick off (a done item is struck through). The list view
+ * has three sections: what rolled over from earlier weeks and waits to be placed (shown only while something does), this
+ * week, and the backlog. It can also be shown as a board with a column per status (backlog, to-do, in progress, done), with
+ * Rolled over as a strip above the columns. Removing an item archives it and offers an Undo. The items are the workspace's, so
+ * every to-do panel, in any window, shows the same items; the panel itself saves only which items and sections it has
+ * folded away and which view it is on.
  */
 export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; panelId: PanelId; state: TodoPanelState }) {
   const todosStore = store.todos;
-  const { status, todos, look: savedLook, error } = useSyncExternalStore(todosStore.subscribe, todosStore.getSnapshot, todosStore.getSnapshot);
+  const { status, todos, look: savedLook, setup, archive, reports, error } = useSyncExternalStore(todosStore.subscribe, todosStore.getSnapshot, todosStore.getSnapshot);
+  // An item being dragged from one section to another, and which section it is over.
+  const [dragging, setDragging] = useState<{ id: number; from: DragFrom } | null>(null);
+  const [over, setOver] = useState<DragTarget | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [addingTo, setAddingTo] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<Todo | null>(null);
+  /** What was just done, said at the bottom for a few seconds; with the id of an item just removed, an Undo comes with it. */
+  const [bar, setBar] = useState<{ message: string; undo?: number } | null>(null);
+  /** What is typed in the Archive view's search box. */
+  const [query, setQuery] = useState("");
+  /** The item the owner is deleting for good, and what that would erase, once found out (for that item). */
+  const [deleting, setDeleting] = useState<{ id: number; title: string } | null>(null);
+  const [previewed, setPreviewed] = useState<{ id: number; result: TodoDeletePreview | "error" } | null>(null);
+  const preview: TodoDeletePreview | "loading" | "error" = deleting && previewed?.id === deleting.id ? previewed.result : "loading";
 
   useEffect(() => {
     void todosStore.load();
   }, [todosStore]);
 
-  const tree = useMemo(() => buildTodoTree(todos), [todos]);
+  useEffect(() => {
+    if (!bar) return;
+    const timer = setTimeout(() => setBar(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [bar]);
+
+  // The archive and the reports are read when their views are opened, and kept up to date after that.
+  useEffect(() => {
+    if (state.view === "archive") void todosStore.loadArchive();
+    if (state.view === "reports") void todosStore.loadReports();
+  }, [state.view, todosStore]);
+
+  // Before anything is erased for good, find out how much goes and which reports mention it.
+  useEffect(() => {
+    if (!deleting) return;
+    let current = true;
+    void todosStore.previewDelete(deleting.id).then((result) => {
+      if (current) setPreviewed({ id: deleting.id, result: result.preview ?? "error" });
+    });
+    return () => {
+      current = false;
+    };
+  }, [deleting, todosStore]);
+
+  const sections = useMemo(() => todoSections(todos), [todos]);
   const collapsed = useMemo(() => new Set(state.collapsed), [state.collapsed]);
+  const titles = useMemo(() => new Map([...todos, ...(archive ?? [])].map((t) => [t.id, t.title])), [todos, archive]);
+  const sectionsOfReports = useMemo(() => (reports ? reportSections(reports) : null), [reports]);
+  const groups = useMemo(() => (archive ? archiveGroups(archive, titles, query) : null), [archive, titles, query]);
+  /** What is waiting in Rolled over, whole branches, so the board's columns can leave it out. */
+  const inRolledOver = useMemo(() => new Set(sections.rolledOver.flatMap((node) => [...subtreeIds(todos, node.todo.id)])), [sections, todos]);
 
   function toggleCollapsed(id: number, fold: boolean) {
     if (collapsed.has(id) === fold) return;
@@ -214,36 +347,164 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     store.setPanelState(panelId, { ...state, collapsed: next } satisfies TodoPanelState);
   }
 
+  function toggleSection(section: TodoSection) {
+    const next = state.foldedSections.includes(section) ? state.foldedSections.filter((s) => s !== section) : [...state.foldedSections, section];
+    store.setPanelState(panelId, { ...state, foldedSections: next } satisfies TodoPanelState);
+  }
+
+  function endDrag() {
+    setDragging(null);
+    setOver(null);
+  }
+
+  /** Picking up a top-level item; its id rides along under its own type, not as text. */
+  const dragSource = (id: number, from: DragFrom): DragHandlers => ({
+    onDragStart: (event) => {
+      event.dataTransfer.setData(TODO_DRAG_TYPE, String(id));
+      event.dataTransfer.effectAllowed = "move";
+      setDragging({ id, from });
+    },
+    onDragEnd: endDrag,
+  });
+
+  // A section takes a drop only while an item it accepts is held; any other drag (a note, a panel) is left to whoever wants it.
+  const dropZone = (target: DragTarget, accepts: (from: DragFrom) => boolean, onDropped: (id: number, from: DragFrom) => void): DropZone => ({
+    state: dragging === null || !accepts(dragging.from) ? undefined : over === target ? "over" : "ready",
+    onDragOver: (event) => {
+      if (dragging === null || !accepts(dragging.from)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setOver(target);
+    },
+    onDragLeave: (event) => {
+      // Moving across what is inside the section is not leaving it.
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setOver((now) => (now === target ? null : now));
+    },
+    onDrop: (event) => {
+      if (dragging === null || !accepts(dragging.from)) return;
+      event.preventDefault();
+      const { id, from } = dragging;
+      endDrag();
+      onDropped(id, from);
+    },
+  });
+  // This week takes what comes from the Backlog or Rolled over; the Backlog takes what comes from This week.
+  const weekDropZone = dropZone("this-week", (from) => from !== "this-week", (id, from) => {
+    void (from === "rolled-over" ? todosStore.acceptRolled(id) : todosStore.setStatus(id, "todo"));
+  });
+  const backlogDropZone = dropZone("backlog", (from) => from === "this-week", (id) => void todosStore.setStatus(id, "backlog"));
+
   function setView(view: TodoView) {
     if (view !== state.view) store.setPanelState(panelId, { ...state, view } satisfies TodoPanelState);
   }
 
-  function askToDelete(todo: Todo) {
-    // An item with nothing under it is quick to type again; one with sub-items is not.
-    if (countDescendants(todos, todo.id) === 0) void todosStore.remove(todo.id);
-    else setDeleting(todo);
+  // Removing keeps the item in the archive, so it needs no question: the Undo is there for a slip.
+  function remove(todo: Todo) {
+    const subItems = countDescendants(todos, todo.id);
+    setBar({ message: `Removed “${todo.title}”${subItems > 0 ? ` and ${subItems === 1 ? "1 sub-item" : `${subItems} sub-items`}` : ""}.`, undo: todo.id });
+    void todosStore.remove(todo.id);
   }
 
-  const underDeleting = deleting ? countDescendants(todos, deleting.id) : 0;
+  async function undoRemove() {
+    if (bar?.undo === undefined) return;
+    const id = bar.undo;
+    setBar(null);
+    await todosStore.restore(id);
+  }
+
+  async function restore(item: ArchivedTodo) {
+    const result = await todosStore.restore(item.id);
+    if (result.error) return;
+    setBar({
+      message: result.toTopLevel
+        ? `Restored “${item.title}” at the top level, because what it was under is still archived.`
+        : `Restored “${item.title}”.`,
+    });
+  }
+
+  function closeDelete() {
+    setDeleting(null);
+    setPreviewed(null);
+  }
+
+  async function makeReport(kind: ReportKind, periodStart: string, label: string) {
+    const result = await todosStore.generateReport(kind, periodStart);
+    if (!result.error) setBar({ message: `Made a new report for ${label}.` });
+  }
+
+  function deleteForGood() {
+    if (!deleting) return;
+    const { id, title } = deleting;
+    closeDelete();
+    setBar({ message: `Deleted “${title}” permanently.` });
+    void todosStore.deleteForGood(id);
+  }
+
   // The to-do background chosen in Settings > Styling; the notes' background shows only where it says "Same as notes".
   const look = todoLookStyle(savedLook);
+
+  const rowProps = {
+    store,
+    collapsed,
+    onToggleCollapsed: toggleCollapsed,
+    editing,
+    onEdit: setEditing,
+    addingTo,
+    onAddTo: setAddingTo,
+    onRemove: remove,
+    onDeleteForGood: (todo: Todo) => setDeleting({ id: todo.id, title: todo.title }),
+  };
+  const rows = (nodes: TodoNode[], drag?: RowProps["drag"]) =>
+    nodes.map((node) => <TodoRow key={node.todo.id} node={node} depth={0} {...rowProps} drag={drag} />);
+  const rolledEntries = (withChildren: boolean) =>
+    sections.rolledOver.map((node) => (
+      <RolledEntry
+        key={node.todo.id}
+        todo={node.todo}
+        parentTitle={node.todo.parentId === null ? null : (titles.get(node.todo.parentId) ?? null)}
+        subItems={withChildren ? 0 : countDescendants(todos, node.todo.id)}
+        onAdd={() => void todosStore.acceptRolled(node.todo.id)}
+        onBacklog={() => void todosStore.moveRolledToBacklog(node.todo.id)}
+        onDrop={() => void todosStore.drop(node.todo.id)}
+        drag={withChildren ? dragSource(node.todo.id, "rolled-over") : undefined}
+      >
+        {withChildren && node.children.length > 0 && <ul>{rows(node.children)}</ul>}
+      </RolledEntry>
+    ));
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col gap-2 p-2", look.className)} style={look.style}>
       <div className="flex items-center gap-2">
         <div className="min-w-0 flex-1">
-          <TitleInput
-            label="New to-do"
-            placeholder="Add a to-do"
-            keepOpen
-            onSubmit={(title) => todosStore.add(title, null)}
-          />
+          {state.view === "reports" ? (
+            <span className="block px-1 text-sm text-muted-foreground">To-do reports</span>
+          ) : state.view === "archive" ? (
+            <Input
+              type="search"
+              aria-label="Search the archive"
+              placeholder="Search the archive"
+              value={query}
+              className="h-7"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          ) : (
+            <TitleInput
+              label="New to-do"
+              placeholder="Add a to-do"
+              keepOpen
+              addLabel="Add to-do"
+              onSubmit={(title) => todosStore.add(title, null)}
+            />
+          )}
         </div>
         <div role="group" aria-label="View" className="flex shrink-0 gap-0.5 rounded-lg border p-0.5">
           {(
             [
               ["list", "List", ListIcon],
               ["board", "Board", KanbanIcon],
+              ["reports", "Reports", FileTextIcon],
+              ["archive", "Archive", ArchiveIcon],
             ] as const
           ).map(([view, label, Icon]) => (
             <Button
@@ -260,12 +521,29 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
           ))}
         </div>
       </div>
+      {setup?.pending && (
+        <section aria-label="Archive completed items" className="flex flex-col gap-2 rounded-md border bg-card p-3 text-sm text-card-foreground">
+          <p>Archive {setup.completed === 1 ? "1 item" : `${setup.completed} items`} you&apos;ve already completed?</p>
+          <p className="text-xs text-muted-foreground">
+            They are filed under the weeks they were last changed. If you leave them, they are archived at the end of the week
+            instead, without a date.
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => void todosStore.finishSetup(true)}>
+              Yes, archive {setup.completed === 1 ? "it" : "them"}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => void todosStore.finishSetup(false)}>
+              No, leave {setup.completed === 1 ? "it" : "them"}
+            </Button>
+          </div>
+        </section>
+      )}
       {error && (
         <p role="alert" className="text-xs text-destructive">
           {error}
         </p>
       )}
-      <div className={cn("min-h-0 flex-1", state.view === "list" && "overflow-y-auto")}>
+      <div className={cn("flex min-h-0 flex-1 flex-col", state.view === "list" && "overflow-y-auto")}>
         {status === "error" ? (
           <div className="flex flex-col items-start gap-2 p-1 text-sm text-muted-foreground">
             <span>The to-do list could not be loaded.</span>
@@ -275,47 +553,157 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
           </div>
         ) : status !== "ready" ? (
           <p className="p-1 text-sm text-muted-foreground">Loading…</p>
-        ) : tree.length === 0 ? (
-          <p className="p-1 text-sm text-muted-foreground">Nothing to do yet.</p>
+        ) : state.view === "reports" ? (
+          sectionsOfReports === null ? (
+            <p className="p-1 text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <TodoReports
+              sections={sectionsOfReports}
+              onOpen={(report: TodoReportEntry) => store.openNoteBeside(report.noteId)}
+              onRegenerate={(report: TodoReportEntry) => void makeReport(report.kind, report.periodStart, report.label)}
+              onGenerate={(kind: ReportKind, period: TodoMissingReport) => void makeReport(kind, period.periodStart, period.label)}
+            />
+          )
+        ) : state.view === "archive" ? (
+          groups === null ? (
+            <p className="p-1 text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <TodoArchive
+              groups={groups}
+              searching={query.trim() !== ""}
+              onRestore={(item) => void restore(item)}
+              onDelete={(item) => setDeleting({ id: item.id, title: item.title })}
+            />
+          )
         ) : state.view === "board" ? (
-          <TodoBoard todos={todos} onMove={(id, next) => void todosStore.setStatus(id, next)} onDelete={askToDelete} />
-        ) : (
-          <ul aria-label="To-dos">
-            {tree.map((node) => (
-              <TodoRow
-                key={node.todo.id}
-                node={node}
-                depth={0}
-                store={store}
-                collapsed={collapsed}
-                onToggleCollapsed={toggleCollapsed}
-                editing={editing}
-                onEdit={setEditing}
-                addingTo={addingTo}
-                onAddTo={setAddingTo}
-                onDelete={askToDelete}
+          <>
+            {sections.rolledOver.length > 0 && (
+              <section aria-label="Rolled over" className="mb-2 flex max-h-48 shrink-0 flex-col gap-1 overflow-y-auto">
+                <h3 className="px-1 text-xs font-medium text-muted-foreground">Rolled over ({sections.rolledOver.length})</h3>
+                <ul className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-1.5">{rolledEntries(false)}</ul>
+              </section>
+            )}
+            <div className="min-h-0 flex-1">
+              <TodoBoard
+                todos={todos.filter((t) => !inRolledOver.has(t.id))}
+                onMove={(id, next) => void todosStore.setStatus(id, next)}
+                onRemove={remove}
+                onDeleteForGood={rowProps.onDeleteForGood}
               />
-            ))}
-          </ul>
+            </div>
+          </>
+        ) : (
+          <div className="flex flex-col gap-3">
+            <Section
+              title="This week"
+              folded={state.foldedSections.includes("this-week")}
+              onToggle={() => toggleSection("this-week")}
+              dropZone={weekDropZone}
+            >
+              {sections.thisWeek.length === 0 ? (
+                <p className="p-1 text-sm text-muted-foreground">{todos.length === 0 ? "Nothing to do yet." : "Nothing this week."}</p>
+              ) : (
+                <ul aria-label="To-dos">
+                  {rows(sections.thisWeek, (todo) => (todo.done ? undefined : dragSource(todo.id, "this-week")))}
+                </ul>
+              )}
+            </Section>
+            {sections.rolledOver.length > 0 && (
+              <Section
+                title="Rolled over"
+                count={sections.rolledOver.length}
+                folded={state.foldedSections.includes("rolled-over")}
+                onToggle={() => toggleSection("rolled-over")}
+              >
+                <ul aria-label="Rolled over items" className="flex flex-col gap-1.5">
+                  {rolledEntries(true)}
+                </ul>
+              </Section>
+            )}
+            <Section
+              title="Backlog"
+              count={sections.backlog.length}
+              folded={state.foldedSections.includes("backlog")}
+              onToggle={() => toggleSection("backlog")}
+              dropZone={backlogDropZone}
+            >
+              <TitleInput
+                label="New backlog item"
+                placeholder="Add to the backlog"
+                keepOpen
+                addLabel="Add to backlog"
+                onSubmit={(title) => todosStore.add(title, null, "backlog")}
+              />
+              {sections.backlog.length > 0 && (
+                <ul aria-label="Backlog items">{rows(sections.backlog, (todo) => dragSource(todo.id, "backlog"))}</ul>
+              )}
+            </Section>
+          </div>
         )}
       </div>
+      {bar && (
+        <div role="status" className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm text-card-foreground shadow-sm">
+          <span className="min-w-0 break-words">{bar.message}</span>
+          {bar.undo !== undefined && (
+            <Button size="xs" variant="secondary" onClick={() => void undoRemove()}>
+              Undo
+            </Button>
+          )}
+        </div>
+      )}
       <ConfirmDialog
         open={deleting !== null}
-        title="Delete this to-do?"
+        title="Delete permanently?"
         description={
           deleting && (
             <>
-              “{deleting.title}” and its {underDeleting === 1 ? "sub-item" : `${underDeleting} sub-items`} will be deleted for good.
+              “{deleting.title}”
+              {preview !== "loading" && preview !== "error" && preview.items > 1
+                ? ` and its ${preview.items - 1 === 1 ? "1 sub-item" : `${preview.items - 1} sub-items`}`
+                : preview === "loading" || preview === "error"
+                  ? " and anything under it"
+                  : ""}{" "}
+              will be erased for good, with {preview !== "loading" && preview !== "error" && preview.items > 1 ? "their" : "its"} history. This cannot be undone, and backup files you made earlier may still contain{" "}
+              {preview !== "loading" && preview !== "error" && preview.items > 1 ? "them" : "it"}.
             </>
           )
         }
-        confirmLabel="Delete"
-        onConfirm={() => {
-          if (deleting) void todosStore.remove(deleting.id);
-          setDeleting(null);
-        }}
-        onCancel={() => setDeleting(null)}
-      />
+        confirmLabel="Delete permanently"
+        confirmDisabled={preview === "loading"}
+        onConfirm={deleteForGood}
+        onCancel={closeDelete}
+      >
+        <div className="text-sm text-muted-foreground">
+          {preview === "loading" ? (
+            <p>Checking the reports…</p>
+          ) : preview === "error" ? (
+            <p>The reports could not be checked.</p>
+          ) : preview.reports.length === 0 ? (
+            <p>No report mentions it.</p>
+          ) : (
+            <>
+              <p>These reports mention it. Deleting does not change them, so open one to edit it first:</p>
+              <ul className="mt-1 flex flex-col items-start gap-0.5">
+                {preview.reports.map((report) => (
+                  <li key={report.noteId}>
+                    <button
+                      type="button"
+                      className="text-left text-foreground underline underline-offset-2"
+                      aria-label={`Open ${report.title}`}
+                      onClick={() => {
+                        closeDelete();
+                        store.openNoteBeside(report.noteId);
+                      }}
+                    >
+                      {report.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      </ConfirmDialog>
     </div>
   );
 }

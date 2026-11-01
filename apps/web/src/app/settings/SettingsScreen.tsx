@@ -15,6 +15,7 @@ import { PluginsProvider } from "./PluginsProvider";
 import { PluginsSettings } from "./PluginsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { StylingSettings } from "./StylingSettings";
+import { TodoSettings } from "./TodoSettings";
 import { TrashCan } from "./TrashCan";
 import { Updates } from "./Updates";
 import { WritingSettings } from "./WritingSettings";
@@ -99,6 +100,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
             <Updates />
 
             <PanelSettings />
+
+            <TodoSettings />
 
             <BackupRestore defaultBackupDir={snapshot.backupDir} />
 

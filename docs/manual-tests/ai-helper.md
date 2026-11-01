@@ -15,6 +15,15 @@ script covers. You need Ollama running with one small chat model (for example `q
 - [ ] Type `192.168.1.250:11434`. A warning about an unencrypted network appears at once. **Save**: the settings
   save, then an error says it can't reach that computer (or times out after about 10 seconds). Reload: the address is
   still there.
+- [ ] Alternate address (needs a server you can reach two ways, e.g. LAN and Tailscale): put the LAN address in
+  *Server address* and the Tailscale one in *Alternate address*, **Save**. At home the status names the LAN address and
+  does not mention the alternate. Turn Wi-Fi off and connect to another network (a phone hotspot) with Tailscale on,
+  press **Test connection**: it finds the models on the Tailscale address and says it is the alternate address. Ask a
+  question in a note: it answers, and the panel says *Sends your notes to* the Tailscale host. Go back to the home
+  network and ask again within a minute: it uses the LAN address again. With Tailscale off and away from home, the error
+  names both addresses.
+- [ ] Type the same address in both fields: refused, saying they are the same. Clear the alternate and Save: the
+  field stays empty after a reload.
 - [ ] Type `ftp://nas`, then `http://nas:22`. Each is refused with a reason and nothing is saved.
 - [ ] Set the context size to `12` and Save: refused, with the allowed range.
 

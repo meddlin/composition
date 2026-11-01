@@ -65,6 +65,14 @@ export function disableSearch(reason: string): void {
   synced = false;
 }
 
+/**
+ * Whether the host app has said search is not there (it is still starting, or could not be): `disableSearch` was called and
+ * `configureSearch` has not been since. Without a host app that says so (the web app), search is only tried, so this is false.
+ */
+export function searchIsDisabled(): boolean {
+  return unavailableReason !== null;
+}
+
 export function unavailableMessage(): string {
   return unavailableReason ?? `Search is unavailable. Is Meilisearch running at ${meiliHost()}?`;
 }

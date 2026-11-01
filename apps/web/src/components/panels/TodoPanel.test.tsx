@@ -2,14 +2,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TodoLook } from "@/lib/composition/todoLook";
-import type { Todo, TodosApi, TodoStatus } from "@/lib/composition/todosApi";
-import { withDone, withStatus } from "@/lib/composition/todos";
+import type { Todo, TodoStatus } from "@/lib/composition/todosApi";
+import { memoryTodosBackend } from "@/lib/composition/todosMemoryBackend";
 import { createTodosStore } from "@/lib/composition/todosStore";
 import type { WorkspaceStore } from "../notes/workspaceStore";
 import { KINDS, type TodoPanelState } from "./kinds";
 import { TodoPanel } from "./TodoPanel";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 const item = (id: number, parentId: number | null, title: string, done = false, status: TodoStatus = done ? "done" : "todo"): Todo => ({
   id,
@@ -21,60 +24,34 @@ const item = (id: number, parentId: number | null, title: string, done = false, 
   updatedAt: "",
 });
 
-/** A backend that keeps its items in memory. */
-function backend(initial: Todo[] = [], look: TodoLook = { background: "notes", color: null }): TodosApi {
-  let items = [...initial];
-  let next = 100;
-  return {
-    loadTodoLook: async () => look,
-    saveTodoLook: async (saved) => {
-      look = saved;
-    },
-    listTodos: async () => items,
-    createTodo: async (title, parentId) => {
-      const created = item(next++, parentId, title);
-      items = [...items, created];
-      return created;
-    },
-    renameTodo: async (id, title) => {
-      items = items.map((t) => (t.id === id ? { ...t, title } : t));
-      return items.find((t) => t.id === id)!;
-    },
-    setTodoDone: async (id, done) => {
-      items = items.map((t) => (t.id === id ? withDone(t, done) : t));
-      return items.find((t) => t.id === id)!;
-    },
-    setTodoStatus: async (id, status) => {
-      items = items.map((t) => (t.id === id ? withStatus(t, status) : t));
-      return items.find((t) => t.id === id)!;
-    },
-    deleteTodo: async (id) => {
-      const gone = new Set([id]);
-      for (let grew = true; grew; ) {
-        grew = false;
-        for (const t of items) {
-          if (t.parentId !== null && gone.has(t.parentId) && !gone.has(t.id)) {
-            gone.add(t.id);
-            grew = true;
-          }
-        }
-      }
-      items = items.filter((t) => !gone.has(t.id));
-    },
-  };
-}
+/** An item waiting in Rolled over, from the week of 18 October. */
+const rolled = (id: number, parentId: number | null, title: string, rollCount = 1): Todo => ({
+  ...item(id, parentId, title),
+  rolledFromWeek: "2026-10-18",
+  rollCount,
+});
+
+const LIST: TodoPanelState = { collapsed: [], view: "list", foldedSections: [] };
+const BOARD: TodoPanelState = { collapsed: [], view: "board", foldedSections: [] };
+const ARCHIVE: TodoPanelState = { collapsed: [], view: "archive", foldedSections: [] };
+const REPORTS: TodoPanelState = { collapsed: [], view: "reports", foldedSections: [] };
 
 /** The panel, with a workspace that has only what it uses: the to-do items and the panel's saved state. */
-function setup(initial: Todo[] = [], start: TodoPanelState = { collapsed: [], view: "list" }) {
-  const todos = createTodosStore(backend(initial));
+function setup(
+  initial: Todo[] = [],
+  start: TodoPanelState = LIST,
+  options: Omit<NonNullable<Parameters<typeof memoryTodosBackend>[0]>, "todos"> = {},
+) {
+  const todos = createTodosStore(memoryTodosBackend({ todos: initial, ...options }));
   let state: TodoPanelState = start;
   const setPanelState = vi.fn((_id: string, next: unknown) => {
     state = next as TodoPanelState;
     view.rerender(<TodoPanel store={store} panelId="p1" state={state} />);
   });
-  const store = { todos, setPanelState } as unknown as WorkspaceStore;
+  const openNoteBeside = vi.fn();
+  const store = { todos, setPanelState, openNoteBeside } as unknown as WorkspaceStore;
   const view = render(<TodoPanel store={store} panelId="p1" state={state} />);
-  return { todos, setPanelState };
+  return { todos, setPanelState, openNoteBeside };
 }
 
 const typeInto = (name: string, value: string) => {
@@ -98,6 +75,58 @@ describe("the to-do panel", () => {
 
     expect(await screen.findByText("Buy milk")).toBeTruthy();
     expect((screen.getByRole("textbox", { name: "New to-do" }) as HTMLInputElement).value).toBe("");
+  });
+
+  it("adds an item with the Add button as well as with Enter, and clears the box for the next", async () => {
+    setup();
+    await screen.findByText("Nothing to do yet.");
+    const box = screen.getByRole("textbox", { name: "New to-do" }) as HTMLInputElement;
+
+    fireEvent.change(box, { target: { value: "Buy milk" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add to-do" }));
+
+    expect(await screen.findByText("Buy milk")).toBeTruthy();
+    expect(box.value).toBe("");
+    // The cursor goes back to the box, so the next one can be typed straight away.
+    expect(document.activeElement).toBe(box);
+  });
+
+  it("has the Add button off while the box is empty or only spaces", async () => {
+    setup();
+    await screen.findByText("Nothing to do yet.");
+    const add = screen.getByRole("button", { name: "Add to-do" }) as HTMLButtonElement;
+    const box = screen.getByRole("textbox", { name: "New to-do" });
+    expect(add.disabled).toBe(true);
+
+    fireEvent.change(box, { target: { value: "   " } });
+    expect(add.disabled).toBe(true);
+
+    fireEvent.change(box, { target: { value: "Buy milk" } });
+    expect(add.disabled).toBe(false);
+
+    fireEvent.click(add);
+    await screen.findByText("Buy milk");
+    expect(add.disabled).toBe(true);
+  });
+
+  it("has an Add button for the backlog's own box too, which adds to the backlog", async () => {
+    setup([item(2, null, "Buy milk")]);
+    await screen.findByRole("region", { name: "Backlog" });
+
+    fireEvent.change(screen.getByRole("textbox", { name: "New backlog item" }), { target: { value: "Learn Spanish" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add to backlog" }));
+
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Backlog" })).getByText("Learn Spanish")).toBeTruthy());
+    expect(within(screen.getByRole("region", { name: "This week" })).queryByText("Learn Spanish")).toBeNull();
+  });
+
+  it("has no Add button on the box for a sub-item or a rename, which are for one item and close when done", async () => {
+    setup([item(1, null, "Plan trip")]);
+    fireEvent.click(await screen.findByRole("button", { name: "Add a sub-item to Plan trip" }));
+
+    expect(screen.getByRole("textbox", { name: "New sub-item of Plan trip" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Add sub-item" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Add (to-do|to backlog)$/ })).toHaveLength(2);
   });
 
   it("adds a sub-item under an item, shown beneath it", async () => {
@@ -146,36 +175,64 @@ describe("the to-do panel", () => {
     await waitFor(() => expect(screen.getByText("Buy milk").className).not.toContain("line-through"));
   });
 
-  it("deletes an item with no sub-items at once", async () => {
+  it("removes an item at once, and says so with an Undo", async () => {
     setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Delete Buy milk" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
 
-    await waitFor(() => expect(screen.queryByText("Buy milk")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("Buy milk", { selector: "span.break-words" })).toBeNull());
     expect(screen.getByText("Walk dog")).toBeTruthy();
+    expect((await screen.findByRole("status")).textContent).toContain("Removed “Buy milk”.");
   });
 
-  it("asks before deleting an item with sub-items, and deletes them with it", async () => {
+  it("brings a removed item back with Undo", async () => {
+    setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByText("Buy milk")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+  });
+
+  it("removes an item with sub-items without asking, says how many went with it, and Undo brings them all back", async () => {
     setup([item(1, null, "Plan trip"), item(2, 1, "Book flights"), item(3, null, "Walk dog")]);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Delete Plan trip" }));
-    expect(screen.getByText(/will be deleted for good/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByText("Plan trip")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Plan trip" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Plan trip" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
-
-    await waitFor(() => expect(screen.queryByText("Plan trip")).toBeNull());
+    expect((await screen.findByRole("status")).textContent).toContain("Removed “Plan trip” and 1 sub-item.");
     expect(screen.queryByText("Book flights")).toBeNull();
-    expect(screen.getByText("Walk dog")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(await screen.findByText("Book flights")).toBeTruthy();
+    expect(screen.getByText("Plan trip")).toBeTruthy();
+  });
+
+  it("stops offering the Undo after a while", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    setup([item(1, null, "Buy milk")]);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Remove Buy milk" }));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(screen.getByRole("status")).toBeTruthy();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(8000);
+    });
+
+    expect(screen.queryByRole("status")).toBeNull();
   });
 
   it("folds an item's sub-items away and saves that in the panel's state", async () => {
     const { setPanelState } = setup([item(1, null, "Plan trip"), item(2, 1, "Book flights")]);
     fireEvent.click(await screen.findByRole("button", { name: "Hide the sub-items of Plan trip" }));
 
-    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [1], view: "list" });
+    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [1], view: "list", foldedSections: [] });
     expect(screen.queryByText("Book flights")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Show the sub-items of Plan trip" }));
@@ -183,9 +240,9 @@ describe("the to-do panel", () => {
   });
 
   it("offers to try again when the items cannot be loaded", async () => {
-    const todos = createTodosStore({ ...backend(), listTodos: vi.fn().mockRejectedValueOnce(new Error("no disk")).mockResolvedValue([]) });
+    const todos = createTodosStore({ ...memoryTodosBackend(), listTodos: vi.fn().mockRejectedValueOnce(new Error("no disk")).mockResolvedValue([]) });
     const store = { todos, setPanelState: vi.fn() } as unknown as WorkspaceStore;
-    render(<TodoPanel store={store} panelId="p1" state={{ collapsed: [], view: "list" }} />);
+    render(<TodoPanel store={store} panelId="p1" state={LIST} />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
 
@@ -206,7 +263,7 @@ describe("the to-do board", () => {
 
   /** The panel on the board view; a click on the view buttons is saved into the state like in the real workspace. */
   function onBoard(initial: Todo[] = items) {
-    return setup(initial, { collapsed: [], view: "board" });
+    return setup(initial, BOARD);
   }
 
   it("puts each item in the column of its status", async () => {
@@ -256,14 +313,19 @@ describe("the to-do board", () => {
     expect(cardsIn("Backlog")).toEqual([]);
   });
 
-  it("deletes a card, asking first when it has sub-items", async () => {
+  it("removes a card, with an Undo, whether or not it has sub-items", async () => {
     onBoard();
-    fireEvent.click(await screen.findByRole("button", { name: "Delete Plan trip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Plan trip" }));
     await waitFor(() => expect(cardsIn("Backlog")).toEqual([]));
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete Write report" }));
-    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove Write report" }));
     await waitFor(() => expect(cardsIn("In progress")).toEqual([]));
+    expect(cardsIn("To-do")).toEqual(["Buy milk"]);
+
+    // An item that comes back from the archive is a to-do again, whatever it was; what was under it comes back as it was.
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(cardsIn("To-do")).toEqual(["Buy milk", "Write report", "Draft intro"]));
+    expect(cardsIn("In progress")).toEqual([]);
   });
 
   it("switches between the list and the board, saving the choice in the panel's state", async () => {
@@ -273,7 +335,7 @@ describe("the to-do board", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Board view" }));
 
-    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [], view: "board" });
+    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [], view: "board", foldedSections: [] });
     expect(await screen.findByRole("group", { name: "To-do board" })).toBeTruthy();
     expect(screen.queryByRole("list", { name: "To-dos" })).toBeNull();
 
@@ -282,7 +344,7 @@ describe("the to-do board", () => {
   });
 
   it("shows a move made on the board as a tick in the list", async () => {
-    setup([item(2, null, "Buy milk")], { collapsed: [], view: "board" });
+    setup([item(2, null, "Buy milk")], BOARD);
     fireEvent.click(await screen.findByRole("button", { name: "Move Buy milk to In progress" }));
     fireEvent.click(await screen.findByRole("button", { name: "Move Buy milk to Done" }));
     fireEvent.click(screen.getByRole("button", { name: "List view" }));
@@ -294,18 +356,40 @@ describe("the to-do board", () => {
 
 describe("the to-do kind", () => {
   it("starts with nothing folded", () => {
-    expect(KINDS.todo.initialState()).toEqual({ collapsed: [], view: "list" });
+    expect(KINDS.todo.initialState()).toEqual({ collapsed: [], view: "list", foldedSections: [] });
   });
 
   it("restores what it saved, and drops what is not an id", () => {
     const context = { hasNote: () => true, hasNotebook: () => true };
-    expect(KINDS.todo.restore({ collapsed: [1, "x", 2.5, 3] }, context)).toEqual({ collapsed: [1, 3], view: "list" });
+    expect(KINDS.todo.restore({ collapsed: [1, "x", 2.5, 3] }, context)).toEqual({ collapsed: [1, 3], view: "list", foldedSections: [] });
   });
 
   it("restores the view it saved, and shows the list for a panel saved before there were views", () => {
     const context = { hasNote: () => true, hasNotebook: () => true };
-    expect(KINDS.todo.restore({ collapsed: [], view: "board" }, context)).toEqual({ collapsed: [], view: "board" });
-    expect(KINDS.todo.restore({ collapsed: [], view: "gantt" }, context)).toEqual({ collapsed: [], view: "list" });
+    expect(KINDS.todo.restore({ collapsed: [], view: "board" }, context)).toEqual(BOARD);
+    expect(KINDS.todo.restore({ collapsed: [], view: "gantt" }, context)).toEqual(LIST);
+  });
+
+  it("restores which sections were folded, shows them all open for a panel saved before there were sections, and drops what is not one", () => {
+    const context = { hasNote: () => true, hasNotebook: () => true };
+    expect(KINDS.todo.restore({ collapsed: [], view: "list", foldedSections: ["backlog", "rolled-over"] }, context)).toEqual({
+      collapsed: [],
+      view: "list",
+      foldedSections: ["backlog", "rolled-over"],
+    });
+    expect(KINDS.todo.restore({ collapsed: [], view: "list" }, context)).toEqual(LIST);
+    expect(KINDS.todo.restore({ collapsed: [], view: "list", foldedSections: ["archive", 3, "backlog", "backlog"] }, context)).toEqual({
+      collapsed: [],
+      view: "list",
+      foldedSections: ["backlog"],
+    });
+  });
+
+  it("restores the Archive view, and a saved view it does not know is the list", () => {
+    const context = { hasNote: () => true, hasNotebook: () => true };
+    expect(KINDS.todo.restore({ collapsed: [], view: "archive" }, context)).toEqual(ARCHIVE);
+    expect(KINDS.todo.restore({ collapsed: [], view: "reports" }, context)).toEqual(REPORTS);
+    expect(KINDS.todo.restore({ collapsed: [], view: "gantt" }, context)).toEqual(LIST);
   });
 
   it("cannot restore anything else, so the panel comes back empty", () => {
@@ -317,9 +401,9 @@ describe("the to-do kind", () => {
 describe("the to-do background", () => {
   /** The panel, with a workspace whose to-do store is given the look to start from. */
   function withLook(look: TodoLook) {
-    const todos = createTodosStore(backend([], look));
+    const todos = createTodosStore(memoryTodosBackend({ look }));
     const store = { todos, setPanelState: vi.fn() } as unknown as WorkspaceStore;
-    render(<TodoPanel store={store} panelId="p1" state={{ collapsed: [], view: "list" }} />);
+    render(<TodoPanel store={store} panelId="p1" state={LIST} />);
     return { todos, body: () => screen.getByLabelText("New to-do").closest("div.flex-col") as HTMLElement };
   }
 
@@ -350,5 +434,747 @@ describe("the to-do background", () => {
 
     expect(body().className).not.toContain("note-surface");
     expect(body().style.backgroundColor).toBe("rgb(251, 243, 217)");
+  });
+});
+
+describe("the sections of the list", () => {
+  const items = [
+    rolled(1, null, "Write Q4 plan", 1),
+    item(2, null, "Buy milk"),
+    item(3, null, "Someday trip", false, "backlog"),
+    item(4, null, "Walk dog", true),
+  ];
+  const section = (name: string) => screen.getByRole("region", { name });
+
+  it("shows what is rolled over, this week and the backlog, each in its own section", async () => {
+    setup(items);
+    await screen.findByRole("region", { name: "This week" });
+
+    expect(within(section("Rolled over")).getByText("Write Q4 plan")).toBeTruthy();
+    expect(within(section("This week")).getAllByRole("listitem").map((li) => li.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("Buy milk"), expect.stringContaining("Walk dog")]),
+    );
+    expect(within(section("This week")).queryByText("Someday trip")).toBeNull();
+    expect(within(section("Backlog")).getByText("Someday trip")).toBeTruthy();
+  });
+
+  it("puts This week first, then Rolled over, then the Backlog, so the list you work from is at the top", async () => {
+    setup(items);
+    await screen.findByRole("region", { name: "This week" });
+
+    const order = screen
+      .getAllByRole("region")
+      .map((region) => region.getAttribute("aria-label"))
+      .filter((name) => ["Rolled over", "This week", "Backlog"].includes(name ?? ""));
+
+    expect(order).toEqual(["This week", "Rolled over", "Backlog"]);
+  });
+
+  it("has no Rolled over section when nothing is waiting there", async () => {
+    setup([item(2, null, "Buy milk")]);
+    await screen.findByRole("region", { name: "This week" });
+
+    expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull();
+    expect(screen.getByRole("region", { name: "Backlog" })).toBeTruthy();
+  });
+
+  it("says which week a rolled-over item came from, and how long it has waited", async () => {
+    setup([rolled(1, null, "Write Q4 plan", 1), rolled(2, null, "Call the bank", 2)]);
+    await screen.findByRole("region", { name: "Rolled over" });
+
+    const plan = within(section("Rolled over")).getByText("Write Q4 plan").closest("li")!;
+    const bank = within(section("Rolled over")).getByText("Call the bank").closest("li")!;
+    expect(plan.textContent).toMatch(/From the week of .*18/);
+    expect(plan.textContent).not.toMatch(/waiting/);
+    expect(bank.textContent).toMatch(/waiting 2 weeks/);
+  });
+
+  it("adds a gentle nudge once an item has rolled over three times, and not before", async () => {
+    setup([rolled(1, null, "Write Q4 plan", 2), rolled(2, null, "Call the bank", 3)]);
+    await screen.findByRole("region", { name: "Rolled over" });
+
+    expect(within(section("Rolled over")).getAllByText(/Rolled over \d+ times/)).toHaveLength(1);
+    expect(within(within(section("Rolled over")).getByText("Call the bank").closest("li")!).getByText(/Rolled over 3 times/)).toBeTruthy();
+  });
+
+  it("adds a rolled-over item to this week", async () => {
+    setup([rolled(1, null, "Write Q4 plan"), item(2, null, "Buy milk")]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Add Write Q4 plan to this week" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull());
+    expect(within(section("This week")).getByText("Write Q4 plan")).toBeTruthy();
+  });
+
+  it("moves a rolled-over item to the backlog", async () => {
+    setup([rolled(1, null, "Write Q4 plan")]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Move Write Q4 plan to the backlog" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull());
+    expect(within(section("Backlog")).getByText("Write Q4 plan")).toBeTruthy();
+  });
+
+  it("drops a rolled-over item", async () => {
+    setup([rolled(1, null, "Write Q4 plan"), item(2, null, "Buy milk")]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Drop Write Q4 plan" }));
+
+    await waitFor(() => expect(screen.queryByText("Write Q4 plan")).toBeNull());
+    expect(screen.getByText("Buy milk")).toBeTruthy();
+  });
+
+  it("treats a rolled branch as one: its sub-items show under it, and go with it", async () => {
+    setup([rolled(1, null, "Plan trip"), rolled(2, 1, "Book flights"), item(3, null, "Buy milk")]);
+    await screen.findByRole("region", { name: "Rolled over" });
+    expect(within(section("Rolled over")).getByText("Book flights")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Plan trip to this week" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull());
+    const trip = within(section("This week")).getByText("Plan trip").closest("li")!;
+    expect(within(trip).getByText("Book flights")).toBeTruthy();
+  });
+
+  it("says what a rolled sub-item is under, when it was rolled without its parent", async () => {
+    setup([item(1, null, "Plan trip", true), rolled(2, 1, "Book flights")]);
+    await screen.findByRole("region", { name: "Rolled over" });
+
+    expect(within(section("Rolled over")).getByText("in Plan trip")).toBeTruthy();
+  });
+
+  it("adds an item straight to the backlog from the backlog's own box", async () => {
+    setup([item(2, null, "Buy milk")]);
+    await screen.findByRole("region", { name: "Backlog" });
+
+    typeInto("New backlog item", "Learn Spanish");
+
+    await waitFor(() => expect(within(section("Backlog")).getByText("Learn Spanish")).toBeTruthy());
+    expect(within(section("This week")).queryByText("Learn Spanish")).toBeNull();
+  });
+
+  it("folds a section away and saves that in the panel's state", async () => {
+    const { setPanelState } = setup([item(2, null, "Buy milk"), item(3, null, "Someday trip", false, "backlog")]);
+    fireEvent.click(await screen.findByRole("button", { name: "Hide the Backlog section" }));
+
+    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [], view: "list", foldedSections: ["backlog"] });
+    expect(screen.queryByText("Someday trip")).toBeNull();
+    expect(screen.getByText("Buy milk")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show the Backlog section" }));
+    expect(await screen.findByText("Someday trip")).toBeTruthy();
+  });
+
+  it("shows a section folded when the panel was saved that way", async () => {
+    setup([item(2, null, "Buy milk"), item(3, null, "Someday trip", false, "backlog")], { ...LIST, foldedSections: ["backlog"] });
+    await screen.findByText("Buy milk");
+
+    expect(screen.queryByText("Someday trip")).toBeNull();
+    expect(screen.getByRole("button", { name: "Show the Backlog section" }).getAttribute("aria-expanded")).toBe("false");
+  });
+});
+
+describe("Rolled over on the board", () => {
+  const items = [rolled(1, null, "Write Q4 plan", 2), item(2, null, "Buy milk"), rolled(3, null, "Plan trip"), rolled(4, 3, "Book flights")];
+  const strip = () => screen.getByRole("region", { name: "Rolled over" });
+
+  it("shows what is rolled over in a strip above the columns, and keeps it out of them", async () => {
+    setup(items, BOARD);
+    await screen.findByRole("group", { name: "To-do board" });
+
+    expect(within(strip()).getByText("Write Q4 plan")).toBeTruthy();
+    expect(within(strip()).getByText("Plan trip")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: "To-do" })).getAllByRole("listitem").map((li) => li.getAttribute("aria-label"))).toEqual(["Buy milk"]);
+    expect(screen.queryByRole("listitem", { name: "Book flights" })).toBeNull();
+  });
+
+  it("has no strip when nothing is rolled over", async () => {
+    setup([item(2, null, "Buy milk")], BOARD);
+    await screen.findByRole("group", { name: "To-do board" });
+
+    expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull();
+  });
+
+  it("adds an item to this week, or to the backlog, or drops it, from the strip", async () => {
+    setup(items, BOARD);
+    fireEvent.click(await screen.findByRole("button", { name: "Add Write Q4 plan to this week" }));
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "To-do" })).getByLabelText("Write Q4 plan")).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Plan trip to the backlog" }));
+    await waitFor(() => expect(within(screen.getByRole("region", { name: "Backlog" })).getByLabelText("Plan trip")).toBeTruthy());
+    expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull();
+  });
+
+  it("drops an item from the strip", async () => {
+    setup(items, BOARD);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Drop Write Q4 plan" }));
+
+    await waitFor(() => expect(screen.queryByText("Write Q4 plan")).toBeNull());
+    expect(within(strip()).getByText("Plan trip")).toBeTruthy();
+  });
+});
+
+describe("the first-run question", () => {
+  const completed = [item(1, null, "Reply to vendor", true), item(2, null, "Send invoice", true), item(3, null, "Write plan")];
+
+  it("asks whether to archive the items already completed, and says what leaving them means", async () => {
+    setup(completed, LIST, { setup: { pending: true, completed: 2 } });
+
+    const question = await screen.findByRole("region", { name: "Archive completed items" });
+
+    expect(question.textContent).toContain("Archive 2 items you've already completed?");
+    expect(question.textContent).toContain("filed under the weeks they were last changed");
+    expect(question.textContent).toMatch(/without a date/);
+  });
+
+  it("archives them on a yes, and stops asking", async () => {
+    setup(completed, LIST, { setup: { pending: true, completed: 2 } });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Yes, archive them" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Archive completed items" })).toBeNull());
+    expect(screen.queryByText("Reply to vendor")).toBeNull();
+    expect(screen.getByText("Write plan")).toBeTruthy();
+  });
+
+  it("leaves them on a no, and stops asking", async () => {
+    setup(completed, LIST, { setup: { pending: true, completed: 2 } });
+
+    fireEvent.click(await screen.findByRole("button", { name: "No, leave them" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Archive completed items" })).toBeNull());
+    expect(screen.getByText("Reply to vendor")).toBeTruthy();
+  });
+
+  it("says it in the singular for one item, and does not ask when there is nothing to ask about", async () => {
+    setup([item(1, null, "Reply to vendor", true)], LIST, { setup: { pending: true, completed: 1 } });
+    const question = await screen.findByRole("region", { name: "Archive completed items" });
+    expect(question.textContent).toContain("Archive 1 item you've already completed?");
+    expect(screen.getByRole("button", { name: "Yes, archive it" })).toBeTruthy();
+    cleanup();
+
+    setup(completed);
+    await screen.findByRole("region", { name: "This week" });
+    expect(screen.queryByRole("region", { name: "Archive completed items" })).toBeNull();
+  });
+});
+
+describe("the Archive view", () => {
+  const archivedItems = [
+    { todo: item(10, null, "Plan trip"), reason: "removed" as const, week: "2026-10-25", action: 1 },
+    { todo: item(11, 10, "Book flights"), reason: "removed" as const, week: "2026-10-25", action: 1 },
+    { todo: { ...item(12, null, "Reply to vendor", true), doneAt: "2026-10-13T15:30:00.000Z" }, reason: "done" as const, week: "2026-10-11" },
+    { todo: rolled(13, null, "Old idea"), reason: "dropped" as const, week: "2026-10-11" },
+  ];
+  const week = (iso: string) => screen.getByRole("region", { name: `Archived in the week of ${iso}` });
+  const entry = (title: string) => screen.getByText(title).closest("li")!;
+
+  async function onArchive(initial: Todo[] = [item(1, null, "Buy milk")], options: Parameters<typeof setup>[2] = { archived: archivedItems }) {
+    const result = setup(initial, ARCHIVE, options);
+    await screen.findAllByRole("region", { name: /^Archived in the week of/ });
+    return result;
+  }
+
+  it("lists what was archived by the week it happened in, newest week first, each marked done, removed or dropped", async () => {
+    await onArchive();
+
+    expect(screen.getAllByRole("region", { name: /^Archived in the week of/ }).map((r) => r.getAttribute("aria-label"))).toEqual([
+      "Archived in the week of 2026-10-25",
+      "Archived in the week of 2026-10-11",
+    ]);
+    expect(entry("Plan trip").textContent).toMatch(/Removed/);
+    expect(entry("Reply to vendor").textContent).toMatch(/Done/);
+    expect(entry("Old idea").textContent).toMatch(/Dropped/);
+    expect(within(week("2026-10-11")).getByText("Reply to vendor")).toBeTruthy();
+  });
+
+  it("shows a branch archived together as one entry, with its sub-items under it", async () => {
+    await onArchive();
+
+    expect(within(entry("Plan trip")).getByText("Book flights")).toBeTruthy();
+    expect(within(week("2026-10-25")).getAllByRole("listitem").filter((li) => li.parentElement?.getAttribute("aria-label") === "Archived items")).toHaveLength(1);
+  });
+
+  it("has a search box in place of the add box, and shows only what matches", async () => {
+    await onArchive();
+    expect(screen.queryByRole("textbox", { name: "New to-do" })).toBeNull();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the archive" }), { target: { value: "VENDOR" } });
+
+    expect(screen.getByText("Reply to vendor")).toBeTruthy();
+    expect(screen.queryByText("Plan trip")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Archived in the week of 2026-10-25" })).toBeNull();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the archive" }), { target: { value: "zzz" } });
+    expect(screen.getByText(/Nothing in the archive matches/)).toBeTruthy();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the archive" }), { target: { value: "" } });
+    expect(screen.getByText("Plan trip")).toBeTruthy();
+  });
+
+  it("says so when nothing has been archived", async () => {
+    setup([], ARCHIVE);
+
+    expect(await screen.findByText("Nothing has been archived yet.")).toBeTruthy();
+  });
+
+  it("restores an entry with what was archived with it, and says so", async () => {
+    const { todos } = await onArchive();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore Plan trip" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("Restored “Plan trip”.");
+    await waitFor(() => expect(screen.queryByText("Plan trip", { selector: "span.break-words" })).toBeNull());
+    expect(todos.getSnapshot().todos.map((t) => [t.id, t.parentId])).toEqual([[1, null], [10, null], [11, 10]]);
+    expect(screen.queryByRole("region", { name: "Archived in the week of 2026-10-25" })).toBeNull();
+  });
+
+  it("says when something came back at the top level because what it was under is still archived", async () => {
+    const { todos } = await onArchive();
+
+    fireEvent.click(screen.getByRole("button", { name: "Restore Book flights" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("at the top level");
+    expect(todos.getSnapshot().todos.find((t) => t.id === 11)?.parentId).toBeNull();
+  });
+
+  it("asks before deleting for good, says how much goes, and lists the reports that mention it with links to open them", async () => {
+    const { openNoteBeside } = await onArchive([item(1, null, "Buy milk")], {
+      archived: archivedItems,
+      reports: { 10: [{ noteId: 7, title: "Weekly 2026-10-25" }, { noteId: 5, title: "Monthly 2026-10" }] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Plan trip permanently" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() => expect(within(dialog).getByText(/These reports mention it/)).toBeTruthy());
+    expect(dialog.textContent).toContain("“Plan trip” and its 1 sub-item will be erased for good");
+    expect(dialog.textContent).toMatch(/backup files you made earlier may still contain/i);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Open Weekly 2026-10-25" }));
+
+    expect(openNoteBeside).toHaveBeenCalledWith(7);
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByText("Plan trip")).toBeTruthy();
+  });
+
+  it("deletes for good when confirmed, and says so", async () => {
+    const { todos } = await onArchive();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Plan trip permanently" }));
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() => expect(within(dialog).getByText("No report mentions it.")).toBeTruthy());
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
+
+    expect((await screen.findByRole("status")).textContent).toContain("Deleted “Plan trip” permanently.");
+    await waitFor(() => expect(screen.queryByText("Book flights")).toBeNull());
+    expect(todos.getSnapshot().archive?.map((t) => t.id)).toEqual([12, 13]);
+  });
+
+  it("leaves everything alone when the deletion is cancelled", async () => {
+    const { todos } = await onArchive();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete Plan trip permanently" }));
+    fireEvent.click(within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(todos.getSnapshot().archive).toHaveLength(4);
+  });
+
+  it("does not let the deletion be confirmed before the reports have been checked", async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const backend = memoryTodosBackend({ archived: archivedItems });
+    const preview = backend.previewTodoDelete;
+    const todos = createTodosStore({
+      ...backend,
+      previewTodoDelete: async (id) => {
+        await held;
+        return preview(id);
+      },
+    });
+    const store = { todos, setPanelState: vi.fn(), openNoteBeside: vi.fn() } as unknown as WorkspaceStore;
+    render(<TodoPanel store={store} panelId="p1" state={ARCHIVE} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Delete Plan trip permanently" }));
+    const dialog = await screen.findByRole("alertdialog");
+
+    expect((within(dialog).getByRole("button", { name: "Delete permanently" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(within(dialog).getByText("Checking the reports…")).toBeTruthy();
+
+    release();
+    await waitFor(() => expect((within(dialog).getByRole("button", { name: "Delete permanently" }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("switches to the Archive view, saving the choice in the panel's state", async () => {
+    const { setPanelState } = setup([item(1, null, "Buy milk")], LIST, { archived: archivedItems });
+    await screen.findByRole("region", { name: "This week" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Archive view" }));
+
+    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [], view: "archive", foldedSections: [] });
+    expect(await screen.findByRole("region", { name: "Archived in the week of 2026-10-25" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Archive view" }).getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("Delete permanently beside Remove", () => {
+  const openMenu = (title: string) => fireEvent.pointerDown(screen.getByRole("button", { name: `Actions for ${title}` }), { button: 0, ctrlKey: false });
+
+  it("sits in a small menu on a row of the list, and asks before erasing the item and what is under it", async () => {
+    const { todos } = setup([item(1, null, "Plan trip"), item(2, 1, "Book flights"), item(3, null, "Buy milk")]);
+    await screen.findByText("Plan trip");
+
+    openMenu("Plan trip");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete permanently…" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    await waitFor(() => expect(within(dialog).getByText("No report mentions it.")).toBeTruthy());
+    expect(dialog.textContent).toContain("“Plan trip” and its 1 sub-item will be erased for good");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete permanently" }));
+
+    await waitFor(() => expect(screen.queryByText("Plan trip", { selector: "span.break-words" })).toBeNull());
+    expect(todos.getSnapshot().todos.map((t) => t.id)).toEqual([3]);
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+  });
+
+  it("is on a card of the board too", async () => {
+    setup([item(2, null, "Buy milk")], BOARD);
+    await screen.findByRole("group", { name: "To-do board" });
+
+    openMenu("Buy milk");
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete permanently…" }));
+
+    expect(await screen.findByRole("alertdialog")).toBeTruthy();
+  });
+
+  it("keeps Remove as it was: one click, no question", async () => {
+    setup([item(2, null, "Buy milk")]);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Removed “Buy milk”."));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
+
+describe("the Reports view", () => {
+  const report = (noteId: number, kind: "weekly" | "monthly" | "quarterly", periodStart: string, label: string, generated: string) => ({
+    noteId,
+    title: `${{ weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly" }[kind]} ${label} · generated ${generated}`,
+    kind,
+    periodStart,
+    periodEnd: periodStart,
+    label,
+    generatedAt: `${generated.slice(0, 10)}T${generated.slice(11)}:00.000Z`,
+  });
+  const data = {
+    reports: [
+      report(5, "weekly", "2026-10-11", "2026-10-11 → 2026-10-17", "2026-10-19 09:00"),
+      report(7, "weekly", "2026-10-18", "2026-10-18 → 2026-10-24", "2026-10-26 09:00"),
+      report(9, "monthly", "2026-09-01", "2026-09", "2026-10-02 09:00"),
+    ],
+    missing: [
+      { kind: "weekly" as const, periodStart: "2026-10-04", periodEnd: "2026-10-10", label: "2026-10-04 → 2026-10-10" },
+      { kind: "monthly" as const, periodStart: "2026-08-01", periodEnd: "2026-08-31", label: "2026-08" },
+    ],
+  };
+  const sectionOf = (name: string) => screen.getByRole("region", { name });
+  const titlesIn = (name: string) => within(sectionOf(name)).queryAllByRole("listitem").map((li) => li.getAttribute("aria-label"));
+
+  async function onReports(options: Parameters<typeof setup>[2] = { todoReports: data }) {
+    const result = setup([], REPORTS, options);
+    await screen.findByRole("region", { name: "Weekly reports" });
+    return result;
+  }
+
+  it("lists the reports by Weeks, Months and Quarters, newest period first, each section saying when it has none", async () => {
+    await onReports();
+
+    expect(titlesIn("Weekly reports")).toEqual([
+      "Weekly 2026-10-18 → 2026-10-24 · generated 2026-10-26 09:00",
+      "Weekly 2026-10-11 → 2026-10-17 · generated 2026-10-19 09:00",
+    ]);
+    expect(titlesIn("Monthly reports")).toEqual(["Monthly 2026-09 · generated 2026-10-02 09:00"]);
+    expect(within(sectionOf("Quarterly reports")).getByText("No quarterly reports yet.")).toBeTruthy();
+    expect(screen.queryByRole("textbox", { name: "New to-do" })).toBeNull();
+  });
+
+  it("opens a report in a note panel beside the to-do panel", async () => {
+    const { openNoteBeside } = await onReports();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open Weekly 2026-10-18 → 2026-10-24 · generated 2026-10-26 09:00" }));
+
+    expect(openNoteBeside).toHaveBeenCalledWith(7);
+  });
+
+  it("makes another report for the same period with Regenerate, listed first among its copies, and says so", async () => {
+    await onReports();
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate Weekly 2026-10-11 → 2026-10-17 · generated 2026-10-19 09:00" }));
+
+    await waitFor(() => expect(titlesIn("Weekly reports")).toHaveLength(3));
+    expect(titlesIn("Weekly reports")[0]).toBe("Weekly 2026-10-18 → 2026-10-24 · generated 2026-10-26 09:00");
+    expect(titlesIn("Weekly reports").filter((t) => t?.includes("2026-10-11 → 2026-10-17"))).toHaveLength(2);
+    expect((await screen.findByRole("status")).textContent).toMatch(/^Made a new report for 2026-10-11 → 2026-10-17/);
+  });
+
+  it("makes a report for a period that has none from a picker in its section, which then no longer offers it", async () => {
+    await onReports();
+    const picker = within(sectionOf("Weekly reports")).getByLabelText("Make a weekly report for") as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["2026-10-04 → 2026-10-10"]);
+
+    fireEvent.click(within(sectionOf("Weekly reports")).getByRole("button", { name: "Generate a weekly report" }));
+
+    await waitFor(() => expect(titlesIn("Weekly reports")).toHaveLength(3));
+    expect(within(sectionOf("Weekly reports")).queryByLabelText("Make a weekly report for")).toBeNull();
+    expect(within(sectionOf("Monthly reports")).getByLabelText("Make a monthly report for")).toBeTruthy();
+  });
+
+  it("lets the period to make a report for be chosen, newest first", async () => {
+    await onReports({
+      todoReports: {
+        reports: [],
+        missing: [
+          { kind: "weekly", periodStart: "2026-10-04", periodEnd: "2026-10-10", label: "2026-10-04 → 2026-10-10" },
+          { kind: "weekly", periodStart: "2026-10-18", periodEnd: "2026-10-24", label: "2026-10-18 → 2026-10-24" },
+        ],
+      },
+    });
+    const picker = within(sectionOf("Weekly reports")).getByLabelText("Make a weekly report for") as HTMLSelectElement;
+    expect([...picker.options].map((o) => o.textContent)).toEqual(["2026-10-18 → 2026-10-24", "2026-10-04 → 2026-10-10"]);
+
+    fireEvent.change(picker, { target: { value: "2026-10-04" } });
+    fireEvent.click(within(sectionOf("Weekly reports")).getByRole("button", { name: "Generate a weekly report" }));
+
+    await waitFor(() => expect(titlesIn("Weekly reports")).toHaveLength(1));
+    expect(titlesIn("Weekly reports")[0]).toContain("2026-10-04 → 2026-10-10");
+  });
+
+  it("switches to the Reports view, saving the choice in the panel's state", async () => {
+    const { setPanelState } = setup([item(1, null, "Buy milk")], LIST, { todoReports: data });
+    await screen.findByRole("region", { name: "This week" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Reports view" }));
+
+    expect(setPanelState).toHaveBeenCalledWith("p1", { collapsed: [], view: "reports", foldedSections: [] });
+    expect(await screen.findByRole("region", { name: "Weekly reports" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reports view" }).getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+const section = (name: string) => screen.getByRole("region", { name });
+const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: "", dropEffect: "", types: ["application/x-composition-todo"] });
+const rowIn = (region: string, title: string) => within(section(region)).getByText(title).closest("li") as HTMLElement;
+
+async function openList(start: Todo[]) {
+  const result = setup(start);
+  await screen.findByRole("region", { name: "This week" });
+  return result;
+}
+
+describe("dragging into This week", () => {
+  const items = [
+    rolled(1, null, "Plan trip"),
+    rolled(2, 1, "Book flights"),
+    item(3, null, "Buy milk"),
+    item(4, null, "Someday trip", false, "backlog"),
+    item(5, 4, "Check visas"),
+  ];
+  const inList = (start: Todo[] = items) => openList(start);
+
+  it("moves a backlog item to This week when it is dropped there", async () => {
+    const { todos } = await inList();
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+    fireEvent.dragOver(section("This week"), { dataTransfer: transfer });
+    fireEvent.drop(section("This week"), { dataTransfer: transfer });
+
+    await waitFor(() => expect(within(section("This week")).getByText("Someday trip")).toBeTruthy());
+    expect(within(section("Backlog")).queryByText("Someday trip")).toBeNull();
+    expect(todos.getSnapshot().todos.find((t) => t.id === 4)).toMatchObject({ status: "todo" });
+    // What was under it comes along, as it does everywhere.
+    expect(within(rowIn("This week", "Someday trip")).getByText("Check visas")).toBeTruthy();
+  });
+
+  it("places a rolled-over entry, with what is rolled under it, when it is dropped on This week", async () => {
+    const { todos } = await inList();
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("Rolled over", "Plan trip"), { dataTransfer: transfer });
+    fireEvent.dragOver(section("This week"), { dataTransfer: transfer });
+    fireEvent.drop(section("This week"), { dataTransfer: transfer });
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Rolled over" })).toBeNull());
+    expect(within(rowIn("This week", "Plan trip")).getByText("Book flights")).toBeTruthy();
+    expect(todos.getSnapshot().todos.every((t) => t.rolledFromWeek === undefined)).toBe(true);
+  });
+
+  it("shows where it can be dropped while something is dragged, and more so when it is over it", async () => {
+    await inList();
+    const transfer = dataTransfer();
+    expect(section("This week").getAttribute("data-drop-target")).toBeNull();
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+    expect(section("This week").getAttribute("data-drop-target")).toBe("ready");
+
+    fireEvent.dragOver(section("This week"), { dataTransfer: transfer });
+    expect(section("This week").getAttribute("data-drop-target")).toBe("over");
+
+    fireEvent.dragLeave(section("This week"), { dataTransfer: transfer });
+    expect(section("This week").getAttribute("data-drop-target")).toBe("ready");
+
+    fireEvent.dragEnd(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+    expect(section("This week").getAttribute("data-drop-target")).toBeNull();
+  });
+
+  it("changes nothing when it is dropped anywhere else, or the drag is given up", async () => {
+    const { todos } = await inList();
+    const transfer = dataTransfer();
+    const before = todos.getSnapshot().todos;
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+    fireEvent.dragOver(section("Rolled over"), { dataTransfer: transfer });
+    fireEvent.drop(section("Rolled over"), { dataTransfer: transfer });
+    fireEvent.drop(section("Backlog"), { dataTransfer: transfer });
+    fireEvent.dragEnd(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+
+    expect(todos.getSnapshot().todos).toEqual(before);
+    expect(within(section("Backlog")).getByText("Someday trip")).toBeTruthy();
+  });
+
+  it("makes a top-level backlog item and a rolled-over entry draggable, but not what is under them", async () => {
+    await inList();
+
+    expect(rowIn("Backlog", "Someday trip").getAttribute("draggable")).toBe("true");
+    expect(rowIn("Rolled over", "Plan trip").getAttribute("draggable")).toBe("true");
+    expect(rowIn("Backlog", "Check visas").getAttribute("draggable")).not.toBe("true");
+    expect(rowIn("Rolled over", "Book flights").getAttribute("draggable")).not.toBe("true");
+  });
+
+  it("leaves a drag of something else alone, so a note or a panel dropped on it still goes where it should", async () => {
+    await inList();
+
+    const accepted = fireEvent.dragOver(section("This week"), { dataTransfer: { types: ["application/x-composition-note"], dropEffect: "" } });
+
+    expect(accepted).toBe(true); // not cancelled
+    expect(section("This week").getAttribute("data-drop-target")).toBeNull();
+  });
+
+  it("does not put an item's id in plain text, which a note's editor would take as text to insert", async () => {
+    await inList();
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+
+    expect(transfer.setData).toHaveBeenCalledWith("application/x-composition-todo", "4");
+    expect(transfer.setData).not.toHaveBeenCalledWith("text/plain", expect.anything());
+  });
+});
+
+describe("dragging back to the Backlog", () => {
+  const items = [
+    item(1, null, "Buy milk"),
+    item(2, 1, "Oat milk"),
+    item(3, null, "Plan trip", false, "in_progress"),
+    item(4, null, "Pay rent", true),
+    item(5, null, "Someday trip", false, "backlog"),
+    rolled(6, null, "Old chore"),
+  ];
+
+  it("moves a to-do from This week to the Backlog when it is dropped there, and what is under it goes along", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    fireEvent.drop(section("Backlog"), { dataTransfer: transfer });
+
+    await waitFor(() => expect(within(section("Backlog")).getByText("Buy milk")).toBeTruthy());
+    expect(within(rowIn("Backlog", "Buy milk")).getByText("Oat milk")).toBeTruthy();
+    expect(within(section("This week")).queryByText("Buy milk")).toBeNull();
+    expect(todos.getSnapshot().todos.find((t) => t.id === 1)).toMatchObject({ status: "backlog" });
+  });
+
+  it("takes one that is in progress too", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Plan trip"), { dataTransfer: transfer });
+    fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    fireEvent.drop(section("Backlog"), { dataTransfer: transfer });
+
+    await waitFor(() => expect(within(section("Backlog")).getByText("Plan trip")).toBeTruthy());
+    expect(todos.getSnapshot().todos.find((t) => t.id === 3)).toMatchObject({ status: "backlog" });
+  });
+
+  it("makes a top-level to-do draggable, but not a sub-item and not one that is done", async () => {
+    await openList(items);
+
+    expect(rowIn("This week", "Buy milk").getAttribute("draggable")).toBe("true");
+    expect(rowIn("This week", "Plan trip").getAttribute("draggable")).toBe("true");
+    expect(rowIn("This week", "Oat milk").getAttribute("draggable")).not.toBe("true");
+    expect(rowIn("This week", "Pay rent").getAttribute("draggable")).not.toBe("true");
+  });
+
+  it("shows the Backlog as the place to drop a to-do, and This week as nothing, since it is already there", async () => {
+    await openList(items);
+    const transfer = dataTransfer();
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+
+    fireEvent.dragStart(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBe("ready");
+    expect(section("This week").getAttribute("data-drop-target")).toBeNull();
+
+    fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBe("over");
+
+    fireEvent.dragLeave(section("Backlog"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBe("ready");
+
+    fireEvent.dragEnd(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+  });
+
+  it("offers each section only what belongs there: the Backlog takes nothing dragged from the Backlog or from Rolled over", async () => {
+    await openList(items);
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: dataTransfer() });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+    expect(section("This week").getAttribute("data-drop-target")).toBe("ready");
+    fireEvent.dragEnd(rowIn("Backlog", "Someday trip"));
+
+    fireEvent.dragStart(rowIn("Rolled over", "Old chore"), { dataTransfer: dataTransfer() });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+  });
+
+  it("changes nothing when a to-do is dropped back on This week or on Rolled over, or the drag is given up", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+    const before = todos.getSnapshot().todos;
+
+    fireEvent.dragStart(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    const accepted = fireEvent.dragOver(section("This week"), { dataTransfer: transfer });
+    fireEvent.drop(section("This week"), { dataTransfer: transfer });
+    fireEvent.drop(section("Rolled over"), { dataTransfer: transfer });
+    fireEvent.dragEnd(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+
+    expect(accepted).toBe(true); // not offered, so not cancelled
+    expect(todos.getSnapshot().todos).toEqual(before);
+    expect(within(section("This week")).getByText("Buy milk")).toBeTruthy();
+  });
+
+  it("does not let an item be dropped on the Backlog that was dragged from the Backlog", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+    const before = todos.getSnapshot().todos;
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday trip"), { dataTransfer: transfer });
+    const accepted = fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    fireEvent.drop(section("Backlog"), { dataTransfer: transfer });
+
+    expect(accepted).toBe(true);
+    expect(todos.getSnapshot().todos).toEqual(before);
   });
 });

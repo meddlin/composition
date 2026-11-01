@@ -109,17 +109,24 @@ export type SaveSettingsResult = {
   dbPath?: string;
 };
 
-export type SaveAssistantSettingsInput = { serverUrl: string; contextTokens: number };
+export type SaveAssistantSettingsInput = {
+  serverUrl: string;
+  /** A second address for the same server, used when `serverUrl` doesn't answer; blank or missing for none. */
+  alternateUrl?: string;
+  contextTokens: number;
+};
 
 /** `settings` is what was saved, normalized; absent with `error` when nothing was. */
 export type SaveAssistantSettingsResult = { error?: string; settings?: AssistantSettings };
 
 /** The models the saved Ollama server offers the AI helper. */
 export type AssistantModels = {
-  /** The address that was asked, so the UI can show where the text will go. */
+  /** The address that was asked, so the UI can show where the text will go: the saved alternate when the server didn't answer. */
   serverUrl: string;
   /** Whether that address is this machine; if not, notes sent there cross a network. */
   local: boolean;
+  /** Whether `serverUrl` is the saved alternate address rather than the first one; absent means it is not. */
+  viaAlternate?: boolean;
   /** The context size the helper asks the server for, from the saved settings. */
   contextTokens: number;
   models: ModelSummary[];

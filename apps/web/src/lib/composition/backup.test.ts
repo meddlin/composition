@@ -76,9 +76,22 @@ describe("createBackup", () => {
     expect(path.dirname(result.file!)).toBe(backups);
     expect(path.basename(result.file!)).toMatch(/^composition-backup-\d{4}-\d{2}-\d{2}-\d{6}\.tar\.gz$/);
     expect(fs.statSync(result.file!).size).toBe(result.bytes);
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0 });
     // Only the backup is left in the folder, none of the working files.
     expect(fs.readdirSync(backups)).toEqual([path.basename(result.file!)]);
+  });
+
+  it("counts the to-dos on the list and the archived ones apart", async () => {
+    const { service } = await populate();
+    const repo = await import("./todosRepo");
+    const trip = repo.addTodo("Plan trip", null);
+    repo.addTodo("Book flights", trip.id);
+    const idea = repo.addTodo("Old idea", null);
+    repo.archiveTodoTree(idea.id, "removed", 0);
+
+    const result = await service.createBackup(backups);
+
+    expect(result.counts).toMatchObject({ todos: 2, archivedTodos: 1 });
   });
 
   it("is an ordinary tar.gz with the database, images, attachments and settings in it", async () => {
@@ -134,7 +147,7 @@ describe("createBackup", () => {
 
     const result = await service.createBackup(backups);
 
-    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0 });
+    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0, todos: 0, archivedTodos: 0 });
   });
 
   it("does not let two run at once", async () => {
@@ -161,7 +174,7 @@ describe("restoreBackup", () => {
     const result = await service.restoreBackup(file!);
 
     expect(result.error).toBeUndefined();
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0 });
     const workspace = await service.loadWorkspace();
     expect(workspace.notes.map((n) => n.title).sort()).toEqual(["First note", "Second note"]);
     expect(workspace.notes.find((n) => n.id === first.id)).toMatchObject({ groupId: group.id });
@@ -179,6 +192,51 @@ describe("restoreBackup", () => {
       favorites: [{ type: "note", id: first.id }],
       location: { name: "Austin, Texas" },
     });
+  });
+
+  it("brings back the to-dos, the archive, the activity log, the report links and the to-do settings", async () => {
+    const { service, settings, first } = await populate();
+    const repo = await import("./todosRepo");
+    const { getDb, closeDb } = await import("./db");
+    const trip = repo.addTodo("Plan trip", null, new Date(2026, 9, 26, 9, 0));
+    repo.addTodo("Book flights", trip.id, new Date(2026, 9, 26, 9, 5));
+    const sent = repo.addTodo("Send report", null, new Date(2026, 9, 26, 9, 10));
+    repo.updateTodo(sent.id, { done: true }, new Date(2026, 9, 27, 16, 30));
+    const idea = repo.addTodo("Old idea", null, new Date(2026, 9, 26, 9, 15));
+    repo.archiveTodoTree(idea.id, "removed", 0, new Date(2026, 9, 28, 8, 0));
+    repo.markWeekClosed({ start: "2026-10-25", end: "2026-10-31" }, new Date(2026, 10, 1, 9, 0));
+    getDb()
+      .prepare("INSERT INTO todo_reports (kind, period_start, period_end, note_id, generated_at) VALUES ('week', '2026-10-25', '2026-10-31', ?, ?)")
+      .run(first.id, "2026-11-01T14:03:00.000Z");
+    const cycle = { weekStartsOn: 1, retentionMonths: null, fiscalYearStartMonth: 10 } as const;
+    settings.saveWebSettings({ ...settings.loadWebSettings(), todos: cycle });
+
+    const snapshot = () => ({
+      live: repo.listTodos(),
+      archived: repo.listArchivedTodos(),
+      events: repo.listTodoEvents(),
+      closed: getDb().prepare("SELECT kind, period_start, period_end, closed_at FROM todo_closed").all(),
+      reports: getDb().prepare("SELECT kind, period_start, period_end, note_id, generated_at FROM todo_reports").all(),
+    });
+    const before = snapshot();
+    expect(before.live).toHaveLength(3);
+    expect(before.archived).toHaveLength(1);
+    expect(before.events.length).toBeGreaterThan(5);
+    const { file } = await service.createBackup(backups);
+
+    // Lose everything, and change the to-do settings.
+    closeDb();
+    fs.rmSync(dataDir(), { recursive: true });
+    settings.saveWebSettings({ ...settings.loadWebSettings(), todos: { weekStartsOn: 0, retentionMonths: 60, fiscalYearStartMonth: 1 } });
+
+    const result = await service.restoreBackup(file!);
+
+    expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ todos: 3, archivedTodos: 1 });
+    expect(snapshot()).toEqual(before);
+    expect(settings.loadWebSettings().todos).toEqual(cycle);
+    // The report link still points at a note that came back with it.
+    expect((await service.loadWorkspace()).notes.map((n) => n.id)).toContain(first.id);
   });
 
   it("replaces what is there now rather than merging with it", async () => {
@@ -269,7 +327,37 @@ describe("restoreBackup", () => {
     const result = await service.restoreBackup(file);
 
     expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ todos: 0, archivedTodos: 0 });
     expect((await service.loadWorkspace()).notes.map((n) => n.title)).toEqual(["Ancient"]);
+  });
+
+  it("restores a backup made before the weekly cycle, counting its to-dos as live ones", async () => {
+    const service = await import("./service");
+    const Database = (await import("better-sqlite3")).default;
+    const old = path.join(home, "old-todos.db");
+    const db = new Database(old);
+    db.exec(`CREATE TABLE notes (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, content TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      CREATE TABLE todos (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER, title TEXT NOT NULL,
+      done INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+      INSERT INTO todos (title, done, created_at, updated_at) VALUES ('open', 0, '', ''), ('closed', 1, '', '');`);
+    db.close();
+    const { writeArchive } = await import("./tarArchive");
+    const file = path.join(home, "old-todos.tar.gz");
+    const manifest = { format: "composition-backup", version: 1, createdAt: "2026-09-01T00:00:00.000Z", counts: {} };
+    await writeArchive(file, new Map([["composition-backup.json", Buffer.from(JSON.stringify(manifest))]]), [
+      { name: "composition.db", file: old },
+    ]);
+
+    const result = await service.restoreBackup(file);
+
+    expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ todos: 2, archivedTodos: 0 });
+    const repo = await import("./todosRepo");
+    expect(repo.listTodos().map((t) => [t.title, t.status])).toEqual([
+      ["open", "todo"],
+      ["closed", "done"],
+    ]);
   });
 });
 

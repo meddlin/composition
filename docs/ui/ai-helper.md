@@ -20,12 +20,34 @@ hosted service, and nothing the model says is written into your note.
 2. In **Settings → AI helper**, leave the server address blank for Ollama on this computer
    (`http://127.0.0.1:11434`), or enter the address of a server you host. Press **Save**: it saves and then checks the
    connection, and lists the models it found. **Test connection** checks again later, for example after you start Ollama.
-3. Optionally set the **context size**: how many tokens of the note and the conversation the model can read at once.
+3. Optionally set an **alternate address** for the same server, for when you are away from the network the first one
+   is on (see [Home and away](#home-and-away)).
+4. Optionally set the **context size**: how many tokens of the note and the conversation the model can read at once.
    The default is 8,192. A bigger window needs more memory on the server.
 
 A server on another machine has to be reachable from this one (Ollama listens only on `127.0.0.1` unless
 `OLLAMA_HOST` says otherwise). Ollama has no sign-in of its own, so put anything that needs one behind your own network
 or VPN: this version sends no credentials, and a server that asks for them is reported as such.
+
+## Home and away
+
+A server on your home network has a different address away from home. If you reach it by another route too (its
+Tailscale address, say), enter the home address as the **server address** and the other as the **alternate address**.
+Before each question the helper asks the first one whether it is Ollama (`GET /api/version`); if it does not answer
+within about 1.5 seconds, it tries the alternate (up to 5 seconds). So at home it uses the home address, away from home
+it uses the alternate, and it goes back by itself when the first starts answering again. The choice is remembered for
+10 seconds, so a conversation does not wait before every message; a request that finds nothing at the remembered
+address drops it and chooses again at once. Away from home, the first question after the choice expires waits about
+1.5 seconds longer.
+
+The panel's *Sends your notes to* line, and the warning in Settings about plain `http://`, follow the address in use.
+**Test connection** says when it had to use the alternate. If neither answers, the error names both. With no alternate
+set, none of this happens: no extra request is made. Something else on the network you are visiting that happens to
+have the home address does not fool it, because it must answer as Ollama, but it is still best to keep the alternate
+one you trust.
+
+Traffic over a VPN such as Tailscale is encrypted by the VPN even for `http://`, but Settings cannot tell that from a
+plain network, so it still shows the unencrypted warning for that address.
 
 ## Use it
 
@@ -77,7 +99,7 @@ rest) appear as text. The panel is given the note to read and has no way to chan
 
 ## Good to know
 
-- **Backups** carry the server address and context size (they are settings). Chats are not saved, so they are not in a
+- **Backups** carry the server address, the alternate address and the context size (they are settings). Chats are not saved, so they are not in a
   backup.
 - **Web and desktop** make the request differently, for the same result: the web app through its own streaming route
   (a Server Action would hold back autosave while an answer streams, and the route refuses requests that do not come

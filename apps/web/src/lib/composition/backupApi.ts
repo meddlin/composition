@@ -26,6 +26,10 @@ export type BackupCounts = {
   images: number;
   /** Attached files. */
   attachments: number;
+  /** To-do items on the live list. */
+  todos: number;
+  /** To-do items in the archive (done, removed or dropped). */
+  archivedTodos: number;
 };
 
 /**
@@ -65,7 +69,10 @@ void _everyMethodListed;
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
-/** "12 notes, 3 groups, 4 images and 1 attached file", plus what the Trash Can holds, if anything. */
+/**
+ * "12 notes, 3 groups, 4 images and 1 attached file", then the to-dos and their archive when there are any, plus what the
+ * Trash Can holds, if anything.
+ */
 export function describeCounts(counts: BackupCounts): string {
   const parts = [
     plural(counts.notes, "note"),
@@ -73,6 +80,10 @@ export function describeCounts(counts: BackupCounts): string {
     plural(counts.images, "image"),
     `${counts.attachments} attached ${counts.attachments === 1 ? "file" : "files"}`,
   ];
+  if (counts.todos > 0 || counts.archivedTodos > 0) {
+    const archived = counts.archivedTodos > 0 ? ` (${counts.archivedTodos} archived)` : "";
+    parts.push(`${plural(counts.todos, "to-do")}${archived}`);
+  }
   const text = `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   const trashed = counts.trashedNotes + counts.trashedGroups;
   return trashed > 0 ? `${text}, plus ${plural(trashed, "item")} in the Trash Can` : text;

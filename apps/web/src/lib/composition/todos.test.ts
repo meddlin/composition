@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTodoTree, cleanTodoTitle, countDescendants, subtreeIds, withDone, withStatus } from "./todos";
-import type { Todo } from "./todosApi";
+import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, subtreeIds, todoSections, withDone, withStatus } from "./todos";
+import type { ArchivedTodo, Todo } from "./todosApi";
 
 const todo = (id: number, parentId: number | null, title = `t${id}`): Todo => ({
   id,
@@ -66,5 +66,149 @@ describe("withStatus and withDone", () => {
 
   it("leaves an item that is not done where it is when unticked", () => {
     expect(withDone({ ...todo(1, null), status: "backlog" }, false)).toMatchObject({ status: "backlog", done: false });
+  });
+});
+
+describe("todoSections", () => {
+  const rolled = (id: number, parentId: number | null, rollCount = 1): Todo => ({ ...todo(id, parentId), rolledFromWeek: "2026-10-18", rollCount });
+  const backlog = (id: number, parentId: number | null = null): Todo => ({ ...todo(id, parentId), status: "backlog" });
+  const ids = (nodes: { todo: Todo; children: unknown[] }[]) => nodes.map((n) => n.todo.id);
+
+  it("puts rolled-over items in Rolled over, the backlog in Backlog, and the rest in This week", () => {
+    const { rolledOver, thisWeek, backlog: inBacklog } = todoSections([todo(1, null), rolled(2, null), backlog(3), todo(4, null), { ...todo(5, null), status: "done", done: true }]);
+
+    expect(ids(rolledOver)).toEqual([2]);
+    expect(ids(thisWeek)).toEqual([1, 4, 5]);
+    expect(ids(inBacklog)).toEqual([3]);
+  });
+
+  it("keeps the sub-items of an item with it, whatever their own status", () => {
+    const { thisWeek, backlog: inBacklog } = todoSections([todo(1, null), backlog(2, 1), backlog(3), todo(4, 3)]);
+
+    expect(thisWeek[0].children.map((n) => n.todo.id)).toEqual([2]);
+    expect(inBacklog[0].children.map((n) => n.todo.id)).toEqual([4]);
+  });
+
+  it("shows a rolled branch as one, with all that is under it", () => {
+    const { rolledOver, thisWeek } = todoSections([rolled(1, null), rolled(2, 1), todo(3, 1), todo(4, null)]);
+
+    expect(ids(rolledOver)).toEqual([1]);
+    expect(rolledOver[0].children.map((n) => n.todo.id)).toEqual([2, 3]);
+    expect(ids(thisWeek)).toEqual([4]);
+  });
+
+  it("lists a rolled sub-item of an item that was not rolled in Rolled over, and not twice", () => {
+    const { rolledOver, thisWeek } = todoSections([{ ...todo(1, null), status: "done", done: true }, rolled(2, 1), { ...todo(3, 1), status: "done", done: true }]);
+
+    expect(ids(rolledOver)).toEqual([2]);
+    expect(ids(thisWeek)).toEqual([1]);
+    expect(thisWeek[0].children.map((n) => n.todo.id)).toEqual([3]);
+  });
+
+  it("lists the rolled items in the order they were made, and leaves out an item whose parent is missing", () => {
+    const { rolledOver, thisWeek, backlog: inBacklog } = todoSections([rolled(3, null), rolled(7, null), todo(9, 99)]);
+
+    expect(ids(rolledOver)).toEqual([3, 7]);
+    expect(thisWeek).toEqual([]);
+    expect(inBacklog).toEqual([]);
+  });
+
+  it("lets the rolled mark win over the backlog status", () => {
+    const { rolledOver, backlog: inBacklog } = todoSections([{ ...backlog(1), rolledFromWeek: "2026-10-18" }]);
+
+    expect(ids(rolledOver)).toEqual([1]);
+    expect(inBacklog).toEqual([]);
+  });
+});
+
+describe("archiveGroups", () => {
+  const archived = (
+    id: number,
+    parentId: number | null,
+    title: string,
+    week: string,
+    reason: ArchivedTodo["archiveReason"] = "removed",
+    archivedAt = "2026-10-28T12:00:00.000Z",
+  ): ArchivedTodo => ({ id, parentId, title, status: "todo", createdAt: "", archivedAt, archiveWeek: week, archiveReason: reason });
+  const titlesOf = (...items: ArchivedTodo[]) => new Map(items.map((t) => [t.id, t.title]));
+  const names = (nodes: { todo: ArchivedTodo; children: unknown[] }[]) => nodes.map((n) => n.todo.title);
+
+  it("groups by the week archived, newest week first", () => {
+    const items = [archived(1, null, "a", "2026-10-11"), archived(2, null, "b", "2026-10-25"), archived(3, null, "c", "2026-10-18"), archived(4, null, "d", "2026-10-25")];
+
+    const groups = archiveGroups(items, titlesOf(...items), "");
+
+    expect(groups.map((g) => [g.week, names(g.entries)])).toEqual([
+      ["2026-10-25", ["b", "d"]],
+      ["2026-10-18", ["c"]],
+      ["2026-10-11", ["a"]],
+    ]);
+  });
+
+  it("keeps a branch archived together, as one entry with its sub-items under it", () => {
+    const items = [archived(1, null, "Plan trip", "2026-10-25"), archived(2, 1, "Book flights", "2026-10-25"), archived(3, 2, "Aisle seat", "2026-10-25"), archived(4, null, "Reply", "2026-10-25")];
+
+    const [group] = archiveGroups(items, titlesOf(...items), "");
+
+    expect(names(group.entries)).toEqual(["Plan trip", "Reply"]);
+    expect(names(group.entries[0].children)).toEqual(["Book flights"]);
+    expect(names(group.entries[0].children[0].children)).toEqual(["Aisle seat"]);
+  });
+
+  it("files a sub-item archived on its own, in another week, under that week, and says what it was under", () => {
+    const items = [archived(1, null, "Plan trip", "2026-10-25"), archived(2, 1, "Book flights", "2026-10-18", "done")];
+    const titles = titlesOf(...items);
+
+    const groups = archiveGroups(items, titles, "");
+
+    expect(groups.map((g) => g.week)).toEqual(["2026-10-25", "2026-10-18"]);
+    expect(groups[1].entries[0]).toMatchObject({ todo: { title: "Book flights" }, parentTitle: "Plan trip" });
+    expect(groups[0].entries[0].parentTitle).toBeNull();
+  });
+
+  it("knows the title of a parent that is still on the list, or none when it cannot be found", () => {
+    const items = [archived(2, 1, "Book flights", "2026-10-18", "done"), archived(3, 99, "Orphan", "2026-10-18")];
+    const titles = new Map([[1, "Plan trip"], ...titlesOf(...items)]);
+
+    const [group] = archiveGroups(items, titles, "");
+
+    expect(group.entries.map((e) => e.parentTitle)).toEqual(["Plan trip", null]);
+  });
+
+  it("lists what was archived most recently first, and what went at the same moment in the order it was made", () => {
+    const items = [
+      archived(1, null, "swept a", "2026-10-25", "done", "2026-11-01T00:05:00.000Z"),
+      archived(2, null, "removed late", "2026-10-25", "removed", "2026-10-30T09:00:00.000Z"),
+      archived(3, null, "swept b", "2026-10-25", "done", "2026-11-01T00:05:00.000Z"),
+    ];
+
+    const [group] = archiveGroups(items, titlesOf(...items), "");
+
+    expect(names(group.entries)).toEqual(["swept a", "swept b", "removed late"]);
+  });
+
+  it("filters by what is typed, ignoring case, leaving out weeks with nothing in them", () => {
+    const items = [archived(1, null, "Plan trip", "2026-10-25"), archived(2, null, "Reply to vendor", "2026-10-18"), archived(3, null, "Book TRIP insurance", "2026-10-18")];
+
+    const groups = archiveGroups(items, titlesOf(...items), "  trip ");
+
+    expect(groups.map((g) => [g.week, names(g.entries)])).toEqual([
+      ["2026-10-25", ["Plan trip"]],
+      ["2026-10-18", ["Book TRIP insurance"]],
+    ]);
+    expect(archiveGroups(items, titlesOf(...items), "zzz")).toEqual([]);
+  });
+
+  it("shows a sub-item that matches without the parent that does not, as an entry of its own", () => {
+    const items = [archived(1, null, "Plan trip", "2026-10-25"), archived(2, 1, "Book flights", "2026-10-25")];
+
+    const [group] = archiveGroups(items, titlesOf(...items), "flights");
+
+    expect(group.entries).toHaveLength(1);
+    expect(group.entries[0]).toMatchObject({ todo: { title: "Book flights" }, parentTitle: "Plan trip", children: [] });
+  });
+
+  it("is empty when nothing is archived", () => {
+    expect(archiveGroups([], new Map(), "")).toEqual([]);
   });
 });
