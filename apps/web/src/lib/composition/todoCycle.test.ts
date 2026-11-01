@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_PLUGIN_SETTINGS } from "./plugins";
 
 /**
  * The weekly cycle end to end on a real temporary database: the first run, closing weeks (several at once after a break),
@@ -194,19 +195,19 @@ describe("while the To-do plugin is off", () => {
     const { cycle, repo, setSettings } = await load();
     cycle.runCycle(local(10, 14));
     const open = repo.addTodo("Write Q4 plan", null, local(10, 12));
-    setSettings({ plugins: { todo: false } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: false } });
 
     expect(cycle.runCycle(local(11, 4))).toEqual({ awaitingSetup: false, closedWeeks: 0, purged: 0, reportNotes: [] });
     expect(repo.lastClosedWeekEnd()).toBe("2026-10-10");
 
-    setSettings({ plugins: { todo: true } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: true } });
     expect(cycle.runCycle(local(11, 4)).closedWeeks).toBe(3);
     expect(repo.listTodos().find((t) => t.id === open.id)).toMatchObject({ rolledFromWeek: "2026-10-11", rollCount: 3 });
   });
 
   it("does not even start the cycle on a first run", async () => {
     const { cycle, repo, setSettings } = await load();
-    setSettings({ plugins: { todo: false } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: false } });
 
     cycle.runCycle(local(10, 28));
 
@@ -422,12 +423,12 @@ describe("the reports the cycle makes", () => {
   it("makes the weekly reports of every week that had something in it after a break, oldest first, and none for the quiet one", async () => {
     const { cycle, repo, setSettings } = await load();
     cycle.runCycle(local(10, 14));
-    setSettings({ plugins: { todo: false } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: false } });
     await work(repo, "First", [10, 12], [10, 13]); // the week of the 11th
     await work(repo, "Third", [10, 27], [10, 28]); // the week of the 25th; the week of the 18th is quiet
     expect(cycle.runCycle(local(11, 4)).reportNotes).toEqual([]);
 
-    setSettings({ plugins: { todo: true } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: true } });
     const result = cycle.runCycle(local(11, 4));
 
     const { notes } = await notebook();
@@ -449,7 +450,7 @@ describe("the reports the cycle makes", () => {
     const { cycle, repo, setSettings } = await load();
     cycle.runCycle(local(10, 28));
     await work(repo, "Reply to vendor", [10, 26], [10, 27]);
-    setSettings({ plugins: { todo: false } });
+    setSettings({ plugins: { ...DEFAULT_PLUGIN_SETTINGS, todo: false } });
 
     expect(cycle.runCycle(local(11, 2)).reportNotes).toEqual([]);
     expect((await notebook()).book).toBeUndefined();

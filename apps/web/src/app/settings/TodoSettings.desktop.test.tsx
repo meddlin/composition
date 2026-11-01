@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DEFAULT_PLUGIN_SETTINGS } from "@/lib/composition/plugins";
 import type { TodoSettings as Settings } from "@/lib/composition/todoSettings";
 import { loadTodoSettings, previewTodoPurge, saveTodoSettings } from "@/lib/composition/todosClient";
 import { PluginsProvider } from "./PluginsProvider";
@@ -28,7 +29,7 @@ const keepFor = () => screen.getByLabelText("Keep archived items for") as HTMLSe
 
 function renderSettings(todoPluginOn = true) {
   render(
-    <PluginsProvider initial={{ todo: todoPluginOn }}>
+    <PluginsProvider initial={{ ...DEFAULT_PLUGIN_SETTINGS, todo: todoPluginOn }}>
       <TodoSettings />
     </PluginsProvider>,
   );
