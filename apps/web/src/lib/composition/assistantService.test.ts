@@ -218,3 +218,108 @@ describe("streamAssistantChat", () => {
     await server.clientAborted;
   });
 });
+
+describe("an alternate address", () => {
+  const version = { body: { version: "0.40.13" } };
+  const tags = { body: { models: [] } };
+  const showLocal = { body: { capabilities: ["completion"], model_info: {} } };
+  const request: ChatRequest = { model: "qwen3:0.6b", messages: [{ role: "user", content: "hi" }], numCtx: 8192 };
+  let other: FakeOllama | undefined;
+
+  afterEach(async () => {
+    await other?.close();
+    other = undefined;
+  });
+
+  const saved = async (serverUrl: string, alternateUrl: string) => {
+    const tools = await load();
+    await tools.saveAssistantSettings({ serverUrl, alternateUrl, contextTokens: 8192 });
+    return tools;
+  };
+
+  async function chat(tools: Awaited<ReturnType<typeof load>>) {
+    const events: ChatEvent[] = [];
+    for await (const event of tools.streamAssistantChat(request)) events.push(event);
+    return events;
+  }
+
+  it("is saved with the other settings, and cleared by saving it blank", async () => {
+    const { saveAssistantSettings, loadWebSettings } = await load();
+
+    expect(await saveAssistantSettings({ serverUrl: "nas:11434", alternateUrl: "100.64.0.9:11434/", contextTokens: 8192 })).toEqual({
+      settings: { serverUrl: "http://nas:11434", alternateUrl: "http://100.64.0.9:11434", contextTokens: 8192 },
+    });
+    expect(loadWebSettings().assistant?.alternateUrl).toBe("http://100.64.0.9:11434");
+
+    await saveAssistantSettings({ serverUrl: "nas:11434", alternateUrl: "  ", contextTokens: 8192 });
+    expect(loadWebSettings().assistant).toEqual({ serverUrl: "http://nas:11434", contextTokens: 8192 });
+  });
+
+  it("uses the first address when it answers, and never contacts the alternate", async () => {
+    server = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    other = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    const { listAssistantModels } = await saved(server.url, other.url);
+
+    const result = await listAssistantModels();
+
+    expect(result).toMatchObject({ serverUrl: server.url, viaAlternate: false, local: true });
+    expect(other.requests).toHaveLength(0);
+  });
+
+  it("uses the alternate when the first address does not answer, and says so", async () => {
+    other = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    const { listAssistantModels } = await saved(await closedAddress(), other.url);
+
+    const result = await listAssistantModels();
+
+    expect(result).toMatchObject({ serverUrl: other.url, viaAlternate: true });
+    expect(result.error).toBeUndefined();
+  });
+
+  it("treats a first address that answers with something other than Ollama as not answering", async () => {
+    server = await startFakeOllama({ "GET /api/version": { contentType: "text/html", body: "<html>router login</html>" as never } });
+    other = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    const { listAssistantModels } = await saved(server.url, other.url);
+
+    expect(await listAssistantModels()).toMatchObject({ serverUrl: other.url, viaAlternate: true });
+  });
+
+  it("sends the chat to the alternate when the first address does not answer", async () => {
+    other = await startFakeOllama({
+      "GET /api/version": version,
+      "POST /api/show": showLocal,
+      "POST /api/chat": { body: fixture("chat-plain.ndjson") },
+    });
+    const tools = await saved(await closedAddress(), other.url);
+
+    const events = await chat(tools);
+
+    expect(events[events.length - 1]).toEqual({ type: "done" });
+    expect(other.requests.some((r) => r.path === "/api/chat")).toBe(true);
+  });
+
+  it("names both addresses when neither answers", async () => {
+    const first = await closedAddress();
+    const second = await closedAddress();
+    const tools = await saved(first, second);
+
+    const listed = await tools.listAssistantModels();
+    expect(listed.error).toMatchObject({ kind: "unreachable", message: expect.stringContaining(first) });
+    expect(listed.error?.message).toContain(second);
+
+    expect(await chat(tools)).toEqual([{ type: "error", kind: "unreachable", message: expect.stringContaining(second) }]);
+  });
+
+  it("switches when the chosen address stops answering, without a second attempt from the user", async () => {
+    server = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    other = await startFakeOllama({ "GET /api/version": version, "GET /api/tags": tags });
+    const { listAssistantModels } = await saved(server.url, other.url);
+    expect((await listAssistantModels()).viaAlternate).toBe(false);
+
+    // The first address goes away (the laptop left the network) within the time a choice is remembered.
+    await server.close();
+    server = undefined;
+
+    expect(await listAssistantModels()).toMatchObject({ serverUrl: other.url, viaAlternate: true });
+  });
+});

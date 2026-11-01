@@ -216,6 +216,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
     return [
       {
         serverUrl: text("saveAssistantSettings", value.serverUrl, "serverUrl"),
+        ...(value.alternateUrl !== undefined && { alternateUrl: text("saveAssistantSettings", value.alternateUrl, "alternateUrl") }),
         contextTokens: finite("saveAssistantSettings", value.contextTokens, "contextTokens"),
       },
     ];
