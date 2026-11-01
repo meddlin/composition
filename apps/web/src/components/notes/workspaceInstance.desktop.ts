@@ -33,6 +33,16 @@ export function createWorkspace(initial: WorkspaceData, panels?: PanelsToRestore
       },
     },
   );
+  // The weekly cycle runs in the main process, at launch and every hour. When it has closed a week (or purged old items) the
+  // list changed behind the screen's back, so every to-do panel, in this window and the pop-outs that share its store, reads it again.
+  // It may also have made report notes, and the notebook and groups they go in, so the notes are taken from the database too.
+  window.composition?.onTodosChanged(() => {
+    void store.todos.reload();
+    client
+      .loadWorkspace()
+      .then((fresh) => store.reconcile(fresh))
+      .catch((error) => console.error("[todos] the notes were not refreshed:", error));
+  });
   // The pop-outs the workspace is saved with open now, and any made later; a pop-out finds the workspace by `window.opener`,
   // so it is published first.
   publishWorkspace({ store, writing: initial.writing ?? DEFAULT_WRITING_SETTINGS });

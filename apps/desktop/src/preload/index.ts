@@ -8,7 +8,7 @@ import { ASSISTANT_METHODS, type AssistantEventMessage } from "../../../web/src/
 import { UPDATE_METHODS, type UpdateState } from "../../../web/src/lib/composition/updatesApi";
 import type { AppearanceMessage } from "../../../web/src/lib/composition/appearanceApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
-import { APPEARANCE_CHANNEL, ASSISTANT_EVENT_CHANNEL, channelFor, INITIAL_CHANNEL, POPOUT_CLOSED_CHANNEL, UPDATE_STATE_CHANNEL } from "../shared/channels";
+import { APPEARANCE_CHANNEL, ASSISTANT_EVENT_CHANNEL, channelFor, INITIAL_CHANNEL, POPOUT_CLOSED_CHANNEL, TODOS_CHANGED_CHANNEL, UPDATE_STATE_CHANNEL } from "../shared/channels";
 
 /**
  * Exposes `window.composition`: every CompositionApi, AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, UpdatesApi, WindowApi and AI helper
@@ -44,6 +44,13 @@ function onAppearance(listener: (appearance: AppearanceMessage) => void): () => 
   return () => void ipcRenderer.removeListener(APPEARANCE_CHANNEL, handler);
 }
 
+/** Calls `listener` each time the weekly cycle has changed the to-do list; returns the function that stops listening. */
+function onTodosChanged(listener: () => void): () => void {
+  const handler = () => listener();
+  ipcRenderer.on(TODOS_CHANGED_CHANNEL, handler);
+  return () => void ipcRenderer.removeListener(TODOS_CHANGED_CHANNEL, handler);
+}
+
 /** Calls `listener` with the id of each pop-out window the user closes; returns the function that stops listening. */
 function onPopoutClosed(listener: (windowId: string) => void): () => void {
   const handler = (_event: unknown, windowId: string) => listener(windowId);
@@ -54,6 +61,7 @@ function onPopoutClosed(listener: (windowId: string) => void): () => void {
 contextBridge.exposeInMainWorld("composition", {
   ...api,
   onAppearance,
+  onTodosChanged,
   onPopoutClosed,
   onUpdateState,
   onAssistantEvent,

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_HOME_SETTINGS, type HomeSettings } from "./home";
 import { DEFAULT_LAYOUT } from "./layout";
 import { DEFAULT_PLUGIN_SETTINGS } from "./plugins";
+import { DEFAULT_TODO_SETTINGS } from "./todoSettings";
 import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // Meilisearch isn't running in tests; indexing is best-effort in the service,
@@ -52,6 +53,7 @@ describe("saveSettings", () => {
       editorFont: "default",
       noteBackground: "plain",
       todoLook: { background: "notes", color: null },
+      todos: DEFAULT_TODO_SETTINGS,
       plugins: DEFAULT_PLUGIN_SETTINGS,
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,

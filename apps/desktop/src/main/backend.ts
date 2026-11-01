@@ -15,5 +15,7 @@ export * as searchIndex from "../../../web/src/lib/composition/searchIndex";
 export * as service from "../../../web/src/lib/composition/service";
 export * as panelsService from "../../../web/src/lib/composition/panelsService";
 export * as todosService from "../../../web/src/lib/composition/todosService";
+export { runCycle as runTodoCycle } from "../../../web/src/lib/composition/todoCycle";
+export { indexReportNotes } from "../../../web/src/lib/composition/todoReportIndex";
 export { defaultSharedLocationPath, loadWebSettings } from "../../../web/src/lib/composition/webSettings";
 export type { ThemeName } from "../../../web/src/lib/composition/themes";

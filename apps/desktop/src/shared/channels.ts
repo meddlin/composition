@@ -20,3 +20,6 @@ export const APPEARANCE_CHANNEL = "composition:appearance";
  */
 export const POPOUT_CLOSED_CHANNEL = "composition:popout-closed";
 
+
+/** Pushed from the main process to every window when the weekly cycle has changed the to-do list (a week closed, or old items were purged), so each reads it again. */
+export const TODOS_CHANGED_CHANNEL = "composition:todos-changed";

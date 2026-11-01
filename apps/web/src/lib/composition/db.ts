@@ -96,6 +96,68 @@ CREATE TABLE IF NOT EXISTS todos (
 CREATE INDEX IF NOT EXISTS idx_todos_parent_id ON todos (parent_id);
 `;
 
+/**
+ * The to-do weekly cycle (docs/todo-archival-plan.md). `todo_events` is the activity log: one row per change to an item,
+ * never shown, with the local date it happened on (`on_date`) and the zone's offset in minutes, so changing the machine's
+ * time zone cannot move an event into another week. `todo_closed` records the weeks, months and quarters the sweep has
+ * already dealt with, which is what makes it safe to run twice. `todo_reports` links each period to the notes that
+ * report it; there can be several per period, because regenerating makes a new note. No foreign keys: deleting an item
+ * erases its log rows (todosRepo.ts), and a report's note belongs to the notes, which the owner can delete.
+ */
+const TODO_CYCLE_SCHEMA = `
+CREATE TABLE IF NOT EXISTS todo_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    todo_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    at TEXT NOT NULL,
+    on_date TEXT NOT NULL,
+    utc_offset INTEGER NOT NULL DEFAULT 0,
+    from_status TEXT,
+    to_status TEXT,
+    week_start TEXT,
+    roll_count INTEGER,
+    reason TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_todo_events_todo_id ON todo_events (todo_id);
+CREATE INDEX IF NOT EXISTS idx_todo_events_on_date ON todo_events (on_date);
+CREATE TABLE IF NOT EXISTS todo_closed (
+    kind TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    closed_at TEXT NOT NULL,
+    PRIMARY KEY (kind, period_start)
+);
+CREATE TABLE IF NOT EXISTS todo_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL,
+    period_start TEXT NOT NULL,
+    period_end TEXT NOT NULL,
+    note_id INTEGER NOT NULL,
+    generated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_todo_reports_period ON todo_reports (kind, period_start);
+-- Where the reports go: the id of the To-do reports notebook and of its Weekly, Monthly and Quarterly groups, so a rename is
+-- followed and a deletion is noticed (and made again).
+CREATE TABLE IF NOT EXISTS todo_places (
+    place TEXT PRIMARY KEY,
+    ref_id INTEGER NOT NULL
+);
+`;
+
+/** The columns the weekly cycle adds to `todos`, as additive migrations like the notes' later columns. */
+const TODO_CYCLE_COLUMNS: readonly [column: string, ddl: string][] = [
+  // When it was ticked: the instant, and the local date (a week is made of local dates).
+  ["done_at", "ALTER TABLE todos ADD COLUMN done_at TEXT"],
+  ["done_on", "ALTER TABLE todos ADD COLUMN done_on TEXT"],
+  // Set when it left the live list; the week it happened in; and why (done, removed or dropped).
+  ["archived_at", "ALTER TABLE todos ADD COLUMN archived_at TEXT"],
+  ["archive_week", "ALTER TABLE todos ADD COLUMN archive_week TEXT"],
+  ["archive_reason", "ALTER TABLE todos ADD COLUMN archive_reason TEXT"],
+  // The week an unfinished item first rolled over from while it waits in Rolled over, and how many week closes it has been through.
+  ["rolled_from_week", "ALTER TABLE todos ADD COLUMN rolled_from_week TEXT"],
+  ["roll_count", "ALTER TABLE todos ADD COLUMN roll_count INTEGER NOT NULL DEFAULT 0"],
+];
+
 function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -143,6 +205,8 @@ function openConnection(dbPath: string): Database.Database {
     db.exec("ALTER TABLE todos ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'");
     db.exec("UPDATE todos SET status = 'done' WHERE done = 1");
   }
+  db.exec(TODO_CYCLE_SCHEMA);
+  for (const [column, ddl] of TODO_CYCLE_COLUMNS) ensureColumn(db, "todos", column, ddl);
   ensureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
   ensureColumn(
     db,

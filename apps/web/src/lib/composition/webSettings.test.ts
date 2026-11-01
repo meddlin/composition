@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_EDITOR_RATIO } from "./layout";
 import { DEFAULT_THEME } from "./themes";
 import { DEFAULT_HOME_SETTINGS } from "./home";
+import { DEFAULT_TODO_SETTINGS } from "./todoSettings";
 import { DEFAULT_WRITING_SETTINGS } from "./writing";
 
 // The default settings path is fixed from the home directory at import time, so point
@@ -46,6 +47,7 @@ describe("web settings layout", () => {
       editorFont: "default",
       noteBackground: "plain",
       todoLook: { background: "notes", color: null },
+      todos: DEFAULT_TODO_SETTINGS,
       plugins: { todo: true },
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
@@ -75,6 +77,27 @@ describe("web settings layout", () => {
 
     writeSettings({ appDataDir: "/data", todoLook: { background: "paisley", color: "navy" } });
     expect(loadWebSettings().todoLook).toEqual({ background: "notes", color: null });
+  });
+
+  it("loads the saved to-do cycle settings, repairing any part that is invalid, and defaults them for a file from before", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+
+    writeSettings({ appDataDir: "/data", todos: { weekStartsOn: 1, retentionMonths: null, fiscalYearStartMonth: 10 } });
+    expect(loadWebSettings().todos).toEqual({ weekStartsOn: 1, retentionMonths: null, fiscalYearStartMonth: 10 });
+
+    writeSettings({ appDataDir: "/data", todos: { weekStartsOn: 9, retentionMonths: 0, fiscalYearStartMonth: "x" } });
+    expect(loadWebSettings().todos).toEqual(DEFAULT_TODO_SETTINGS);
+
+    writeSettings({ appDataDir: "/data" });
+    expect(loadWebSettings().todos).toEqual(DEFAULT_TODO_SETTINGS);
+  });
+
+  it("keeps the to-do cycle settings through a save", async () => {
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+
+    saveWebSettings({ ...loadWebSettings(), todos: { weekStartsOn: 5, retentionMonths: 36, fiscalYearStartMonth: 7 } });
+
+    expect(loadWebSettings().todos).toEqual({ weekStartsOn: 5, retentionMonths: 36, fiscalYearStartMonth: 7 });
   });
 
   it("loads saved writing settings, repairing any part that is invalid", async () => {

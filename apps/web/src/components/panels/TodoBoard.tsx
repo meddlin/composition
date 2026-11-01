@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TODO_STATUSES, type Todo, type TodoStatus } from "@/lib/composition/todosApi";
 import { cn } from "@/lib/utils";
+import { TodoMenu } from "./TodoMenu";
 
 export const STATUS_LABELS: Record<TodoStatus, string> = {
   backlog: "Backlog",
@@ -18,7 +19,8 @@ function Card({
   parentTitle,
   dragging,
   onMove,
-  onDelete,
+  onRemove,
+  onDeleteForGood,
   onDragStart,
   onDragEnd,
 }: {
@@ -26,7 +28,8 @@ function Card({
   parentTitle: string | null;
   dragging: boolean;
   onMove: (id: number, status: TodoStatus) => void;
-  onDelete: (todo: Todo) => void;
+  onRemove: (todo: Todo) => void;
+  onDeleteForGood: (todo: Todo) => void;
   onDragStart: () => void;
   onDragEnd: () => void;
 }) {
@@ -72,15 +75,12 @@ function Card({
             <ChevronRightIcon />
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-          aria-label={`Delete ${todo.title}`}
-          onClick={() => onDelete(todo)}
-        >
-          <Trash2Icon />
-        </Button>
+        <div className="flex opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+          <Button variant="ghost" size="icon-xs" aria-label={`Remove ${todo.title}`} title="Remove" onClick={() => onRemove(todo)}>
+            <Trash2Icon />
+          </Button>
+          <TodoMenu title={todo.title} onDeleteForGood={() => onDeleteForGood(todo)} />
+        </div>
       </div>
     </li>
   );
@@ -94,11 +94,13 @@ function Card({
 export function TodoBoard({
   todos,
   onMove,
-  onDelete,
+  onRemove,
+  onDeleteForGood,
 }: {
   todos: readonly Todo[];
   onMove: (id: number, status: TodoStatus) => void;
-  onDelete: (todo: Todo) => void;
+  onRemove: (todo: Todo) => void;
+  onDeleteForGood: (todo: Todo) => void;
 }) {
   const [dragging, setDragging] = useState<number | null>(null);
   const [over, setOver] = useState<TodoStatus | null>(null);
@@ -149,7 +151,8 @@ export function TodoBoard({
                   parentTitle={todo.parentId === null ? null : (titles.get(todo.parentId) ?? null)}
                   dragging={dragging === todo.id}
                   onMove={onMove}
-                  onDelete={onDelete}
+                  onRemove={onRemove}
+                  onDeleteForGood={onDeleteForGood}
                   onDragStart={() => setDragging(todo.id)}
                   onDragEnd={() => {
                     setDragging(null);

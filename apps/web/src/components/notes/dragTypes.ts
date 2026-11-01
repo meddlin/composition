@@ -34,6 +34,12 @@ export function draggedNoteId(data: Pick<DataTransfer, "types" | "getData">): nu
  */
 export const PANEL_DRAG_TYPE = "application/x-composition-panel-id";
 
+/**
+ * A to-do dragged from a to-do panel's Backlog or Rolled over onto its This week. It carries the item's id and is kept out
+ * of text/plain, which a note's editor would take as text to insert.
+ */
+export const TODO_DRAG_TYPE = "application/x-composition-todo";
+
 export function hasDraggedPanel(types: readonly string[]): boolean {
   return types.includes(PANEL_DRAG_TYPE);
 }

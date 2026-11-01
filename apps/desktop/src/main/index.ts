@@ -7,7 +7,7 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, indexReportNotes, listNotes, loadWebSettings, panelsService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
 import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
@@ -16,6 +16,7 @@ import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./pro
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
 import { createPopoutManager } from "./popoutManager";
+import { broadcastTodosChanged, createTodoCycleRunner, notifyTodoReports } from "./todoCycleRunner";
 import { createWindowPrefsStore, createWindowTranslucency } from "./translucency";
 import { createWindowState } from "./windowState";
 import { createMainWindow, THEME_BACKGROUND } from "./window";
@@ -142,6 +143,7 @@ let shutdownDone = false;
 function shutDown(): Promise<void> {
   shutdown ??= (async () => {
     try {
+      todoCycle.stop();
       // The pages go first: once the database is closed, what they still hold (text typed in the last moments, which
       // waits half a second to be saved) could no longer be, as their own unload comes too late.
       await flushRenderers(BrowserWindow.getAllWindows(), FLUSH_TIMEOUT_MS);
@@ -158,6 +160,16 @@ function shutDown(): Promise<void> {
 }
 
 const updates = createElectronUpdates({ userData, prepareToQuit: shutDown });
+
+// The to-do list's weekly cycle: weeks that have ended are closed as the app starts (before the first window reads the list)
+// and then every hour, and every window is told when that changed the list.
+const announceTodos = () => broadcastTodosChanged(BrowserWindow.getAllWindows());
+const todoCycle = createTodoCycleRunner({
+  run: () => runTodoCycle(),
+  announce: announceTodos,
+  indexReports: (noteIds) => void indexReportNotes(noteIds),
+  log: (message, detail) => console.log(message, detail ?? ""),
+});
 
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
@@ -226,7 +238,7 @@ async function main(): Promise<void> {
     attachments,
     backup,
     panels: panelsService,
-    todos: todosService,
+    todos: notifyTodoReports(todosService, announceTodos),
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
@@ -239,6 +251,8 @@ async function main(): Promise<void> {
 
   // Search comes up in the background; the window doesn't wait for it.
   void sidecar.start();
+  // Before the window, so a week that ended while the app was closed is already closed when the list is first read.
+  todoCycle.start();
   openMainWindow();
   updates.installMenuItem();
   installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });

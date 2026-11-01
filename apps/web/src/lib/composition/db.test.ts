@@ -69,12 +69,95 @@ describe("opening the database", () => {
     const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[])
       .map((t) => t.name)
       .filter((name) => !name.startsWith("sqlite_"));
-    expect(tables.sort()).toEqual(["attachments", "groups", "notebooks", "notes", "todos", "trashed_groups", "trashed_notes"]);
+    expect(tables.sort()).toEqual([
+      "attachments",
+      "groups",
+      "notebooks",
+      "notes",
+      "todo_closed",
+      "todo_events",
+      "todo_places",
+      "todo_reports",
+      "todos",
+      "trashed_groups",
+      "trashed_notes",
+    ]);
     expect(columnsOf(db, "attachments").sort()).toEqual(
       ["created_at", "file_name", "id", "note_id", "size", "stored_name"].sort(),
     );
     const indexes = db.prepare("PRAGMA index_list(attachments)").all() as { name: string }[];
     expect(indexes.map((i) => i.name)).toContain("idx_attachments_note_id");
+  });
+
+  describe("the to-do weekly cycle", () => {
+    const CYCLE_COLUMNS = [
+      "done_at",
+      "done_on",
+      "archived_at",
+      "archive_week",
+      "archive_reason",
+      "rolled_from_week",
+      "roll_count",
+    ];
+
+    it("gives a new database the columns, and tables for the log, the closed periods and the reports", async () => {
+      const { getDb } = await import("./db");
+      const db = getDb();
+
+      expect(columnsOf(db, "todos")).toEqual(expect.arrayContaining(CYCLE_COLUMNS));
+      expect(columnsOf(db, "todo_events").sort()).toEqual(
+        ["at", "from_status", "id", "kind", "on_date", "reason", "roll_count", "to_status", "todo_id", "utc_offset", "week_start"].sort(),
+      );
+      expect(columnsOf(db, "todo_closed").sort()).toEqual(["closed_at", "kind", "period_end", "period_start"]);
+      expect(columnsOf(db, "todo_reports").sort()).toEqual(
+        ["generated_at", "id", "kind", "note_id", "period_end", "period_start"].sort(),
+      );
+      expect(columnsOf(db, "todo_places").sort()).toEqual(["place", "ref_id"]);
+    });
+
+    it("adds the columns to a to-do table that predates them, keeping its items as they were", async () => {
+      const old = new Database(dbFile);
+      old.exec(`CREATE TABLE todos (id INTEGER PRIMARY KEY AUTOINCREMENT, parent_id INTEGER, title TEXT NOT NULL,
+        done INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'todo', created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+      old.prepare("INSERT INTO todos (title, done, status, created_at, updated_at) VALUES ('Kept', 1, 'done', 'c', 'u')").run();
+      old.close();
+
+      const { getDb } = await import("./db");
+      const db = getDb();
+
+      expect(columnsOf(db, "todos")).toEqual(expect.arrayContaining(CYCLE_COLUMNS));
+      expect(db.prepare("SELECT * FROM todos").get()).toEqual({
+        id: 1,
+        parent_id: null,
+        title: "Kept",
+        done: 1,
+        status: "done",
+        created_at: "c",
+        updated_at: "u",
+        done_at: null,
+        done_on: null,
+        archived_at: null,
+        archive_week: null,
+        archive_reason: null,
+        rolled_from_week: null,
+        roll_count: 0,
+      });
+    });
+
+    it("leaves the log and the to-dos alone when the database is opened again", async () => {
+      const first = await import("./db");
+      const db = first.getDb();
+      db.prepare("INSERT INTO todos (title, created_at, updated_at) VALUES ('A', 'c', 'u')").run();
+      db.prepare("INSERT INTO todo_events (todo_id, kind, at, on_date) VALUES (1, 'created', 'c', '2026-10-27')").run();
+      first.closeDb();
+
+      const again = first.getDb();
+
+      expect(again.prepare("SELECT COUNT(*) AS n FROM todos").get()).toEqual({ n: 1 });
+      expect(again.prepare("SELECT todo_id, kind, on_date, utc_offset FROM todo_events").all()).toEqual([
+        { todo_id: 1, kind: "created", on_date: "2026-10-27", utc_offset: 0 },
+      ]);
+    });
   });
 
   it("puts everything an older database held into one notebook", async () => {
