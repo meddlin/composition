@@ -16,9 +16,23 @@ function bridge(): TodosApi {
 
 export const loadTodoLook: TodosApi["loadTodoLook"] = () => bridge().loadTodoLook();
 export const saveTodoLook: TodosApi["saveTodoLook"] = (look) => bridge().saveTodoLook(look);
+export const loadTodoSettings: TodosApi["loadTodoSettings"] = () => bridge().loadTodoSettings();
+export const saveTodoSettings: TodosApi["saveTodoSettings"] = (settings) => bridge().saveTodoSettings(settings);
+export const previewTodoPurge: TodosApi["previewTodoPurge"] = (months) => bridge().previewTodoPurge(months);
 export const listTodos: TodosApi["listTodos"] = () => bridge().listTodos();
 export const createTodo: TodosApi["createTodo"] = (title, parentId) => bridge().createTodo(title, parentId);
 export const renameTodo: TodosApi["renameTodo"] = (id, title) => bridge().renameTodo(id, title);
 export const setTodoDone: TodosApi["setTodoDone"] = (id, done) => bridge().setTodoDone(id, done);
 export const setTodoStatus: TodosApi["setTodoStatus"] = (id, status) => bridge().setTodoStatus(id, status);
 export const deleteTodo: TodosApi["deleteTodo"] = (id) => bridge().deleteTodo(id);
+export const previewTodoDelete: TodosApi["previewTodoDelete"] = (id) => bridge().previewTodoDelete(id);
+export const loadTodoReports: TodosApi["loadTodoReports"] = () => bridge().loadTodoReports();
+export const generateTodoReport: TodosApi["generateTodoReport"] = (kind, periodStart) => bridge().generateTodoReport(kind, periodStart);
+export const listArchivedTodos: TodosApi["listArchivedTodos"] = () => bridge().listArchivedTodos();
+export const removeTodo: TodosApi["removeTodo"] = (id) => bridge().removeTodo(id);
+export const dropTodo: TodosApi["dropTodo"] = (id) => bridge().dropTodo(id);
+export const restoreTodo: TodosApi["restoreTodo"] = (id) => bridge().restoreTodo(id);
+export const acceptRolledTodo: TodosApi["acceptRolledTodo"] = (id) => bridge().acceptRolledTodo(id);
+export const moveRolledTodoToBacklog: TodosApi["moveRolledTodoToBacklog"] = (id) => bridge().moveRolledTodoToBacklog(id);
+export const loadTodoSetup: TodosApi["loadTodoSetup"] = () => bridge().loadTodoSetup();
+export const finishTodoSetup: TodosApi["finishTodoSetup"] = (archiveCompleted) => bridge().finishTodoSetup(archiveCompleted);

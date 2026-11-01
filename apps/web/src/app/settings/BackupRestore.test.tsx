@@ -10,7 +10,7 @@ vi.mock("@/lib/composition/backupClient", () => ({
   restoreBackup: vi.fn(),
 }));
 
-const counts = { notes: 12, groups: 3, trashedNotes: 0, trashedGroups: 0, images: 4, attachments: 1 };
+const counts = { notes: 12, groups: 3, trashedNotes: 0, trashedGroups: 0, images: 4, attachments: 1, todos: 0, archivedTodos: 0 };
 const reload = vi.fn();
 
 beforeEach(() => {
@@ -39,6 +39,17 @@ describe("Backup", () => {
     expect(createBackup).toHaveBeenCalledWith("/home/me/Composition Backups");
     expect(status.textContent).toBe(
       "Backed up 12 notes, 3 groups, 4 images and 1 attached file to /home/me/Composition Backups/composition-backup-1.tar.gz (1.4 MB).",
+    );
+  });
+
+  it("counts the to-dos and their archive in what it says the backup holds", async () => {
+    vi.mocked(createBackup).mockResolvedValue({ file: "/x/b.tar.gz", counts: { ...counts, todos: 8, archivedTodos: 31 } });
+    renderIt();
+
+    fireEvent.click(screen.getByRole("button", { name: "Create backup" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "Backed up 12 notes, 3 groups, 4 images, 1 attached file and 8 to-dos (31 archived) to /x/b.tar.gz.",
     );
   });
 

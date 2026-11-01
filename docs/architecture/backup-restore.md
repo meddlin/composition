@@ -19,14 +19,17 @@ can list and unpack, so a backup never locks the user into this app:
 
 ```
 composition-backup.json   what this is, the format version, when, how many of each thing
-settings.json             color scheme, city, column sizes, favorites, the AI helper's server address and context size
+settings.json             color scheme, city, column sizes, favorites, the AI helper's server address and context size, the to-do settings
 composition.db            a consistent snapshot of the database
 app_data/<image>          every pasted image
 attachments/<file>        every attached file
 ```
 
 The database holds the notes, groups, the Trash Can and the attachment records, so those come
-back too. Two things are deliberately **not** in it:
+back too. So do the **to-dos**: the live list, the archive, the activity log, which weeks, months and quarters the weekly cycle has
+closed, and the links to the reports (the reports themselves are ordinary notes). The counts in the description, and the line the Settings
+screen shows after a backup or restore, say `… and 8 to-dos (31 archived)` when there are any; there is no to-do code in the backup itself,
+because the whole database file is the snapshot ([todo-weekly-cycle.md](todo-weekly-cycle.md)). Two things are deliberately **not** in it:
 
 - **The search index.** It is derived from the database ([search.md](search.md)); a restore
   rebuilds it.

@@ -360,6 +360,40 @@ describe("TODO_VALIDATORS", () => {
     },
   );
 
+  it("reads the cycle settings without taking anything from the page", () => {
+    expect(TODO_VALIDATORS.loadTodoSettings(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes on cycle settings rebuilt from their three fields, and nothing else the page sent", () => {
+    expect(TODO_VALIDATORS.saveTodoSettings([{ weekStartsOn: 1, retentionMonths: 24, fiscalYearStartMonth: 10, extra: "x" }, "extra"])).toEqual([
+      { weekStartsOn: 1, retentionMonths: 24, fiscalYearStartMonth: 10 },
+    ]);
+    expect(TODO_VALIDATORS.saveTodoSettings([{ weekStartsOn: 0, retentionMonths: null, fiscalYearStartMonth: 1 }])).toEqual([
+      { weekStartsOn: 0, retentionMonths: null, fiscalYearStartMonth: 1 },
+    ]);
+  });
+
+  it.each([
+    [undefined],
+    [null],
+    ["settings"],
+    [{}],
+    [{ weekStartsOn: 7, retentionMonths: 24, fiscalYearStartMonth: 10 }],
+    [{ weekStartsOn: 1, retentionMonths: 0, fiscalYearStartMonth: 10 }],
+    [{ weekStartsOn: 1, retentionMonths: 24, fiscalYearStartMonth: 13 }],
+    [{ weekStartsOn: 1, retentionMonths: 24 }],
+  ])("refuses %j as cycle settings to save", (value) => {
+    expect(() => TODO_VALIDATORS.saveTodoSettings([value])).toThrow(InvalidArgumentsError);
+  });
+
+  it("previews a purge for a window of months or for Keep forever, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.previewTodoPurge([12, "extra"])).toEqual([12]);
+    expect(TODO_VALIDATORS.previewTodoPurge([null])).toEqual([null]);
+    for (const months of [undefined, 0, -1, 2.5, 601, "12", {}]) {
+      expect(() => TODO_VALIDATORS.previewTodoPurge([months])).toThrow(InvalidArgumentsError);
+    }
+  });
+
   it("lists the items without taking anything from the page", () => {
     expect(TODO_VALIDATORS.listTodos(["/etc/passwd"])).toEqual([]);
   });
@@ -371,6 +405,59 @@ describe("TODO_VALIDATORS", () => {
     expect(TODO_VALIDATORS.setTodoDone([4, true])).toEqual([4, true]);
     expect(TODO_VALIDATORS.setTodoStatus([4, "in_progress", "extra"])).toEqual([4, "in_progress"]);
     expect(TODO_VALIDATORS.deleteTodo([4, "extra"])).toEqual([4]);
+  });
+
+  it("lists the archive without taking anything from the page", () => {
+    expect(TODO_VALIDATORS.listArchivedTodos(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes on just the id for each archive method", () => {
+    expect(TODO_VALIDATORS.removeTodo([4, "extra"])).toEqual([4]);
+    expect(TODO_VALIDATORS.dropTodo([4, "extra"])).toEqual([4]);
+    expect(TODO_VALIDATORS.restoreTodo([4, "extra"])).toEqual([4]);
+    expect(TODO_VALIDATORS.acceptRolledTodo([4, "extra"])).toEqual([4]);
+  });
+
+  it("passes on just the id when asking what a permanent delete would erase, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.previewTodoDelete([4, "extra"])).toEqual([4]);
+    for (const value of [undefined, null, "4", 1.5, NaN, {}]) {
+      expect(() => TODO_VALIDATORS.previewTodoDelete([value])).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("lists the reports without taking anything from the page", () => {
+    expect(TODO_VALIDATORS.loadTodoReports(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("makes a report only for a known kind and a real date", () => {
+    expect(TODO_VALIDATORS.generateTodoReport(["weekly", "2026-10-18", "extra"])).toEqual(["weekly", "2026-10-18"]);
+    expect(TODO_VALIDATORS.generateTodoReport(["quarterly", "2026-07-01"])).toEqual(["quarterly", "2026-07-01"]);
+    for (const args of [[], ["weekly"], ["yearly", "2026-10-18"], ["weekly", "2026-02-30"], ["weekly", "18/10/2026"], ["weekly", 20261018], [null, "2026-10-18"], ["weekly", "2026-10-18T00:00"]]) {
+      expect(() => TODO_VALIDATORS.generateTodoReport(args)).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("passes on just the id for Move to backlog, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.moveRolledTodoToBacklog([4, "extra"])).toEqual([4]);
+    for (const value of [undefined, null, "4", 1.5, NaN, {}]) {
+      expect(() => TODO_VALIDATORS.moveRolledTodoToBacklog([value])).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("asks about the first-run question without taking anything from the page, and answers only with a yes or a no", () => {
+    expect(TODO_VALIDATORS.loadTodoSetup(["/etc/passwd"])).toEqual([]);
+    expect(TODO_VALIDATORS.finishTodoSetup([true, "extra"])).toEqual([true]);
+    expect(TODO_VALIDATORS.finishTodoSetup([false])).toEqual([false]);
+    for (const value of [undefined, null, "true", 1, 0, {}]) {
+      expect(() => TODO_VALIDATORS.finishTodoSetup([value])).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it.each(["removeTodo", "dropTodo", "restoreTodo", "acceptRolledTodo"] as const)("refuses %s without a whole-number id", (method) => {
+    for (const value of [undefined, null, "4", 1.5, NaN, Infinity, {}, [4], true]) {
+      expect(() => TODO_VALIDATORS[method]([value])).toThrow(InvalidArgumentsError);
+    }
+    expect(() => TODO_VALIDATORS[method]([])).toThrow(InvalidArgumentsError);
   });
 
   it.each([
