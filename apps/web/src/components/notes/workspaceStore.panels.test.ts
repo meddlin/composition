@@ -1429,3 +1429,79 @@ describe("the AI helper as a panel", () => {
     });
   });
 });
+
+describe("opening a kind of panel without an empty panel", () => {
+  it("fills the empty panel a window starts with", () => {
+    const store = gridStore();
+    const [only] = panelIds(mainWindow(store).layout);
+
+    expect(store.openKind("ai")).toBe(only);
+
+    expect(kindOf(store, only)).toBe("ai");
+    expect(panelIds(mainWindow(store).layout)).toEqual([only]);
+  });
+
+  it("splits beside the focused panel when that is not empty, and focuses the new one", () => {
+    const store = gridStore();
+    const [first] = panelIds(mainWindow(store).layout);
+    store.setPanelKind(first, "notes-browser");
+
+    const opened = store.openKind("todo")!;
+
+    expect(panelIds(mainWindow(store).layout)).toEqual([first, opened]);
+    expect(kindOf(store, opened)).toBe("todo");
+    expect(focused(store)).toBe(opened);
+  });
+
+  it("goes to the panel of the kind that is already open, and makes none", () => {
+    const store = gridStore();
+    const [first] = panelIds(mainWindow(store).layout);
+    store.setPanelKind(first, "notes-browser");
+    const todo = store.openKind("todo")!;
+    store.focusPanel(first);
+
+    expect(store.openKind("todo")).toBe(todo);
+
+    expect(panelIds(mainWindow(store).layout)).toEqual([first, todo]);
+    expect(focused(store)).toBe(todo);
+  });
+
+  it("does not open a kind whose plugin is off, and changes nothing", async () => {
+    const store = gridStore();
+    const before = store.getSnapshot().panels;
+
+    expect(store.openKind("rss")).toBeNull();
+    expect(store.openKind("reading-list")).toBeNull();
+    expect(store.getSnapshot().panels).toBe(before);
+
+    await store.plugins.setEnabled("rss", true);
+    expect(store.openKind("rss")).not.toBeNull();
+
+    await store.plugins.setEnabled("todo", false);
+    expect(store.openKind("todo")).toBeNull();
+  });
+
+  it("opens in the window it is asked for", () => {
+    const store = gridStore();
+    const [first] = panelIds(mainWindow(store).layout);
+    store.setPanelKind(first, "notes-browser");
+    const windowId = store.movePanelToNewWindow(store.openKind("ai")!)!;
+
+    const opened = store.openKind("todo", windowId)!;
+
+    expect(store.getSnapshot().panels.windows[windowId].focusOrder).toContain(opened);
+    expect(panelIds(mainWindow(store).layout)).not.toContain(opened);
+    expect(store.openKind("todo", "gone")).toBeNull();
+  });
+
+  it("saves the arrangement it makes", () => {
+    const save = vi.fn();
+    const store = gridStore([], {}, { save });
+    store.setPanelKind(panelIds(mainWindow(store).layout)[0], "notes-browser");
+    save.mockClear();
+
+    store.openKind("ai");
+
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+});

@@ -1,4 +1,5 @@
 import { BESIDE_VIEW, KINDS, noteIdOf, type AssistantPanelState, type NotePanelState } from "./kinds";
+import { launcherFor, type LauncherKind } from "./launchers";
 import {
   closePanel as closeLayout,
   movePanel as moveLayout,
@@ -133,6 +134,33 @@ export function setPanelState(panels: PanelsState, panelId: PanelId, state: unkn
   const panel = panels.byId[panelId];
   if (!panel) return panels;
   return { ...panels, byId: { ...panels.byId, [panelId]: { ...panel, state } } };
+}
+
+/**
+ * Opens a kind of panel in a window without the user making an empty panel first (the palette's "Open …" and the rail).
+ * A kind that is `reuse: "focus"` goes to the panel of it the window already has, the one used last; otherwise it fills
+ * the focused panel if that is empty, or else goes in a new panel to the right of the focused one. Null if there is no
+ * such window. Whether the kind's plugin is on is not checked here: the store does that.
+ */
+export function openKind(
+  panels: PanelsState,
+  windowId: WindowId,
+  kind: LauncherKind,
+  newId: () => PanelId,
+): { panels: PanelsState; panelId: PanelId } | null {
+  const window = panels.windows[windowId];
+  if (!window) return null;
+
+  if (launcherFor(kind).reuse === "focus") {
+    const existing = window.focusOrder.find((id) => panels.byId[id].kind === kind);
+    if (existing !== undefined) return { panels: focusPanel(panels, existing), panelId: existing };
+  }
+
+  const focusedId = focusedPanelId(window);
+  if (panels.byId[focusedId].kind === "empty") return { panels: setPanelKind(panels, focusedId, kind), panelId: focusedId };
+
+  const panelId = newId();
+  return { panels: splitPanel(panels, focusedId, "right", { id: panelId, kind, state: KINDS[kind].initialState() }), panelId };
 }
 
 /** Shows the note in a note panel (keeping its tab) or an empty one (which becomes a note panel), and focuses it. */
