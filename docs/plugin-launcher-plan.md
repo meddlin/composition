@@ -1,7 +1,7 @@
 # Opening plugin panels without an empty panel: design and build plan
 
 Today a plugin's panel can only be reached by first making an **empty panel** (`+`, Split Right) and then choosing the kind in
-it. Status: **steps 1–3 built (2026-11-01; 1 and 2 committed), step 4 not started; see "What step 1/2/3 found". The rail was driven in the built desktop app on 2026-11-01 (see "What step 3 found").** Anything marked **my pick** is a judgment, not something the owner
+it. Status: **built (2026-11-01); Gates A–C passed, Gate D passed except its manual test, which is yours to run (`docs/manual-tests/plugin-launcher.md`).** Steps 1–3 are committed; step 4 and the PR follow. See "What step 1/2/3/4 found". Anything marked **my pick** is a judgment, not something the owner
 decided; **Inference** is reasoning from a fact, not a measurement. The three questions the owner has not answered yet are
 marked ★ and repeated in "Open questions".
 
@@ -175,3 +175,13 @@ Each step ends with a gate; do not start the next until it has passed.
 | Icons | `SparklesIcon`, `ListChecksIcon`, `BookmarkIcon` (not `BookOpenIcon`, which the notebooks use), `RssIcon`, `LibraryBigIcon`. Chosen to be distinct; unchecked on screen. |
 | Search | *rail* also reaches Open Reading List by letters in order; Toggle Plugin Rail ranks first. |
 | Not built | A Manage plugins button (see risk 6). |
+
+## What step 4 found
+
+| Question | Answer |
+|---|---|
+| Built | An **Opening a plugin's panel** section and the rail's rules in [ui/panels.md](ui/panels.md#opening-a-plugins-panel) (and the new palette rows); a row in [feature-matrix.md](feature-matrix.md) (desktop only); a line in [index.md](index.md); [manual-tests/plugin-launcher.md](manual-tests/plugin-launcher.md); new checks in `apps/desktop/scripts/smoke.mjs`. |
+| Gate D | `pnpm test` pieces: `test:scripts` 12 pass; `test:desktop` (typecheck, 31 files, 615 tests) pass; `test:web` 174 files, 2720 tests pass (run after step 3, no web code changed since). `pnpm lint:actions` is untouched (no workflow changed). **`pnpm --dir apps/desktop smoke` passes: 125 checks** (80 before; it counted the palette's options as 7, now 11). The CLI suite was not run. |
+| New smoke checks | The rail's icons on a fresh install; Open To-do from the palette (new panel, cursor in it); the icon shows pressed; a click on an open kind goes to that panel (count unchanged); RSS Reader is not in the palette while off; opening from Home returns the panels, from the rail and from the palette; Toggle Plugin Rail off and on; Hide from Rail, with the kind still in the palette; everything opened is closed again so the later checks and the relaunch see the arrangement they expect. |
+| A flaky helper, fixed | The first version of the smoke helper typed into the palette while the previous one was still closing, so a query was mangled and Enter ran another command (the later relaunch checks then failed too). It now waits for the last palette to be gone and for the search box to have the cursor. The same trap as the palette unit tests' (the cursor is moved into a panel a moment after the palette closes). |
+| Left for you | **The manual test** (looks, hover text, the light theme, keyboard-only use, narrow windows). |

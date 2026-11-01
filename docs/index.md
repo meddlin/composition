@@ -45,6 +45,8 @@ See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside 
 
 See [reading-list-plan.md](reading-list-plan.md) for the Reading List plugin (desktop only, off until switched on): a list of article links beside a webview that shows the one you pick; [ui/panels.md](ui/panels.md#the-reading-list-panel) describes it and [manual-tests/reading-list.md](manual-tests/reading-list.md) checks it by hand.
 
+See [plugin-launcher-plan.md](plugin-launcher-plan.md) for opening a plugin's panel without making an empty panel first (desktop only): Open commands in the command palette and a rail of icons beside the notebooks, which can be switched off or trimmed in Settings; [ui/panels.md](ui/panels.md#opening-a-plugins-panel) describes it and [manual-tests/plugin-launcher.md](manual-tests/plugin-launcher.md) checks it by hand.
+
 See [rss-reader-plan.md](rss-reader-plan.md) for the RSS Reader plugin (desktop only, off until switched on): subscribe to RSS and Atom feeds, read their entries and unsubscribe; [ui/panels.md](ui/panels.md#the-rss-reader-panel) describes it and [manual-tests/rss.md](manual-tests/rss.md) checks it by hand.
 
 ## Features

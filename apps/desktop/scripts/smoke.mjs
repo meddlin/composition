@@ -576,7 +576,8 @@ try {
     "Cmd/Ctrl+Shift+P opens the command palette from inside a note, with the cursor in its search box and every panel command listed",
     (await palette(page).count()) === 1 &&
       (await page.getByRole("combobox", { name: "Search commands" }).evaluate((el) => el === document.activeElement)) &&
-      (await palette(page).getByRole("option").count()) === 7,
+      // The seven panel commands, the Open commands for the plugins that are on (Reading List and RSS Reader start off), and the rail's.
+      (await palette(page).getByRole("option").count()) === 11,
   );
   await page.keyboard.type("next");
   await page.keyboard.press("Enter");
@@ -609,6 +610,110 @@ try {
   await page.keyboard.press(chord("W"));
   const closed = await settled(async () => (await panelCount(page)) === panelsBefore && (await panelWithCursor(page)) === "Smoke note");
   check("Cmd/Ctrl+Shift+W closes it again, and the cursor goes back to the panel used before", closed, await panelWithCursor(page));
+  await page.waitForTimeout(300);
+
+  // ---- Opening plugin panels: the palette's Open commands, and the rail of icons beside the notebooks. Everything it
+  // opens is closed again, so the arrangement the later checks (and the relaunch) expect is left as it was.
+  const rail = page.getByRole("navigation", { name: "Plugins" });
+  const railIcons = async () => ((await rail.count()) === 0 ? [] : rail.getByRole("button").evaluateAll((buttons) => buttons.map((b) => b.getAttribute("aria-label"))));
+  const regionCount = (name) => page.getByRole("region", { name }).count();
+  const homePressed = () => page.getByRole("button", { name: "Home page" }).getAttribute("aria-pressed");
+  // The palette is made fresh each time it opens and takes a moment to close, so wait for the last one to be gone and for the
+  // search box to have the cursor before typing: a press that lands on the closing one runs the wrong command.
+  const searchBox = page.getByRole("combobox", { name: "Search commands" });
+  const closePalette = () => palette(page).waitFor({ state: "detached", timeout: 5_000 }).catch(() => {});
+  const openPalette = async (query) => {
+    await closePalette();
+    await page.keyboard.press(chord("P"));
+    await searchBox.waitFor({ timeout: 5_000 });
+    await settled(async () => searchBox.evaluate((el) => el === document.activeElement));
+    await page.keyboard.type(query);
+  };
+  const runFromPalette = async (query) => {
+    await openPalette(query);
+    await page.keyboard.press("Enter");
+    await closePalette();
+  };
+  const railIconsFresh = await railIcons();
+  check(
+    "the plugin rail has an icon for each panel that can be opened and whose plugin is on, in the empty panel's order",
+    JSON.stringify(railIconsFresh) === JSON.stringify(["Notes browser", "AI helper", "To-do"]),
+    railIconsFresh.join(", "),
+  );
+
+  const panelsBeforeOpen = await panelCount(page);
+  await page.getByRole("region", { name: "Smoke note" }).getByLabel("Markdown editor").click();
+  await runFromPalette("to-do");
+  check(
+    "Open To-do in the palette opens a to-do panel beside the focused one, and the cursor goes into it",
+    await settled(async () => (await regionCount("To-do")) === 1 && (await panelCount(page)) === panelsBeforeOpen + 1 && (await panelWithCursor(page)) === "To-do"),
+    `${await regionCount("To-do")} / ${await panelCount(page)} / ${await panelWithCursor(page)}`,
+  );
+  check("and its rail icon shows it is open", (await rail.getByRole("button", { name: "To-do" }).getAttribute("aria-pressed")) === "true");
+
+  await page.getByRole("region", { name: "Smoke note" }).getByLabel("Markdown editor").click();
+  await rail.getByRole("button", { name: "To-do" }).click();
+  check(
+    "clicking a rail icon whose panel is open goes to that panel instead of making another",
+    await settled(async () => (await panelWithCursor(page)) === "To-do" && (await panelCount(page)) === panelsBeforeOpen + 1),
+    `${await panelWithCursor(page)} / ${await panelCount(page)}`,
+  );
+
+  await openPalette("rss");
+  check(
+    "the palette does not list RSS Reader while its plugin is off",
+    (await page.getByText("No matching command").count()) === 1 && (await palette(page).getByRole("option").count()) === 0,
+  );
+  await page.keyboard.press("Escape");
+  await closePalette();
+
+  await page.getByRole("button", { name: "Home page" }).click();
+  const homeShown = (await homePressed()) === "true" && (await regionCount("To-do")) === 0;
+  await rail.getByRole("button", { name: "To-do" }).click();
+  check(
+    "opening a panel from the rail while Home is showing brings the panels back",
+    homeShown && (await settled(async () => (await homePressed()) === "false" && (await regionCount("To-do")) === 1)),
+  );
+  await page.getByRole("button", { name: "Home page" }).click();
+  await runFromPalette("ai helper");
+  check(
+    "and so does Open from the palette",
+    await settled(async () => (await homePressed()) === "false" && (await regionCount("AI helper")) === 1),
+  );
+  // Close the AI helper that was opened, and the to-do panel, to leave the arrangement as it was.
+  await page.getByRole("region", { name: "AI helper" }).getByRole("button", { name: "Close panel" }).click();
+
+  await runFromPalette("rail");
+  const railOff = await settled(async () => (await rail.count()) === 0);
+  await runFromPalette("rail");
+  const railBack = await settled(async () => (await rail.count()) === 1);
+  check("Toggle Plugin Rail in the palette removes the rail and brings it back", railOff && railBack, `${railOff} / ${railBack}`);
+
+  await rail.getByRole("button", { name: "To-do" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Hide from Rail" }).click();
+  const hidden = await settled(async () => !(await railIcons()).includes("To-do"));
+  await openPalette("to-do");
+  const stillInPalette = (await palette(page).getByRole("option").count()) === 1;
+  await page.keyboard.press("Escape");
+  await closePalette();
+  check(
+    "Hide from Rail takes one icon off the rail, and that kind is still in the palette",
+    hidden && stillInPalette && (await railIcons()).length === 2,
+    (await railIcons()).join(", "),
+  );
+  // Put the icon back, as Settings does, so the relaunch below starts from the defaults.
+  await page.evaluate(() => {
+    const key = "composition.panels";
+    const saved = JSON.parse(window.localStorage.getItem(key) ?? "{}");
+    window.localStorage.setItem(key, JSON.stringify({ ...saved, hiddenRailKinds: [] }));
+  });
+
+  await page.getByRole("region", { name: "To-do" }).getByRole("button", { name: "Close panel" }).click();
+  check(
+    "closing what it opened leaves the panels as they were",
+    await settled(async () => (await panelCount(page)) === panelsBeforeOpen),
+    String(await panelCount(page)),
+  );
   await page.waitForTimeout(300);
 
   // ---- Pop-outs: a panel in a window of its own, over the one workspace the main window holds.

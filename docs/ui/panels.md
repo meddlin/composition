@@ -45,6 +45,40 @@ Dropping shows where the panel will land: the half of the target nearest the poi
 Picking a note in the sidebar **focuses** the panel that already shows it; otherwise it goes in the focused panel if that is an empty or note
 panel, else in the note panel used last, else in a new panel to the right. So ordinary navigation never makes a second panel for a note.
 
+## Opening a plugin's panel
+
+An empty panel lists the kinds a panel can become, but you do not have to make one first. A panel of **Notes browser, AI helper, To-do,
+Reading List or RSS Reader** can be opened directly, three ways:
+
+| How | Result |
+|---|---|
+| **Command palette** (`Mod+Shift+P`), then **Open AI Helper**, **Open To-do**, **Open Reading List**, **Open RSS Reader** or **Open Notes Browser** | Opens it in the window you are in. Found by name or by what it is about (*todo*, *tasks*, *feeds*, *read later*, *notebook*). |
+| The **plugin rail**: a narrow column of icons left of the Notebooks column | Click an icon. The main window only. |
+| **An empty panel** | Its buttons, as before. |
+
+**What opening does** (the palette and the rail alike): if the window already has a panel of that kind, it **goes to that panel** (the one used
+last) rather than making another; else if the focused panel is empty it **fills it**; else it makes a **new panel to the right of the focused one**.
+The notes browser is the exception: a second, independent list is what the kind is for, so it always makes a new panel. A second to-do or
+RSS panel is still one `+` and an empty panel away. The cursor goes into the panel. If **Home** or a group's page is showing in place of the
+panels, opening a panel brings the panels back.
+
+**A plugin that is off** is not offered: no command in the palette, no icon on the rail, no button in an empty panel (Reading List and RSS
+Reader start off; turn them on in Settings → Plugins). Turning a plugin off removes its icon; turning it on brings it back.
+
+### The plugin rail
+
+- **Icons.** One per kind that is on, in the empty panel's order. An icon is **pressed** (with a small bar at its left edge) while the window has a
+  panel of that kind. Right-click an icon for **Hide from Rail**.
+- **Off for the keyboard.** **Settings → General → Panels → Show the plugin rail** removes the whole column (about 48 px), and so does
+  **Toggle Plugin Rail** in the palette (the main window's palette only). With it off nothing is drawn and nothing is left to tab through; every
+  panel can still be opened from the palette and from an empty panel.
+- **One icon off, the plugin on.** Under the same setting, **Icons in the plugin rail** has a box per kind. Unticking one (or **Hide from Rail**)
+  takes only that icon off the rail: the plugin stays on, and its palette command and empty-panel button stay. A plugin that is off shows its box
+  disabled, saying so, and keeps the choice, so an icon you hid is still hidden when the plugin comes back. When no icon is left the rail goes too.
+- **Saved per computer**, like the Notebooks column's collapse, not in the workspace. Pop-outs have no rail.
+- **Narrow windows.** The main window is never narrower than 760 px. At that width the rail, the Notebooks column and the note list leave room for one
+  narrow panel; collapse the Notebooks column, or turn the rail off, for more.
+
 ## Pop-out windows
 
 A panel can be pulled into a window of its own, which is still Composition: `⋯` → **Move to new window**, **Move to window ▸** (another pop-out),
@@ -206,10 +240,14 @@ of the window you are in**, so in a pop-out they act on the pop-out's panels.
 | **Next Panel** / **Previous Panel** | `Mod+Shift+]` / `Mod+Shift+[` | Moves to the panel after or before this one, **in the order they are laid out** (left to right, top to bottom), wrapping round. |
 | **Move to New Window** | | Pulls the focused panel into a window of its own. |
 | **Move to Main Window** | | Brings the focused panel of a pop-out back. Does nothing in the main window. |
+| **Open Notes Browser**, **Open AI Helper**, **Open To-do**, **Open Reading List**, **Open RSS Reader** | | Opens that kind of panel ([how](#opening-a-plugins-panel)). A kind whose plugin is off is not listed. |
+| **Toggle Plugin Rail** | | Shows or hides the [plugin rail](#the-plugin-rail). The main window's palette only. |
 
 - **The palette.** `Mod+Shift+P` opens it, from anywhere in a window, with the cursor in its search box. Type to narrow the list (every
   word has to match; a name's initials such as `sr` work, and so do other words such as *pop out* or *below*), **↑ ↓** to move,
   **Enter** to run, **Esc** to close. Each command shows its key. `Mod+Shift+P` again closes it. Each window has its own palette.
+- **The Open commands and Toggle Plugin Rail have no keys**; the palette is how they are reached. Opening acts on the window the palette is in, and
+  its list is the plugins that are on. Matching letters in order also reaches them (*sr* finds Open RSS Reader after Split Right), and the better match is listed first.
 - **After a command the cursor goes into the panel it left focused**, not back to the one it was typing in, so typing carries on there.
 - **The keys** are matched by the **physical key** (and with Cmd or Ctrl and Shift, never Alt, which AltGr types characters with on
   some layouts), so they work wherever the layout puts the characters. A key held down does not repeat a command. Keys do nothing while the
