@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { KINDS } from "./kinds";
 import { panelIds } from "./layoutTree";
 import { MAIN_WINDOW, closeWindow, focusPanel, focusedPanelId, initialPanels, movePanelToNewWindow, openKind, setPanelKind, splitPanel, type PanelsState } from "./panelsState";
 
@@ -24,7 +25,7 @@ describe("opening a kind of panel", () => {
 
     expect(opened.panelId).toBe("p1");
     expect(kindsOf(opened.panels)).toEqual(["rss"]);
-    expect(opened.panels.byId.p1.state).toEqual({ selectedFeedId: null, selectedEntryId: null });
+    expect(opened.panels.byId.p1.state).toEqual(KINDS.rss.initialState());
     expect(focused(opened.panels)).toBe("p1");
   });
 
@@ -36,13 +37,13 @@ describe("opening a kind of panel", () => {
 
     expect(kindsOf(opened.panels)).toEqual(["notes-browser", "todo"]);
     expect(focused(opened.panels)).toBe(opened.panelId);
-    expect(opened.panels.byId[opened.panelId].state).toEqual({ collapsed: [], view: "list" });
+    expect(opened.panels.byId[opened.panelId].state).toEqual(KINDS.todo.initialState());
   });
 
   it("splits beside the focused panel, wherever that is in the row", () => {
     const { panels, newId } = start();
     let state = setPanelKind(panels, "p1", "ai");
-    state = splitPanel(state, "p1", "right", { id: "m2", kind: "notes-browser", state: { notebookId: null } });
+    state = splitPanel(state, "p1", "right", { id: "m2", kind: "notes-browser", state: KINDS["notes-browser"].initialState() });
     state = focusPanel(state, "p1");
 
     const opened = openKind(state, MAIN_WINDOW, "todo", newId)!;
@@ -65,8 +66,8 @@ describe("opening a kind of panel", () => {
   it("goes to the one used last when there are two", () => {
     const { panels, newId } = start();
     let state = setPanelKind(panels, "p1", "todo");
-    state = splitPanel(state, "p1", "right", { id: "m2", kind: "todo", state: { collapsed: [], view: "list" } });
-    state = splitPanel(state, "m2", "right", { id: "m3", kind: "ai", state: { noteId: null, follow: true } });
+    state = splitPanel(state, "p1", "right", { id: "m2", kind: "todo", state: KINDS.todo.initialState() });
+    state = splitPanel(state, "m2", "right", { id: "m3", kind: "ai", state: KINDS.ai.initialState() });
 
     const opened = openKind(state, MAIN_WINDOW, "todo", newId)!;
 
@@ -106,7 +107,7 @@ describe("opening a kind of panel", () => {
   it("looks only at its own window: a pop-out's panel of the kind does not count in the main window", () => {
     const { panels, newId } = start();
     let state = setPanelKind(panels, "p1", "notes-browser");
-    state = splitPanel(state, "p1", "right", { id: "m2", kind: "rss", state: { selectedFeedId: null, selectedEntryId: null } });
+    state = splitPanel(state, "p1", "right", { id: "m2", kind: "rss", state: KINDS.rss.initialState() });
     state = movePanelToNewWindow(state, "m2", "w1", { id: "m3", kind: "empty", state: null });
 
     const inMain = openKind(state, MAIN_WINDOW, "rss", newId)!;
