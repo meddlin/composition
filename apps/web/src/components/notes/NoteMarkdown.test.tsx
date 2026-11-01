@@ -44,6 +44,23 @@ describe("NoteMarkdown", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("draws a <Chart> from the CSV block inside it", () => {
+    renderNote('Before.\n\n<Chart type="line" title="Sales">\n\n```csv\nmonth,sales\nJan,10\nFeb,12\n```\n\n</Chart>\n\nAfter.');
+
+    expect(screen.getByRole("img", { name: "Sales: line chart of sales by month, 2 rows" })).toBeDefined();
+    // The table is the chart's data, not text left in the note.
+    expect(screen.queryByText(/Jan,10/)).toBeNull();
+    expect(screen.getByText("After.")).toBeDefined();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says why a <Chart> can't be drawn, without dropping the rest of the note", () => {
+    renderNote("<Chart>\n\n```csv\nname,note\na,b\n```\n\n</Chart>\n\nAfter.");
+
+    expect(screen.getByRole("img", { name: "Chart not drawn" }).textContent).toMatch(/no column of numbers/);
+    expect(screen.getByText("After.")).toBeDefined();
+  });
+
   it("renders <Warning> next to <Info>, each with its own label", () => {
     renderNote("<Info>\n\nfyi\n\n</Info>\n\n<Warning>\n\nSome **danger**.\n\n</Warning>");
 
@@ -119,7 +136,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],

@@ -202,6 +202,35 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Chart>", () => {
+    const chart = (props: string, csv: string) => `<Chart${props}>\n\n\`\`\`csv\n${csv}\n\`\`\`\n\n</Chart>`;
+
+    it("is a code block of bars under its title, one per value", () => {
+      const [block] = parsePreview(chart(' title="Sales"', "month,sales\nJan,10\nFeb,5")).blocks;
+      const bars = "█".repeat(32);
+      expect(block).toEqual({
+        kind: "markdown",
+        source: `**Sales**\n\n\`\`\`\nJan  10 ${bars}\nFeb   5 ${"█".repeat(16)}\n\`\`\``,
+      });
+    });
+
+    it("names each series when there are several, and the share of each slice of a pie", () => {
+      const [series] = parsePreview(chart("", "m,a,b\nJan,1,2")).blocks;
+      expect(series).toMatchObject({ kind: "markdown", source: expect.stringMatching(/Jan {2}a 1 .*\n {5}b 2 /) });
+
+      const [pie] = parsePreview(chart(' type="pie"', "k,v\nx,1\ny,3")).blocks;
+      expect(pie).toMatchObject({ source: expect.stringMatching(/x {2}1 [█▏▎▍▌▋▊▉]+ {2}25%\ny {2}3 █+ {2}75%/) });
+    });
+
+    it("says so when the table can't be drawn", () => {
+      expect(parsePreview("<Chart />").blocks).toEqual([{ kind: "markdown", source: "Chart: add a \\`\\`\\`csv block with a header row and the data." }]);
+    });
+
+    it("is dropped from inside a sentence", () => {
+      expect(parsePreview("See <Chart /> now.").blocks).toEqual([{ kind: "markdown", source: "See  now." }]);
+    });
+  });
+
   describe("indented code", () => {
     it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
       const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
@@ -456,7 +485,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {
