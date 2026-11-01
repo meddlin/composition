@@ -207,8 +207,73 @@ describe("running a panel command", () => {
     const store = setup();
     const before = store.getSnapshot().panels;
 
-    for (const id of ALL) runPanelCommand(store, "w99", id);
+    for (const id of [...ALL, "open:todo" as const]) expect(runPanelCommand(store, "w99", id)).toBeNull();
 
     expect(store.getSnapshot().panels).toBe(before);
+  });
+
+  it("says nothing was opened for a command that opens no panel", () => {
+    const store = setup();
+
+    for (const id of ALL) expect(runPanelCommand(store, MAIN_WINDOW, id)).toBeNull();
+  });
+
+  describe("the commands that open a panel", () => {
+    it("turn the empty panel a window starts with into the kind, and say which panel that is", () => {
+      const store = setup();
+      const [only] = panelsIn(store, MAIN_WINDOW);
+
+      expect(runPanelCommand(store, MAIN_WINDOW, "open:todo")).toBe(only);
+
+      expect(kindOf(store, only)).toBe("todo");
+      expect(panelsIn(store, MAIN_WINDOW)).toEqual([only]);
+    });
+
+    it("put it beside the focused panel when that is not empty, and focus it", () => {
+      const store = setup();
+      const [a] = panelsIn(store, MAIN_WINDOW);
+      store.setPanelKind(a, "notes-browser");
+
+      const opened = runPanelCommand(store, MAIN_WINDOW, "open:ai");
+
+      expect(panelsIn(store, MAIN_WINDOW)).toEqual([a, opened]);
+      expect(focusedIn(store, MAIN_WINDOW)).toBe(opened);
+    });
+
+    it("go to the panel of the kind the window has, instead of making another", () => {
+      const store = setup();
+      const [a] = panelsIn(store, MAIN_WINDOW);
+      store.setPanelKind(a, "notes-browser");
+      const todo = runPanelCommand(store, MAIN_WINDOW, "open:todo");
+      store.focusPanel(a);
+
+      expect(runPanelCommand(store, MAIN_WINDOW, "open:todo")).toBe(todo);
+
+      expect(panelsIn(store, MAIN_WINDOW)).toHaveLength(2);
+      expect(focusedIn(store, MAIN_WINDOW)).toBe(todo);
+    });
+
+    it("open nothing for a plugin that is off, and say so", async () => {
+      const store = setup();
+      const before = store.getSnapshot().panels;
+
+      expect(runPanelCommand(store, MAIN_WINDOW, "open:rss")).toBeNull();
+      expect(store.getSnapshot().panels).toBe(before);
+
+      await store.plugins.setEnabled("rss", true);
+      expect(runPanelCommand(store, MAIN_WINDOW, "open:rss")).not.toBeNull();
+    });
+
+    it("work in a pop-out, on its own panels", () => {
+      const store = setup();
+      const [a] = panelsIn(store, MAIN_WINDOW);
+      const b = store.splitPanel(a, "right")!;
+      const popout = store.movePanelToNewWindow(b)!;
+
+      const opened = runPanelCommand(store, popout, "open:todo")!;
+
+      expect(panelsIn(store, popout)).toEqual([opened]);
+      expect(panelsIn(store, MAIN_WINDOW)).toEqual([a]);
+    });
   });
 });

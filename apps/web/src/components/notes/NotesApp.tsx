@@ -146,7 +146,13 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
   const [reveal, setReveal] = useState<RevealRequest | null>(null);
   const layout = useLayout(initialLayout);
   // How the open notes are shown differs by app: a row of panes on the web, a grid of panels on the desktop.
-  const surface = useNoteSurface(store);
+  // Home and a group's page are shown in the panels' place, so a panel opened from the palette has to bring them back.
+  const surface = useNoteSurface(store, undefined, {
+    showPanels: () => {
+      setHomeOpen(false);
+      setViewedGroupId(null);
+    },
+  });
   const focusedId = surface.focusedNoteId;
   const {
     actions,

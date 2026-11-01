@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PANEL_COMMANDS, PALETTE_SHORTCUT, isPaletteShortcut, panelCommandForKey, searchPanelCommands } from "./panelCommands";
+import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
+import { LAUNCH_COMMANDS, PANEL_COMMANDS, PALETTE_SHORTCUT, isPaletteShortcut, panelCommandForKey, searchPanelCommands } from "./panelCommands";
 
 const ids = (query: string) => searchPanelCommands(query).map((command) => command.id);
 
@@ -50,9 +51,22 @@ describe("the panel commands", () => {
 });
 
 describe("searching the panel commands", () => {
-  it("lists all of them, in order, for an empty query", () => {
-    expect(ids("")).toEqual(["split-right", "split-down", "close-panel", "next-panel", "previous-panel", "move-to-new-window", "move-to-main-window"]);
-    expect(ids("   ")).toHaveLength(7);
+  it("lists all of them, the panel commands and then the Open commands, in order, for an empty query", () => {
+    expect(ids("")).toEqual([
+      "split-right",
+      "split-down",
+      "close-panel",
+      "next-panel",
+      "previous-panel",
+      "move-to-new-window",
+      "move-to-main-window",
+      "open:notes-browser",
+      "open:ai",
+      "open:todo",
+      "open:reading-list",
+      "open:rss",
+    ]);
+    expect(ids("   ")).toHaveLength(12);
   });
 
   it("finds a command by the start of a word in its name, whatever the case", () => {
@@ -75,8 +89,9 @@ describe("searching the panel commands", () => {
   });
 
   it("finds a command by its initials or letters in order, as in other palettes", () => {
-    expect(ids("sr")).toEqual(["split-right"]);
-    expect(ids("sd")).toEqual(["split-down"]);
+    // Letters in order also reach an Open command (the s and r of "Open RSS Reader"), which ranks after the panel command.
+    expect(ids("sr")[0]).toBe("split-right");
+    expect(ids("sd")[0]).toBe("split-down");
   });
 
   it("puts a command whose name matches before one that only has the word as a keyword", () => {
@@ -134,5 +149,60 @@ describe("the key for the palette", () => {
     expect(isPaletteShortcut(press("KeyP", { altKey: true }))).toBe(false);
     expect(isPaletteShortcut(press("KeyP", { repeat: true }))).toBe(false);
     expect(isPaletteShortcut(press("KeyO"))).toBe(false);
+  });
+});
+
+describe("the commands that open a panel", () => {
+  const allOn = Object.fromEntries(Object.keys(DEFAULT_PLUGIN_SETTINGS).map((id) => [id, true])) as PluginSettings;
+
+  it("are one for each launcher, named in Title Case like the other commands, with no key", () => {
+    expect(LAUNCH_COMMANDS.map((command) => command.label)).toEqual([
+      "Open Notes Browser",
+      "Open AI Helper",
+      "Open To-do",
+      "Open Reading List",
+      "Open RSS Reader",
+    ]);
+    expect(LAUNCH_COMMANDS.map((command) => command.opens)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
+    expect(LAUNCH_COMMANDS.every((command) => command.shortcut === undefined)).toBe(true);
+  });
+
+  it("are not run by a key", () => {
+    expect(PANEL_COMMANDS.some((command) => command.opens)).toBe(false);
+    expect(panelCommandForKey(press("KeyL"))).toBeNull();
+  });
+
+  it("are found by their name, and by the word Open", () => {
+    expect(ids("open")).toEqual(LAUNCH_COMMANDS.map((command) => command.id));
+    expect(ids("rss")[0]).toBe("open:rss");
+    expect(ids("to-do")[0]).toBe("open:todo");
+    expect(ids("reading")[0]).toBe("open:reading-list");
+    expect(ids("ai helper")[0]).toBe("open:ai");
+  });
+
+  it("are found by what they are about", () => {
+    expect(ids("todo")[0]).toBe("open:todo");
+    expect(ids("tasks")).toEqual(["open:todo"]);
+    expect(ids("feeds")).toEqual(["open:rss"]);
+    expect(ids("news")[0]).toBe("open:rss");
+    expect(ids("read later")[0]).toBe("open:reading-list");
+    expect(ids("articles")).toEqual(["open:reading-list"]);
+    expect(ids("assistant")).toEqual(["open:ai"]);
+    expect(ids("notebook")).toEqual(["open:notes-browser"]);
+  });
+
+  it("leave the panel commands first for the words they share", () => {
+    expect(ids("split")).toEqual(["split-right", "split-down"]);
+    expect(ids("panel")[0]).toBe("close-panel");
+  });
+
+  it("leave out a command whose plugin is off, given which plugins are on", () => {
+    const some = (enabled: PluginSettings) => searchPanelCommands("", enabled).flatMap((command) => (command.opens ? [command.opens] : []));
+
+    expect(some(allOn)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
+    expect(some(DEFAULT_PLUGIN_SETTINGS)).toEqual(["notes-browser", "ai", "todo"]);
+    expect(some({ ...allOn, todo: false })).toEqual(["notes-browser", "ai", "reading-list", "rss"]);
+    expect(searchPanelCommands("rss", DEFAULT_PLUGIN_SETTINGS).map((command) => command.id)).toEqual([]);
+    expect(searchPanelCommands("split", { ...allOn, todo: false, rss: false, "reading-list": false })).toHaveLength(2);
   });
 });

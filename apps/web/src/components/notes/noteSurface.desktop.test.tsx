@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { panelIds } from "../panels/layoutTree";
 import { resetPanelPrefs, setWarnDuplicateNotePanels } from "../panels/panelPrefs";
 import { useNoteSurface } from "./noteSurface.desktop";
@@ -25,15 +25,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function setup() {
+function setup(showPanels?: () => void) {
   const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [] }, {} as WorkspaceDeps, undefined, { panels: {} });
-  render(<Harness store={store} />);
+  render(<Harness store={store} showPanels={showPanels} />);
   return store;
 }
 
 /** The surface a workspace gets on the desktop, with a button for each thing it offers. */
-function Harness({ store, windowId }: { store: WorkspaceStore; windowId?: string }) {
-  const surface = useNoteSurface(store, windowId);
+function Harness({ store, windowId, showPanels }: { store: WorkspaceStore; windowId?: string; showPanels?: () => void }) {
+  const surface = useNoteSurface(store, windowId, { showPanels });
   const [first] = panelIds(store.getSnapshot().panels.windows[windowId ?? "main"].layout);
   return (
     <>
@@ -65,7 +65,18 @@ describe("the panel commands in the notes surface of the desktop app", () => {
     act(() => void press("KeyP"));
 
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
-    expect(screen.getAllByRole("option")).toHaveLength(7);
+    expect(screen.getAllByRole("option")).toHaveLength(10);
+  });
+
+  it("tell the workspace to show its panels when the palette opens one, so Home does not hide it", () => {
+    const showPanels = vi.fn();
+    const store = setup(showPanels);
+
+    act(() => void press("KeyP"));
+    fireEvent.click(screen.getByRole("option", { name: /Open To-do/ }));
+
+    expect(showPanels).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().panels.byId[panelIds(store.getSnapshot().panels.windows.main.layout)[0]].kind).toBe("todo");
   });
 
   it("have keys that act on the window the surface is for", () => {

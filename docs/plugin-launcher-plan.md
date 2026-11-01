@@ -1,7 +1,7 @@
 # Opening plugin panels without an empty panel: design and build plan
 
 Today a plugin's panel can only be reached by first making an **empty panel** (`+`, Split Right) and then choosing the kind in
-it. Status: **step 1 built (2026-11-01), steps 2–4 not started; see "What step 1 found".** Anything marked **my pick** is a judgment, not something the owner
+it. Status: **steps 1 and 2 built (2026-11-01), steps 3–4 not started; see "What step 1 found" and "What step 2 found".** Anything marked **my pick** is a judgment, not something the owner
 decided; **Inference** is reasoning from a fact, not a measurement. The three questions the owner has not answered yet are
 marked ★ and repeated in "Open questions".
 
@@ -106,11 +106,11 @@ Each step ends with a gate; do not start the next until it has passed.
    a table-driven test of `openKind` (focus an existing one, fill an empty focused panel, split when the focused panel is not empty,
    `notes-browser` always new, an unknown window changes nothing, the main window and a pop-out are separate) and of `store.openKind`
    refusing an off plugin.
-2. **Palette.** The *Open* commands, keywords, `isAvailable`, `showPanels` through `useNoteSurface`, and *Toggle Plugin Rail* (a no-op
-   until step 3). **Gate B:** search tests (*todo*, *tasks*, *feeds*, *rss*, *read later*, *ai*, *split* still first); a palette test that
+2. **Palette.** The *Open* commands, keywords, the plugin filter, and `showPanels` through `useNoteSurface`. (*Toggle Plugin Rail* moved to
+   step 3: it would be a command that does nothing until the preference exists.) **Gate B:** search tests (*todo*, *tasks*, *feeds*, *rss*, *read later*, *ai*, *split* still first); a palette test that
    typing *rss* and pressing Enter opens a panel, and that an off plugin is not listed; `runPanelCommand` tests; a test that opening
    from Home returns to the panels.
-3. **Rail.** `PluginRail`, `NoteSurface.rail`, `showPluginRail` and `hiddenRailKinds` in `panelPrefs.ts`, the Settings checkboxes,
+3. **Rail.** *Toggle Plugin Rail* (palette command), `PluginRail`, `NoteSurface.rail`, `showPluginRail` and `hiddenRailKinds` in `panelPrefs.ts`, the Settings checkboxes,
    the icon's **Hide from Rail**, *Toggle Plugin Rail*. **Gate C:** component tests (only available launchers shown; turning a plugin off
    removes its icon and turning it on restores it; a hidden kind has no icon while its plugin stays on, and its *Open* command, panel and
    empty-panel button are still there; a hidden kind of an off plugin stays hidden when the plugin comes back on; nothing renders when
@@ -152,3 +152,15 @@ Each step ends with a gate; do not start the next until it has passed.
 | Circular import | `panelsState.ts` imports `launchers.ts`, which imports `kinds.ts`; `launchers.ts` imports only *types* from `panelsState.ts`, so there is no cycle. |
 | Test mistake worth knowing | A test that built panels by hand with ids `p2`, `p3` collided with the ids the test's counter made; hand-made ids in these tests are `m2`, `m3`. |
 | Pre-existing | `pnpm exec tsc --noEmit` in `apps/web` reports one error, `LayoutProps` not found in `src/app/layout.tsx` (a Next-generated type); the file is untouched by this work. |
+
+## What step 2 found
+
+| Question | Answer |
+|---|---|
+| Built | `LAUNCH_COMMANDS` and the plugin filter in [`panelCommands.ts`](../apps/web/src/components/panels/panelCommands.ts) (`searchPanelCommands(query, enabled?)`; `PANEL_COMMANDS` is still the seven, so the keys and the shortcuts list are untouched); `runPanelCommand` now returns the panel an Open command opened, else null; `PanelCommandPalette` takes `showPanels` and reads `usePlugins`; `useNoteSurface(store, windowId, { showPanels })` in both surfaces (the web one ignores it); `NotesApp` passes the callback that leaves Home and a group's page. |
+| Gate B | `pnpm test` in `apps/web`: 172 files, 2680 tests pass; eslint clean. New tests: search by name, by topic (*todo*, *tasks*, *feeds*, *read later*, *notebook*, *assistant*), the plugin filter, the runner (empty panel filled, split beside, existing panel focused, off plugin refused, pop-out, gone window), the palette (typing and Enter, a click, off then on, `showPanels` called only when a panel opened), and the surface passing `showPanels` on. |
+| Not tested | That `NotesApp` really leaves Home: its tests run on the web surface, which has no palette. The callback is two setters; the surface test checks it is called. Look at it in the Electron app. |
+| Toggle Plugin Rail | Moved to step 3 (above). |
+| Docs | `docs/ui/panels.md` still lists seven commands; step 4 updates it with the rest. |
+| Search noise | Letters-in-order matching reaches the new commands (*sr* now also finds Open RSS Reader, and *news* Open Notes Browser). The panel command still ranks first, because ties keep list order; two old assertions now check the first result instead of the whole list. Tightening the matcher (letters only at word starts) would change behavior that is not part of this plan. |
+| Test isolation | Closing the palette puts the cursor in the focused panel a moment later, looking the panel up by id in the whole page. A test that ends first has that happen in the *next* test's panels (an unrelated test that moves focus with the keys then failed). The palette tests that open a panel wait for the cursor to settle. |

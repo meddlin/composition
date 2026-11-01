@@ -49,7 +49,7 @@ const sidebar = (): PanelHost["sidebar"] => ({
 });
 
 /** A window of panels with the commands mounted beside it, as the notes surface does. */
-function setup(prepare: (store: WorkspaceStore) => string = () => MAIN_WINDOW) {
+function setup(prepare: (store: WorkspaceStore) => string = () => MAIN_WINDOW, showPanels?: () => void) {
   const deps = { saveNoteContent: vi.fn(async (id: number, content: string) => ({ ...note(id, `Note ${id}`), content })) } as unknown as WorkspaceDeps;
   const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [] }, deps, undefined, { panels: {} });
   const host: PanelHost = {
@@ -66,7 +66,7 @@ function setup(prepare: (store: WorkspaceStore) => string = () => MAIN_WINDOW) {
   render(
     <AssistantProvider store={store.assistant}>
       <PanelGrid store={store} host={host} windowId={windowId} />
-      <PanelCommandPalette store={store} windowId={windowId} />
+      <PanelCommandPalette store={store} windowId={windowId} showPanels={showPanels} />
     </AssistantProvider>,
   );
   return { store, windowId };
@@ -103,7 +103,7 @@ describe("the command palette", () => {
     expect(document.activeElement).toBe(search());
   });
 
-  it("lists every panel command, with its key beside it where it has one", () => {
+  it("lists every panel command, and the panels it can open, with its key beside it where it has one", () => {
     setup();
     press("KeyP");
 
@@ -115,6 +115,10 @@ describe("the command palette", () => {
       expect.stringMatching(/^Previous Panel/),
       expect.stringMatching(/^Move to New Window/),
       expect.stringMatching(/^Move to Main Window/),
+      // Reading List and RSS Reader are off until turned on, so the palette does not list them yet.
+      expect.stringMatching(/^Open Notes Browser/),
+      expect.stringMatching(/^Open AI Helper/),
+      expect.stringMatching(/^Open To-do/),
     ]);
     const keys = (name: string) => Array.from(screen.getByRole("option", { name: new RegExp(name) }).querySelectorAll("kbd")).map((k) => k.textContent);
     expect(keys("Split Right")).toEqual(["Ctrl", "Shift", "\\"]); // jsdom is not a Mac
@@ -179,7 +183,7 @@ describe("the command palette", () => {
 
     press("KeyP");
 
-    expect(screen.getAllByRole("option")).toHaveLength(7);
+    expect(screen.getAllByRole("option")).toHaveLength(10);
     expect((search() as HTMLInputElement).value).toBe("");
   });
 
@@ -213,6 +217,81 @@ describe("the command palette", () => {
     press("KeyW", search());
 
     expect(panelsIn(store)).toHaveLength(2);
+  });
+});
+
+describe("opening a panel from the palette", () => {
+  /**
+   * Closing the palette puts the cursor in the focused panel a moment later, by looking the panel up in the page. A test
+   * that ends first would have that happen in the next test's panels, so each waits for it.
+   */
+  const cursorSettled = () => waitFor(() => expect(document.activeElement).not.toBe(document.body));
+  const kindsIn = (store: WorkspaceStore) => panelIds(store.getSnapshot().panels.windows[MAIN_WINDOW].layout).map((id) => store.getSnapshot().panels.byId[id].kind);
+
+  it("opens the kind that is typed for, in the panel it fills, and closes", async () => {
+    const showPanels = vi.fn();
+    const { store } = setup(() => MAIN_WINDOW, showPanels);
+    press("KeyP");
+
+    fireEvent.change(search(), { target: { value: "to-do" } });
+    expect(options()).toEqual([expect.stringContaining("Open To-do")]);
+    fireEvent.keyDown(search(), { key: "Enter" });
+
+    expect(palette()).toBeNull();
+    expect(kindsIn(store)).toEqual(["todo"]);
+    expect(showPanels).toHaveBeenCalledTimes(1);
+    await cursorSettled();
+  });
+
+  it("finds a kind by what it is about, and runs it when clicked", async () => {
+    const { store } = setup(twoNotes);
+    press("KeyP");
+    fireEvent.change(search(), { target: { value: "tasks" } });
+
+    fireEvent.click(screen.getByRole("option", { name: /Open To-do/ }));
+
+    expect(kindsIn(store)).toEqual(["note", "note", "todo"]);
+    expect(focusedIn(store)).toBe(panelsIn(store)[2]);
+    await cursorSettled();
+  });
+
+  it("does not list a kind whose plugin is off, and lists it once the plugin is on", async () => {
+    const { store } = setup();
+    press("KeyP");
+    fireEvent.change(search(), { target: { value: "rss" } });
+    expect(screen.getByText("No matching command")).toBeTruthy();
+
+    fireEvent.keyDown(search(), { key: "Escape" });
+    await act(async () => void store.plugins.setEnabled("rss", true));
+    press("KeyP");
+    fireEvent.change(search(), { target: { value: "rss" } });
+
+    expect(options()).toEqual([expect.stringContaining("Open RSS Reader")]);
+  });
+
+  it("asks for the panels to be shown only when a panel was opened", async () => {
+    const showPanels = vi.fn();
+    setup(() => MAIN_WINDOW, showPanels);
+
+    press("KeyP");
+    fireEvent.click(screen.getByRole("option", { name: /Split Right/ }));
+    expect(showPanels).not.toHaveBeenCalled();
+    await waitFor(() => expect(palette()).toBeNull());
+
+    press("KeyP");
+    fireEvent.click(screen.getByRole("option", { name: /Open Notes Browser/ }));
+    expect(showPanels).toHaveBeenCalledTimes(1);
+    await cursorSettled();
+  });
+
+  it("works without a way to show the panels, as in a pop-out", async () => {
+    const { store } = setup();
+    press("KeyP");
+
+    fireEvent.click(screen.getByRole("option", { name: /Open AI Helper/ }));
+
+    expect(kindsIn(store)).toEqual(["ai"]);
+    await cursorSettled();
   });
 });
 
