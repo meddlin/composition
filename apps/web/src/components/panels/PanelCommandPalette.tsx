@@ -64,6 +64,7 @@ export function PanelCommandPalette({ store, windowId, showPanels }: { store: Wo
         <DialogDescription className="sr-only">Type to find a panel command or a panel to open, then press Enter to run it.</DialogDescription>
         <Palette
           enabled={enabled}
+          windowId={windowId}
           onRun={(command) => {
             const opened = runPanelCommand(store, windowId, command);
             if (opened !== null) showPanels?.();
@@ -76,12 +77,12 @@ export function PanelCommandPalette({ store, windowId, showPanels }: { store: Wo
 }
 
 /** The search box and the list of commands it narrows. It is made fresh each time the palette opens. */
-function Palette({ enabled, onRun }: { enabled: PluginSettings; onRun: (command: PanelCommandId) => void }) {
+function Palette({ enabled, windowId, onRun }: { enabled: PluginSettings; windowId: WindowId; onRun: (command: PanelCommandId) => void }) {
   const isMac = useIsMac();
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const listboxId = useId();
-  const matches = useMemo(() => searchPanelCommands(query, enabled), [query, enabled]);
+  const matches = useMemo(() => searchPanelCommands(query, enabled, windowId), [query, enabled, windowId]);
   const optionId = (index: number) => `${listboxId}-${index}`;
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {

@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssistantProvider } from "../notes/AssistantProvider";
 import type { Note } from "../notes/types";
 import { createWorkspaceStore, type WorkspaceDeps, type WorkspaceStore } from "../notes/workspaceStore";
 import { panelIds } from "./layoutTree";
 import { MAIN_WINDOW, focusedPanelId } from "./panelsState";
 import { PanelCommandPalette } from "./PanelCommandPalette";
+import { resetPanelPrefs, useShowPluginRail } from "./panelPrefs";
 import { PanelGrid, type PanelHost } from "./PanelGrid";
 
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -18,6 +19,10 @@ vi.mock("@/lib/composition/attachmentsClient", () => ({
   removeAttachment: vi.fn(),
 }));
 
+beforeEach(() => {
+  window.localStorage.clear();
+  resetPanelPrefs();
+});
 afterEach(cleanup);
 
 const note = (id: number, title: string): Note => ({
@@ -119,6 +124,7 @@ describe("the command palette", () => {
       expect.stringMatching(/^Open Notes Browser/),
       expect.stringMatching(/^Open AI Helper/),
       expect.stringMatching(/^Open To-do/),
+      expect.stringMatching(/^Toggle Plugin Rail/),
     ]);
     const keys = (name: string) => Array.from(screen.getByRole("option", { name: new RegExp(name) }).querySelectorAll("kbd")).map((k) => k.textContent);
     expect(keys("Split Right")).toEqual(["Ctrl", "Shift", "\\"]); // jsdom is not a Mac
@@ -183,7 +189,7 @@ describe("the command palette", () => {
 
     press("KeyP");
 
-    expect(screen.getAllByRole("option")).toHaveLength(10);
+    expect(screen.getAllByRole("option")).toHaveLength(11);
     expect((search() as HTMLInputElement).value).toBe("");
   });
 
@@ -295,6 +301,38 @@ describe("opening a panel from the palette", () => {
   });
 });
 
+describe("the plugin rail's command", () => {
+  function RailProbe() {
+    return <output aria-label="rail">{String(useShowPluginRail())}</output>;
+  }
+
+  it("turns the rail off and back on from the palette", () => {
+    setup();
+    render(<RailProbe />);
+    expect(screen.getByLabelText("rail").textContent).toBe("true");
+
+    press("KeyP");
+    fireEvent.change(search(), { target: { value: "rail" } });
+    expect(options()).toEqual([expect.stringContaining("Toggle Plugin Rail")]);
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(screen.getByLabelText("rail").textContent).toBe("false");
+
+    press("KeyP");
+    fireEvent.change(search(), { target: { value: "rail" } });
+    fireEvent.keyDown(search(), { key: "Enter" });
+    expect(screen.getByLabelText("rail").textContent).toBe("true");
+  });
+
+  it("is found by what it does", () => {
+    setup();
+    press("KeyP");
+
+    fireEvent.change(search(), { target: { value: "hide icons" } });
+
+    expect(options()).toEqual([expect.stringContaining("Toggle Plugin Rail")]);
+  });
+});
+
 describe("the keys for panel commands", () => {
   it("split right with Cmd/Ctrl+Shift+\\, from inside a note's editor", () => {
     const { store } = setup(twoNotes);
@@ -359,6 +397,15 @@ describe("in a pop-out", () => {
 
     expect(panelsIn(store, windowId)).toHaveLength(2);
     expect(panelsIn(store)).toEqual(mainBefore);
+  });
+
+  it("does not offer Toggle Plugin Rail, which is about the main window's rail", () => {
+    popoutSetup();
+    press("KeyP");
+
+    fireEvent.change(search(), { target: { value: "rail" } });
+
+    expect(screen.getByText("No matching command")).toBeTruthy();
   });
 
   it("Move to Main Window brings the panel back from the palette", () => {

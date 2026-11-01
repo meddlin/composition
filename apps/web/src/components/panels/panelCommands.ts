@@ -1,12 +1,14 @@
 import type { PluginSettings } from "@/lib/composition/plugins";
 import type { Combo } from "../shortcuts/shortcuts";
 import { LAUNCHERS, isKindAvailable, type LauncherKind } from "./launchers";
+import { MAIN_WINDOW, type WindowId } from "./panelsState";
 
 /** The command that opens a kind of panel (see `launchers.ts`). */
 export type LaunchCommandId = `open:${LauncherKind}`;
 
 export type PanelCommandId =
   | LaunchCommandId
+  | "toggle-rail"
   | "split-right"
   | "split-down"
   | "close-panel"
@@ -30,6 +32,8 @@ export type PanelCommand = {
   shortcut?: CommandShortcut;
   /** The kind of panel an Open command opens; the commands that work on the focused panel have none. */
   opens?: LauncherKind;
+  /** The command is about the main window (its rail), so a pop-out's palette does not list it. */
+  mainWindowOnly?: true;
 };
 
 /** The panel commands, in the order the palette lists them. */
@@ -69,8 +73,13 @@ export const LAUNCH_COMMANDS: readonly PanelCommand[] = LAUNCHERS.map((launcher)
   opens: launcher.kind,
 }));
 
-/** Everything the palette lists: the panel commands, then the ones that open a panel. */
-const PALETTE_COMMANDS: readonly PanelCommand[] = [...PANEL_COMMANDS, ...LAUNCH_COMMANDS];
+/** Commands about the window rather than a panel. */
+export const VIEW_COMMANDS: readonly PanelCommand[] = [
+  { id: "toggle-rail", label: "Toggle Plugin Rail", keywords: ["show", "hide", "sidebar", "icons", "activity bar"], mainWindowOnly: true },
+];
+
+/** Everything the palette lists: the panel commands, then the ones that open a panel, then the window's. */
+const PALETTE_COMMANDS: readonly PanelCommand[] = [...PANEL_COMMANDS, ...LAUNCH_COMMANDS, ...VIEW_COMMANDS];
 
 /** Opens the palette. */
 export const PALETTE_SHORTCUT: CommandShortcut = { keys: ["Mod", "Shift", "P"], code: "KeyP" };
@@ -114,10 +123,15 @@ function scoreToken(command: PanelCommand, token: string): number {
 /**
  * The commands that match a search, best first. Every word of the query has to match; an empty query lists them all.
  * Ties keep the order of the list: the panel commands, then the Open commands. Given which plugins are on, an Open
- * command for a plugin that is off is left out, as the empty panel leaves it out.
+ * command for a plugin that is off is left out, as the empty panel leaves it out; given a window other than the main
+ * one, so are the commands that are only about the main window.
  */
-export function searchPanelCommands(query: string, enabled?: PluginSettings): PanelCommand[] {
-  const commands = PALETTE_COMMANDS.filter((command) => !command.opens || !enabled || isKindAvailable(command.opens, enabled));
+export function searchPanelCommands(query: string, enabled?: PluginSettings, windowId?: WindowId): PanelCommand[] {
+  const commands = PALETTE_COMMANDS.filter(
+    (command) =>
+      (!command.opens || !enabled || isKindAvailable(command.opens, enabled)) &&
+      (!command.mainWindowOnly || windowId === undefined || windowId === MAIN_WINDOW),
+  );
   const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
   if (tokens.length === 0) return [...commands];
 

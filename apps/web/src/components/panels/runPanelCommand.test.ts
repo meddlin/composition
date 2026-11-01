@@ -1,4 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { parsePanelPrefs, resetPanelPrefs } from "./panelPrefs";
 import { createWorkspaceStore, type WorkspaceDeps, type WorkspaceStore } from "../notes/workspaceStore";
 import type { Note } from "../notes/types";
 import { panelIds } from "./layoutTree";
@@ -30,7 +32,15 @@ const focusedIn = (store: WorkspaceStore, windowId: string) => focusedPanelId(wi
 const kindOf = (store: WorkspaceStore, panelId: string) => store.getSnapshot().panels.byId[panelId].kind;
 const windowIds = (store: WorkspaceStore) => Object.keys(store.getSnapshot().panels.windows);
 
-const ALL: PanelCommandId[] = ["split-right", "split-down", "close-panel", "next-panel", "previous-panel", "move-to-new-window", "move-to-main-window"];
+beforeEach(() => {
+  window.localStorage.clear();
+  resetPanelPrefs();
+});
+
+/** What was saved, so the test does not depend on a hook. */
+const railIsOn = () => parsePanelPrefs(window.localStorage.getItem("composition.panels")).showPluginRail;
+
+const ALL: PanelCommandId[] = ["split-right", "split-down", "close-panel", "next-panel", "previous-panel", "move-to-new-window", "move-to-main-window", "toggle-rail"];
 
 describe("running a panel command", () => {
   describe("split right and split down", () => {
@@ -275,5 +285,37 @@ describe("running a panel command", () => {
       expect(panelsIn(store, popout)).toEqual([opened]);
       expect(panelsIn(store, MAIN_WINDOW)).toEqual([a]);
     });
+  });
+});
+
+describe("toggle plugin rail", () => {
+  it("turns the rail off and on again in the main window", () => {
+    const store = setup();
+    expect(railIsOn()).toBe(true);
+
+    expect(runPanelCommand(store, MAIN_WINDOW, "toggle-rail")).toBeNull();
+    expect(railIsOn()).toBe(false);
+
+    runPanelCommand(store, MAIN_WINDOW, "toggle-rail");
+    expect(railIsOn()).toBe(true);
+  });
+
+  it("changes no panel", () => {
+    const store = setup();
+    const before = store.getSnapshot().panels;
+
+    runPanelCommand(store, MAIN_WINDOW, "toggle-rail");
+
+    expect(store.getSnapshot().panels).toBe(before);
+  });
+
+  it("does nothing from a pop-out, which has no rail and could not tell the main window", () => {
+    const store = setup();
+    const [a] = panelsIn(store, MAIN_WINDOW);
+    const popout = store.movePanelToNewWindow(store.splitPanel(a, "right")!)!;
+
+    runPanelCommand(store, popout, "toggle-rail");
+
+    expect(railIsOn()).toBe(true);
   });
 });

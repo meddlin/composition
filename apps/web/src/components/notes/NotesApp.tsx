@@ -315,6 +315,7 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
         </div>
       </header>
       <div className="flex min-h-0 flex-1">
+        {surface.rail}
         <NotebookPanel
           collapsed={notebookPanel.collapsed}
           width={notebookPanel.width}

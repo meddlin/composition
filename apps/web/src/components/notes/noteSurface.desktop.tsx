@@ -8,6 +8,7 @@ import { setWarnDuplicateNotePanels, useWarnDuplicateNotePanels } from "../panel
 import { MAIN_WINDOW, isNoteShown, type WindowId } from "../panels/panelsState";
 import { PanelCommandPalette } from "../panels/PanelCommandPalette";
 import { PanelGrid } from "../panels/PanelGrid";
+import { PluginRail } from "../panels/PluginRail";
 import type { NoteAreaProps, NoteSurface } from "./noteSurfaceTypes";
 import { noteTitle } from "./types";
 import type { WorkspaceStore } from "./workspaceStore";
@@ -70,6 +71,8 @@ export function useNoteSurface(
         <PanelCommandPalette store={store} windowId={windowId} showPanels={options.showPanels} />
       </>
     ),
+    // A pop-out is for one task and has no room to spare, so only the main window has the rail.
+    rail: windowId === MAIN_WINDOW ? <PluginRail store={store} showPanels={options.showPanels} /> : null,
   };
 }
 

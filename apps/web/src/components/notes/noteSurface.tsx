@@ -28,6 +28,7 @@ export function useNoteSurface(store: WorkspaceStore, _windowId?: string, _optio
     // The row's panes take drops themselves.
     dropNote: () => {},
     dialog: null,
+    rail: null,
   };
 }
 

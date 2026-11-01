@@ -2,6 +2,7 @@ import type { WorkspaceStore } from "../notes/workspaceStore";
 import type { PanelId } from "./layoutTree";
 import { isLauncherKind } from "./launchers";
 import type { PanelCommandId } from "./panelCommands";
+import { toggleShowPluginRail } from "./panelPrefs";
 import { MAIN_WINDOW, focusedPanelId, type KindId, type WindowId } from "./panelsState";
 
 /**
@@ -20,6 +21,10 @@ export function runPanelCommand(store: WorkspaceStore, windowId: WindowId, id: P
   const panelId = focusedPanelId(window);
 
   switch (id) {
+    case "toggle-rail":
+      // The rail is the main window's (a pop-out has none, and its page would not tell the main window's of the change).
+      if (windowId === MAIN_WINDOW) toggleShowPluginRail();
+      break;
     case "split-right":
       store.splitPanel(panelId, "right");
       break;

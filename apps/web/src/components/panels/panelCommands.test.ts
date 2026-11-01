@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
-import { LAUNCH_COMMANDS, PANEL_COMMANDS, PALETTE_SHORTCUT, isPaletteShortcut, panelCommandForKey, searchPanelCommands } from "./panelCommands";
+import { MAIN_WINDOW } from "./panelsState";
+import { LAUNCH_COMMANDS, PANEL_COMMANDS, PALETTE_SHORTCUT, VIEW_COMMANDS, isPaletteShortcut, panelCommandForKey, searchPanelCommands } from "./panelCommands";
 
 const ids = (query: string) => searchPanelCommands(query).map((command) => command.id);
 
@@ -65,8 +66,9 @@ describe("searching the panel commands", () => {
       "open:todo",
       "open:reading-list",
       "open:rss",
+      "toggle-rail",
     ]);
-    expect(ids("   ")).toHaveLength(12);
+    expect(ids("   ")).toHaveLength(13);
   });
 
   it("finds a command by the start of a word in its name, whatever the case", () => {
@@ -204,5 +206,21 @@ describe("the commands that open a panel", () => {
     expect(some({ ...allOn, todo: false })).toEqual(["notes-browser", "ai", "reading-list", "rss"]);
     expect(searchPanelCommands("rss", DEFAULT_PLUGIN_SETTINGS).map((command) => command.id)).toEqual([]);
     expect(searchPanelCommands("split", { ...allOn, todo: false, rss: false, "reading-list": false })).toHaveLength(2);
+  });
+});
+
+describe("the command for the plugin rail", () => {
+  it("is Toggle Plugin Rail, with no key, found by what it does", () => {
+    expect(VIEW_COMMANDS.map((command) => command.label)).toEqual(["Toggle Plugin Rail"]);
+    expect(VIEW_COMMANDS[0].shortcut).toBeUndefined();
+    expect(ids("rail")[0]).toBe("toggle-rail"); // letters in order also reach Open Reading List, after it
+    expect(ids("hide")).toEqual(["toggle-rail"]);
+    expect(ids("sidebar")).toEqual(["toggle-rail"]);
+  });
+
+  it("is listed for the main window and not for a pop-out", () => {
+    expect(searchPanelCommands("rail", undefined, MAIN_WINDOW)[0].id).toBe("toggle-rail");
+    expect(searchPanelCommands("hide", undefined, "w1")).toEqual([]);
+    expect(searchPanelCommands("", undefined, "w1").map((command) => command.id)).not.toContain("toggle-rail");
   });
 });
