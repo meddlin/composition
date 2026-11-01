@@ -79,23 +79,29 @@ const COUNTED_TABLES = {
   attachments: "attachments",
 } as const;
 
-/** Row counts of a database file, opened read-only. A table an older version never created counts as 0. */
-function countRows(databaseFile: string): Pick<BackupCounts, keyof typeof COUNTED_TABLES> {
+/**
+ * Row counts of a database file, opened read-only. A table or column an older version never created counts as 0, so a
+ * backup from before the weekly cycle (no `archived_at`) reads as all live to-dos.
+ */
+function countRows(databaseFile: string): Omit<BackupCounts, "images"> {
   const db = new Database(databaseFile, { readonly: true, fileMustExist: true });
   try {
-    const count = (table: string): number => {
+    const count = (table: string, where = "1"): number => {
       try {
-        return (db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number }).n;
+        return (db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`).get() as { n: number }).n;
       } catch {
         return 0;
       }
     };
+    const archivedTodos = count("todos", "archived_at IS NOT NULL");
     return {
       notes: count(COUNTED_TABLES.notes),
       groups: count(COUNTED_TABLES.groups),
       trashedNotes: count(COUNTED_TABLES.trashedNotes),
       trashedGroups: count(COUNTED_TABLES.trashedGroups),
       attachments: count(COUNTED_TABLES.attachments),
+      todos: count("todos") - archivedTodos,
+      archivedTodos,
     };
   } finally {
     db.close();

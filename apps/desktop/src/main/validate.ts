@@ -9,7 +9,9 @@ import type { FeedMethod } from "../../../web/src/lib/composition/feedsApi";
 import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingList";
 import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
-import { isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
+import { isRetention, validateTodoSettings } from "../../../web/src/lib/composition/todoSettings";
+import { isReportKind, isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
+import { isLocalDate } from "../../../web/src/lib/composition/todoWeeks";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
 import type { ApiMethod } from "./backend";
@@ -268,6 +270,13 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     // Rebuilt from the two checked fields, so nothing else the page sends is saved.
     return isTodoLook(look) ? [{ background: look.background, color: look.color }] : fail("saveTodoLook", "look");
   },
+  loadTodoSettings: none,
+  saveTodoSettings: ([settings]) => {
+    // Rebuilt from the three checked fields, so nothing else the page sends is saved.
+    const checked = validateTodoSettings(settings);
+    return checked.error === undefined ? [checked.settings] : fail("saveTodoSettings", "settings");
+  },
+  previewTodoPurge: ([months]) => [isRetention(months) ? months : fail("previewTodoPurge", "months")],
   listTodos: none,
   createTodo: ([title, parentId]) => [todoTitle("createTodo", title), nullableId("createTodo", parentId, "parentId")],
   renameTodo: ([todoId, title]) => [id("renameTodo", todoId, "id"), todoTitle("renameTodo", title)],
@@ -277,6 +286,20 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     isTodoStatus(status) ? status : fail("setTodoStatus", "status"),
   ],
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
+  previewTodoDelete: ([todoId]) => [id("previewTodoDelete", todoId, "id")],
+  loadTodoReports: none,
+  generateTodoReport: ([kind, periodStart]) => [
+    isReportKind(kind) ? kind : fail("generateTodoReport", "kind"),
+    isLocalDate(periodStart) ? periodStart : fail("generateTodoReport", "periodStart"),
+  ],
+  listArchivedTodos: none,
+  removeTodo: ([todoId]) => [id("removeTodo", todoId, "id")],
+  dropTodo: ([todoId]) => [id("dropTodo", todoId, "id")],
+  restoreTodo: ([todoId]) => [id("restoreTodo", todoId, "id")],
+  acceptRolledTodo: ([todoId]) => [id("acceptRolledTodo", todoId, "id")],
+  moveRolledTodoToBacklog: ([todoId]) => [id("moveRolledTodoToBacklog", todoId, "id")],
+  loadTodoSetup: none,
+  finishTodoSetup: ([archiveCompleted]) => [flag("finishTodoSetup", archiveCompleted, "archiveCompleted")],
 };
 
 const readingTitle = (method: string, value: unknown): string =>

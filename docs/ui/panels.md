@@ -24,7 +24,7 @@ A panel shows one thing, its *kind*:
 | **Note** | A note, with its Markdown / Preview / Split tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. |
 | **Notes browser** | A second tree of a notebook's groups and notes, with its own chosen notebook (a menu at the top). Picking a note opens it in the note panel used last, or in a new one beside the browser. |
 | **AI helper** | The [AI helper](ai-helper.md)'s chat about one note. See below. |
-| **To-do** | A to-do list. See below. |
+| **To-do** | A to-do list that archives what is done each week, with an archive and reports. See below. |
 
 A window always has at least one panel. Closing the last one leaves a new empty panel; an empty panel that is already alone has no close button.
 
@@ -97,35 +97,93 @@ closed like any other.
 
 ## The to-do panel
 
-A plain to-do list in a panel of its own (choose **To-do** in an empty panel). Source: [`TodoPanel.tsx`](../../apps/web/src/components/panels/TodoPanel.tsx),
-[`todosStore.ts`](../../apps/web/src/lib/composition/todosStore.ts) (the list and the background, shared by every window) and
-[`todosService.ts`](../../apps/web/src/lib/composition/todosService.ts) (the `todos` table in the notes database).
+A to-do list in a panel of its own (choose **To-do** in an empty panel) that tidies itself every week: finished items go to an archive,
+unfinished ones roll over for you to place, and each week, month and quarter gets a report you can edit. Source:
+[`TodoPanel.tsx`](../../apps/web/src/components/panels/TodoPanel.tsx), [`todosStore.ts`](../../apps/web/src/lib/composition/todosStore.ts)
+(the list, the archive and the reports, shared by every window) and [`todosService.ts`](../../apps/web/src/lib/composition/todosService.ts)
+(the `todos` table in the notes database). How the weekly cycle works: [todo-weekly-cycle.md](../architecture/todo-weekly-cycle.md). To test it by hand:
+[manual-tests/todo-archival.md](../manual-tests/todo-archival.md).
 
-- **Adding.** Type in the box at the top and press Enter; the box stays for the next one. The **+** on an item adds a **sub-item** under it
-  (sub-items nest without limit, and the box stays open for more; Escape closes it).
+Four **views**, chosen with the buttons beside the add box (List, Board, Reports, Archive). Which one a panel is on is saved with the panel's
+layout (a panel saved before the board, the reports and the archive existed opens on the list).
+
+- **Adding.** Type in the box at the top and press Enter, or click the small **Add** beside it (off while the box is empty); the box stays, with the cursor in it, for the next one. The **+** on an item adds a **sub-item** under it
+  (sub-items nest without limit, and the box stays open for more; Escape closes it). A new item starts in **This week**; the **Backlog** has its own box, with its own **Add**.
 - **Renaming.** The pencil on an item, or double-click its title. Enter saves, Escape gives up.
 - **Done.** The checkbox ticks an item off and its text is struck through and dimmed. Ticking an item does not tick its sub-items.
-- **Deleting.** The bin on an item. An item with sub-items asks first, because they go with it.
-- **List or board.** The two buttons beside the add box switch the panel between the nested **list** and a **board** with a column per status:
-  **Backlog**, **To-do**, **In progress** and **Done** ([`TodoBoard.tsx`](../../apps/web/src/components/panels/TodoBoard.tsx)). A new item starts
-  in *To-do*. Move a card with the arrows on it, or drag it to another column. Every item is a card, sub-items too (a sub-item says which
-  item it is under), and moving a card does not move the cards under it. *Done* is the same state as the list's checkbox: moving a card to
-  *Done* ticks it, and unticking a done item puts it back in *To-do*. Which view a panel is on is saved with the panel's layout (a panel saved
-  before the board existed opens on the list). Items ticked off before statuses existed show up in *Done*.
-- **Folding.** The arrow beside an item with sub-items hides or shows them; which are folded is saved with the panel's layout.
-- **Background.** **Settings > Styling > To-do background** (desktop app only) gives the to-do panels a **pattern** (*Same as notes*, *Plain*, *Grid*,
+- **Removing.** The bin on an item is **Remove**: it goes to the archive at once, with its sub-items, and a bar says so with an **Undo** for a few
+  seconds. Nothing is asked first. An item that comes back from the archive is a to-do again, whatever it was.
+- **Delete permanently.** The **⋯** menu beside Remove on a row or a board card, and the bin on an Archive entry, erase an item, everything under
+  it and its history for good. A confirmation says how many items go, that it cannot be undone, that backup files made earlier may still contain it,
+  and lists the reports that mention it as links that open the report beside, so you can edit them first. Reports are never changed by a delete.
+- **Folding.** The arrow beside an item with sub-items hides or shows them, and each section's heading folds that section; both are saved with the layout.
+
+### The list
+
+Three sections, each folding away, in the order **This week**, **Rolled over**, **Backlog**, so the list you work from is at the top:
+
+- **This week**, the list you work from: what you have added or placed in the week, and what is done in it. A done item stays until its week closes; a done parent with an open sub-item stays until everything in it is done.
+- **Rolled over**, only while something is waiting there: items that were open when their week closed, each saying **From the week of** the day it first
+  rolled from, **waiting N weeks** once it has rolled more than once, and, from the third roll, a gentle nudge to move it or drop it (nothing happens by
+  itself). Three actions, each on the item and **everything rolled under it**: **Add to this week**, **Move to backlog** and **Drop** (to the archive, marked
+  Dropped). A rolled sub-item whose parent is not rolled is its own entry and says what it is **in**.
+- **Backlog**, items with the Backlog status, never swept: the same list every week, with its own add box.
+
+**Dragging between sections.** Items move by dragging as well as by their buttons. A top-level Backlog item, or a whole Rolled over entry, can be dragged onto
+**This week**; a top-level to-do in **This week** can be dragged back onto the **Backlog**. A drop works anywhere in the section, even folded or empty. While one
+is held, the section it can go to gets a faint dashed outline, and a stronger one with a tint when it is over it; the others show nothing. A Backlog item dropped on
+This week becomes a to-do; a Rolled over entry does what **Add to this week** does, on the entry and everything rolled under it; a to-do dropped on the Backlog
+becomes a Backlog item (an in-progress one too). What is under an item comes along in each case. A to-do that is **done** cannot be dragged (it stays until its week
+closes; un-tick it first), and neither can a Rolled over entry onto the Backlog (use **Move to backlog**). Dropped anywhere else, or let go of, nothing changes. A sub-item is not
+dragged on its own (dragging it picks up the item it is under), and a row being renamed is not a handle. The drag carries the item's id under its own type
+(`TODO_DRAG_TYPE`, [`dragTypes.ts`](../../apps/web/src/components/notes/dragTypes.ts)), not as text, so a note or a panel dropped on the same screen is not mistaken for it, and a
+note's editor has no text to take from it. It is mouse-only: the keyboard way to place a Rolled over entry is its **Add to this week** button, and a Backlog item or a to-do is moved
+on the board. The board is unchanged: its cards move by their arrows or by dragging between columns.
+
+### The board
+
+**Board** shows a column per status: **Backlog**, **To-do**, **In progress** and **Done** ([`TodoBoard.tsx`](../../apps/web/src/components/panels/TodoBoard.tsx)).
+A new item starts in *To-do*. Move a card with the arrows on it, or drag it to another column. Every item is a card, sub-items too (a sub-item says which item
+it is under), and moving a card does not move the cards under it. *Done* is the same state as the list's checkbox. **Rolled over** is a strip above the columns with
+the same three actions, and the columns leave those items out.
+
+### Reports
+
+**Reports** lists the reports as **Weeks**, **Months** and **Quarters**, newest period first, every copy of a period. A report is an ordinary note in the
+**To-do reports** notebook (groups Weekly, Monthly and Quarterly), so it can be searched, edited and deleted like any note. **Open** shows it in a note panel beside
+this one. **Regenerate** makes **another** note for the same period and leaves the first, with what you wrote in it, untouched. Each section has a **Make a report for…**
+picker of the closed periods that have none (a quiet week, or one you deleted). The reports are made when a week, month or quarter closes and had something
+in it; each has a **My notes** section at the bottom for you to write in, and the month's and quarter's carry up what the weekly ones say.
+
+### The archive
+
+**Archive** is what left the list, a week at a time (newest first), each entry marked **Done**, **Removed** or **Dropped** with its date, a branch archived together
+shown together. Type in the search box to filter by title. **Restore** brings an entry back to the list (what was archived with it comes too; if what it was under is
+still archived, it comes back at the top level and says so). Items are kept for the window set in **Settings > General > To-dos**, 5 years unless you change it,
+then deleted for good.
+
+### Settings
+
+- **Settings > General > To-dos** (desktop app only, hidden while the plugin is off): **Week starts on** (default Sunday), **Keep archived items for** (1, 2, 3, 5 or 10
+  years, **Keep forever**, or a number of months from 1 to 600; lowering it first says how many archived items would be deleted and asks you to confirm), and
+  **Fiscal year starts in** (quarterly reports follow it; a fiscal year is named by the year it ends in).
+- **Settings > Styling > To-do background** (desktop app only) gives the to-do panels a **pattern** (*Same as notes*, *Plain*, *Grid*,
   *Dots* or *Ruled lines*) and a **color** (a few presets, any color from the picker, or the color scheme's own), with a small preview. It is
   **one setting for every to-do panel**, in any window, and is separate from the note background above it: *Same as notes* follows that
   setting, and the other patterns draw whatever you pick, whatever it says. It applies at once, including in pop-outs, and is saved in the
   settings file (`todoLook`). A chosen color also sets the text color to light or dark, whichever reads better on it, so it works under every
   color scheme. **Reset to default** undoes both.
+
+### A plugin, and one list
+
 - **A plugin.** The to-do list is a built-in plugin, on by default, switched in **Settings > Plugins** (`plugins` in the settings file; registry in
-  [`plugins.ts`](../../apps/web/src/lib/composition/plugins.ts)). While it is **off**, an empty panel does not offer **To-do**, **Settings > Styling > To-do
-  background** is hidden, and a to-do panel that is already open stays in its place saying the plugin is off, with a **Turn on To-do** button. Nothing is
-  deleted: the items stay in the database and the panel keeps its folded items, so turning it back on restores everything. The change applies at
-  once in every window. The app's IPC and the `todos` table are unchanged by it. The web app lists the plugin but cannot turn it on or off, as it has no panels.
-- **One list.** The items belong to the workspace, not the panel: any number of to-do panels, in any window, show and change the same list,
-  and it is saved in the database as you go, so closing a panel loses nothing.
+  [`plugins.ts`](../../apps/web/src/lib/composition/plugins.ts)). While it is **off**, an empty panel does not offer **To-do**, the To-dos and To-do background
+  settings are hidden, **the weekly cycle does not run** (no week closes, no report is made, nothing is purged), and a to-do panel that is already open stays in its
+  place saying the plugin is off, with a **Turn on To-do** button. Nothing is deleted: the items stay in the database, so turning it back on restores everything,
+  and the cycle catches up, week by week, at the next launch or within the hour. The change applies at once in every window. The web app lists the plugin but cannot
+  turn it on or off, as it has no panels.
+- **One list.** The items belong to the workspace, not the panel: any number of to-do panels, in any window, show and change the same list, and it is saved in the
+  database as you go, so closing a panel loses nothing. When the weekly cycle changes the list, every window reads it again.
 
 ## The Reading List panel
 
@@ -244,4 +302,4 @@ read from the database again and merged in.
 
 ## Not built yet
 
-Dragging a panel header out of the window to pop it out, and native-menu entries for the panel commands. The to-do panel is the basic version: no due dates, tags, ordering by hand or the other things the Taskfile project has yet. See [panel-system-plan.md](../panel-system-plan.md#build-order).
+Dragging a panel header out of the window to pop it out, and native-menu entries for the panel commands. The to-do panel has no due dates, tags or ordering by hand yet. See [panel-system-plan.md](../panel-system-plan.md#build-order).

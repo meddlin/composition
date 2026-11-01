@@ -15,11 +15,19 @@ export type NotesBrowserState = { notebookId: number | null };
  */
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
-/** How a to-do panel shows the items: as the nested list, or as a board with a column per status. */
-export type TodoView = "list" | "board";
+/** How a to-do panel shows the items: as the nested list, as a board with a column per status, as the reports, or the archive. */
+export type TodoView = "list" | "board" | "reports" | "archive";
 
-/** What a to-do panel saves: the items whose sub-items are folded away in it, and which view it is on. The items themselves, and the panels' background, are the workspace's. */
-export type TodoPanelState = { collapsed: number[]; view: TodoView };
+/** The places the list view sorts items into, each of which can be folded away. */
+export type TodoSection = "rolled-over" | "this-week" | "backlog";
+
+const TODO_SECTIONS: readonly unknown[] = ["rolled-over", "this-week", "backlog"] satisfies TodoSection[];
+
+/**
+ * What a to-do panel saves: the items whose sub-items are folded away in it, which view it is on, and which sections of the
+ * list are folded away. The items themselves, and the panels' background, are the workspace's.
+ */
+export type TodoPanelState = { collapsed: number[]; view: TodoView; foldedSections: TodoSection[] };
 
 /** The least width, in px, the list beside a Reading List page can be dragged to, and the least the page keeps. */
 export const READING_LIST_MIN_WIDTH = 160;
@@ -98,13 +106,16 @@ export const KINDS: Record<
   todo: {
     minWidth: MIN_PANEL_WIDTH,
     plugin: "todo",
-    initialState: (): TodoPanelState => ({ collapsed: [], view: "list" }),
+    initialState: (): TodoPanelState => ({ collapsed: [], view: "list", foldedSections: [] }),
     restore(saved) {
       if (!isRecord(saved) || !Array.isArray(saved.collapsed)) return null;
       return {
         collapsed: saved.collapsed.filter((id): id is number => Number.isSafeInteger(id)),
-        // Panels saved before the board existed have no view.
-        view: saved.view === "board" ? "board" : "list",
+        // Panels saved before the board existed have no view, and ones saved before the sections have none folded.
+        view: saved.view === "board" || saved.view === "reports" || saved.view === "archive" ? saved.view : "list",
+        foldedSections: Array.isArray(saved.foldedSections)
+          ? [...new Set(saved.foldedSections.filter((section): section is TodoSection => TODO_SECTIONS.includes(section)))]
+          : [],
       } satisfies TodoPanelState;
     },
   },
