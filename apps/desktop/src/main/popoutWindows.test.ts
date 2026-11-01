@@ -24,6 +24,7 @@ describe("decideWindowOpen", () => {
       nodeIntegration: false,
       webSecurity: true,
       spellcheck: true,
+      webviewTag: true,
     });
     expect(decision.options).toMatchObject({ show: false, backgroundColor: "#121212", title: "Composition" });
   });

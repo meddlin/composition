@@ -158,6 +158,51 @@ const TODO_CYCLE_COLUMNS: readonly [column: string, ddl: string][] = [
   ["roll_count", "ALTER TABLE todos ADD COLUMN roll_count INTEGER NOT NULL DEFAULT 0"],
 ];
 
+/**
+ * The Reading List plugin's links. `url` is unique because the list refuses a link it already has; `title` is empty until
+ * the page has been opened and named itself. The CLI shares this file and ignores the table.
+ */
+const READING_LIST_SCHEMA = `
+CREATE TABLE IF NOT EXISTS reading_list (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
+    read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+`;
+
+/**
+ * The RSS Reader's feeds and their entries. Deleting a feed deletes its entries too (feedsRepo.ts does that in one
+ * transaction, so no foreign key is declared). The CLI shares this file and ignores the tables.
+ */
+const FEEDS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS feeds (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    url TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL DEFAULT '',
+    site_url TEXT NOT NULL DEFAULT '',
+    etag TEXT NOT NULL DEFAULT '',
+    last_modified TEXT NOT NULL DEFAULT '',
+    last_fetched_at TEXT,
+    last_error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS feed_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    feed_id INTEGER NOT NULL,
+    guid TEXT NOT NULL,
+    url TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    summary TEXT NOT NULL DEFAULT '',
+    published_at TEXT NOT NULL,
+    read INTEGER NOT NULL DEFAULT 0,
+    UNIQUE (feed_id, guid)
+);
+CREATE INDEX IF NOT EXISTS idx_feed_items_feed_published ON feed_items (feed_id, published_at);
+`;
+
 function ensureColumn(db: Database.Database, table: string, column: string, ddl: string): void {
   const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
   if (!columns.some((c) => c.name === column)) {
@@ -199,6 +244,8 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
   db.exec(TODOS_SCHEMA);
+  db.exec(READING_LIST_SCHEMA);
+  db.exec(FEEDS_SCHEMA);
   // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
   const todoColumns = db.prepare("PRAGMA table_info(todos)").all() as { name: string }[];
   if (!todoColumns.some((c) => c.name === "status")) {

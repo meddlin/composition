@@ -6,6 +6,8 @@ import { DEFAULT_HOME_SETTINGS, toggleNotebookPin as toggleNotebookPinIn, type H
 import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/composition/pluginsStore";
 import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
+import { createFeedsStore, unavailableFeeds, type FeedsStore } from "@/lib/composition/feedsStore";
+import { createReadingListStore, unavailableReadingList, type ReadingListStore } from "@/lib/composition/readingListStore";
 import { createTodosStore, unavailableTodos, type TodosStore } from "@/lib/composition/todosStore";
 import type { WritingSettings } from "@/lib/composition/writing";
 import type { DropZone, Edge, PanelId, SplitPath } from "../panels/layoutTree";
@@ -109,6 +111,10 @@ export type WorkspaceSnapshot = {
 export type WorkspaceOptions = {
   /** The to-do items the to-do panels show, one list for every window. Without it, loading them reports that they are unavailable. */
   todos?: TodosStore;
+  /** The Reading List's links, one list for every window. Without it, loading them reports that they are unavailable. */
+  readingList?: ReadingListStore;
+  /** The RSS Reader's feeds and entries, one set for every window. Without it, loading them reports that they are unavailable. */
+  feeds?: FeedsStore;
   /** Which plugins are on, one answer for every window. Without it, all are on and a change is only remembered while the page is open. */
   plugins?: PluginsStore;
   panels?: {
@@ -126,6 +132,10 @@ export type WorkspaceStore = {
   readonly assistant: ChatsStore;
   /** The to-do items, which live with the workspace so every to-do panel, in any window, shows one list. */
   readonly todos: TodosStore;
+  /** The Reading List's links, which live with the workspace so every Reading List panel, in any window, shows one list. */
+  readonly readingList: ReadingListStore;
+  /** The RSS Reader's feeds and entries, which live with the workspace so every RSS panel, in any window, shows the same ones. */
+  readonly feeds: FeedsStore;
   /** Which built-in plugins are on, which live with the workspace so every panel, in any window, agrees. */
   readonly plugins: PluginsStore;
   subscribe(listener: () => void): () => void;
@@ -577,6 +587,8 @@ export function createWorkspaceStore(
   return {
     assistant,
     todos: options.todos ?? createTodosStore(unavailableTodos),
+    readingList: options.readingList ?? createReadingListStore(unavailableReadingList),
+    feeds: options.feeds ?? createFeedsStore(unavailableFeeds),
     plugins,
     subscribe(listener) {
       listeners.add(listener);

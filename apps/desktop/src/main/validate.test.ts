@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { FEED_METHODS } from "../../../web/src/lib/composition/feedsApi";
+import { READING_LIST_METHODS } from "../../../web/src/lib/composition/readingListApi";
 import { TODO_METHODS } from "../../../web/src/lib/composition/todosApi";
 import { PANELS_METHODS } from "../../../web/src/lib/composition/panelsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -40,7 +42,7 @@ describe("VALIDATORS", () => {
       wordCountEnabled: true,
     };
     expect(VALIDATORS.saveWritingSettings([{ ...writing, extra: 1 }])).toEqual([writing]);
-    expect(VALIDATORS.savePluginSettings([{ todo: false, extra: 1 }])).toEqual([{ todo: false }]);
+    expect(VALIDATORS.savePluginSettings([{ todo: false, "reading-list": true, rss: false, extra: 1 }])).toEqual([{ todo: false, "reading-list": true, rss: false }]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
@@ -159,6 +161,7 @@ describe("VALIDATORS", () => {
     ["savePluginSettings", [null]],
     ["savePluginSettings", [{}]],
     ["savePluginSettings", [{ todo: "off" }]],
+    ["savePluginSettings", [{ todo: true }]],
     ["saveHomeSettings", [null]],
     ["saveHomeSettings", [{ layout: 1 }]],
     ["saveHomeSettings", [{ layout: "rail", sections: "all", recentCount: 12, density: "standard", startup: "note" }]],
@@ -465,5 +468,93 @@ describe("TODO_VALIDATORS", () => {
     ["deleteTodo", [null]],
   ] as const)("refuses %s with %j", (method, args) => {
     expect(() => TODO_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("READING_LIST_VALIDATORS", () => {
+  it("has a validator for every method of the Reading List API, and no extras", () => {
+    expect(Object.keys(READING_LIST_VALIDATORS).sort()).toEqual([...READING_LIST_METHODS].sort());
+  });
+
+  it("lists and clears without taking anything from the page", () => {
+    expect(READING_LIST_VALIDATORS.listReadingItems(["/etc/passwd"])).toEqual([]);
+    expect(READING_LIST_VALIDATORS.clearReadingData(["https://evil.example/"])).toEqual([]);
+  });
+
+  it("passes on a link as the shared rule writes it, and nothing else the page sent", () => {
+    expect(READING_LIST_VALIDATORS.addReadingItem(["  example.com/a#top ", "extra"])).toEqual(["https://example.com/a"]);
+    expect(READING_LIST_VALIDATORS.setReadingItemTitle([4, "A post", "extra"])).toEqual([4, "A post"]);
+    expect(READING_LIST_VALIDATORS.setReadingItemRead([4, true, "extra"])).toEqual([4, true]);
+    expect(READING_LIST_VALIDATORS.deleteReadingItem([4, "extra"])).toEqual([4]);
+  });
+
+  it.each([
+    ["addReadingItem", []],
+    ["addReadingItem", [null]],
+    ["addReadingItem", [{ toString: () => "https://example.com" }]],
+    ["addReadingItem", [""]],
+    ["addReadingItem", ["javascript:alert(1)"]],
+    ["addReadingItem", ["file:///etc/passwd"]],
+    ["addReadingItem", ["app://composition/"]],
+    ["addReadingItem", ["data:text/html,hi"]],
+    ["addReadingItem", [`https://example.com/${"a".repeat(3000)}`]],
+    ["setReadingItemTitle", ["4", "x"]],
+    ["setReadingItemTitle", [4, null]],
+    ["setReadingItemTitle", [4, "x".repeat(10000)]],
+    ["setReadingItemRead", [4, "true"]],
+    ["setReadingItemRead", [1.5, true]],
+    ["setReadingItemRead", [4]],
+    ["deleteReadingItem", [null]],
+    ["deleteReadingItem", ["4"]],
+  ] as const)("refuses %s with %j", (method, args) => {
+    expect(() => READING_LIST_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("FEED_VALIDATORS", () => {
+  it("has a validator for every method of the feeds API, and no extras", () => {
+    expect(Object.keys(FEED_VALIDATORS).sort()).toEqual([...FEED_METHODS].sort());
+  });
+
+  it("lists and refreshes everything without taking anything from the page", () => {
+    expect(FEED_VALIDATORS.listFeeds(["/etc/passwd"])).toEqual([]);
+    expect(FEED_VALIDATORS.refreshAllFeeds(["https://evil.example/"])).toEqual([]);
+  });
+
+  it("passes on an address as the shared rule writes it, and nothing else the page sent", () => {
+    expect(FEED_VALIDATORS.subscribeFeed(["  example.com/feed#top ", "extra"])).toEqual(["https://example.com/feed"]);
+    expect(FEED_VALIDATORS.unsubscribeFeed([4, "extra"])).toEqual([4]);
+    expect(FEED_VALIDATORS.listFeedEntries([4, "extra"])).toEqual([4]);
+    expect(FEED_VALIDATORS.listFeedEntries([null])).toEqual([null]);
+    expect(FEED_VALIDATORS.refreshFeed([4])).toEqual([4]);
+    expect(FEED_VALIDATORS.setFeedEntryRead([7, false, "extra"])).toEqual([7, false]);
+    expect(FEED_VALIDATORS.markFeedRead([null])).toEqual([null]);
+    expect(FEED_VALIDATORS.markFeedRead([3])).toEqual([3]);
+  });
+
+  it.each([
+    ["subscribeFeed", []],
+    ["subscribeFeed", [null]],
+    ["subscribeFeed", [{ toString: () => "https://example.com" }]],
+    ["subscribeFeed", [""]],
+    ["subscribeFeed", ["javascript:alert(1)"]],
+    ["subscribeFeed", ["file:///etc/passwd"]],
+    ["subscribeFeed", ["app://composition/"]],
+    ["subscribeFeed", ["https://user:pw@example.com/feed"]],
+    ["subscribeFeed", [`https://example.com/${"a".repeat(3000)}`]],
+    ["unsubscribeFeed", [null]],
+    ["unsubscribeFeed", ["4"]],
+    ["listFeedEntries", []],
+    ["listFeedEntries", ["4"]],
+    ["listFeedEntries", [1.5]],
+    ["refreshFeed", [null]],
+    ["refreshFeed", [{ id: 4 }]],
+    ["setFeedEntryRead", [7, "false"]],
+    ["setFeedEntryRead", [7]],
+    ["setFeedEntryRead", [null, true]],
+    ["markFeedRead", []],
+    ["markFeedRead", ["all"]],
+  ] as const)("refuses %s with %j", (method, args) => {
+    expect(() => FEED_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });

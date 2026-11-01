@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import type { Components } from "react-markdown";
+import { Chart } from "./Chart";
 import { Drawio } from "./Drawio";
 import { Footnotes } from "./Footnotes";
 import { Image } from "./Image";
@@ -30,8 +31,12 @@ export const mdxComponents: Record<
     url?: string;
     start?: string;
     description?: string;
+    type?: string;
+    x?: string;
+    y?: string;
+    height?: string;
   }>
-> = { Info, Warning, Image, Drawio, Toc, Mark, Footnotes, YouTube, Repo };
+> = { Info, Warning, Image, Drawio, Toc, Mark, Footnotes, YouTube, Repo, Chart };
 
 const names = Object.keys(mdxComponents);
 

@@ -1,7 +1,7 @@
 # Reading List plugin: design and build plan
 
 A list of article links on the left and, on the right, the page of the one you picked, rendered inside Composition, so a
-reading list can be read without leaving the app. Status: **proposed (2026-10-28), nothing built.** Revised the same day for
+reading list can be read without leaving the app. Status: **built (2026-10-30); Gates A–G passed (see "What the build found"), Gate H (the manual test) is yours to run.** First proposed 2026-10-28. Revised the same day for
 the built-in plugin system that PR #190 added. Anything marked **my pick** is a judgment, not something the owner decided;
 **Inference** is reasoning from a fact, not a measurement.
 
@@ -116,6 +116,21 @@ Each step ends with a gate; do not start the next until it has passed.
 6. **Panel UI.** List, add box, narrow/wide layout, toolbar, with `ReadingWebview` behind a small seam so component tests can pass a fake (jsdom has no `<webview>`). **Gate F:** component tests; look at it with `preview_start` on the `web` server as AGENTS.md requires.
 7. **Main-process guard.** `readingListGuard.ts`, `webviewTag` on both window types, R2's enforcement, R11's plugin check, the forwarding of keys (if the spike said it works), the CSP change (if it said it is needed). **Gate G:** unit tests for what the guard refuses (a `src` of `file:`, a `preload`, `nodeIntegration`, any attach while the plugin is off); the smoke test loads a local `http://127.0.0.1` fixture page in the webview and confirms `window.composition` is *not* defined inside it.
 8. **Settings and docs.** The Clear browsing data control; a **Reading List** section in [panels.md](ui/panels.md), a row in [feature-matrix.md](feature-matrix.md) (desktop only), a line in [index.md](index.md), and `docs/manual-tests/reading-list.md` (real sites, a paywalled sign-in, a pop-out, narrow panel, dividers over a page, keys, toggling the plugin off and on with a page open). **Gate H:** the manual test, run by hand.
+
+## What the build found
+
+The spike (Gate A) was run as `apps/desktop/scripts/smoke-reading-list.mjs` against the real app (Electron 44), not as a throwaway; it stays as the Gate G smoke test.
+
+| Question | Answer |
+|---|---|
+| Risk 1: do keys leave the webview? | **They do not reach the host, but the guest's `before-input-event` sees them**, and `hostWebContents.sendInputEvent` hands them on: `Mod+Shift+\` inside a page splits the panel. Matched by physical key (`input.code`), not the character, because Shift changes the character. |
+| Risk 2: drags over the page | A webview swallows them, as predicted. The panel's view sets `pointer-events: none` while a divider is held (`ResizeHandle` marks `body[data-resizing]`) or an HTML drag is in progress (`dragstart`/`dragend`). The smoke test checks the divider case; the drag across the page is in the manual test. |
+| Risk 3: does the CSP govern `<webview>`? | **No.** A page whose server sends `X-Frame-Options: DENY` loads, with no CSP error in the console; `protocol.ts` is unchanged. |
+| Pop-outs | Work with `webviewTag: true` in both window types; a test compares the two preference sets so they cannot drift (risk 5). |
+| R2 as written was wrong in one place | Electron has **already chosen the guest's session** when `will-attach-webview` runs: rewriting `params.partition` there does nothing (a forged view kept the partition it named). So the guard **refuses** any view that does not ask for exactly `persist:reading-list` (the panel always does), instead of overriding it. A view that names none (which would be the app's own session) is refused too. |
+| R8 as written was incomplete | With `allowpopups` off, Electron drops a `window.open`/`target=_blank` before the guest's open handler hears of it, so the link did nothing. The view now sets `allowpopups`, which is safe because the handler denies every window and sends the address to the browser. |
+| Risk 6: is the plugin check stale after a save? | No: `loadWebSettings()` reads the settings file at each attach, so turning the plugin off refuses the next attach at once. |
+| Not in the plan, added | **Clear browsing data asks first** (it signs you out of every site), and the narrow/wide switch uses the panel's own width, not the window's. |
 
 ## Non-goals and future work
 

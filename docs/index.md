@@ -43,7 +43,9 @@ See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside 
 [ai-helper-research.md](ai-helper-research.md) and [ai-helper-plan.md](ai-helper-plan.md).
 
 
-See [reading-list-plan.md](reading-list-plan.md) for the plan for a Reading List plugin: a list of article links beside a webview that shows the one you pick.
+See [reading-list-plan.md](reading-list-plan.md) for the Reading List plugin (desktop only, off until switched on): a list of article links beside a webview that shows the one you pick; [ui/panels.md](ui/panels.md#the-reading-list-panel) describes it and [manual-tests/reading-list.md](manual-tests/reading-list.md) checks it by hand.
+
+See [rss-reader-plan.md](rss-reader-plan.md) for the RSS Reader plugin (desktop only, off until switched on): subscribe to RSS and Atom feeds, read their entries and unsubscribe; [ui/panels.md](ui/panels.md#the-rss-reader-panel) describes it and [manual-tests/rss.md](manual-tests/rss.md) checks it by hand.
 
 See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for how the to-do list tidies itself each week (finished items archived, unfinished ones rolled over, a history kept for a window you set, and weekly, monthly and quarterly reports written as notes), [ui/panels.md](ui/panels.md#the-to-do-panel) for what the panel does, [manual-tests/todo-archival.md](manual-tests/todo-archival.md) for checking it by hand, and [todo-archival-plan.md](todo-archival-plan.md) for the design and its decisions.
 

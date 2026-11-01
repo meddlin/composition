@@ -52,6 +52,11 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "A card linking to a git repository (GitHub, GitLab, …)",
     template: '<Repo url="$0" />',
   },
+  Chart: {
+    description: "A bar, line, area or pie chart of a CSV table written inside the tag",
+    // Blank lines around the fence are what make it a code block (see Chart).
+    template: '<Chart type="bar">\n\n```csv\n$0\n```\n\n</Chart>',
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));

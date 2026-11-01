@@ -1,3 +1,4 @@
+import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
@@ -7,14 +8,19 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, indexReportNotes, listNotes, loadWebSettings, panelsService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, feedsService, indexReportNotes, listNotes, loadWebSettings, panelsService, readingListService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
+import { fetchFeedText } from "./feedFetcher";
+import { startFeedRefresh } from "./feedRefresh";
+import { createFeedsController } from "./feedsController";
 import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
+import { READING_LIST_PARTITION } from "../../../web/src/lib/composition/readingListApi";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
+import { clearReadingData, installReadingListGuard } from "./readingListGuard";
 import { createPopoutManager } from "./popoutManager";
 import { broadcastTodosChanged, createTodoCycleRunner, notifyTodoReports } from "./todoCycleRunner";
 import { createWindowPrefsStore, createWindowTranslucency } from "./translucency";
@@ -184,6 +190,34 @@ const translucency = createWindowTranslucency({
   solidBackground: () => THEME_BACKGROUND[currentThemeKey()] ?? THEME_BACKGROUND.dark,
 });
 
+// The Reading List's pages live in a session of their own, apart from the app's UI (cookies, cache, storage).
+const readingSession = () => session.fromPartition(READING_LIST_PARTITION);
+
+/** What every window gets so its page may hold a Reading List web view, and only while the plugin is on. */
+function attachReadingListGuard(webContents: Parameters<typeof installReadingListGuard>[0]): void {
+  installReadingListGuard(webContents, {
+    // Read from the settings file at each attach, so switching the plugin off takes effect without a restart.
+    pluginEnabled: () => loadWebSettings().plugins["reading-list"],
+    openExternal: (url) => void shell.openExternal(url),
+    readingSession,
+  });
+}
+
+// The RSS Reader's feeds: fetched here (the renderer has no network access), only while the plugin is on. A fetch from this
+// computer's own addresses is refused; only an unpackaged build started with COMPOSITION_FEEDS_ALLOW_PRIVATE=1 (the smoke
+// test, which serves a feed from 127.0.0.1) lifts that.
+const feeds = createFeedsController({
+  store: feedsService,
+  fetchFeed: (url, validators) =>
+    fetchFeedText(url, validators, {
+      fetch,
+      lookup: async (hostname) => (await dns.lookup(hostname, { all: true })).map(({ address }) => address),
+      allowPrivate: !app.isPackaged && process.env.COMPOSITION_FEEDS_ALLOW_PRIVATE === "1",
+      userAgent: `Composition/${app.getVersion()}`,
+    }),
+  pluginEnabled: () => loadWebSettings().plugins.rss,
+});
+
 // Pop-outs: a panel pulled into a window of its own. The main window's page opens them; this decides that they may be
 // opened, remembers where each was put (in a file only this process writes) and closes them with the main window.
 const popouts = createPopoutManager({
@@ -197,6 +231,7 @@ const popouts = createPopoutManager({
   }),
   openExternal: (url) => void shell.openExternal(url),
   installContextMenu,
+  installReadingListGuard: attachReadingListGuard,
 });
 
 function openMainWindow(): BrowserWindow {
@@ -207,6 +242,7 @@ function openMainWindow(): BrowserWindow {
     theme: currentThemeKey(),
     translucent: translucency.isActive(),
     popouts,
+    installReadingListGuard: attachReadingListGuard,
   });
 }
 
@@ -239,6 +275,9 @@ async function main(): Promise<void> {
     backup,
     panels: panelsService,
     todos: notifyTodoReports(todosService, announceTodos),
+    // Clearing is the one call that needs a browser session, which only this process has.
+    readingList: { ...readingListService, clearReadingData: () => clearReadingData(readingSession()) },
+    feeds,
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
@@ -254,6 +293,11 @@ async function main(): Promise<void> {
   // Before the window, so a week that ended while the app was closed is already closed when the list is first read.
   todoCycle.start();
   openMainWindow();
+  startFeedRefresh({
+    enabled: () => loadWebSettings().plugins.rss,
+    hasWindow: () => BrowserWindow.getAllWindows().length > 0,
+    refreshAll: () => feeds.refreshAllFeeds(),
+  });
   updates.installMenuItem();
   installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
   updates.manager.start();

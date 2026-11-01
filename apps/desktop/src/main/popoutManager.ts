@@ -41,6 +41,8 @@ type Options = {
   openExternal: (url: string) => void;
   /** Attaches the right-click menu (spelling, editing) to a window's page. */
   installContextMenu: (webContents: any) => void;
+  /** Attaches the guard that decides what web views a window's page may hold (the Reading List's). */
+  installReadingListGuard: (webContents: any) => void;
 };
 
 /**
@@ -53,7 +55,7 @@ type Options = {
  * mistaken for one the user closed: the saved layout still has it, and it comes back with the main window.
  */
 export function createPopoutManager(options: Options) {
-  const { allowedOrigins, preloadPath, backgroundColor, translucent, windowState, openExternal, installContextMenu } = options;
+  const { allowedOrigins, preloadPath, backgroundColor, translucent, windowState, openExternal, installContextMenu, installReadingListGuard } = options;
   const open = new Map<string, WindowLike>();
   const destroying = new Set<string>();
 
@@ -68,6 +70,7 @@ export function createPopoutManager(options: Options) {
 
   function guard(window: WindowLike, id: string, main: WindowLike): void {
     installContextMenu(window.webContents);
+    installReadingListGuard(window.webContents);
     // A pop-out opens nothing of its own: links in its notes go to the browser, as in the main window.
     window.webContents.setWindowOpenHandler(({ url }) => {
       const decision = decideWindowOpen({ url, openedByPopout: true, allowedOrigins, preloadPath, backgroundColor: backgroundColor(), translucent: translucent() });

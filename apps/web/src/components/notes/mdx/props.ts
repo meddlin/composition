@@ -1,4 +1,5 @@
 import { insideFence, type MdxCompletion } from "./completions";
+import { CHART_TYPES } from "./chartData";
 import type { mdxComponents } from "./components";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
 
@@ -75,6 +76,21 @@ const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
   Repo: [
     { name: "url", description: "The repository's page or clone address (github.com/owner/repo, git@host:owner/repo.git)" },
     { name: "description", description: "What the repository is for, shown under its name" },
+  ],
+  Chart: [
+    {
+      name: "type",
+      description: "Kind of chart (bar when left out)",
+      values: CHART_TYPES.map((type) => ({ value: type, description: `A ${type} chart` })),
+    },
+    { name: "x", description: "The column for the labels along the bottom (the first when left out)" },
+    { name: "y", description: "The column(s) to draw, comma-separated (every column of numbers when left out)" },
+    { name: "title", description: "Caption shown above the chart" },
+    {
+      name: "height",
+      description: "How tall to draw it, in pixels (280 when left out)",
+      values: ["200", "280", "400", "600"].map((value) => ({ value, description: `${value} pixels tall` })),
+    },
   ],
 };
 

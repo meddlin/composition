@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -17,13 +17,14 @@ import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { HEADINGS_PROP, imageNameFromRef, parseRepo, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
+import { chartMarkdown } from "./chartText";
+import { HEADINGS_PROP, imageNameFromRef, parseChart, parseRepo, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -219,6 +220,8 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "markdown", source: youtubeMarkdown(element) }];
     case "Repo":
       return [{ kind: "markdown", source: repoMarkdown(element) }];
+    case "Chart":
+      return [{ kind: "markdown", source: chartText(element) }];
     default:
       return [];
   }
@@ -265,6 +268,9 @@ function replacement(element: Node, source: string): string {
       return youtubeMarkdown(element);
     case "Repo":
       return repoMarkdown(element);
+    // A block of bars can't sit in a sentence or a list item, any more than a table of contents can.
+    case "Chart":
+      return "";
     case "Info":
     case "Warning":
     case "Mark": {
@@ -313,6 +319,21 @@ function repoMarkdown(element: Node): string {
   if (!ref) return url ? `Not a repository address: ${url.replace(/[\\[\]<>`*_]/g, "\\$&")}` : "Repository: add a url";
   const description = attribute(element, "description")?.trim().replace(/[\\[\]<>`*_]/g, "\\$&");
   return `[⎇ ${repoLabel(ref).replace(/_/g, "\\_")}](${ref.href})${description ? ` — ${description}` : ""}`;
+}
+
+/** The text of a tag's code blocks and text, in order: the CSV of a `<Chart>`. */
+function csvOf(node: Node): string {
+  if (node.type === "code" || node.type === "text" || node.type === "inlineCode") return node.value ?? "";
+  return (node.children ?? []).map(csvOf).join("\n");
+}
+
+/**
+ * `<Chart>` as bars of text in a code block (see chartText.ts), since a terminal can't draw the
+ * chart. A table that can't be drawn is said so in words, as on the web.
+ */
+function chartText(element: Node): string {
+  const parsed = parseChart({ type: attribute(element, "type"), x: attribute(element, "x"), y: attribute(element, "y"), csv: csvOf(element) });
+  return parsed.spec ? chartMarkdown(parsed.spec, attribute(element, "title")) : parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {
