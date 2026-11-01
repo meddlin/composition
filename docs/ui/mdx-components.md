@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -243,6 +243,49 @@ Source: [`mdx/Repo.tsx`](../../apps/web/src/components/notes/mdx/Repo.tsx) and
 [`mdx/repoRef.ts`](../../apps/web/src/components/notes/mdx/repoRef.ts), which reads the address
 (and is shared with the terminal app).
 
+## `<Chart>`
+
+A bar, line, area or pie chart of a table, with the table written inside the tag as a CSV block:
+
+````mdx
+<Chart type="line" x="month" y="sales,costs" title="2026">
+
+```csv
+month,sales,costs
+Jan,10,7
+Feb,12,8
+Mar,9,9
+```
+
+</Chart>
+````
+
+- **Blank lines around the fence.** As for `<Info>`, the tags go on lines of their own with blank lines
+  around the content; that is what makes the fence a code block. The data is CSV because a tag's props
+  are plain strings (see [How it renders](#how-it-renders)), and a fenced block is the one place a note
+  can hold a table of numbers that Markdown won't rewrap.
+- **The table.** The first row names the columns. Cells can be quoted (`"Smith, J"`, with `""` for a
+  quote). Numbers can be plain, `1,234` or `12%` (read as 12). A cell that isn't a number is a gap in its
+  series, not an error. Up to 500 rows are drawn.
+- `type` is `bar` (the default), `line`, `area` or `pie`; one that isn't any of them is a bar chart.
+- `x` is the column for the labels (the first by default). `y` is the column or columns to draw,
+  comma-separated (every other column that holds numbers by default). A pie draws only the first, with
+  `x` naming its slices.
+- `title` captions the chart. `height` is in pixels (280 by default, kept between 120 and 800).
+- Colors are the active theme's own (`--primary`, `--success`, `--warning`, `--destructive`), so a chart
+  matches the note it is in and reads in every scheme. It is a figure with a text label saying what it
+  charts, for screen readers.
+- A table that can't be drawn (no rows, a column that isn't there, no column of numbers) shows a short
+  notice in place of the chart, saying which, so the rest of the note stays put.
+- The terminal draws a horizontal bar of text for every value, whatever the type (a line's shape is lost,
+  its numbers are not), with a pie's share of the whole after each slice.
+
+Source: [`mdx/Chart.tsx`](../../apps/web/src/components/notes/mdx/Chart.tsx), a thin wrapper over
+[Recharts](https://recharts.org/), and [`mdx/chartData.ts`](../../apps/web/src/components/notes/mdx/chartData.ts),
+which reads the CSV and the props (and is shared with the terminal app, whose drawing is
+[`chartText.ts`](../../apps/cli/src/chartText.ts)). A note never reaches Recharts' own API: swapping
+the library means rewriting `Chart.tsx` only.
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -279,6 +322,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Footnotes>`, and the list at the end of a note without it | A box titled `Footnotes`, one numbered line per footnote; a link keeps its address in brackets after its words. Citations in the text are superscript digits (`¹`), since `[1]` would be read as a link. The definitions are not left where they were written. |
 | `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
 | `<Repo>` | A link to the repository, `⎇ owner/name`, with the description after it. A `url` that isn't a repository is said so in words. |
+| `<Chart>` | A code block of bars made of block characters, one per value, under the title in bold. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 | `<Drawio>` | The same as `<Image>`: the diagram's picture, which is a PNG. The terminal has no editor, so it cannot change one. |
 
@@ -317,6 +361,9 @@ worth trying for that prop.
 | `<YouTube>` | `url`, `title` | none (free text) |
 | `<YouTube>` | `start` | `30` `1:00` `5:00` |
 | `<Repo>` | `url`, `description` | none (free text) |
+| `<Chart>` | `type` | `bar` `line` `area` `pie` |
+| `<Chart>` | `height` | `200` `280` `400` `600` |
+| `<Chart>` | `x`, `y`, `title` | none (free text) |
 
 A value menu closes when nothing matches what's typed, since `width="320"` is as good as any
 preset. Picking a value replaces what was typed, closing quote included, and puts the caret past

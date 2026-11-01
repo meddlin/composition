@@ -73,6 +73,8 @@ export * as panes from "../../web/src/components/notes/panes";
 export { remarkRestrictMdx, renderKey } from "../../web/src/components/notes/mdx/remarkRestrictMdx";
 export { parseYouTube, youtubeWatchUrl } from "../../web/src/components/notes/mdx/youtubeRef";
 export { parseRepo, repoLabel } from "../../web/src/components/notes/mdx/repoRef";
+export { parseChart } from "../../web/src/components/notes/mdx/chartData";
+export type { ChartSpec } from "../../web/src/components/notes/mdx/chartData";
 export { remarkIndentedCode } from "../../web/src/components/notes/mdx/remarkIndentedCode";
 export { remarkHeadings, HEADINGS_PROP } from "../../web/src/components/notes/mdx/remarkHeadings";
 export type { TocHeading } from "../../web/src/components/notes/mdx/remarkHeadings";

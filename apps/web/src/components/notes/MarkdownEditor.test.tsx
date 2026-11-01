@@ -285,6 +285,7 @@ describe("MarkdownEditor component completion", () => {
       expect.stringContaining("<Footnotes>"),
       expect.stringContaining("<YouTube>"),
       expect.stringContaining("<Repo>"),
+      expect.stringContaining("<Chart>"),
     ]);
   });
 
@@ -381,8 +382,9 @@ describe("MarkdownEditor component completion", () => {
     key("ArrowUp");
     key("Enter");
 
-    expect(editor().value).toBe('<Repo url="" />');
-    expect(editor().selectionStart).toBe('<Repo url="'.length);
+    expect(editor().value).toBe('<Chart type="bar">\n\n```csv\n\n```\n\n</Chart>');
+    // Inside the fence, where the table goes.
+    expect(editor().selectionStart).toBe('<Chart type="bar">\n\n```csv\n'.length);
   });
 
   it("inserts a component picked with the mouse", () => {
