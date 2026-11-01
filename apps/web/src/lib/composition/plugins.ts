@@ -22,6 +22,14 @@ export const PLUGINS = [
     host: "desktop",
     defaultEnabled: false,
   },
+  {
+    id: "rss",
+    name: "RSS Reader",
+    description:
+      "Subscribe to RSS and Atom feeds, read what is new in them, and unsubscribe. Off until you turn it on, because it makes the app fetch feeds from the internet. Turning it off hides the panel and stops fetching; your subscriptions are kept.",
+    host: "desktop",
+    defaultEnabled: false,
+  },
 ] as const satisfies readonly {
   id: string;
   name: string;
@@ -38,7 +46,7 @@ export type PluginSettings = Record<PluginId, boolean>;
 
 /**
  * Whether a plugin is on until the user chooses. Most are, so the app behaves as it did before the plugin existed; one that
- * brings in a new capability (the Reading List loads web pages) says `defaultEnabled: false` and waits to be switched on.
+ * brings in a new capability (the Reading List loads web pages, the RSS Reader fetches feeds) says `defaultEnabled: false` and waits to be switched on.
  */
 const defaultFor = (plugin: (typeof PLUGINS)[number]): boolean => !("defaultEnabled" in plugin) || plugin.defaultEnabled;
 

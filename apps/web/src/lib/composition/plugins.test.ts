@@ -3,24 +3,28 @@ import { DEFAULT_PLUGIN_SETTINGS, isPluginId, parsePluginSettings, PLUGINS, plug
 
 describe("plugins", () => {
   it("has the to-do list on by default, so the app is unchanged until a choice is made, and the Reading List off", () => {
-    expect(DEFAULT_PLUGIN_SETTINGS).toEqual({ todo: true, "reading-list": false });
-    expect(PLUGINS.map(({ id }) => id)).toEqual(["todo", "reading-list"]);
+    expect(DEFAULT_PLUGIN_SETTINGS).toEqual({ todo: true, "reading-list": false, rss: false });
+    expect(PLUGINS.map(({ id }) => id)).toEqual(["todo", "reading-list", "rss"]);
   });
 
   it("reads saved settings, repairing what is missing or invalid and dropping what is unknown", () => {
-    expect(parsePluginSettings({ todo: false, "reading-list": true })).toEqual({ todo: false, "reading-list": true });
-    expect(parsePluginSettings({ todo: "off", other: false })).toEqual({ todo: true, "reading-list": false });
-    expect(parsePluginSettings(null)).toEqual({ todo: true, "reading-list": false });
-    expect(parsePluginSettings([false])).toEqual({ todo: true, "reading-list": false });
+    expect(parsePluginSettings({ todo: false, "reading-list": true, rss: false })).toEqual({ todo: false, "reading-list": true, rss: false });
+    expect(parsePluginSettings({ todo: "off", other: false })).toEqual({ todo: true, "reading-list": false, rss: false });
+    expect(parsePluginSettings(null)).toEqual({ todo: true, "reading-list": false, rss: false });
+    expect(parsePluginSettings([false])).toEqual({ todo: true, "reading-list": false, rss: false });
   });
 
   it("reads a settings file from before the Reading List as having it off", () => {
-    expect(parsePluginSettings({ todo: true })).toEqual({ todo: true, "reading-list": false });
-    expect(parsePluginSettings({ todo: false })).toEqual({ todo: false, "reading-list": false });
+    expect(parsePluginSettings({ todo: true })).toEqual({ todo: true, "reading-list": false, rss: false });
+    expect(parsePluginSettings({ todo: false })).toEqual({ todo: false, "reading-list": false, rss: false });
+  });
+
+  it("reads a settings file from before the RSS Reader as having it off", () => {
+    expect(parsePluginSettings({ todo: true, "reading-list": true })).toEqual({ todo: true, "reading-list": true, rss: false });
   });
 
   it("accepts a full set of settings from outside", () => {
-    expect(validatePluginSettings({ todo: false, "reading-list": true })).toEqual({ settings: { todo: false, "reading-list": true } });
+    expect(validatePluginSettings({ todo: false, "reading-list": true, rss: false })).toEqual({ settings: { todo: false, "reading-list": true, rss: false } });
   });
 
   it("refuses settings that are incomplete, mistyped or about an unknown plugin", () => {
@@ -28,8 +32,8 @@ describe("plugins", () => {
     expect(validatePluginSettings([]).error).toBeTruthy();
     expect(validatePluginSettings({}).error).toMatch(/To-do/);
     expect(validatePluginSettings({ todo: true }).error).toMatch(/Reading List/);
-    expect(validatePluginSettings({ todo: 1, "reading-list": false }).error).toMatch(/To-do/);
-    expect(validatePluginSettings({ todo: true, "reading-list": false, mystery: true }).error).toMatch(/mystery/);
+    expect(validatePluginSettings({ todo: 1, "reading-list": false, rss: false }).error).toMatch(/To-do/);
+    expect(validatePluginSettings({ todo: true, "reading-list": false, rss: false, mystery: true }).error).toMatch(/mystery/);
   });
 
   it("knows its own ids", () => {

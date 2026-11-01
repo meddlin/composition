@@ -4,6 +4,8 @@ import type { AttachmentMethod } from "../../../web/src/lib/composition/attachme
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import { PLUGINS } from "../../../web/src/lib/composition/plugins";
+import { normalizeFeedUrl } from "../../../web/src/lib/composition/feeds";
+import type { FeedMethod } from "../../../web/src/lib/composition/feedsApi";
 import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingList";
 import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
@@ -295,6 +297,26 @@ export const READING_LIST_VALIDATORS: Record<ReadingListMethod, Validator> = {
   setReadingItemRead: ([itemId, read]) => [id("setReadingItemRead", itemId, "id"), flag("setReadingItemRead", read, "read")],
   deleteReadingItem: ([itemId]) => [id("deleteReadingItem", itemId, "id")],
   clearReadingData: none,
+};
+
+/**
+ * The feed methods take ids, booleans and one address. The address is checked with the same rule the panel and the service
+ * use (web addresses only) and passed on as that rule writes it, so a `file:` or `javascript:` address never reaches the
+ * fetcher. Where the main process may actually go (no private addresses) is the fetcher's job, since a name can resolve
+ * anywhere.
+ */
+export const FEED_VALIDATORS: Record<FeedMethod, Validator> = {
+  listFeeds: none,
+  subscribeFeed: ([url]) => {
+    const checked = typeof url === "string" ? normalizeFeedUrl(url) : null;
+    return checked?.url !== undefined ? [checked.url] : fail("subscribeFeed", "url");
+  },
+  unsubscribeFeed: ([feedId]) => [id("unsubscribeFeed", feedId, "id")],
+  listFeedEntries: ([feedId]) => [nullableId("listFeedEntries", feedId, "feedId")],
+  refreshFeed: ([feedId]) => [id("refreshFeed", feedId, "id")],
+  refreshAllFeeds: none,
+  setFeedEntryRead: ([entryId, read]) => [id("setFeedEntryRead", entryId, "id"), flag("setFeedEntryRead", read, "read")],
+  markFeedRead: ([feedId]) => [nullableId("markFeedRead", feedId, "feedId")],
 };
 
 /** The update methods take nothing from the page except a boolean or a number: where updates come from is fixed in the build, so no URL or path ever comes from the renderer. */
