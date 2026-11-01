@@ -56,6 +56,7 @@ const expectedBridge = [
   ...ASSISTANT_METHODS,
   "onUpdateState",
   "onAppearance",
+  "onTodosChanged",
   "onPopoutClosed",
   "onAssistantEvent",
   "initial",
@@ -376,6 +377,71 @@ try {
   check("client-side navigation to /settings works", page.url().includes("/settings"), page.url());
   check("settings show the database path", (await page.getByText(path.join(home, ".composition", "composition.db")).count()) > 0);
   await page.screenshot({ path: path.join(out, "3-settings-dark.png") });
+
+  // ---- To-dos over IPC: remove, archive, restore and delete permanently, the refusals, and the To-dos settings card.
+  const todoRound = await page.evaluate(async () => {
+    const api = window.composition;
+    const ids = (todos) => todos.map((t) => t.id);
+    const parent = await api.createTodo("Smoke parent", null);
+    const child = await api.createTodo("Smoke child", parent.id);
+    const live = async () => ids(await api.listTodos());
+    const archived = async () => (await api.listArchivedTodos()).map((t) => [t.id, t.archiveReason]);
+
+    await api.removeTodo(parent.id);
+    const afterRemove = { live: await live(), archived: await archived() };
+    const restored = await api.restoreTodo(parent.id);
+    const afterRestore = { live: await live(), archived: await archived() };
+    const refused = {};
+    for (const [name, call] of [
+      ["dropPlaced", () => api.dropTodo(parent.id)],
+      ["restoreLive", () => api.restoreTodo(parent.id)],
+      ["removeMissing", () => api.removeTodo(987654)],
+      ["hostileId", () => api.removeTodo("1")],
+      ["hostilePreview", () => api.previewTodoDelete("1")],
+    ]) {
+      try {
+        await call();
+        refused[name] = false;
+      } catch {
+        refused[name] = true;
+      }
+    }
+    await api.removeTodo(parent.id);
+    const preview = await api.previewTodoDelete(parent.id);
+    const previewMissing = await api.previewTodoDelete(987654);
+    await api.deleteTodo(parent.id);
+    const afterDelete = { live: await live(), archived: await archived() };
+    return { parent: parent.id, child: child.id, afterRemove, restored, afterRestore, refused, preview, previewMissing, afterDelete };
+  });
+  check(
+    "a to-do is removed to the archive with its sub-item, over IPC",
+    JSON.stringify(todoRound.afterRemove) === JSON.stringify({ live: [], archived: [[todoRound.parent, "removed"], [todoRound.child, "removed"]] }),
+    JSON.stringify(todoRound.afterRemove),
+  );
+  check(
+    "and restored, as it was left, to the list",
+    todoRound.restored.toTopLevel === false &&
+      JSON.stringify(todoRound.afterRestore) === JSON.stringify({ live: [todoRound.parent, todoRound.child], archived: [] }),
+    JSON.stringify(todoRound.afterRestore),
+  );
+  check(
+    "dropping an item that is not in Rolled over, restoring a live one, removing a missing one and a hostile id are all refused",
+    Object.values(todoRound.refused).length === 5 && Object.values(todoRound.refused).every(Boolean),
+    JSON.stringify(todoRound.refused),
+  );
+  check(
+    "what Delete permanently would erase is counted, reports and all, before anything is deleted",
+    todoRound.preview.items === 2 && Array.isArray(todoRound.preview.reports) && todoRound.preview.reports.length === 0 && todoRound.previewMissing.items === 0,
+    JSON.stringify([todoRound.preview, todoRound.previewMissing]),
+  );
+  check("Delete permanently erases an archived item and its sub-item", todoRound.afterDelete.live.length === 0 && todoRound.afterDelete.archived.length === 0, JSON.stringify(todoRound.afterDelete));
+  const todoCard = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: "To-dos" }) });
+  await todoCard.waitFor();
+  check("the To-dos settings card starts on Sunday, 5 years, January", (await todoCard.getByLabel("Week starts on").inputValue()) === "0" && (await todoCard.getByLabel("Keep archived items for").inputValue()) === "60" && (await todoCard.getByLabel("Fiscal year starts in").inputValue()) === "1");
+  await todoCard.getByLabel("Week starts on").selectOption("1");
+  await waitFor(() => JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).todos?.weekStartsOn === 1).catch(() => {});
+  check("and a change is stored in the app's own settings file", JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).todos?.weekStartsOn === 1);
+  await todoCard.getByLabel("Week starts on").selectOption("0");
 
   // ---- AI helper (Settings). The server is a stand-in on a free local port; nothing leaves this machine.
   const ollama = await startFakeOllama();
@@ -1023,6 +1089,34 @@ try {
     saved.notes.some((n) => n.content.includes(quitText)),
     quitText,
   );
+  // ---- Reports over IPC. Last, because a report is a note and the checks above count notes.
+  const reportsBefore = await page.evaluate(() => window.composition.loadTodoReports());
+  const toMake = reportsBefore.missing.find((m) => m.kind === "weekly");
+  check("the week the first run started from is offered for a report, since it has none", Boolean(toMake) && reportsBefore.reports.length === 0, JSON.stringify(reportsBefore.missing[0]));
+  const madeReport = toMake ? await page.evaluate(([kind, start]) => window.composition.generateTodoReport(kind, start), [toMake.kind, toMake.periodStart]) : null;
+  const afterReport = await page.evaluate(async () => ({ reports: await window.composition.loadTodoReports(), workspace: await window.composition.loadWorkspace() }));
+  check(
+    "a report made by hand is a note in the To-do reports notebook, and is listed with the reports",
+    madeReport !== null &&
+      afterReport.reports.reports.some((r) => r.noteId === madeReport.noteId) &&
+      !afterReport.reports.missing.some((m) => m.kind === "weekly" && m.periodStart === toMake.periodStart) &&
+      afterReport.workspace.notebooks.some((n) => n.name === "To-do reports") &&
+      afterReport.workspace.notes.some((n) => n.id === madeReport.noteId && n.title.startsWith("Weekly ") && n.content.includes("## My notes")),
+    JSON.stringify(madeReport),
+  );
+  const reportRefusals = await page.evaluate(async () => {
+    const refused = [];
+    for (const args of [["yearly", "2026-01-01"], ["weekly", "last week"], ["weekly", "2026-02-30"], ["weekly", "2030-01-06"], [null, null]]) {
+      try {
+        await window.composition.generateTodoReport(...args);
+        refused.push(false);
+      } catch {
+        refused.push(true);
+      }
+    }
+    return refused;
+  });
+  check("a kind that is not one, a date that is not one, and a period that has not closed are refused", reportRefusals.length === 5 && reportRefusals.every(Boolean), JSON.stringify(reportRefusals));
   await page.screenshot({ path: path.join(out, "6-relaunched.png") });
 } catch (error) {
   console.error(error);

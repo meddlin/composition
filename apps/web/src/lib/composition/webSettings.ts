@@ -8,6 +8,7 @@ import { clampCliSidebarColumns, clampEditorRatio, clampSidebarWidth, DEFAULT_LA
 import { DEFAULT_APP_DATA_DIR, defaultDatabasePath } from "./paths";
 import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./editorFonts";
 import { DEFAULT_TODO_LOOK, readTodoLook, type TodoLook } from "./todoLook";
+import { DEFAULT_TODO_SETTINGS, parseTodoSettings, type TodoSettings } from "./todoSettings";
 import { DEFAULT_NOTE_BACKGROUND, isNoteBackgroundName, type NoteBackgroundName } from "./noteBackgrounds";
 import { DEFAULT_PLUGIN_SETTINGS, parsePluginSettings, type PluginSettings } from "./plugins";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
@@ -66,6 +67,8 @@ export type WebSettings = {
   noteBackground: NoteBackgroundName;
   /** The background of the desktop app's to-do panels, apart from the notes' (all of them share it). */
   todoLook: TodoLook;
+  /** How the to-do cycle runs: the week's first day, how long the archive is kept, the fiscal year (Settings > To-dos). */
+  todos: TodoSettings;
   /** Which built-in plugins are on (Settings > Plugins). */
   plugins: PluginSettings;
   /** The editor's ruler and reflow. */
@@ -96,6 +99,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   editorFont: DEFAULT_EDITOR_FONT,
   noteBackground: DEFAULT_NOTE_BACKGROUND,
   todoLook: DEFAULT_TODO_LOOK,
+  todos: DEFAULT_TODO_SETTINGS,
   plugins: DEFAULT_PLUGIN_SETTINGS,
   writing: DEFAULT_WRITING_SETTINGS,
   home: DEFAULT_HOME_SETTINGS,
@@ -140,6 +144,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
     noteBackground: isNoteBackgroundName(value.noteBackground) ? value.noteBackground : DEFAULT_NOTE_BACKGROUND,
     todoLook: readTodoLook(value.todoLook),
+    todos: parseTodoSettings(value.todos),
     plugins: parsePluginSettings(value.plugins),
     writing: parseWritingSettings(value.writing),
     home: parseHomeSettings(value.home),

@@ -31,6 +31,8 @@ export type DesktopBridge = CompositionApi &
     onAssistantEvent(listener: AssistantEventListener): () => void;
     /** Calls `listener` with the id of each pop-out window the user closes; returns the function that stops listening. */
     onPopoutClosed(listener: (windowId: string) => void): () => void;
+    /** Calls `listener` each time the weekly cycle has changed the to-do list (a week closed, or old items were purged); returns the function that stops listening. */
+    onTodosChanged(listener: () => void): () => void;
     /** Calls `listener` with how the app looks each time the scheme, a font or the sun's city is saved; returns the function that stops listening. */
     onAppearance(listener: AppearanceListener): () => void;
     /** Calls `listener` with each update state the app pushes; returns the function that stops listening. */

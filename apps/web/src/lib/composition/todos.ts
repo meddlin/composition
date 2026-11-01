@@ -1,4 +1,4 @@
-import { MAX_TODO_TITLE_LENGTH, type Todo, type TodoStatus } from "./todosApi";
+import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoStatus } from "./todosApi";
 
 /** An item with its sub-items, in order. */
 export type TodoNode = { todo: Todo; children: TodoNode[] };
@@ -15,8 +15,86 @@ export function buildTodoTree(todos: readonly Todo[]): TodoNode[] {
   return roots;
 }
 
+/** The live list sorted into the three places an item can be: waiting in Rolled over, This week, or the Backlog. */
+export type TodoSections = { rolledOver: TodoNode[]; thisWeek: TodoNode[]; backlog: TodoNode[] };
+
+/**
+ * Where each item is shown. A rolled-over item is the top of its own entry in Rolled over, with everything under it, even
+ * when its parent is not rolled (it is then taken out from under the parent, which stays where it is). Every other
+ * top-level item is in the Backlog if its status says so and in This week if not, with its sub-items beneath it whatever
+ * their own status. The rolled mark wins over the backlog status. An item whose parent is missing is left out.
+ */
+export function todoSections(todos: readonly Todo[]): TodoSections {
+  const rolled = new Set(todos.filter((t) => t.rolledFromWeek !== undefined).map((t) => t.id));
+  const isRolledTop = (t: Todo) => rolled.has(t.id) && (t.parentId === null || !rolled.has(t.parentId));
+  const rolledTops = new Set(todos.filter(isRolledTop).map((t) => t.id));
+
+  const nodes = new Map<number, TodoNode>(todos.map((todo) => [todo.id, { todo, children: [] }]));
+  for (const todo of todos) {
+    if (todo.parentId !== null) nodes.get(todo.parentId)?.children.push(nodes.get(todo.id)!);
+  }
+  // A branch with the rolled entries taken out of it.
+  const withoutRolled = (node: TodoNode): TodoNode => ({
+    todo: node.todo,
+    children: node.children.filter((child) => !rolledTops.has(child.todo.id)).map(withoutRolled),
+  });
+
+  const tops = todos.filter((t) => t.parentId === null && !rolled.has(t.id)).map((t) => withoutRolled(nodes.get(t.id)!));
+  return {
+    rolledOver: todos.filter(isRolledTop).map((t) => nodes.get(t.id)!),
+    thisWeek: tops.filter((node) => node.todo.status !== "backlog"),
+    backlog: tops.filter((node) => node.todo.status === "backlog"),
+  };
+}
+
+/** One entry in the archive: an item, with the items archived under it in the same week beneath it. */
+export type ArchiveEntry = {
+  todo: ArchivedTodo;
+  /** What it was under, for an entry that is not shown under its parent (the parent is on the list, or archived in another week). */
+  parentTitle: string | null;
+  children: ArchiveEntry[];
+};
+
+/** The archive's entries for one week. `week` is the first day of the week they were archived in. */
+export type ArchiveGroup = { week: string; entries: ArchiveEntry[] };
+
+/**
+ * The archive as it is shown: filtered by what is typed (any part of a title, whatever the case), grouped by the week
+ * archived, newest week first. A branch archived together is one entry with its sub-items under it; a sub-item archived
+ * on its own, or whose parent does not match, is an entry of its own that says what it was under (`titles` knows every
+ * item, listed or archived). Within a week the most recently archived come first, and what went at the same moment
+ * (the weekly sweep) in the order it was made.
+ */
+export function archiveGroups(archived: readonly ArchivedTodo[], titles: ReadonlyMap<number, string>, query: string): ArchiveGroup[] {
+  const needle = query.trim().toLowerCase();
+  const shown = needle === "" ? archived : archived.filter((item) => item.title.toLowerCase().includes(needle));
+  const byWeek = new Map<string, ArchivedTodo[]>();
+  for (const item of shown) byWeek.set(item.archiveWeek, [...(byWeek.get(item.archiveWeek) ?? []), item]);
+
+  return [...byWeek]
+    .sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0))
+    .map(([week, items]) => {
+      const inWeek = new Set(items.map((item) => item.id));
+      const entries = new Map<number, ArchiveEntry>(
+        items.map((todo) => [todo.id, { todo, parentTitle: todo.parentId === null ? null : (titles.get(todo.parentId) ?? null), children: [] }]),
+      );
+      const tops: ArchiveEntry[] = [];
+      for (const todo of [...items].sort((a, b) => a.id - b.id)) {
+        const entry = entries.get(todo.id)!;
+        if (todo.parentId !== null && inWeek.has(todo.parentId)) {
+          entry.parentTitle = null;
+          entries.get(todo.parentId)!.children.push(entry);
+        } else {
+          tops.push(entry);
+        }
+      }
+      tops.sort((a, b) => b.todo.archivedAt.localeCompare(a.todo.archivedAt) || a.todo.id - b.todo.id);
+      return { week, entries: tops };
+    });
+}
+
 /** The ids of the item and every item under it. */
-export function subtreeIds(todos: readonly Todo[], id: number): Set<number> {
+export function subtreeIds(todos: readonly { id: number; parentId: number | null }[], id: number): Set<number> {
   const ids = new Set([id]);
   // Items are listed in no order the loop can rely on, so repeat until nothing new joins.
   for (let grew = true; grew; ) {
