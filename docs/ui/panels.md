@@ -160,6 +160,39 @@ every window), [`readingListService.ts`](../../apps/web/src/lib/composition/read
 - **Pop-outs.** The panel's page is made again in the pop-out, so it reloads; the link that is open is kept.
 - **Not in the web app or the CLI.** A browser tab already is a browser. Importing from a note, tags and folders are future work.
 
+## The RSS Reader panel
+
+The feeds you are subscribed to on the left and, on the right, the entries of the one you picked (or of all of them), with the open entry's
+excerpt beneath (choose **RSS Reader** in an empty panel). It is a **built-in plugin that is off until you turn it on** in **Settings > Plugins**,
+because it makes the app fetch feeds from the internet. Plan and decisions: [rss-reader-plan.md](../rss-reader-plan.md). Source:
+[`RssPanel.tsx`](../../apps/web/src/components/panels/RssPanel.tsx), [`feedsStore.ts`](../../apps/web/src/lib/composition/feedsStore.ts) (the feeds and entries, shared by
+every window), [`feedsService.ts`](../../apps/web/src/lib/composition/feedsService.ts) (the `feeds` and `feed_items` tables in the notes database; no network),
+and, in the main process, [`feedFetcher.ts`](../../apps/desktop/src/main/feedFetcher.ts) (the only code that touches the network, with its limits),
+[`feedParse.ts`](../../apps/desktop/src/main/feedParse.ts), [`feedsController.ts`](../../apps/desktop/src/main/feedsController.ts) (joins them, and checks the plugin is on)
+and [`feedRefresh.ts`](../../apps/desktop/src/main/feedRefresh.ts) (the timer).
+
+- **Subscribing.** Paste a feed address in the box at the top of the feed list and press Enter. The feed is fetched and read **before** it is kept, so an address
+  that is not a feed is refused with the reason and nothing is stored. A feed already subscribed to is not added twice: the panel says so and shows it. RSS 2.0/0.9,
+  RDF (RSS 1.0) and Atom are read; JSON Feed is not, and a site's address is not searched for a feed.
+- **Feeds.** Each row shows the feed's title (the host name until it has been fetched once), its unread count, and a warning when the last fetch failed (hover for why).
+  **All entries** lists every feed's entries together. A row's `⋯`: Refresh, Mark all read, Open site in browser, Copy feed address, **Unsubscribe**.
+- **Unsubscribing asks first**, naming the feed, and says its entries are removed for good and not sent to the Trash Can. Cancel holds the focus; **Esc** and **Cancel**
+  remove nothing. Confirming removes the feed and all its entries in one step. A panel that was showing it goes back to all entries.
+- **Entries.** Newest first, unread in bold with a dot, at most the newest 300 listed at a time. Picking one shows its title, date and **plain-text** excerpt (the feed's markup is
+  stripped and never rendered), with **Open in browser** (which also marks it read), **Send to Reading List** (only while that plugin is on) and **Mark read/unread**.
+  The app keeps the newest 200 entries of each feed plus every unread one.
+- **Refreshing.** Opening the panel fetches any feed that has not been fetched in the last 10 minutes; the app also refreshes every feed about every 30 minutes while it is open and
+  a window exists, and **Refresh** does it by hand. A refresh asks the server only whether the feed changed (`ETag` / `Last-Modified`). One that fails shows its reason on the feed
+  and keeps the entries it already had.
+- **What the app will fetch.** Only `http` and `https`, from the main process (the page itself has no network access). A name or redirect that leads to this computer or a private
+  network (`127.0.0.1`, `localhost`, `10.x`, `192.168.x`, `169.254.x`, `.local` and the like) is refused, a feed over 5 MB is not read, a server that takes over 15 seconds is given up on,
+  and at most 5 redirects are followed. Each address is looked up before it is fetched; a name that changes its answer between the check and the fetch is not caught (see the plan, risk 3).
+- **Off.** Turning the plugin off stops the timer and makes the main process refuse every fetch, including subscribing and refreshing; an open RSS Reader panel says the plugin is off, with
+  **Turn on RSS Reader**. Subscriptions, entries and read marks are kept.
+- **One set of feeds.** They belong to the workspace, not the panel: any number of RSS panels, in any window, show and change the same ones. A panel saves only which feed and entry it has open.
+- **Narrow panels.** From a panel width of 640 px the feeds and entries sit side by side; below that the panel shows the feeds, then the entries, then one entry, each with a way back.
+- **Not in the web app or the CLI.** Fetching needs the desktop app's main process. OPML import and export, folders, search, notifications and reading the article inside the panel are future work.
+
 ## Panel commands and the command palette
 
 Every panel command can be run from the **command palette**, and the ones that are used most have keys. Both act on the **focused panel

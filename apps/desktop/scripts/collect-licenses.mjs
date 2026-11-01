@@ -118,8 +118,9 @@ const packages = new Map([
     "meilisearch",
     "js-yaml",
   ]),
-  // Native module loaded at runtime from node_modules.
-  ...closure(desktopDir, ["better-sqlite3"]),
+  // better-sqlite3 is a native module loaded at runtime from node_modules.
+  // The RSS Reader's feed parser, bundled into the main process (esbuild) with its own dependencies.
+  ...closure(desktopDir, ["better-sqlite3", "@rowanmanning/feed-parser"]),
   // The command line tool's own runtime packages (its other dependencies are bundled and are
   // the web packages above). Needs apps/cli installed, as a release does.
   ...(fs.existsSync(path.join(cliDir, "node_modules"))

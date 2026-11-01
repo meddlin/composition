@@ -1,3 +1,4 @@
+import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
@@ -7,8 +8,11 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, listNotes, loadWebSettings, panelsService, readingListService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, defaultSharedLocationPath, feedsService, listNotes, loadWebSettings, panelsService, readingListService, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
+import { fetchFeedText } from "./feedFetcher";
+import { startFeedRefresh } from "./feedRefresh";
+import { createFeedsController } from "./feedsController";
 import { flushRenderers } from "./flushRenderers";
 import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
@@ -187,6 +191,21 @@ function attachReadingListGuard(webContents: Parameters<typeof installReadingLis
   });
 }
 
+// The RSS Reader's feeds: fetched here (the renderer has no network access), only while the plugin is on. A fetch from this
+// computer's own addresses is refused; only an unpackaged build started with COMPOSITION_FEEDS_ALLOW_PRIVATE=1 (the smoke
+// test, which serves a feed from 127.0.0.1) lifts that.
+const feeds = createFeedsController({
+  store: feedsService,
+  fetchFeed: (url, validators) =>
+    fetchFeedText(url, validators, {
+      fetch,
+      lookup: async (hostname) => (await dns.lookup(hostname, { all: true })).map(({ address }) => address),
+      allowPrivate: !app.isPackaged && process.env.COMPOSITION_FEEDS_ALLOW_PRIVATE === "1",
+      userAgent: `Composition/${app.getVersion()}`,
+    }),
+  pluginEnabled: () => loadWebSettings().plugins.rss,
+});
+
 // Pop-outs: a panel pulled into a window of its own. The main window's page opens them; this decides that they may be
 // opened, remembers where each was put (in a file only this process writes) and closes them with the main window.
 const popouts = createPopoutManager({
@@ -246,6 +265,7 @@ async function main(): Promise<void> {
     todos: todosService,
     // Clearing is the one call that needs a browser session, which only this process has.
     readingList: { ...readingListService, clearReadingData: () => clearReadingData(readingSession()) },
+    feeds,
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),
     assistant: createAssistantHost({ stream: service.streamAssistantChat }),
@@ -259,6 +279,11 @@ async function main(): Promise<void> {
   // Search comes up in the background; the window doesn't wait for it.
   void sidecar.start();
   openMainWindow();
+  startFeedRefresh({
+    enabled: () => loadWebSettings().plugins.rss,
+    hasWindow: () => BrowserWindow.getAllWindows().length > 0,
+    refreshAll: () => feeds.refreshAllFeeds(),
+  });
   updates.installMenuItem();
   installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
   updates.manager.start();

@@ -1,5 +1,6 @@
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { FEED_METHODS, type FeedsApi } from "../../../web/src/lib/composition/feedsApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { READING_LIST_METHODS, type ReadingListApi } from "../../../web/src/lib/composition/readingListApi";
 import { TODO_METHODS, type TodosApi } from "../../../web/src/lib/composition/todosApi";
@@ -10,7 +11,7 @@ import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import type { AssistantHost, AssistantSender } from "./assistant";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isAllowedOrigin } from "./origin";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, FEED_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 /** The slice of Electron's `ipcMain` this module uses, so tests don't need Electron. */
 export type IpcMainLike = {
@@ -29,7 +30,7 @@ export class UntrustedSenderError extends Error {}
 
 /**
  * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi,
- * DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, UpdatesApi, WindowApi and AI helper chat calls, over IPC, one channel per method.
+ * DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, FeedsApi, UpdatesApi, WindowApi and AI helper chat calls, over IPC, one channel per method.
  *
  * Every call is checked twice: the sender must be a frame of our own UI (a
  * navigated-away or injected frame must never reach the notes database), and
@@ -43,6 +44,7 @@ export function registerIpc(options: {
   panels: PanelsApi;
   todos: TodosApi;
   readingList: ReadingListApi;
+  feeds: FeedsApi;
   updates: UpdatesApi;
   window: WindowApi;
   /** Runs the AI helper's chat turns. Not a plain method: it needs the window that asked. */
@@ -51,7 +53,7 @@ export function registerIpc(options: {
   /** Synchronous snapshot for the preload, taken before the page paints. */
   initial: () => unknown;
 }): void {
-  const { ipcMain, api, attachments, backup, panels, todos, readingList, updates, window, assistant, isTrustedUrl, initial } = options;
+  const { ipcMain, api, attachments, backup, panels, todos, readingList, feeds, updates, window, assistant, isTrustedUrl, initial } = options;
 
   const trusted = (event: IpcEventLike): boolean => {
     const url = event.senderFrame?.url;
@@ -77,6 +79,7 @@ export function registerIpc(options: {
   for (const method of PANELS_METHODS) expose(method, PANELS_VALIDATORS[method], panels);
   for (const method of TODO_METHODS) expose(method, TODO_VALIDATORS[method], todos);
   for (const method of READING_LIST_METHODS) expose(method, READING_LIST_VALIDATORS[method], readingList);
+  for (const method of FEED_METHODS) expose(method, FEED_VALIDATORS[method], feeds);
   for (const method of UPDATE_METHODS) expose(method, UPDATE_VALIDATORS[method], updates);
   for (const method of WINDOW_METHODS) expose(method, WINDOW_VALIDATORS[method], window);
 

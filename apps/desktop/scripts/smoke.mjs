@@ -39,6 +39,7 @@ const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../w
 const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { TODO_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/todosApi.ts"));
 const { READING_LIST_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/readingListApi.ts"));
+const { FEED_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/feedsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
 const { WINDOW_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/windowApi.ts"));
@@ -49,6 +50,7 @@ const expectedBridge = [
   ...PANELS_METHODS,
   ...TODO_METHODS,
   ...READING_LIST_METHODS,
+  ...FEED_METHODS,
   ...UPDATE_METHODS,
   ...WINDOW_METHODS,
   ...ASSISTANT_METHODS,

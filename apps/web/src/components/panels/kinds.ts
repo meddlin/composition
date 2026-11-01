@@ -29,6 +29,9 @@ export const DEFAULT_READING_LIST_WIDTH = 260;
 /** What a Reading List panel saves: the link it has open (none yet, or one since deleted), and how wide its list is. The links themselves are the workspace's. */
 export type ReadingListPanelState = { selectedId: number | null; listWidth: number };
 
+/** What an RSS Reader panel saves: the feed it shows (none, for all of them) and the entry it has open. The feeds and entries themselves are the workspace's. */
+export type RssPanelState = { selectedFeedId: number | null; selectedEntryId: number | null };
+
 /** What a kind may check a saved state against: the workspace as it is now. */
 export type RestoreContext = {
   hasNote(noteId: number): boolean;
@@ -118,6 +121,20 @@ export const KINDS: Record<
         listWidth:
           typeof listWidth === "number" && Number.isFinite(listWidth) ? Math.max(READING_LIST_MIN_WIDTH, Math.round(listWidth)) : DEFAULT_READING_LIST_WIDTH,
       } satisfies ReadingListPanelState;
+    },
+  },
+  rss: {
+    minWidth: 480,
+    plugin: "rss",
+    initialState: (): RssPanelState => ({ selectedFeedId: null, selectedEntryId: null }),
+    restore(saved) {
+      if (!isRecord(saved)) return null;
+      const { selectedFeedId, selectedEntryId } = saved;
+      // The feed or entry may be gone since; the panel then falls back to all entries, so it is not checked here.
+      return {
+        selectedFeedId: Number.isSafeInteger(selectedFeedId) ? (selectedFeedId as number) : null,
+        selectedEntryId: Number.isSafeInteger(selectedEntryId) ? (selectedEntryId as number) : null,
+      } satisfies RssPanelState;
     },
   },
 };
