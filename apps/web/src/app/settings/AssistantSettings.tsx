@@ -21,12 +21,13 @@ const plural = (count: number, one: string, many: string) => `${count} ${count =
 const PULL_HINT = "Install one with: ollama pull <model>";
 
 function describeModels(found: AssistantModels): string {
+  const via = found.viaAlternate ? " (the alternate address; the first one didn't answer)" : "";
   if (found.models.length === 0) {
-    return `Reached Ollama at ${found.serverUrl}, but it has no models that can chat. ${PULL_HINT}`;
+    return `Reached Ollama at ${found.serverUrl}${via}, but it has no models that can chat. ${PULL_HINT}`;
   }
   const names = found.models.slice(0, SHOWN_MODELS).map((m) => (m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name));
   const more = found.models.length - names.length;
-  return `Found ${plural(found.models.length, "model", "models")} on ${found.serverUrl}: ${names.join(", ")}${more > 0 ? `, and ${more} more` : ""}.`;
+  return `Found ${plural(found.models.length, "model", "models")} on ${found.serverUrl}${via}: ${names.join(", ")}${more > 0 ? `, and ${more} more` : ""}.`;
 }
 
 function describeHidden(count: number): string {
@@ -51,6 +52,7 @@ type Outcome = {
 export function AssistantSettings({ initial }: { initial: Settings }) {
   const [saved, setSaved] = useState(initial);
   const [address, setAddress] = useState(initial.serverUrl);
+  const [alternate, setAlternate] = useState(initial.alternateUrl ?? "");
   const [windowText, setWindowText] = useState(String(initial.contextTokens));
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [pending, startTransition] = useTransition();
@@ -61,22 +63,26 @@ export function AssistantSettings({ initial }: { initial: Settings }) {
     setOutcome(null);
   }
 
-  const dirty = address !== saved.serverUrl || windowText !== String(saved.contextTokens);
+  const dirty = address !== saved.serverUrl || alternate !== (saved.alternateUrl ?? "") || windowText !== String(saved.contextTokens);
 
   const entered = parseServerUrl(address);
   const unencrypted = entered.ok && entered.url.startsWith("http:") && !isLoopback(entered.url);
+  const enteredAlternate = alternate.trim() === "" ? undefined : parseServerUrl(alternate);
+  const alternateUnencrypted =
+    enteredAlternate?.ok === true && enteredAlternate.url.startsWith("http:") && !isLoopback(enteredAlternate.url);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
       const contextTokens = windowText.trim() === "" ? Number.NaN : Number(windowText);
-      const result = await saveAssistantSettings({ serverUrl: address, contextTokens });
+      const result = await saveAssistantSettings({ serverUrl: address, alternateUrl: alternate, contextTokens });
       if (result.error || !result.settings) {
         setOutcome({ saved: false, settingsError: result.error ?? "The settings could not be saved." });
         return;
       }
       setSaved(result.settings);
       setAddress(result.settings.serverUrl);
+      setAlternate(result.settings.alternateUrl ?? "");
       setWindowText(String(result.settings.contextTokens));
       setOutcome({ saved: true, found: await listAssistantModels() });
     });
@@ -103,7 +109,7 @@ export function AssistantSettings({ initial }: { initial: Settings }) {
         </CardTitle>
         <CardDescription>
           A panel beside a note where you can ask a language model running on Ollama for input. Each question sends the
-          note you are in, and any text you have selected, to the server below and nowhere else. Models that run on
+          note you are in, and any text you have selected, to the server below (or its alternate address) and nowhere else. Models that run on
           ollama.com are hidden, so a note stays on the server you choose.
         </CardDescription>
       </CardHeader>
@@ -112,7 +118,8 @@ export function AssistantSettings({ initial }: { initial: Settings }) {
           <Field className="gap-1">
             <FieldLabel htmlFor="assistant-server">Server address</FieldLabel>
             <FieldDescription className="text-xs">
-              Where Ollama is running: this computer (the default) or a server you host.
+              Where Ollama is running: this computer (the default) or a server you host. If you also set an alternate
+              address, this one is tried first.
             </FieldDescription>
             <Input
               id="assistant-server"
@@ -128,6 +135,31 @@ export function AssistantSettings({ initial }: { initial: Settings }) {
             <p className="text-warning">
               This address is not on this computer and is not https, so the notes you send will cross the network
               unencrypted. Use https, or a network you trust.
+            </p>
+          )}
+
+          <Field className="gap-1">
+            <FieldLabel htmlFor="assistant-alternate">Alternate address (optional)</FieldLabel>
+            <FieldDescription className="text-xs">
+              The same server by another route, for when you are away from the network the address above is on, for
+              example its Tailscale address. It is used only when the address above does not answer, and the helper
+              switches back by itself when it does.
+            </FieldDescription>
+            <Input
+              id="assistant-alternate"
+              type="text"
+              value={alternate}
+              onChange={(event) => edit(() => setAlternate(event.target.value))}
+              placeholder="http://100.x.y.z:11434"
+              spellCheck={false}
+              className="font-mono"
+            />
+          </Field>
+          {alternateUnencrypted && (
+            <p className="text-warning">
+              The alternate address is not on this computer and is not https, so the notes you send to it will cross
+              the network unencrypted unless that network encrypts them for you (a VPN does). Use https, or a network
+              you trust.
             </p>
           )}
 

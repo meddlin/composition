@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AssistantModels } from "@/lib/composition/api";
+import type { AssistantSettings as Settings } from "@/lib/composition/assistant/settings";
 import { listAssistantModels, saveAssistantSettings } from "@/lib/composition/client";
 import { AssistantSettings } from "./AssistantSettings";
 
@@ -15,7 +16,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-const saved = { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 };
+const saved: Settings = { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 };
 
 const found = (overrides: Partial<AssistantModels> = {}): AssistantModels => ({
   serverUrl: "http://127.0.0.1:11434",
@@ -29,11 +30,12 @@ const found = (overrides: Partial<AssistantModels> = {}): AssistantModels => ({
   ...overrides,
 });
 
-function renderIt(initial = saved) {
+function renderIt(initial: Settings = saved) {
   render(<AssistantSettings initial={initial} />);
 }
 
 const address = () => screen.getByLabelText("Server address") as HTMLInputElement;
+const alternate = () => screen.getByLabelText("Alternate address (optional)") as HTMLInputElement;
 const windowSize = () => screen.getByLabelText("Context size (tokens)") as HTMLInputElement;
 const click = (name: string) => act(async () => void fireEvent.click(screen.getByRole("button", { name })));
 const type = (input: HTMLInputElement, value: string) => act(async () => void fireEvent.change(input, { target: { value } }));
@@ -57,7 +59,7 @@ describe("AssistantSettings", () => {
     await type(windowSize(), "16384");
     await click("Save");
 
-    expect(saveAssistantSettings).toHaveBeenCalledWith({ serverUrl: "nas:11434", contextTokens: 16384 });
+    expect(saveAssistantSettings).toHaveBeenCalledWith({ serverUrl: "nas:11434", alternateUrl: "", contextTokens: 16384 });
     expect(listAssistantModels).toHaveBeenCalledTimes(1);
     const status = screen.getByRole("status").textContent ?? "";
     expect(status).toContain("Saved.");
@@ -163,5 +165,46 @@ describe("AssistantSettings", () => {
     await type(address(), typed);
 
     expect(Boolean(screen.queryByText(/unencrypted/i))).toBe(warned);
+  });
+
+  it("shows a saved alternate address, and saves one entered with the first", async () => {
+    vi.mocked(saveAssistantSettings).mockResolvedValue({
+      settings: { serverUrl: "http://192.168.1.164:11434", alternateUrl: "http://100.64.0.9:11434", contextTokens: 8192 },
+    });
+    vi.mocked(listAssistantModels).mockResolvedValue(found({ serverUrl: "http://192.168.1.164:11434", local: false }));
+    renderIt({ serverUrl: "http://192.168.1.164:11434", contextTokens: 8192 });
+    expect(alternate().value).toBe("");
+
+    await type(alternate(), "100.64.0.9:11434");
+    await click("Save");
+
+    expect(saveAssistantSettings).toHaveBeenCalledWith({
+      serverUrl: "http://192.168.1.164:11434",
+      alternateUrl: "100.64.0.9:11434",
+      contextTokens: 8192,
+    });
+    expect(alternate().value).toBe("http://100.64.0.9:11434");
+  });
+
+  it("says when the check had to use the alternate address", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(
+      found({ serverUrl: "http://100.64.0.9:11434", local: false, viaAlternate: true }),
+    );
+    renderIt({ serverUrl: "http://192.168.1.164:11434", alternateUrl: "http://100.64.0.9:11434", contextTokens: 8192 });
+    expect(alternate().value).toBe("http://100.64.0.9:11434");
+
+    await click("Test connection");
+
+    expect(screen.getByRole("status").textContent).toContain("on http://100.64.0.9:11434 (the alternate address");
+  });
+
+  it("holds back Test connection until an edited alternate is saved, and warns about an unencrypted one", async () => {
+    renderIt({ serverUrl: "http://192.168.1.164:11434", contextTokens: 8192 });
+    expect(screen.queryByText(/alternate address is not on this computer/i)).toBeNull();
+
+    await type(alternate(), "http://100.64.0.9:11434");
+
+    expect((screen.getByRole("button", { name: "Test connection" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/alternate address is not on this computer/i)).toBeTruthy();
   });
 });

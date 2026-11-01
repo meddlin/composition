@@ -77,3 +77,35 @@ describe("checkAssistantSettings", () => {
     expect(checkAssistantSettings({ serverUrl: "", contextTokens: "8192" })).toMatchObject({ ok: false });
   });
 });
+
+describe("the alternate address", () => {
+  it("is read back normalized, and left out when absent, blank, unusable or the same as the first address", () => {
+    expect(parseAssistantSettings({ serverUrl: "http://nas:11434", alternateUrl: "100.64.0.9:11434/", contextTokens: 8192 })).toEqual({
+      serverUrl: "http://nas:11434",
+      alternateUrl: "http://100.64.0.9:11434",
+      contextTokens: 8192,
+    });
+    for (const alternateUrl of [undefined, "", "  ", "ftp://x", 5, "http://NAS:11434/"]) {
+      expect(parseAssistantSettings({ serverUrl: "http://nas:11434", alternateUrl, contextTokens: 8192 })).not.toHaveProperty("alternateUrl");
+    }
+  });
+
+  it("is accepted when entered, and means none when blank or missing", () => {
+    expect(checkAssistantSettings({ serverUrl: "nas", alternateUrl: " 100.64.0.9:11434 ", contextTokens: 8192 })).toEqual({
+      ok: true,
+      settings: { serverUrl: "http://nas", alternateUrl: "http://100.64.0.9:11434", contextTokens: 8192 },
+    });
+    expect(checkAssistantSettings({ serverUrl: "nas", alternateUrl: "", contextTokens: 8192 })).toEqual({
+      ok: true,
+      settings: { serverUrl: "http://nas", contextTokens: 8192 },
+    });
+  });
+
+  it("is refused, saying which address is wrong, when it cannot work or repeats the first", () => {
+    const unusable = checkAssistantSettings({ serverUrl: "nas", alternateUrl: "ftp://tail", contextTokens: 8192 });
+    expect(!unusable.ok && unusable.error).toMatch(/^Alternate address: .*http/i);
+    const same = checkAssistantSettings({ serverUrl: "http://nas:80", alternateUrl: "NAS", contextTokens: 8192 });
+    expect(!same.ok && same.error).toMatch(/same as the server address/i);
+    expect(checkAssistantSettings({ serverUrl: "nas", alternateUrl: 5, contextTokens: 8192 })).toMatchObject({ ok: false });
+  });
+});

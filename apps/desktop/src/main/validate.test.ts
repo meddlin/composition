@@ -91,6 +91,12 @@ describe("VALIDATORS", () => {
     ).toEqual([{ serverUrl: "http://nas:11434", contextTokens: 8192 }]);
   });
 
+  it("passes the AI helper's alternate address along when there is one", () => {
+    expect(
+      VALIDATORS.saveAssistantSettings([{ serverUrl: "http://nas:11434", alternateUrl: "100.64.0.9:11434", contextTokens: 8192 }]),
+    ).toEqual([{ serverUrl: "http://nas:11434", alternateUrl: "100.64.0.9:11434", contextTokens: 8192 }]);
+  });
+
   it("takes no arguments to list the AI helper's models, so the renderer cannot point it at an address", () => {
     expect(VALIDATORS.listAssistantModels(["http://169.254.169.254/latest/meta-data/"])).toEqual([]);
   });
@@ -183,6 +189,7 @@ describe("VALIDATORS", () => {
     ["saveAssistantSettings", [{ serverUrl: 11434, contextTokens: 8192 }]],
     ["saveAssistantSettings", [{ serverUrl: "", contextTokens: "8192" }]],
     ["saveAssistantSettings", [{ serverUrl: "", contextTokens: Number.NaN }]],
+    ["saveAssistantSettings", [{ serverUrl: "", alternateUrl: 5, contextTokens: 8192 }]],
     ["saveImage", [null]],
     ["saveImage", [{ noteId: "3", fileName: "a.png", data: new Uint8Array(1) }]],
     ["saveImage", [{ noteId: 3, fileName: 1, data: new Uint8Array(1) }]],
