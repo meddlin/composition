@@ -1,15 +1,40 @@
-import type { AssistantModels, SaveAssistantSettingsInput, SaveAssistantSettingsResult } from "./api";
+import type { AssistantModels, ChatGptModels, SaveAssistantSettingsInput, SaveAssistantSettingsResult } from "./api";
+import { credentialsPathFor } from "./assistant/chatgpt/credentials";
+import { listChatGptModels, streamChat as streamChatGpt } from "./assistant/chatgpt/responses";
+import { createChatGptSession } from "./assistant/chatgpt/session";
 import { forgetEndpoint, resolveEndpoint, type Endpoint } from "./assistant/endpoint";
 import type { Failure } from "./assistant/errors";
 import { isCloudModelName, listModels, modelInfo } from "./assistant/models";
 import { streamChat } from "./assistant/ollama";
 import { isLoopback } from "./assistant/serverUrl";
 import { checkAssistantSettings, DEFAULT_ASSISTANT_SETTINGS, type AssistantSettings } from "./assistant/settings";
-import type { ChatEvent, ChatRequest } from "./assistant/types";
-import { loadWebSettings, saveWebSettings } from "./webSettings";
+import type { ChatEvent, ChatGptStatus, ChatRequest } from "./assistant/types";
+import { loadWebSettings, saveWebSettings, settingsPath } from "./webSettings";
 
 /** How long to wait for a server to list its models before giving up. */
 const LIST_TIMEOUT_MS = 10_000;
+
+/**
+ * The ChatGPT sign-in for this process (the web server, or the desktop app's main process). Its tokens are kept in
+ * a file beside the settings and never leave this process: a page is only ever told whether it is signed in.
+ */
+const chatgpt = createChatGptSession({ credentialsFile: () => credentialsPathFor(settingsPath()) });
+
+export const chatGptStatus = async (): Promise<ChatGptStatus> => chatgpt.status();
+export const startChatGptSignIn = (): Promise<{ error?: string }> => chatgpt.startSignIn();
+export async function signOutChatGpt(): Promise<{ error?: string }> {
+  chatgpt.signOut();
+  return {};
+}
+
+async function listChatGpt(signal: AbortSignal): Promise<ChatGptModels> {
+  if (chatgpt.status().state !== "signed-in") return { signedIn: false, models: [] };
+  const token = await chatgpt.accessToken();
+  if (!token.ok) return { signedIn: chatgpt.status().state === "signed-in", models: [], error: token.failure };
+  const result = await listChatGptModels(token.accessToken, signal);
+  if (!result.ok) return { signedIn: true, models: [], error: { kind: result.kind, message: result.message } };
+  return { signedIn: true, models: result.models };
+}
 
 export async function saveAssistantSettings(input: SaveAssistantSettingsInput): Promise<SaveAssistantSettingsResult> {
   const checked = checkAssistantSettings(input);
@@ -46,16 +71,20 @@ export async function listAssistantModels(timeoutMs = LIST_TIMEOUT_MS): Promise<
   const settings = loadWebSettings().assistant ?? DEFAULT_ASSISTANT_SETTINGS;
   const { contextTokens } = settings;
   const signal = AbortSignal.timeout(timeoutMs);
-  const reached = await viaEndpoint(settings, signal, (url) => listModels(url, signal));
+  // Asked together, so a slow or absent Ollama server does not hold up the ChatGPT models (or the other way round).
+  const [reached, chatgptModels] = await Promise.all([
+    viaEndpoint(settings, signal, (url) => listModels(url, signal)),
+    listChatGpt(signal),
+  ]);
 
   if ("failure" in reached) {
     const { serverUrl } = settings;
-    return { serverUrl, local: isLoopback(serverUrl), viaAlternate: false, contextTokens, models: [], hiddenCloud: 0, error: reached.failure };
+    return { serverUrl, local: isLoopback(serverUrl), viaAlternate: false, contextTokens, models: [], hiddenCloud: 0, error: reached.failure, chatgpt: chatgptModels };
   }
   const { endpoint, result } = reached;
   const where = { serverUrl: endpoint.url, local: isLoopback(endpoint.url), viaAlternate: endpoint.alternate, contextTokens };
-  if (!result.ok) return { ...where, models: [], hiddenCloud: 0, error: { kind: result.kind, message: result.message } };
-  return { ...where, models: result.models, hiddenCloud: result.hiddenCloud };
+  if (!result.ok) return { ...where, models: [], hiddenCloud: 0, error: { kind: result.kind, message: result.message }, chatgpt: chatgptModels };
+  return { ...where, models: result.models, hiddenCloud: result.hiddenCloud, chatgpt: chatgptModels };
 }
 
 const OTHER_HOST = (model: string) =>
@@ -68,6 +97,16 @@ const OTHER_HOST = (model: string) =>
  * passed `checkChatRequest`.
  */
 export async function* streamAssistantChat(request: ChatRequest, signal?: AbortSignal): AsyncGenerator<ChatEvent> {
+  if (request.provider === "chatgpt") {
+    // Only a signed-in user reaches ChatGPT, and the token is read here, never taken from the caller.
+    const token = await chatgpt.accessToken();
+    if (!token.ok) {
+      yield { type: "error", ...token.failure };
+      return;
+    }
+    yield* streamChatGpt(token.accessToken, request, signal);
+    return;
+  }
   const settings = loadWebSettings().assistant ?? DEFAULT_ASSISTANT_SETTINGS;
   if (isCloudModelName(request.model)) {
     yield { type: "error", kind: "refused", message: OTHER_HOST(request.model) };

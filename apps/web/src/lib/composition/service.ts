@@ -6,7 +6,7 @@ import * as attachments from "./attachments";
 import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
-import { listAssistantModels, saveAssistantSettings, streamAssistantChat } from "./assistantService";
+import { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
   ImageInfo,
@@ -805,7 +805,7 @@ export function initialSunTheme(): { tone: "light" | "dark"; autoLight: string }
 }
 
 // The AI helper's settings and model list live in assistantService.ts; they are part of this module's surface.
-export { listAssistantModels, saveAssistantSettings, streamAssistantChat };
+export { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat };
 
 // Compile-time proof that this module implements the whole contract.
 const _implementsApi: CompositionApi = {
@@ -846,6 +846,9 @@ const _implementsApi: CompositionApi = {
   savePluginSettings,
   saveAssistantSettings,
   listAssistantModels,
+  chatGptStatus,
+  startChatGptSignIn,
+  signOutChatGpt,
   saveLocation,
   loadSunSchedule,
 };

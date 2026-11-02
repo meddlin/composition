@@ -333,3 +333,87 @@ describe("AssistantPanel", () => {
     expect(props.onReturnFocus).toHaveBeenCalled();
   });
 });
+
+describe("AssistantPanel with ChatGPT", () => {
+  const chatgpt = {
+    signedIn: true,
+    models: [{ name: "gpt-6.1-sol", label: "GPT-6.1-Sol", parameterSize: "", contextLength: 200_000, capabilities: ["completion"] }],
+  };
+  const gptOption = () => screen.findByRole("option", { name: "GPT-6.1-Sol" });
+  const pickGpt = async () => {
+    await gptOption();
+    fireEvent.change(screen.getByLabelText("Model"), { target: { value: "chatgpt gpt-6.1-sol" } });
+  };
+
+  it("groups the models by who runs them, and keeps Ollama first", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt }));
+    renderPanel();
+    await gptOption();
+    expect(screen.getByRole("group", { name: /Ollama/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "ChatGPT (OpenAI)" })).toBeTruthy();
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("qwen3:0.6b");
+    expect(screen.getByText(/this computer/i)).toBeTruthy();
+  });
+
+  it("asks ChatGPT with the model's own window, and warns that the note goes to OpenAI", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt }));
+    const requests = script([{ type: "done" }]);
+    renderPanel();
+    await pickGpt();
+    expect(screen.getByText(/Sends your notes to ChatGPT \(OpenAI\)/)).toBeTruthy();
+    await ask("hi");
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]).toMatchObject({ provider: "chatgpt", model: "gpt-6.1-sol", numCtx: 200_000 });
+    expect(localStorage.getItem("composition.assistant.model")).toBe("chatgpt gpt-6.1-sol");
+  });
+
+  it("sends no provider for an Ollama model, as before", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt }));
+    const requests = script([{ type: "done" }]);
+    renderPanel();
+    await ask("hi");
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect("provider" in requests[0]).toBe(false);
+  });
+
+  it("remembers a ChatGPT choice across panels", async () => {
+    localStorage.setItem("composition.assistant.model", "chatgpt gpt-6.1-sol");
+    vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt }));
+    renderPanel();
+    await gptOption();
+    expect((screen.getByLabelText("Model") as HTMLSelectElement).value).toBe("chatgpt gpt-6.1-sol");
+  });
+
+  it("still works with ChatGPT when the Ollama server is down, and says so", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(
+      models({ models: [], error: { kind: "unreachable", message: "Can't reach Ollama at http://127.0.0.1:11434. Is it running?" }, chatgpt }),
+    );
+    const requests = script([{ type: "done" }]);
+    renderPanel();
+    await gptOption();
+    expect(screen.getByText(/Ollama: Can't reach Ollama/)).toBeTruthy();
+    fireEvent.change(composer(), { target: { value: "hi" } });
+    await act(async () => void fireEvent.keyDown(composer(), { key: "Enter" }));
+    await waitFor(() => expect(requests[0]).toMatchObject({ provider: "chatgpt" }));
+  });
+
+  it("shows the whole error when nothing can answer", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(
+      models({
+        models: [],
+        error: { kind: "unreachable", message: "Can't reach Ollama." },
+        chatgpt: { signedIn: true, models: [], error: { kind: "auth", message: "Sign in again in Settings." } },
+      }),
+    );
+    renderPanel();
+    expect(await screen.findByText(/Ollama: Can't reach Ollama/)).toBeTruthy();
+    expect(screen.getByText(/ChatGPT: Sign in again/)).toBeTruthy();
+  });
+
+  it("shows only the Ollama list, ungrouped, when nobody is signed in", async () => {
+    vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt: { signedIn: false, models: [] } }));
+    renderPanel();
+    await ready();
+    expect(screen.queryByRole("group")).toBeNull();
+  });
+});

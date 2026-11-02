@@ -17,6 +17,7 @@ import type {
   SettingsSnapshot,
   Workspace,
 } from "./api";
+import type { ChatGptStatus } from "./assistant/types";
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
@@ -301,6 +302,21 @@ export async function saveAssistantSettings(input: SaveAssistantSettingsInput): 
 // Not cached: it asks the server on the network, and the answer changes as models are pulled.
 export async function listAssistantModels(): Promise<AssistantModels> {
   return service.listAssistantModels();
+}
+
+// Not cached: whether someone is signed in changes the moment the browser tab comes back.
+export async function chatGptStatus(): Promise<ChatGptStatus> {
+  return service.chatGptStatus();
+}
+
+export async function startChatGptSignIn(): Promise<{ error?: string }> {
+  return service.startChatGptSignIn();
+}
+
+export async function signOutChatGpt(): Promise<{ error?: string }> {
+  const result = await service.signOutChatGpt();
+  if (!result.error) revalidatePath("/settings");
+  return result;
 }
 
 export async function saveLocation(city: string): Promise<SaveLocationResult> {

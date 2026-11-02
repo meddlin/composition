@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button";
 import type { AssistantModels } from "@/lib/composition/api";
 import { buildMessages, estimateTokens, fitsContext } from "@/lib/composition/assistant/context";
 import { activeConversation, historyOf, type Turn } from "@/lib/composition/assistant/conversations";
+import type { ModelSummary } from "@/lib/composition/assistant/models";
+import { MAX_CONTEXT_TOKENS } from "@/lib/composition/assistant/settings";
+import { DEFAULT_CHATGPT_CONTEXT, type ChatProviderName } from "@/lib/composition/assistant/types";
 import { listAssistantModels } from "@/lib/composition/client";
 import { cn } from "@/lib/utils";
 import { AssistantMarkdown } from "./AssistantMarkdown";
@@ -14,6 +17,16 @@ import { useAssistant } from "./AssistantProvider";
 import { copyText } from "./clipboard";
 
 const MODEL_KEY = "composition.assistant.model";
+
+/**
+ * A ChatGPT model's key in the picker. An Ollama model's key is its plain name (what was stored before ChatGPT
+ * existed), and a name from Ollama never has a space in it, so the two cannot collide.
+ */
+const CHATGPT_PREFIX = "chatgpt ";
+
+type Choice = { key: string; provider: ChatProviderName; model: ModelSummary };
+
+const optionLabel = (m: ModelSummary) => m.label ?? (m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name);
 
 // Plain constants, shown by React: kept out of template strings, which Opengrep reads as HTML.
 const PULL_HINT = "Install one with: ollama pull <model>";
@@ -132,8 +145,22 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
     void listAssistantModels().then(setFound);
   }, []);
 
-  const model = found?.models.find((m) => m.name === picked) ?? found?.models[0];
-  const numCtx = found && model ? Math.min(found.contextTokens, model.contextLength ?? found.contextTokens) : (found?.contextTokens ?? 8192);
+  const ollamaChoices = useMemo<Choice[]>(() => (found?.models ?? []).map((model) => ({ key: model.name, provider: "ollama", model })), [found]);
+  const chatgptChoices = useMemo<Choice[]>(
+    () => (found?.chatgpt?.models ?? []).map((model) => ({ key: CHATGPT_PREFIX + model.name, provider: "chatgpt", model })),
+    [found],
+  );
+  const choices = useMemo(() => [...ollamaChoices, ...chatgptChoices], [ollamaChoices, chatgptChoices]);
+  const choice = choices.find((c) => c.key === picked) ?? choices[0];
+  const model = choice?.model;
+  const provider = choice?.provider ?? "ollama";
+  // ChatGPT's window is the model's own (the context size in Settings is Ollama's setting).
+  const numCtx =
+    provider === "chatgpt" && model
+      ? Math.min(model.contextLength ?? DEFAULT_CHATGPT_CONTEXT, MAX_CONTEXT_TOKENS)
+      : found && model
+        ? Math.min(found.contextTokens, model.contextLength ?? found.contextTokens)
+        : (found?.contextTokens ?? 8192);
 
   const conversation = activeConversation(assistant.chats, noteId);
   const turns = useMemo(() => conversation?.turns ?? [], [conversation]);
@@ -155,7 +182,7 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
 
   function send() {
     if (!model || !canSend) return;
-    assistant.send({ noteId, noteContent, selection, userText: draft.trim(), model: model.name, numCtx });
+    assistant.send({ noteId, noteContent, selection, userText: draft.trim(), ...(provider === "chatgpt" && { provider }), model: model.name, numCtx });
     setDraft("");
     setSelection("");
   }
@@ -182,7 +209,9 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
   };
 
   const host = found ? new URL(found.serverUrl).host : "";
-  const noModels = found && !found.error && found.models.length === 0;
+  const noModels = found && choices.length === 0 && !found.error && !found.chatgpt?.error;
+  // With nothing to ask, a failure is the whole story; with some models, it is a note about the ones that are missing.
+  const unavailable = [found?.error && `Ollama: ${found.error.message}`, found?.chatgpt?.error && `ChatGPT: ${found.chatgpt.error.message}`].filter(Boolean) as string[];
 
   return (
     <aside
@@ -220,21 +249,42 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
             </Button>
           )}
         </div>
-        {found && !found.error && found.models.length > 0 && (
+        {found && choices.length > 0 && (
           <select
             aria-label="Model"
-            value={model?.name ?? ""}
+            value={choice?.key ?? ""}
             onChange={(event) => {
               setPicked(event.target.value);
               storeModel(event.target.value);
             }}
             className="w-full rounded-md border bg-background px-2 py-1 text-xs"
           >
-            {found.models.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.parameterSize ? `${m.name} (${m.parameterSize})` : m.name}
-              </option>
-            ))}
+            {chatgptChoices.length > 0 ? (
+              <>
+                {ollamaChoices.length > 0 && (
+                  <optgroup label={`Ollama (${host})`}>
+                    {ollamaChoices.map((c) => (
+                      <option key={c.key} value={c.key}>
+                        {optionLabel(c.model)}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="ChatGPT (OpenAI)">
+                  {chatgptChoices.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {optionLabel(c.model)}
+                    </option>
+                  ))}
+                </optgroup>
+              </>
+            ) : (
+              ollamaChoices.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {optionLabel(c.model)}
+                </option>
+              ))
+            )}
           </select>
         )}
         {assistant.chats[noteId] && assistant.chats[noteId].conversations.length > 1 && (
@@ -251,20 +301,44 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
             ))}
           </select>
         )}
-        {found && !found.error && (
-          <p className={cn("text-xs", found.local ? "text-muted-foreground" : "text-warning")}>
-            {found.local ? "Runs on this computer: nothing leaves it." : `Sends your notes to ${host}.`}
+        {found && choice && (
+          <p className={cn("text-xs", provider === "ollama" && found.local ? "text-muted-foreground" : "text-warning")}>
+            {provider === "chatgpt"
+              ? "Sends your notes to ChatGPT (OpenAI) and counts against your ChatGPT plan."
+              : found.local
+                ? "Runs on this computer: nothing leaves it."
+                : `Sends your notes to ${host}.`}
           </p>
         )}
       </header>
 
       <div ref={log} role="log" aria-live="polite" aria-busy={streaming} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-3">
         {found === null && <p className="text-sm text-muted-foreground">Looking for models…</p>}
-        {found?.error && (
+        {unavailable.length > 0 && choices.length > 0 && (
+          <div className="flex flex-col gap-1 text-xs text-warning">
+            {unavailable.map((line) => (
+              <p key={line} className="break-words">
+                {line}
+              </p>
+            ))}
+            <Button variant="outline" size="xs" className="w-fit" onClick={load}>
+              Check again
+            </Button>
+          </div>
+        )}
+        {unavailable.length > 0 && choices.length === 0 && (
           <div className="flex flex-col gap-2 text-sm">
-            <p role="alert" className="break-words text-destructive">
-              {found.error.message}
-            </p>
+            {unavailable.length === 1 && found?.error ? (
+              <p role="alert" className="break-words text-destructive">
+                {found.error.message}
+              </p>
+            ) : (
+              unavailable.map((line) => (
+                <p key={line} role="alert" className="break-words text-destructive">
+                  {line}
+                </p>
+              ))
+            )}
             <div className="flex items-center gap-3">
               <Button variant="outline" size="sm" onClick={load}>
                 Check again
@@ -292,7 +366,7 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
         {deleted && turns.length === 0 && (
           <p className="text-sm text-muted-foreground">This note was deleted, so there is nothing to ask about.</p>
         )}
-        {!deleted && found && !found.error && found.models.length > 0 && turns.length === 0 && (
+        {!deleted && found && choices.length > 0 && turns.length === 0 && (
           <p className="text-sm text-muted-foreground">
             Ask for guidance on this note. Select some text first to ask about just that part. Answers appear here;
             nothing is written into your note.

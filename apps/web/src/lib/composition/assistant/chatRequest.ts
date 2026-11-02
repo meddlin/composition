@@ -1,6 +1,6 @@
 import { isCloudModelName } from "./models";
 import { MAX_CONTEXT_TOKENS, MIN_CONTEXT_TOKENS } from "./settings";
-import type { ChatMessage, ChatRequest, ChatRole } from "./types";
+import { CHAT_PROVIDERS, type ChatMessage, type ChatProviderName, type ChatRequest, type ChatRole } from "./types";
 
 /** The most text one request may carry, in characters, across all its messages. About 2 MB: far more than a note. */
 export const MAX_REQUEST_CHARS = 2_000_000;
@@ -19,10 +19,12 @@ const refuse = (error: string): CheckedChatRequest => ({ ok: false, error });
  */
 export function checkChatRequest(input: unknown): CheckedChatRequest {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return refuse("The request is not an object.");
-  const { model, messages, numCtx } = input as Record<string, unknown>;
+  const { provider, model, messages, numCtx } = input as Record<string, unknown>;
 
+  if (provider !== undefined && !CHAT_PROVIDERS.includes(provider as ChatProviderName)) return refuse("The provider is not one the helper knows.");
   if (typeof model !== "string" || model === "" || model.length > MAX_MODEL_NAME) return refuse("The model name is missing or invalid.");
-  if (isCloudModelName(model)) {
+  // `:cloud` is Ollama's own naming; a ChatGPT model name is whatever its catalog says.
+  if (provider !== "chatgpt" && isCloudModelName(model)) {
     return refuse(`"${model}" runs on ollama.com, not on your server, so the AI helper does not use it.`);
   }
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
@@ -44,5 +46,5 @@ export function checkChatRequest(input: unknown): CheckedChatRequest {
     if (characters > MAX_REQUEST_CHARS) return refuse("The conversation is too large to send.");
     checked.push({ role: role as ChatRole, content });
   }
-  return { ok: true, request: { model, messages: checked, numCtx } };
+  return { ok: true, request: { ...(provider !== undefined && { provider: provider as ChatProviderName }), model, messages: checked, numCtx } };
 }

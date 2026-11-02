@@ -8,7 +8,7 @@ import {
   type ChatsState,
   type Turn,
 } from "./conversations";
-import type { ChatEvent, ChatRequest } from "./types";
+import type { ChatEvent, ChatProviderName, ChatRequest } from "./types";
 
 export type SendInput = {
   noteId: number;
@@ -16,6 +16,8 @@ export type SendInput = {
   noteContent: string;
   selection?: string;
   userText: string;
+  /** Who answers; absent means Ollama. */
+  provider?: ChatProviderName;
   model: string;
   numCtx: number;
 };
@@ -85,7 +87,7 @@ export function createChatsStore(deps: ChatsDeps, newId: () => string = () => cr
     running.set(noteId, controller);
     void (async () => {
       try {
-        for await (const event of deps.streamChat({ model: input.model, messages: built.messages, numCtx: input.numCtx }, controller.signal)) {
+        for await (const event of deps.streamChat({ ...(input.provider && { provider: input.provider }), model: input.model, messages: built.messages, numCtx: input.numCtx }, controller.signal)) {
           dispatch({ type: "event", noteId, conversationId, turnId: turn.id, event });
         }
       } finally {

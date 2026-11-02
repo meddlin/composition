@@ -1,6 +1,6 @@
 import type { ModelSummary } from "./assistant/models";
 import type { AssistantSettings } from "./assistant/settings";
-import type { ChatErrorKind } from "./assistant/types";
+import type { ChatErrorKind, ChatGptStatus } from "./assistant/types";
 import type { Favorites } from "./favorites";
 import type { Group } from "./groupsRepo";
 import type { Layout } from "./layout";
@@ -134,6 +134,15 @@ export type AssistantModels = {
   hiddenCloud: number;
   /** Why the list could not be read, in a sentence a person can act on. */
   error?: { kind: ChatErrorKind; message: string };
+  /** The ChatGPT models the signed-in account may use, asked at the same time as the server's. */
+  chatgpt?: ChatGptModels;
+};
+
+/** `models` is empty when nobody is signed in to ChatGPT, or when `error` says why the list could not be read. */
+export type ChatGptModels = {
+  signedIn: boolean;
+  models: ModelSummary[];
+  error?: { kind: ChatErrorKind; message: string };
 };
 
 /** An image pasted into a note; `fileName` is the original name, used only to name the stored copy. */
@@ -231,6 +240,13 @@ export interface CompositionApi {
   /** Asks the saved Ollama server which models the AI helper can use. The renderer never supplies the address. */
   listAssistantModels(): Promise<AssistantModels>;
 
+  /** Whether the AI helper may use the user's ChatGPT plan. Never carries a token. */
+  chatGptStatus(): Promise<ChatGptStatus>;
+  /** Sends the user to ChatGPT's approval page in their browser; the answer is picked up by `chatGptStatus`. */
+  startChatGptSignIn(): Promise<{ error?: string }>;
+  /** Forgets the ChatGPT account on this computer. */
+  signOutChatGpt(): Promise<{ error?: string }>;
+
   /** Geocodes and saves the city that "Follow the sun" tracks; an empty string forgets it. */
   saveLocation(city: string): Promise<SaveLocationResult>;
   /** Sunrise/sunset events for the "auto" scheme, or null when another scheme is selected. */
@@ -280,6 +296,9 @@ export const API_METHODS = [
   "savePluginSettings",
   "saveAssistantSettings",
   "listAssistantModels",
+  "chatGptStatus",
+  "startChatGptSignIn",
+  "signOutChatGpt",
   "saveLocation",
   "loadSunSchedule",
 ] as const satisfies readonly (keyof CompositionApi)[];

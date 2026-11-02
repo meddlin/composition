@@ -17,6 +17,9 @@ From the owner, 2026-10-21 (details and reasons in the research's [E3](ai-helper
 
 - Ollama only, local or self-hosted remote. No ChatGPT, no OpenAI, no hosted provider, no API key.
   LM Studio, llama.cpp and vLLM come later; Ollama's cloud models are hidden.
+  *Superseded 2026-11-02 for ChatGPT:* a second provider, ChatGPT through the user's plan (Sign in with ChatGPT, no API
+  key, off until signed in), was added behind the `ChatProvider` seam. Ollama's cloud models stay hidden; see
+  [ui/ai-helper.md](ui/ai-helper.md#use-your-chatgpt-plan).
 - A dock inside each pane, beside the editor/preview. Web and desktop. Not the CLI.
 - Context is the current note and the current selection. Other notes are not sent.
 - Copy and "new note from this answer" are wanted. "Insert at cursor" is not.

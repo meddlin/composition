@@ -75,12 +75,16 @@ export const savePluginSettings: CompositionApi["savePluginSettings"] = (plugins
 export const saveAssistantSettings: CompositionApi["saveAssistantSettings"] = (input) =>
   bridge().saveAssistantSettings(input);
 export const listAssistantModels: CompositionApi["listAssistantModels"] = () => bridge().listAssistantModels();
+export const chatGptStatus: CompositionApi["chatGptStatus"] = () => bridge().chatGptStatus();
+export const startChatGptSignIn: CompositionApi["startChatGptSignIn"] = () => bridge().startChatGptSignIn();
+export const signOutChatGpt: CompositionApi["signOutChatGpt"] = () => bridge().signOutChatGpt();
 export const saveLocation: CompositionApi["saveLocation"] = (city) => bridge().saveLocation(city);
 export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
   bridge().loadSunSchedule();
 
 export type {
   AssistantModels,
+  ChatGptModels,
   ImageInfo,
   ImageUse,
   MoveGroupResult,
@@ -137,6 +141,9 @@ const _implementsApi: CompositionApi = {
   savePluginSettings,
   saveAssistantSettings,
   listAssistantModels,
+  chatGptStatus,
+  startChatGptSignIn,
+  signOutChatGpt,
   saveLocation,
   loadSunSchedule,
 };

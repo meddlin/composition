@@ -323,3 +323,102 @@ describe("an alternate address", () => {
     expect(await listAssistantModels()).toMatchObject({ serverUrl: other.url, viaAlternate: true });
   });
 });
+
+describe("ChatGPT", () => {
+  const request: ChatRequest = { provider: "chatgpt", model: "gpt-6.1-sol", messages: [{ role: "user", content: "hi" }], numCtx: 128_000 };
+
+  /** An account that is signed in, as the sign-in would have left it beside the settings file. */
+  const signedIn = (over: object = {}) => {
+    const dir = path.join(home, ".composition-web");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "chatgpt-auth.json"),
+      JSON.stringify({ clientId: "oaiapp_1", hostId: "urn:uuid:h", accessToken: "tok", refreshToken: "ref", expiresAt: Date.now() + 3_600_000, ...over }),
+    );
+  };
+
+  /** Answers OpenAI's addresses itself and leaves everything else (the fake Ollama) to the real `fetch`. */
+  function stubOpenAi(routes: Record<string, () => Response>) {
+    const realFetch = fetch;
+    const asked: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal("fetch", async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith("https://api.openai.com/")) {
+        asked.push({ url, init });
+        return (routes[url] ?? (() => new Response("", { status: 500 })))();
+      }
+      return realFetch(input, init);
+    });
+    return asked;
+  }
+
+  const sse = (...events: object[]) => new Response(events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join(""));
+
+  async function run(req: ChatRequest = request) {
+    const { streamAssistantChat } = await load();
+    const events: ChatEvent[] = [];
+    for await (const event of streamAssistantChat(req)) events.push(event);
+    return events;
+  }
+
+  it("tells a signed-out user to sign in, without contacting anyone", async () => {
+    const asked = stubOpenAi({});
+    const events = await run();
+    expect(events).toEqual([{ type: "error", kind: "auth", message: expect.stringMatching(/not signed in/i) }]);
+    expect(asked).toEqual([]);
+  });
+
+  it("streams the answer with the saved token, and never touches the Ollama server", async () => {
+    signedIn();
+    server = await startFakeOllama({});
+    const tools = await load();
+    await tools.saveAssistantSettings({ serverUrl: server.url, contextTokens: 8192 });
+    const asked = stubOpenAi({
+      "https://api.openai.com/v1/responses": () => sse({ type: "response.output_text.delta", delta: "Hi!" }, { type: "response.completed", response: {} }),
+    });
+
+    const events = await run();
+
+    expect(events).toEqual([{ type: "delta", text: "Hi!" }, { type: "done" }]);
+    expect((asked[0].init?.headers as Record<string, string>).authorization).toBe("Bearer tok");
+    expect(server.requests).toEqual([]);
+  });
+
+  it("does not apply Ollama's cloud-name rule to a ChatGPT model", async () => {
+    signedIn();
+    stubOpenAi({ "https://api.openai.com/v1/responses": () => sse({ type: "response.completed", response: {} }) });
+    expect(await run({ ...request, model: "gpt:cloud" })).toEqual([{ type: "done" }]);
+  });
+
+  it("lists the signed-in account's models next to the server's, even when the server is down", async () => {
+    signedIn();
+    stubOpenAi({
+      "https://api.openai.com/v1/models": () => Response.json({ models: [{ slug: "gpt-6.1-sol", display_name: "GPT-6.1-Sol", visibility: "list" }] }),
+    });
+    const { saveAssistantSettings, listAssistantModels } = await load();
+    await saveAssistantSettings({ serverUrl: await closedAddress(), contextTokens: 8192 });
+
+    const result = await listAssistantModels();
+
+    expect(result.error).toMatchObject({ kind: "unreachable" });
+    expect(result.chatgpt).toEqual({ signedIn: true, models: [expect.objectContaining({ name: "gpt-6.1-sol", label: "GPT-6.1-Sol" })] });
+  });
+
+  it("offers no ChatGPT models, and asks OpenAI nothing, when signed out", async () => {
+    const asked = stubOpenAi({});
+    server = await startFakeOllama({ "GET /api/tags": { body: { models: [] } } });
+    const { saveAssistantSettings, listAssistantModels } = await load();
+    await saveAssistantSettings({ serverUrl: server.url, contextTokens: 8192 });
+
+    expect((await listAssistantModels()).chatgpt).toEqual({ signedIn: false, models: [] });
+    expect(asked).toEqual([]);
+  });
+
+  it("reports the account, and forgets it on sign-out", async () => {
+    signedIn({ email: "me@example.com" });
+    const { chatGptStatus, signOutChatGpt } = await import("./assistantService");
+    expect(await chatGptStatus()).toEqual({ state: "signed-in", email: "me@example.com" });
+    await signOutChatGpt();
+    expect(await chatGptStatus()).toEqual({ state: "signed-out" });
+  });
+});
