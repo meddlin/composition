@@ -1,5 +1,5 @@
 import type { Failure } from "../errors";
-import type { ModelSummary } from "../models";
+import type { ModelSummary, ReasoningEffort } from "../models";
 import type { ChatEvent, ChatMessage, ChatRequest } from "../types";
 import { CHATGPT_RESOURCE, type Fetch } from "./oauth";
 import { readSse, SseError } from "./sse";
@@ -96,6 +96,7 @@ export async function* streamChat(
         model: request.model,
         ...(instructions !== undefined && { instructions }),
         input,
+        ...(request.effort && { reasoning: { effort: request.effort } }),
         store: false,
         stream: true,
       }),
@@ -168,7 +169,28 @@ export async function* streamChat(
   }
 }
 
-type CatalogEntry = { slug?: unknown; id?: unknown; display_name?: unknown; visibility?: unknown; context_window?: unknown; max_context_window?: unknown; context_length?: unknown };
+/**
+ * How big a ChatGPT model is, by its family name (OpenAI's names do not say). Ordered by the API price per token:
+ * Astra is the flagship, Sol costs a fifth of it, Terra half of Sol, Luna a twentieth of Sol.
+ */
+const SIZE_BY_FAMILY: Record<string, string> = { astra: "Large", sol: "Medium", terra: "Small", luna: "Mini" };
+
+export function sizeOfChatGptModel(slug: string): string | undefined {
+  const family = slug.toLowerCase().split(/[^a-z]+/).find((part) => part in SIZE_BY_FAMILY);
+  return family === undefined ? undefined : SIZE_BY_FAMILY[family];
+}
+
+function reasoningLevelsOf(value: unknown): ReasoningEffort[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((level): ReasoningEffort[] => {
+    const effort = (level as { effort?: unknown } | null)?.effort;
+    if (typeof effort !== "string" || !/^[a-z]{1,16}$/.test(effort)) return [];
+    const description = (level as { description?: unknown }).description;
+    return [{ effort, description: typeof description === "string" ? description : "" }];
+  });
+}
+
+type CatalogEntry = { supported_reasoning_levels?: unknown; default_reasoning_level?: unknown; slug?: unknown; id?: unknown; display_name?: unknown; visibility?: unknown; context_window?: unknown; max_context_window?: unknown; context_length?: unknown };
 
 export type ChatGptModelList = { ok: true; models: ModelSummary[] } | ({ ok: false } & Failure);
 
@@ -200,9 +222,15 @@ export async function listChatGptModels(accessToken: string, signal?: AbortSigna
     const slug = typeof entry.slug === "string" ? entry.slug : typeof entry.id === "string" ? entry.id : undefined;
     if (slug === undefined || (entry.visibility !== undefined && entry.visibility !== "list")) continue;
     const windowSize = [entry.context_window, entry.max_context_window, entry.context_length].find((v): v is number => typeof v === "number" && v > 0);
+    const name = typeof entry.display_name === "string" && entry.display_name !== "" ? entry.display_name : slug;
+    const size = sizeOfChatGptModel(slug);
+    const efforts = reasoningLevelsOf(entry.supported_reasoning_levels);
+    const defaultEffort = efforts.find((l) => l.effort === entry.default_reasoning_level)?.effort;
     models.push({
       name: slug,
-      label: typeof entry.display_name === "string" && entry.display_name !== "" ? entry.display_name : slug,
+      label: size ? `${name} (${size})` : name,
+      ...(efforts.length > 0 && { efforts }),
+      ...(defaultEffort !== undefined && { defaultEffort }),
       parameterSize: "",
       contextLength: windowSize,
       capabilities: ["completion"],

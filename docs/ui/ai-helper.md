@@ -41,6 +41,13 @@ ChatGPT's approval page (OpenAI's *Sign in with ChatGPT* for open-source apps, s
 and the page says *Signed in as …*. The ChatGPT models your account can use then appear in the panel's model list, under
 **ChatGPT (OpenAI)**, below your Ollama models. Pick one for a chat; the choice is remembered per computer.
 
+- **Sizes.** OpenAI's names don't say how big a model is, so the list adds it: *Astra* is **Large** (the flagship),
+  *Sol* **Medium**, *Terra* **Small** and *Luna* **Mini**, ordered by what each costs per token. A model from a family the
+  app doesn't know is listed without a size.
+- **Effort.** Under the model list, an **Effort** menu lists the reasoning levels that model supports (for example low to
+  max), with its default marked. A higher level thinks longer and uses more of your plan. The level is remembered per
+  model, and the request only carries it when you pick something other than the default.
+
 - **It uses your plan, not an API key.** It needs a ChatGPT Go, Plus or Pro plan. Usage counts against your plan, and you
   can cap what this app may use (a weekly share, and optionally credits) in ChatGPT under *Settings → Security and
   login → Sign in with ChatGPT*. When the cap is reached the answer stops with a message saying so; nothing switches to

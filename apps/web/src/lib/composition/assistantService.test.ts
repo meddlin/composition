@@ -401,7 +401,7 @@ describe("ChatGPT", () => {
     const result = await listAssistantModels();
 
     expect(result.error).toMatchObject({ kind: "unreachable" });
-    expect(result.chatgpt).toEqual({ signedIn: true, models: [expect.objectContaining({ name: "gpt-6.1-sol", label: "GPT-6.1-Sol" })] });
+    expect(result.chatgpt).toEqual({ signedIn: true, models: [expect.objectContaining({ name: "gpt-6.1-sol", label: "GPT-6.1-Sol (Medium)" })] });
   });
 
   it("offers no ChatGPT models, and asks OpenAI nothing, when signed out", async () => {
