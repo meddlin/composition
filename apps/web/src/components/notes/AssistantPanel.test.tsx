@@ -367,6 +367,49 @@ describe("AssistantPanel with ChatGPT", () => {
     expect(localStorage.getItem("composition.assistant.model")).toBe("chatgpt gpt-6.1-sol");
   });
 
+  describe("reasoning effort", () => {
+    const withEfforts = {
+      signedIn: true,
+      models: [
+        {
+          ...chatgpt.models[0],
+          label: "GPT-6.1 Sol (Medium)",
+          efforts: [{ effort: "low", description: "Fast" }, { effort: "high", description: "Deep" }],
+          defaultEffort: "low",
+        },
+      ],
+    };
+    const pick = async () => {
+      await screen.findByRole("option", { name: "GPT-6.1 Sol (Medium)" });
+      fireEvent.change(screen.getByLabelText("Model"), { target: { value: "chatgpt gpt-6.1-sol" } });
+    };
+
+    it("shows the size in the model list and an Effort picker for the model's levels", async () => {
+      vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt: withEfforts }));
+      renderPanel();
+      expect(screen.queryByLabelText("Effort")).toBeNull();
+      await pick();
+      const effort = screen.getByLabelText("Effort") as HTMLSelectElement;
+      expect(effort.value).toBe("low");
+      expect(Array.from(effort.options).map((o) => o.text)).toEqual(["low (default)", "high"]);
+    });
+
+    it("sends the level only when it is not the default, and remembers it", async () => {
+      vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt: withEfforts }));
+      const requests = script([{ type: "done" }, { type: "done" }]);
+      renderPanel();
+      await pick();
+      await ask("one");
+      await waitFor(() => expect(requests).toHaveLength(1));
+      expect(requests[0]).not.toHaveProperty("effort");
+      fireEvent.change(screen.getByLabelText("Effort"), { target: { value: "high" } });
+      await ask("two");
+      await waitFor(() => expect(requests).toHaveLength(2));
+      expect(requests[1]).toMatchObject({ effort: "high" });
+      expect(JSON.parse(localStorage.getItem("composition.assistant.effort") ?? "{}")).toEqual({ "chatgpt gpt-6.1-sol": "high" });
+    });
+  });
+
   it("sends no provider for an Ollama model, as before", async () => {
     vi.mocked(listAssistantModels).mockResolvedValue(models({ chatgpt }));
     const requests = script([{ type: "done" }]);

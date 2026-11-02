@@ -14,10 +14,16 @@ export function isCloudModelName(name: string): boolean {
   return lower === "cloud" || (!suffix.includes("/") && lower.endsWith("-cloud"));
 }
 
+export type ReasoningEffort = { effort: string; description: string };
+
 export type ModelSummary = {
   name: string;
   /** What to show in place of `name`, when the provider has a friendlier one (ChatGPT's "GPT-6.1 Sol"). */
   label?: string;
+  /** The reasoning levels the model accepts, lowest first (ChatGPT's catalog lists them; Ollama models have none). */
+  efforts?: ReasoningEffort[];
+  /** The level the model uses when none is sent; one of `efforts`. */
+  defaultEffort?: string;
   /** Ollama's own text, like "7.6B" or "751.63M"; empty when the server did not say. */
   parameterSize: string;
   /** The model's largest context window in tokens, when it says. */

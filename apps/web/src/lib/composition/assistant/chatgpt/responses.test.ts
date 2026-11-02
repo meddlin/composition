@@ -66,6 +66,11 @@ describe("streamChat (ChatGPT)", () => {
     expect(body.input.every((m: { role: string }) => m.role !== "system")).toBe(true);
   });
 
+  it("asks for the reasoning level only when one is given", async () => {
+    const { fetchImpl } = await run(sse({ type: "response.completed", response: {} }), { ...request, effort: "high" });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body).reasoning).toEqual({ effort: "high" });
+  });
+
   it("streams the text, then usage and done", async () => {
     const { events } = await run(
       sse(
@@ -164,10 +169,33 @@ describe("listChatGptModels", () => {
     expect(result).toEqual({
       ok: true,
       models: [
-        { name: "gpt-6.1-sol", label: "GPT-6.1-Sol", parameterSize: "", contextLength: 200000, capabilities: ["completion"] },
+        { name: "gpt-6.1-sol", label: "GPT-6.1-Sol (Medium)", parameterSize: "", contextLength: 200000, capabilities: ["completion"] },
         { name: "plain", label: "plain", parameterSize: "", contextLength: undefined, capabilities: ["completion"] },
       ],
     });
+  });
+
+  it("adds a size to the name, and lists the reasoning levels with the default", async () => {
+    const levels = [{ effort: "low", description: "Fast" }, { effort: "high", description: "Deep" }, { effort: "bad level!" }];
+    const result = await listChatGptModels(
+      "token",
+      undefined,
+      list({
+        models: [
+          { slug: "gpt-6-astra", display_name: "GPT-6-Astra", supported_reasoning_levels: levels, default_reasoning_level: "low" },
+          { slug: "gpt-6.1-sol", display_name: "GPT-6.1 Sol" },
+          { slug: "gpt-5.6-terra", display_name: "GPT-5.6-Terra" },
+          { slug: "gpt-6-luna", display_name: "GPT-6-Luna", default_reasoning_level: "nope" },
+        ],
+      }),
+    );
+    expect(result.ok && result.models.map((m) => m.label)).toEqual(["GPT-6-Astra (Large)", "GPT-6.1 Sol (Medium)", "GPT-5.6-Terra (Small)", "GPT-6-Luna (Mini)"]);
+    expect(result.ok && result.models[0]).toMatchObject({
+      efforts: [{ effort: "low", description: "Fast" }, { effort: "high", description: "Deep" }],
+      defaultEffort: "low",
+    });
+    expect(result.ok && result.models[3]).not.toHaveProperty("defaultEffort");
+    expect(result.ok && result.models[1]).not.toHaveProperty("efforts");
   });
 
   it("asks to sign in again on a 401", async () => {

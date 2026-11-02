@@ -17,6 +17,7 @@ import { useAssistant } from "./AssistantProvider";
 import { copyText } from "./clipboard";
 
 const MODEL_KEY = "composition.assistant.model";
+const EFFORT_KEY = "composition.assistant.effort";
 
 /**
  * A ChatGPT model's key in the picker. An Ollama model's key is its plain name (what was stored before ChatGPT
@@ -58,6 +59,24 @@ function readStoredModel(): string | null {
 function storeModel(name: string) {
   try {
     localStorage.setItem(MODEL_KEY, name);
+  } catch {
+    // Remembering the choice is a convenience only.
+  }
+}
+
+/** The reasoning level picked for each ChatGPT model, by picker key. */
+function readStoredEfforts(): Record<string, string> {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(EFFORT_KEY) ?? "{}");
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? (parsed as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function storeEfforts(efforts: Record<string, string>) {
+  try {
+    localStorage.setItem(EFFORT_KEY, JSON.stringify(efforts));
   } catch {
     // Remembering the choice is a convenience only.
   }
@@ -129,6 +148,7 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
   const deleted = panel?.deleted ?? false;
   const [found, setFound] = useState<AssistantModels | null>(null);
   const [picked, setPicked] = useState<string | null>(readStoredModel);
+  const [efforts, setEfforts] = useState<Record<string, string>>(readStoredEfforts);
   const [draft, setDraft] = useState("");
   const [selection, setSelection] = useState("");
   const log = useRef<HTMLDivElement>(null);
@@ -154,6 +174,10 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
   const choice = choices.find((c) => c.key === picked) ?? choices[0];
   const model = choice?.model;
   const provider = choice?.provider ?? "ollama";
+  // The reasoning level, for a ChatGPT model whose catalog lists some: the one picked for it, else its default.
+  const levels = provider === "chatgpt" ? (model?.efforts ?? []) : [];
+  const pickedEffort = choice ? efforts[choice.key] : undefined;
+  const effort = levels.find((l) => l.effort === pickedEffort)?.effort ?? model?.defaultEffort ?? levels[0]?.effort;
   // ChatGPT's window is the model's own (the context size in Settings is Ollama's setting).
   const numCtx =
     provider === "chatgpt" && model
@@ -182,7 +206,7 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
 
   function send() {
     if (!model || !canSend) return;
-    assistant.send({ noteId, noteContent, selection, userText: draft.trim(), ...(provider === "chatgpt" && { provider }), model: model.name, numCtx });
+    assistant.send({ noteId, noteContent, selection, userText: draft.trim(), ...(provider === "chatgpt" && { provider }), model: model.name, numCtx, ...(effort !== undefined && effort !== model.defaultEffort && { effort }) });
     setDraft("");
     setSelection("");
   }
@@ -286,6 +310,27 @@ export function AssistantPanel({ noteId, noteContent, getSelection, onNewNoteFro
               ))
             )}
           </select>
+        )}
+        {choice && levels.length > 0 && (
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Effort
+            <select
+              aria-label="Effort"
+              value={effort ?? ""}
+              onChange={(event) => {
+                const next = { ...efforts, [choice.key]: event.target.value };
+                setEfforts(next);
+                storeEfforts(next);
+              }}
+              className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1 text-xs text-foreground"
+            >
+              {levels.map((l) => (
+                <option key={l.effort} value={l.effort} title={l.description}>
+                  {l.effort === model?.defaultEffort ? `${l.effort} (default)` : l.effort}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {assistant.chats[noteId] && assistant.chats[noteId].conversations.length > 1 && (
           <select

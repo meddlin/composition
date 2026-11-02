@@ -23,6 +23,8 @@ export type ChatRequest = {
   messages: ChatMessage[];
   /** The context window to ask the server for, in tokens. Sent every time: the server's own default is small. */
   numCtx: number;
+  /** ChatGPT only: the reasoning level to ask for. Absent means the model's own default. */
+  effort?: string;
 };
 
 /** Why a turn failed, in terms the UI can act on. */

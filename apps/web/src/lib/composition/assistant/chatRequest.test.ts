@@ -59,6 +59,16 @@ describe("checkChatRequest", () => {
       expect(plain.ok && "provider" in plain.request).toBe(false);
     });
 
+    it("keeps a reasoning level for ChatGPT only, and refuses a malformed one", () => {
+      expect(checkChatRequest({ ...good, provider: "chatgpt", effort: "high" })).toMatchObject({ ok: true, request: { effort: "high" } });
+      const plain = checkChatRequest({ ...good, provider: "chatgpt" });
+      expect(plain.ok && "effort" in plain.request).toBe(false);
+      expect(refused({ ...good, provider: "ollama", effort: "high" })).toMatch(/reasoning/i);
+      expect(refused({ ...good, effort: "high" })).toMatch(/reasoning/i);
+      expect(refused({ ...good, provider: "chatgpt", effort: "High; drop" })).toMatch(/reasoning/i);
+      expect(refused({ ...good, provider: "chatgpt", effort: 3 })).toMatch(/reasoning/i);
+    });
+
     it("refuses one it does not know", () => {
       expect(refused({ ...good, provider: "mystery" })).toMatch(/provider/i);
     });

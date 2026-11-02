@@ -20,6 +20,8 @@ export type SendInput = {
   provider?: ChatProviderName;
   model: string;
   numCtx: number;
+  /** ChatGPT only: a reasoning level other than the model's default. */
+  effort?: string;
 };
 
 /** The one thing a chat reaches outside for: the stream of events for a request. */
@@ -87,7 +89,7 @@ export function createChatsStore(deps: ChatsDeps, newId: () => string = () => cr
     running.set(noteId, controller);
     void (async () => {
       try {
-        for await (const event of deps.streamChat({ ...(input.provider && { provider: input.provider }), model: input.model, messages: built.messages, numCtx: input.numCtx }, controller.signal)) {
+        for await (const event of deps.streamChat({ ...(input.provider && { provider: input.provider }), model: input.model, messages: built.messages, numCtx: input.numCtx, ...(input.effort && { effort: input.effort }) }, controller.signal)) {
           dispatch({ type: "event", noteId, conversationId, turnId: turn.id, event });
         }
       } finally {
