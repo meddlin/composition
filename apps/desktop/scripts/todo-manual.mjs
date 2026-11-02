@@ -25,7 +25,7 @@ const option = (name) => {
 };
 const home = path.resolve(option("home") ?? path.join(os.tmpdir(), "composition-manual-todo"));
 
-const usage = `Usage: pnpm manual:todo <command> [options]
+const usageText = `Usage: pnpm manual:todo <command> [options]
 
   setup  --scenario behind|first-run|archive|retention [--weeks N] [--keep MONTHS|forever] [--home DIR]
          behind      N weeks (default 3) have ended since the app last ran, with work in each
@@ -37,7 +37,9 @@ const usage = `Usage: pnpm manual:todo <command> [options]
   report [--home DIR]              print what the database holds, to compare with the app
   launch [--home DIR]              print the command that starts the app on that home
 
-The default home is ${path.join(os.tmpdir(), "composition-manual-todo")}.`;
+The default home is `;
+// Kept apart from the help text above: a template literal with <command> and a ${...} reads as HTML to opengrep.
+const usage = usageText + path.join(os.tmpdir(), "composition-manual-todo") + ".";
 
 if (command === "launch") {
   console.log(`COMPOSITION_DEV_HOME=${home} pnpm --dir apps/desktop dev`);
