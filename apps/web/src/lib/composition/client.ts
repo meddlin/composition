@@ -16,6 +16,7 @@ export {
   createNotebook,
   deleteGroup,
   deleteNote,
+  chatGptStatus,
   deleteNotebook,
   listAssistantModels,
   listImages,
@@ -50,9 +51,12 @@ export {
   saveTheme,
   saveWritingSettings,
   searchNotes,
+  signOutChatGpt,
+  startChatGptSignIn,
 } from "./actions";
 export type {
   AssistantModels,
+  ChatGptModels,
   ImageInfo,
   ImageUse,
   MoveGroupResult,

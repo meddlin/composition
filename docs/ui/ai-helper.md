@@ -6,13 +6,17 @@ Source: [`AssistantPanel.tsx`](../../apps/web/src/components/notes/AssistantPane
 [`assistantDock.ts`](../../apps/web/src/components/notes/assistantDock.ts),
 [`createNoteFromAnswer.ts`](../../apps/web/src/components/notes/createNoteFromAnswer.ts),
 [`lib/composition/assistant/`](../../apps/web/src/lib/composition/assistant/),
-[`AssistantSettings.tsx`](../../apps/web/src/app/settings/AssistantSettings.tsx) (web and desktop; the terminal app
-doesn't have it yet). How it was researched and built: [ai-helper-research.md](../ai-helper-research.md),
+[`AssistantSettings.tsx`](../../apps/web/src/app/settings/AssistantSettings.tsx) and
+[`ChatGptSettings.tsx`](../../apps/web/src/app/settings/ChatGptSettings.tsx) (web and desktop; the terminal app
+doesn't have them yet). How it was researched and built: [ai-helper-research.md](../ai-helper-research.md),
 [ai-helper-plan.md](../ai-helper-plan.md).
 
 A chat panel beside a note, where you can ask a language model for guidance on what you are writing. The model runs
-on **your own Ollama server**: on this computer, or on one you host. Nothing is sent to ChatGPT, OpenAI or any other
-hosted service, and nothing the model says is written into your note.
+on **your own Ollama server** (on this computer, or on one you host), or, if you sign in, on **ChatGPT through your
+ChatGPT plan** (no API key, no per-token bill). Ollama is the default and never leaves your network; ChatGPT is off until
+you sign in and is only used for the chats where you pick one of its models. A common split: ChatGPT for general
+questions, an Ollama model for anything involving code you would rather keep at home. Nothing the model says is written
+into your note.
 
 ## Set it up
 
@@ -28,6 +32,33 @@ hosted service, and nothing the model says is written into your note.
 A server on another machine has to be reachable from this one (Ollama listens only on `127.0.0.1` unless
 `OLLAMA_HOST` says otherwise). Ollama has no sign-in of its own, so put anything that needs one behind your own network
 or VPN: this version sends no credentials, and a server that asks for them is reported as such.
+
+## Use your ChatGPT plan
+
+Off until you choose it. In **Settings → AI helper → ChatGPT**, press **Continue with ChatGPT**. Your browser opens
+ChatGPT's approval page (OpenAI's *Sign in with ChatGPT* for open-source apps, see
+[developers.openai.com/siwc](https://developers.openai.com/siwc)); approve it and the browser returns to this computer
+and the page says *Signed in as …*. The ChatGPT models your account can use then appear in the panel's model list, under
+**ChatGPT (OpenAI)**, below your Ollama models. Pick one for a chat; the choice is remembered per computer.
+
+- **It uses your plan, not an API key.** It needs a ChatGPT Go, Plus or Pro plan. Usage counts against your plan, and you
+  can cap what this app may use (a weekly share, and optionally credits) in ChatGPT under *Settings → Security and
+  login → Sign in with ChatGPT*. When the cap is reached the answer stops with a message saying so; nothing switches to
+  a paid API on its own.
+- **What is sent.** Every question with a ChatGPT model sends the same things as for Ollama (the note, any selection, the
+  earlier turns of that chat), to OpenAI. The panel says *Sends your notes to ChatGPT (OpenAI)* whenever one is picked.
+  If you switch models in the middle of a chat, the earlier turns go to the new one.
+- **Where the sign-in lives.** Only in the app's own process (the web server, or the desktop app's main process), in a
+  file named `chatgpt-auth.json` beside the settings file, readable only by you. A page is told whether you are signed in
+  and as whom, never a token. Backups carry the settings, not this file.
+- **Sign out** forgets the account on this computer. To also withdraw the app's access, remove it in ChatGPT under the
+  same *Sign in with ChatGPT* page.
+- **The web app has to run on the computer you are using**, because the browser is sent back to a loopback address
+  (`127.0.0.1`) on it.
+- **Preview limits.** This is a preview feature at OpenAI: only chat is used (no tools, no images), and its limits and
+  models may change. The model list is whatever your account is given.
+
+If Ollama is not running, a signed-in ChatGPT still works, and the panel says what is missing.
 
 ## Home and away
 
@@ -60,7 +91,8 @@ Drag the divider to resize it. In a pane narrower than 600 px it covers the note
 - **A part of the note.** Select text in the editor or the preview, then click into the question box: a chip shows
   *Selection (n characters)* and the question is about that text. The **×** on the chip drops it. It is sent with one
   question only.
-- **Models.** The list is what the server has installed and can chat with. The choice is remembered on this computer.
+- **Models.** The list is what the Ollama server has installed and can chat with, plus your ChatGPT models once you
+  are signed in (grouped under their own heading). The choice is remembered on this computer.
 - **Chats.** Each note has its own chats. **+** starts a new one; a switcher appears once there are two. They are kept
   while the app is open and **are not saved**: reloading or quitting forgets them. Deleting a note drops its chats.
 - **Using an answer.** **Copy** copies it. **New note from this** makes a *separate* note in the same group, titled from
@@ -74,8 +106,8 @@ Drag the divider to resize it. In a pane narrower than 600 px it covers the note
 
 Every question sends the **current note** (its title, description, tags and text, as you have it on screen even if
 it has not saved yet; not its dates), the **selection** if you made one, and **the earlier questions and answers of
-that chat**, to the server in Settings and nowhere else. The panel says where: *Runs on this computer* for a local
-server, or *Sends your notes to* the host name. If the address is plain `http://` and not this computer, Settings
+that chat**, to the server in Settings (or, for a ChatGPT model, to OpenAI) and nowhere else. The panel says where:
+*Runs on this computer* for a local server, or *Sends your notes to* the host name or ChatGPT. If the address is plain `http://` and not this computer, Settings
 warns that the note crosses the network unencrypted. Other notes are never sent.
 
 The line under the question box shows roughly how large that is (*Sends this note (about N tokens)*; it counts one token

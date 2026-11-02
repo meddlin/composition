@@ -7,7 +7,17 @@ export type ChatRole = "system" | "user" | "assistant";
 
 export type ChatMessage = { role: ChatRole; content: string };
 
+/** Who answers: the saved Ollama server, or ChatGPT through the user's plan (Sign in with ChatGPT). */
+export type ChatProviderName = "ollama" | "chatgpt";
+
+export const CHAT_PROVIDERS: readonly ChatProviderName[] = ["ollama", "chatgpt"];
+
+/** The window to assume for a ChatGPT model whose listing does not say, in tokens. */
+export const DEFAULT_CHATGPT_CONTEXT = 128_000;
+
 export type ChatRequest = {
+  /** Absent means Ollama, which is what a request from before ChatGPT existed meant. */
+  provider?: ChatProviderName;
   model: string;
   /** Never empty: Ollama answers an empty list by only loading the model. */
   messages: ChatMessage[];
@@ -48,3 +58,12 @@ export type ChatEvent =
 export interface ChatProvider {
   streamChat(baseUrl: string, request: ChatRequest, signal?: AbortSignal): AsyncIterable<ChatEvent>;
 }
+
+/**
+ * Whether the app may spend the user's ChatGPT plan. `pending` is the time between sending the user to ChatGPT's
+ * approval page and its answer coming back. `error` says why the last attempt failed. Never carries a token.
+ */
+export type ChatGptStatus =
+  | { state: "signed-out"; error?: string }
+  | { state: "pending" }
+  | { state: "signed-in"; email?: string };

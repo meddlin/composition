@@ -223,6 +223,10 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   },
   // No arguments, on purpose: the address it asks is the saved one, never one the renderer names.
   listAssistantModels: none,
+  // No arguments either: the sign-in is the app's own, started and read here, and a page never sees a token.
+  chatGptStatus: none,
+  startChatGptSignIn: none,
+  signOutChatGpt: none,
   saveLocation: ([city]) => [text("saveLocation", city, "city")],
   loadSunSchedule: none,
 };

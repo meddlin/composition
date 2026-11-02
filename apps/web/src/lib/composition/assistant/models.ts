@@ -16,6 +16,8 @@ export function isCloudModelName(name: string): boolean {
 
 export type ModelSummary = {
   name: string;
+  /** What to show in place of `name`, when the provider has a friendlier one (ChatGPT's "GPT-6.1 Sol"). */
+  label?: string;
   /** Ollama's own text, like "7.6B" or "751.63M"; empty when the server did not say. */
   parameterSize: string;
   /** The model's largest context window in tokens, when it says. */

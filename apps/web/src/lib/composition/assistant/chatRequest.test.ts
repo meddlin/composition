@@ -50,4 +50,23 @@ describe("checkChatRequest", () => {
       expect(refused({ ...good, model })).toMatch(/ollama\.com/i);
     }
   });
+
+  describe("provider", () => {
+    it("is kept when it is one the helper knows, and left out when absent", () => {
+      expect(checkChatRequest({ ...good, provider: "chatgpt" })).toMatchObject({ ok: true, request: { provider: "chatgpt" } });
+      expect(checkChatRequest({ ...good, provider: "ollama" })).toMatchObject({ ok: true, request: { provider: "ollama" } });
+      const plain = checkChatRequest(good);
+      expect(plain.ok && "provider" in plain.request).toBe(false);
+    });
+
+    it("refuses one it does not know", () => {
+      expect(refused({ ...good, provider: "mystery" })).toMatch(/provider/i);
+    });
+
+    it("applies Ollama's cloud-model refusal to Ollama only", () => {
+      expect(refused({ ...good, model: "gpt-oss:120b-cloud" })).toMatch(/ollama\.com/);
+      expect(refused({ ...good, provider: "ollama", model: "gpt-oss:120b-cloud" })).toMatch(/ollama\.com/);
+      expect(checkChatRequest({ ...good, provider: "chatgpt", model: "gpt-oss:120b-cloud" }).ok).toBe(true);
+    });
+  });
 });

@@ -101,6 +101,12 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.listAssistantModels(["http://169.254.169.254/latest/meta-data/"])).toEqual([]);
   });
 
+  it("takes no arguments for the ChatGPT sign-in, so a page can neither choose where it goes nor hand it a token", () => {
+    expect(VALIDATORS.chatGptStatus(["x"])).toEqual([]);
+    expect(VALIDATORS.startChatGptSignIn([{ redirect: "http://evil.example" }])).toEqual([]);
+    expect(VALIDATORS.signOutChatGpt(["x"])).toEqual([]);
+  });
+
   it("drops arguments the method doesn't take", () => {
     expect(VALIDATORS.deleteNote([5, "extra", {}])).toEqual([5]);
     expect(VALIDATORS.loadWorkspace(["surprise"])).toEqual([]);

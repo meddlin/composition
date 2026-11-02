@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { AssistantSettings } from "./AssistantSettings";
+import { ChatGptSettings } from "./ChatGptSettings";
 import { BackupRestore } from "./BackupRestore";
 import { FunMetrics } from "./FunMetrics";
 import { HomeSettings } from "./HomeSettings";
@@ -134,7 +135,10 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           </TabsContent>
 
           <TabsContent value="ai">
-            <AssistantSettings initial={snapshot.assistant} />
+            <div className="flex flex-col gap-4">
+              <AssistantSettings initial={snapshot.assistant} />
+              <ChatGptSettings />
+            </div>
           </TabsContent>
 
           <TabsContent value="shortcuts">

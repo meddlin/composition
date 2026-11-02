@@ -85,3 +85,27 @@ script covers. You need Ollama running with one small chat model (for example `q
 - [ ] The same walkthrough in the app. The window's own CSP still blocks the page from reaching the network
   (`pnpm smoke` checks this, but only in a packaged run).
 - [ ] Quit the app while an answer is streaming: Ollama's log shows the request cancelled.
+
+## 9. ChatGPT (needs a ChatGPT Go, Plus or Pro account)
+
+Use the scratch home from the top, so the sign-in lands in a throwaway `chatgpt-auth.json`.
+
+- [ ] Settings → AI helper → ChatGPT says it is off and offers **Continue with ChatGPT**. Before signing in, the panel's
+  model list has only Ollama models and no group headings.
+- [ ] **Continue with ChatGPT** opens the browser on ChatGPT's approval page. Approve: the tab says *Signed in*, and
+  within a couple of seconds Settings says *Signed in as* your email.
+- [ ] Press the button and close the approval tab without approving: Settings keeps saying *Waiting…*; **Cancel**
+  returns it to signed-out. Deny on the approval page: Settings says *Sign-in was cancelled.*
+- [ ] With something else already listening on port 1455 (for example `codex login`), signing in still works.
+- [ ] `chatgpt-auth.json` sits next to `settings.json` and only you can read it (`ls -l`). No token appears in the
+  settings page, the network tab, or `settings.json`.
+- [ ] The panel's model list now has a **ChatGPT (OpenAI)** group. Pick one: the line under the list says *Sends your
+  notes to ChatGPT (OpenAI)*. Ask a question; the answer streams in. Switch a model in the middle of a chat: the next
+  answer still knows the earlier ones.
+- [ ] Stop Ollama: the panel notes *Ollama: …* but ChatGPT still answers.
+- [ ] In ChatGPT's *Sign in with ChatGPT* page, set this app's weekly cap very low (or use it until it is hit): the
+  answer ends with the message about the usage limit, not a blank or a hang.
+- [ ] Remove the app in ChatGPT's *Sign in with ChatGPT* page, then ask again: the panel says to sign in again, and
+  Settings goes back to signed-out.
+- [ ] **Sign out** removes `chatgpt-auth.json` and the ChatGPT group from the list.
+- [ ] Desktop: the same, and the browser opens from the app. The Ollama-only checks above still pass.
