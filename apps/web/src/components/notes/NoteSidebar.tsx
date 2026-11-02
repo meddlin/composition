@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownUpIcon, BookOpenIcon, CalendarIcon } from "lucide-react";
+import { ArrowDownUpIcon, BookOpenIcon, CalendarIcon, ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { GroupTree, InlineTextInput, type RevealRequest } from "./GroupTree";
+import { GroupTree, InlineTextInput, type FoldRequest, type RevealRequest } from "./GroupTree";
 import { setNoteDatePrefs, useNoteDatePrefs } from "./noteDatePrefs";
 import { isNoteSort, NOTE_SORT_LABELS, NOTE_SORTS, setNoteSort, useNoteSort } from "./noteSort";
 import type { Group, Note, Notebook } from "./types";
@@ -83,6 +83,7 @@ export function NoteSidebar({
   onMoveGroupToNotebook,
 }: Props) {
   const [addingGroup, setAddingGroup] = useState(false);
+  const [fold, setFold] = useState<FoldRequest | null>(null);
   const dates = useNoteDatePrefs();
   const sort = useNoteSort();
 
@@ -108,6 +109,24 @@ export function NoteSidebar({
         </div>
       )}
       <div className="flex items-center justify-end gap-1 px-2 pt-1">
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Collapse all groups"
+          title="Collapse all groups"
+          onClick={() => setFold((f) => ({ mode: "collapse", nonce: (f?.nonce ?? 0) + 1 }))}
+        >
+          <ChevronsDownUpIcon className="text-muted-foreground" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label="Expand all groups"
+          title="Expand all groups"
+          onClick={() => setFold((f) => ({ mode: "expand", nonce: (f?.nonce ?? 0) + 1 }))}
+        >
+          <ChevronsUpDownIcon className="text-muted-foreground" />
+        </Button>
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
@@ -169,6 +188,7 @@ export function NoteSidebar({
           viewedGroupId={viewedGroupId}
           reveal={reveal}
           onRevealed={onRevealed}
+          fold={fold}
           favorites={favorites}
           onToggleFavorite={onToggleFavorite}
           onSelectNote={onSelect}

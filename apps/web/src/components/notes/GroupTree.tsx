@@ -27,6 +27,9 @@ const ROW_ACTIONS_CLASS =
 /** A request to bring a note's row into view; a new `nonce` is a new request, even for the same note. */
 export type RevealRequest = { noteId: number; nonce: number };
 
+/** A request to open or close every group; a new `nonce` is a new request, even for the same mode. */
+export type FoldRequest = { mode: "expand" | "collapse"; nonce: number };
+
 type Reveal = {
   noteId: number;
   nonce: number;
@@ -48,6 +51,8 @@ type TreeProps = {
   reveal?: RevealRequest | null;
   /** Called when the revealed note's row has been scrolled to, so the request can be dropped. */
   onRevealed?: () => void;
+  /** When set, opens or closes every group in the tree. */
+  fold?: FoldRequest | null;
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   onSelectNote: (id: number) => void;
@@ -77,6 +82,7 @@ export function GroupTree({
   viewedGroupId,
   reveal: revealRequest = null,
   onRevealed,
+  fold = null,
   favorites,
   onToggleFavorite,
   onSelectNote,
@@ -164,6 +170,7 @@ export function GroupTree({
     activeId,
     viewedGroupId,
     reveal,
+    fold,
     favorites,
     onToggleFavorite,
     isGroupEmpty,
@@ -320,6 +327,7 @@ type SharedProps = {
   activeId: number | null;
   viewedGroupId: number | null;
   reveal: Reveal | null;
+  fold: FoldRequest | null;
   favorites: Favorites;
   onToggleFavorite: (type: FavoriteType, id: number) => void;
   isGroupEmpty: (id: number) => boolean;
@@ -358,6 +366,7 @@ function GroupNode({
   activeId,
   viewedGroupId,
   reveal,
+  fold,
   favorites,
   onToggleFavorite,
   isGroupEmpty,
@@ -403,6 +412,12 @@ function GroupNode({
   if (reveal && reveal.nonce !== seenRevealNonce) {
     setSeenRevealNonce(reveal.nonce);
     if (reveal.ancestorIds.has(group.id)) setCollapsed(false);
+  }
+  // Applies a collapse/expand-all request once, on top of whatever the group was showing.
+  const [seenFoldNonce, setSeenFoldNonce] = useState<number>();
+  if (fold && fold.nonce !== seenFoldNonce) {
+    setSeenFoldNonce(fold.nonce);
+    setCollapsed(fold.mode === "collapse");
   }
   const isTopLevel = depth === 0;
   const empty = isGroupEmpty(group.id);
@@ -555,6 +570,7 @@ function GroupNode({
             activeId={activeId}
             viewedGroupId={viewedGroupId}
             reveal={reveal}
+            fold={fold}
             favorites={favorites}
             onToggleFavorite={onToggleFavorite}
             isGroupEmpty={isGroupEmpty}
