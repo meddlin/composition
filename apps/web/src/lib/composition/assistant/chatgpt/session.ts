@@ -24,8 +24,6 @@ const SIGN_IN_TIMEOUT_MS = 5 * 60_000;
 /** A token this close to the end of its hour is renewed first, so one never dies halfway through an answer. */
 const RENEW_BEFORE_MS = 5 * 60_000;
 
-const PAGE_HEAD = '<!doctype html><meta charset="utf-8"><title>Composition</title>';
-
 export type AccessToken = { ok: true; accessToken: string } | { ok: false; failure: Failure };
 
 export type SignInStart = { error?: string };
@@ -164,8 +162,13 @@ export function createChatGptSession(options: SessionOptions): ChatGptSession {
       }
       const callback = readCallback(url.searchParams, pkce.state);
       const text = callback.ok ? "Signed in. You can close this tab and go back to Composition." : callback.error;
-      response.writeHead(callback.ok ? 200 : 400, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-      response.end(`${PAGE_HEAD}<p>${text.replace(/[&<>]/g, "")}</p>`);
+      // Plain text, not a page: the message can carry words from the query string, and text cannot run as markup.
+      response.writeHead(callback.ok ? 200 : 400, {
+        "content-type": "text/plain; charset=utf-8",
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff",
+      });
+      response.end(text);
       if (!callback.ok && callback.stray) return;
       stopWaiting();
       if (!callback.ok) {
