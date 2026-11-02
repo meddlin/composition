@@ -946,6 +946,18 @@ describe("NotesApp drag-and-drop reordering", () => {
     expect(placeGroup).toHaveBeenCalledWith(1, null, 3);
   });
 
+  it("collapses and expands every group from the sidebar toolbar", () => {
+    renderApp();
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse all groups" }));
+    expect(screen.queryByLabelText(/^Collapse (?!all)/)).toBeNull();
+    expect(screen.getAllByLabelText(/^Expand (?!all)/).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Expand all groups" }));
+    expect(screen.queryByLabelText(/^Expand (?!all)/)).toBeNull();
+    expect(screen.getAllByLabelText(/^Collapse (?!all)/).length).toBeGreaterThan(0);
+  });
+
   it("nests the group instead when it is dropped on the middle of a row", async () => {
     vi.mocked(moveGroup).mockResolvedValue({ group: { ...groups[0], parentId: 2 } });
     renderApp();
