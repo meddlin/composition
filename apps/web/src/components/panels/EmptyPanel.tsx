@@ -3,20 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import type { PanelId } from "./layoutTree";
-import { KINDS } from "./kinds";
+import { availableLaunchers } from "./launchers";
 import { usePlugins } from "../plugins/usePlugins";
 import type { KindId } from "./panelsState";
 import type { WorkspaceStore } from "../notes/workspaceStore";
-
-/** The kinds an empty panel offers to become, in the order they are listed. */
-const CHOICES: { kind: Exclude<KindId, "empty">; label: string }[] = [
-  { kind: "note", label: "Note" },
-  { kind: "notes-browser", label: "Notes browser" },
-  { kind: "ai", label: "AI helper" },
-  { kind: "todo", label: "To-do" },
-  { kind: "reading-list", label: "Reading List" },
-  { kind: "rss", label: "RSS Reader" },
-];
 
 /**
  * A panel with nothing in it yet: a place to arrange the window before filling it. Choosing a kind turns the panel
@@ -24,11 +14,11 @@ const CHOICES: { kind: Exclude<KindId, "empty">; label: string }[] = [
  */
 export function EmptyPanel({ store, panelId }: { store: WorkspaceStore; panelId: PanelId }) {
   const { enabled } = usePlugins(store.plugins);
-  // A kind that belongs to a plugin that is off is not offered.
-  const choices = CHOICES.filter(({ kind }) => {
-    const plugin = KINDS[kind].plugin;
-    return plugin === undefined || enabled[plugin];
-  });
+  // Note comes first and is not a launcher; a kind that belongs to a plugin that is off is not offered.
+  const choices: { kind: Exclude<KindId, "empty">; label: string }[] = [
+    { kind: "note", label: "Note" },
+    ...availableLaunchers(enabled).map(({ kind, label }) => ({ kind, label })),
+  ];
   return (
     <Empty>
       <EmptyHeader>

@@ -19,6 +19,8 @@ export type NoteSurface = {
   dropNote(noteId: number, panelId: PanelId, zone: DropZone): void;
   /** Rendered once by the workspace: whatever the surface asks the user with. */
   dialog: ReactNode;
+  /** Rendered once by the workspace, left of the notebooks: the desktop's rail of icons that open a panel. The web has none. */
+  rail: ReactNode;
 };
 
 /** What the part of the workspace that shows the open notes is given. */

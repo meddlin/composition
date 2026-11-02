@@ -15,10 +15,11 @@ export type { NoteAreaProps, NoteSurface, SidebarActions };
 
 /**
  * The web app's notes surface: the open notes side by side in a single row of panes (see `panes.ts`). It has one window,
- * so `windowId` (which the desktop's surface uses for a pop-out) is not needed; it is here so both take the same arguments.
+ * so `windowId` (which the desktop's surface uses for a pop-out) and `showPanels` (what it calls after opening a panel) are
+ * not needed; they are here so both take the same arguments.
  */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- see above
-export function useNoteSurface(store: WorkspaceStore, _windowId?: string): NoteSurface {
+export function useNoteSurface(store: WorkspaceStore, _windowId?: string, _options?: { showPanels?: () => void }): NoteSurface {
   const { panes } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   return {
     focusedNoteId: panes.focusedId,
@@ -27,6 +28,7 @@ export function useNoteSurface(store: WorkspaceStore, _windowId?: string): NoteS
     // The row's panes take drops themselves.
     dropNote: () => {},
     dialog: null,
+    rail: null,
   };
 }
 

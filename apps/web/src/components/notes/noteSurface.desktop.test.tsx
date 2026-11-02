@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { panelIds } from "../panels/layoutTree";
 import { resetPanelPrefs, setWarnDuplicateNotePanels } from "../panels/panelPrefs";
 import { useNoteSurface } from "./noteSurface.desktop";
@@ -25,15 +25,15 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function setup() {
+function setup(showPanels?: () => void) {
   const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [] }, {} as WorkspaceDeps, undefined, { panels: {} });
-  render(<Harness store={store} />);
+  render(<Harness store={store} showPanels={showPanels} />);
   return store;
 }
 
 /** The surface a workspace gets on the desktop, with a button for each thing it offers. */
-function Harness({ store, windowId }: { store: WorkspaceStore; windowId?: string }) {
-  const surface = useNoteSurface(store, windowId);
+function Harness({ store, windowId, showPanels }: { store: WorkspaceStore; windowId?: string; showPanels?: () => void }) {
+  const surface = useNoteSurface(store, windowId, { showPanels });
   const [first] = panelIds(store.getSnapshot().panels.windows[windowId ?? "main"].layout);
   return (
     <>
@@ -44,6 +44,7 @@ function Harness({ store, windowId }: { store: WorkspaceStore; windowId?: string
       <button onClick={() => surface.openNoteBeside(2)}>Beta to the side</button>
       <button onClick={() => surface.dropNote(1, first, "right")}>Drop Alpha on the right</button>
       {surface.dialog}
+      <div data-testid="rail">{surface.rail}</div>
     </>
   );
 }
@@ -55,6 +56,28 @@ const noteIds = (store: WorkspaceStore) =>
   });
 const click = (name: string) => act(() => void fireEvent.click(screen.getByRole("button", { name })));
 
+describe("the plugin rail in the notes surface of the desktop app", () => {
+  it("is part of the main window's surface, with an icon for what can be opened", () => {
+    setup();
+
+    const rail = screen.getByRole("navigation", { name: "Plugins" });
+    expect(rail).toBeTruthy();
+    expect(screen.getByTestId("rail").contains(rail)).toBe(true);
+    expect(screen.getByRole("button", { name: "AI helper" })).toBeTruthy();
+  });
+
+  it("is not part of a pop-out's", () => {
+    const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [] }, {} as WorkspaceDeps, undefined, { panels: {} });
+    const [first] = panelIds(store.getSnapshot().panels.windows.main.layout);
+    const second = store.splitPanel(first, "right")!;
+    const popout = store.movePanelToNewWindow(second)!;
+
+    render(<Harness store={store} windowId={popout} />);
+
+    expect(screen.queryByRole("navigation", { name: "Plugins" })).toBeNull();
+  });
+});
+
 describe("the panel commands in the notes surface of the desktop app", () => {
   const press = (code: string) => fireEvent.keyDown(document.body, { code, key: "", metaKey: true, shiftKey: true });
 
@@ -65,7 +88,18 @@ describe("the panel commands in the notes surface of the desktop app", () => {
     act(() => void press("KeyP"));
 
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
-    expect(screen.getAllByRole("option")).toHaveLength(7);
+    expect(screen.getAllByRole("option")).toHaveLength(11);
+  });
+
+  it("tell the workspace to show its panels when the palette opens one, so Home does not hide it", () => {
+    const showPanels = vi.fn();
+    const store = setup(showPanels);
+
+    act(() => void press("KeyP"));
+    fireEvent.click(screen.getByRole("option", { name: /Open To-do/ }));
+
+    expect(showPanels).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().panels.byId[panelIds(store.getSnapshot().panels.windows.main.layout)[0]].kind).toBe("todo");
   });
 
   it("have keys that act on the window the surface is for", () => {

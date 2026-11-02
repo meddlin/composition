@@ -11,7 +11,8 @@ import { createReadingListStore, unavailableReadingList, type ReadingListStore }
 import { createTodosStore, unavailableTodos, type TodosStore } from "@/lib/composition/todosStore";
 import type { WritingSettings } from "@/lib/composition/writing";
 import type { DropZone, Edge, PanelId, SplitPath } from "../panels/layoutTree";
-import { aboutNoteId } from "../panels/kinds";
+import { aboutNoteId, KINDS } from "../panels/kinds";
+import type { LauncherKind } from "../panels/launchers";
 import { fromDocument, highestPanelNumber, highestWindowNumber, toDocument, type PanelsDocument } from "../panels/panelsDocument";
 import {
   closePanel as closePanelIn,
@@ -27,6 +28,7 @@ import {
   resizePanels as resizePanelsIn,
   dropNote as dropNoteIn,
   openAssistantFor as openAssistantForIn,
+  openKind as openKindIn,
   openNote as openNoteIn,
   openNoteBeside as openNoteBesideIn,
   openNoteBesideNote as openNoteBesideNoteIn,
@@ -168,6 +170,11 @@ export type WorkspaceStore = {
   setPanelKind(panelId: PanelId, kind: KindId): void;
   /** Replaces the state a panel saves; what it means is up to the panel's kind. */
   setPanelState(panelId: PanelId, state: unknown): void;
+  /**
+   * Opens a kind of panel in a window without an empty panel being made first, and says which panel it is (see `openKind`
+   * in `panelsState.ts`). Null, and nothing changes, for a kind whose plugin is off or a window that is gone.
+   */
+  openKind(kind: LauncherKind, windowId?: WindowId): PanelId | null;
   /** Shows a note the way picking it in the sidebar does (see `openNote` in `panelsState.ts`). */
   openNote(noteId: number, windowId?: WindowId): void;
   /** The sidebar's "Open to the side": a new note panel beside the focused one, even if the note is open already. */
@@ -608,6 +615,14 @@ export function createWorkspaceStore(
     closePanel: (panelId) => updatePanels((panels) => closePanelIn(panels, panelId, { id: newPanelId(), kind: "empty", state: null })),
     setPanelKind: (panelId, kind) => updatePanels((panels) => setPanelKindIn(panels, panelId, kind)),
     setPanelState: (panelId, panelState) => updatePanels((panels) => setPanelStateIn(panels, panelId, panelState)),
+    openKind: (kind, windowId = MAIN_WINDOW) => {
+      const plugin = KINDS[kind].plugin;
+      if (plugin !== undefined && !plugins.getSnapshot().enabled[plugin]) return null;
+      const opened = openKindIn(state.panels, windowId, kind, newPanelId);
+      if (!opened) return null;
+      if (opened.panels !== state.panels) set({ panels: opened.panels });
+      return opened.panelId;
+    },
     openNote: (noteId, windowId = MAIN_WINDOW) => updatePanels((panels) => openNoteIn(panels, windowId, noteId, newPanelId)),
     openNoteBeside: (noteId, windowId = MAIN_WINDOW) =>
       updatePanels((panels) => openNoteBesideIn(panels, windowId, noteId, newPanelId)),

@@ -8,6 +8,7 @@ import { setWarnDuplicateNotePanels, useWarnDuplicateNotePanels } from "../panel
 import { MAIN_WINDOW, isNoteShown, type WindowId } from "../panels/panelsState";
 import { PanelCommandPalette } from "../panels/PanelCommandPalette";
 import { PanelGrid } from "../panels/PanelGrid";
+import { PluginRail } from "../panels/PluginRail";
 import type { NoteAreaProps, NoteSurface } from "./noteSurfaceTypes";
 import { noteTitle } from "./types";
 import type { WorkspaceStore } from "./workspaceStore";
@@ -19,7 +20,14 @@ export type { NoteAreaProps, NoteSurface };
  * or a drop on a panel) asks first, unless the user turned that warning off. It also carries the window's panel
  * commands (see PanelCommandPalette).
  */
-export function useNoteSurface(store: WorkspaceStore, windowId: WindowId = MAIN_WINDOW): NoteSurface {
+export function useNoteSurface(
+  store: WorkspaceStore,
+  windowId: WindowId = MAIN_WINDOW,
+  options: {
+    /** Called after a panel was opened from the palette, to bring back the panels if something else (Home) is shown in their place. */
+    showPanels?: () => void;
+  } = {},
+): NoteSurface {
   const { panels, notes, deleted } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const warn = useWarnDuplicateNotePanels();
   const [asking, setAsking] = useState<{ noteId: number; proceed: () => void } | null>(null);
@@ -60,9 +68,11 @@ export function useNoteSurface(store: WorkspaceStore, windowId: WindowId = MAIN_
           />
         )}
         {/* The panel commands (their keys and the palette) are for this window, whichever kind of window it is. */}
-        <PanelCommandPalette store={store} windowId={windowId} />
+        <PanelCommandPalette store={store} windowId={windowId} showPanels={options.showPanels} />
       </>
     ),
+    // A pop-out is for one task and has no room to spare, so only the main window has the rail.
+    rail: windowId === MAIN_WINDOW ? <PluginRail store={store} showPanels={options.showPanels} /> : null,
   };
 }
 

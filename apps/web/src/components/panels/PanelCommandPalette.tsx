@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useId, useMemo, useState } from "react";
+import type { PluginSettings } from "@/lib/composition/plugins";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { Keys } from "../shortcuts/ShortcutList";
 import { useIsMac } from "../shortcuts/useIsMac";
+import { usePlugins } from "../plugins/usePlugins";
 import type { WorkspaceStore } from "../notes/workspaceStore";
 import { focusPanelElement } from "./focusPanelElement";
 import { isPaletteShortcut, panelCommandForKey, searchPanelCommands, type PanelCommandId } from "./panelCommands";
@@ -13,10 +15,13 @@ import { runPanelCommand } from "./runPanelCommand";
 
 /**
  * The panel commands of one window: their keys, and the command palette that lists them. Mounted once in each window
- * (the main one and every pop-out), so a command acts on the window the user is in.
+ * (the main one and every pop-out), so a command acts on the window the user is in. `showPanels` is called after an
+ * Open command opened a panel, for a window that can be showing something else in the panels' place (the main
+ * window's Home and group pages).
  */
-export function PanelCommandPalette({ store, windowId }: { store: WorkspaceStore; windowId: WindowId }) {
+export function PanelCommandPalette({ store, windowId, showPanels }: { store: WorkspaceStore; windowId: WindowId; showPanels?: () => void }) {
   const [open, setOpen] = useState(false);
+  const { enabled } = usePlugins(store.plugins);
 
   /** Moves the cursor into the window's focused panel, which a command may have changed. */
   const focusFocusedPanel = () => {
@@ -56,10 +61,13 @@ export function PanelCommandPalette({ store, windowId }: { store: WorkspaceStore
         }}
       >
         <DialogTitle className="sr-only">Command palette</DialogTitle>
-        <DialogDescription className="sr-only">Type to find a panel command, then press Enter to run it.</DialogDescription>
+        <DialogDescription className="sr-only">Type to find a panel command or a panel to open, then press Enter to run it.</DialogDescription>
         <Palette
+          enabled={enabled}
+          windowId={windowId}
           onRun={(command) => {
-            runPanelCommand(store, windowId, command);
+            const opened = runPanelCommand(store, windowId, command);
+            if (opened !== null) showPanels?.();
             setOpen(false);
           }}
         />
@@ -69,12 +77,12 @@ export function PanelCommandPalette({ store, windowId }: { store: WorkspaceStore
 }
 
 /** The search box and the list of commands it narrows. It is made fresh each time the palette opens. */
-function Palette({ onRun }: { onRun: (command: PanelCommandId) => void }) {
+function Palette({ enabled, windowId, onRun }: { enabled: PluginSettings; windowId: WindowId; onRun: (command: PanelCommandId) => void }) {
   const isMac = useIsMac();
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
   const listboxId = useId();
-  const matches = useMemo(() => searchPanelCommands(query), [query]);
+  const matches = useMemo(() => searchPanelCommands(query, enabled, windowId), [query, enabled, windowId]);
   const optionId = (index: number) => `${listboxId}-${index}`;
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {

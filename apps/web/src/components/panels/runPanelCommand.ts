@@ -1,17 +1,30 @@
 import type { WorkspaceStore } from "../notes/workspaceStore";
+import type { PanelId } from "./layoutTree";
+import { isLauncherKind } from "./launchers";
 import type { PanelCommandId } from "./panelCommands";
-import { MAIN_WINDOW, focusedPanelId, type WindowId } from "./panelsState";
+import { toggleShowPluginRail } from "./panelPrefs";
+import { MAIN_WINDOW, focusedPanelId, type KindId, type WindowId } from "./panelsState";
 
 /**
  * Does what a panel command says to the focused panel of a window. A command that does not apply (moving the main
- * window's panel to the main window, or any command for a window that is gone) changes nothing.
+ * window's panel to the main window, or any command for a window that is gone) changes nothing. An Open command says
+ * which panel it opened or went to, and is null for the others, and for one that opened nothing (its plugin is off).
  */
-export function runPanelCommand(store: WorkspaceStore, windowId: WindowId, id: PanelCommandId): void {
+export function runPanelCommand(store: WorkspaceStore, windowId: WindowId, id: PanelCommandId): PanelId | null {
   const window = store.getSnapshot().panels.windows[windowId];
-  if (!window) return;
+  if (!window) return null;
+
+  if (id.startsWith("open:")) {
+    const kind = id.slice("open:".length) as KindId;
+    return isLauncherKind(kind) ? store.openKind(kind, windowId) : null;
+  }
   const panelId = focusedPanelId(window);
 
   switch (id) {
+    case "toggle-rail":
+      // The rail is the main window's (a pop-out has none, and its page would not tell the main window's of the change).
+      if (windowId === MAIN_WINDOW) toggleShowPluginRail();
+      break;
     case "split-right":
       store.splitPanel(panelId, "right");
       break;
@@ -34,4 +47,5 @@ export function runPanelCommand(store: WorkspaceStore, windowId: WindowId, id: P
       store.movePanelToWindow(panelId, MAIN_WINDOW);
       break;
   }
+  return null;
 }
