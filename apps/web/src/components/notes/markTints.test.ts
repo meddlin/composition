@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { markTints, tintSegments } from "./markTints";
+import { markElements, markTints, tintSegments } from "./markTints";
 import { tokenizeMarkdown } from "./markdownTokens";
 
 const tints = (text: string) => markTints(text, tokenizeMarkdown(text));
@@ -57,6 +57,53 @@ describe("markTints", () => {
 
   it("leaves a self-closing tag out", () => {
     expect(tints('<Mark color="green" /> text </Mark>')).toEqual([]);
+  });
+});
+
+/** The text of each element's opening and closing tag. */
+const tags = (text: string) =>
+  markElements(text, tokenizeMarkdown(text)).map(({ open, close }) => [text.slice(open.start, open.end), text.slice(close.start, close.end)]);
+
+describe("markElements", () => {
+  it("gives the opening and closing tag of each pair", () => {
+    expect(tags('a <Mark color="green">b</Mark> c <Mark>d</Mark>')).toEqual([
+      ['<Mark color="green">', "</Mark>"],
+      ["<Mark>", "</Mark>"],
+    ]);
+  });
+
+  it("pairs nested ones inner with inner, and lists them in the order they open", () => {
+    const text = '<Mark color="yellow">a <Mark color="green">b</Mark> c</Mark>';
+    const elements = markElements(text, tokenizeMarkdown(text));
+
+    expect(elements).toHaveLength(2);
+    expect(text.slice(elements[0].open.start, elements[0].open.end)).toBe('<Mark color="yellow">');
+    expect(elements[0].close.start).toBeGreaterThan(elements[1].close.start);
+    expect(text.slice(elements[1].open.start, elements[1].open.end)).toBe('<Mark color="green">');
+  });
+
+  it("finds tags inside bold and links, which the colouring takes as one run", () => {
+    expect(tags("**<Mark>b</Mark>** and [<Mark>c</Mark>](url)")).toHaveLength(2);
+  });
+
+  it("ignores what markTints ignores: code, frontmatter, tags left open or closed twice, self-closing tags", () => {
+    expect(tags("run `<Mark>x</Mark>` now")).toEqual([]);
+    expect(tags('---\ntitle: "<Mark>x</Mark>"\n---\nbody')).toEqual([]);
+    expect(tags("<Mark>open")).toEqual([]);
+    expect(tags("close</Mark>")).toEqual([]);
+    expect(tags("<Mark>a</Mark></Mark>")).toEqual([["<Mark>", "</Mark>"]]);
+    expect(tags('<Mark color="blue" /> text')).toEqual([]);
+  });
+
+  it("is empty for a note with no highlights", () => {
+    expect(tags("nothing here")).toEqual([]);
+  });
+
+  it("pairs up the same tags as markTints does, so the tint and the tags never disagree", () => {
+    const text = 'x <Mark color="pink">a <Mark>b</Mark> c</Mark> <Mark>stray y';
+
+    expect(tags(text)).toHaveLength(2);
+    expect(markTints(text, tokenizeMarkdown(text)).map((t) => text.slice(t.start, t.end))).toEqual(["a ", "b", " c"]);
   });
 });
 

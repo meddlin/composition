@@ -2,7 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
-import { markTints, type Tint } from "./markTints";
+import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
 import { tokenizeMarkdown } from "./markdownTokens";
 import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
 import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
@@ -51,20 +51,33 @@ export function bodyStart(text: string): number {
   return text.length - parse(text)[1].length;
 }
 
+/** The highlights of a note: the text to tint, and each pair of tags (hidden like `**` while the caret is elsewhere). */
+export type Highlights = { tints: readonly Tint[]; elements: readonly MarkElement[] };
+
+const NO_HIGHLIGHTS: Highlights = { tints: [], elements: [] };
+
 /**
- * Where the text is highlighted: between each `<Mark color="…">` and its `</Mark>`. Found the way the plain editor
- * finds them, and skipped, as it does, for a note too long to colour on every keystroke.
+ * Where the text is highlighted, between each `<Mark color="…">` and its `</Mark>`, and where those tags are. Found
+ * the way the plain editor finds them, and skipped, as it does, for a note too long to colour on every keystroke.
  */
-export function tintsOf(text: string): Tint[] {
-  return text.length <= MAX_HIGHLIGHT_CHARS && text.includes("<Mark") ? markTints(text, tokenizeMarkdown(text)) : [];
+export function highlightsOf(text: string): Highlights {
+  if (text.length > MAX_HIGHLIGHT_CHARS || !text.includes("<Mark")) return NO_HIGHLIGHTS;
+  const segments = tokenizeMarkdown(text);
+  return { tints: markTints(text, segments), elements: markElements(text, segments) };
 }
 
 /**
  * The decorations for the parts of the document inside `ranges` (the viewport, normally). `frontmatterEnd` is where
- * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `tints` (see `tintsOf`) are painted
- * behind the highlighted text, wherever it is.
+ * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `highlights` (see `highlightsOf`) are
+ * painted behind the highlighted text, wherever it is, and their tags are hidden as `**` is: shown, dimmed, only
+ * while the selection touches the element, from its opening tag to its closing one.
  */
-export function liveDecorations(state: EditorState, ranges: readonly Span[], frontmatterEnd: number, tints: readonly Tint[] = []): DecorationSet {
+export function liveDecorations(
+  state: EditorState,
+  ranges: readonly Span[],
+  frontmatterEnd: number,
+  highlights: Highlights = NO_HIGHLIGHTS,
+): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
 
@@ -103,8 +116,17 @@ export function liveDecorations(state: EditorState, ranges: readonly Span[], fro
     });
   }
 
-  for (const { start, end, color } of tints) {
+  for (const { start, end, color } of highlights.tints) {
     if (start < end && end <= doc.length) decorations.push(tintMarks.get(color)!.range(start, end));
+  }
+  for (const { open, close } of highlights.elements) {
+    if (close.end > doc.length) continue;
+    const active = touches(state, open.start, close.end);
+    for (const tag of [open, close]) {
+      // A tag that runs over a line break can't be hidden by a plugin, so it is left showing, dimmed like the rest.
+      if (active || doc.sliceString(tag.start, tag.end).includes("\n")) decorations.push(syntax.range(tag.start, tag.end));
+      else decorations.push(hidden.range(tag.start, tag.end));
+    }
   }
 
   if (frontmatterEnd > 0) {
@@ -121,20 +143,20 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     frontmatterEnd: number;
-    tints: Tint[];
+    highlights: Highlights;
 
     constructor(view: EditorView) {
       const text = view.state.doc.toString();
       this.frontmatterEnd = bodyStart(text);
-      this.tints = tintsOf(text);
-      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.tints);
+      this.highlights = highlightsOf(text);
+      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.highlights);
     }
 
     update(update: ViewUpdate) {
       if (update.docChanged) {
         const text = update.state.doc.toString();
         this.frontmatterEnd = bodyStart(text);
-        this.tints = tintsOf(text);
+        this.highlights = highlightsOf(text);
       }
       if (
         update.docChanged ||
@@ -142,7 +164,7 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
         update.viewportChanged ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {
-        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.tints);
+        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.highlights);
       }
     }
   },

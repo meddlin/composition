@@ -2,7 +2,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { bodyStart, liveDecorations, tintsOf } from "./liveMarkdown";
+import { bodyStart, highlightsOf, liveDecorations } from "./liveMarkdown";
 
 type Found = { from: number; to: number; kind: string };
 
@@ -15,7 +15,7 @@ function decorate(text: string, caret: number | [number, number]): { hidden: Fou
     extensions: [markdown({ base: markdownLanguage })],
   });
   ensureSyntaxTree(state, state.doc.length, 5000);
-  const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), tintsOf(text));
+  const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), highlightsOf(text));
   const out = { hidden: [] as Found[], marked: [] as Found[], lines: [] as Found[] };
   set.between(0, state.doc.length, (start, end, value) => {
     const kind = (value.spec.class as string | undefined) ?? "";
@@ -162,14 +162,14 @@ describe("highlighted text", () => {
   it("finds the text between the tags, in the colour the tag names", () => {
     const text = `one ${G("two")} three`;
 
-    expect(tintsOf(text)).toEqual([{ start: text.indexOf("two"), end: text.indexOf("two") + 3, color: "green" }]);
+    expect(highlightsOf(text).tints).toEqual([{ start: text.indexOf("two"), end: text.indexOf("two") + 3, color: "green" }]);
   });
 
   it("tints it, and only it, with the colour as the same attribute the plain editor uses", () => {
     const text = `one ${G("two")} three`;
     const found: { color?: string }[] = [];
     const state = EditorState.create({ doc: text, extensions: [markdown({ base: markdownLanguage })] });
-    liveDecorations(state, [{ from: 0, to: text.length }], 0, tintsOf(text)).between(0, text.length, (_from, _to, value) => {
+    liveDecorations(state, [{ from: 0, to: text.length }], 0, highlightsOf(text)).between(0, text.length, (_from, _to, value) => {
       found.push({ color: value.spec.attributes?.["data-color"] });
     });
 
@@ -181,24 +181,110 @@ describe("highlighted text", () => {
   it("tints each highlight in its own colour, nested ones by the inner colour", () => {
     const text = `${Y("a")} ${G("b")}`;
 
-    expect(tintsOf(text).map((t) => t.color)).toEqual(["yellow", "green"]);
+    expect(highlightsOf(text).tints.map((t) => t.color)).toEqual(["yellow", "green"]);
   });
 
   it("leaves tags in code and frontmatter alone, and ones that are not closed", () => {
-    expect(tintsOf(`run \`${Y("code")}\` now`)).toEqual([]);
-    expect(tintsOf('---\ntitle: "<Mark>x</Mark>"\n---\nbody')).toEqual([]);
-    expect(tintsOf('half <Mark color="blue">open')).toEqual([]);
+    expect(highlightsOf(`run \`${Y("code")}\` now`).tints).toEqual([]);
+    expect(highlightsOf('---\ntitle: "<Mark>x</Mark>"\n---\nbody').tints).toEqual([]);
+    expect(highlightsOf('half <Mark color="blue">open').tints).toEqual([]);
   });
 
   it("does not look for highlights in a note with none, or in one too long to colour", () => {
-    expect(tintsOf("nothing here")).toEqual([]);
-    expect(tintsOf(`${Y("x")}${"a".repeat(100_001)}`)).toEqual([]);
+    expect(highlightsOf("nothing here").tints).toEqual([]);
+    expect(highlightsOf(`${Y("x")}${"a".repeat(100_001)}`).tints).toEqual([]);
   });
 
   it("moves with the text as it is edited (found again on each change, not kept)", () => {
     const before = `${G("two")}`;
     const after = `new ${G("two")}`;
 
-    expect(tintsOf(after)[0].start).toBe(tintsOf(before)[0].start + 4);
+    expect(highlightsOf(after).tints[0].start).toBe(highlightsOf(before).tints[0].start + 4);
+  });
+});
+
+describe("the tags of a highlight", () => {
+  const OPEN = '<Mark color="green">';
+  const CLOSE = "</Mark>";
+  const text = `one ${OPEN}two${CLOSE} three`;
+  const openAt = text.indexOf(OPEN);
+  const twoAt = text.indexOf("two");
+  const closeAt = text.indexOf(CLOSE);
+  const afterAt = closeAt + CLOSE.length;
+  const tagRanges = [
+    [openAt, openAt + OPEN.length],
+    [closeAt, afterAt],
+  ];
+
+  it("hides both tags, and tints the text, while the caret is elsewhere", () => {
+    const { hidden, marked } = decorate(text, text.length);
+
+    expect(spans(hidden)).toEqual(tagRanges);
+    expect(marked.filter((m) => m.kind === "md-mark").map(({ from, to }) => [from, to])).toEqual([[twoAt, twoAt + 3]]);
+  });
+
+  it("shows them, dimmed, while the caret is anywhere in the highlight", () => {
+    for (const caret of [twoAt, twoAt + 2, openAt + 3]) {
+      const { hidden, marked } = decorate(text, caret);
+      expect(hidden).toEqual([]);
+      expect(spans(marked.filter((m) => m.kind === "cm-live-syntax"))).toEqual(tagRanges);
+    }
+  });
+
+  it("keeps them until the caret has left: right before and right after still touch the highlight", () => {
+    expect(decorate(text, openAt).hidden).toEqual([]);
+    expect(decorate(text, afterAt).hidden).toEqual([]);
+    expect(decorate(text, openAt - 1).hidden).toHaveLength(2);
+    expect(decorate(text, afterAt + 1).hidden).toHaveLength(2);
+  });
+
+  it("treats a selection that reaches the highlight as being in it", () => {
+    expect(decorate(text, [0, openAt]).hidden).toEqual([]);
+    expect(decorate(text, [afterAt, text.length]).hidden).toEqual([]);
+    expect(decorate(text, [0, openAt - 1]).hidden).toHaveLength(2);
+  });
+
+  it("judges nested highlights one at a time", () => {
+    const nested = `<Mark color="yellow">a <Mark color="green">b</Mark> c</Mark>`;
+    const inner = nested.indexOf('<Mark color="green">');
+    const { hidden, marked } = decorate(nested, nested.indexOf(" c") + 1);
+
+    // The caret is in the outer highlight but not the inner one: only the inner one's tags are hidden.
+    expect(spans(hidden)).toEqual([
+      [inner, inner + '<Mark color="green">'.length],
+      [nested.indexOf("</Mark> c"), nested.indexOf("</Mark> c") + CLOSE.length],
+    ]);
+    expect(marked.filter((m) => m.kind === "cm-live-syntax")).toHaveLength(2);
+  });
+
+  it("leaves a tag with no partner showing, so a half-typed one is never lost", () => {
+    for (const open of ['half <Mark color="blue">open', "half <Mark", "stray </Mark> close"]) {
+      expect(decorate(open, open.length).hidden).toEqual([]);
+    }
+  });
+
+  it("leaves tags in code and in frontmatter alone", () => {
+    expect(decorate(`run \`${OPEN}x${CLOSE}\` now`, 0).hidden.filter((h) => h.kind === "")).toEqual([
+      { from: 4, to: 5, kind: "" },
+      { from: 4 + 1 + OPEN.length + 1 + CLOSE.length, to: 4 + 1 + OPEN.length + 1 + CLOSE.length + 1, kind: "" },
+    ]);
+    const fm = `---\ntitle: "${OPEN}x${CLOSE}"\n---\nbody`;
+    expect(spans(decorate(fm, fm.length).hidden)).toEqual([]);
+  });
+
+  it("does not hide a tag that runs over a line break (a plugin can't), but hides the other", () => {
+    const split = '<Mark\ncolor="yellow">x</Mark> after';
+    const { hidden, marked } = decorate(split, split.length);
+
+    expect(spans(hidden)).toEqual([[split.indexOf("</Mark>"), split.indexOf("</Mark>") + CLOSE.length]]);
+    expect(spans(marked.filter((m) => m.kind === "cm-live-syntax"))).toEqual([[0, split.indexOf(">") + 1]]);
+  });
+
+  it("hides every highlight's tags, wherever they are in the note", () => {
+    const two = `${OPEN}a${CLOSE} and ${OPEN}b${CLOSE}`;
+
+    expect(decorate(two, two.indexOf(" and ") + 2).hidden).toHaveLength(4);
+    // The caret in the first one shows only its own.
+    expect(decorate(two, two.indexOf("a")).hidden).toHaveLength(2);
   });
 });

@@ -3,8 +3,8 @@
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
 default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2,
-4 and 5 are built and Gates A, B, C, E and F have passed, and most of Step 3 came with Step 2 (see there); Steps 6
-to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+4, 5 and 6 are built and Gates A, B, C, E, F and G have passed, and most of Step 3 came with Step 2 (see there);
+Steps 7 and 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -248,9 +248,21 @@ The Live idea applied to highlights: a highlighted passage is drawn in its colou
   highlight) still works, since the caret inside a highlight shows the tags; and a freshly highlighted selection
   stays selected, so its tags are shown until the caret moves on.
 - Copying a selection copies the source, tags included, as it does for `**`.
-- **Gate G:** unit tests in the style of `liveMarkdown.test.ts` (hidden when the caret is elsewhere, shown when
-  inside or right after, half-typed and unbalanced tags untouched, code and frontmatter skipped), and a look at it
-  in the browser.
+- **Built (2026-11-03).** `markElements` in `markTints.ts` returns each complete pair's opening and closing tag. It
+  shares `markTints`' code-and-frontmatter detection (now `literalFinder`) and pairs tags exactly as it does, so the
+  tint and the tags cannot disagree. `liveMarkdown.ts` has `highlightsOf(text)`, `{ tints, elements }`, found again on
+  each document change; `liveDecorations` hides an element's two tags, or, when the selection reaches anywhere from its
+  opening tag to its closing one (ends included), marks them `cm-live-syntax`. A tag that runs over a line break is
+  left showing, dimmed, because CodeMirror does not let a view plugin replace a line break. Tags with no partner are
+  never in `elements`, so a half-typed `<Mark` stays in view.
+- **Gate G:** passed. Unit tests for `markElements` and for the hiding rules (shown inside and at both ends, hidden
+  one character away, selections, nesting judged one element at a time, unbalanced tags, code, frontmatter, a tag
+  over a line break, several highlights), plus an editor-level test (3364 tests in all). In a real browser on a
+  scratch notebook: after highlighting "big" the tags show while it is still selected; with the caret at the end of
+  the note the line reads `hello big world and bold more` with "big" tinted green; walking the caret with the arrow
+  keys from the start, the tags appear when it reaches the character before the highlight, stay through it and
+  one character past `</Mark>`, and are hidden again the character after; with the caret inside, the menu offers Remove
+  and `0` takes the tags off.
 
 ### Step 7: ruler and reflow
 

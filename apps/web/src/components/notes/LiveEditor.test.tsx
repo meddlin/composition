@@ -22,6 +22,22 @@ describe("LiveEditor", () => {
     expect(view.state.doc.toString()).toBe("**bold** tail");
   });
 
+  it("shows a highlight without its tags, tinted, until the caret is in it", () => {
+    const { container } = render(<LiveEditor value={'<Mark color="green">big</Mark> tail'} onChange={() => {}} />);
+    const view = editorIn(container);
+    // The caret starts at the beginning, which touches the highlight, so its tags show.
+    expect(text(container)).toBe('<Mark color="green">big</Mark> tail');
+
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    expect(text(container)).toBe("big tail");
+    const tinted = container.querySelector(".md-mark");
+    expect([tinted?.textContent, tinted?.getAttribute("data-color")]).toEqual(["big", "green"]);
+
+    view.dispatch({ selection: { anchor: 20 } });
+    expect(text(container)).toBe('<Mark color="green">big</Mark> tail');
+    expect(view.state.doc.toString()).toBe('<Mark color="green">big</Mark> tail');
+  });
+
   it("takes on text changed from outside without reporting it as typing", () => {
     const onChange = vi.fn();
     const { container, rerender } = render(<LiveEditor value="one" onChange={onChange} />);
