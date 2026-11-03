@@ -2,6 +2,10 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
+import { markTints, type Tint } from "./markTints";
+import { tokenizeMarkdown } from "./markdownTokens";
+import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
+import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
 
 /**
  * The live editor's Markdown: the text stays what it is (the document is the Markdown source, character for
@@ -28,6 +32,8 @@ const hidden = Decoration.replace({});
 const syntax = Decoration.mark({ class: "cm-live-syntax" });
 const headingLine = [1, 2, 3, 4, 5, 6].map((level) => Decoration.line({ class: `cm-live-heading cm-live-h${level}` }));
 const frontmatterLine = Decoration.line({ class: "cm-live-frontmatter" });
+/** The tint behind the text of a `<Mark color="…">`, which is the same one the plain editor paints (see `.md-mark`). */
+const tintMarks = new Map(HIGHLIGHT_COLORS.map((color) => [color, Decoration.mark({ class: "md-mark", attributes: { "data-color": color } })]));
 const styles = new Map(Object.values(INLINE).map(({ class: name }) => [name, Decoration.mark({ class: name })]));
 
 type Span = { from: number; to: number };
@@ -46,10 +52,19 @@ export function bodyStart(text: string): number {
 }
 
 /**
- * The decorations for the parts of the document inside `ranges` (the viewport, normally). `frontmatterEnd` is where
- * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text.
+ * Where the text is highlighted: between each `<Mark color="…">` and its `</Mark>`. Found the way the plain editor
+ * finds them, and skipped, as it does, for a note too long to colour on every keystroke.
  */
-export function liveDecorations(state: EditorState, ranges: readonly Span[], frontmatterEnd: number): DecorationSet {
+export function tintsOf(text: string): Tint[] {
+  return text.length <= MAX_HIGHLIGHT_CHARS && text.includes("<Mark") ? markTints(text, tokenizeMarkdown(text)) : [];
+}
+
+/**
+ * The decorations for the parts of the document inside `ranges` (the viewport, normally). `frontmatterEnd` is where
+ * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `tints` (see `tintsOf`) are painted
+ * behind the highlighted text, wherever it is.
+ */
+export function liveDecorations(state: EditorState, ranges: readonly Span[], frontmatterEnd: number, tints: readonly Tint[] = []): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
 
@@ -88,6 +103,10 @@ export function liveDecorations(state: EditorState, ranges: readonly Span[], fro
     });
   }
 
+  for (const { start, end, color } of tints) {
+    if (start < end && end <= doc.length) decorations.push(tintMarks.get(color)!.range(start, end));
+  }
+
   if (frontmatterEnd > 0) {
     const last = doc.lineAt(Math.min(frontmatterEnd - 1, doc.length)).number;
     for (let number = 1; number <= last; number++) decorations.push(frontmatterLine.range(doc.line(number).from));
@@ -102,21 +121,28 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     frontmatterEnd: number;
+    tints: Tint[];
 
     constructor(view: EditorView) {
-      this.frontmatterEnd = bodyStart(view.state.doc.toString());
-      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd);
+      const text = view.state.doc.toString();
+      this.frontmatterEnd = bodyStart(text);
+      this.tints = tintsOf(text);
+      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.tints);
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged) this.frontmatterEnd = bodyStart(update.state.doc.toString());
+      if (update.docChanged) {
+        const text = update.state.doc.toString();
+        this.frontmatterEnd = bodyStart(text);
+        this.tints = tintsOf(text);
+      }
       if (
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {
-        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd);
+        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.tints);
       }
     }
   },

@@ -200,8 +200,8 @@ export function MarkdownEditor({
    */
   function applyHighlight(choice: HighlightChoice, range: TextRange) {
     const el = textarea.current;
-    if (!el) return;
-    const before = el.value;
+    if (!showLive && !el) return;
+    const before = showLive ? liveSurface.text() : el!.value;
     const result = choice === "remove" ? removeHighlight(before, range) : highlightRange(before, range, choice);
     if (!result.ok) {
       setEditNotice({ reason: result.reason, value: before });
@@ -217,6 +217,15 @@ export function MarkdownEditor({
     let tail = 0;
     while (tail < before.length - from && tail < after.length - from && before[before.length - 1 - tail] === after[after.length - 1 - tail]) tail++;
     const replacement = after.slice(from, after.length - tail);
+
+    if (showLive) {
+      // The live editor keeps its own undo history, in which this is one step.
+      if (before !== after) liveSurface.replace(from, before.length - tail, replacement, null);
+      liveSurface.setSelection(result.selection.start, result.selection.end);
+      liveView.current?.focus();
+      return;
+    }
+    if (!el) return;
 
     if (before !== after) {
       el.focus();

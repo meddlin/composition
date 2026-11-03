@@ -2,9 +2,9 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2
-and 4 are built and Gates A, B, C and E have passed, and most of Step 3 came with Step 2 (see there); Steps 5 to 8
-are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2,
+4 and 5 are built and Gates A, B, C, E and F have passed, and most of Step 3 came with Step 2 (see there); Steps 6
+to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -29,8 +29,8 @@ hooks. "Pure" means the logic works on a string and needs no change; "bound" mea
 | Image → `<Image />` | Ctrl/Cmd+Shift+X | `mdx/imageToMdx.ts` | `convertImagesToMdx` (uses `execCommand`) | **yes (Step 2)** |
 | MDX completion | `<`, inside a tag, frontmatter, snippets | `mdx/completions`, `props`, `frontmatterProps`, `snippets` | `useMdxCompletion` | **yes (arrived with Step 2)** |
 | Note-link picker | `[[`, Ctrl/Cmd+Shift+K | `noteLinks.ts` | `useNoteLinkPicker` | **yes (Step 4)** |
-| Highlight menu | Ctrl/Cmd+Shift+H | `highlightText.ts` | `useHighlightMenu`, `applyHighlight` (`execCommand`) | no |
-| Highlight tint | `<Mark color>` text is tinted | `markTints.ts` | `MarkdownHighlight` layer | no |
+| Highlight menu | Ctrl/Cmd+Shift+H | `highlightText.ts` | `useHighlightMenu`, `applyHighlight` (`execCommand`) | **yes (Step 5)** |
+| Highlight tint | `<Mark color>` text is tinted | `markTints.ts` | `MarkdownHighlight` layer | **yes (Step 5)** |
 | Ruler | Settings > Writing | — | overlay in `MarkdownEditor` | no |
 | Reflow | typing past the column | `reflowText.ts` | `reflowTyping`, `applyReflow` (`execCommand`) | no |
 | Draw.io | Ctrl/Cmd+Shift+D, Diagram button | `mdx/drawioSrc.ts` | `startDiagram` | **yes (arrived with Step 2)** |
@@ -215,7 +215,21 @@ other, not in parallel branches.
 - Tint: the plain editor paints the text between `<Mark color="…">` tags in that colour, so a highlight is
   visible there. Live gets the same, from `markTints`. **My pick:** reuse the plain editor's tokenizer for this, under
   its existing 100,000-character guard, rather than writing it again from the syntax tree.
-- **Gate F:** the 35 highlight tests pass in both modes; highlighting a selection in Live shows the colour.
+- **Built (2026-11-03).**
+  - `applyHighlight` has a live path: it works out the same minimal change, then `surface.replace(…, null)` and
+    `setSelection` (two transactions, one undo step) and keeps focus in the editor; the textarea path
+    (`execCommand`, with its fallback) is untouched, and the preview's menu still goes through the textarea path.
+  - The tint reuses the plain editor's own scan (`markTints` over `tokenizeMarkdown`, under the same 100,000-character
+    guard) as `tintsOf` in `liveMarkdown.ts`, found again on each document change and not on each caret move, and
+    painted with the existing `.md-mark` / `data-color` styling.
+  - The menu itself and its keys were already in Live from Step 2; refusals show in the Live panel's red notice.
+  - The menu, highlighting, existing-highlight and tint groups of `MarkdownEditor.highlight.test.tsx` run on both
+    editors (the preview-menu group stays as it was); `liveMarkdown.test.ts` has tint tests.
+- **Gate F:** the highlight tests pass in both modes (3348 tests in all). Checked in a real browser on a scratch
+  notebook: with "big" selected, Cmd+Shift+H lists the colours, `2` gives `<Mark color="green">big</Mark>` with
+  "big" tinted green and still selected, focus kept; one undo and one redo each take it back and forward; with the
+  caret inside it the menu adds Remove, and `0` takes the tags off and leaves "big" selected. A note that is not
+  valid MDX is refused with the red explanation in the Live panel, as in the Markdown tab.
 
 ### Step 6: hide the `<Mark>` tags (Live only)
 
