@@ -51,7 +51,7 @@ See [rss-reader-plan.md](rss-reader-plan.md) for the RSS Reader plugin (desktop 
 
 See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for how the to-do list tidies itself each week (finished items archived, unfinished ones rolled over, a history kept for a window you set, and weekly, monthly and quarterly reports written as notes), [ui/panels.md](ui/panels.md#the-to-do-panel) for what the panel does, [manual-tests/todo-archival.md](manual-tests/todo-archival.md) for checking it by hand, and [todo-archival-plan.md](todo-archival-plan.md) for the design and its decisions.
 
-See [live-editor-parity-plan.md](live-editor-parity-plan.md) for the plan to bring every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) into the Live tab, which shows Markdown syntax only under the caret.
+See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.
 
 ## Features
 

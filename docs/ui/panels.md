@@ -21,7 +21,7 @@ A panel shows one thing, its *kind*:
 | Kind | Shows |
 |---|---|
 | **Empty** | A place to arrange the window before filling it, offering to become one of the other kinds. |
-| **Note** | A note, with its Markdown / Preview / Split tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. |
+| **Note** | A note, with its Markdown / Preview / Split / Live tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. |
 | **Notes browser** | A second tree of a notebook's groups and notes, with its own chosen notebook (a menu at the top). Picking a note opens it in the note panel used last, or in a new one beside the browser. |
 | **AI helper** | The [AI helper](ai-helper.md)'s chat about one note. See below. |
 | **To-do** | A to-do list that archives what is done each week, with an archive and reports. See below. |

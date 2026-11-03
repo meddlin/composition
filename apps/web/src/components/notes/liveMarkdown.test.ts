@@ -2,7 +2,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
-import { bodyStart, highlightsOf, liveDecorations } from "./liveMarkdown";
+import { bodyStart, scanOf, liveDecorations } from "./liveMarkdown";
 
 type Found = { from: number; to: number; kind: string };
 
@@ -15,7 +15,7 @@ function decorate(text: string, caret: number | [number, number]): { hidden: Fou
     extensions: [markdown({ base: markdownLanguage })],
   });
   ensureSyntaxTree(state, state.doc.length, 5000);
-  const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), highlightsOf(text));
+  const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
   const out = { hidden: [] as Found[], marked: [] as Found[], lines: [] as Found[] };
   set.between(0, state.doc.length, (start, end, value) => {
     const kind = (value.spec.class as string | undefined) ?? "";
@@ -162,14 +162,14 @@ describe("highlighted text", () => {
   it("finds the text between the tags, in the colour the tag names", () => {
     const text = `one ${G("two")} three`;
 
-    expect(highlightsOf(text).tints).toEqual([{ start: text.indexOf("two"), end: text.indexOf("two") + 3, color: "green" }]);
+    expect(scanOf(text).tints).toEqual([{ start: text.indexOf("two"), end: text.indexOf("two") + 3, color: "green" }]);
   });
 
   it("tints it, and only it, with the colour as the same attribute the plain editor uses", () => {
     const text = `one ${G("two")} three`;
     const found: { color?: string }[] = [];
     const state = EditorState.create({ doc: text, extensions: [markdown({ base: markdownLanguage })] });
-    liveDecorations(state, [{ from: 0, to: text.length }], 0, highlightsOf(text)).between(0, text.length, (_from, _to, value) => {
+    liveDecorations(state, [{ from: 0, to: text.length }], 0, scanOf(text)).between(0, text.length, (_from, _to, value) => {
       found.push({ color: value.spec.attributes?.["data-color"] });
     });
 
@@ -181,25 +181,25 @@ describe("highlighted text", () => {
   it("tints each highlight in its own colour, nested ones by the inner colour", () => {
     const text = `${Y("a")} ${G("b")}`;
 
-    expect(highlightsOf(text).tints.map((t) => t.color)).toEqual(["yellow", "green"]);
+    expect(scanOf(text).tints.map((t) => t.color)).toEqual(["yellow", "green"]);
   });
 
   it("leaves tags in code and frontmatter alone, and ones that are not closed", () => {
-    expect(highlightsOf(`run \`${Y("code")}\` now`).tints).toEqual([]);
-    expect(highlightsOf('---\ntitle: "<Mark>x</Mark>"\n---\nbody').tints).toEqual([]);
-    expect(highlightsOf('half <Mark color="blue">open').tints).toEqual([]);
+    expect(scanOf(`run \`${Y("code")}\` now`).tints).toEqual([]);
+    expect(scanOf('---\ntitle: "<Mark>x</Mark>"\n---\nbody').tints).toEqual([]);
+    expect(scanOf('half <Mark color="blue">open').tints).toEqual([]);
   });
 
   it("does not look for highlights in a note with none, or in one too long to colour", () => {
-    expect(highlightsOf("nothing here").tints).toEqual([]);
-    expect(highlightsOf(`${Y("x")}${"a".repeat(100_001)}`).tints).toEqual([]);
+    expect(scanOf("nothing here").tints).toEqual([]);
+    expect(scanOf(`${Y("x")}${"a".repeat(100_001)}`).tints).toEqual([]);
   });
 
   it("moves with the text as it is edited (found again on each change, not kept)", () => {
     const before = `${G("two")}`;
     const after = `new ${G("two")}`;
 
-    expect(highlightsOf(after).tints[0].start).toBe(highlightsOf(before).tints[0].start + 4);
+    expect(scanOf(after).tints[0].start).toBe(scanOf(before).tints[0].start + 4);
   });
 });
 
@@ -286,5 +286,59 @@ describe("the tags of a highlight", () => {
     expect(decorate(two, two.indexOf(" and ") + 2).hidden).toHaveLength(4);
     // The caret in the first one shows only its own.
     expect(decorate(two, two.indexOf("a")).hidden).toHaveLength(2);
+  });
+});
+
+describe("syntax colours", () => {
+  /** What is coloured, and in which of the plain editor's colours, as [class, text]. */
+  const coloured = (text: string) =>
+    decorate(text, text.length)
+      .marked.filter((m) => m.kind.startsWith("md-") && m.kind !== "md-mark")
+      .map(({ from, to, kind }) => [kind, text.slice(from, to)]);
+
+  it("colours fenced code, and its fences, as the Markdown editor does", () => {
+    expect(coloured("```js\nconst a = 1\n```\n\nafter")).toEqual([
+      ["md-fence", "```js"],
+      ["md-code", "const a = 1"],
+      ["md-fence", "```"],
+    ]);
+  });
+
+  it("colours inline code, links and their addresses, tags, rules, and list and quote marks", () => {
+    expect(coloured("a `code` b")).toEqual([["md-code", "`code`"]]);
+    expect(coloured("see [site](https://example.com)")).toEqual([
+      ["md-link", "[site]"],
+      ["md-url", "(https://example.com)"],
+    ]);
+    expect(coloured("<Info>hi</Info> there")).toEqual([
+      ["md-tag", "<Info>"],
+      ["md-tag", "</Info>"],
+    ]);
+    expect(coloured("one\n\n---\n\ntwo")).toEqual([["md-rule", "---"]]);
+    expect(coloured("- item")).toEqual([["md-marker", "- "]]);
+    expect(coloured("> quoted")).toEqual([["md-marker", "> "]]);
+  });
+
+  it("leaves headings, bold, italic and frontmatter to the live look, which draws them its own way", () => {
+    expect(coloured("# Title\n\n**bold** and *italic*")).toEqual([]);
+    expect(coloured("---\ntitle: Note\n---\nbody")).toEqual([]);
+  });
+
+  it("lets a highlight's tags be dimmed when shown, over their colour", () => {
+    // The tag is coloured like any other, and the dimming is a class of its own that the editor's theme puts on top.
+    const text = '<Mark color="green">x</Mark>';
+    const { marked } = decorate(text, 2);
+
+    expect(marked.filter((m) => m.kind === "cm-live-syntax")).toHaveLength(2);
+    expect(marked.filter((m) => m.kind === "md-tag")).toHaveLength(2);
+  });
+
+  it("does not colour a note too long to colour on every keystroke", () => {
+    expect(scanOf(`\`code\`${"a".repeat(100_001)}`).tokens).toEqual([]);
+  });
+
+  it("finds the same runs again as the text changes (not kept from before)", () => {
+    expect(scanOf("`a`").tokens).toHaveLength(1);
+    expect(scanOf("a").tokens).toHaveLength(0);
   });
 });

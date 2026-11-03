@@ -8,6 +8,9 @@ The Markdown tab colours headings, emphasis, code, links, lists, quotes, code fe
 and MDX tags as you type. The code *inside* a fence is not coloured by language (the preview does
 that); the editor shows it as code.
 
+The [Live tab](live-editor.md) colours the same runs with the same tokenizer and `.md-*` classes (it leaves headings, bold,
+italic and frontmatter to its own styling).
+
 ## How it works
 
 The editor is still a plain `<textarea>`, which keeps the caret, selection, undo, IME, spell-check

@@ -38,6 +38,38 @@ describe("LiveEditor", () => {
     expect(view.state.doc.toString()).toBe('<Mark color="green">big</Mark> tail');
   });
 
+  it("is a labelled, multi-line text box with spell checking, for assistive tech", () => {
+    const { container } = render(<LiveEditor value="text" onChange={() => {}} />);
+    const content = container.querySelector(".cm-content")!;
+
+    expect(content.getAttribute("role")).toBe("textbox");
+    expect(content.getAttribute("aria-multiline")).toBe("true");
+    expect(content.getAttribute("aria-label")).toBe("Markdown editor");
+    expect(content.getAttribute("spellcheck")).toBe("true");
+  });
+
+  it("shows the attributes it is given for an open menu, keeps its own, and drops the ones taken away", () => {
+    const { container, rerender } = render(<LiveEditor value="text" onChange={() => {}} attributes={{ "aria-controls": "menu-1" }} />);
+    const content = container.querySelector(".cm-content")!;
+    expect(content.getAttribute("aria-controls")).toBe("menu-1");
+    expect(content.getAttribute("aria-label")).toBe("Markdown editor");
+
+    rerender(<LiveEditor value="text" onChange={() => {}} attributes={{ "aria-controls": undefined, "aria-activedescendant": "option-2" }} />);
+
+    expect(content.getAttribute("aria-controls")).toBeNull();
+    expect(content.getAttribute("aria-activedescendant")).toBe("option-2");
+    expect(content.getAttribute("aria-label")).toBe("Markdown editor");
+  });
+
+  it("says it is read only when it is", () => {
+    const { container, rerender } = render(<LiveEditor value="text" onChange={() => {}} />);
+    expect(container.querySelector(".cm-content")!.getAttribute("aria-readonly")).toBeNull();
+
+    rerender(<LiveEditor value="text" onChange={() => {}} readOnly />);
+
+    expect(container.querySelector(".cm-content")!.getAttribute("aria-readonly")).toBe("true");
+  });
+
   it("takes on text changed from outside without reporting it as typing", () => {
     const onChange = vi.fn();
     const { container, rerender } = render(<LiveEditor value="one" onChange={onChange} />);

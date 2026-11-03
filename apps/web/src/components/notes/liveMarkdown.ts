@@ -3,7 +3,7 @@ import type { EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
-import { tokenizeMarkdown } from "./markdownTokens";
+import { tokenizeMarkdown, type TokenKind } from "./markdownTokens";
 import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
 import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
 
@@ -51,32 +51,59 @@ export function bodyStart(text: string): number {
   return text.length - parse(text)[1].length;
 }
 
-/** The highlights of a note: the text to tint, and each pair of tags (hidden like `**` while the caret is elsewhere). */
-export type Highlights = { tints: readonly Tint[]; elements: readonly MarkElement[] };
+/**
+ * The kinds of text the plain editor colours that the live editor colours the same way: code and its fences, rules,
+ * links and their addresses, tags, and list and quote marks. The rest it draws its own way (headings large, bold and
+ * italic as such, frontmatter set apart), so colouring them too would only fight that.
+ */
+const COLOURED: ReadonlySet<TokenKind> = new Set(["fence", "code", "rule", "url", "link", "tag", "marker"]);
+const tokenMarks = new Map([...COLOURED].map((kind) => [kind, Decoration.mark({ class: `md-${kind}` })]));
 
-const NO_HIGHLIGHTS: Highlights = { tints: [], elements: [] };
+type Token = { start: number; end: number; kind: TokenKind };
+
+/** What the live editor needs to know of a note's text beyond its Markdown syntax tree. */
+export type NoteScan = {
+  /** The text of each highlight, to tint. */
+  tints: readonly Tint[];
+  /** Each highlight's pair of tags (hidden like `**` while the caret is elsewhere). */
+  elements: readonly MarkElement[];
+  /** The runs the plain editor colours, and in which of its colours (the `md-…` classes). */
+  tokens: readonly Token[];
+};
+
+const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [] };
 
 /**
- * Where the text is highlighted, between each `<Mark color="…">` and its `</Mark>`, and where those tags are. Found
- * the way the plain editor finds them, and skipped, as it does, for a note too long to colour on every keystroke.
+ * Reads the note the way the plain editor does to colour it: its runs (`tokenizeMarkdown`), the text between each
+ * `<Mark color="…">` and its `</Mark>`, and where those tags are. Skipped, as it does, for a note too long to colour
+ * on every keystroke.
  */
-export function highlightsOf(text: string): Highlights {
-  if (text.length > MAX_HIGHLIGHT_CHARS || !text.includes("<Mark")) return NO_HIGHLIGHTS;
+export function scanOf(text: string): NoteScan {
+  if (text.length > MAX_HIGHLIGHT_CHARS) return NO_SCAN;
   const segments = tokenizeMarkdown(text);
-  return { tints: markTints(text, segments), elements: markElements(text, segments) };
+
+  const tokens: Token[] = [];
+  let at = 0;
+  for (const { text: run, kind } of segments) {
+    if (kind && COLOURED.has(kind)) tokens.push({ start: at, end: at + run.length, kind });
+    at += run.length;
+  }
+  if (!text.includes("<Mark")) return { tints: [], elements: [], tokens };
+  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens };
 }
 
 /**
  * The decorations for the parts of the document inside `ranges` (the viewport, normally). `frontmatterEnd` is where
- * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `highlights` (see `highlightsOf`) are
- * painted behind the highlighted text, wherever it is, and their tags are hidden as `**` is: shown, dimmed, only
- * while the selection touches the element, from its opening tag to its closing one.
+ * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `scan` (see `scanOf`) is where the
+ * text is coloured as the plain editor colours it, and where it is highlighted: tinted behind the text, wherever it
+ * is, with the tags hidden as `**` is: shown, dimmed, only while the selection touches the element, from its
+ * opening tag to its closing one.
  */
 export function liveDecorations(
   state: EditorState,
   ranges: readonly Span[],
   frontmatterEnd: number,
-  highlights: Highlights = NO_HIGHLIGHTS,
+  scan: NoteScan = NO_SCAN,
 ): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
@@ -116,10 +143,13 @@ export function liveDecorations(
     });
   }
 
-  for (const { start, end, color } of highlights.tints) {
+  for (const { start, end, kind } of scan.tokens) {
+    if (start < end && end <= doc.length) decorations.push(tokenMarks.get(kind)!.range(start, end));
+  }
+  for (const { start, end, color } of scan.tints) {
     if (start < end && end <= doc.length) decorations.push(tintMarks.get(color)!.range(start, end));
   }
-  for (const { open, close } of highlights.elements) {
+  for (const { open, close } of scan.elements) {
     if (close.end > doc.length) continue;
     const active = touches(state, open.start, close.end);
     for (const tag of [open, close]) {
@@ -143,20 +173,20 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
     frontmatterEnd: number;
-    highlights: Highlights;
+    scan: NoteScan;
 
     constructor(view: EditorView) {
       const text = view.state.doc.toString();
       this.frontmatterEnd = bodyStart(text);
-      this.highlights = highlightsOf(text);
-      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.highlights);
+      this.scan = scanOf(text);
+      this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.scan);
     }
 
     update(update: ViewUpdate) {
       if (update.docChanged) {
         const text = update.state.doc.toString();
         this.frontmatterEnd = bodyStart(text);
-        this.highlights = highlightsOf(text);
+        this.scan = scanOf(text);
       }
       if (
         update.docChanged ||
@@ -164,7 +194,7 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
         update.viewportChanged ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {
-        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.highlights);
+        this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.scan);
       }
     }
   },

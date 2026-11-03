@@ -395,6 +395,20 @@
   background-color: var(--glass-background, var(--background));
 }
 
+/*
+ * The live editor's lines sit on the grid too: whole squares tall (a heading is two), so each line of text stays on a
+ * rule however the lines above it are drawn. Without the background its lines keep the roomier spacing of the preview.
+ */
+[data-note-background="architect"] .note-surface .cm-editor .cm-scroller {
+  line-height: var(--grid-square);
+}
+[data-note-background="architect"] .note-surface .cm-editor .cm-live-heading {
+  line-height: var(--grid-square);
+}
+[data-note-background="architect"] .note-surface .cm-editor :is(.cm-live-h1, .cm-live-h2) {
+  line-height: calc(var(--grid-square) * 2);
+}
+
 /* A note's preview is set in the font chosen in Settings; --preview-font is put on <html> by the layouts. */
 .preview-text {
   font-family: var(--preview-font, inherit);

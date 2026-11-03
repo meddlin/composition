@@ -2,9 +2,9 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2,
-4, 5, 6 and 7 are built and Gates A, B, C, E, F, G and H have passed, and most of Step 3 came with Step 2 (see
-there); Step 8 is not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0 to 8 are
+built and Gates A to H have passed (Step 3's gate with a note, see there); **Gate I, the owner's by-hand test
+([manual-tests/live-editor.md](manual-tests/live-editor.md)), is the one left.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -37,7 +37,7 @@ hooks. "Pure" means the logic works on a string and needs no change; "bound" mea
 | Tab types a tab | Tab | — | `onKeyDown` | yes |
 | Find in note | Ctrl/Cmd+F | `findMatches.ts` | `MarkdownEditor` | yes |
 | Read-only, spellcheck | — | — | — | yes |
-| Syntax colours (code, fences, URLs, tags) | — | `markdownTokens.ts` | `MarkdownHighlight` layer | no (only bold, italic, strike, code, headings) |
+| Syntax colours (code, fences, URLs, tags) | — | `markdownTokens.ts` | `MarkdownHighlight` layer | **yes (Step 8)** |
 
 The first inventory missed three of these: the image picker, Image → `<Image />`, and the draw.io shortcut. They
 are in this plan too.
@@ -295,14 +295,30 @@ The Live idea applied to highlights: a highlighted passage is drawn in its colou
 
 ### Step 8: what is left, then the switch
 
-- The edit-notice line (the red "why that didn't happen" message) is shown in Live already for Image → `<Image />`;
-  the highlight menu's refusals need the same in Step 5. (The draw.io shortcut came with Step 2.)
+- The edit-notice line (the red "why that didn't happen" message) is shown in Live (Image → `<Image />` in Step 2,
+  highlight refusals in Step 5), and the draw.io shortcut came with Step 2.
 - Syntax colours for code, fences, URLs and tags, so a note does not look plainer in Live than in the Markdown tab.
   **My pick:** decorations by syntax-tree node name using the same `--syntax-*` colours, not a new dependency.
 - Accessibility pass: the label, the `aria-controls`/`aria-activedescendant` wiring on `.cm-content`, focus
   return after each menu.
 - A by-hand test script, `docs/manual-tests/live-editor.md`, in the style of the others, covering what jsdom
   cannot: IME composition, the macOS and Windows keys, a real paste of an image, menu placement in a long note.
+- **Built (2026-11-03).**
+  - Syntax colours: `scanOf` in `liveMarkdown.ts` (which replaced `highlightsOf`) reads the note once per document
+    change with the plain editor's `tokenizeMarkdown` and gives, beside the tints and tags, the runs of the kinds
+    the live look does not draw itself (code and fences, rules, links and addresses, tags, list and quote marks)
+    as `md-…` marks, so Live uses the same classes and colours as the Markdown tab. This is not the by-node-name
+    decorations this plan first picked: reusing the tokenizer keeps the two tabs colouring identical text
+    identically, and needs no second classifier. Headings, bold, italic and frontmatter are left to the live look.
+  - Accessibility: the editor is a labelled multi-line text box with spell checking, says when it is read only,
+    and takes the menus' `aria-controls` / `aria-activedescendant` (tested on both editors in every menu's suite;
+    `LiveEditor.test.tsx` covers the editor's own attributes). Focus stays in the editor through every menu.
+  - Found while writing the manual test: with the architect notebook background the grid is 24px and the live
+    editor's lines were 27px, so the text drifted off the rules. Under that background the lines are now whole grid
+    squares (a level 1 or 2 heading, two), in `globals.css`; otherwise they keep the preview's spacing.
+  - Docs: [ui/live-editor.md](ui/live-editor.md), [manual-tests/live-editor.md](manual-tests/live-editor.md), the
+    tab lists in `ui/web-side-by-side.md` and `ui/panels.md`, a note in `ui/markdown-editor-highlighting.md`, and
+    the index.
 - **Gate I (the owner's):** the manual script passes on the desktop app. Only then is "make Live the default"
   worth deciding, and that decision (a setting, a per-notebook choice, or a one-line change to the starting view in
   `initialPanes` and the `note` kind) is its own small piece of work.
