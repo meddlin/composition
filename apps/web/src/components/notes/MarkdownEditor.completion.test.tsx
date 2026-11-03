@@ -8,46 +8,34 @@ vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 const menu = () => screen.queryByRole("listbox", { name: "MDX components" });
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 
-const MDX = "Step 3: MDX completion";
-
-// Run against the plain Markdown editor and the live one. The scenarios that only say a menu stays shut pass in the
-// live editor today because nothing there ever opens one; they mean something once Step 3 is in, and the scenario
-// that opens a menu (pending above them) is what shows the menu is missing until then.
+// Run against the plain Markdown editor and the live one, which share the menu.
 describeParity("MarkdownEditor component completion", (scenario) => {
-  scenario(
-    "lists the components after a <",
-    ({ render }) => {
-      const editor = render();
+  scenario("lists the components after a <", ({ render }) => {
+    const editor = render();
 
-      editor.type("<");
+    editor.type("<");
 
-      expect(options()).toEqual([
-        expect.stringContaining("<Info>"),
-        expect.stringContaining("<Warning>"),
-        expect.stringContaining("<Image>"),
-        expect.stringContaining("<Drawio>"),
-        expect.stringContaining("<Toc>"),
-        expect.stringContaining("<Mark>"),
-        expect.stringContaining("<Footnotes>"),
-        expect.stringContaining("<YouTube>"),
-        expect.stringContaining("<Repo>"),
-        expect.stringContaining("<Chart>"),
-      ]);
-    },
-    { pendingInLive: MDX },
-  );
+    expect(options()).toEqual([
+      expect.stringContaining("<Info>"),
+      expect.stringContaining("<Warning>"),
+      expect.stringContaining("<Image>"),
+      expect.stringContaining("<Drawio>"),
+      expect.stringContaining("<Toc>"),
+      expect.stringContaining("<Mark>"),
+      expect.stringContaining("<Footnotes>"),
+      expect.stringContaining("<YouTube>"),
+      expect.stringContaining("<Repo>"),
+      expect.stringContaining("<Chart>"),
+    ]);
+  });
 
-  scenario(
-    "narrows the list as the name is typed",
-    ({ render }) => {
-      const editor = render();
+  scenario("narrows the list as the name is typed", ({ render }) => {
+    const editor = render();
 
-      editor.type("<wa");
+    editor.type("<wa");
 
-      expect(options()).toEqual([expect.stringContaining("<Warning>")]);
-    },
-    { pendingInLive: MDX },
-  );
+    expect(options()).toEqual([expect.stringContaining("<Warning>")]);
+  });
 
   scenario("closes when nothing matches", ({ render }) => {
     const editor = render();
@@ -57,19 +45,15 @@ describeParity("MarkdownEditor component completion", (scenario) => {
     expect(menu()).toBeNull();
   });
 
-  scenario(
-    "stays out of the way of an ordinary <",
-    ({ render }) => {
-      const editor = render();
+  scenario("stays out of the way of an ordinary <", ({ render }) => {
+    const editor = render();
 
-      editor.type("1 <");
-      expect(menu()).not.toBeNull();
+    editor.type("1 <");
+    expect(menu()).not.toBeNull();
 
-      editor.type("a<");
-      expect(menu()).toBeNull();
-    },
-    { pendingInLive: MDX },
-  );
+    editor.type("a<");
+    expect(menu()).toBeNull();
+  });
 
   scenario("stays out of the way inside a fenced code block", ({ render }) => {
     const editor = render();
@@ -79,34 +63,26 @@ describeParity("MarkdownEditor component completion", (scenario) => {
     expect(menu()).toBeNull();
   });
 
-  scenario(
-    "inserts the highlighted component on Enter, with the caret inside it",
-    ({ render }) => {
-      const editor = render();
-      editor.type("<");
+  scenario("inserts the highlighted component on Enter, with the caret inside it", ({ render }) => {
+    const editor = render();
+    editor.type("<");
 
-      editor.press("ArrowDown");
-      editor.press("Enter");
+    editor.press("ArrowDown");
+    editor.press("Enter");
 
-      expect(editor.text()).toBe("<Warning>\n\n\n\n</Warning>");
-      expect(editor.caret()).toBe("<Warning>\n\n".length);
-      expect(menu()).toBeNull();
-    },
-    { pendingInLive: MDX },
-  );
+    expect(editor.text()).toBe("<Warning>\n\n\n\n</Warning>");
+    expect(editor.caret()).toBe("<Warning>\n\n".length);
+    expect(menu()).toBeNull();
+  });
 
-  scenario(
-    "inserts on Tab, replacing what was typed after the <",
-    ({ render }) => {
-      const editor = render();
-      editor.type("intro\n\n<In");
+  scenario("inserts on Tab, replacing what was typed after the <", ({ render }) => {
+    const editor = render();
+    editor.type("intro\n\n<In");
 
-      editor.press("Tab");
+    editor.press("Tab");
 
-      expect(editor.text()).toBe("intro\n\n<Info>\n\n\n\n</Info>");
-    },
-    { pendingInLive: MDX },
-  );
+    expect(editor.text()).toBe("intro\n\n<Info>\n\n\n\n</Info>");
+  });
 
   scenario("types a tab on Tab when no menu is open, at the caret", ({ render }) => {
     const editor = render();
@@ -139,70 +115,54 @@ describeParity("MarkdownEditor component completion", (scenario) => {
     expect(editor.text()).toBe("text");
   });
 
-  scenario(
-    "wraps from the first item to the last with ArrowUp",
-    ({ render }) => {
-      const editor = render();
-      editor.type("<");
+  scenario("wraps from the first item to the last with ArrowUp", ({ render }) => {
+    const editor = render();
+    editor.type("<");
 
-      editor.press("ArrowUp");
-      editor.press("Enter");
+    editor.press("ArrowUp");
+    editor.press("Enter");
 
-      expect(editor.text()).toBe('<Chart type="bar">\n\n```csv\n\n```\n\n</Chart>');
-      // Inside the fence, where the table goes.
-      expect(editor.caret()).toBe('<Chart type="bar">\n\n```csv\n'.length);
-    },
-    { pendingInLive: MDX },
-  );
+    expect(editor.text()).toBe('<Chart type="bar">\n\n```csv\n\n```\n\n</Chart>');
+    // Inside the fence, where the table goes.
+    expect(editor.caret()).toBe('<Chart type="bar">\n\n```csv\n'.length);
+  });
 
-  scenario(
-    "inserts a component picked with the mouse",
-    ({ render }) => {
-      const editor = render();
-      editor.type("text <");
+  scenario("inserts a component picked with the mouse", ({ render }) => {
+    const editor = render();
+    editor.type("text <");
 
-      fireEvent.mouseDown(screen.getByRole("option", { name: /Info/ }));
+    fireEvent.mouseDown(screen.getByRole("option", { name: /Info/ }));
 
-      expect(editor.text()).toBe("text <Info>\n\n\n\n</Info>");
-    },
-    { pendingInLive: MDX },
-  );
+    expect(editor.text()).toBe("text <Info>\n\n\n\n</Info>");
+  });
 
-  scenario(
-    "marks the highlighted option for assistive tech",
-    ({ render }) => {
-      const editor = render();
-      editor.type("<");
+  scenario("marks the highlighted option for assistive tech", ({ render }) => {
+    const editor = render();
+    editor.type("<");
 
-      editor.press("ArrowDown");
+    editor.press("ArrowDown");
 
-      const warning = screen.getByRole("option", { name: /Warning/ });
-      expect(warning.getAttribute("aria-selected")).toBe("true");
-      expect(editor.element().getAttribute("aria-activedescendant")).toBe(warning.id);
-      expect(editor.element().getAttribute("aria-controls")).toBe(menu()!.id);
-    },
-    { pendingInLive: MDX },
-  );
+    const warning = screen.getByRole("option", { name: /Warning/ });
+    expect(warning.getAttribute("aria-selected")).toBe("true");
+    expect(editor.element().getAttribute("aria-activedescendant")).toBe(warning.id);
+    expect(editor.element().getAttribute("aria-controls")).toBe(menu()!.id);
+  });
 
-  scenario(
-    "closes on Escape and stays closed while the same tag is typed",
-    ({ render }) => {
-      const editor = render();
-      editor.type("<");
+  scenario("closes on Escape and stays closed while the same tag is typed", ({ render }) => {
+    const editor = render();
+    editor.type("<");
 
-      editor.press("Escape");
-      expect(menu()).toBeNull();
-      expect(editor.text()).toBe("<");
+    editor.press("Escape");
+    expect(menu()).toBeNull();
+    expect(editor.text()).toBe("<");
 
-      editor.type("<I");
-      expect(menu()).toBeNull();
+    editor.type("<I");
+    expect(menu()).toBeNull();
 
-      // A new tag asks again.
-      editor.type("<I and <");
-      expect(menu()).not.toBeNull();
-    },
-    { pendingInLive: MDX },
-  );
+    // A new tag asks again.
+    editor.type("<I and <");
+    expect(menu()).not.toBeNull();
+  });
 
   scenario("leaves Enter alone when the menu is closed", ({ render, mode }) => {
     const editor = render();
@@ -218,17 +178,13 @@ describeParity("MarkdownEditor component completion", (scenario) => {
     }
   });
 
-  scenario(
-    "closes when the editor loses focus",
-    ({ render }) => {
-      const editor = render();
-      editor.type("<");
-      expect(menu()).not.toBeNull();
+  scenario("closes when the editor loses focus", ({ render }) => {
+    const editor = render();
+    editor.type("<");
+    expect(menu()).not.toBeNull();
 
-      editor.blur();
+    editor.blur();
 
-      expect(menu()).toBeNull();
-    },
-    { pendingInLive: MDX },
-  );
+    expect(menu()).toBeNull();
+  });
 });

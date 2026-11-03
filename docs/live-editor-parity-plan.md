@@ -2,8 +2,9 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0 and 1
-are built and Gates A and B have passed; Steps 2 to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1 and 2
+are built and Gates A, B and C have passed, and most of Step 3 came with Step 2 (see there); Steps 4 to 8 are not
+started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -23,16 +24,16 @@ hooks. "Pure" means the logic works on a string and needs no change; "bound" mea
 
 | Feature | Shortcut / trigger | Logic (pure) | Bound to the textarea | Live today |
 |---|---|---|---|---|
-| Image paste | paste | `imageRefs`, `imageLimit` | `onPaste`, placeholder + upload in `MarkdownEditor` | no |
-| Image picker | Ctrl/Cmd+Shift+M | `imagePicker.ts` | `useImagePicker`, `ImagePickerMenu` position | no |
-| Image → `<Image />` | Ctrl/Cmd+Shift+X | `mdx/imageToMdx.ts` | `convertImagesToMdx` (uses `execCommand`) | no |
-| MDX completion | `<`, inside a tag, frontmatter, snippets | `mdx/completions`, `props`, `frontmatterProps`, `snippets` | `useMdxCompletion` | no |
+| Image paste | paste | `imageRefs`, `imageLimit` | `onPaste`, placeholder + upload in `MarkdownEditor` | **yes (Step 2)** |
+| Image picker | Ctrl/Cmd+Shift+M | `imagePicker.ts` | `useImagePicker`, `ImagePickerMenu` position | **yes (Step 2)** |
+| Image → `<Image />` | Ctrl/Cmd+Shift+X | `mdx/imageToMdx.ts` | `convertImagesToMdx` (uses `execCommand`) | **yes (Step 2)** |
+| MDX completion | `<`, inside a tag, frontmatter, snippets | `mdx/completions`, `props`, `frontmatterProps`, `snippets` | `useMdxCompletion` | **yes (arrived with Step 2)** |
 | Note-link picker | `[[`, Ctrl/Cmd+Shift+K | `noteLinks.ts` | `useNoteLinkPicker` | no |
 | Highlight menu | Ctrl/Cmd+Shift+H | `highlightText.ts` | `useHighlightMenu`, `applyHighlight` (`execCommand`) | no |
 | Highlight tint | `<Mark color>` text is tinted | `markTints.ts` | `MarkdownHighlight` layer | no |
 | Ruler | Settings > Writing | — | overlay in `MarkdownEditor` | no |
 | Reflow | typing past the column | `reflowText.ts` | `reflowTyping`, `applyReflow` (`execCommand`) | no |
-| Draw.io | Ctrl/Cmd+Shift+D, Diagram button | `mdx/drawioSrc.ts` | `startDiagram` | button works (caret kept in a ref); shortcut no |
+| Draw.io | Ctrl/Cmd+Shift+D, Diagram button | `mdx/drawioSrc.ts` | `startDiagram` | **yes (arrived with Step 2)** |
 | Tab types a tab | Tab | — | `onKeyDown` | yes |
 | Find in note | Ctrl/Cmd+F | `findMatches.ts` | `MarkdownEditor` | yes |
 | Read-only, spellcheck | — | — | — | yes |
@@ -158,8 +159,27 @@ other, not in parallel branches.
   latter becomes one `replace`.
 - **Care:** the picker swallows printable keys into its filter. That works by cancelling `keydown`, which is also
   how it works in the textarea; it is unreliable under IME and on Android keyboards in both editors, and stays so.
-- **Gate C:** the image suites pass in both modes; paste a picture in Live and see the placeholder, the upload and
-  the final `![alt](app_data/…)`, with the caret still after it.
+- **Built (2026-11-03).**
+  - `liveSurface.ts` is the live editor as a surface (`useLiveSurface`): text and selection from the CodeMirror
+    state; `replace` is one `dispatch` with the caret in the new text's coordinates; `coordsAt` is
+    `view.coordsAtPos` relative to the box the menus sit in (and survives a DOM with no layout).
+  - `LiveEditor` takes `events` (`LiveEditorEvents`: key, paste, change, select, scroll, focus, blur), a `Prec.highest`
+    `keydown` handler that returns `defaultPrevented` so an open menu has Enter, Tab and the arrows before the
+    Markdown keymap, `attributes` (the menus' ARIA, in a `Compartment`) and `onView`. `MarkdownEditor` hands it the
+    same `useEditorFeatures` the textarea uses, and draws the menus in a `relative` box around it.
+  - `useImageUpload.ts` holds the paste, placeholder, upload and error flow, moved out of `MarkdownEditor`, and works
+    through whichever surface is showing (read through a ref, so an upload that finishes after a switch of tab goes
+    into the editor that is showing then). `EditorSurface.replace`'s `caret` is now counted from `start` in the new
+    text, and `null` leaves the selection alone.
+  - One key handler (`handleKey`) serves both editors: the draw.io shortcut, Image → `<Image />` and the menus.
+    `convertImagesToMdx` keeps its textarea path (`execCommand`, so native undo is one step) and has a live path.
+  - Converted to run on both editors: paste (`MarkdownEditor.paste.test.tsx`, new, moved out of
+    `MarkdownEditor.test.tsx`), the image picker, Image → `<Image />` with `<Image>` prop completion, and the draw.io
+    new-diagram scenarios.
+- **Gate C:** the image suites pass in both modes (3299 tests in all). Passed, and checked in a real browser on a
+  scratch notebook: a pasted PNG shows `[Uploading pasted (1)…]` at the caret at once and becomes
+  `![pasted](app_data/….png)` after the real save; Ctrl/Cmd+Shift+M lists it beside the caret; Enter inserts it;
+  Ctrl/Cmd+Shift+X turns it into an `<Image />` tag; one undo takes that back.
 
 ### Step 3: MDX completion
 
@@ -167,8 +187,12 @@ other, not in parallel branches.
   accepting and Escape dismissing.
 - `liveSurface.coordsAt` has to handle the caret sitting right after a hidden mark; completion only opens on
   typed text, where nothing is hidden, so this is a check rather than a fix.
-- **Gate D:** the completion tests (in `MarkdownEditor.test.tsx`) pass in both modes; the menu sits under the
-  caret in a scrolled, wrapped note.
+- **Built, by Step 2 (2026-11-03).** Sharing the hooks meant the Live editor had the `<` menu as soon as the
+  features were wired in: all 10 `pendingInLive` markers on the completion suite turned red ("Expect test to fail"),
+  which is the harness doing its job, and were removed. Left for Step 3 proper is only the check below.
+- **Gate D:** the completion tests (now `MarkdownEditor.completion.test.tsx`) pass in both modes (done); the menu
+  sits under the caret in a scrolled, wrapped note (seen in a browser, near the bottom of a scrolled note, where it
+  flips above the line; still to look at in a note that wraps).
 
 ### Step 4: note-link picker
 
@@ -223,7 +247,8 @@ The Live idea applied to highlights: a highlighted passage is drawn in its colou
 
 ### Step 8: what is left, then the switch
 
-- Draw.io shortcut (Ctrl/Cmd+Shift+D) and the edit-notice line (the red "why that didn't happen" message) in Live.
+- The edit-notice line (the red "why that didn't happen" message) is shown in Live already for Image → `<Image />`;
+  the highlight menu's refusals need the same in Step 5. (The draw.io shortcut came with Step 2.)
 - Syntax colours for code, fences, URLs and tags, so a note does not look plainer in Live than in the Markdown tab.
   **My pick:** decorations by syntax-tree node name using the same `--syntax-*` colours, not a new dependency.
 - Accessibility pass: the label, the `aria-controls`/`aria-activedescendant` wiring on `.cm-content`, focus
@@ -240,6 +265,8 @@ The Live idea applied to highlights: a highlighted passage is drawn in its colou
   keeps its own. Keeping both mounted would make two histories fight over one text. (Accepted by the owner.)
 - The ruler is approximate in a proportional font; reflow is not.
 - Reflow's break joins the typed character's undo step.
+- Enter, and pasting plain text, are done by the live editor itself; in the textarea the browser does them, so the
+  scenarios check "nothing cancelled the key or the paste" there and "the text changed" here.
 - Text is drawn with the preview font, not the editor font, so it reads like the preview.
 - `<Mark>` tags are hidden away from the caret in Live (Step 6); the Markdown tab shows them always.
 

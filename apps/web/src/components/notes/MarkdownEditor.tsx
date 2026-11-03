@@ -1,20 +1,19 @@
-import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type ClipboardEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
+import type { EditorView } from "@codemirror/view";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
 import { Textarea } from "@/components/ui/textarea";
-import { saveImage } from "@/lib/composition/client";
 import { parse } from "@/lib/composition/frontmatter";
-import { imageRef } from "@/lib/composition/imageRefs";
-import { maxImageBytes } from "@/lib/composition/imageLimit";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
 import { cn } from "@/lib/utils";
 import { caretCoordinates } from "./caretCoordinates";
 import { DrawioDialog, type DrawioSource } from "./DrawioDialog";
 import { DrawioEditContext, type DrawioEditing } from "./DrawioEdit";
-import { fromReactKey, useTextareaSurface } from "./editorSurface";
+import { fromReactKey, useTextareaSurface, type EditorKeyEvent } from "./editorSurface";
 import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { ImagePickerMenu } from "./ImagePickerMenu";
-import { LiveEditor } from "./LiveEditor";
+import { LiveEditor, type LiveEditorEvents } from "./LiveEditor";
+import { useLiveSurface } from "./liveSurface";
 import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
 import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
 import { rememberHighlightColor } from "./lastHighlightColor";
@@ -33,6 +32,7 @@ import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
 import type { Note } from "./types";
 import { useEditorFeatures } from "./useEditorFeatures";
+import { useImageUpload } from "./useImageUpload";
 import { IMAGE_PICKER_SHORTCUT } from "./useImagePicker";
 import { usePreviewFind } from "./usePreviewFind";
 import { NOTE_LINK_SHORTCUT } from "./useNoteLinkPicker";
@@ -80,8 +80,8 @@ type Props = {
 
 const NO_NOTES: readonly Note[] = [];
 
-/** Markdown image syntax is `![alt](path)`, so brackets in the alt text must go. */
-const altTextFor = (fileName: string) => fileName.replace(/\.[^.]*$/, "").replace(/[[\]\r\n]+/g, " ").trim() || "image";
+/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX and the diagram editor. */
+const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`;
 
 export function MarkdownEditor({
   noteId,
@@ -118,12 +118,8 @@ export function MarkdownEditor({
   useEffect(() => {
     latest.current = value;
   }, [value]);
-  // Where the caret was last in the live editor, which draws its own text and has no textarea to ask.
-  const liveSelection = useRef({ start: 0, end: 0 });
   const pendingCaret = useRef<number | null>(null);
   const pendingSelection = useRef<TextRange | null>(null);
-  const uploads = useRef(0);
-  const [imageError, setImageError] = useState<string | null>(null);
   // Why a highlight or an image conversion didn't happen, and the text it was refused for: editing the note clears it.
   const [editNotice, setEditNotice] = useState<{ reason: string; value: string } | null>(null);
 
@@ -144,57 +140,31 @@ export function MarkdownEditor({
     onChange(next);
   }
 
-  /** Swaps `placeholder` for `replacement`, keeping the caret where the user left it. */
-  function resolvePlaceholder(placeholder: string, replacement: string) {
-    const start = latest.current.indexOf(placeholder);
-    if (start === -1) return;
-    const end = start + placeholder.length;
-    const el = textarea.current;
-    if (el && document.activeElement === el) {
-      const shift = replacement.length - placeholder.length;
-      const caret = el.selectionStart;
-      pendingCaret.current = caret >= end ? caret + shift : caret > start ? start + replacement.length : caret;
-    }
-    replaceText(start, end, replacement);
-  }
+  // The writing menus (completion, the pickers, the highlight menu) and pasted images ask whichever editor is showing
+  // through a surface, rather than the textarea or the live editor themselves, so that both share them.
+  const liveView = useRef<EditorView | null>(null);
+  const liveBox = useRef<HTMLDivElement>(null);
+  const textareaSurface = useTextareaSurface(textarea, (start, end, text, caret) => {
+    if (caret !== null) pendingCaret.current = start + caret;
+    replaceText(start, end, text);
+  });
+  const liveSurface = useLiveSurface(liveView, liveBox);
+  const surface = showLive ? liveSurface : textareaSurface;
 
-  /** Puts a placeholder where the image goes, uploads in the background, and returns where the placeholder ends. */
-  function insertImage(file: File, start: number, end: number): number {
-    const placeholder = `[Uploading ${altTextFor(file.name)} (${++uploads.current})…]`;
-    pendingCaret.current = start + placeholder.length;
-    replaceText(start, end, placeholder);
-    void upload(file, placeholder);
-    return start + placeholder.length;
-  }
-
-  async function upload(file: File, placeholder: string) {
-    let failure: string | null = null;
-    let markdown = "";
-    try {
-      const result = await saveImage({
-        noteId,
-        fileName: file.name,
-        data: new Uint8Array(await file.arrayBuffer()),
-      });
-      if (result.name) markdown = `![${altTextFor(file.name)}](${imageRef(result.name)})`;
-      else failure = result.error ?? "Could not save the image.";
-    } catch {
-      failure = "Could not save the image.";
-    }
-    if (failure) setImageError(failure);
-    resolvePlaceholder(placeholder, markdown);
-  }
+  const imageUpload = useImageUpload({
+    noteId,
+    surface,
+    readText: showLive ? () => liveSurface.text() : () => latest.current,
+  });
 
   // The draw.io editor: opened for a new diagram (where in the note it goes) or on one already stored.
   const [diagram, setDiagram] = useState<{ source: DrawioSource; at: { start: number; end: number } } | null>(null);
 
   function startDiagram() {
-    const el = textarea.current;
     const text = latest.current;
     const bodyStart = text.length - parse(text)[1].length;
     const end = text.length;
-    const start = showLive ? liveSelection.current.start : (el?.selectionStart ?? end);
-    const stop = showLive ? liveSelection.current.end : (el?.selectionEnd ?? end);
+    const { start, end: stop } = surface.selection();
     setDiagram({ source: { kind: "new" }, at: diagramRange(text, Math.min(start, end), Math.min(stop, end), bodyStart) });
   }
   useImperativeHandle(controls, () => ({ insertDiagram: startDiagram }));
@@ -222,13 +192,6 @@ export function MarkdownEditor({
     latest.current = next;
     onChange(next);
   }
-
-  // The writing menus (completion, the pickers, the highlight menu) ask the editor through this rather than the
-  // textarea, so that the live editor can share them.
-  const surface = useTextareaSurface(textarea, (start, end, text, caret) => {
-    pendingCaret.current = start + caret;
-    replaceText(start, end, text);
-  });
 
   /**
    * Highlights (or un-highlights) `range`. The change goes in as typing would, so the browser's undo
@@ -279,15 +242,23 @@ export function MarkdownEditor({
    * tag, which can say how wide to be. Goes in as typing would, so undo takes it back in one step,
    * and leaves the caret ready for another prop.
    */
-  function convertImagesToMdx(el: HTMLTextAreaElement) {
-    const before = el.value;
-    const edit = imagesToMdx(before, el.selectionStart, el.selectionEnd);
+  function convertImagesToMdx() {
+    const before = surface.text();
+    const { start, end } = surface.selection();
+    const edit = imagesToMdx(before, start, end);
     if (!edit) {
       setEditNotice({ reason: "Put the caret in a Markdown image, ![alt](src), or select some, to turn them into <Image /> tags.", value: before });
       return;
     }
     setEditNotice(null);
 
+    if (showLive) {
+      // The live editor keeps its own undo history, in which this is one step.
+      surface.replace(edit.start, edit.end, edit.text, edit.caret);
+      return;
+    }
+    const el = textarea.current;
+    if (!el) return;
     const after = before.slice(0, edit.start) + edit.text + before.slice(edit.end);
     const caret = edit.start + edit.caret;
     el.focus();
@@ -380,19 +351,24 @@ export function MarkdownEditor({
     onChange(edit.text);
   }
 
-  /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (isDrawioShortcut(event) && !event.nativeEvent.isComposing) {
+  /** The shortcuts and menus that work in either editor; they come ahead of the editor's own keys. */
+  function handleKey(event: EditorKeyEvent) {
+    if (isDrawioShortcut(event) && !event.isComposing) {
       event.preventDefault(); // Keep the browser from claiming it too (it bookmarks all tabs).
       startDiagram();
       return;
     }
-    if (isImageToMdxShortcut(event) && !event.nativeEvent.isComposing) {
+    if (isImageToMdxShortcut(event) && !event.isComposing) {
       event.preventDefault(); // Keep the browser from claiming it too.
-      convertImagesToMdx(event.currentTarget);
+      convertImagesToMdx();
       return;
     }
-    features.onKeyDown(fromReactKey(event));
+    features.onKeyDown(event);
+  }
+
+  /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */
+  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    handleKey(fromReactKey(event));
     if (event.defaultPrevented || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
@@ -403,23 +379,27 @@ export function MarkdownEditor({
     replaceText(el.selectionStart, el.selectionEnd, "\t");
   }
 
-  function onPaste(event: ClipboardEvent<HTMLTextAreaElement>) {
-    const images = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
-    // Cells copied from a spreadsheet arrive as text and a picture of that text; the text is what was meant.
-    if (images.length === 0 || event.clipboardData.getData("text/plain") !== "") return;
-    event.preventDefault();
-    setImageError(null);
+  /** What the live editor tells the same features the textarea's own events do. */
+  const liveEvents: LiveEditorEvents = {
+    onKeyDown: handleKey,
+    onPaste: (event) => {
+      if (!readOnly) imageUpload.paste(event);
+    },
+    onChange: features.onChange,
+    onSelect: features.onSelect,
+    onScroll: features.onScroll,
+    onFocus: features.onFocus,
+    onBlur: features.onBlur,
+  };
 
-    const { selectionStart, selectionEnd } = event.currentTarget;
-    const limit = maxImageBytes;
-    if (limit !== null && images.some((file) => file.size > limit)) {
-      setImageError(`Images can be at most ${limit / (1024 * 1024)} MB.`);
-      return;
-    }
-    // The first replaces the selection; any others follow it.
-    let at = insertImage(images[0], selectionStart, selectionEnd);
-    for (const file of images.slice(1)) at = insertImage(file, at, at);
-  }
+  const menus = (
+    <>
+      {imagePicker.open && <ImagePickerMenu {...imagePicker.menu} />}
+      {completion.open && <MdxCompletionMenu {...completion.menu} />}
+      {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}
+      {highlightMenu.open && <HighlightMenu {...highlightMenu.menu} />}
+    </>
+  );
 
   return (
     // Column sizes go through CSS variables. The editor stays mounted while the preview is
@@ -439,9 +419,9 @@ export function MarkdownEditor({
         hidden={!showEditor}
         className="flex min-h-0 flex-col"
       >
-        {imageError && (
+        {imageUpload.error && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
-            {imageError}
+            {imageUpload.error}
           </p>
         )}
         {showEditor && editNotice?.value === value && (
@@ -463,13 +443,13 @@ export function MarkdownEditor({
               features.onChange();
             }}
             readOnly={readOnly}
-            onPaste={readOnly ? undefined : onPaste}
+            onPaste={readOnly ? undefined : imageUpload.paste}
             // The text is drawn by the highlight layer, but the browser's squiggles still land on the textarea's own text.
             spellCheck
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
             {...features.aria}
-            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`}
+            aria-keyshortcuts={KEY_SHORTCUTS}
             onKeyDown={onKeyDown}
             onSelect={features.onSelect}
             onFocus={features.onFocus}
@@ -494,10 +474,7 @@ export function MarkdownEditor({
               />
             </div>
           )}
-          {imagePicker.open && <ImagePickerMenu {...imagePicker.menu} />}
-          {completion.open && <MdxCompletionMenu {...completion.menu} />}
-          {noteLinkPicker.open && <NoteLinkMenu {...noteLinkPicker.menu} />}
-          {highlightMenu.open && <HighlightMenu {...highlightMenu.menu} />}
+          {!showLive && menus}
         </div>
       </section>
       {view === "split" && (
@@ -550,23 +527,36 @@ export function MarkdownEditor({
         hidden={!showLive}
         className="flex min-h-0 flex-col"
       >
-        {imageError && showLive && (
+        {showLive && imageUpload.error && (
           <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
-            {imageError}
+            {imageUpload.error}
+          </p>
+        )}
+        {showLive && editNotice?.value === value && (
+          <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
+            {editNotice.reason}
           </p>
         )}
         {/* Not mounted while hidden: it is a second copy of the editor, and the plain editor keeps the undo history. */}
         {showLive && (
-          <LiveEditor
-            value={value}
-            onChange={onChange}
-            readOnly={readOnly}
-            selection={liveSelection}
-            findQuery={findQuery}
-            findOptions={findOptions}
-            findCurrent={findCurrent}
-            onFindCount={setLiveMatchCount}
-          />
+          // The box the menus are placed in, as the plain editor's wrapper is for its own.
+          <div ref={liveBox} className="relative flex min-h-0 flex-1 flex-col">
+            <LiveEditor
+              value={value}
+              onChange={onChange}
+              readOnly={readOnly}
+              onView={(editor) => {
+                liveView.current = editor;
+              }}
+              events={liveEvents}
+              attributes={{ ...features.aria, "aria-keyshortcuts": KEY_SHORTCUTS }}
+              findQuery={findQuery}
+              findOptions={findOptions}
+              findCurrent={findCurrent}
+              onFindCount={setLiveMatchCount}
+            />
+            {menus}
+          </div>
         )}
       </section>
       <DrawioDialog

@@ -2,10 +2,16 @@
 // Markdown editor can't quietly be missing from the live one (see docs/live-editor-parity-plan.md).
 import { EditorView } from "@codemirror/view";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { afterEach, describe, it, vi } from "vitest";
-import { MarkdownEditor } from "./MarkdownEditor";
+import { MarkdownEditor, type MarkdownEditorControls } from "./MarkdownEditor";
 import type { Note } from "./types";
+
+// jsdom does no layout, and CodeMirror asks the browser where text is whenever it scrolls or draws a selection.
+if (typeof Range !== "undefined" && typeof Range.prototype.getClientRects !== "function") {
+  Range.prototype.getClientRects = () => ({ length: 0, item: () => null, [Symbol.iterator]: [][Symbol.iterator] }) as unknown as DOMRectList;
+  Range.prototype.getBoundingClientRect = () => new DOMRect();
+}
 
 export type EditorMode = "markdown" | "live";
 export const EDITOR_MODES: readonly EditorMode[] = ["markdown", "live"];
@@ -23,6 +29,10 @@ export type EditorDriver = {
   /** Makes the text `text` with the caret at `caret` (default: the end), as typing that ends there would. */
   type(text: string, caret?: number): void;
   select(start: number, end: number): void;
+  /** Puts the caret in the editor, as clicking into it would. */
+  focus(): void;
+  /** Pastes `files` (and `text`, if any); true when nothing cancelled the paste, as with `fireEvent`. */
+  paste(files: File[], text?: string): boolean;
   /** Presses a key; true when nothing cancelled it, as with `fireEvent`. */
   press(key: string, init?: KeyboardEventInit): boolean;
   /** Moves focus out of the editor. */
@@ -32,16 +42,22 @@ export type EditorDriver = {
 };
 
 export type RenderOptions = {
+  /** What the Markdown editor shows beside the text: both editor and preview (the default), as the app starts a note. The live editor has no other view. */
+  view?: "split" | "markdown" | "preview";
   initial?: string;
   notes?: readonly Note[];
   noteId?: number;
+  /** Set to a ref to get the editor's controls, as the pane around it does. */
+  controls?: Ref<MarkdownEditorControls>;
 };
 
 function Harness({
   mode,
+  view = "split",
   initial = "",
   notes,
   noteId = 7,
+  controls,
   onValue,
 }: RenderOptions & { mode: EditorMode; onValue: (value: string) => void }) {
   const [value, setValue] = useState(initial);
@@ -56,8 +72,9 @@ function Harness({
       ratio={0.5}
       onRatioChange={vi.fn()}
       onRatioCommit={vi.fn()}
-      view={mode}
+      view={mode === "live" ? "live" : view}
       notes={notes}
+      controls={controls}
     />
   );
 }
@@ -67,6 +84,18 @@ export function renderEditor(mode: EditorMode, options: RenderOptions = {}): Edi
   const reported: string[] = [];
   const { container } = render(<Harness mode={mode} {...options} onValue={(value) => reported.push(value)} />);
   return mode === "markdown" ? textareaDriver(reported) : liveDriver(container, reported);
+}
+
+/** What a paste carries, as `fireEvent.paste` takes it. */
+const clipboard = (files: File[], text: string) => ({
+  clipboardData: { files, getData: (type: string) => (type === "text/plain" ? text : "") },
+});
+
+/** Types `marked` with the caret where its `|` is (no `|` means the end), as typing that ends there would. */
+export function typeMarked(editor: EditorDriver, marked: string) {
+  const at = marked.indexOf("|");
+  const text = marked.replace("|", "");
+  editor.type(text, at === -1 ? text.length : at);
 }
 
 function textareaDriver(reported: string[]): EditorDriver {
@@ -87,6 +116,8 @@ function textareaDriver(reported: string[]): EditorDriver {
       el().setSelectionRange(start, end);
       fireEvent.select(el());
     },
+    focus: () => fireEvent.focus(el()),
+    paste: (files, text = "") => fireEvent.paste(el(), clipboard(files, text)),
     press: (key, init) => fireEvent.keyDown(el(), { key, ...init }),
     blur: () => fireEvent.blur(el()),
   };
@@ -117,6 +148,8 @@ function liveDriver(container: HTMLElement, reported: string[]): EditorDriver {
         view().dispatch({ selection: { anchor: start, head: end } });
       });
     },
+    focus: () => act(() => view().contentDOM.focus()),
+    paste: (files, text = "") => fireEvent.paste(view().contentDOM, clipboard(files, text)),
     press: (key, init) => fireEvent.keyDown(view().contentDOM, { key, ...init }),
     blur: () => fireEvent.blur(view().contentDOM),
   };

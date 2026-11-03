@@ -2,9 +2,10 @@
 
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { Annotation, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
+import { Annotation, Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, drawSelection, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { liveMarkdown } from "./liveMarkdown";
 import { changedSpan } from "./reflowText";
@@ -53,13 +54,42 @@ function typeTab(view: EditorView): boolean {
   return true;
 }
 
+/**
+ * What the editor tells the note's writing features (the menus, pasted images) as things happen in it. They get a
+ * key before the editor's own keymap does, so a menu that is open has Enter, Tab and the arrows to itself, and
+ * a handler that calls `preventDefault` has handled the event.
+ */
+export type LiveEditorEvents = {
+  onKeyDown(event: EditorKeyEvent): void;
+  onPaste(event: ClipboardEvent): void;
+  /** Typing (or any change that is not the note changing underneath the editor). */
+  onChange(): void;
+  /** The caret or selection moved, or the text changed. */
+  onSelect(): void;
+  onScroll(): void;
+  onFocus(): void;
+  onBlur(): void;
+};
+
+/** The editor's attributes on top of its label: what the menus are, for assistive tech. Undefined ones are left off. */
+type Attributes = Record<string, string | undefined>;
+
+const contentAttributes = (label: string, attributes: Attributes) =>
+  EditorView.contentAttributes.of({
+    "aria-label": label,
+    spellcheck: "true",
+    ...(Object.fromEntries(Object.entries(attributes).filter(([, value]) => value !== undefined)) as Record<string, string>),
+  });
+
 type Props = {
   value: string;
   onChange: (value: string) => void;
   /** The text can be read and copied but not changed. */
   readOnly?: boolean;
-  /** Kept up to date with the caret (or selection), for the parts of the note that act on where it is. */
-  selection?: RefObject<{ start: number; end: number }>;
+  /** Given the editor's view once it is built, and null when it is taken away. */
+  onView?: (view: EditorView | null) => void;
+  events?: LiveEditorEvents;
+  attributes?: Attributes;
   /** Highlights this phrase (see `findMatches`) and steps to the `current` match. */
   findQuery?: string;
   findOptions?: FindOptions;
@@ -80,7 +110,9 @@ export function LiveEditor({
   value,
   onChange,
   readOnly = false,
-  selection,
+  onView,
+  events,
+  attributes,
   findQuery = "",
   findOptions = NO_OPTIONS,
   findCurrent = 0,
@@ -90,19 +122,20 @@ export function LiveEditor({
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const readOnlyFacet = useRef(new Compartment());
+  const attributesFacet = useRef(new Compartment());
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
+  const eventsRef = useRef(events);
+  const onViewRef = useRef(onView);
   useEffect(() => {
     onChangeRef.current = onChange;
+    eventsRef.current = events;
+    onViewRef.current = onView;
   });
-  const selectionRef = useRef(selection);
-  useEffect(() => {
-    selectionRef.current = selection;
-  });
-  const initial = useRef({ value, readOnly, label });
+  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {} });
 
   useEffect(() => {
-    const { value: doc, readOnly: locked, label: ariaLabel } = initial.current;
+    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes } = initial.current;
     const editor = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -119,25 +152,52 @@ export function LiveEditor({
           // Like the plain editor, Tab types a tab in place of whatever is selected (for nested list items, say);
           // Shift+Tab stays free to leave the editor. (CodeMirror's own `insertTab` indents a selection instead.)
           keymap.of([{ key: "Tab", run: typeTab }, ...defaultKeymap, ...historyKeymap]),
+          // Ahead of the keymap (and the Markdown one, whose Enter continues a list): an open menu is told first.
+          Prec.highest(
+            EditorView.domEventHandlers({
+              keydown: (event) => {
+                eventsRef.current?.onKeyDown(fromNativeKey(event));
+                return event.defaultPrevented;
+              },
+              paste: (event) => {
+                eventsRef.current?.onPaste(event);
+                return event.defaultPrevented;
+              },
+            }),
+          ),
+          EditorView.domEventObservers({
+            focus: () => eventsRef.current?.onFocus(),
+            blur: () => eventsRef.current?.onBlur(),
+          }),
           readOnlyFacet.current.of(EditorState.readOnly.of(locked)),
-          EditorView.contentAttributes.of({ "aria-label": ariaLabel, spellcheck: "true" }),
+          attributesFacet.current.of(contentAttributes(ariaLabel, ariaAttributes)),
           EditorView.updateListener.of((update) => {
-            if (update.selectionSet && selectionRef.current) {
-              const { from, to } = update.state.selection.main;
-              selectionRef.current.current = { start: from, end: to };
+            const typed = update.docChanged && !update.transactions.some((t) => t.annotation(fromNote));
+            if (typed) {
+              onChangeRef.current(update.state.doc.toString());
+              eventsRef.current?.onChange();
             }
-            if (!update.docChanged || update.transactions.some((t) => t.annotation(fromNote))) return;
-            onChangeRef.current(update.state.doc.toString());
+            if (update.selectionSet || update.docChanged) eventsRef.current?.onSelect();
           }),
         ],
       }),
     });
     view.current = editor;
+    onViewRef.current?.(editor);
+    const onScroll = () => eventsRef.current?.onScroll();
+    editor.scrollDOM.addEventListener("scroll", onScroll);
     return () => {
+      editor.scrollDOM.removeEventListener("scroll", onScroll);
+      onViewRef.current?.(null);
       editor.destroy();
       view.current = null;
     };
   }, []);
+
+  const attributesKey = JSON.stringify(attributes ?? {});
+  useEffect(() => {
+    view.current?.dispatch({ effects: attributesFacet.current.reconfigure(contentAttributes(label, JSON.parse(attributesKey) as Attributes)) });
+  }, [label, attributesKey]);
 
   useEffect(() => {
     view.current?.dispatch({ effects: readOnlyFacet.current.reconfigure(EditorState.readOnly.of(readOnly)) });

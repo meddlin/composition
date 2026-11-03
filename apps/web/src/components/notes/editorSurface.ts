@@ -11,8 +11,12 @@ export interface EditorSurface {
   /** The note's text as the editor has it right now (which can be ahead of what React last rendered). */
   text(): string;
   selection(): { start: number; end: number };
-  /** Swaps `[start, end)` for `text` and puts the caret `caret` characters into it (by default, after it). */
-  replace(start: number, end: number, text: string, caret?: number): void;
+  /**
+   * Swaps `[start, end)` for `text`. `caret` is where the caret goes, counted from `start` in the new text, so it can
+   * be negative (before the change) or past the end of `text` (after it); by default it goes after `text`, and
+   * `null` leaves the selection alone.
+   */
+  replace(start: number, end: number, text: string, caret?: number | null): void;
   setSelection(start: number, end: number): void;
   /** Where the character at `pos` is, in the box the menus are placed in, with the editor's own scrolling already taken off. */
   coordsAt(pos: number): { left: number; top: number; height: number };
@@ -36,6 +40,23 @@ export type EditorKeyEvent = {
   readonly defaultPrevented: boolean;
   preventDefault(): void;
 };
+
+/** A native keyboard event as an `EditorKeyEvent`; it is the same event, so `preventDefault` reaches it. */
+export function fromNativeKey(event: globalThis.KeyboardEvent): EditorKeyEvent {
+  return {
+    key: event.key,
+    shiftKey: event.shiftKey,
+    altKey: event.altKey,
+    ctrlKey: event.ctrlKey,
+    metaKey: event.metaKey,
+    repeat: event.repeat,
+    isComposing: event.isComposing,
+    get defaultPrevented() {
+      return event.defaultPrevented;
+    },
+    preventDefault: () => event.preventDefault(),
+  };
+}
 
 /** A React keyboard event as an `EditorKeyEvent`. It stays the same event: `preventDefault` reaches it, and `defaultPrevented` reads it. */
 export function fromReactKey(event: KeyboardEvent): EditorKeyEvent {
@@ -61,7 +82,7 @@ export function fromReactKey(event: KeyboardEvent): EditorKeyEvent {
  */
 export function useTextareaSurface(
   textarea: RefObject<HTMLTextAreaElement | null>,
-  replace: (start: number, end: number, text: string, caret: number) => void,
+  replace: (start: number, end: number, text: string, caret: number | null) => void,
 ): EditorSurface {
   const latestReplace = useRef(replace);
   useEffect(() => {
@@ -72,7 +93,7 @@ export function useTextareaSurface(
     () => ({
       text: () => textarea.current?.value ?? "",
       selection: () => ({ start: textarea.current?.selectionStart ?? 0, end: textarea.current?.selectionEnd ?? 0 }),
-      replace: (start, end, text, caret = text.length) => latestReplace.current(start, end, text, caret),
+      replace: (start, end, text, caret) => latestReplace.current(start, end, text, caret === undefined ? text.length : caret),
       setSelection: (start, end) => textarea.current?.setSelectionRange(start, end),
       coordsAt(pos) {
         const el = textarea.current;

@@ -4,6 +4,7 @@ import { createRef, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DrawioSource } from "./DrawioDialog";
 import { MarkdownEditor, type MarkdownEditorControls } from "./MarkdownEditor";
+import { describeParity, type EditorDriver } from "./parityHarness";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 
@@ -41,7 +42,6 @@ function Harness({ initial, controls }: { initial: string; controls?: React.Ref<
 }
 
 const editor = () => screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
-const shortcut = (init: object = {}) => fireEvent.keyDown(editor(), { key: "D", shiftKey: true, metaKey: true, ...init });
 const dialog = () => screen.queryByRole("dialog", { name: "diagram editor" });
 const sourceOf = () => JSON.parse(dialog()!.getAttribute("data-source")!) as DrawioSource;
 
@@ -50,61 +50,65 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("MarkdownEditor: new diagrams", () => {
-  it("Cmd+Shift+D opens the diagram editor for a new diagram", () => {
-    render(<Harness initial="Intro" />);
+// New diagrams, in the plain Markdown editor and the live one.
+describeParity("MarkdownEditor: new diagrams", (scenario) => {
+  const diagramShortcut = (editor: EditorDriver, init: KeyboardEventInit = {}) =>
+    editor.press("D", { shiftKey: true, metaKey: true, ...init });
 
-    shortcut();
+  scenario("Cmd+Shift+D opens the diagram editor for a new diagram", ({ render }) => {
+    const editor = render({ initial: "Intro" });
+
+    diagramShortcut(editor);
 
     expect(sourceOf()).toEqual({ kind: "new" });
   });
 
-  it("also answers to Ctrl+Shift+D", () => {
-    render(<Harness initial="Intro" />);
+  scenario("also answers to Ctrl+Shift+D", ({ render }) => {
+    const editor = render({ initial: "Intro" });
 
-    shortcut({ metaKey: false, ctrlKey: true });
+    diagramShortcut(editor, { metaKey: false, ctrlKey: true });
 
     expect(dialog()).not.toBeNull();
   });
 
-  it("puts the saved diagram at the caret, as a block of its own", () => {
-    render(<Harness initial={`${FRONTMATTER}One Two`} />);
-    editor().setSelectionRange(FRONTMATTER.length + 4, FRONTMATTER.length + 4);
-    shortcut();
+  scenario("puts the saved diagram at the caret, as a block of its own", ({ render }) => {
+    const editor = render({ initial: `${FRONTMATTER}One Two` });
+    editor.select(FRONTMATTER.length + 4, FRONTMATTER.length + 4);
+    diagramShortcut(editor);
 
     fireEvent.click(screen.getByRole("button", { name: "stub save" }));
 
-    expect(latest).toBe(`${FRONTMATTER}One \n\n${NEW_TAG}\n\nTwo`);
+    expect(editor.reported.at(-1)).toBe(`${FRONTMATTER}One \n\n${NEW_TAG}\n\nTwo`);
     expect(dialog()).toBeNull();
   });
 
-  it("goes after the frontmatter, at the end, when the editor was never clicked in (the caret is at 0)", () => {
-    render(<Harness initial={`${FRONTMATTER}Body`} />);
-    editor().setSelectionRange(0, 0);
-    shortcut();
+  scenario("goes after the frontmatter, at the end, when the editor was never clicked in (the caret is at 0)", ({ render }) => {
+    const editor = render({ initial: `${FRONTMATTER}Body` });
+    editor.select(0, 0);
+    diagramShortcut(editor);
 
     fireEvent.click(screen.getByRole("button", { name: "stub save" }));
 
-    expect(latest).toBe(`${FRONTMATTER}Body\n\n${NEW_TAG}\n\n`);
+    expect(editor.reported.at(-1)).toBe(`${FRONTMATTER}Body\n\n${NEW_TAG}\n\n`);
   });
 
-  it("is opened from outside too, by the pane's Diagram button", () => {
+  scenario("is opened from outside too, by the pane's Diagram button", ({ render }) => {
     const controls = createRef<MarkdownEditorControls>();
-    render(<Harness initial="Intro" controls={controls} />);
+    render({ initial: "Intro", controls });
 
     act(() => controls.current?.insertDiagram());
 
     expect(sourceOf()).toEqual({ kind: "new" });
   });
 
-  it("leaves the note as it was when closed without saving", () => {
-    render(<Harness initial="Intro" />);
-    shortcut();
+  scenario("leaves the note as it was when closed without saving", ({ render }) => {
+    const editor = render({ initial: "Intro" });
+    diagramShortcut(editor);
 
     fireEvent.click(screen.getByRole("button", { name: "stub close" }));
 
-    expect(latest).toBe(""); // never changed
-    expect(editor().value).toBe("Intro");
+    expect(editor.reported).toEqual([]); // never changed
+    expect(editor.text()).toBe("Intro");
     expect(dialog()).toBeNull();
   });
 });
