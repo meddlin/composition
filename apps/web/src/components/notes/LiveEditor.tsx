@@ -1,6 +1,6 @@
 "use client";
 
-import { defaultKeymap, history, historyKeymap, insertTab } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Annotation, Compartment, EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, drawSelection, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
@@ -45,6 +45,13 @@ const editorTheme = EditorView.theme({
   },
   ".cm-placeholder": { color: "var(--muted-foreground)" },
 });
+
+/** Types a tab at the caret, or over the selection. */
+function typeTab(view: EditorView): boolean {
+  if (view.state.readOnly) return false;
+  view.dispatch(view.state.replaceSelection("\t"), { scrollIntoView: true, userEvent: "input" });
+  return true;
+}
 
 type Props = {
   value: string;
@@ -109,8 +116,9 @@ export function LiveEditor({
           findHighlights,
           editorTheme,
           placeholder("Start writing in Markdown…"),
-          // Like the plain editor, Tab types a tab (for nested list items, say); Shift+Tab stays free to leave the editor.
-          keymap.of([{ key: "Tab", run: insertTab }, ...defaultKeymap, ...historyKeymap]),
+          // Like the plain editor, Tab types a tab in place of whatever is selected (for nested list items, say);
+          // Shift+Tab stays free to leave the editor. (CodeMirror's own `insertTab` indents a selection instead.)
+          keymap.of([{ key: "Tab", run: typeTab }, ...defaultKeymap, ...historyKeymap]),
           readOnlyFacet.current.of(EditorState.readOnly.of(locked)),
           EditorView.contentAttributes.of({ "aria-label": ariaLabel, spellcheck: "true" }),
           EditorView.updateListener.of((update) => {

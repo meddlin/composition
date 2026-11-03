@@ -2,8 +2,8 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Step 0 is built
-and Gate A has passed; Steps 1 to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0 and 1
+are built and Gates A and B have passed; Steps 2 to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -131,8 +131,21 @@ other, not in parallel branches.
 - Convert the scenarios that exercise the features above to `describe.each(["markdown", "live"])`, a suite at a
   time as each step lands (the 29 note-link, 17 image-picker, 35 highlight, 8 writing and 9 draw.io tests are the
   main source). Behaviour that is deliberately different (below) gets its own test.
+- **Built (2026-11-03).** `parityHarness.tsx` has `renderEditor(mode, options)`, returning an `EditorDriver`
+  (`type`, `select`, `press`, `blur`, `text`, `caret`, `selection`, `element`, `reported`) for the textarea and
+  for CodeMirror, and `describeParity(title, define)`, which runs the scenarios once per editor. A scenario that
+  the live editor cannot do yet is written with `{ pendingInLive: "Step N: …" }`: it runs there as vitest's
+  `it.fails`, so it is red the moment the feature arrives, and the marker has to come off. A scenario that differs
+  on purpose checks `mode` and says why (see "leaves Enter alone when the menu is closed"). The MDX completion
+  suite is converted (`MarkdownEditor.completion.test.tsx`, moved out of `MarkdownEditor.test.tsx`): 22 scenarios
+  pass, 10 are pending in live until Step 3. The driver has tests of its own (`parityHarness.test.tsx`).
+- **What the harness found at once:** Tab with a selection indented the line in Live (CodeMirror's `insertTab`)
+  where the Markdown tab replaces the selection with a tab. Fixed in `LiveEditor.tsx`.
+- Scenarios that only say a menu stays shut pass in Live today because nothing there opens one; the scenario
+  that opens a menu, pending beside them, is what shows it is missing.
 - **Gate B:** the harness runs one converted suite in both modes and fails when the Live behaviour is broken on
-  purpose.
+  purpose. Passed: it found the Tab difference above, and a pending marker on a scenario that already passes in
+  Live turns red ("Expect test to fail").
 
 ### Step 2: images (paste, picker, Image → `<Image />`)
 
