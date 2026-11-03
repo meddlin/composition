@@ -2,9 +2,9 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1 and 2
-are built and Gates A, B and C have passed, and most of Step 3 came with Step 2 (see there); Steps 4 to 8 are not
-started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2
+and 4 are built and Gates A, B, C and E have passed, and most of Step 3 came with Step 2 (see there); Steps 5 to 8
+are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -28,7 +28,7 @@ hooks. "Pure" means the logic works on a string and needs no change; "bound" mea
 | Image picker | Ctrl/Cmd+Shift+M | `imagePicker.ts` | `useImagePicker`, `ImagePickerMenu` position | **yes (Step 2)** |
 | Image → `<Image />` | Ctrl/Cmd+Shift+X | `mdx/imageToMdx.ts` | `convertImagesToMdx` (uses `execCommand`) | **yes (Step 2)** |
 | MDX completion | `<`, inside a tag, frontmatter, snippets | `mdx/completions`, `props`, `frontmatterProps`, `snippets` | `useMdxCompletion` | **yes (arrived with Step 2)** |
-| Note-link picker | `[[`, Ctrl/Cmd+Shift+K | `noteLinks.ts` | `useNoteLinkPicker` | no |
+| Note-link picker | `[[`, Ctrl/Cmd+Shift+K | `noteLinks.ts` | `useNoteLinkPicker` | **yes (Step 4)** |
 | Highlight menu | Ctrl/Cmd+Shift+H | `highlightText.ts` | `useHighlightMenu`, `applyHighlight` (`execCommand`) | no |
 | Highlight tint | `<Mark color>` text is tinted | `markTints.ts` | `MarkdownHighlight` layer | no |
 | Ruler | Settings > Writing | — | overlay in `MarkdownEditor` | no |
@@ -198,7 +198,15 @@ other, not in parallel branches.
 
 - `[[` and Ctrl/Cmd+Shift+K on the surface. The shortcut's session mode (typing filters the menu, not the note)
   uses the same key swallowing as the image picker.
-- **Gate E:** the 29 note-link tests pass in both modes.
+- **Built (2026-11-03), with no feature code:** the picker was already working in Live once Step 2 wired the shared
+  features in. Step 4 was converting `MarkdownEditor.noteLinks.test.tsx` (the `[[` and shortcut groups, 22 scenarios;
+  the preview group stays as it was) to run on both editors, and proving the one thing jsdom cannot.
+- **Gate E:** the note-link tests pass in both modes (done). The shortcut's session mode takes printable keys into
+  its filter by cancelling `keydown`; jsdom does not insert text on a key press, so this was checked in a real
+  browser: Ctrl/Cmd+Shift+K, then `z` `z` as key presses shows "Link to: zz / No matching notes" and leaves the note
+  untouched; Backspace twice and Enter inserts `[Untitled](note:1)`, closes the menu and keeps focus. (A tool that
+  inserts text without key events skips the picker's key handling and just types into the note, in the Markdown tab
+  as much as here; a keyboard sends the keys.)
 
 ### Step 5: highlight menu and its tint
 
