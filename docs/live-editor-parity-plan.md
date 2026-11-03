@@ -3,8 +3,8 @@
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
 default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Steps 0, 1, 2,
-4, 5 and 6 are built and Gates A, B, C, E, F and G have passed, and most of Step 3 came with Step 2 (see there);
-Steps 7 and 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
+4, 5, 6 and 7 are built and Gates A, B, C, E, F, G and H have passed, and most of Step 3 came with Step 2 (see
+there); Step 8 is not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -31,8 +31,8 @@ hooks. "Pure" means the logic works on a string and needs no change; "bound" mea
 | Note-link picker | `[[`, Ctrl/Cmd+Shift+K | `noteLinks.ts` | `useNoteLinkPicker` | **yes (Step 4)** |
 | Highlight menu | Ctrl/Cmd+Shift+H | `highlightText.ts` | `useHighlightMenu`, `applyHighlight` (`execCommand`) | **yes (Step 5)** |
 | Highlight tint | `<Mark color>` text is tinted | `markTints.ts` | `MarkdownHighlight` layer | **yes (Step 5)** |
-| Ruler | Settings > Writing | — | overlay in `MarkdownEditor` | no |
-| Reflow | typing past the column | `reflowText.ts` | `reflowTyping`, `applyReflow` (`execCommand`) | no |
+| Ruler | Settings > Writing | — | overlay in `MarkdownEditor` | **yes (Step 7)** |
+| Reflow | typing past the column | `reflowText.ts` | `reflowTyping`, `applyReflow` (`execCommand`) | **yes (Step 7)** |
 | Draw.io | Ctrl/Cmd+Shift+D, Diagram button | `mdx/drawioSrc.ts` | `startDiagram` | **yes (arrived with Step 2)** |
 | Tab types a tab | Tab | — | `onKeyDown` | yes |
 | Find in note | Ctrl/Cmd+F | `findMatches.ts` | `MarkdownEditor` | yes |
@@ -276,8 +276,22 @@ The Live idea applied to highlights: a highlighted passage is drawn in its colou
   proportional, so `ch` is the width of a `0`, not of an average letter: the ruler is approximate, while reflow is
   exact (it counts characters, hidden marks included, because that is what the file holds). The owner accepted
   this; the manual script says so, so nobody reports it as a bug.
-- **Gate H:** the writing tests pass in both modes; reflow in Live produces the same text as in the Markdown
-  tab for the same typing.
+- **Built (2026-11-03).** `liveReflow.ts`, a `transactionFilter` (not the `transactionExtender` this plan first
+  named: an extender can only add effects and annotations, not changes). It returns `[tr, { changes, selection,
+  sequential: true }]`, so the break is in the typed character's own transaction. It acts on a change that is one
+  edit of one line with `input.type` and not `input.type.compose`; paste, drop, delete, undo, Enter and a multi-line
+  insert are left alone. A line that still fits is settled from the caret's line alone, without reading the note.
+  `LiveEditor` takes a `reflow` prop (`enabled`, `column`, `keepTables`) through a `Compartment`, so the setting
+  applies without rebuilding the editor. The ruler is drawn around the live editor as around the textarea, in the
+  preview font: `calc(1rem + Nch)`.
+- **Harness:** `typeKeys` types a character at a time (a keystroke, not a replacement); `type()` in the live driver is
+  now a plain edit (`input`), because replacing the whole text must not be reflowed as typing is. `render` takes
+  `writing` settings. `MarkdownEditor.writing.test.tsx` runs on both editors, and `liveReflow.test.ts` covers what
+  counts as typing.
+- **Gate H:** passed (3388 tests in all). Reflow in Live produces the same text as in the Markdown tab for the
+  same typing. In a real browser on a scratch notebook with ruler and reflow at 40: a 96-character sentence typed
+  at the end came out as lines of 39, 37 and 18 characters, the caret stayed at the end, one undo took the typed text
+  and its breaks back together with nothing left over, and the ruler line was drawn at `calc(40ch + 1rem)`.
 
 ### Step 8: what is left, then the switch
 

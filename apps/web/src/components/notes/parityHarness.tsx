@@ -4,8 +4,10 @@ import { EditorView } from "@codemirror/view";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState, type Ref } from "react";
 import { afterEach, describe, it, vi } from "vitest";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { MarkdownEditor, type MarkdownEditorControls } from "./MarkdownEditor";
 import type { Note } from "./types";
+import { WritingProvider } from "./WritingProvider";
 
 // jsdom does no layout, and CodeMirror asks the browser where text is whenever it scrolls or draws a selection.
 if (typeof Range !== "undefined" && typeof Range.prototype.getClientRects !== "function") {
@@ -28,6 +30,8 @@ export type EditorDriver = {
   caret(): number;
   /** Makes the text `text` with the caret at `caret` (default: the end), as typing that ends there would. */
   type(text: string, caret?: number): void;
+  /** Types `text` a character at a time, after what is there, the way a keyboard does (each one a typed character, not a paste). */
+  typeKeys(text: string): void;
   select(start: number, end: number): void;
   /** Puts the caret in the editor, as clicking into it would. */
   focus(): void;
@@ -49,6 +53,8 @@ export type RenderOptions = {
   noteId?: number;
   /** Set to a ref to get the editor's controls, as the pane around it does. */
   controls?: Ref<MarkdownEditorControls>;
+  /** The ruler and reflow settings (Settings > Writing), on top of the defaults, which have both off. */
+  writing?: Partial<WritingSettings>;
 };
 
 function Harness({
@@ -58,10 +64,12 @@ function Harness({
   notes,
   noteId = 7,
   controls,
+  writing,
   onValue,
 }: RenderOptions & { mode: EditorMode; onValue: (value: string) => void }) {
   const [value, setValue] = useState(initial);
   return (
+    <WritingProvider value={{ ...DEFAULT_WRITING_SETTINGS, ...writing }}>
     <MarkdownEditor
       noteId={noteId}
       value={value}
@@ -76,6 +84,7 @@ function Harness({
       notes={notes}
       controls={controls}
     />
+    </WritingProvider>
   );
 }
 
@@ -111,6 +120,14 @@ function textareaDriver(reported: string[]): EditorDriver {
       fireEvent.focus(el());
       fireEvent.change(el(), { target: { value: text, selectionStart: caret, selectionEnd: caret } });
     },
+    typeKeys(text) {
+      for (const char of text) {
+        const next = el().value + char;
+        fireEvent.input(el(), { target: { value: next }, inputType: "insertText", data: char });
+        // A change that does not come from typing leaves the caret where the browser put it, at the end.
+        if (el().selectionStart === el().value.length - 1) el().setSelectionRange(el().value.length, el().value.length);
+      }
+    },
     select(start, end) {
       fireEvent.focus(el());
       el().setSelectionRange(start, end);
@@ -138,8 +155,19 @@ function liveDriver(container: HTMLElement, reported: string[]): EditorDriver {
         view().dispatch({
           changes: { from: 0, to: view().state.doc.length, insert: text },
           selection: { anchor: caret },
-          userEvent: "input.type",
+          // Replacing the whole text is an edit, not a keystroke: it must not be reflowed as typing is.
+          userEvent: "input",
         });
+      });
+    },
+    typeKeys(text) {
+      act(() => {
+        view().contentDOM.focus();
+        view().dispatch({ selection: { anchor: view().state.doc.length } });
+        for (const char of text) {
+          const at = view().state.selection.main.head;
+          view().dispatch({ changes: { from: at, insert: char }, selection: { anchor: at + char.length }, userEvent: "input.type" });
+        }
       });
     },
     select(start, end) {

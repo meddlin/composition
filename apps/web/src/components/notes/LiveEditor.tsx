@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { liveMarkdown } from "./liveMarkdown";
+import { liveReflow } from "./liveReflow";
 import { changedSpan } from "./reflowText";
 
 /** Marks a change that came from the note changing underneath the editor, which is not the user typing. */
@@ -81,6 +82,13 @@ const contentAttributes = (label: string, attributes: Attributes) =>
     ...(Object.fromEntries(Object.entries(attributes).filter(([, value]) => value !== undefined)) as Record<string, string>),
   });
 
+/** Breaking lines as they are typed past a column (see `liveReflow`); off unless `enabled`. */
+export type LiveReflow = { enabled: boolean; column: number; keepTables: boolean };
+
+const NO_REFLOW: LiveReflow = { enabled: false, column: 80, keepTables: true };
+
+const reflowExtension = ({ enabled, column, keepTables }: LiveReflow) => (enabled ? liveReflow({ column, keepTables }) : []);
+
 type Props = {
   value: string;
   onChange: (value: string) => void;
@@ -90,6 +98,7 @@ type Props = {
   onView?: (view: EditorView | null) => void;
   events?: LiveEditorEvents;
   attributes?: Attributes;
+  reflow?: LiveReflow;
   /** Highlights this phrase (see `findMatches`) and steps to the `current` match. */
   findQuery?: string;
   findOptions?: FindOptions;
@@ -113,6 +122,7 @@ export function LiveEditor({
   onView,
   events,
   attributes,
+  reflow = NO_REFLOW,
   findQuery = "",
   findOptions = NO_OPTIONS,
   findCurrent = 0,
@@ -123,6 +133,7 @@ export function LiveEditor({
   const view = useRef<EditorView | null>(null);
   const readOnlyFacet = useRef(new Compartment());
   const attributesFacet = useRef(new Compartment());
+  const reflowFacet = useRef(new Compartment());
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
   const eventsRef = useRef(events);
@@ -132,10 +143,10 @@ export function LiveEditor({
     eventsRef.current = events;
     onViewRef.current = onView;
   });
-  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {} });
+  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {}, reflow });
 
   useEffect(() => {
-    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes } = initial.current;
+    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes, reflow: initialReflow } = initial.current;
     const editor = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -171,6 +182,7 @@ export function LiveEditor({
           }),
           readOnlyFacet.current.of(EditorState.readOnly.of(locked)),
           attributesFacet.current.of(contentAttributes(ariaLabel, ariaAttributes)),
+          reflowFacet.current.of(reflowExtension(initialReflow)),
           EditorView.updateListener.of((update) => {
             const typed = update.docChanged && !update.transactions.some((t) => t.annotation(fromNote));
             if (typed) {
@@ -193,6 +205,13 @@ export function LiveEditor({
       view.current = null;
     };
   }, []);
+
+  const { enabled: reflowEnabled, column: reflowColumn, keepTables: reflowKeepsTables } = reflow;
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: reflowFacet.current.reconfigure(reflowExtension({ enabled: reflowEnabled, column: reflowColumn, keepTables: reflowKeepsTables })),
+    });
+  }, [reflowEnabled, reflowColumn, reflowKeepsTables]);
 
   const attributesKey = JSON.stringify(attributes ?? {});
   useEffect(() => {

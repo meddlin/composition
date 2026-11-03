@@ -559,11 +559,22 @@ export function MarkdownEditor({
               }}
               events={liveEvents}
               attributes={{ ...features.aria, "aria-keyshortcuts": KEY_SHORTCUTS }}
+              reflow={{ enabled: writing.reflowEnabled, column: writing.reflowColumn, keepTables: writing.reflowKeepsTables }}
               findQuery={findQuery}
               findOptions={findOptions}
               findCurrent={findCurrent}
               onFindCount={setLiveMatchCount}
             />
+            {writing.rulerEnabled && (
+              // Clipped to the editor, so a ruler past its right edge doesn't widen the page.
+              <div aria-hidden data-testid="editor-ruler" className="pointer-events-none absolute inset-0 overflow-hidden">
+                {/* After the editor's 1rem of padding, in the editor's own font: a column here is that many widths of a "0", which in a proportional font is only a guide. */}
+                <div
+                  className="preview-text absolute inset-y-0 w-px bg-foreground/20"
+                  style={{ left: `calc(1rem + ${writing.rulerColumn}ch)` }}
+                />
+              </div>
+            )}
             {menus}
           </div>
         )}

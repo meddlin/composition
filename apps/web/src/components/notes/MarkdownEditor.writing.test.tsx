@@ -1,117 +1,94 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
-import { MarkdownEditor } from "./MarkdownEditor";
-import { WritingProvider } from "./WritingProvider";
+import { fireEvent } from "@testing-library/react";
+import { expect, vi } from "vitest";
+import { describeParity, type EditorDriver } from "./parityHarness";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 
-function Harness({ initial = "", writing }: { initial?: string; writing: Partial<WritingSettings> }) {
-  const [value, setValue] = useState(initial);
-  return (
-    <WritingProvider value={{ ...DEFAULT_WRITING_SETTINGS, ...writing }}>
-      <MarkdownEditor
-        noteId={7}
-        value={value}
-        onChange={setValue}
-        ratio={0.5}
-        onRatioChange={vi.fn()}
-        onRatioCommit={vi.fn()}
-        view="markdown"
-      />
-    </WritingProvider>
-  );
-}
+/** The ruler of the editor that is showing (the Markdown tab's stays in the page, hidden, beside the live one). */
+const rulerOf = (editor: EditorDriver) =>
+  editor.element().closest("[role=tabpanel]")!.querySelector<HTMLElement>("[data-testid=editor-ruler]");
 
-const editor = () => screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
+// The ruler and reflow, in the plain Markdown editor and the live one.
+describeParity("the editor's ruler", (scenario) => {
+  scenario("is not drawn unless switched on", ({ render }) => {
+    const editor = render({ writing: { rulerColumn: 72 } });
 
-/** Types `text` at the end of the editor the way a keyboard does: a character at a time, each an `insertText` input. */
-function type(text: string) {
-  for (const char of text) {
-    const el = editor();
-    const next = el.value + char;
-    fireEvent.input(el, { target: { value: next }, inputType: "insertText", data: char });
-    // A change that does not come from typing leaves the caret where the browser put it, at the end.
-    if (el.selectionStart === el.value.length - 1) el.setSelectionRange(el.value.length, el.value.length);
-  }
-}
-
-afterEach(cleanup);
-
-describe("the editor's ruler", () => {
-  it("is not drawn unless switched on", () => {
-    render(<Harness writing={{ rulerColumn: 72 }} />);
-
-    expect(screen.queryByTestId("editor-ruler")).toBeNull();
+    expect(rulerOf(editor)).toBeNull();
   });
 
-  it("is drawn at the chosen column, counted in the editor's own characters", () => {
-    render(<Harness writing={{ rulerEnabled: true, rulerColumn: 72 }} />);
+  scenario("is drawn at the chosen column, counted in the editor's own characters", ({ render }) => {
+    const editor = render({ writing: { rulerEnabled: true, rulerColumn: 72 } });
 
-    const ruler = screen.getByTestId("editor-ruler");
+    const ruler = rulerOf(editor)!;
     expect(ruler.getAttribute("aria-hidden")).toBe("true");
     expect((ruler.firstElementChild as HTMLElement).style.left).toContain("72ch");
   });
 
-  it("never changes the text", () => {
-    render(<Harness writing={{ rulerEnabled: true, rulerColumn: 20 }} />);
+  scenario("never changes the text", ({ render }) => {
+    const editor = render({ writing: { rulerEnabled: true, rulerColumn: 20 } });
 
-    type("the quick brown fox jumps over the lazy dog");
+    editor.typeKeys("the quick brown fox jumps over the lazy dog");
 
-    expect(editor().value).toBe("the quick brown fox jumps over the lazy dog");
+    expect(editor.text()).toBe("the quick brown fox jumps over the lazy dog");
   });
 });
 
-describe("the editor's reflow", () => {
+describeParity("the editor's reflow", (scenario) => {
   const on = { reflowEnabled: true, reflowColumn: 20 };
 
-  it("does nothing unless switched on", () => {
-    render(<Harness writing={{ reflowColumn: 20 }} />);
+  scenario("does nothing unless switched on", ({ render }) => {
+    const editor = render({ writing: { reflowColumn: 20 } });
 
-    type("the quick brown fox jumps over the lazy dog");
+    editor.typeKeys("the quick brown fox jumps over the lazy dog");
 
-    expect(editor().value).toBe("the quick brown fox jumps over the lazy dog");
+    expect(editor.text()).toBe("the quick brown fox jumps over the lazy dog");
   });
 
-  it("breaks a line as it is typed past the column, and keeps typing after the break", () => {
-    render(<Harness writing={on} />);
+  scenario("breaks a line as it is typed past the column, and keeps typing after the break", ({ render }) => {
+    const editor = render({ writing: on });
 
-    type("the quick brown fox jumps over the lazy dog");
+    editor.typeKeys("the quick brown fox jumps over the lazy dog");
 
-    expect(editor().value).toBe("the quick brown fox\njumps over the lazy\ndog");
-    expect(editor().selectionStart).toBe(editor().value.length);
+    expect(editor.text()).toBe("the quick brown fox\njumps over the lazy\ndog");
+    expect(editor.caret()).toBe(editor.text().length);
   });
 
-  it("lines a list item's continuation up under its text", () => {
-    render(<Harness writing={on} />);
+  scenario("lines a list item's continuation up under its text", ({ render }) => {
+    const editor = render({ writing: on });
 
-    type("- the quick brown fox jumps");
+    editor.typeKeys("- the quick brown fox jumps");
 
-    expect(editor().value).toBe("- the quick brown\n  fox jumps");
+    expect(editor.text()).toBe("- the quick brown\n  fox jumps");
   });
 
-  it("leaves a table row whole, unless asked to break it", () => {
+  scenario("leaves a table row whole, unless asked to break it", ({ render }) => {
     const row = "| the quick brown fox | jumps over |";
-    const { unmount } = render(<Harness writing={on} />);
-    type(row);
-    expect(editor().value).toBe(row);
-    unmount();
-
-    render(<Harness writing={{ ...on, reflowKeepsTables: false }} />);
-    type(row);
-    expect(editor().value).toBe("| the quick brown\nfox | jumps over |");
+    const kept = render({ writing: on });
+    kept.typeKeys(row);
+    expect(kept.text()).toBe(row);
   });
 
-  it("leaves pasted text, and text that is not being typed, alone", () => {
-    render(<Harness writing={on} />);
+  scenario("breaks a table row when asked to", ({ render }) => {
+    const editor = render({ writing: { ...on, reflowKeepsTables: false } });
+
+    editor.typeKeys("| the quick brown fox | jumps over |");
+
+    expect(editor.text()).toBe("| the quick brown\nfox | jumps over |");
+  });
+
+  scenario("leaves pasted text, and text that is not being typed, alone", ({ render, mode }) => {
+    const editor = render({ writing: on });
     const long = "the quick brown fox jumps over the lazy dog";
 
-    fireEvent.input(editor(), { target: { value: long }, inputType: "insertFromPaste" });
-    expect(editor().value).toBe(long);
+    if (mode === "markdown") {
+      fireEvent.input(editor.element(), { target: { value: long }, inputType: "insertFromPaste" });
+    } else {
+      editor.paste([], long);
+    }
+    expect(editor.text()).toBe(long);
 
-    fireEvent.change(editor(), { target: { value: `${long}!` } });
-    expect(editor().value).toBe(`${long}!`);
+    editor.type(`${long}!`);
+    expect(editor.text()).toBe(`${long}!`);
   });
 });
