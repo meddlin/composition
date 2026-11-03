@@ -1,8 +1,8 @@
-import { useId, useMemo, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
+import { useId, useMemo, useState, type CSSProperties } from "react";
+import { placeMenu, type EditorKeyEvent, type EditorSurface, type Position } from "./editorSurface";
 import { NOTE_MENU_HEIGHT_PX, noteOptionId } from "./NoteLinkMenu";
 import { findNoteTrigger, linkTo, matchNotes } from "./noteLinks";
 import type { Note } from "./types";
-import { placeMenu, type Position } from "./useMdxCompletion";
 
 /** Cmd+Shift+K on macOS, Ctrl+Shift+K elsewhere; `aria-keyshortcuts` says the same. */
 export const NOTE_LINK_SHORTCUT = "Control+Shift+K Meta+Shift+K";
@@ -15,21 +15,14 @@ export function isNoteLinkShortcut(event: { key: string; shiftKey: boolean; altK
 type Session = { start: number; end: number; label: string; query: string };
 
 /**
- * Linking to another note from the editor's textarea, two ways. Typing `[[`
+ * Linking to another note from the editor, two ways. Typing `[[`
  * lists the notes that match what follows it; the shortcut does the same at the
  * caret, or over the selected words, which then become the link's text. The
- * chosen note goes in as `[title](note:id)`. `insert` swaps `[start, end)` for
- * `text` and puts the caret `caret` characters into it.
+ * chosen note goes in as `[title](note:id)`.
  */
-export function useNoteLinkPicker(
-  textarea: RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  notes: readonly Note[],
-  currentNoteId: number,
-  insert: (start: number, end: number, text: string, caret: number) => void,
-) {
+export function useNoteLinkPicker(surface: EditorSurface, value: string, notes: readonly Note[], currentNoteId: number) {
   const menuId = useId();
-  // Where the caret is, or null when the textarea has no caret or a selection (or isn't focused).
+  // Where the caret is, or null when the editor has no caret or a selection (or isn't focused).
   const [caret, setCaret] = useState<number | null>(null);
   const [position, setPosition] = useState<Position>({ left: 0 });
   const [active, setActive] = useState(0);
@@ -48,38 +41,38 @@ export function useNoteLinkPicker(
   const activeIndex = Math.max(0, Math.min(active, items.length - 1));
 
   /** Reads where the caret is now; call after anything that can move it or change the text. */
-  function sync(el: HTMLTextAreaElement) {
-    const collapsed = el.selectionStart === el.selectionEnd;
+  function sync() {
+    const { start, end } = surface.selection();
+    const text = surface.text();
+    const collapsed = start === end;
     // Clicking elsewhere, or changing the text, ends a picker the shortcut opened.
-    if (session && (el.selectionStart !== session.start || el.selectionEnd !== session.end || el.value !== value)) {
+    if (session && (start !== session.start || end !== session.end || text !== value)) {
       setSession(null);
     }
-    const next = collapsed ? findNoteTrigger(el.value, el.selectionStart) : null;
-    setCaret(collapsed ? el.selectionStart : null);
+    const next = collapsed ? findNoteTrigger(text, start) : null;
+    setCaret(collapsed ? start : null);
     if (next?.query !== trigger?.query) setActive(0);
     if (!next) setDismissed(null);
-    if (next) setPosition(placeMenu(el, next.start, NOTE_MENU_HEIGHT_PX));
+    if (next) setPosition(placeMenu(surface, next.start, NOTE_MENU_HEIGHT_PX));
   }
 
   /** Opens the picker at the caret, or over the selection; the shortcut calls this. */
-  function openPicker(el: HTMLTextAreaElement) {
+  function openPicker() {
     if (open) return;
-    const { selectionStart: start, selectionEnd: end } = el;
-    setSession({ start, end, label: el.value.slice(start, end), query: "" });
+    const { start, end } = surface.selection();
+    setSession({ start, end, label: surface.text().slice(start, end), query: "" });
     setActive(0);
-    setPosition(placeMenu(el, start, NOTE_MENU_HEIGHT_PX));
+    setPosition(placeMenu(surface, start, NOTE_MENU_HEIGHT_PX));
   }
 
   function accept(note: Note) {
-    const el = textarea.current;
-    if (!el) return;
     if (session) {
       const text = linkTo(note, session.label);
-      insert(session.start, session.end, text, text.length);
+      surface.replace(session.start, session.end, text, text.length);
       setSession(null);
     } else if (shownTrigger) {
       const text = linkTo(note);
-      insert(shownTrigger.start, el.selectionStart, text, text.length);
+      surface.replace(shownTrigger.start, surface.selection().start, text, text.length);
       setCaret(shownTrigger.start + text.length);
     }
   }
@@ -95,12 +88,12 @@ export function useNoteLinkPicker(
     setActive(0);
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing) return;
+  function onKeyDown(event: EditorKeyEvent) {
+    if (event.isComposing) return;
     if (isNoteLinkShortcut(event)) {
       event.preventDefault(); // Keep the browser from claiming it (Firefox opens its web console on Ctrl+Shift+K).
       if (open) close();
-      else openPicker(event.currentTarget);
+      else openPicker();
       return;
     }
     if (!open) return;
@@ -147,20 +140,18 @@ export function useNoteLinkPicker(
       onPick: accept,
       onHover: setActive,
     },
-    /** Props for the textarea, so assistive tech hears the menu as part of it. */
-    textareaProps: {
-      "aria-autocomplete": "list" as const,
+    /** Attributes for the editor, so assistive tech hears the menu as part of it. */
+    aria: {
       "aria-controls": open ? menuId : undefined,
       "aria-activedescendant": open && items.length > 0 ? noteOptionId(menuId, items[activeIndex]) : undefined,
-      "aria-keyshortcuts": NOTE_LINK_SHORTCUT,
-      onKeyDown,
-      onSelect: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onScroll: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onFocus: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onBlur: () => {
-        setCaret(null);
-        setSession(null);
-      },
+    },
+    onKeyDown,
+    onSelect: sync,
+    onScroll: sync,
+    onFocus: sync,
+    onBlur: () => {
+      setCaret(null);
+      setSession(null);
     },
     sync,
   };

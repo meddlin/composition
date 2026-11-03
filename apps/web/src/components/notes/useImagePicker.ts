@@ -1,10 +1,10 @@
-import { useId, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
+import { useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import { listImages } from "@/lib/composition/client";
 import type { ImageInfo } from "@/lib/composition/api";
 import { imageMarkdown } from "@/lib/composition/imageRefs";
+import { placeMenu, type EditorKeyEvent, type EditorSurface, type Position } from "./editorSurface";
 import { IMAGE_MENU_HEIGHT_PX, IMAGE_MENU_WIDTH_PX, imageOptionId } from "./ImagePickerMenu";
 import { matchImages } from "./imagePicker";
-import { placeMenu, type Position } from "./useMdxCompletion";
 
 /** Cmd+Shift+M on macOS, Ctrl+Shift+M elsewhere; `aria-keyshortcuts` says the same. */
 export const IMAGE_PICKER_SHORTCUT = "Control+Shift+M Meta+Shift+M";
@@ -17,17 +17,12 @@ export function isImagePickerShortcut(event: { key: string; shiftKey: boolean; a
 type Session = { start: number; end: number; label: string; query: string };
 
 /**
- * Inserting an image that is already stored, from the editor's textarea: the
+ * Inserting an image that is already stored, from the editor: the
  * shortcut lists the images (newest first) at the caret, typing narrows them,
  * and the chosen one goes in as `![alt](app_data/name)`. Selected words become
- * its alt text. `insert` swaps `[start, end)` for `text` and puts the caret
- * `caret` characters into it.
+ * its alt text.
  */
-export function useImagePicker(
-  textarea: RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  insert: (start: number, end: number, text: string, caret: number) => void,
-) {
+export function useImagePicker(surface: EditorSurface, value: string) {
   const menuId = useId();
   const [session, setSession] = useState<Session | null>(null);
   const [position, setPosition] = useState<Position>({ left: 0 });
@@ -48,19 +43,20 @@ export function useImagePicker(
   }
 
   /** Clicking elsewhere, or changing the text, ends the picker; call after anything that can move the caret or change the text. */
-  function sync(el: HTMLTextAreaElement) {
-    if (session && (el.selectionStart !== session.start || el.selectionEnd !== session.end || el.value !== value)) close();
+  function sync() {
+    const { start, end } = surface.selection();
+    if (session && (start !== session.start || end !== session.end || surface.text() !== value)) close();
   }
 
   /** Opens the picker at the caret, or over the selection; the shortcut calls this. */
-  function openPicker(el: HTMLTextAreaElement) {
-    const { selectionStart: start, selectionEnd: end } = el;
+  function openPicker() {
+    const { start, end } = surface.selection();
     const id = ++request.current;
-    setSession({ start, end, label: el.value.slice(start, end), query: "" });
+    setSession({ start, end, label: surface.text().slice(start, end), query: "" });
     setActive(0);
     setImages(null);
     setFailed(false);
-    setPosition(placeMenu(el, start, IMAGE_MENU_HEIGHT_PX, IMAGE_MENU_WIDTH_PX));
+    setPosition(placeMenu(surface, start, IMAGE_MENU_HEIGHT_PX, IMAGE_MENU_WIDTH_PX));
     listImages().then(
       (listed) => request.current === id && setImages(listed),
       () => request.current === id && setFailed(true),
@@ -70,7 +66,7 @@ export function useImagePicker(
   function accept(image: ImageInfo) {
     if (!session) return;
     const text = imageMarkdown(image.name, session.label);
-    insert(session.start, session.end, text, text.length);
+    surface.replace(session.start, session.end, text, text.length);
     close();
   }
 
@@ -80,12 +76,12 @@ export function useImagePicker(
     setActive(0);
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.nativeEvent.isComposing) return;
+  function onKeyDown(event: EditorKeyEvent) {
+    if (event.isComposing) return;
     if (isImagePickerShortcut(event)) {
       event.preventDefault(); // Keep the browser from claiming it.
       if (open) close();
-      else openPicker(event.currentTarget);
+      else openPicker();
       return;
     }
     if (!session) return;
@@ -134,16 +130,15 @@ export function useImagePicker(
       onPick: accept,
       onHover: setActive,
     },
-    /** Props for the textarea, so assistive tech hears the menu as part of it. */
-    textareaProps: {
+    /** Attributes for the editor, so assistive tech hears the menu as part of it. */
+    aria: {
       "aria-controls": open ? menuId : undefined,
       "aria-activedescendant": open && items.length > 0 ? imageOptionId(menuId, items[activeIndex]) : undefined,
-      "aria-keyshortcuts": IMAGE_PICKER_SHORTCUT,
-      onKeyDown,
-      onSelect: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onScroll: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onBlur: close,
     },
+    onKeyDown,
+    onSelect: sync,
+    onScroll: sync,
+    onBlur: close,
     sync,
   };
 }

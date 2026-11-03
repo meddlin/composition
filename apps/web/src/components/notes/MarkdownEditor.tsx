@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { caretCoordinates } from "./caretCoordinates";
 import { DrawioDialog, type DrawioSource } from "./DrawioDialog";
 import { DrawioEditContext, type DrawioEditing } from "./DrawioEdit";
+import { fromReactKey, useTextareaSurface } from "./editorSurface";
 import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
@@ -30,12 +31,11 @@ import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
-import { useHighlightMenu } from "./useHighlightMenu";
-import { useImagePicker } from "./useImagePicker";
 import type { Note } from "./types";
+import { useEditorFeatures } from "./useEditorFeatures";
+import { IMAGE_PICKER_SHORTCUT } from "./useImagePicker";
 import { usePreviewFind } from "./usePreviewFind";
-import { useMdxCompletion } from "./useMdxCompletion";
-import { NOTE_LINK_SHORTCUT, useNoteLinkPicker } from "./useNoteLinkPicker";
+import { NOTE_LINK_SHORTCUT } from "./useNoteLinkPicker";
 
 /** A search within this note: what to look for, which match is being looked at, and where to report how many there are. */
 export type FindState = {
@@ -223,17 +223,9 @@ export function MarkdownEditor({
     onChange(next);
   }
 
-  const completion = useMdxCompletion(textarea, value, (start, end, text, caret) => {
-    pendingCaret.current = start + caret;
-    replaceText(start, end, text);
-  });
-
-  const imagePicker = useImagePicker(textarea, value, (start, end, text, caret) => {
-    pendingCaret.current = start + caret;
-    replaceText(start, end, text);
-  });
-
-  const noteLinkPicker = useNoteLinkPicker(textarea, value, notes, noteId, (start, end, text, caret) => {
+  // The writing menus (completion, the pickers, the highlight menu) ask the editor through this rather than the
+  // textarea, so that the live editor can share them.
+  const surface = useTextareaSurface(textarea, (start, end, text, caret) => {
     pendingCaret.current = start + caret;
     replaceText(start, end, text);
   });
@@ -279,7 +271,8 @@ export function MarkdownEditor({
     }
     el.setSelectionRange(result.selection.start, result.selection.end);
   }
-  const highlightMenu = useHighlightMenu(textarea, applyHighlight);
+  const features = useEditorFeatures({ surface, value, notes, noteId, applyHighlight });
+  const { completion, imagePicker, noteLinkPicker, highlightMenu } = features;
 
   /**
    * Turns the Markdown image at the caret (or every one the selection touches) into an `<Image />`
@@ -399,15 +392,7 @@ export function MarkdownEditor({
       convertImagesToMdx(event.currentTarget);
       return;
     }
-    // The menus take Tab while one is open. Shift+Tab stays free so the keyboard can still leave the editor.
-    // The image picker comes first: it swallows every key while open, which a menu opened by typing must not see.
-    if (imagePicker.open || !noteLinkPicker.open) imagePicker.textareaProps.onKeyDown(event);
-    if (event.defaultPrevented) return;
-    noteLinkPicker.textareaProps.onKeyDown(event);
-    if (event.defaultPrevented) return;
-    completion.textareaProps.onKeyDown(event);
-    if (event.defaultPrevented) return;
-    highlightMenu.textareaProps.onKeyDown(event);
+    features.onKeyDown(fromReactKey(event));
     if (event.defaultPrevented || event.key !== "Tab" || event.shiftKey || event.nativeEvent.isComposing) return;
     if (event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
@@ -475,8 +460,7 @@ export function MarkdownEditor({
             onChange={(e) => {
               onChange(e.target.value);
               reflowTyping(e);
-              completion.sync(e.target);
-              noteLinkPicker.sync(e.target);
+              features.onChange();
             }}
             readOnly={readOnly}
             onPaste={readOnly ? undefined : onPaste}
@@ -484,42 +468,14 @@ export function MarkdownEditor({
             spellCheck
             aria-label="Markdown editor"
             placeholder="Start writing in Markdown…"
-            {...completion.textareaProps}
-            aria-controls={
-              imagePicker.textareaProps["aria-controls"] ??
-              completion.textareaProps["aria-controls"] ??
-              noteLinkPicker.textareaProps["aria-controls"] ??
-              highlightMenu.textareaProps["aria-controls"]
-            }
-            aria-activedescendant={
-              imagePicker.textareaProps["aria-activedescendant"] ??
-              completion.textareaProps["aria-activedescendant"] ??
-              noteLinkPicker.textareaProps["aria-activedescendant"] ??
-              highlightMenu.textareaProps["aria-activedescendant"]
-            }
-            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${imagePicker.textareaProps["aria-keyshortcuts"]} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`}
+            {...features.aria}
+            aria-keyshortcuts={`${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`}
             onKeyDown={onKeyDown}
-            onSelect={(event) => {
-              imagePicker.textareaProps.onSelect(event);
-              completion.textareaProps.onSelect(event);
-              noteLinkPicker.textareaProps.onSelect(event);
-              highlightMenu.textareaProps.onSelect(event);
-            }}
-            onFocus={(event) => {
-              completion.textareaProps.onFocus(event);
-              noteLinkPicker.textareaProps.onFocus(event);
-            }}
-            onBlur={() => {
-              imagePicker.textareaProps.onBlur();
-              completion.textareaProps.onBlur();
-              noteLinkPicker.textareaProps.onBlur();
-              highlightMenu.textareaProps.onBlur();
-            }}
-            onScroll={(event) => {
-              imagePicker.textareaProps.onScroll(event);
-              completion.textareaProps.onScroll(event);
-              noteLinkPicker.textareaProps.onScroll(event);
-              highlightMenu.textareaProps.onScroll();
+            onSelect={features.onSelect}
+            onFocus={features.onFocus}
+            onBlur={features.onBlur}
+            onScroll={() => {
+              features.onScroll();
               highlightLayer.sync();
             }}
             className={cn(

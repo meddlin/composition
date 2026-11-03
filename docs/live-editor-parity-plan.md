@@ -2,8 +2,8 @@
 
 The Live tab (a CodeMirror 6 editor that shows Markdown syntax only under the caret) shipped with the core look and
 nothing else. This plan brings every writing feature of the textarea editor into it, so that Live can one day be the
-default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); nothing built
-yet.** Anything marked **my pick** is a judgment, not something the owner decided; see
+default without anyone losing something. Status: **planned and agreed with the owner (2026-11-03); Step 0 is built
+and Gate A has passed; Steps 1 to 8 are not started.** Anything marked **my pick** is a judgment, not something the owner decided; see
 [Decided by the owner](#decided-by-the-owner-2026-11-03) for what was.
 
 ## Goal and rule
@@ -113,6 +113,12 @@ other, not in parallel branches.
   `useNoteLinkPicker`, `useImagePicker` and `useHighlightMenu` to take a surface and an `EditorKeyEvent`.
 - Gather the feature hooks and their key, selection and blur wiring in one `useEditorFeatures(surface, …)` so
   `MarkdownEditor` and the Live view share it, instead of the textarea's long prop list.
+- **Built (2026-11-03).** `editorSurface.ts` holds the interface, `EditorKeyEvent` and `fromReactKey`,
+  `useTextareaSurface` (a hook, because the lint rule against reading refs during render allows refs to be passed
+  to hooks only), and `placeMenu`, which moved here from `useMdxCompletion`. The four hooks take a surface and
+  return `aria` plus plain `onKeyDown/onSelect/onScroll/onFocus/onBlur/sync` functions instead of `textareaProps`;
+  `useEditorFeatures.ts` gathers them. `replace` is the surface's, so the hooks no longer take an `insert`
+  callback.
 - **Gate A:** the seven existing `MarkdownEditor.*` suites, `NoteFind`, `reflowText` and the rest pass with only
   signature changes in the tests. Nothing in the Live tab changes yet.
 

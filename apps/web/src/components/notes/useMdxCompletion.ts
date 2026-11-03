@@ -1,18 +1,12 @@
-import { useId, useMemo, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
-import { caretCoordinates } from "./caretCoordinates";
-import { MENU_WIDTH_PX, optionId } from "./MdxCompletionMenu";
+import { useId, useMemo, useState, type CSSProperties } from "react";
+import { placeMenu, type EditorKeyEvent, type EditorSurface, type Position } from "./editorSurface";
+import { optionId } from "./MdxCompletionMenu";
 import { expandCompletion, findTrigger, matchCompletions, type MdxCompletion } from "./mdx/completions";
 import { findFrontmatterTarget } from "./mdx/frontmatterProps";
 import { findPropTarget, type PropTarget } from "./mdx/props";
 import { findSnippetTarget } from "./mdx/snippets";
 
 const NO_ITEMS: MdxCompletion[] = [];
-
-/** Roughly the tallest the menu gets, to decide whether it fits below the caret. */
-const MENU_HEIGHT_PX = 200;
-const GAP_PX = 4;
-
-export type Position = { left: number; top?: number; bottom?: number };
 
 /** What the menu is offering at the caret: the text a choice replaces, and the choices. */
 type Target = PropTarget;
@@ -25,20 +19,14 @@ function findTarget(text: string, caret: number): Target | null {
 }
 
 /**
- * Intellisense for MDX components in the editor's textarea: after a `<` it
+ * Intellisense for MDX components in the editor: after a `<` it
  * lists the components that match what has been typed, and inserts the chosen
  * one. Inside a component's tag it lists the props the tag doesn't have yet
  * and, within a prop's quotes, the values worth trying (`width="50%"`).
- * `insert` swaps `[start, end)` for `text` and puts the caret `caret`
- * characters into it.
  */
-export function useMdxCompletion(
-  textarea: RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  insert: (start: number, end: number, text: string, caret: number) => void,
-) {
+export function useMdxCompletion(surface: EditorSurface, value: string) {
   const menuId = useId();
-  // Where the caret is, or null when the textarea has no caret or a selection (or isn't focused).
+  // Where the caret is, or null when the editor has no caret or a selection (or isn't focused).
   const [caret, setCaret] = useState<number | null>(null);
   const [position, setPosition] = useState<Position>({ left: 0 });
   const [active, setActive] = useState(0);
@@ -52,27 +40,27 @@ export function useMdxCompletion(
   const activeIndex = Math.min(active, items.length - 1);
 
   /** Reads where the caret is now; call after anything that can move it or change the text. */
-  function sync(el: HTMLTextAreaElement) {
-    const collapsed = el.selectionStart === el.selectionEnd;
-    const next = collapsed ? findTarget(el.value, el.selectionStart) : null;
-    setCaret(collapsed ? el.selectionStart : null);
+  function sync() {
+    const { start, end } = surface.selection();
+    const collapsed = start === end;
+    const next = collapsed ? findTarget(surface.text(), start) : null;
+    setCaret(collapsed ? start : null);
     if (next?.query !== target?.query) setActive(0);
     if (!next) setDismissed(null);
-    if (next) setPosition(placeMenu(el, next.start));
+    if (next) setPosition(placeMenu(surface, next.start));
   }
 
   function accept(item: MdxCompletion) {
-    const el = textarea.current;
-    if (!el || !shown) return;
+    if (!shown) return;
     const { text: inserted, caret: offset } = expandCompletion(item);
-    insert(shown.start, shown.end, inserted, offset);
+    surface.replace(shown.start, shown.end, inserted, offset);
     setCaret(shown.start + offset);
     // The next menu (a prop's values, after the prop) starts at its top, not where this one's highlight was.
     setActive(0);
   }
 
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (!shown || event.nativeEvent.isComposing) return;
+  function onKeyDown(event: EditorKeyEvent) {
+    if (!shown || event.isComposing) return;
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
@@ -99,34 +87,17 @@ export function useMdxCompletion(
   return {
     open,
     menu: { id: menuId, items, label: target?.label ?? "", active: activeIndex, style, onPick: accept, onHover: setActive },
-    /** Props for the textarea, so assistive tech hears the menu as part of it. */
-    textareaProps: {
+    /** Attributes for the editor, so assistive tech hears the menu as part of it. */
+    aria: {
       "aria-autocomplete": "list" as const,
       "aria-controls": open ? menuId : undefined,
       "aria-activedescendant": open ? optionId(menuId, items[activeIndex]) : undefined,
-      onKeyDown,
-      onSelect: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onScroll: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onFocus: (event: { currentTarget: HTMLTextAreaElement }) => sync(event.currentTarget),
-      onBlur: () => setCaret(null),
     },
+    onKeyDown,
+    onSelect: sync,
+    onScroll: sync,
+    onFocus: sync,
+    onBlur: () => setCaret(null),
     sync,
   };
-}
-
-/** Puts a menu `menuHeight` tall under the character at `start`, or above it when it would run off the bottom. */
-export function placeMenu(
-  el: HTMLTextAreaElement,
-  start: number,
-  menuHeight = MENU_HEIGHT_PX,
-  menuWidth = MENU_WIDTH_PX,
-): Position {
-  const { top, left, height } = caretCoordinates(el, start);
-  const lineTop = top - el.scrollTop;
-  const maxLeft = Math.max(0, el.clientWidth - menuWidth);
-  const x = Math.min(Math.max(0, left - el.scrollLeft), maxLeft);
-  const fitsBelow = lineTop + height + GAP_PX + menuHeight <= el.clientHeight;
-  return fitsBelow || lineTop < menuHeight
-    ? { left: x, top: lineTop + height + GAP_PX }
-    : { left: x, bottom: el.clientHeight - lineTop + GAP_PX };
 }
