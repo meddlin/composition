@@ -124,6 +124,12 @@ export function NotePane({
   const [count, setCount] = useState(0);
   const findInput = useRef<HTMLInputElement>(null);
 
+  /** Puts the caret in whichever editor is showing: the plain one's textarea, or the live editor's text. */
+  function focusEditor() {
+    const editors = section.current?.querySelectorAll<HTMLElement>('[role="tabpanel"] :is(textarea, .cm-content)');
+    [...(editors ?? [])].find((el) => !el.closest("[hidden]"))?.focus();
+  }
+
   function focusFind() {
     findInput.current?.focus();
     findInput.current?.select();
@@ -132,19 +138,22 @@ export function NotePane({
   function openFind() {
     // A word picked out in the editor is most likely the one to look for.
     const active = document.activeElement;
+    let picked = "";
     if (active instanceof HTMLTextAreaElement && section.current?.contains(active)) {
-      const picked = active.value.slice(active.selectionStart, active.selectionEnd);
-      if (picked !== "" && picked.length <= 200 && !/[\r\n]/.test(picked)) {
-        setQuery(picked);
-        setCurrent(0);
-      }
+      picked = active.value.slice(active.selectionStart, active.selectionEnd);
+    } else if (active instanceof HTMLElement && active.classList.contains("cm-content") && section.current?.contains(active)) {
+      picked = window.getSelection()?.toString() ?? "";
+    }
+    if (picked !== "" && picked.length <= 200 && !/[\r\n]/.test(picked)) {
+      setQuery(picked);
+      setCurrent(0);
     }
     setFindOpen(true);
     focusFind(); // already open; a find bar opening now is focused by the effect below
   }
 
   function closeFind() {
-    if (document.activeElement === findInput.current) section.current?.querySelector("textarea")?.focus();
+    if (document.activeElement === findInput.current) focusEditor();
     setFindOpen(false);
   }
 
@@ -188,7 +197,7 @@ export function NotePane({
     }
     if (assistantOpen) {
       setAssistantOpen(false);
-      requestAnimationFrame(() => section.current?.querySelector("textarea")?.focus());
+      requestAnimationFrame(focusEditor);
     } else {
       setAssistantOpen(true);
       requestAnimationFrame(() => section.current?.querySelector<HTMLElement>('[aria-label="Ask about this note"]')?.focus());
@@ -213,9 +222,7 @@ export function NotePane({
       // A hidden editor can't keep focus, and typing should carry on when it comes back.
       if (next !== "preview") {
         requestAnimationFrame(() => {
-          if (!document.activeElement || document.activeElement === document.body) {
-            section.current?.querySelector("textarea")?.focus();
-          }
+          if (!document.activeElement || document.activeElement === document.body) focusEditor();
         });
       }
     }
@@ -388,7 +395,7 @@ export function NotePane({
                 getSelection={() => (section.current ? readPaneSelection(section.current) : "")}
                 onNewNoteFromText={onNewNoteFromText}
                 onClose={toggleAssistant}
-                onReturnFocus={() => section.current?.querySelector("textarea")?.focus()}
+                onReturnFocus={focusEditor}
               />
             </div>
           </>

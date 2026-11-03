@@ -8,9 +8,10 @@ const TABS: { view: PaneView; label: string }[] = [
   { view: "markdown", label: "Markdown" },
   { view: "preview", label: "Preview" },
   { view: "split", label: "Split" },
+  { view: "live", label: "Live" },
 ];
 
-/** What each tab brings into view: split shows both of the others' panels. */
+/** What each tab brings into view: split shows both the editor's and the preview's panels; live has a panel of its own. */
 export const tabId = (idBase: string, view: PaneView) => `${idBase}-tab-${view}`;
 export const panelId = (idBase: string, view: PaneView) => `${idBase}-panel-${view}`;
 
@@ -24,7 +25,7 @@ type Props = {
 };
 
 /**
- * Switches a note between its editor, its preview, and both side by side.
+ * Switches a note between its editor, its preview, both side by side, and the live editor that is both in one.
  * Ctrl/Cmd+\ and Cmd+Ctrl+Left/Right (handled by the pane) step through them. Arrow keys move between
  * the tabs (and select, as there is nothing to load).
  */

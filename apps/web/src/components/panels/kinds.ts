@@ -49,7 +49,7 @@ export type RestoreContext = {
 /** The width a panel can be dragged down to unless its kind needs more. The same as the web app's note pane. */
 const MIN_PANEL_WIDTH = 240;
 
-const VIEWS: readonly unknown[] = ["split", "markdown", "preview"] satisfies PaneView[];
+const VIEWS: readonly unknown[] = ["split", "markdown", "preview", "live"] satisfies PaneView[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);

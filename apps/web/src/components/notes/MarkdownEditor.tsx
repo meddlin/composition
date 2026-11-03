@@ -13,6 +13,7 @@ import { panelId, tabId } from "./EditorTabs";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { FrontmatterCard } from "./FrontmatterCard";
 import { ImagePickerMenu } from "./ImagePickerMenu";
+import { LiveEditor } from "./LiveEditor";
 import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
 import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
 import { rememberHighlightColor } from "./lastHighlightColor";
@@ -61,7 +62,7 @@ type Props = {
   ratio: number;
   onRatioChange: (ratio: number) => void;
   onRatioCommit: () => void;
-  /** Which of the editor and preview to show; both, side by side, unless told otherwise. */
+  /** Which of the editor, preview and live editor to show; the first two side by side, unless told otherwise. */
   view?: PaneView;
   /** Prefix for the panels' ids, so tabs elsewhere (EditorTabs) can point at them. */
   idBase?: string;
@@ -100,8 +101,9 @@ export function MarkdownEditor({
   const writing = useWriting();
   const ownIdBase = useId();
   const ids = idBase ?? ownIdBase;
-  const showEditor = view !== "preview";
-  const showPreview = view !== "markdown";
+  const showEditor = view === "markdown" || view === "split";
+  const showPreview = view === "preview" || view === "split";
+  const showLive = view === "live";
   // The raw text (frontmatter included) stays in the editor; the preview shows
   // the frontmatter as a metadata card rather than as Markdown content.
   const [fm, body] = useMemo(() => parse(value), [value]);
@@ -116,6 +118,8 @@ export function MarkdownEditor({
   useEffect(() => {
     latest.current = value;
   }, [value]);
+  // Where the caret was last in the live editor, which draws its own text and has no textarea to ask.
+  const liveSelection = useRef({ start: 0, end: 0 });
   const pendingCaret = useRef<number | null>(null);
   const pendingSelection = useRef<TextRange | null>(null);
   const uploads = useRef(0);
@@ -189,7 +193,9 @@ export function MarkdownEditor({
     const text = latest.current;
     const bodyStart = text.length - parse(text)[1].length;
     const end = text.length;
-    setDiagram({ source: { kind: "new" }, at: diagramRange(text, el?.selectionStart ?? end, el?.selectionEnd ?? end, bodyStart) });
+    const start = showLive ? liveSelection.current.start : (el?.selectionStart ?? end);
+    const stop = showLive ? liveSelection.current.end : (el?.selectionEnd ?? end);
+    setDiagram({ source: { kind: "new" }, at: diagramRange(text, Math.min(start, end), Math.min(stop, end), bodyStart) });
   }
   useImperativeHandle(controls, () => ({ insertDiagram: startDiagram }));
 
@@ -325,8 +331,10 @@ export function MarkdownEditor({
     [showEditor, value, findQuery, findOptions],
   );
   const previewMatchCount = usePreviewFind(previewBox, showPreview && findQuery !== "", findQuery, findOptions, findCurrent);
+  const [liveMatchCount, setLiveMatchCount] = useState(0);
   // Both showing is the usual case, and they agree except where Markdown syntax gets in the way; the editor leads.
-  const findCount = showEditor ? editorMatches.length : previewMatchCount;
+  // The live editor searches the source text, as the plain editor does.
+  const findCount = showLive ? liveMatchCount : showEditor ? editorMatches.length : previewMatchCount;
   useEffect(() => onFindCount?.(findCount), [onFindCount, findCount]);
 
   const currentMatch = editorMatches.length === 0 ? -1 : Math.min(findCurrent, editorMatches.length - 1);
@@ -577,6 +585,32 @@ export function MarkdownEditor({
               </DrawioEditContext.Provider>
             </NoteLinksProvider>
           </PreviewHighlightMenu>
+        )}
+      </section>
+      <section
+        role="tabpanel"
+        id={panelId(ids, "live")}
+        aria-labelledby={tabId(ids, "live")}
+        hidden={!showLive}
+        className="flex min-h-0 flex-col"
+      >
+        {imageError && showLive && (
+          <p role="alert" className="border-b px-4 py-2 text-xs text-destructive">
+            {imageError}
+          </p>
+        )}
+        {/* Not mounted while hidden: it is a second copy of the editor, and the plain editor keeps the undo history. */}
+        {showLive && (
+          <LiveEditor
+            value={value}
+            onChange={onChange}
+            readOnly={readOnly}
+            selection={liveSelection}
+            findQuery={findQuery}
+            findOptions={findOptions}
+            findCurrent={findCurrent}
+            onFindCount={setLiveMatchCount}
+          />
         )}
       </section>
       <DrawioDialog

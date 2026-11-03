@@ -7,8 +7,11 @@
  * a reload starts again with one pane.
  */
 
-/** What a pane shows of its note: the editor, the preview, or both beside each other. */
-export type PaneView = "split" | "markdown" | "preview";
+/**
+ * What a pane shows of its note: the editor, the preview, both beside each other, or the live editor, which is the
+ * two in one (the Markdown drawn as it will read, with its syntax showing only where the caret is).
+ */
+export type PaneView = "split" | "markdown" | "preview" | "live";
 
 export type Pane = {
   noteId: number;
@@ -64,10 +67,10 @@ export function shownView(view: PaneView, wideEnough: boolean): PaneView {
 
 /**
  * The view `delta` steps from the one shown, in the tabs' order (Markdown, Preview,
- * Split) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
+ * Split, Live) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
  */
 export function stepView(shown: PaneView, canSplit: boolean, delta: 1 | -1): PaneView {
-  const order: PaneView[] = canSplit ? ["markdown", "preview", "split"] : ["markdown", "preview"];
+  const order: PaneView[] = canSplit ? ["markdown", "preview", "split", "live"] : ["markdown", "preview", "live"];
   return order[(order.indexOf(shown) + delta + order.length) % order.length];
 }
 
