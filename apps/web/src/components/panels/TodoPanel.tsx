@@ -1,12 +1,12 @@
 "use client";
 
-import { ArchiveIcon, ChevronRightIcon, FileTextIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ArchiveIcon, ArrowDownToLineIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FileTextIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { reportSections } from "@/lib/composition/todoReportList";
-import { archiveGroups, countDescendants, subtreeIds, todoSections, type TodoNode } from "@/lib/composition/todos";
+import { archiveGroups, countDescendants, sortDoneLast, subtreeIds, todoSections, type TodoNode } from "@/lib/composition/todos";
 import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoMissingReport, type TodoReportEntry } from "@/lib/composition/todosApi";
 import type { ReportKind } from "@/lib/composition/todoReports";
 import type { TodoResult } from "@/lib/composition/todosStore";
@@ -122,25 +122,51 @@ type RowProps = {
   onAddTo: (id: number | null) => void;
   onRemove: (todo: Todo) => void;
   onDeleteForGood: (todo: Todo) => void;
-  /** Makes a top-level row something to drag to another section (sub-items come along with it), or not, for the ones that cannot. */
-  drag?: (todo: Todo) => DragHandlers | undefined;
+  /** The rows beside this one in the list it is shown in, in order: what Move up and Move down step past. */
+  siblings: TodoNode[];
+  /** Puts the item just before or just after another one under the same parent. */
+  onPlace: (id: number, targetId: number, edge: Edge) => void;
+  /** Where the rows are shown, so a drop knows what it may reorder among. A row with no section cannot be dragged. */
+  section?: DragFrom;
+  /** How a row is picked up, and takes what is dropped on it, to rearrange the list. */
+  drag?: RowDrag;
 };
 
 type DragHandlers = { onDragStart: (event: DragEvent<HTMLElement>) => void; onDragEnd: () => void };
 
+/** Which side of a row a dragged item would land on. */
+type Edge = "before" | "after";
+
+type RowDrag = {
+  source: (todo: Todo, section: DragFrom) => DragHandlers;
+  /** The row edge a dragged item is over, where a line shows it would land. */
+  mark: { id: number; edge: Edge } | null;
+  onOver: (event: DragEvent<HTMLElement>, todo: Todo, section: DragFrom) => void;
+  onLeave: (event: DragEvent<HTMLElement>, todo: Todo) => void;
+  onDrop: (event: DragEvent<HTMLElement>, todo: Todo, section: DragFrom) => void;
+};
+
 function TodoRow(props: RowProps) {
-  const { node, depth, store, collapsed, onToggleCollapsed, editing, onEdit, addingTo, onAddTo, onRemove, onDeleteForGood, drag } = props;
+  const { node, depth, store, collapsed, onToggleCollapsed, editing, onEdit, addingTo, onAddTo, onRemove, onDeleteForGood, siblings, onPlace, section, drag } = props;
   const { todo, children } = node;
   const folded = collapsed.has(todo.id);
   const shownChildren = children.length > 0 && !folded;
+  const place = siblings.findIndex((sibling) => sibling.todo.id === todo.id);
+  const above = siblings[place - 1];
+  const below = siblings[place + 1];
   // A box being typed in is not a handle: dragging inside it should select text.
-  const handlers = depth === 0 && editing !== todo.id ? drag?.(todo) : undefined;
+  const handlers = section && editing !== todo.id ? drag?.source(todo, section) : undefined;
+  const mark = drag?.mark?.id === todo.id ? drag.mark.edge : undefined;
 
   return (
     <li draggable={handlers ? true : undefined} onDragStart={handlers?.onDragStart} onDragEnd={handlers?.onDragEnd}>
       <div
-        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-muted/50 focus-within:bg-muted/50"
+        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-muted/50 focus-within:bg-muted/50 data-[drop=before]:shadow-[inset_0_2px_0_0_var(--ring)] data-[drop=after]:shadow-[inset_0_-2px_0_0_var(--ring)]"
         style={{ paddingLeft: depth * INDENT }}
+        data-drop={mark}
+        onDragOver={section && drag ? (event) => drag.onOver(event, todo, section) : undefined}
+        onDragLeave={drag ? (event) => drag.onLeave(event, todo) : undefined}
+        onDrop={section && drag ? (event) => drag.onDrop(event, todo, section) : undefined}
       >
         {children.length > 0 ? (
           <Button
@@ -184,6 +210,16 @@ function TodoRow(props: RowProps) {
         )}
         {editing !== todo.id && (
           <div className="flex shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            {section && (
+              <>
+                <Button variant="ghost" size="icon-xs" aria-label={`Move ${todo.title} up`} title="Move up" disabled={!above} onClick={() => above && onPlace(todo.id, above.todo.id, "before")}>
+                  <ChevronUpIcon />
+                </Button>
+                <Button variant="ghost" size="icon-xs" aria-label={`Move ${todo.title} down`} title="Move down" disabled={!below} onClick={() => below && onPlace(todo.id, below.todo.id, "after")}>
+                  <ChevronDownIcon />
+                </Button>
+              </>
+            )}
             <Button variant="ghost" size="icon-xs" aria-label={`Add a sub-item to ${todo.title}`} onClick={() => {
               onToggleCollapsed(todo.id, false);
               onAddTo(todo.id);
@@ -202,7 +238,7 @@ function TodoRow(props: RowProps) {
       </div>
       {(shownChildren || addingTo === todo.id) && (
         <ul>
-          {shownChildren && children.map((child) => <TodoRow key={child.todo.id} {...props} node={child} depth={depth + 1} />)}
+          {shownChildren && children.map((child) => <TodoRow key={child.todo.id} {...props} node={child} depth={depth + 1} siblings={children} />)}
           {addingTo === todo.id && (
             <li style={{ paddingLeft: (depth + 1) * INDENT + 28 }} className="py-0.5 pr-1">
               <TitleInput
@@ -233,6 +269,12 @@ type DropZone = {
   onDrop: (event: DragEvent<HTMLElement>) => void;
 };
 
+/** The half of a row the pointer is over: dropped there, an item lands before the row (upper half) or after it. */
+function edgeOf(event: DragEvent<HTMLElement>): Edge {
+  const box = event.currentTarget.getBoundingClientRect();
+  return event.clientY < box.top + box.height / 2 ? "before" : "after";
+}
+
 /** A section of the list: a heading that folds it away, and what is in it. */
 function Section({
   title,
@@ -240,6 +282,7 @@ function Section({
   folded,
   onToggle,
   dropZone,
+  actions,
   children,
 }: {
   title: string;
@@ -247,6 +290,8 @@ function Section({
   folded: boolean;
   onToggle: () => void;
   dropZone?: DropZone;
+  /** Buttons beside the heading. */
+  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -258,20 +303,23 @@ function Section({
       onDragLeave={dropZone?.onDragLeave}
       onDrop={dropZone?.onDrop}
     >
-      <h3>
-        <Button
-          variant="ghost"
-          size="xs"
-          className="gap-1 px-1 font-medium text-muted-foreground"
-          aria-expanded={!folded}
-          aria-label={folded ? `Show the ${title} section` : `Hide the ${title} section`}
-          onClick={onToggle}
-        >
-          <ChevronRightIcon className={cn("transition-transform", !folded && "rotate-90")} />
-          {title}
-          {count !== undefined && count > 0 && <span>({count})</span>}
-        </Button>
-      </h3>
+      <div className="flex items-center justify-between gap-1">
+        <h3>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="gap-1 px-1 font-medium text-muted-foreground"
+            aria-expanded={!folded}
+            aria-label={folded ? `Show the ${title} section` : `Hide the ${title} section`}
+            onClick={onToggle}
+          >
+            <ChevronRightIcon className={cn("transition-transform", !folded && "rotate-90")} />
+            {title}
+            {count !== undefined && count > 0 && <span>({count})</span>}
+          </Button>
+        </h3>
+        {actions}
+      </div>
       {!folded && children}
     </section>
   );
@@ -291,9 +339,11 @@ const UNDO_MS = 8000;
 export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; panelId: PanelId; state: TodoPanelState }) {
   const todosStore = store.todos;
   const { status, todos, look: savedLook, setup, archive, reports, error } = useSyncExternalStore(todosStore.subscribe, todosStore.getSnapshot, todosStore.getSnapshot);
-  // An item being dragged from one section to another, and which section it is over.
-  const [dragging, setDragging] = useState<{ id: number; from: DragFrom } | null>(null);
+  // An item being dragged: to another section if it `moves` (a top-level item that is not done; a sub-item only reorders), or to
+  // another place among its siblings. Which section it is over, and which row edge, are kept beside it.
+  const [dragging, setDragging] = useState<{ id: number; parentId: number | null; from: DragFrom; moves: boolean } | null>(null);
   const [over, setOver] = useState<DragTarget | null>(null);
+  const [mark, setMark] = useState<{ id: number; edge: Edge } | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [addingTo, setAddingTo] = useState<number | null>(null);
   /** What was just done, said at the bottom for a few seconds; with the id of an item just removed, an Undo comes with it. */
@@ -355,23 +405,64 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
   function endDrag() {
     setDragging(null);
     setOver(null);
+    setMark(null);
   }
 
-  /** Picking up a top-level item; its id rides along under its own type, not as text. */
-  const dragSource = (id: number, from: DragFrom): DragHandlers => ({
+  /** Picking up an item; its id rides along under its own type, not as text. Its sub-items come along with it. */
+  const dragSource = (todo: Todo, from: DragFrom, moves: boolean): DragHandlers => ({
     onDragStart: (event) => {
-      event.dataTransfer.setData(TODO_DRAG_TYPE, String(id));
+      // A sub-item is inside the row of its item, which is draggable too: only the one picked up is dragged.
+      event.stopPropagation();
+      event.dataTransfer.setData(TODO_DRAG_TYPE, String(todo.id));
       event.dataTransfer.effectAllowed = "move";
-      setDragging({ id, from });
+      setDragging({ id: todo.id, parentId: todo.parentId, from, moves });
     },
     onDragEnd: endDrag,
   });
 
+  /** Puts an item just before or just after another one under the same parent. */
+  function place(id: number, targetId: number, edge: Edge) {
+    const target = todos.find((t) => t.id === targetId);
+    if (!target) return;
+    const siblings = todos.filter((t) => t.parentId === target.parentId);
+    const next = siblings[siblings.findIndex((t) => t.id === targetId) + 1];
+    void todosStore.move(id, edge === "before" ? targetId : (next?.id ?? null));
+  }
+
+  // A row takes a drop from an item of the same list under the same parent, which rearranges them. Anything else is left to
+  // bubble up to the section (an item from another section) or to whoever wants it.
+  const reorders = (todo: Todo, section: DragFrom) =>
+    dragging !== null && dragging.id !== todo.id && dragging.parentId === todo.parentId && dragging.from === section;
+  const rowDrag: RowDrag = {
+    source: (todo, section) => dragSource(todo, section, todo.parentId === null && !todo.done),
+    mark,
+    onOver: (event, todo, section) => {
+      if (!reorders(todo, section)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "move";
+      const edge = edgeOf(event);
+      setMark((now) => (now?.id === todo.id && now.edge === edge ? now : { id: todo.id, edge }));
+    },
+    onLeave: (event, todo) => {
+      if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      setMark((now) => (now?.id === todo.id ? null : now));
+    },
+    onDrop: (event, todo, section) => {
+      if (!reorders(todo, section)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const { id } = dragging!;
+      endDrag();
+      place(id, todo.id, edgeOf(event));
+    },
+  };
+
   // A section takes a drop only while an item it accepts is held; any other drag (a note, a panel) is left to whoever wants it.
   const dropZone = (target: DragTarget, accepts: (from: DragFrom) => boolean, onDropped: (id: number, from: DragFrom) => void): DropZone => ({
-    state: dragging === null || !accepts(dragging.from) ? undefined : over === target ? "over" : "ready",
+    state: dragging === null || !dragging.moves || !accepts(dragging.from) ? undefined : over === target ? "over" : "ready",
     onDragOver: (event) => {
-      if (dragging === null || !accepts(dragging.from)) return;
+      if (dragging === null || !dragging.moves || !accepts(dragging.from)) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
       setOver(target);
@@ -382,7 +473,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
       setOver((now) => (now === target ? null : now));
     },
     onDrop: (event) => {
-      if (dragging === null || !accepts(dragging.from)) return;
+      if (dragging === null || !dragging.moves || !accepts(dragging.from)) return;
       event.preventDefault();
       const { id, from } = dragging;
       endDrag();
@@ -454,9 +545,13 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     onAddTo: setAddingTo,
     onRemove: remove,
     onDeleteForGood: (todo: Todo) => setDeleting({ id: todo.id, title: todo.title }),
+    onPlace: place,
+    drag: rowDrag,
   };
-  const rows = (nodes: TodoNode[], drag?: RowProps["drag"]) =>
-    nodes.map((node) => <TodoRow key={node.todo.id} node={node} depth={0} {...rowProps} drag={drag} />);
+  const rows = (nodes: TodoNode[], section: DragFrom) =>
+    nodes.map((node) => <TodoRow key={node.todo.id} node={node} depth={0} {...rowProps} siblings={nodes} section={section} />);
+  /** Whether the done items are already below the open ones among their siblings, so there is nothing for "Move completed to the bottom" to do. */
+  const doneAtBottom = sortDoneLast(todos).every((t, i) => t.id === todos[i].id);
   const rolledEntries = (withChildren: boolean) =>
     sections.rolledOver.map((node) => (
       <RolledEntry
@@ -467,9 +562,9 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
         onAdd={() => void todosStore.acceptRolled(node.todo.id)}
         onBacklog={() => void todosStore.moveRolledToBacklog(node.todo.id)}
         onDrop={() => void todosStore.drop(node.todo.id)}
-        drag={withChildren ? dragSource(node.todo.id, "rolled-over") : undefined}
+        drag={withChildren ? dragSource(node.todo, "rolled-over", true) : undefined}
       >
-        {withChildren && node.children.length > 0 && <ul>{rows(node.children)}</ul>}
+        {withChildren && node.children.length > 0 && <ul>{rows(node.children, "rolled-over")}</ul>}
       </RolledEntry>
     ));
 
@@ -599,12 +694,27 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
               folded={state.foldedSections.includes("this-week")}
               onToggle={() => toggleSection("this-week")}
               dropZone={weekDropZone}
+              actions={
+                sections.thisWeek.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    className="text-muted-foreground"
+                    disabled={doneAtBottom}
+                    title="Move the completed to-dos below the others"
+                    onClick={() => void todosStore.sortDoneLast()}
+                  >
+                    <ArrowDownToLineIcon />
+                    Completed to bottom
+                  </Button>
+                )
+              }
             >
               {sections.thisWeek.length === 0 ? (
                 <p className="p-1 text-sm text-muted-foreground">{todos.length === 0 ? "Nothing to do yet." : "Nothing this week."}</p>
               ) : (
                 <ul aria-label="To-dos">
-                  {rows(sections.thisWeek, (todo) => (todo.done ? undefined : dragSource(todo.id, "this-week")))}
+                  {rows(sections.thisWeek, "this-week")}
                 </ul>
               )}
             </Section>
@@ -635,7 +745,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
                 onSubmit={(title) => todosStore.add(title, null, "backlog")}
               />
               {sections.backlog.length > 0 && (
-                <ul aria-label="Backlog items">{rows(sections.backlog, (todo) => dragSource(todo.id, "backlog"))}</ul>
+                <ul aria-label="Backlog items">{rows(sections.backlog, "backlog")}</ul>
               )}
             </Section>
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, subtreeIds, todoSections, withDone, withStatus } from "./todos";
+import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, placeTodo, sortDoneLast, subtreeIds, todoSections, withDone, withStatus } from "./todos";
 import type { ArchivedTodo, Todo } from "./todosApi";
 
 const todo = (id: number, parentId: number | null, title = `t${id}`): Todo => ({
@@ -210,5 +210,54 @@ describe("archiveGroups", () => {
 
   it("is empty when nothing is archived", () => {
     expect(archiveGroups([], new Map(), "")).toEqual([]);
+  });
+});
+
+describe("placeTodo", () => {
+  const ids = (todos: Todo[]) => todos.map((t) => t.id);
+
+  it("puts an item before another among its siblings, leaving everything else where it is", () => {
+    const todos = [todo(1, null), todo(2, 1), todo(3, null), todo(4, 1), todo(5, null)];
+
+    expect(ids(placeTodo(todos, 5, 3))).toEqual([1, 2, 5, 4, 3]);
+    expect(ids(placeTodo(todos, 4, 2))).toEqual([1, 4, 3, 2, 5]);
+  });
+
+  it("puts it last among its siblings when there is nothing to go before, or that is not a sibling", () => {
+    const todos = [todo(1, null), todo(2, 1), todo(3, null), todo(4, null)];
+
+    expect(ids(placeTodo(todos, 1, null))).toEqual([3, 2, 4, 1]);
+    expect(ids(placeTodo(todos, 1, 2))).toEqual([3, 2, 4, 1]);
+    expect(ids(placeTodo(todos, 1, 99))).toEqual([3, 2, 4, 1]);
+  });
+
+  it("leaves the list as it is for an item dropped before itself, or one that is not there", () => {
+    const todos = [todo(1, null), todo(2, null), todo(3, null)];
+
+    expect(ids(placeTodo(todos, 2, 2))).toEqual([1, 2, 3]);
+    expect(ids(placeTodo(todos, 9, 1))).toEqual([1, 2, 3]);
+  });
+});
+
+describe("sortDoneLast", () => {
+  const done = (id: number, parentId: number | null): Todo => ({ ...todo(id, parentId), status: "done", done: true });
+  const ids = (todos: Todo[]) => todos.map((t) => t.id);
+
+  it("moves the done items below the open ones among their siblings, each keeping its order", () => {
+    const todos = [done(1, null), todo(2, null), done(3, null), todo(4, null)];
+
+    expect(ids(sortDoneLast(todos))).toEqual([2, 4, 1, 3]);
+  });
+
+  it("does it at every level, and keeps a done item with the siblings it has", () => {
+    const todos = [todo(1, null), done(2, 1), todo(3, 1), done(4, null), todo(5, null)];
+
+    expect(ids(sortDoneLast(todos))).toEqual([1, 3, 2, 5, 4]);
+  });
+
+  it("changes nothing when the done items are already last", () => {
+    const todos = [todo(1, null), todo(2, 1), done(3, 1), done(4, null)];
+
+    expect(ids(sortDoneLast(todos))).toEqual([1, 2, 3, 4]);
   });
 });

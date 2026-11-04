@@ -66,6 +66,14 @@ export const setTodoStatus: TodosApi["setTodoStatus"] = async (id, status) => {
   return todo;
 };
 
+export const moveTodo: TodosApi["moveTodo"] = async (id, beforeId) => {
+  if (!todosRepo.placeTodo(id, beforeId)) throw new Error("That to-do no longer exists.");
+};
+
+export const sortDoneTodosLast: TodosApi["sortDoneTodosLast"] = async () => {
+  todosRepo.sortDoneLast();
+};
+
 export const deleteTodo: TodosApi["deleteTodo"] = async (id) => {
   todosRepo.deleteTodoTree(id);
 };

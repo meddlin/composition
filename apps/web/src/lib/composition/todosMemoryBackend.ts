@@ -1,6 +1,6 @@
 import type { TodoLook } from "./todoLook";
 import { DEFAULT_TODO_SETTINGS } from "./todoSettings";
-import { subtreeIds, withDone, withStatus } from "./todos";
+import { placeTodo, sortDoneLast, subtreeIds, withDone, withStatus } from "./todos";
 import type { ArchivedTodo, Todo, TodoReportRef, TodoReports, TodoSetup, TodosApi } from "./todosApi";
 
 const REPORT_NAMES = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly" } as const;
@@ -90,6 +90,13 @@ export function memoryTodosBackend(
         const moved = withStatus(t, status);
         return status === "backlog" ? clearRolled(moved, false) : moved;
       }),
+    moveTodo: async (id, beforeId) => {
+      need(id);
+      items = placeTodo(items, id, beforeId);
+    },
+    sortDoneTodosLast: async () => {
+      items = sortDoneLast(items);
+    },
     deleteTodo: async (id) => {
       const branch = subtreeIds([...items, ...archive.map((a) => a.todo)], id);
       items = items.filter((t) => !branch.has(t.id));

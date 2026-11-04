@@ -450,6 +450,18 @@ describe("TODO_VALIDATORS", () => {
     }
   });
 
+  it("passes on an id and what to go before for moveTodo, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.moveTodo([4, 2, "extra"])).toEqual([4, 2]);
+    expect(TODO_VALIDATORS.moveTodo([4, null])).toEqual([4, null]);
+    for (const args of [[], [null, 2], ["4", 2], [4], [4, "2"], [4, 1.5], [4, undefined], [4, {}]]) {
+      expect(() => TODO_VALIDATORS.moveTodo(args)).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("takes nothing from the page for sortDoneTodosLast", () => {
+    expect(TODO_VALIDATORS.sortDoneTodosLast(["/etc/passwd"])).toEqual([]);
+  });
+
   it("asks about the first-run question without taking anything from the page, and answers only with a yes or a no", () => {
     expect(TODO_VALIDATORS.loadTodoSetup(["/etc/passwd"])).toEqual([]);
     expect(TODO_VALIDATORS.finishTodoSetup([true, "extra"])).toEqual([true]);

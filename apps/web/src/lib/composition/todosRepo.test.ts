@@ -678,3 +678,67 @@ describe("the activity log", () => {
     expect(listTodoEvents().map((e) => e.kind)).toEqual(["created"]);
   });
 });
+
+describe("arranging", () => {
+  it("keeps the order the owner gave among siblings, and puts new items after it", async () => {
+    const { addTodo, placeTodo, listTodos } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    addTodo("b", null, local(10, 26));
+    const c = addTodo("c", null, local(10, 26));
+
+    expect(placeTodo(c.id, a.id)).toBe(true);
+    addTodo("d", null, local(10, 27));
+
+    expect(listTodos().map((t) => t.title)).toEqual(["c", "a", "b", "d"]);
+  });
+
+  it("puts an item last when nothing is given to go before, and only moves it among its own siblings", async () => {
+    const { addTodo, placeTodo, listTodos } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    addTodo("b", null, local(10, 26));
+    const a1 = addTodo("a1", a.id, local(10, 26));
+    const a2 = addTodo("a2", a.id, local(10, 26));
+
+    placeTodo(a.id, null);
+    placeTodo(a2.id, a1.id);
+
+    const titles = listTodos().map((t) => t.title);
+    expect(titles.filter((t) => !t.startsWith("a") || t === "a")).toEqual(["b", "a"]);
+    expect(titles.filter((t) => t.startsWith("a") && t !== "a")).toEqual(["a2", "a1"]);
+  });
+
+  it("leaves archived items out of the order, and is not a change to the item", async () => {
+    const { addTodo, archiveTodoTree, placeTodo, listTodos, listTodoEvents, getTodo } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    const b = addTodo("b", null, local(10, 26));
+    const c = addTodo("c", null, local(10, 26));
+    archiveTodoTree(b.id, "removed", 0, local(10, 28));
+    const events = listTodoEvents().length;
+    const updatedAt = getTodo(c.id)!.updatedAt;
+
+    expect(placeTodo(c.id, a.id)).toBe(true);
+    expect(placeTodo(b.id, a.id)).toBe(false);
+
+    expect(listTodos().map((t) => t.title)).toEqual(["c", "a"]);
+    expect(listTodoEvents()).toHaveLength(events);
+    expect(getTodo(c.id)!.updatedAt).toBe(updatedAt);
+    expect(placeTodo(999, null)).toBe(false);
+  });
+
+  it("moves the done items below the open ones at every level, each keeping its order", async () => {
+    const { addTodo, updateTodo, sortDoneLast, listTodos } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    addTodo("b", null, local(10, 26));
+    const c = addTodo("c", null, local(10, 26));
+    const c1 = addTodo("c1", c.id, local(10, 26));
+    addTodo("c2", c.id, local(10, 26));
+    updateTodo(a.id, { done: true }, local(10, 27));
+    updateTodo(c1.id, { done: true }, local(10, 27));
+
+    sortDoneLast();
+
+    const todos = listTodos();
+    expect(todos.filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["b", "c", "a"]);
+    expect(todos.filter((t) => t.parentId === c.id).map((t) => t.title)).toEqual(["c2", "c1"]);
+  });
+});

@@ -156,6 +156,8 @@ const TODO_CYCLE_COLUMNS: readonly [column: string, ddl: string][] = [
   // The week an unfinished item first rolled over from while it waits in Rolled over, and how many week closes it has been through.
   ["rolled_from_week", "ALTER TABLE todos ADD COLUMN rolled_from_week TEXT"],
   ["roll_count", "ALTER TABLE todos ADD COLUMN roll_count INTEGER NOT NULL DEFAULT 0"],
+  // Hand-set order among siblings; NULL until the owner arranges them, and those are listed last, oldest first (see todos.ts placeTodo).
+  ["position", "ALTER TABLE todos ADD COLUMN position INTEGER"],
 ];
 
 /**
