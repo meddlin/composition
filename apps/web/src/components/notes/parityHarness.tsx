@@ -103,7 +103,7 @@ const clipboard = (files: File[], text: string) => ({
 /** Types `marked` with the caret where its `|` is (no `|` means the end), as typing that ends there would. */
 export function typeMarked(editor: EditorDriver, marked: string) {
   const at = marked.indexOf("|");
-  const text = marked.replace("|", "");
+  const text = at === -1 ? marked : marked.slice(0, at) + marked.slice(at + 1);
   editor.type(text, at === -1 ? text.length : at);
 }
 
