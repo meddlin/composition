@@ -53,6 +53,8 @@ const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
   split: "markdown",
   markdown: "preview",
   preview: "split",
+  // The live editor is the web app's (a terminal draws no styled text); the cycle never reaches it, but if it did it would start over.
+  live: "markdown",
 };
 
 export function App({ initial, api = defaultApi, theme: initialTheme = "dark", moveDataLocation, columns: initialColumns }: AppProps) {

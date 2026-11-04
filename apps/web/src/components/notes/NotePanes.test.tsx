@@ -621,13 +621,14 @@ describe("viewing a note as tabs", () => {
     observed.clear();
   });
 
-  it("offers the editor, the preview and both, starting with both", () => {
+  it("offers the editor, the preview, both and the live editor, starting with both", () => {
     renderApp();
 
     expect(within(pane("Alpha")).getAllByRole("tab").map((el) => el.textContent)).toEqual([
       "Markdown",
       "Preview",
       "Split",
+      "Live",
     ]);
     expect(selected("Alpha")).toEqual(["Split"]);
     expect(panel("Alpha", "Markdown")).not.toBeNull();
@@ -669,6 +670,28 @@ describe("viewing a note as tabs", () => {
     expect(panel("Alpha", "Markdown")).not.toBeNull();
     expect(panel("Alpha", "Preview")).not.toBeNull();
     expect(selected("Alpha")).toEqual(["Split"]);
+  });
+
+  it("shows just the live editor on the Live tab, with the note's text in it", () => {
+    renderApp();
+
+    fireEvent.click(tab("Alpha", "Live"));
+
+    expect(selected("Alpha")).toEqual(["Live"]);
+    expect(panel("Alpha", "Live")).not.toBeNull();
+    expect(panel("Alpha", "Markdown")).toBeNull();
+    expect(panel("Alpha", "Preview")).toBeNull();
+    expect(pane("Alpha").querySelector(".cm-content")?.textContent).toContain("body of Alpha");
+  });
+
+  it("takes the live editor away again on another tab, leaving the plain editor's text as it was", () => {
+    renderApp();
+    fireEvent.click(tab("Alpha", "Live"));
+
+    fireEvent.click(tab("Alpha", "Markdown"));
+
+    expect(pane("Alpha").querySelector(".cm-content")).toBeNull();
+    expect(editorIn("Alpha").value).toContain("body of Alpha");
   });
 
   it("chooses the view for each note's pane on its own", () => {
@@ -718,12 +741,14 @@ describe("viewing a note as tabs", () => {
 
       fireEvent.keyDown(tab("Alpha", "Preview"), { key: "ArrowRight" });
       expect(selected("Alpha")).toEqual(["Split"]);
+      fireEvent.keyDown(tab("Alpha", "Split"), { key: "ArrowRight" });
+      expect(selected("Alpha")).toEqual(["Live"]);
 
       // Wraps round.
-      fireEvent.keyDown(tab("Alpha", "Split"), { key: "ArrowRight" });
+      fireEvent.keyDown(tab("Alpha", "Live"), { key: "ArrowRight" });
       expect(selected("Alpha")).toEqual(["Markdown"]);
       fireEvent.keyDown(tab("Alpha", "Markdown"), { key: "ArrowLeft" });
-      expect(selected("Alpha")).toEqual(["Split"]);
+      expect(selected("Alpha")).toEqual(["Live"]);
     });
 
     it("jumps to the first and last tab with Home and End", () => {
@@ -732,7 +757,7 @@ describe("viewing a note as tabs", () => {
       fireEvent.keyDown(tab("Alpha", "Split"), { key: "Home" });
       expect(selected("Alpha")).toEqual(["Markdown"]);
       fireEvent.keyDown(tab("Alpha", "Markdown"), { key: "End" });
-      expect(selected("Alpha")).toEqual(["Split"]);
+      expect(selected("Alpha")).toEqual(["Live"]);
     });
 
     it("cycles the view of the focused note with Ctrl+\\ or Cmd+\\", () => {
@@ -741,8 +766,10 @@ describe("viewing a note as tabs", () => {
       expect(selected("Alpha")).toEqual(["Split"]);
 
       fireEvent.keyDown(document.activeElement!, { code: "Backslash", key: "\\", ctrlKey: true });
+      expect(selected("Alpha")).toEqual(["Live"]);
+      fireEvent.keyDown(document.activeElement ?? document.body, { code: "Backslash", key: "\\", metaKey: true });
       expect(selected("Alpha")).toEqual(["Markdown"]);
-      fireEvent.keyDown(document.activeElement!, { code: "Backslash", key: "\\", metaKey: true });
+      fireEvent.keyDown(document.activeElement ?? document.body, { code: "Backslash", key: "\\", ctrlKey: true });
       expect(selected("Alpha")).toEqual(["Preview"]);
       fireEvent.keyDown(document.activeElement ?? document.body, { code: "Backslash", key: "\\", ctrlKey: true });
       expect(selected("Alpha")).toEqual(["Split"]);
@@ -758,6 +785,8 @@ describe("viewing a note as tabs", () => {
       expect(selected("Alpha")).toEqual(["Preview"]);
       press("ArrowRight");
       expect(selected("Alpha")).toEqual(["Split"]);
+      press("ArrowRight");
+      expect(selected("Alpha")).toEqual(["Live"]);
       press("ArrowRight");
       expect(selected("Alpha")).toEqual(["Markdown"]);
 
@@ -821,9 +850,11 @@ describe("viewing a note as tabs", () => {
       resizePane("Alpha", 300);
       fireEvent.click(tab("Alpha", "Preview"));
 
-      // With Split missing, the tab after Preview is Markdown again.
+      // With Split missing, the tab after Preview is Live, and the one after that Markdown again.
       fireEvent.keyDown(tab("Alpha", "Preview"), { key: "ArrowRight" });
+      expect(selected("Alpha")).toEqual(["Live"]);
 
+      fireEvent.keyDown(tab("Alpha", "Live"), { key: "ArrowRight" });
       expect(selected("Alpha")).toEqual(["Markdown"]);
     });
 

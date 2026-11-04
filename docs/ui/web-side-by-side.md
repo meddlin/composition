@@ -28,8 +28,9 @@ from the keyboard, and the same menu also holds pinning.
 
 ## What a pane shows
 
-Each pane has its own tabs: **Markdown** (the editor), **Preview**, and **Split** (both beside each
-other, with the divider between them shared by every pane).
+Each pane has its own tabs: **Markdown** (the editor), **Preview**, **Split** (both beside each
+other, with the divider between them shared by every pane) and **Live** (the two in one place: the Markdown drawn as it
+will read, with its syntax showing only under the caret; see [live-editor.md](live-editor.md)).
 
 - The first note opened starts on **Split**.
 - A pane added *beside* another starts on **Markdown**: notes open together are there to be written

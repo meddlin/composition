@@ -10,6 +10,48 @@ const LITERAL: ReadonlySet<Segment["kind"]> = new Set(["code", "fence", "frontma
 const MARK_TAG = /<Mark\b[^<>]*>|<\/Mark\s*>/g;
 const COLOR = /\bcolor="([^"]*)"/;
 
+/** Whether an index in the text is in a stretch whose tags are not tags. Ask in increasing order of index. */
+function literalFinder(segments: Segment[]): (index: number) => boolean {
+  const literal: [start: number, end: number][] = [];
+  let at = 0;
+  for (const segment of segments) {
+    if (LITERAL.has(segment.kind)) literal.push([at, at + segment.text.length]);
+    at += segment.text.length;
+  }
+  let l = 0;
+  return (index) => {
+    while (l < literal.length && literal[l][1] <= index) l++;
+    return l < literal.length && literal[l][0] <= index;
+  };
+}
+
+/** A highlight as the text writes it: where its opening and closing tags are. */
+export type MarkElement = { open: { start: number; end: number }; close: { start: number; end: number } };
+
+/**
+ * The tags of each complete `<Mark …>…</Mark>` pair, outside code and frontmatter, in the order they open. They
+ * pair up exactly as `markTints` pairs them, and the same are ignored: a tag left open, one closed twice, a
+ * self-closing one.
+ */
+export function markElements(text: string, segments: Segment[]): MarkElement[] {
+  if (!text.includes("<Mark")) return [];
+
+  const inLiteral = literalFinder(segments);
+  const open: MarkElement["open"][] = [];
+  const elements: MarkElement[] = [];
+  for (const tag of text.matchAll(MARK_TAG)) {
+    if (inLiteral(tag.index)) continue;
+    const closing = tag[0].startsWith("</");
+    if (!closing && tag[0].endsWith("/>")) continue;
+    if (closing && open.length === 0) continue;
+
+    const range = { start: tag.index, end: tag.index + tag[0].length };
+    if (closing) elements.push({ open: open.pop()!, close: range });
+    else open.push(range);
+  }
+  return elements.sort((a, b) => a.open.start - b.open.start);
+}
+
 /**
  * Where the text of `text` is highlighted: between each `<Mark …>` and its `</Mark>`, outside code
  * and frontmatter. The tags are found by scanning the text rather than the coloured runs, because
@@ -22,17 +64,7 @@ const COLOR = /\bcolor="([^"]*)"/;
 export function markTints(text: string, segments: Segment[]): Tint[] {
   if (!text.includes("<Mark")) return [];
 
-  const literal: [start: number, end: number][] = [];
-  let at = 0;
-  for (const segment of segments) {
-    if (LITERAL.has(segment.kind)) literal.push([at, at + segment.text.length]);
-    at += segment.text.length;
-  }
-  let l = 0;
-  const inLiteral = (index: number) => {
-    while (l < literal.length && literal[l][1] <= index) l++;
-    return l < literal.length && literal[l][0] <= index;
-  };
+  const inLiteral = literalFinder(segments);
 
   type Open = { color: HighlightColor; closed: boolean };
   const open: Open[] = [];

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { describeParity, type EditorDriver } from "./parityHarness";
 import type { Note } from "./types";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
@@ -46,248 +47,241 @@ function Harness({
   );
 }
 
-const editor = () => screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
 const menu = () => screen.queryByRole("listbox", { name: "Notes" });
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
-const key = (name: string, init: KeyboardEventInit = {}) => fireEvent.keyDown(editor(), { key: name, ...init });
-const shortcut = () => key("K", { shiftKey: true, metaKey: true });
+const shortcut = (editor: EditorDriver, init: KeyboardEventInit = {}) =>
+  editor.press("K", { shiftKey: true, metaKey: true, ...init });
 
-/** Types by replacing the text and leaving the caret at `caret` (default: the end). */
-function type(value: string, caret = value.length) {
-  fireEvent.focus(editor());
-  fireEvent.change(editor(), { target: { value, selectionStart: caret, selectionEnd: caret } });
-}
+// Linking to a note, in the plain Markdown editor and the live one.
+describeParity("MarkdownEditor note links: typing [[", (scenario) => {
+  scenario("lists the other notes after a [[", ({ render }) => {
+    const editor = render({ notes });
 
-function select(start: number, end: number) {
-  fireEvent.focus(editor());
-  editor().setSelectionRange(start, end);
-}
-
-describe("MarkdownEditor note links: typing [[", () => {
-  afterEach(cleanup);
-
-  it("lists the other notes after a [[", () => {
-    render(<Harness />);
-
-    type("[[");
+    editor.type("[[");
 
     expect(options()).toEqual(["Release checklist", "Groceries", "Pre-release notes"]);
   });
 
-  it("narrows the list as the title is typed", () => {
-    render(<Harness />);
+  scenario("narrows the list as the title is typed", ({ render }) => {
+    const editor = render({ notes });
 
-    type("see [[release");
+    editor.type("see [[release");
 
     expect(options()).toEqual(["Release checklist", "Pre-release notes"]);
   });
 
-  it("closes when nothing matches, and stays out of the way of ordinary brackets", () => {
-    render(<Harness />);
+  scenario("closes when nothing matches, and stays out of the way of ordinary brackets", ({ render }) => {
+    const editor = render({ notes });
 
-    type("[[zzz");
+    editor.type("[[zzz");
     expect(menu()).toBeNull();
 
-    type("a [b]");
-    expect(menu()).toBeNull();
-  });
-
-  it("stays out of the way inside a fenced code block", () => {
-    render(<Harness />);
-
-    type("```\n[[");
-
+    editor.type("a [b]");
     expect(menu()).toBeNull();
   });
 
-  it("inserts a link to the highlighted note on Enter, with the caret after it", () => {
-    render(<Harness />);
-    type("see [[");
+  scenario("stays out of the way inside a fenced code block", ({ render }) => {
+    const editor = render({ notes });
 
-    key("ArrowDown");
-    key("Enter");
+    editor.type("```\n[[");
 
-    expect(editor().value).toBe("see [Groceries](note:2)");
-    expect(editor().selectionStart).toBe("see [Groceries](note:2)".length);
     expect(menu()).toBeNull();
   });
 
-  it("replaces what was typed after the [[, keeping the text around it", () => {
-    render(<Harness />);
-    type("a [[pre and more", "a [[pre".length);
+  scenario("inserts a link to the highlighted note on Enter, with the caret after it", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("see [[");
 
-    key("Tab");
+    editor.press("ArrowDown");
+    editor.press("Enter");
 
-    expect(editor().value).toBe("a [Pre-release notes](note:3) and more");
+    expect(editor.text()).toBe("see [Groceries](note:2)");
+    expect(editor.caret()).toBe("see [Groceries](note:2)".length);
+    expect(menu()).toBeNull();
   });
 
-  it("inserts a note picked with the mouse", () => {
-    render(<Harness />);
-    type("[[");
+  scenario("replaces what was typed after the [[, keeping the text around it", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("a [[pre and more", "a [[pre".length);
+
+    editor.press("Tab");
+
+    expect(editor.text()).toBe("a [Pre-release notes](note:3) and more");
+  });
+
+  scenario("inserts a note picked with the mouse", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("[[");
 
     fireEvent.mouseDown(screen.getByRole("option", { name: "Groceries" }));
 
-    expect(editor().value).toBe("[Groceries](note:2)");
+    expect(editor.text()).toBe("[Groceries](note:2)");
   });
 
-  it("closes on Escape and leaves the text alone", () => {
-    render(<Harness />);
-    type("[[rel");
+  scenario("closes on Escape and leaves the text alone", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("[[rel");
 
-    key("Escape");
+    editor.press("Escape");
 
     expect(menu()).toBeNull();
-    expect(editor().value).toBe("[[rel");
+    expect(editor.text()).toBe("[[rel");
   });
 
-  it("leaves Enter alone when the menu is closed", () => {
-    render(<Harness />);
-    type("plain text");
+  scenario("leaves Enter alone when the menu is closed", ({ render, mode }) => {
+    const editor = render({ notes });
+    editor.type("plain text");
 
-    expect(fireEvent.keyDown(editor(), { key: "Enter" })).toBe(true);
+    if (mode === "markdown") {
+      // The browser makes the new line in a textarea, so all there is to check is that nothing cancelled the key.
+      expect(editor.press("Enter")).toBe(true);
+    } else {
+      // The live editor makes it itself.
+      editor.press("Enter");
+      expect(editor.text()).toBe("plain text\n");
+    }
   });
 
-  it("marks the highlighted option for assistive tech", () => {
-    render(<Harness />);
-    type("[[");
+  scenario("marks the highlighted option for assistive tech", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("[[");
 
-    key("ArrowDown");
+    editor.press("ArrowDown");
 
     const active = screen.getByRole("option", { selected: true });
     expect(active.textContent).toBe("Groceries");
-    expect(editor().getAttribute("aria-activedescendant")).toBe(active.id);
+    expect(editor.element().getAttribute("aria-activedescendant")).toBe(active.id);
   });
 
-  it("does not offer the MDX components for a [", () => {
-    render(<Harness />);
-    type("[[");
+  scenario("does not offer the MDX components for a [", ({ render }) => {
+    const editor = render({ notes });
+    editor.type("[[");
 
     expect(screen.queryByRole("listbox", { name: "MDX components" })).toBeNull();
   });
 });
 
-describe("MarkdownEditor note links: the shortcut", () => {
-  afterEach(cleanup);
+describeParity("MarkdownEditor note links: the shortcut", (scenario) => {
+  scenario("is announced on the editor", ({ render }) => {
+    const editor = render({ notes });
 
-  it("is announced on the editor", () => {
-    render(<Harness />);
-
-    expect(editor().getAttribute("aria-keyshortcuts")).toContain("Control+Shift+K Meta+Shift+K");
+    expect(editor.element().getAttribute("aria-keyshortcuts")).toContain("Control+Shift+K Meta+Shift+K");
   });
 
-  it("opens the picker at the caret and links the chosen note by its title", () => {
-    render(<Harness initial="see " />);
-    type("see ");
+  scenario("opens the picker at the caret and links the chosen note by its title", ({ render }) => {
+    const editor = render({ initial: "see ", notes });
+    editor.type("see ");
 
-    const handled = !shortcut();
+    const handled = !shortcut(editor);
     expect(handled).toBe(true);
     expect(options()).toEqual(["Release checklist", "Groceries", "Pre-release notes"]);
 
-    key("Enter");
+    editor.press("Enter");
 
-    expect(editor().value).toBe("see [Release checklist](note:1)");
+    expect(editor.text()).toBe("see [Release checklist](note:1)");
   });
 
-  it("also answers to Ctrl+Shift+K", () => {
-    render(<Harness />);
+  scenario("also answers to Ctrl+Shift+K", ({ render }) => {
+    const editor = render({ notes });
 
-    key("K", { shiftKey: true, ctrlKey: true });
+    editor.press("K", { shiftKey: true, ctrlKey: true });
 
     expect(menu()).not.toBeNull();
   });
 
-  it("ignores K without Shift (that is search) and with Alt", () => {
-    render(<Harness />);
+  scenario("ignores K without Shift (that is search) and with Alt", ({ render }) => {
+    const editor = render({ notes });
 
-    key("k", { metaKey: true });
-    key("K", { shiftKey: true, metaKey: true, altKey: true });
+    editor.press("k", { metaKey: true });
+    editor.press("K", { shiftKey: true, metaKey: true, altKey: true });
 
     expect(menu()).toBeNull();
   });
 
-  it("filters by what is typed, without putting it in the note", () => {
-    render(<Harness initial="intro" />);
-    type("intro");
+  scenario("filters by what is typed, without putting it in the note", ({ render }) => {
+    const editor = render({ initial: "intro", notes });
+    editor.type("intro");
 
-    shortcut();
-    key("p");
-    key("r");
-    key("e");
+    shortcut(editor);
+    editor.press("p");
+    editor.press("r");
+    editor.press("e");
 
     expect(options()).toEqual(["Pre-release notes"]);
-    expect(editor().value).toBe("intro");
+    expect(editor.text()).toBe("intro");
 
-    key("Backspace");
-    key("Backspace");
-    key("Backspace");
+    editor.press("Backspace");
+    editor.press("Backspace");
+    editor.press("Backspace");
     expect(options()).toHaveLength(3);
   });
 
-  it("makes the selected words the link's text", () => {
-    render(<Harness initial="read the checklist now" />);
-    type("read the checklist now");
+  scenario("makes the selected words the link's text", ({ render }) => {
+    const editor = render({ initial: "read the checklist now", notes });
+    editor.type("read the checklist now");
 
-    select(9, 18);
-    shortcut();
-    key("g");
-    key("Enter");
+    editor.select(9, 18);
+    shortcut(editor);
+    editor.press("g");
+    editor.press("Enter");
 
-    expect(editor().value).toBe("read the [checklist](note:2) now");
+    expect(editor.text()).toBe("read the [checklist](note:2) now");
   });
 
-  it("says when nothing matches, and does nothing on Enter", () => {
-    render(<Harness initial="x" />);
-    type("x");
+  scenario("says when nothing matches, and does nothing on Enter", ({ render }) => {
+    const editor = render({ initial: "x", notes });
+    editor.type("x");
 
-    shortcut();
-    key("z");
-    key("z");
-    key("Enter");
+    shortcut(editor);
+    editor.press("z");
+    editor.press("z");
+    editor.press("Enter");
 
     expect(options()).toEqual([]);
     expect(screen.getByText("No matching notes")).toBeDefined();
-    expect(editor().value).toBe("x");
+    expect(editor.text()).toBe("x");
   });
 
-  it("closes on Escape, or when the shortcut is pressed again, leaving the text alone", () => {
-    render(<Harness initial="x" />);
-    type("x");
+  scenario("closes on Escape, or when the shortcut is pressed again, leaving the text alone", ({ render }) => {
+    const editor = render({ initial: "x", notes });
+    editor.type("x");
 
-    shortcut();
-    key("Escape");
+    shortcut(editor);
+    editor.press("Escape");
     expect(menu()).toBeNull();
 
-    shortcut();
+    shortcut(editor);
     expect(menu()).not.toBeNull();
-    shortcut();
+    shortcut(editor);
     expect(menu()).toBeNull();
-    expect(editor().value).toBe("x");
+    expect(editor.text()).toBe("x");
   });
 
-  it("closes when the editor loses focus", () => {
-    render(<Harness />);
-    shortcut();
+  scenario("closes when the editor loses focus", ({ render }) => {
+    const editor = render({ notes });
+    shortcut(editor);
+    expect(menu()).not.toBeNull();
 
-    fireEvent.blur(editor());
+    editor.blur();
 
     expect(menu()).toBeNull();
   });
 
-  it("escapes brackets in a selection used as the link text", () => {
-    render(<Harness initial="[a]" />);
-    type("[a]");
+  scenario("escapes brackets in a selection used as the link text", ({ render }) => {
+    const editor = render({ initial: "[a]", notes });
+    editor.type("[a]");
 
-    select(0, 3);
-    shortcut();
-    key("Enter");
+    editor.select(0, 3);
+    shortcut(editor);
+    editor.press("Enter");
 
-    expect(editor().value).toBe("[\\[a\\]](note:1)");
+    expect(editor.text()).toBe("[\\[a\\]](note:1)");
   });
 
-  it("leaves other keys alone while no picker is open", () => {
-    render(<Harness />);
+  scenario("leaves other keys alone while no picker is open", ({ render }) => {
+    const editor = render({ notes });
 
-    expect(fireEvent.keyDown(editor(), { key: "a" })).toBe(true);
+    expect(editor.press("a")).toBe(true);
   });
 });
 

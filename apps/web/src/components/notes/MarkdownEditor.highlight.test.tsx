@@ -4,6 +4,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetLastHighlightColor } from "./lastHighlightColor";
 import { MarkdownEditor } from "./MarkdownEditor";
+import { describeParity, type EditorDriver } from "./parityHarness";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 
@@ -38,247 +39,248 @@ const menu = () => screen.queryByRole("listbox", { name: "Highlight color" });
 const options = () => screen.queryAllByRole("option").map((o) => o.textContent);
 const active = () => screen.queryAllByRole("option").find((o) => o.getAttribute("aria-selected") === "true")?.textContent;
 
-/** Selects `needle` in the editor, as dragging over it would. */
-function select(needle: string, from = 0) {
-  const start = editor().value.indexOf(needle, from);
-  fireEvent.focus(editor());
-  editor().setSelectionRange(start, start + needle.length);
-  fireEvent.select(editor());
-}
-
-const shortcut = (init: KeyboardEventInit = {}) =>
-  fireEvent.keyDown(editor(), { key: "H", shiftKey: true, metaKey: true, ...init });
-const key = (name: string) => fireEvent.keyDown(editor(), { key: name });
-
 const Y = (inner: string) => `<Mark color="yellow">${inner}</Mark>`;
 const G = (inner: string) => `<Mark color="green">${inner}</Mark>`;
 
-describe("MarkdownEditor highlighting", () => {
-  afterEach(() => {
-    cleanup();
-    resetLastHighlightColor();
+/** Selects `needle` in the editor, as dragging over it would. */
+function selectText(editor: EditorDriver, needle: string, from = 0) {
+  const start = editor.text().indexOf(needle, from);
+  editor.select(start, start + needle.length);
+}
+
+const highlightShortcut = (editor: EditorDriver, init: KeyboardEventInit = {}) =>
+  editor.press("H", { shiftKey: true, metaKey: true, ...init });
+
+/** What is tinted in the editor that is showing (not in the Markdown editor's layer, which stays in the page, hidden, beside the live one). */
+const tintedIn = (editor: EditorDriver) => editor.element().closest("[role=tabpanel]")!.querySelectorAll(".md-mark");
+
+const selectedText = (editor: EditorDriver) => editor.text().slice(editor.selection().start, editor.selection().end);
+
+afterEach(() => resetLastHighlightColor());
+
+// Highlighting what is selected, in the plain Markdown editor and the live one.
+describeParity("MarkdownEditor highlighting: the colour menu", (scenario) => {
+  scenario("opens over a selection with Cmd/Ctrl+Shift+H, listing the colours", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+
+    highlightShortcut(editor);
+
+    expect(menu()).not.toBeNull();
+    expect(options()).toEqual(["Yellow1", "Green2", "Blue3", "Pink4", "Orange5"]);
   });
 
-  describe("the colour menu", () => {
-    it("opens over a selection with Cmd/Ctrl+Shift+H, listing the colours", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
+  scenario("takes Ctrl as well as Cmd", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
 
-      shortcut();
+    highlightShortcut(editor, { metaKey: false, ctrlKey: true });
 
-      expect(menu()).not.toBeNull();
-      expect(options()).toEqual(["Yellow1", "Green2", "Blue3", "Pink4", "Orange5"]);
-    });
-
-    it("takes Ctrl as well as Cmd", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-
-      shortcut({ metaKey: false, ctrlKey: true });
-
-      expect(menu()).not.toBeNull();
-    });
-
-    it("does nothing with no selection and no highlight under the caret, and keeps the shortcut from reaching the browser", () => {
-      render(<Harness initial="hello big world" />);
-      fireEvent.focus(editor());
-      editor().setSelectionRange(3, 3);
-
-      const notCancelled = shortcut();
-
-      expect(menu()).toBeNull();
-      expect(notCancelled).toBe(false);
-    });
-
-    it("ignores the key without Shift, and with Alt", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-
-      shortcut({ shiftKey: false });
-      shortcut({ altKey: true });
-
-      expect(menu()).toBeNull();
-    });
-
-    it("moves with the arrow keys, wrapping, and closes on Escape", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-      shortcut();
-      expect(active()).toBe("Yellow1");
-
-      key("ArrowDown");
-      expect(active()).toBe("Green2");
-      key("ArrowUp");
-      key("ArrowUp");
-      expect(active()).toBe("Orange5");
-      key("Escape");
-
-      expect(menu()).toBeNull();
-      expect(editor().value).toBe("hello big world");
-    });
-
-    it("closes when the selection moves or the editor loses focus", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-      shortcut();
-      select("world");
-      expect(menu()).toBeNull();
-
-      select("big");
-      shortcut();
-      fireEvent.blur(editor());
-      expect(menu()).toBeNull();
-    });
-
-    it("closes, and lets the key through, when something else is typed", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-      shortcut();
-
-      const notCancelled = fireEvent.keyDown(editor(), { key: "x" });
-
-      expect(menu()).toBeNull();
-      expect(notCancelled).toBe(true);
-    });
-
-    it("is named by the textarea while open, for assistive tech", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-      shortcut();
-
-      expect(editor().getAttribute("aria-controls")).toBe(menu()!.id);
-      expect(editor().getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[0].id);
-    });
+    expect(menu()).not.toBeNull();
   });
 
-  describe("highlighting", () => {
-    it("wraps the selection in the chosen colour with Enter, and selects it again", () => {
-      render(<Harness initial="hello big world" />);
-      select("big");
-      shortcut();
+  scenario("does nothing with no selection and no highlight under the caret, and keeps the shortcut from reaching the browser", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    editor.focus();
+    editor.select(3, 3);
 
-      key("Enter");
+    const notCancelled = highlightShortcut(editor);
 
-      expect(editor().value).toBe(`hello ${Y("big")} world`);
-      expect(editor().value.slice(editor().selectionStart, editor().selectionEnd)).toBe("big");
-      expect(menu()).toBeNull();
-    });
-
-    it("picks with the arrows, a number key or the mouse", () => {
-      render(<Harness initial="one two three" />);
-
-      select("one");
-      shortcut();
-      key("ArrowDown");
-      key("Enter");
-      select("two");
-      shortcut();
-      key("3");
-      select("three");
-      shortcut();
-      fireEvent.mouseDown(screen.getByRole("option", { name: /Pink/ }));
-
-      expect(editor().value).toBe(
-        `${G("one")} <Mark color="blue">two</Mark> <Mark color="pink">three</Mark>`,
-      );
-    });
-
-    it("starts on the colour used last", () => {
-      render(<Harness initial="one two" />);
-      select("one");
-      shortcut();
-      key("2");
-
-      select("two");
-      shortcut();
-
-      expect(active()).toBe("Green2");
-    });
-
-    it("tells the parent what changed, so the note is saved", () => {
-      const onValue = vi.fn();
-      render(<Harness initial="hello big world" onValue={onValue} />);
-      select("big");
-      shortcut();
-
-      key("Enter");
-
-      expect(onValue).toHaveBeenLastCalledWith(`hello ${Y("big")} world`);
-    });
-
-    it("explains a refusal and leaves the note as it was", () => {
-      render(<Harness initial="the set {a, b} is small" />);
-      select("set");
-      shortcut();
-
-      key("Enter");
-
-      expect(editor().value).toBe("the set {a, b} is small");
-      expect(screen.getByRole("alert").textContent).toContain("MDX");
-    });
-
-    it("drops the explanation once the note is edited", () => {
-      render(<Harness initial="the set {a, b} is small" />);
-      select("set");
-      shortcut();
-      key("Enter");
-
-      fireEvent.change(editor(), { target: { value: "the set is small" } });
-
-      expect(screen.queryByRole("alert")).toBeNull();
-    });
+    expect(menu()).toBeNull();
+    expect(notCancelled).toBe(false);
   });
 
-  describe("on an existing highlight", () => {
-    it("opens with a caret inside it, offering Remove", () => {
-      render(<Harness initial={`one ${Y("two")} three`} />);
-      fireEvent.focus(editor());
-      const caret = editor().value.indexOf("wo");
-      editor().setSelectionRange(caret, caret);
-      fireEvent.select(editor());
+  scenario("ignores the key without Shift, and with Alt", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
 
-      shortcut();
+    highlightShortcut(editor, { shiftKey: false });
+    highlightShortcut(editor, { altKey: true });
 
-      expect(options()).toEqual(["Yellow1", "Green2", "Blue3", "Pink4", "Orange5", "Remove highlight0"]);
-    });
-
-    it("recolours it", () => {
-      render(<Harness initial={`one ${Y("two")} three`} />);
-      select("two");
-      shortcut();
-
-      key("2");
-
-      expect(editor().value).toBe(`one ${G("two")} three`);
-    });
-
-    it("removes it, keeping the text selected", () => {
-      render(<Harness initial={`one ${Y("two")} three`} />);
-      select("two");
-      shortcut();
-
-      key("0");
-
-      expect(editor().value).toBe("one two three");
-      expect(editor().value.slice(editor().selectionStart, editor().selectionEnd)).toBe("two");
-    });
-
-    it("does not offer Remove over plain text", () => {
-      render(<Harness initial="one two three" />);
-      select("two");
-      shortcut();
-
-      expect(options()).not.toContain("Remove highlight0");
-    });
+    expect(menu()).toBeNull();
   });
 
-  describe("the editor's colours", () => {
-    it("paints the text between the tags in the highlight's colour", () => {
-      const { container } = render(<Harness initial={`one ${G("two")} three`} />);
+  scenario("moves with the arrow keys, wrapping, and closes on Escape", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+    expect(active()).toBe("Yellow1");
 
-      const tinted = container.querySelectorAll(".md-mark");
-      expect([...tinted].map((el) => [el.textContent, el.getAttribute("data-color")])).toEqual([["two", "green"]]);
-    });
+    editor.press("ArrowDown");
+    expect(active()).toBe("Green2");
+    editor.press("ArrowUp");
+    editor.press("ArrowUp");
+    expect(active()).toBe("Orange5");
+    editor.press("Escape");
+
+    expect(menu()).toBeNull();
+    expect(editor.text()).toBe("hello big world");
+  });
+
+  scenario("closes when the selection moves or the editor loses focus", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+    selectText(editor, "world");
+    expect(menu()).toBeNull();
+
+    selectText(editor, "big");
+    highlightShortcut(editor);
+    expect(menu()).not.toBeNull();
+    editor.blur();
+    expect(menu()).toBeNull();
+  });
+
+  scenario("closes, and lets the key through, when something else is typed", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+
+    const notCancelled = editor.press("x");
+
+    expect(menu()).toBeNull();
+    expect(notCancelled).toBe(true);
+  });
+
+  scenario("is named by the editor while open, for assistive tech", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+
+    expect(editor.element().getAttribute("aria-controls")).toBe(menu()!.id);
+    expect(editor.element().getAttribute("aria-activedescendant")).toBe(screen.getAllByRole("option")[0].id);
+  });
+});
+
+describeParity("MarkdownEditor highlighting: highlighting", (scenario) => {
+  scenario("wraps the selection in the chosen colour with Enter, and selects it again", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+
+    editor.press("Enter");
+
+    expect(editor.text()).toBe(`hello ${Y("big")} world`);
+    expect(selectedText(editor)).toBe("big");
+    expect(menu()).toBeNull();
+  });
+
+  scenario("picks with the arrows, a number key or the mouse", ({ render }) => {
+    const editor = render({ initial: "one two three" });
+
+    selectText(editor, "one");
+    highlightShortcut(editor);
+    editor.press("ArrowDown");
+    editor.press("Enter");
+    selectText(editor, "two");
+    highlightShortcut(editor);
+    editor.press("3");
+    selectText(editor, "three");
+    highlightShortcut(editor);
+    fireEvent.mouseDown(screen.getByRole("option", { name: /Pink/ }));
+
+    expect(editor.text()).toBe(`${G("one")} <Mark color="blue">two</Mark> <Mark color="pink">three</Mark>`);
+  });
+
+  scenario("starts on the colour used last", ({ render }) => {
+    const editor = render({ initial: "one two" });
+    selectText(editor, "one");
+    highlightShortcut(editor);
+    editor.press("2");
+
+    selectText(editor, "two");
+    highlightShortcut(editor);
+
+    expect(active()).toBe("Green2");
+  });
+
+  scenario("tells the parent what changed, so the note is saved", ({ render }) => {
+    const editor = render({ initial: "hello big world" });
+    selectText(editor, "big");
+    highlightShortcut(editor);
+
+    editor.press("Enter");
+
+    expect(editor.reported.at(-1)).toBe(`hello ${Y("big")} world`);
+  });
+
+  scenario("explains a refusal and leaves the note as it was", ({ render }) => {
+    const editor = render({ initial: "the set {a, b} is small" });
+    selectText(editor, "set");
+    highlightShortcut(editor);
+
+    editor.press("Enter");
+
+    expect(editor.text()).toBe("the set {a, b} is small");
+    expect(screen.getByRole("alert").textContent).toContain("MDX");
+  });
+
+  scenario("drops the explanation once the note is edited", ({ render }) => {
+    const editor = render({ initial: "the set {a, b} is small" });
+    selectText(editor, "set");
+    highlightShortcut(editor);
+    editor.press("Enter");
+
+    editor.type("the set is small");
+
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describeParity("MarkdownEditor highlighting: on an existing highlight", (scenario) => {
+  scenario("opens with a caret inside it, offering Remove", ({ render }) => {
+    const editor = render({ initial: `one ${Y("two")} three` });
+    editor.focus();
+    const caret = editor.text().indexOf("wo");
+    editor.select(caret, caret);
+
+    highlightShortcut(editor);
+
+    expect(options()).toEqual(["Yellow1", "Green2", "Blue3", "Pink4", "Orange5", "Remove highlight0"]);
+  });
+
+  scenario("recolours it", ({ render }) => {
+    const editor = render({ initial: `one ${Y("two")} three` });
+    selectText(editor, "two");
+    highlightShortcut(editor);
+
+    editor.press("2");
+
+    expect(editor.text()).toBe(`one ${G("two")} three`);
+  });
+
+  scenario("removes it, keeping the text selected", ({ render }) => {
+    const editor = render({ initial: `one ${Y("two")} three` });
+    selectText(editor, "two");
+    highlightShortcut(editor);
+
+    editor.press("0");
+
+    expect(editor.text()).toBe("one two three");
+    expect(selectedText(editor)).toBe("two");
+  });
+
+  scenario("does not offer Remove over plain text", ({ render }) => {
+    const editor = render({ initial: "one two three" });
+    selectText(editor, "two");
+    highlightShortcut(editor);
+
+    expect(options()).not.toContain("Remove highlight0");
+  });
+});
+
+describeParity("MarkdownEditor highlighting: the editor's colours", (scenario) => {
+  scenario("paints the text between the tags in the highlight's colour", ({ render }) => {
+    const editor = render({ initial: `one ${G("two")} three` });
+
+    const tinted = tintedIn(editor);
+    expect([...tinted].map((el) => [el.textContent, el.getAttribute("data-color")])).toEqual([["two", "green"]]);
+  });
+
+  scenario("leaves text outside the tags, and tags in code, untinted", ({ render }) => {
+    const editor = render({ initial: `plain ${G("one")} and \`${Y("code")}\` end` });
+
+    expect([...tintedIn(editor)].map((el) => el.textContent)).toEqual(["one"]);
   });
 });
 

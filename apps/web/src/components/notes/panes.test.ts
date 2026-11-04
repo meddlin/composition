@@ -58,6 +58,7 @@ describe("shownView", () => {
     expect(shownView("split", true)).toBe("split");
     expect(shownView("markdown", true)).toBe("markdown");
     expect(shownView("preview", true)).toBe("preview");
+    expect(shownView("live", true)).toBe("live");
   });
 
   it("falls back from side by side to the editor tab when there is no room", () => {
@@ -67,26 +68,30 @@ describe("shownView", () => {
   it("leaves a single-view choice alone however narrow the pane is", () => {
     expect(shownView("markdown", false)).toBe("markdown");
     expect(shownView("preview", false)).toBe("preview");
+    expect(shownView("live", false)).toBe("live");
   });
 });
 
 describe("stepView", () => {
-  it("steps through Markdown, Preview and Split, then wraps", () => {
+  it("steps through Markdown, Preview, Split and Live, then wraps", () => {
     expect(stepView("markdown", true, 1)).toBe("preview");
     expect(stepView("preview", true, 1)).toBe("split");
-    expect(stepView("split", true, 1)).toBe("markdown");
+    expect(stepView("split", true, 1)).toBe("live");
+    expect(stepView("live", true, 1)).toBe("markdown");
   });
 
   it("steps back the other way, wrapping round", () => {
+    expect(stepView("live", true, -1)).toBe("split");
     expect(stepView("split", true, -1)).toBe("preview");
     expect(stepView("preview", true, -1)).toBe("markdown");
-    expect(stepView("markdown", true, -1)).toBe("split");
+    expect(stepView("markdown", true, -1)).toBe("live");
   });
 
   it("skips Split when there is no room for it", () => {
-    expect(stepView("markdown", false, 1)).toBe("preview");
-    expect(stepView("preview", false, 1)).toBe("markdown");
-    expect(stepView("markdown", false, -1)).toBe("preview");
+    expect(stepView("preview", false, 1)).toBe("live");
+    expect(stepView("live", false, 1)).toBe("markdown");
+    expect(stepView("markdown", false, -1)).toBe("live");
+    expect(stepView("live", false, -1)).toBe("preview");
   });
 });
 
