@@ -488,3 +488,28 @@ describe("the first-run question", () => {
     await expect(finishTodoSetup(undefined as never)).rejects.toThrow(/yes or no/);
   });
 });
+
+describe("arranging the to-do service's items", () => {
+  it("moves an item before another and keeps the order, and refuses an item that is gone", async () => {
+    const { createTodo, moveTodo, listTodos } = await import("./todosService");
+    const a = await createTodo("a", null);
+    await createTodo("b", null);
+    const c = await createTodo("c", null);
+
+    await moveTodo(c.id, a.id);
+
+    expect((await listTodos()).map((t) => t.title)).toEqual(["c", "a", "b"]);
+    await expect(moveTodo(999, null)).rejects.toThrow(/no longer exists/);
+  });
+
+  it("moves the done items to the bottom", async () => {
+    const { createTodo, setTodoDone, sortDoneTodosLast, listTodos } = await import("./todosService");
+    const a = await createTodo("a", null);
+    await createTodo("b", null);
+    await setTodoDone(a.id, true);
+
+    await sortDoneTodosLast();
+
+    expect((await listTodos()).map((t) => t.title)).toEqual(["b", "a"]);
+  });
+});

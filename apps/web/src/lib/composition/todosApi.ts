@@ -99,7 +99,7 @@ export interface TodosApi {
    * window is shortened. Deletes nothing. Rejects a window that is not valid.
    */
   previewTodoPurge(months: number | null): Promise<number>;
-  /** Every item, oldest first. */
+  /** Every item, in the order the owner arranged them; items not arranged yet are last, oldest first. */
   listTodos(): Promise<Todo[]>;
   /** Adds an item at the end of its siblings, under `parentId` or at the top level. Rejects an empty title or a missing parent. */
   createTodo(title: string, parentId: number | null): Promise<Todo>;
@@ -109,6 +109,14 @@ export interface TodosApi {
   setTodoDone(id: number, done: boolean): Promise<Todo>;
   /** Moves the item to a status ("done" is the same as ticking it). Its sub-items are left as they are. Rejects a missing item. */
   setTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
+  /**
+   * Puts the item immediately before `beforeId` among its siblings (the items under the same parent), or last among them
+   * when `beforeId` is null or not one of them. The order is kept; it is not a change to the item, so it is not logged.
+   * Rejects a missing item.
+   */
+  moveTodo(id: number, beforeId: number | null): Promise<void>;
+  /** "Move completed to the bottom": among the siblings at every level, the done items go below the open ones, each keeping its order. */
+  sortDoneTodosLast(): Promise<void>;
   /**
    * Deletes the item and everything under it, for good, archived or not, with their rows in the activity log ("Delete
    * permanently"). Deleting an item that is already gone is not an error.
@@ -173,6 +181,8 @@ export const TODO_METHODS = [
   "renameTodo",
   "setTodoDone",
   "setTodoStatus",
+  "moveTodo",
+  "sortDoneTodosLast",
   "deleteTodo",
   "previewTodoDelete",
   "loadTodoReports",

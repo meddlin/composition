@@ -290,6 +290,8 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     id("setTodoStatus", todoId, "id"),
     isTodoStatus(status) ? status : fail("setTodoStatus", "status"),
   ],
+  moveTodo: ([todoId, beforeId]) => [id("moveTodo", todoId, "id"), nullableId("moveTodo", beforeId, "beforeId")],
+  sortDoneTodosLast: none,
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
   previewTodoDelete: ([todoId]) => [id("previewTodoDelete", todoId, "id")],
   loadTodoReports: none,

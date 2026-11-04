@@ -220,6 +220,48 @@ describe("the to-do store", () => {
   });
 });
 
+describe("the to-do store's order", () => {
+  const titles = (store: ReturnType<typeof createTodosStore>) => store.getSnapshot().todos.map((t) => t.title);
+
+  it("shows a move at once, and asks the backend to keep it", async () => {
+    const api = fakeBackend([make(1, null, "a"), make(2, null, "b"), make(3, null, "c")]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const moving = store.move(3, 1);
+    expect(titles(store)).toEqual(["c", "a", "b"]);
+    await moving;
+
+    expect(api.moveTodo).toHaveBeenCalledWith(3, 1);
+  });
+
+  it("shows the done items below the open ones at once", async () => {
+    const api = fakeBackend([make(1, null, "a", true), make(2, null, "b"), make(3, null, "c", true), make(4, null, "d")]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const sorting = store.sortDoneLast();
+    expect(titles(store)).toEqual(["b", "d", "a", "c"]);
+    await sorting;
+
+    expect(api.sortDoneTodosLast).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts back the stored order when the backend refuses", async () => {
+    const api = fakeBackend([make(1, null, "a"), make(2, null, "b")]);
+    api.moveTodo.mockRejectedValueOnce(new Error("no disk"));
+    api.sortDoneTodosLast.mockRejectedValueOnce(new Error("no disk"));
+    const store = createTodosStore(api);
+    await store.load();
+
+    expect(await store.move(2, 1)).toEqual({ error: "no disk" });
+    expect(titles(store)).toEqual(["a", "b"]);
+    await store.setDone(1, true);
+    expect(await store.sortDoneLast()).toEqual({ error: "no disk" });
+    expect(store.getSnapshot()).toMatchObject({ error: "no disk" });
+  });
+});
+
 describe("the to-do store's weekly cycle", () => {
   const rolled = (id: number, parentId: number | null, title: string, rollCount = 2): Todo => ({
     ...make(id, parentId, title),

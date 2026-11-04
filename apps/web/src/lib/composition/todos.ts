@@ -1,3 +1,4 @@
+import { applyOrder, placeBefore } from "./ordering";
 import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoStatus } from "./todosApi";
 
 /** An item with its sub-items, in order. */
@@ -123,6 +124,30 @@ export function withStatus(todo: Todo, status: TodoStatus): Todo {
 export function withDone(todo: Todo, done: boolean): Todo {
   if (done) return withStatus(todo, "done");
   return withStatus(todo, todo.status === "done" ? "todo" : todo.status);
+}
+
+/**
+ * The items with `id` moved to sit immediately before `beforeId` among its siblings (the items under the same parent), or
+ * last among them when `beforeId` is null or not one of them. Everything else keeps its place. The repo persists the same
+ * rule (todosRepo.ts), so the screen shows at once what will be stored.
+ */
+export function placeTodo(todos: readonly Todo[], id: number, beforeId: number | null): Todo[] {
+  const todo = todos.find((t) => t.id === id);
+  if (!todo) return [...todos];
+  const siblings = todos.filter((t) => t.parentId === todo.parentId).map((t) => t.id);
+  return applyOrder([...todos], placeBefore(siblings, id, beforeId));
+}
+
+/** Every group of siblings, as ids in display order with the open items first and the done ones after, each keeping its own order. */
+export function doneLastGroups(todos: readonly Todo[]): number[][] {
+  const groups = new Map<number | null, Todo[]>();
+  for (const todo of todos) groups.set(todo.parentId, [...(groups.get(todo.parentId) ?? []), todo]);
+  return [...groups.values()].map((group) => [...group.filter((t) => !t.done), ...group.filter((t) => t.done)].map((t) => t.id));
+}
+
+/** The items with the done ones moved below the open ones among their siblings, at every level. Nothing else changes order. */
+export function sortDoneLast(todos: readonly Todo[]): Todo[] {
+  return doneLastGroups(todos).reduce((list, ids) => applyOrder(list, ids), [...todos]);
 }
 
 /** A title as it is stored: trimmed, on one line. Null when nothing is left, or it is too long to keep. */

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, createEvent, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TodoLook } from "@/lib/composition/todoLook";
 import type { Todo, TodoStatus } from "@/lib/composition/todosApi";
@@ -1044,13 +1044,21 @@ describe("dragging into This week", () => {
     expect(within(section("Backlog")).getByText("Someday trip")).toBeTruthy();
   });
 
-  it("makes a top-level backlog item and a rolled-over entry draggable, but not what is under them", async () => {
+  it("makes a top-level backlog item and a rolled-over entry draggable, and what is under them too, to rearrange it", async () => {
     await inList();
 
     expect(rowIn("Backlog", "Someday trip").getAttribute("draggable")).toBe("true");
     expect(rowIn("Rolled over", "Plan trip").getAttribute("draggable")).toBe("true");
-    expect(rowIn("Backlog", "Check visas").getAttribute("draggable")).not.toBe("true");
-    expect(rowIn("Rolled over", "Book flights").getAttribute("draggable")).not.toBe("true");
+    expect(rowIn("Backlog", "Check visas").getAttribute("draggable")).toBe("true");
+    expect(rowIn("Rolled over", "Book flights").getAttribute("draggable")).toBe("true");
+  });
+
+  it("does not offer This week as a place to drop what is under an item", async () => {
+    await inList();
+
+    fireEvent.dragStart(rowIn("Backlog", "Check visas"), { dataTransfer: dataTransfer() });
+
+    expect(section("This week").getAttribute("data-drop-target")).toBeNull();
   });
 
   it("leaves a drag of something else alone, so a note or a panel dropped on it still goes where it should", async () => {
@@ -1109,13 +1117,21 @@ describe("dragging back to the Backlog", () => {
     expect(todos.getSnapshot().todos.find((t) => t.id === 3)).toMatchObject({ status: "backlog" });
   });
 
-  it("makes a top-level to-do draggable, but not a sub-item and not one that is done", async () => {
+  it("makes every to-do draggable, to rearrange it, but only a top-level one that is not done a thing to drop on the Backlog", async () => {
     await openList(items);
+    const transfer = dataTransfer();
 
-    expect(rowIn("This week", "Buy milk").getAttribute("draggable")).toBe("true");
-    expect(rowIn("This week", "Plan trip").getAttribute("draggable")).toBe("true");
-    expect(rowIn("This week", "Oat milk").getAttribute("draggable")).not.toBe("true");
-    expect(rowIn("This week", "Pay rent").getAttribute("draggable")).not.toBe("true");
+    for (const title of ["Buy milk", "Plan trip", "Oat milk", "Pay rent"]) {
+      expect(rowIn("This week", title).getAttribute("draggable")).toBe("true");
+    }
+    fireEvent.dragStart(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBe("ready");
+    fireEvent.dragEnd(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    for (const title of ["Oat milk", "Pay rent"]) {
+      fireEvent.dragStart(rowIn("This week", title), { dataTransfer: transfer });
+      expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+      fireEvent.dragEnd(rowIn("This week", title), { dataTransfer: transfer });
+    }
   });
 
   it("shows the Backlog as the place to drop a to-do, and This week as nothing, since it is already there", async () => {
@@ -1176,5 +1192,158 @@ describe("dragging back to the Backlog", () => {
 
     expect(accepted).toBe(true);
     expect(todos.getSnapshot().todos).toEqual(before);
+  });
+});
+
+describe("rearranging the list", () => {
+  const items = [item(1, null, "Plan trip"), item(2, null, "Buy milk"), item(3, null, "Call mum"), item(4, 1, "Book flights"), item(5, 1, "Pack bags")];
+  const titlesIn = (region: string) =>
+    within(within(section(region)).getByRole("list", { name: region === "Backlog" ? "Backlog items" : "To-dos" }))
+      .getAllByRole("checkbox")
+      .map((box) => (box.getAttribute("aria-label") ?? "").replace(": done", ""));
+  /** The top-level titles only: the sub-items are listed in the row of their item. */
+  const topLevel = (region: string) => titlesIn(region).filter((title) => !["Book flights", "Pack bags"].includes(title));
+  /** Where the pointer is, in a row: its box has no size in jsdom, so above its top is the upper half and below it the lower half. */
+  const aimed = (type: "dragOver" | "drop", target: Element, transfer: ReturnType<typeof dataTransfer>, clientY: number) => {
+    const event = createEvent[type](target, { dataTransfer: transfer });
+    // jsdom has no DragEvent, so the position is put on the event by hand.
+    Object.defineProperty(event, "clientY", { value: clientY });
+    fireEvent(target, event);
+  };
+
+  it("moves an item down and up with its buttons, and keeps the order", async () => {
+    const { todos } = await openList(items);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Plan trip down" }));
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Buy milk", "Plan trip", "Call mum"]));
+    fireEvent.click(screen.getByRole("button", { name: "Move Call mum up" }));
+
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Buy milk", "Call mum", "Plan trip"]));
+    expect(todos.getSnapshot().todos.filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["Buy milk", "Call mum", "Plan trip"]);
+  });
+
+  it("cannot move the first item up or the last item down", async () => {
+    await openList(items);
+
+    expect((screen.getByRole("button", { name: "Move Plan trip up" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Move Call mum down" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Move Book flights up" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Move Pack bags down" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("moves a sub-item among the sub-items of its item", async () => {
+    const { todos } = await openList(items);
+
+    fireEvent.click(screen.getByRole("button", { name: "Move Book flights down" }));
+
+    await waitFor(() => expect(todos.getSnapshot().todos.filter((t) => t.parentId === 1).map((t) => t.title)).toEqual(["Pack bags", "Book flights"]));
+    expect(topLevel("This week")).toEqual(["Plan trip", "Buy milk", "Call mum"]);
+  });
+
+  it("puts an item dragged onto the upper half of another before it, and onto the lower half after it", async () => {
+    await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("dragOver", rowIn("This week", "Plan trip").firstElementChild!, transfer, -1);
+    expect(rowIn("This week", "Plan trip").firstElementChild!.getAttribute("data-drop")).toBe("before");
+    aimed("drop", rowIn("This week", "Plan trip").firstElementChild!, transfer, -1);
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Call mum", "Plan trip", "Buy milk"]));
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("dragOver", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+    expect(rowIn("This week", "Buy milk").firstElementChild!.getAttribute("data-drop")).toBe("after");
+    aimed("drop", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Plan trip", "Buy milk", "Call mum"]));
+    expect(rowIn("This week", "Buy milk").firstElementChild!.getAttribute("data-drop")).toBeNull();
+  });
+
+  it("reorders sub-items by dragging, without dragging their item along or moving anything between sections", async () => {
+    const { todos } = await openList([...items, item(6, null, "Someday", false, "backlog")]);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Pack bags"), { dataTransfer: transfer });
+    aimed("dragOver", rowIn("This week", "Book flights").firstElementChild!, transfer, -1);
+    // A sub-item is not something to drop on a section.
+    fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+    aimed("drop", rowIn("This week", "Book flights").firstElementChild!, transfer, -1);
+
+    await waitFor(() => expect(todos.getSnapshot().todos.filter((t) => t.parentId === 1).map((t) => t.title)).toEqual(["Pack bags", "Book flights"]));
+    expect(todos.getSnapshot().todos.find((t) => t.id === 1)).toMatchObject({ status: "todo" });
+  });
+
+  it("does not reorder an item dropped on a row under another parent, and does not mistake it for a drop on a section", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+    const before = todos.getSnapshot().todos;
+
+    fireEvent.dragStart(rowIn("This week", "Pack bags"), { dataTransfer: transfer });
+    aimed("dragOver", rowIn("This week", "Buy milk").firstElementChild!, transfer, -1);
+    aimed("drop", rowIn("This week", "Buy milk").firstElementChild!, transfer, -1);
+
+    expect(todos.getSnapshot().todos).toEqual(before);
+  });
+
+  it("keeps a dragged item's status when it is dropped among the other items of This week", async () => {
+    const { todos } = await openList([item(1, null, "Plan trip", false, "in_progress"), item(2, null, "Buy milk")]);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Plan trip"), { dataTransfer: transfer });
+    aimed("dragOver", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+    aimed("drop", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Buy milk", "Plan trip"]));
+    expect(todos.getSnapshot().todos.find((t) => t.id === 1)).toMatchObject({ status: "in_progress" });
+  });
+
+  it("lets a done item be rearranged, but not dropped on the Backlog, which would untick it", async () => {
+    const { todos } = await openList([item(1, null, "Plan trip", true), item(2, null, "Buy milk"), item(3, null, "Someday", false, "backlog")]);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Plan trip"), { dataTransfer: transfer });
+    expect(section("Backlog").getAttribute("data-drop-target")).toBeNull();
+    fireEvent.dragOver(section("Backlog"), { dataTransfer: transfer });
+    fireEvent.drop(section("Backlog"), { dataTransfer: transfer });
+    expect(todos.getSnapshot().todos.find((t) => t.id === 1)).toMatchObject({ status: "done" });
+
+    aimed("dragOver", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+    aimed("drop", rowIn("This week", "Buy milk").firstElementChild!, transfer, 10);
+    await waitFor(() => expect(topLevel("This week")).toEqual(["Buy milk", "Plan trip"]));
+  });
+});
+
+describe("moving the completed to the bottom", () => {
+  const titles = (region: string) => within(section(region)).getAllByRole("checkbox").map((box) => (box.getAttribute("aria-label") ?? "").replace(": done", ""));
+
+  it("moves the done items below the open ones, at every level, and keeps the order otherwise", async () => {
+    const { todos } = await openList([
+      item(1, null, "Plan trip", true),
+      item(2, null, "Buy milk"),
+      item(3, null, "Call mum", true),
+      item(4, null, "Write report"),
+      item(5, 4, "Outline", true),
+      item(6, 4, "Draft"),
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /Completed to bottom/ }));
+
+    await waitFor(() => expect(titles("This week")).toEqual(["Buy milk", "Write report", "Draft", "Outline", "Plan trip", "Call mum"]));
+    expect(todos.getSnapshot().todos.filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["Buy milk", "Write report", "Plan trip", "Call mum"]);
+  });
+
+  it("is off while the done items are already last, and on once ticking an item leaves one above an open one", async () => {
+    await openList([item(1, null, "Buy milk"), item(2, null, "Call mum"), item(3, null, "Plan trip", true)]);
+    expect((screen.getByRole("button", { name: /Completed to bottom/ }) as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Buy milk: done" }));
+
+    await waitFor(() => expect((screen.getByRole("button", { name: /Completed to bottom/ }) as HTMLButtonElement).disabled).toBe(false));
+  });
+
+  it("is not shown while there is nothing this week", async () => {
+    await openList([]);
+
+    expect(screen.queryByRole("button", { name: /Completed to bottom/ })).toBeNull();
   });
 });

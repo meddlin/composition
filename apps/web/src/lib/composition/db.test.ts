@@ -101,6 +101,7 @@ describe("opening the database", () => {
       "archive_reason",
       "rolled_from_week",
       "roll_count",
+      "position",
     ];
 
     it("gives a new database the columns, and tables for the log, the closed periods and the reports", async () => {
@@ -144,6 +145,7 @@ describe("opening the database", () => {
         archive_reason: null,
         rolled_from_week: null,
         roll_count: 0,
+        position: null,
       });
     });
 

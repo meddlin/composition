@@ -1,4 +1,4 @@
-import { cleanTodoTitle, subtreeIds, withDone, withStatus } from "./todos";
+import { cleanTodoTitle, placeTodo, sortDoneLast, subtreeIds, withDone, withStatus } from "./todos";
 import { DEFAULT_TODO_LOOK, type TodoLook } from "./todoLook";
 import type { ReportKind } from "./todoReports";
 import type { ArchivedTodo, Todo, TodoDeletePreview, TodoReportEntry, TodoReports, TodosApi, TodoSetup, TodoStatus } from "./todosApi";
@@ -38,6 +38,10 @@ export type TodosStore = {
   setDone(id: number, done: boolean): Promise<TodoResult>;
   /** Shows the move at once. "done" is the same as ticking the item. */
   setStatus(id: number, status: TodoStatus): Promise<TodoResult>;
+  /** Shows the move at once: the item goes immediately before `beforeId` among its siblings, or last when that is null. */
+  move(id: number, beforeId: number | null): Promise<TodoResult>;
+  /** Shows at once the done items moved below the open ones among their siblings, at every level. */
+  sortDoneLast(): Promise<TodoResult>;
   /** Reads the items again, for when the weekly cycle changed them behind the screen's back. Does nothing before the first load; if it fails the list stays as it was. */
   reload(): Promise<void>;
   /** Removes the item and everything under it, at once, to the archive (not for good). `restore` is the Undo. */
@@ -211,6 +215,26 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
     }
   }
 
+  async function move(id: number, beforeId: number | null): Promise<TodoResult> {
+    set({ todos: placeTodo(state.todos, id, beforeId), error: null });
+    try {
+      await deps.moveTodo(id, beforeId);
+      return {};
+    } catch (error) {
+      return undo(error);
+    }
+  }
+
+  async function sortDoneToBottom(): Promise<TodoResult> {
+    set({ todos: sortDoneLast(state.todos), error: null });
+    try {
+      await deps.sortDoneTodosLast();
+      return {};
+    } catch (error) {
+      return undo(error);
+    }
+  }
+
   async function reload(): Promise<void> {
     if (state.status !== "ready") return;
     try {
@@ -336,6 +360,8 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
     rename,
     setDone,
     setStatus,
+    move,
+    sortDoneLast: sortDoneToBottom,
     reload,
     loadArchive,
     loadReports,
@@ -364,6 +390,8 @@ export const unavailableTodos: TodosDeps = {
   renameTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   setTodoDone: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   setTodoStatus: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
+  moveTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
+  sortDoneTodosLast: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   deleteTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   previewTodoDelete: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   loadTodoReports: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),

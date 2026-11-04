@@ -2,7 +2,8 @@ import type Database from "better-sqlite3";
 import { getDb } from "./db";
 import type { ArchiveReason, EventKind, TodoEvent } from "./todoEvents";
 import { planSweep, type SweepItem, type WeekPlan } from "./todoSweep";
-import { withDone, withStatus } from "./todos";
+import { placeBefore } from "./ordering";
+import { doneLastGroups, withDone, withStatus } from "./todos";
 import { localDateOf, weekOf, type DayOfWeek, type Period } from "./todoWeeks";
 import { isTodoStatus, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoStatus } from "./todosApi";
 
@@ -37,9 +38,15 @@ function fromRow(row: TodoRow): Todo {
   };
 }
 
-/** The live list: everything that has not been archived, oldest first. */
+/**
+ * Display order among siblings: the ones the owner has arranged (`position` set) in that order, then the rest, oldest first,
+ * which is where a new item goes.
+ */
+const DISPLAY_ORDER = "position IS NULL, position, id";
+
+/** The live list: everything that has not been archived, in display order. */
 export function listTodos(): Todo[] {
-  return (getDb().prepare("SELECT * FROM todos WHERE archived_at IS NULL ORDER BY id").all() as TodoRow[]).map(fromRow);
+  return (getDb().prepare(`SELECT * FROM todos WHERE archived_at IS NULL ORDER BY ${DISPLAY_ORDER}`).all() as TodoRow[]).map(fromRow);
 }
 
 type ArchivedRow = TodoRow & { archived_at: string; archive_week: string; archive_reason: string };
@@ -207,6 +214,34 @@ export function updateTodo(
     }
   })();
   return getTodo(id);
+}
+
+/**
+ * Puts the item immediately before `beforeId` among its live siblings, or last when `beforeId` is null or not one of
+ * them, and fixes the whole sibling list's order, so what the owner sees is what stays. Not a content edit: nothing is
+ * logged and `updated_at` is left alone. False, with nothing changed, when the item is not on the live list.
+ */
+export function placeTodo(id: number, beforeId: number | null): boolean {
+  const db = getDb();
+  return db.transaction(() => {
+    const row = db.prepare("SELECT parent_id FROM todos WHERE id = ? AND archived_at IS NULL").get(id) as { parent_id: number | null } | undefined;
+    if (!row) return false;
+    const siblings = (
+      db.prepare(`SELECT id FROM todos WHERE parent_id IS ? AND archived_at IS NULL ORDER BY ${DISPLAY_ORDER}`).all(row.parent_id) as { id: number }[]
+    ).map((sibling) => sibling.id);
+    const setPosition = db.prepare("UPDATE todos SET position = ? WHERE id = ?");
+    placeBefore(siblings, id, beforeId).forEach((todoId, index) => setPosition.run(index, todoId));
+    return true;
+  })();
+}
+
+/** "Move completed to the bottom": among the siblings at every level, the done items go below the open ones, each keeping its order. */
+export function sortDoneLast(): void {
+  const db = getDb();
+  db.transaction(() => {
+    const setPosition = db.prepare("UPDATE todos SET position = ? WHERE id = ?");
+    for (const ids of doneLastGroups(listTodos())) ids.forEach((todoId, index) => setPosition.run(index, todoId));
+  })();
 }
 
 const SUBTREE = `WITH RECURSIVE subtree(id) AS (
