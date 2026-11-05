@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { BrowserWindow, dialog, Menu, MenuItem } from "electron";
+import { appMenuIndex, insertionIndex } from "./appMenu";
 import { chooseDirectory, COMMAND_NAME, inspect, install, isOnPath, launcherPath, linkDirectories, uninstall } from "./cliTool";
 
 /**
@@ -9,10 +10,12 @@ import { chooseDirectory, COMMAND_NAME, inspect, install, isOnPath, launcherPath
  */
 export function installCliToolMenuItem(options: { packaged: boolean; resourcesPath: string }): void {
   // A development run has no bundled command line tool to link to.
-  if (!options.packaged || process.platform !== "darwin") return;
+  if (!options.packaged) return;
   const menu = Menu.getApplicationMenu();
-  const appMenu = menu?.items[0]?.submenu;
-  if (!menu || !appMenu) return;
+  if (!menu) return;
+  const at = appMenuIndex(menu.items, process.platform);
+  const appMenu = at >= 0 ? menu.items[at].submenu : null;
+  if (!appMenu) return;
 
   const launcher = launcherPath(options.resourcesPath);
   const dirs = linkDirectories(os.homedir());
@@ -50,13 +53,13 @@ export function installCliToolMenuItem(options: { packaged: boolean; resourcesPa
     const dir = path.dirname(result.link);
     const hint = isOnPath(dir, process.env.PATH ?? "")
       ? ""
-      : `\n\n${dir} may not be on your PATH. If “${COMMAND_NAME}” isn't found, add this line to ~/.zshrc and open a new Terminal window:\n\nexport PATH="${dir}:$PATH"`;
+      : `\n\n${dir} may not be on your PATH. If “${COMMAND_NAME}” isn't found, add this line to ${process.platform === "linux" ? "~/.profile" : "~/.zshrc"} and open a new Terminal window:\n\nexport PATH="${dir}:$PATH"`;
     await say("info", "The command line tool is installed.", `Run “${COMMAND_NAME}” in Terminal.\n\n${result.link}${hint}`);
   }
 
-  const afterUpdates = appMenu.items.findIndex((entry) => entry.label === "Check for Updates…");
-  const afterAbout = appMenu.items.findIndex((entry) => entry.role === "about");
-  const at = (afterUpdates >= 0 ? afterUpdates : afterAbout) + 1;
-  appMenu.insert(at, new MenuItem({ label: "Install Command Line Tool…", click: () => void onClick() }));
+  appMenu.insert(
+    insertionIndex(appMenu.items, process.platform, "Check for Updates…"),
+    new MenuItem({ label: "Install Command Line Tool…", click: () => void onClick() }),
+  );
   Menu.setApplicationMenu(menu);
 }

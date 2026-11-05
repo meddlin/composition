@@ -40,6 +40,28 @@ export type UpdatePrefsStore = {
   save(prefs: UpdatePrefs): void;
 };
 
+/**
+ * Whether this copy of the app can update itself. macOS replaces the app in place. On Linux only an
+ * AppImage can (electron-updater swaps the file; it sets APPIMAGE when one is running): a .deb
+ * belongs to the package manager, so those users download the newer package themselves.
+ */
+export function updateSupport(where: {
+  packaged: boolean;
+  platform: NodeJS.Platform;
+  env: NodeJS.ProcessEnv;
+}): { ok: true } | { ok: false; reason: string } {
+  if (!where.packaged) return { ok: false, reason: "Updates only work in the installed app, not in a development run." };
+  if (where.platform === "darwin") return { ok: true };
+  if (where.platform === "linux") {
+    if (where.env.APPIMAGE) return { ok: true };
+    return {
+      ok: false,
+      reason: "This copy was installed from a .deb package, which can't update itself. Download the newer .deb from the Composition releases page and install it over this one.",
+    };
+  }
+  return { ok: false, reason: "Automatic updates are only available on macOS and in the Linux AppImage for now." };
+}
+
 export type UpdateManagerOptions = {
   updater: UpdaterLike;
   currentVersion: string;

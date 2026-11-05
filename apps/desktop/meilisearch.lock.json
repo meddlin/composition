@@ -12,6 +12,11 @@
       "name": "meilisearch-macos-amd64",
       "sha256": "e9cfcdb0ecc123391872fb05a3b7853ca3dfd07643eea0d71dc62b17ab12a639",
       "size": 126137716
+    },
+    "linux-x64": {
+      "name": "meilisearch-linux-amd64",
+      "sha256": "cd8e446b29cefe44cdbc872ffb2de906ada165f4b96a33bb9e1a706b1e9279a0",
+      "size": 133101648
     }
   }
 }

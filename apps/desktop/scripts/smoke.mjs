@@ -5,6 +5,7 @@
 //
 //   pnpm build && pnpm smoke
 //   SMOKE_EXECUTABLE=release/mac-arm64/Composition.app/Contents/MacOS/Composition pnpm smoke
+//   SMOKE_EXECUTABLE=/opt/Composition/composition-desktop xvfb-run pnpm smoke     (Linux, the installed .deb)
 //   SMOKE_OUT=/some/dir  keeps screenshots there (default: a temp dir)
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -18,6 +19,9 @@ import { _electron as electron } from "playwright-core";
 
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const packaged = process.env.SMOKE_EXECUTABLE;
+// Whether the app under test can update itself (updateSupport in src/main/updates.ts): the packaged Mac app and a
+// Linux AppImage can; a .deb is the package manager's. APPIMAGE is set by the AppImage runtime, and passes through here.
+const updatesSupported = Boolean(packaged) && (process.platform !== "linux" || Boolean(process.env.APPIMAGE));
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-smoke-"));
 const userData = path.join(home, "userData");
 const out = process.env.SMOKE_OUT ?? fs.mkdtempSync(path.join(os.tmpdir(), "composition-smoke-shots-"));
@@ -890,14 +894,14 @@ try {
   const updateState = await page.evaluate(() => window.composition.getUpdateState());
   const appVersion = JSON.parse(fs.readFileSync(path.join(desktopDir, "package.json"), "utf-8")).version;
   check(
-    "updates are reported as supported only in the packaged app, at this version",
-    updateState.supported === Boolean(packaged) && updateState.currentVersion === appVersion && updateState.phase === "idle",
+    "updates are reported as supported only where the packaged app can update itself, at this version",
+    updateState.supported === updatesSupported && updateState.currentVersion === appVersion && updateState.phase === "idle",
     JSON.stringify(updateState),
   );
   check("automatic checking starts on", updateState.autoCheck === true);
   check("pre-release versions start off", updateState.allowPrerelease === false);
-  // The update toggles are only on the page in the installed app ("Updates only work in the installed app, not in a development run").
-  if (packaged) {
+  // The update toggles are only on the page where updating works ("Updates only work in the installed app, not in a development run").
+  if (updatesSupported) {
     // click(), not uncheck(): the box is driven by the main process's state, so it flips a moment after the click.
     await page.getByLabel("Check for updates automatically").click();
     const updatePrefsFile = path.join(userData, "updates.json");
@@ -908,7 +912,7 @@ try {
     check("and not in the shared settings file", !fs.existsSync(settingsFile) || !("autoCheck" in JSON.parse(fs.readFileSync(settingsFile, "utf-8"))));
     check("the page can't make an update install that isn't ready", (await page.evaluate(() => window.composition.installUpdate())).phase === "idle");
   } else {
-    console.log("SKIP  the update toggles  (development build: they are not shown)");
+    console.log("SKIP  the update toggles  (development build or a .deb install: they are not shown)");
   }
 
   await page.getByRole("tab", { name: "Styling" }).click();

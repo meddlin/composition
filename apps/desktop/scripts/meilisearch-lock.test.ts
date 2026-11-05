@@ -25,6 +25,16 @@ describe("meilisearch.lock.json", () => {
     expect(validateLock(good)).toEqual([]);
   });
 
+  it("accepts the Linux x64 build", () => {
+    const lock = structuredClone(good);
+    Object.assign(lock.assets, { "linux-x64": { name: "meilisearch-linux-amd64", sha256: "b".repeat(64), size: 10 } });
+
+    expect(validateLock(lock)).toEqual([]);
+    expect(downloadUrl(lock, "linux-x64")).toBe(
+      "https://github.com/meilisearch/meilisearch/releases/download/v1.53.1/meilisearch-linux-amd64",
+    );
+  });
+
   it("refuses an Enterprise Edition asset, which isn't allowed in production", () => {
     const lock = structuredClone(good);
     lock.assets["mac-arm64"].name = "meilisearch-enterprise-macos-apple-silicon";

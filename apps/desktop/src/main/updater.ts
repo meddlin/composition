@@ -4,7 +4,8 @@ import { autoUpdater } from "electron-updater";
 import { UPDATE_STATE_CHANNEL } from "../shared/channels";
 import { createUpdatePrefsStore } from "./updatePrefs";
 import { findLatestRelease, STABLE_FEED_URL } from "./releaseFeed";
-import { UpdateManager, type UpdaterLike } from "./updates";
+import { appMenuIndex, insertionIndex } from "./appMenu";
+import { UpdateManager, updateSupport, type UpdaterLike } from "./updates";
 
 /**
  * The Electron side of updates: picks the real updater (or an inert one), pushes state to
@@ -27,19 +28,13 @@ const inertUpdater: UpdaterLike = {
   on: () => undefined,
 };
 
-function supportFor(packaged: boolean, platform: NodeJS.Platform): { ok: true } | { ok: false; reason: string } {
-  if (!packaged) return { ok: false, reason: "Updates only work in the installed app, not in a development run." };
-  if (platform !== "darwin") return { ok: false, reason: "Automatic updates are only available on macOS for now." };
-  return { ok: true };
-}
-
 export function createElectronUpdates(options: {
   /** Electron's per-app data folder; the update preference lives there. */
   userData: string;
   /** Stops Meilisearch and closes the database; see UpdateManagerOptions.prepareToQuit. */
   prepareToQuit: () => Promise<void>;
 }) {
-  const support = supportFor(app.isPackaged, process.platform);
+  const support = updateSupport({ packaged: app.isPackaged, platform: process.platform, env: process.env });
 
   const manager = new UpdateManager({
     // `autoUpdater` builds the real updater on first access, so it is only read when it's usable.
@@ -98,14 +93,14 @@ export function createElectronUpdates(options: {
     await say("Already running the latest supported version.", `You have ${state.currentVersion}.`);
   }
 
-  /** Adds "Check for Updates…" under "About Composition", in Electron's default application menu. */
+  /** Adds "Check for Updates…" to Electron's default menu: under "About" on macOS, in Help on Linux (appMenu.ts). */
   function installMenuItem(): void {
-    if (process.platform !== "darwin") return;
     const menu = Menu.getApplicationMenu();
-    const appMenu = menu?.items[0]?.submenu;
-    if (!menu || !appMenu) return;
-    const aboutAt = appMenu.items.findIndex((entry) => entry.role === "about");
-    appMenu.insert(aboutAt + 1, new MenuItem({ label: "Check for Updates…", click: () => void checkFromMenu() }));
+    if (!menu) return;
+    const at = appMenuIndex(menu.items, process.platform);
+    const appMenu = at >= 0 ? menu.items[at].submenu : null;
+    if (!appMenu) return;
+    appMenu.insert(insertionIndex(appMenu.items, process.platform), new MenuItem({ label: "Check for Updates…", click: () => void checkFromMenu() }));
     Menu.setApplicationMenu(menu);
   }
 

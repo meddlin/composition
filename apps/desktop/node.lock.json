@@ -11,6 +11,11 @@
       "name": "node-v26.12.0-darwin-x64.tar.gz",
       "sha256": "878ecede191c7abc1bff01d3fb81f7ed81aa1161040dba18776b8ff8593614b1",
       "size": 59797494
+    },
+    "linux-x64": {
+      "name": "node-v26.12.0-linux-x64.tar.gz",
+      "sha256": "d9f88af72ad34f7ddf8e67289829f1698f54b6254f7d4f54b7453117ff1a3d2c",
+      "size": 62862851
     }
   }
 }

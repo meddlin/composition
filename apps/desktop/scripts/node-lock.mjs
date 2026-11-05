@@ -2,7 +2,16 @@
 
 const VERSION = /^v(\d+)\.(\d+)\.(\d+)$/;
 const SHA256 = /^[0-9a-f]{64}$/;
-const PLATFORM = /^mac-(arm64|x64)$/;
+const PLATFORM = /^(mac-(arm64|x64)|linux-x64)$/;
+
+/** How nodejs.org names a platform key's operating system: "mac-arm64" is node-<version>-darwin-arm64. */
+const NODE_OS = { mac: "darwin", linux: "linux" };
+
+/** The tarball a platform key ("mac-arm64", "linux-x64") is built from. */
+export function assetName(version, platform) {
+  const [os, arch] = platform.split("-");
+  return `node-${version}-${NODE_OS[os]}-${arch}.tar.gz`;
+}
 
 /** The oldest Node the bundled CLI runs on: node:ffi is on by default from 26.10 (apps/cli/bin/composition.mjs). */
 export const MIN_NODE = [26, 10, 0];
@@ -26,9 +35,8 @@ export function validateLock(lock) {
   if (Object.keys(assets).length === 0) problems.push("no assets listed");
   for (const [platform, asset] of Object.entries(assets)) {
     if (!PLATFORM.test(platform)) problems.push(`${platform}: unsupported platform key`);
-    const arch = platform.replace(/^mac-/, "");
-    if (asset?.name !== `node-${lock?.version}-darwin-${arch}.tar.gz`) {
-      problems.push(`${platform}: asset name must be node-${lock?.version}-darwin-${arch}.tar.gz, got ${asset?.name}`);
+    if (PLATFORM.test(platform) && asset?.name !== assetName(lock?.version, platform)) {
+      problems.push(`${platform}: asset name must be ${assetName(lock?.version, platform)}, got ${asset?.name}`);
     }
     if (!SHA256.test(asset?.sha256 ?? "")) problems.push(`${platform}: sha256 must be 64 lowercase hex characters`);
     if (!Number.isInteger(asset?.size) || asset.size <= 0) problems.push(`${platform}: size must be a positive integer`);

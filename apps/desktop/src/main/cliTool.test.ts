@@ -82,6 +82,8 @@ describe("install", () => {
     expect(install(dirs(), "/Volumes/Composition 0.1.4/Composition.app/Contents/Resources/cli/composition")).toMatchObject({ ok: false });
     expect(locationProblem("/private/var/folders/x/AppTranslocation/ABC/d/Composition.app/Contents/Resources/cli/composition")).toMatch(/Applications/);
     expect(locationProblem("/Applications/Composition.app/Contents/Resources/cli/composition")).toBeNull();
+    expect(locationProblem("/tmp/.mount_CompospAb12/resources/cli/composition")).toMatch(/AppImage/);
+    expect(locationProblem("/opt/Composition/resources/cli/composition")).toBeNull();
   });
 
   it("says so when this build has no command line tool", () => {

@@ -15,7 +15,7 @@ describe("pickRelease", () => {
       pickRelease([
         release("desktop-v0.2.0", ["Composition-0.2.0-arm64.zip", "latest-mac.yml"], { prerelease: true }),
         release("desktop-v0.1.4", ["latest-mac.yml"]),
-      ]),
+      ], "darwin"),
     ).toEqual({
       url: "https://github.com/meddlin/composition/releases/download/desktop-v0.2.0",
       channel: "latest",
@@ -23,7 +23,7 @@ describe("pickRelease", () => {
   });
 
   it("uses the channel named by the update file, which is how a beta version is published", () => {
-    expect(pickRelease([release("desktop-v0.3.0-beta.1", ["beta-mac.yml", "x.zip"])])).toMatchObject({ channel: "beta" });
+    expect(pickRelease([release("desktop-v0.3.0-beta.1", ["beta-mac.yml", "x.zip"])], "darwin")).toMatchObject({ channel: "beta" });
   });
 
   it("skips drafts, other products' releases and releases without a macOS update file", () => {
@@ -33,14 +33,33 @@ describe("pickRelease", () => {
         release("cli-v1.0.0", ["latest-mac.yml"]),
         release("desktop-v0.3.0", ["Composition-0.3.0.dmg"]),
         release("desktop-v0.2.0", ["latest-mac.yml"]),
-      ]),
+      ], "darwin"),
     ).toMatchObject({ url: expect.stringContaining("desktop-v0.2.0") });
+  });
+
+  it("reads latest-linux.yml on Linux, from the release that has it, and ignores the macOS file", () => {
+    const releases = [
+      release("desktop-v0.7.0", ["Composition-0.7.0-arm64.dmg", "latest-mac.yml"]),
+      release("desktop-v0.6.2", ["Composition-0.6.2-x64.AppImage", "latest-linux.yml", "latest-mac.yml"]),
+    ];
+
+    expect(pickRelease(releases, "linux")).toEqual({
+      url: "https://github.com/meddlin/composition/releases/download/desktop-v0.6.2",
+      channel: "latest",
+    });
+    expect(pickRelease(releases, "darwin")).toMatchObject({ url: expect.stringContaining("desktop-v0.7.0") });
+    expect(pickRelease([release("desktop-v0.6.2", ["beta-linux.yml"])], "linux")).toMatchObject({ channel: "beta" });
+  });
+
+  it("finds nothing on a platform the app doesn't update on, or for Linux ARM's differently named file", () => {
+    expect(pickRelease([release("desktop-v0.6.2", ["latest-mac.yml", "latest-linux.yml"])], "win32")).toBeNull();
+    expect(pickRelease([release("desktop-v0.6.2", ["latest-linux-arm64.yml"])], "linux")).toBeNull();
   });
 
   it.each([[null], [{}], [[]], [[{ tag_name: 5 }]], [[null]], [[release("desktop-v1.0.0", [])]]])(
     "finds nothing in %j",
     (releases) => {
-      expect(pickRelease(releases)).toBeNull();
+      expect(pickRelease(releases, "darwin")).toBeNull();
     },
   );
 });
@@ -48,7 +67,7 @@ describe("pickRelease", () => {
 describe("findLatestRelease", () => {
   it("lists releases from the GitHub API", async () => {
     const fetchJson = vi.fn(async () => Response.json([release("desktop-v0.1.4", ["latest-mac.yml"])]));
-    expect(await findLatestRelease(fetchJson as unknown as typeof fetch)).toMatchObject({ channel: "latest" });
+    expect(await findLatestRelease(fetchJson as unknown as typeof fetch, "darwin")).toMatchObject({ channel: "latest" });
     expect(fetchJson).toHaveBeenCalledWith(
       expect.stringMatching(/^https:\/\/api\.github\.com\/repos\/meddlin\/composition\/releases/),
       expect.anything(),

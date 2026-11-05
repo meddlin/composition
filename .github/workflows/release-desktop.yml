@@ -11,6 +11,9 @@ name: Release desktop
 # Publishing it as a normal (non-pre-release) release is what makes installed apps offer it
 # as an update. Local equivalent: `pnpm release` in
 # apps/desktop. Setup and secrets: docs/deployment/manual-build-release.md.
+#
+# Once the macOS builds are attached, a second job builds the Linux x64 packages (.deb and AppImage,
+# unsigned) on Ubuntu and adds them, with latest-linux.yml, to the same draft.
 on:
   push:
     tags:
@@ -109,9 +112,75 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --title "Composition desktop $version" \
-            --notes "macOS desktop build, signed and notarized. Checksums are in SHA256SUMS.txt. latest-mac.yml and the .blockmap files are what installed apps update from; leave them attached. Built by the Release desktop workflow." \
+            --notes "macOS desktop build, signed and notarized (checksums in SHA256SUMS.txt), and Linux x64 packages: a .deb and an AppImage (checksums in SHA256SUMS-linux.txt). latest-mac.yml, latest-linux.yml and the .blockmap files are what installed apps update from; leave them attached. Built by the Release desktop workflow." \
             release/*.dmg release/*.zip release/*.blockmap release/latest-mac.yml release/SHA256SUMS.txt
 
       - name: Remove the API key
         if: always()
         run: rm -f "$RUNNER_TEMP/AuthKey.p8"
+
+  # Linux x64, built after the macOS job has created the draft release, so the two never race to create it.
+  # Nothing is signed, so this needs no secrets and no `release` environment.
+  release-linux:
+    needs: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write # add files to the draft release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/web/pnpm-lock.yaml
+            apps/desktop/pnpm-lock.yaml
+            apps/cli/pnpm-lock.yaml
+
+      - name: Install web, CLI and desktop dependencies
+        run: |
+          pnpm --dir apps/web install --frozen-lockfile
+          pnpm --dir apps/cli install --frozen-lockfile
+          pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Fetch Meilisearch and Node, and assemble the command line tool
+        working-directory: apps/desktop
+        run: |
+          pnpm fetch:meilisearch linux-x64
+          pnpm fetch:node linux-x64
+          pnpm stage:cli linux-x64
+
+      - name: Build the .deb and the AppImage
+        working-directory: apps/desktop
+        run: pnpm dist:linux
+
+      - name: Check the packages
+        working-directory: apps/desktop
+        run: |
+          ls -l release
+          test -n "$(ls release/*.deb)" && test -n "$(ls release/*.AppImage)" && test -f release/latest-linux.yml
+          expected=$(node -p "require('./package.json').version")
+          grep -q "^version: $expected\$" release/latest-linux.yml
+          dpkg-deb --info release/*.deb
+          expected_cli=$(node -p "require('../cli/package.json').version")
+          actual_cli=$(release/linux-unpacked/resources/cli/composition --version)
+          echo "composition --version: $actual_cli"
+          test "$actual_cli" = "$expected_cli"
+
+      - name: Add the Linux packages to the draft release
+        working-directory: apps/desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd release
+          sha256sum *.deb *.AppImage > SHA256SUMS-linux.txt
+          # The AppImage carries its block map inside it; a separate .blockmap file is attached only if there is one.
+          shopt -s nullglob
+          files=(*.deb *.AppImage latest-linux.yml SHA256SUMS-linux.txt *.blockmap)
+          gh release upload "$TAG" "${files[@]}" --repo "$GITHUB_REPOSITORY"

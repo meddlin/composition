@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * The `composition` command that ships inside the app (Contents/Resources/cli/composition) and
+ * The `composition` command that ships inside the app (Contents/Resources/cli/composition on macOS,
+ * resources/cli/composition next to the executable on Linux) and
  * the symlink that puts it on the PATH. A disk image can only copy the app, so the link is made
  * by an app menu item, as editors do for their `code` command. No administrator password: the
  * link goes in the first of a few directories the user can already write to.
@@ -21,8 +22,12 @@ export function launcherPath(resourcesPath: string): string {
   return path.join(resourcesPath, "cli", COMMAND_NAME);
 }
 
-/** A copy of the app that won't stay put (a mounted disk image, or Gatekeeper's temporary copy) can't be linked to. */
+/** A copy of the app that won't stay put (a mounted disk image, Gatekeeper's temporary copy, a running AppImage) can't be linked to. */
 export function locationProblem(launcher: string): string | null {
+  // An AppImage unpacks into a fresh /tmp/.mount_XXXX folder each time it runs and removes it on exit.
+  if (/\/\.mount_[^/]+\//.test(launcher)) {
+    return "Composition is running as an AppImage, whose files only exist while it is open. Install the .deb package to get the command line tool.";
+  }
   if (launcher.includes("/AppTranslocation/") || launcher.startsWith("/Volumes/")) {
     return "Composition is running from a disk image or another volume. Drag it to the Applications folder, open it from there, and try again.";
   }
@@ -48,7 +53,7 @@ function inspectLink(link: string, launcher: string): LinkState {
   if (!stat.isSymbolicLink()) return { kind: "occupied", link };
   const target = path.resolve(path.dirname(link), fs.readlinkSync(link));
   if (target === launcher) return { kind: "installed", link };
-  const oursInAnotherApp = target.endsWith(`/Contents/Resources/cli/${COMMAND_NAME}`);
+  const oursInAnotherApp = target.endsWith(`/Contents/Resources/cli/${COMMAND_NAME}`) || target.endsWith(`/resources/cli/${COMMAND_NAME}`);
   return oursInAnotherApp || !fs.existsSync(target) ? { kind: "elsewhere", link } : { kind: "occupied", link };
 }
 

@@ -1,7 +1,8 @@
 // Assembles the license notices that ship inside the app (Contents/Resources/licenses):
 //
 //   - Electron's and Chromium's licenses, which Electron's own distribution
-//     includes but electron-builder doesn't copy into a macOS app
+//     includes but electron-builder doesn't copy into a macOS app (a Linux app has them
+//     next to the executable already; they are copied there too, for one place to look)
 //   - Meilisearch's MIT notice (licenses/meilisearch-LICENSE-MIT.txt, tracked)
 //   - draw.io's Apache-2.0 license, from the editor vendored into the renderer (pnpm fetch:drawio in apps/web)
 //   - Node.js's license, from the runtime bundled for the command line tool (pnpm fetch:node)
@@ -62,7 +63,7 @@ if (fs.existsSync(drawioLicense)) fs.copyFileSync(drawioLicense, path.join(outDi
 else warnings.push("draw.io's LICENSE was not found in dist/renderer/drawio: run `pnpm build` (it fetches the editor).");
 
 // ---- Node.js (the runtime of the bundled command line tool)
-const nodeLicense = ["mac-arm64", "mac-x64"]
+const nodeLicense = ["mac-arm64", "mac-x64", "linux-x64"]
   .map((platform) => path.join(desktopDir, "resources", "node", platform, "LICENSE"))
   .find((file) => fs.existsSync(file));
 if (nodeLicense) fs.copyFileSync(nodeLicense, path.join(outDir, "node-LICENSE.txt"));

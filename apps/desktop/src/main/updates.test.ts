@@ -5,6 +5,7 @@ import {
   FIRST_CHECK_DELAY_MS,
   releaseNotesText,
   UpdateManager,
+  updateSupport,
   type UpdaterLike,
   type UpdateManagerOptions,
 } from "./updates";
@@ -385,5 +386,27 @@ describe("releaseNotesText", () => {
     expect(releaseNotesText("   ")).toBeUndefined();
     expect(releaseNotesText(null)).toBeUndefined();
     expect(releaseNotesText(undefined)).toBeUndefined();
+  });
+});
+
+describe("updateSupport", () => {
+  const where = (platform: NodeJS.Platform, env: NodeJS.ProcessEnv = {}, packaged = true) => ({ packaged, platform, env });
+
+  it("never updates a development run, whatever the platform", () => {
+    expect(updateSupport(where("darwin", {}, false))).toMatchObject({ ok: false, reason: expect.stringMatching(/development run/) });
+    expect(updateSupport(where("linux", { APPIMAGE: "/home/me/Composition.AppImage" }, false))).toMatchObject({ ok: false });
+  });
+
+  it("updates the macOS app", () => {
+    expect(updateSupport(where("darwin"))).toEqual({ ok: true });
+  });
+
+  it("updates a Linux AppImage, which sets APPIMAGE, but not a .deb", () => {
+    expect(updateSupport(where("linux", { APPIMAGE: "/home/me/Composition.AppImage" }))).toEqual({ ok: true });
+    expect(updateSupport(where("linux"))).toMatchObject({ ok: false, reason: expect.stringMatching(/\.deb/) });
+  });
+
+  it("doesn't update elsewhere", () => {
+    expect(updateSupport(where("win32"))).toMatchObject({ ok: false });
   });
 });
