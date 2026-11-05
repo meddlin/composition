@@ -72,6 +72,15 @@ function walk(dir, base = dir) {
   });
 }
 
+const NATIVE_EXTENSIONS = new Set(["node", "dylib", "so"]);
+
+/** A native library by its name: addon.node, libfoo.dylib, libfoo.so, or a versioned libfoo.so.1.2 (not a regex: nothing to backtrack). */
+function isNativeFile(file) {
+  const parts = path.basename(file).split(".");
+  while (parts.length > 2 && /^\d+$/.test(parts[parts.length - 1])) parts.pop();
+  return parts.length > 1 && NATIVE_EXTENSIONS.has(parts[parts.length - 1]);
+}
+
 for (const platform of platforms) {
   const { os: targetOs, cpu, arch } = TARGETS[platform];
   const nodeBinary = path.join(desktopDir, "resources", "node", platform, "node");
@@ -139,7 +148,7 @@ for (const platform of platforms) {
 
   // Every native file, and the Node binary, must be this architecture. Checked where a tool can tell:
   // `lipo` on a Mac, `file` on Linux. (The other machine's apps are checked when they are built there.)
-  const native = walk(app).filter((file) => /\.(node|dylib|so)(\.\d+)*$/.test(file));
+  const native = walk(app).filter(isNativeFile);
   const checker = targetOs === "darwin" && process.platform === "darwin" ? "lipo" : targetOs === "linux" && process.platform === "linux" ? "file" : null;
   if (checker) {
     for (const file of [...native.map((name) => path.join(app, name)), nodeBinary]) {
