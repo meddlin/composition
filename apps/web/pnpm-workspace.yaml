@@ -2,3 +2,10 @@ allowBuilds:
   better-sqlite3: true
   sharp: false
   unrs-resolver: false
+
+# GHSA-g3hv-75wg-m249: minimatch >=7 <11.0.1 has a DoS via globparts amplification.
+# Pulled in by build/lint tooling only; the v3/v5 copies are outside the affected range.
+overrides:
+  "minimatch@>=7.0.0 <11.0.1": "^11.0.1"
+  # GHSA-rj75-hqrm-r3gf: quadratic selector parsing. @tailwindcss/typography pins 6.0.10 exactly.
+  "postcss-selector-parser@<6.1.5": "^6.1.5"
