@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { saveEditorFont, saveNoteBackground, savePreviewFont } from "@/lib/composition/client";
+import { saveEditorFont, saveNoteBackground, savePreviewFont, saveWritingSettings } from "@/lib/composition/client";
 import { EDITOR_FONT_CHOICES, editorFontStack } from "@/lib/composition/editorFonts";
 import { NOTE_BACKGROUND_CHOICES } from "@/lib/composition/noteBackgrounds";
 import { PREVIEW_FONT_CHOICES, previewFontStack } from "@/lib/composition/previewFonts";
@@ -14,6 +14,7 @@ vi.mock("@/lib/composition/client", () => ({
   saveNoteBackground: vi.fn(async () => ({})),
   saveSettings: vi.fn(async () => ({})),
   saveTheme: vi.fn(async () => ({})),
+  saveWritingSettings: vi.fn(async () => ({})),
 }));
 
 afterEach(() => {
@@ -28,6 +29,8 @@ function renderForm(
   currentPreviewFont: "default" | "lora" = "default",
   currentEditorFont: "default" | "lora" | "jetbrains-mono" = "default",
   currentNoteBackground: "plain" | "architect" = "plain",
+  currentHeadingRail = true,
+  currentHeadingRailSide: "left" | "right" = "left",
 ) {
   render(
     <StylingSettings
@@ -35,6 +38,8 @@ function renderForm(
       currentPreviewFont={currentPreviewFont}
       currentEditorFont={currentEditorFont}
       currentNoteBackground={currentNoteBackground}
+      currentHeadingRail={currentHeadingRail}
+      currentHeadingRailSide={currentHeadingRailSide}
       currentCity=""
     />,
   );
@@ -150,5 +155,71 @@ describe("note background setting", () => {
     expect(rootBackground()).toBe("plain");
     expect(screen.getByText("Unknown background.")).toBeTruthy();
     expect(within(backgroundGroup()).getByRole("radio", { name: "Plain" }).getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+describe("heading rail setting", () => {
+  const checkbox = () => screen.getByRole("checkbox", { name: "Show the heading rail" });
+
+  it("shows the saved choice", () => {
+    renderForm("default", "default", "plain", false);
+
+    expect(checkbox().getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("saves only the rail when it is switched", async () => {
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(checkbox());
+    });
+
+    expect(saveWritingSettings).toHaveBeenCalledWith({ headingRailEnabled: false });
+    expect(checkbox().getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("goes back to what it was and says why when the save fails", async () => {
+    vi.mocked(saveWritingSettings).mockResolvedValueOnce({ error: "Unknown writing setting." });
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(checkbox());
+    });
+
+    expect(screen.getByText("Unknown writing setting.")).toBeTruthy();
+    expect(checkbox().getAttribute("aria-checked")).toBe("true");
+  });
+});
+
+describe("heading rail side setting", () => {
+  const sides = () => screen.getByRole("radiogroup", { name: "Heading rail side" });
+
+  it("offers both sides, with the saved one selected", () => {
+    renderForm("default", "default", "plain", true, "right");
+
+    expect(within(sides()).getByRole("radio", { name: "Right of the text" }).getAttribute("aria-checked")).toBe("true");
+    expect(within(sides()).getByRole("radio", { name: "Left of the text" }).getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("saves only the side when one is picked", async () => {
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(within(sides()).getByRole("radio", { name: "Right of the text" }));
+    });
+
+    expect(saveWritingSettings).toHaveBeenCalledWith({ headingRailSide: "right" });
+  });
+
+  it("goes back to the old side and says why when the save fails", async () => {
+    vi.mocked(saveWritingSettings).mockResolvedValueOnce({ error: "Unknown writing setting." });
+    renderForm();
+
+    await act(async () => {
+      fireEvent.click(within(sides()).getByRole("radio", { name: "Right of the text" }));
+    });
+
+    expect(screen.getByText("Unknown writing setting.")).toBeTruthy();
+    expect(within(sides()).getByRole("radio", { name: "Left of the text" }).getAttribute("aria-checked")).toBe("true");
   });
 });

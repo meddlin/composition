@@ -162,16 +162,17 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   saveNoteBackground: ([background]) => [text("saveNoteBackground", background, "background")],
   saveWritingSettings: ([input]) => {
     const value = record("saveWritingSettings", input, "settings");
-    return [
-      {
-        rulerEnabled: flag("saveWritingSettings", value.rulerEnabled, "rulerEnabled"),
-        rulerColumn: finite("saveWritingSettings", value.rulerColumn, "rulerColumn"),
-        reflowEnabled: flag("saveWritingSettings", value.reflowEnabled, "reflowEnabled"),
-        reflowColumn: finite("saveWritingSettings", value.reflowColumn, "reflowColumn"),
-        reflowKeepsTables: flag("saveWritingSettings", value.reflowKeepsTables, "reflowKeepsTables"),
-        wordCountEnabled: flag("saveWritingSettings", value.wordCountEnabled, "wordCountEnabled"),
-      },
-    ];
+    // Only the settings sent are changed (the Styling page sends just its own), but something has to be sent.
+    const settings: Record<string, boolean | number | string> = {};
+    for (const key of ["rulerColumn", "reflowColumn"] as const) {
+      if (key in value) settings[key] = finite("saveWritingSettings", value[key], key);
+    }
+    for (const key of ["rulerEnabled", "reflowEnabled", "reflowKeepsTables", "wordCountEnabled", "headingRailEnabled"] as const) {
+      if (key in value) settings[key] = flag("saveWritingSettings", value[key], key);
+    }
+    if ("headingRailSide" in value) settings.headingRailSide = text("saveWritingSettings", value.headingRailSide, "headingRailSide");
+    if (Object.keys(settings).length === 0) fail("saveWritingSettings", "settings");
+    return [settings];
   },
   savePluginSettings: ([input]) => {
     const value = record("savePluginSettings", input, "settings");

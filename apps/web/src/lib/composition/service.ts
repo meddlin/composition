@@ -740,10 +740,12 @@ export async function saveNoteBackground(background: string): Promise<{ error?: 
   return {};
 }
 
-export async function saveWritingSettings(writing: WritingSettings): Promise<{ error?: string }> {
-  const checked = validateWritingSettings(writing);
+export async function saveWritingSettings(writing: Partial<WritingSettings>): Promise<{ error?: string }> {
+  // What isn't sent stays as saved, so the Writing and Styling pages can each save their own part.
+  const current = loadWebSettings();
+  const checked = validateWritingSettings({ ...current.writing, ...writing });
   if (!checked.settings) return { error: checked.error };
-  saveWebSettings({ ...loadWebSettings(), writing: checked.settings });
+  saveWebSettings({ ...current, writing: checked.settings });
   return {};
 }
 

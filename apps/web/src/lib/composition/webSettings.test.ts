@@ -114,6 +114,8 @@ describe("web settings layout", () => {
       reflowColumn: 80,
       reflowKeepsTables: true,
       wordCountEnabled: false,
+      headingRailEnabled: true,
+      headingRailSide: "left",
     });
   });
 

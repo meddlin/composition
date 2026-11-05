@@ -14,6 +14,8 @@ import { FrontmatterCard } from "./FrontmatterCard";
 import { ImagePickerMenu } from "./ImagePickerMenu";
 import { LiveEditor, type LiveEditorEvents } from "./LiveEditor";
 import { useLiveSurface } from "./liveSurface";
+import { HeadingRail, RAIL_GUTTER_PX } from "./HeadingRail";
+import { useLiveRail, usePreviewRail, useTextareaRail } from "./headingRails";
 import { HighlightMenu, type HighlightChoice } from "./HighlightMenu";
 import { highlightRange, removeHighlight, type TextRange } from "./highlightText";
 import { rememberHighlightColor } from "./lastHighlightColor";
@@ -292,6 +294,11 @@ export function MarkdownEditor({
   const highlightLayer = useHighlightSync(textarea, highlight, value);
 
   const previewBox = useRef<HTMLDivElement>(null);
+  const railOn = writing.headingRailEnabled;
+  const railSide = writing.headingRailSide;
+  const editorRail = useTextareaRail(textarea, value, railOn && showEditor);
+  const liveRail = useLiveRail(liveView, value, railOn && showLive);
+  const previewRail = usePreviewRail(previewBox, railOn && showPreview);
   const findQuery = find?.query ?? "";
   const findCurrent = find?.current ?? 0;
   const matchCase = find?.options.matchCase ?? false;
@@ -415,7 +422,7 @@ export function MarkdownEditor({
     // shown alone, so its caret, undo history and any image still uploading are not lost.
     <div
       ref={grid}
-      style={{ "--editor-col": `${ratio}fr`, "--preview-col": `${1 - ratio}fr` } as CSSProperties}
+      style={{ "--editor-col": `${ratio}fr`, "--preview-col": `${1 - ratio}fr`, "--note-pad-left": railOn && railSide === "left" ? `${RAIL_GUTTER_PX}px` : "1rem", "--note-pad-right": railOn && railSide === "right" ? `${RAIL_GUTTER_PX}px` : "1rem" } as CSSProperties}
       className={cn(
         "grid min-h-0 min-w-0 flex-1 grid-rows-1",
         view === "split" ? "grid-cols-[minmax(0,var(--editor-col))_auto_minmax(0,var(--preview-col))]" : "grid-cols-1",
@@ -468,7 +475,7 @@ export function MarkdownEditor({
               highlightLayer.sync();
             }}
             className={cn(
-              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 editor-text note-surface text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
+              "min-h-0 flex-1 resize-none rounded-none border-0 p-4 pl-(--note-pad-left) pr-(--note-pad-right) editor-text note-surface text-sm leading-6 field-sizing-fixed focus-visible:ring-0 md:text-sm dark:bg-transparent",
               // The colours come from the layer underneath; the textarea only draws the caret and selection over it.
               highlight && "relative text-transparent caret-foreground selection:bg-brand/30 selection:text-transparent",
             )}
@@ -476,13 +483,14 @@ export function MarkdownEditor({
           {writing.rulerEnabled && (
             // Clipped to the editor, so a ruler past its right edge doesn't widen the page.
             <div aria-hidden data-testid="editor-ruler" className="pointer-events-none absolute inset-0 overflow-hidden">
-              {/* Measured in the editor's own characters (`ch`), after its 1rem of padding; the font and size match the textarea's. */}
+              {/* Measured in the editor's own characters (`ch`), after its left padding; the font and size match the textarea's. */}
               <div
                 className="editor-text absolute inset-y-0 w-px bg-foreground/20 text-sm"
-                style={{ left: `calc(1rem + ${writing.rulerColumn}ch)` }}
+                style={{ left: `calc(var(--note-pad-left) + ${writing.rulerColumn}ch)` }}
               />
             </div>
           )}
+          {showEditor && <HeadingRail {...editorRail} side={railSide} />}
           {!showLive && menus}
         </div>
       </section>
@@ -504,7 +512,7 @@ export function MarkdownEditor({
         id={panelId(ids, "preview")}
         aria-labelledby={tabId(ids, "preview")}
         hidden={!showPreview}
-        className="flex min-h-0 flex-col"
+        className="relative flex min-h-0 flex-col"
       >
         {/* Not rendered while hidden: re-rendering Markdown on every keystroke would be wasted work. */}
         {showPreview && !showEditor && editNotice?.value === value && (
@@ -515,7 +523,7 @@ export function MarkdownEditor({
         {showPreview && (
           <PreviewHighlightMenu
             boxRef={previewBox}
-            className="prose preview-text note-pane note-surface max-w-none flex-1 overflow-y-auto p-4"
+            className="prose preview-text note-pane note-surface max-w-none flex-1 overflow-y-auto p-4 pl-(--note-pad-left) pr-(--note-pad-right)"
             text={value}
             body={body}
             onApply={applyHighlight}
@@ -528,6 +536,7 @@ export function MarkdownEditor({
             </NoteLinksProvider>
           </PreviewHighlightMenu>
         )}
+        {showPreview && <HeadingRail {...previewRail} side={railSide} />}
       </section>
       <section
         role="tabpanel"
@@ -568,13 +577,14 @@ export function MarkdownEditor({
             {writing.rulerEnabled && (
               // Clipped to the editor, so a ruler past its right edge doesn't widen the page.
               <div aria-hidden data-testid="editor-ruler" className="pointer-events-none absolute inset-0 overflow-hidden">
-                {/* After the editor's 1rem of padding, in the editor's own font: a column here is that many widths of a "0", which in a proportional font is only a guide. */}
+                {/* After the editor's left padding, in the editor's own font: a column here is that many widths of a "0", which in a proportional font is only a guide. */}
                 <div
                   className="preview-text absolute inset-y-0 w-px bg-foreground/20"
-                  style={{ left: `calc(1rem + ${writing.rulerColumn}ch)` }}
+                  style={{ left: `calc(var(--note-pad-left) + ${writing.rulerColumn}ch)` }}
                 />
               </div>
             )}
+            <HeadingRail {...liveRail} side={railSide} />
             {menus}
           </div>
         )}
