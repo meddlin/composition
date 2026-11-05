@@ -2,6 +2,7 @@
 
 Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveMarkdown.ts`](../../apps/web/src/components/notes/liveMarkdown.ts),
+[`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
 [`editorSurface.ts`](../../apps/web/src/components/notes/editorSurface.ts),
@@ -24,8 +25,13 @@ it will read, with the syntax showing only where the caret is. The other three t
   tags hidden, and the tags come back while the caret or a selection is anywhere from the opening tag to the closing
   one. A tag with no partner, one in code or in frontmatter, and one that runs over a line break are left showing.
 - **Horizontal rules** (`---`, `***`, `___` on a line of their own) are drawn as a line across the page with the marks hidden, and the marks come back while the caret is on the line.
+- **Images** (`![alt](src)` and `<Image src="…" />`) are drawn as the picture, in place of the text that writes them,
+  at the `width` an `<Image>` asks for and never wider than the note. A pasted image becomes one as soon as it has
+  uploaded. While the caret is on the text it stays, and the picture is drawn after it; a picture that can't be
+  loaded shows "Image not found: alt" in place of the text (beside the text, while the caret is on it, it is left out).
+  Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
-- Everything else (links, lists, quotes, code blocks, images, MDX tags) is shown as the Markdown you wrote, coloured
+- Everything else (links, lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
@@ -61,7 +67,7 @@ same scenario on each:
   background (Settings → Styling) each line is a whole grid square tall (a level 1 or 2 heading, two), so the text
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
-- Not in the Live tab, by design: inline images, rendered links and lists, and a preview of MDX components. Use
+- Not in the Live tab, by design: rendered links and lists, diagrams, and a preview of MDX components. Use
   **Split** for those.
 
 ## Keeping it level with the Markdown tab

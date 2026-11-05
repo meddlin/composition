@@ -2,6 +2,7 @@ import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
+import { ImageWidget } from "./liveImages";
 import { bodyStart, scanOf, liveDecorations } from "./liveMarkdown";
 
 type Found = { from: number; to: number; kind: string };
@@ -366,5 +367,99 @@ describe("syntax colours", () => {
   it("finds the same runs again as the text changes (not kept from before)", () => {
     expect(scanOf("`a`").tokens).toHaveLength(1);
     expect(scanOf("a").tokens).toHaveLength(0);
+  });
+});
+
+describe("images", () => {
+  /** The pictures drawn for `text` with the caret at `caret`: where, whether in place of the text or beside it, and what. */
+  function pictures(text: string, caret: number | [number, number]) {
+    const [from, to] = typeof caret === "number" ? [caret, caret] : caret;
+    const state = EditorState.create({
+      doc: text,
+      selection: EditorSelection.range(from, to),
+      extensions: [markdown({ base: markdownLanguage })],
+    });
+    ensureSyntaxTree(state, state.doc.length, 5000);
+    const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
+    const found: { from: number; to: number; beside: boolean; spec: ImageWidget["spec"] }[] = [];
+    set.between(0, state.doc.length, (start, end, value) => {
+      const widget = value.spec.widget;
+      if (widget instanceof ImageWidget) found.push({ from: start, to: end, beside: widget.beside, spec: widget.spec });
+    });
+    return found;
+  }
+
+  const stored = "![diagram](app_data/map-0123456789ab.png)";
+
+  it("draws a Markdown image in place of its text while the caret is elsewhere", () => {
+    const text = `before ${stored} after`;
+    expect(pictures(text, 0)).toEqual([
+      { from: 7, to: 7 + stored.length, beside: false, spec: { src: "app_data/map-0123456789ab.png", alt: "diagram", title: "", width: "" } },
+    ]);
+  });
+
+  it("keeps the text while the caret is on it, and draws the picture after it", () => {
+    const text = `before ${stored} after`;
+    const end = 7 + stored.length;
+    for (const caret of [7, 20, end]) {
+      expect(pictures(text, caret)).toMatchObject([{ from: end, to: end, beside: true }]);
+    }
+    expect(pictures(text, [0, 9])).toMatchObject([{ beside: true }]);
+  });
+
+  it("reads the title, an address in angle brackets, and an address on the web", () => {
+    expect(pictures('![a](https://example.com/p.png "Hover")', 0)[0].spec).toEqual({
+      src: "https://example.com/p.png",
+      alt: "a",
+      title: "Hover",
+      width: "",
+    });
+    expect(pictures("![my map](<app_data/x y.png>)", 0)[0].spec.src).toBe("app_data/x y.png");
+  });
+
+  it("leaves alone an image with no address of its own, and one in code", () => {
+    expect(pictures("![alt][ref]\n\n[ref]: app_data/x.png", 30)).toEqual([]);
+    expect(pictures("![alt]()", 0)).toEqual([]);
+    expect(pictures("`![a](app_data/x.png)` and\n\n```\n![a](app_data/x.png)\n```", 0)).toEqual([]);
+  });
+
+  it("does not draw an image in frontmatter", () => {
+    const fm = "---\ntitle: 'x ![a](app_data/x.png)'\n---\nbody";
+    expect(pictures(fm, fm.length)).toEqual([]);
+  });
+
+  describe("<Image />", () => {
+    const tag = '<Image src="app_data/map-0123456789ab.png" alt="the map" width="50%" />';
+
+    it("is drawn in place of the tag, with its alt text and width", () => {
+      const text = `see\n\n${tag}\n\nafter`;
+      expect(pictures(text, 0)).toEqual([
+        {
+          from: 5,
+          to: 5 + tag.length,
+          beside: false,
+          spec: { src: "app_data/map-0123456789ab.png", alt: "the map", title: "", width: "50%" },
+        },
+      ]);
+    });
+
+    it("keeps the tag, and draws the picture after it, while the caret is on it", () => {
+      expect(pictures(tag, 10)).toMatchObject([{ from: tag.length, to: tag.length, beside: true }]);
+    });
+
+    it("reads single quotes and braced strings", () => {
+      const text = "<Image src='app_data/x.png' alt={\"a b\"} />";
+      expect(pictures(text, 0)[0].spec).toMatchObject({ src: "app_data/x.png", alt: "a b" });
+    });
+
+    it("waits for a src, and for the tag to be closed", () => {
+      expect(pictures('<Image alt="x" />', 0)).toEqual([]);
+      expect(pictures('<Image src="app_data/x.png"', 0)).toEqual([]);
+    });
+
+    it("leaves a tag in code alone", () => {
+      expect(pictures(`\`${tag}\``, 0)).toEqual([]);
+      expect(pictures(`\`\`\`\n${tag}\n\`\`\``, 0)).toEqual([]);
+    });
   });
 });

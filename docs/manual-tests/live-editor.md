@@ -42,6 +42,8 @@ inserts text, which skips key events and so skips the menus' key handling.
 ## 4. Images and diagrams
 
 - [ ] Copy a screenshot to the clipboard and paste: `[Uploading image (1)…]` appears at the caret at once, then becomes `![image](app_data/…)` with the caret still after it. Paste two at once.
+- [ ] When that finishes, the picture itself is drawn in the line (the Markdown is hidden); click it and the Markdown comes back, dimmed, with the picture after it; move away and it is the picture again.
+- [ ] Type `<Image src="app_data/…" width="50%" />` (a name from the Images page) and `![x](app_data/nope-0123456789ab.png)`: the first draws at half the note's width, the second says "Image not found: x".
 - [ ] Paste a picture and, before it finishes, switch to the Markdown tab and back: it still resolves, in whichever editor you are in.
 - [ ] Paste text copied from a spreadsheet: the text pastes, not a picture.
 - [ ] Put the caret in `![alt](src)` and press Cmd/Ctrl+Shift+X: it becomes `<Image … />` with the caret ready for another prop; one undo takes it back.
