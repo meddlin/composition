@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
+import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
 import { tokenizeMarkdown, type TokenKind } from "./markdownTokens";
 import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
@@ -39,6 +40,9 @@ const styles = new Map(Object.values(INLINE).map(({ class: name }) => [name, Dec
 
 type Span = { from: number; to: number };
 
+/** A node of the Markdown syntax tree (its package is not one of ours to import from). */
+type SyntaxNode = ReturnType<typeof syntaxTree>["topNode"];
+
 /** Whether the caret, or any selection, reaches `from`..`to`, ends included. */
 function touches(state: EditorState, from: number, to: number): boolean {
   return state.selection.ranges.some((range) => range.from <= to && range.to >= from);
@@ -70,9 +74,11 @@ export type NoteScan = {
   elements: readonly MarkElement[];
   /** The runs the plain editor colours, and in which of its colours (the `md-…` classes). */
   tokens: readonly Token[];
+  /** Each `<Image … />`, to draw (Markdown's `![alt](src)` is found in the syntax tree instead). */
+  images: readonly ImageElement[];
 };
 
-const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [] };
+const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [], images: [] };
 
 /**
  * Reads the note the way the plain editor does to colour it: its runs (`tokenizeMarkdown`), the text between each
@@ -89,8 +95,31 @@ export function scanOf(text: string): NoteScan {
     if (kind && COLOURED.has(kind)) tokens.push({ start: at, end: at + run.length, kind });
     at += run.length;
   }
-  if (!text.includes("<Mark")) return { tints: [], elements: [], tokens };
-  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens };
+  const images = imageElements(text, segments);
+  if (!text.includes("<Mark")) return { tints: [], elements: [], tokens, images };
+  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens, images };
+}
+
+/** What a Markdown `![alt](src "title")` shows, or null when it has no address of its own (`![alt][ref]`). */
+function markdownImage(state: EditorState, image: SyntaxNode): NoteImageSpec | null {
+  const url = image.getChild("URL");
+  if (!url) return null;
+  const src = markdownImageSrc(state.sliceDoc(url.from, url.to));
+  if (src === "") return null;
+  const title = image.getChild("LinkTitle");
+  // The alt text is what lies between the `![` and the `]` that closes it.
+  const marks = image.getChildren("LinkMark");
+  const alt = marks.length >= 2 ? state.sliceDoc(marks[0].to, marks[1].from) : "";
+  return { src, alt, title: title ? markdownImageTitle(state.sliceDoc(title.from, title.to)) : "", width: "" };
+}
+
+/**
+ * Draws a picture in place of the text that writes it. While the caret is on that text it stays, as the syntax of
+ * anything does, and the picture is drawn after it, so what is being typed or edited is the text and is still seen.
+ */
+function drawImage(decorations: Range<Decoration>[], image: NoteImageSpec, from: number, to: number, active: boolean) {
+  if (active) decorations.push(Decoration.widget({ widget: new ImageWidget(image, true), side: 1 }).range(to));
+  else decorations.push(Decoration.replace({ widget: new ImageWidget(image, false) }).range(from, to));
 }
 
 /**
@@ -140,6 +169,13 @@ export function liveDecorations(
           return;
         }
 
+        if (node.name === "Image") {
+          const image = markdownImage(state, node.node);
+          if (!image) return;
+          drawImage(decorations, image, node.from, node.to, touches(state, node.from, node.to));
+          return false;
+        }
+
         const inline = INLINE[node.name];
         if (!inline) return;
         decorations.push(styles.get(inline.class)!.range(node.from, node.to));
@@ -157,6 +193,9 @@ export function liveDecorations(
   }
   for (const { start, end, color } of scan.tints) {
     if (start < end && end <= doc.length) decorations.push(tintMarks.get(color)!.range(start, end));
+  }
+  for (const { start, end, ...image } of scan.images) {
+    if (end <= doc.length) drawImage(decorations, image, start, end, touches(state, start, end));
   }
   for (const { open, close } of scan.elements) {
     if (close.end > doc.length) continue;
@@ -235,6 +274,10 @@ const liveTheme = EditorView.baseTheme({
     backgroundPosition: "0 50%",
     backgroundRepeat: "no-repeat",
   },
+  // A picture drawn in the text: never wider than the note, and sitting on the line like a word.
+  ".cm-live-image": { display: "inline-block", maxWidth: "100%", verticalAlign: "bottom" },
+  ".cm-live-image img": { display: "block", maxWidth: "100%", height: "auto" },
+  ".cm-live-image-missing": { color: "var(--muted-foreground)", fontStyle: "italic" },
   ".cm-live-frontmatter": {
     fontFamily: "var(--editor-font, var(--font-mono))",
     fontSize: "0.85em",

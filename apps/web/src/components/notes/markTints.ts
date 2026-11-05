@@ -11,7 +11,7 @@ const MARK_TAG = /<Mark\b[^<>]*>|<\/Mark\s*>/g;
 const COLOR = /\bcolor="([^"]*)"/;
 
 /** Whether an index in the text is in a stretch whose tags are not tags. Ask in increasing order of index. */
-function literalFinder(segments: Segment[]): (index: number) => boolean {
+export function literalFinder(segments: Segment[]): (index: number) => boolean {
   const literal: [start: number, end: number][] = [];
   let at = 0;
   for (const segment of segments) {
