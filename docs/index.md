@@ -150,3 +150,5 @@ See [ui/web-side-by-side.md](ui/web-side-by-side.md) for opening several notes s
 See [ui/panels.md](ui/panels.md) for how the desktop app's panels behave (a resizable grid of notes and notes browsers, saved between launches),
 [panel-system-plan.md](panel-system-plan.md) for the design, the build order and what is still to come (dragging a panel out of the window, keyboard shortcuts and menu entries),
 and [panel-system-research.md](panel-system-research.md) for the pop-out spike and the facts behind it.
+
+See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
