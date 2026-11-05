@@ -32,6 +32,8 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
       reflowColumn: 80,
       reflowKeepsTables: true,
       wordCountEnabled: false,
+      headingRailEnabled: true,
+      headingRailSide: "left",
     },
     home: {
       layout: "rail",
