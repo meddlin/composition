@@ -109,16 +109,19 @@ describe("a pop-out's page", () => {
     const { store, b } = setup();
     render(<PopoutApp />);
     await screen.findByRole("region", { name: "Beta" });
-    expect(document.title).toBe("Beta");
+    expect(document.title).toBe("Composition - Beta");
 
+    let second!: ReturnType<typeof store.splitPanel>;
     act(() => {
-      const second = store.splitPanel(b, "right")!;
-      store.setPanelKind(second, "notes-browser");
+      second = store.splitPanel(b, "right")!;
+      store.setPanelKind(second!, "notes-browser");
     });
 
-    expect(document.title).toBe("Notes browser");
+    expect(document.title).toBe("Composition - Notes browser");
+    act(() => store.setPanelKind(second!, "todo"));
+    expect(document.title).toBe("Composition - To-do");
     act(() => store.focusPanel(b));
-    expect(document.title).toBe("Beta");
+    expect(document.title).toBe("Composition - Beta");
   });
 
   it("does not drop its window from the workspace when the page is left: the app also tears pop-outs down as it quits, and they must come back", async () => {
