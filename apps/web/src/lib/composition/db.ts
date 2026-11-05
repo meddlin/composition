@@ -158,6 +158,8 @@ const TODO_CYCLE_COLUMNS: readonly [column: string, ddl: string][] = [
   ["roll_count", "ALTER TABLE todos ADD COLUMN roll_count INTEGER NOT NULL DEFAULT 0"],
   // Hand-set order among siblings; NULL until the owner arranges them, and those are listed last, oldest first (see todos.ts placeTodo).
   ["position", "ALTER TABLE todos ADD COLUMN position INTEGER"],
+  // 1 (critical) to 5 (nice to have); NULL when none is set.
+  ["priority", "ALTER TABLE todos ADD COLUMN priority INTEGER"],
 ];
 
 /**

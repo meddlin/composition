@@ -1,5 +1,5 @@
 import { applyOrder, placeBefore } from "./ordering";
-import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoStatus } from "./todosApi";
+import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoPriority, type TodoStatus } from "./todosApi";
 
 /** An item with its sub-items, in order. */
 export type TodoNode = { todo: Todo; children: TodoNode[] };
@@ -148,6 +148,27 @@ export function doneLastGroups(todos: readonly Todo[]): number[][] {
 /** The items with the done ones moved below the open ones among their siblings, at every level. Nothing else changes order. */
 export function sortDoneLast(todos: readonly Todo[]): Todo[] {
   return doneLastGroups(todos).reduce((list, ids) => applyOrder(list, ids), [...todos]);
+}
+
+/** The item with its priority set, or cleared with null. */
+export function withPriority(todo: Todo, priority: TodoPriority | null): Todo {
+  const { priority: _old, ...rest } = todo;
+  void _old;
+  return priority === null ? rest : { ...rest, priority };
+}
+
+/** Every group of siblings, as ids in priority order: P1 first, items with none last, equal ones keeping the order they have. */
+export function priorityGroups(todos: readonly Todo[]): number[][] {
+  const groups = new Map<number | null, Todo[]>();
+  for (const todo of todos) groups.set(todo.parentId, [...(groups.get(todo.parentId) ?? []), todo]);
+  const rank = (todo: Todo) => todo.priority ?? Number.POSITIVE_INFINITY;
+  // Array.prototype.sort is stable, so equal priorities keep their order.
+  return [...groups.values()].map((group) => [...group].sort((a, b) => rank(a) - rank(b)).map((t) => t.id));
+}
+
+/** The items sorted by priority among their siblings, at every level. Nothing else changes order. */
+export function sortByPriority(todos: readonly Todo[]): Todo[] {
+  return priorityGroups(todos).reduce((list, ids) => applyOrder(list, ids), [...todos]);
 }
 
 /** A title as it is stored: trimmed, on one line. Null when nothing is left, or it is too long to keep. */

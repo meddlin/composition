@@ -262,6 +262,37 @@ describe("the to-do store's order", () => {
   });
 });
 
+describe("the to-do store's priorities", () => {
+  it("shows a priority at once, asks the backend to keep it, and clears it with null", async () => {
+    const api = fakeBackend([make(1, null, "a")]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const setting = store.setPriority(1, 2);
+    expect(store.getSnapshot().todos[0].priority).toBe(2);
+    expect(await setting).toEqual({});
+    expect(api.setTodoPriority).toHaveBeenCalledWith(1, 2);
+
+    await store.setPriority(1, null);
+    expect(store.getSnapshot().todos[0].priority).toBeUndefined();
+  });
+
+  it("shows the sort at once, and puts things back when the backend refuses", async () => {
+    const api = fakeBackend([make(1, null, "a"), { ...make(2, null, "b"), priority: 1 }]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const sorting = store.sortByPriority();
+    expect(store.getSnapshot().todos.map((t) => t.title)).toEqual(["b", "a"]);
+    await sorting;
+    expect(api.sortTodosByPriority).toHaveBeenCalledTimes(1);
+
+    api.setTodoPriority.mockRejectedValueOnce(new Error("no disk"));
+    expect(await store.setPriority(1, 3)).toEqual({ error: "no disk" });
+    expect(store.getSnapshot().todos.find((t) => t.id === 1)!.priority).toBeUndefined();
+  });
+});
+
 describe("the to-do store's weekly cycle", () => {
   const rolled = (id: number, parentId: number | null, title: string, rollCount = 2): Todo => ({
     ...make(id, parentId, title),

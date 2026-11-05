@@ -3,9 +3,9 @@ import { getDb } from "./db";
 import type { ArchiveReason, EventKind, TodoEvent } from "./todoEvents";
 import { planSweep, type SweepItem, type WeekPlan } from "./todoSweep";
 import { placeBefore } from "./ordering";
-import { doneLastGroups, withDone, withStatus } from "./todos";
+import { doneLastGroups, priorityGroups, withDone, withStatus } from "./todos";
 import { localDateOf, weekOf, type DayOfWeek, type Period } from "./todoWeeks";
-import { isTodoStatus, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoStatus } from "./todosApi";
+import { isTodoPriority, isTodoStatus, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoPriority, type TodoStatus } from "./todosApi";
 
 type TodoRow = {
   id: number;
@@ -13,6 +13,7 @@ type TodoRow = {
   title: string;
   done: number;
   status: string;
+  priority: number | null;
   created_at: string;
   updated_at: string;
   done_at: string | null;
@@ -30,6 +31,7 @@ function fromRow(row: TodoRow): Todo {
     title: row.title,
     status,
     done: status === "done",
+    ...(isTodoPriority(row.priority) && { priority: row.priority }),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     ...(row.done_at !== null && status === "done" && { doneAt: row.done_at }),
@@ -180,7 +182,7 @@ export function addTodo(title: string, parentId: number | null, now: Date = new 
 /** A change to an item: a new title, and/or ticking it (`done`) or moving it (`status`; wins over `done` if both are given). */
 export function updateTodo(
   id: number,
-  change: { title?: string; done?: boolean; status?: TodoStatus },
+  change: { title?: string; done?: boolean; status?: TodoStatus; priority?: TodoPriority | null },
   now: Date = new Date(),
 ): Todo | null {
   const current = getTodo(id);
@@ -189,12 +191,15 @@ export function updateTodo(
   if (change.done !== undefined) next = withDone(next, change.done);
   if (change.status !== undefined) next = withStatus(next, change.status);
   const title = change.title ?? current.title;
+  // A priority is not part of the activity log (the weekly reports count status changes), so changing it logs nothing.
+  const priority = change.priority === undefined ? (current.priority ?? null) : change.priority;
   const db = getDb();
   db.transaction(() => {
-    db.prepare("UPDATE todos SET title = ?, done = ?, status = ?, updated_at = ? WHERE id = ?").run(
+    db.prepare("UPDATE todos SET title = ?, done = ?, status = ?, priority = ?, updated_at = ? WHERE id = ?").run(
       title,
       next.done ? 1 : 0,
       next.status,
+      priority,
       now.toISOString(),
       id,
     );
@@ -241,6 +246,15 @@ export function sortDoneLast(): void {
   db.transaction(() => {
     const setPosition = db.prepare("UPDATE todos SET position = ? WHERE id = ?");
     for (const ids of doneLastGroups(listTodos())) ids.forEach((todoId, index) => setPosition.run(index, todoId));
+  })();
+}
+
+/** "Sort by priority": among the siblings at every level, P1 goes first and items with none last, equal ones keeping their order. */
+export function sortByPriority(): void {
+  const db = getDb();
+  db.transaction(() => {
+    const setPosition = db.prepare("UPDATE todos SET position = ? WHERE id = ?");
+    for (const ids of priorityGroups(listTodos())) ids.forEach((todoId, index) => setPosition.run(index, todoId));
   })();
 }
 

@@ -513,3 +513,26 @@ describe("arranging the to-do service's items", () => {
     expect((await listTodos()).map((t) => t.title)).toEqual(["b", "a"]);
   });
 });
+
+describe("priority", () => {
+  it("sets a priority, clears it, and refuses one that is not a priority or an item that is gone", async () => {
+    const { createTodo, setTodoPriority } = await import("./todosService");
+    const a = await createTodo("a", null);
+
+    expect((await setTodoPriority(a.id, 3)).priority).toBe(3);
+    expect((await setTodoPriority(a.id, null)).priority).toBeUndefined();
+    await expect(setTodoPriority(a.id, 6 as never)).rejects.toThrow("not a to-do priority");
+    await expect(setTodoPriority(999, 1)).rejects.toThrow("no longer exists");
+  });
+
+  it("sorts the list by priority", async () => {
+    const { createTodo, setTodoPriority, sortTodosByPriority, listTodos } = await import("./todosService");
+    await createTodo("a", null);
+    const b = await createTodo("b", null);
+    await setTodoPriority(b.id, 1);
+
+    await sortTodosByPriority();
+
+    expect((await listTodos()).map((t) => t.title)).toEqual(["b", "a"]);
+  });
+});

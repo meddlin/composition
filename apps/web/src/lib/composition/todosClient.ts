@@ -24,8 +24,10 @@ export const createTodo: TodosApi["createTodo"] = (title, parentId) => bridge().
 export const renameTodo: TodosApi["renameTodo"] = (id, title) => bridge().renameTodo(id, title);
 export const setTodoDone: TodosApi["setTodoDone"] = (id, done) => bridge().setTodoDone(id, done);
 export const setTodoStatus: TodosApi["setTodoStatus"] = (id, status) => bridge().setTodoStatus(id, status);
+export const setTodoPriority: TodosApi["setTodoPriority"] = (id, priority) => bridge().setTodoPriority(id, priority);
 export const moveTodo: TodosApi["moveTodo"] = (id, beforeId) => bridge().moveTodo(id, beforeId);
 export const sortDoneTodosLast: TodosApi["sortDoneTodosLast"] = () => bridge().sortDoneTodosLast();
+export const sortTodosByPriority: TodosApi["sortTodosByPriority"] = () => bridge().sortTodosByPriority();
 export const deleteTodo: TodosApi["deleteTodo"] = (id) => bridge().deleteTodo(id);
 export const previewTodoDelete: TodosApi["previewTodoDelete"] = (id) => bridge().previewTodoDelete(id);
 export const loadTodoReports: TodosApi["loadTodoReports"] = () => bridge().loadTodoReports();

@@ -742,3 +742,50 @@ describe("arranging", () => {
     expect(todos.filter((t) => t.parentId === c.id).map((t) => t.title)).toEqual(["c2", "c1"]);
   });
 });
+
+describe("priority", () => {
+  it("starts with none, keeps what is set, and clears it", async () => {
+    const { addTodo, updateTodo, getTodo } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    expect(getTodo(a.id)!.priority).toBeUndefined();
+
+    expect(updateTodo(a.id, { priority: 2 }, local(10, 27))!.priority).toBe(2);
+    // Another change leaves it alone.
+    expect(updateTodo(a.id, { title: "a2" }, local(10, 27))!.priority).toBe(2);
+    expect(updateTodo(a.id, { priority: null }, local(10, 27))!.priority).toBeUndefined();
+  });
+
+  it("is not logged, and survives being removed and restored", async () => {
+    const { addTodo, updateTodo, archiveTodoTree, restoreTodo, getTodo, listTodoEvents } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    const events = listTodoEvents().length;
+
+    updateTodo(a.id, { priority: 1 }, local(10, 27));
+    expect(listTodoEvents()).toHaveLength(events);
+
+    archiveTodoTree(a.id, "removed", 0, local(10, 28));
+    restoreTodo(a.id, local(10, 28));
+    expect(getTodo(a.id)!.priority).toBe(1);
+  });
+
+  it("sorts by priority at every level, P1 first and none last, equal ones keeping their order", async () => {
+    const { addTodo, updateTodo, sortByPriority, listTodos } = await import("./todosRepo");
+    const a = addTodo("a", null, local(10, 26));
+    const b = addTodo("b", null, local(10, 26));
+    addTodo("c", null, local(10, 26));
+    const d = addTodo("d", null, local(10, 26));
+    const b1 = addTodo("b1", b.id, local(10, 26));
+    const b2 = addTodo("b2", b.id, local(10, 26));
+    updateTodo(a.id, { priority: 3 });
+    updateTodo(b.id, { priority: 1 });
+    updateTodo(d.id, { priority: 3 });
+    updateTodo(b2.id, { priority: 2 });
+    void b1;
+
+    sortByPriority();
+
+    const todos = listTodos();
+    expect(todos.filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["b", "a", "d", "c"]);
+    expect(todos.filter((t) => t.parentId === b.id).map((t) => t.title)).toEqual(["b2", "b1"]);
+  });
+});

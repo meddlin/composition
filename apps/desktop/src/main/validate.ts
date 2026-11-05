@@ -10,7 +10,7 @@ import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingLis
 import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
 import { isRetention, validateTodoSettings } from "../../../web/src/lib/composition/todoSettings";
-import { isReportKind, isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
+import { isReportKind, isTodoPriority, isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
 import { isLocalDate } from "../../../web/src/lib/composition/todoWeeks";
 import type { UpdateMethod } from "../../../web/src/lib/composition/updatesApi";
 import type { WindowMethod } from "../../../web/src/lib/composition/windowApi";
@@ -290,8 +290,13 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     id("setTodoStatus", todoId, "id"),
     isTodoStatus(status) ? status : fail("setTodoStatus", "status"),
   ],
+  setTodoPriority: ([todoId, priority]) => [
+    id("setTodoPriority", todoId, "id"),
+    priority === null || isTodoPriority(priority) ? priority : fail("setTodoPriority", "priority"),
+  ],
   moveTodo: ([todoId, beforeId]) => [id("moveTodo", todoId, "id"), nullableId("moveTodo", beforeId, "beforeId")],
   sortDoneTodosLast: none,
+  sortTodosByPriority: none,
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],
   previewTodoDelete: ([todoId]) => [id("previewTodoDelete", todoId, "id")],
   loadTodoReports: none,

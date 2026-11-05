@@ -1,12 +1,12 @@
 "use client";
 
-import { ArchiveIcon, ArrowDownToLineIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FileTextIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { ArchiveIcon, ArrowDownToLineIcon, ArrowUpNarrowWideIcon, ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, FileTextIcon, KanbanIcon, ListIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { reportSections } from "@/lib/composition/todoReportList";
-import { archiveGroups, countDescendants, sortDoneLast, subtreeIds, todoSections, type TodoNode } from "@/lib/composition/todos";
+import { archiveGroups, countDescendants, sortByPriority, sortDoneLast, subtreeIds, todoSections, type TodoNode } from "@/lib/composition/todos";
 import { MAX_TODO_TITLE_LENGTH, type ArchivedTodo, type Todo, type TodoDeletePreview, type TodoMissingReport, type TodoReportEntry } from "@/lib/composition/todosApi";
 import type { ReportKind } from "@/lib/composition/todoReports";
 import type { TodoResult } from "@/lib/composition/todosStore";
@@ -20,6 +20,7 @@ import { RolledEntry } from "./RolledOver";
 import { TodoArchive } from "./TodoArchive";
 import { TodoBoard } from "./TodoBoard";
 import { TodoMenu } from "./TodoMenu";
+import { PriorityMenu } from "./TodoPriority";
 import { TodoReports } from "./TodoReports";
 import { todoLookStyle } from "./todoLookStyle";
 
@@ -208,8 +209,14 @@ function TodoRow(props: RowProps) {
             {todo.title}
           </span>
         )}
+        {todo.priority !== undefined && (
+          <PriorityMenu title={todo.title} priority={todo.priority} onChange={(priority) => void store.todos.setPriority(todo.id, priority)} />
+        )}
         {editing !== todo.id && (
           <div className="flex shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
+            {todo.priority === undefined && (
+              <PriorityMenu title={todo.title} priority={undefined} onChange={(priority) => void store.todos.setPriority(todo.id, priority)} />
+            )}
             {section && (
               <>
                 <Button variant="ghost" size="icon-xs" aria-label={`Move ${todo.title} up`} title="Move up" disabled={!above} onClick={() => above && onPlace(todo.id, above.todo.id, "before")}>
@@ -552,6 +559,21 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     nodes.map((node) => <TodoRow key={node.todo.id} node={node} depth={0} {...rowProps} siblings={nodes} section={section} />);
   /** Whether the done items are already below the open ones among their siblings, so there is nothing for "Move completed to the bottom" to do. */
   const doneAtBottom = sortDoneLast(todos).every((t, i) => t.id === todos[i].id);
+  /** Likewise for "Sort by priority". */
+  const prioritySorted = sortByPriority(todos).every((t, i) => t.id === todos[i].id);
+  const sortButton = (
+    <Button
+      variant="ghost"
+      size="xs"
+      className="text-muted-foreground"
+      disabled={prioritySorted}
+      title="Order the to-dos by priority, P1 first and those with none last"
+      onClick={() => void todosStore.sortByPriority()}
+    >
+      <ArrowUpNarrowWideIcon />
+      Sort by priority
+    </Button>
+  );
   const rolledEntries = (withChildren: boolean) =>
     sections.rolledOver.map((node) => (
       <RolledEntry
@@ -696,17 +718,20 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
               dropZone={weekDropZone}
               actions={
                 sections.thisWeek.length > 0 && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    className="text-muted-foreground"
-                    disabled={doneAtBottom}
-                    title="Move the completed to-dos below the others"
-                    onClick={() => void todosStore.sortDoneLast()}
-                  >
-                    <ArrowDownToLineIcon />
-                    Completed to bottom
-                  </Button>
+                  <div className="flex">
+                    {sortButton}
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      className="text-muted-foreground"
+                      disabled={doneAtBottom}
+                      title="Move the completed to-dos below the others"
+                      onClick={() => void todosStore.sortDoneLast()}
+                    >
+                      <ArrowDownToLineIcon />
+                      Completed to bottom
+                    </Button>
+                  </div>
                 )
               }
             >
@@ -736,6 +761,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
               folded={state.foldedSections.includes("backlog")}
               onToggle={() => toggleSection("backlog")}
               dropZone={backlogDropZone}
+              actions={sections.backlog.length > 0 && sortButton}
             >
               <TitleInput
                 label="New backlog item"

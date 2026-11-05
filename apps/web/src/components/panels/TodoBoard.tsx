@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { TODO_STATUSES, type Todo, type TodoStatus } from "@/lib/composition/todosApi";
 import { cn } from "@/lib/utils";
 import { TodoMenu } from "./TodoMenu";
+import { PriorityBadge } from "./TodoPriority";
 
 export const STATUS_LABELS: Record<TodoStatus, string> = {
   backlog: "Backlog",
@@ -54,6 +55,7 @@ function Card({
     >
       {parentTitle !== null && <span className="truncate text-xs text-muted-foreground">in {parentTitle}</span>}
       <span className={cn("break-words", todo.done && "text-muted-foreground line-through")}>{todo.title}</span>
+      {todo.priority !== undefined && <PriorityBadge priority={todo.priority} className="self-start" />}
       <div className="flex items-center justify-between">
         <div className="flex">
           <Button
