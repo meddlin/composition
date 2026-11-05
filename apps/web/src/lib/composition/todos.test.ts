@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, placeTodo, sortDoneLast, subtreeIds, todoSections, withDone, withStatus } from "./todos";
-import type { ArchivedTodo, Todo } from "./todosApi";
+import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, placeTodo, sortByPriority, sortDoneLast, subtreeIds, todoSections, withDone, withPriority, withStatus } from "./todos";
+import type { ArchivedTodo, Todo, TodoPriority } from "./todosApi";
 
 const todo = (id: number, parentId: number | null, title = `t${id}`): Todo => ({
   id,
@@ -259,5 +259,39 @@ describe("sortDoneLast", () => {
     const todos = [todo(1, null), todo(2, 1), done(3, 1), done(4, null)];
 
     expect(ids(sortDoneLast(todos))).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("withPriority", () => {
+  it("sets a priority, replaces it, and clears it with null", () => {
+    const set = withPriority(todo(1, null), 2);
+    expect(set.priority).toBe(2);
+    expect(withPriority(set, 5).priority).toBe(5);
+    expect("priority" in withPriority(set, null)).toBe(false);
+  });
+});
+
+describe("sortByPriority", () => {
+  const ranked = (id: number, parentId: number | null, priority?: TodoPriority): Todo => ({ ...todo(id, parentId), ...(priority && { priority }) });
+  const ids = (todos: Todo[]) => todos.map((t) => t.id);
+
+  it("puts P1 first and the items with no priority last, equal ones keeping their order", () => {
+    const todos = [ranked(1, null), ranked(2, null, 3), ranked(3, null, 1), ranked(4, null, 3), ranked(5, null, 5), ranked(6, null, 2)];
+
+    expect(ids(sortByPriority(todos))).toEqual([3, 6, 2, 4, 5, 1]);
+  });
+
+  it("sorts the sub-items among themselves and keeps them with their parent's list", () => {
+    const todos = [ranked(1, null, 4), ranked(2, 1, 5), ranked(3, 1, 1), ranked(4, null, 2)];
+
+    const sorted = sortByPriority(todos);
+    expect(ids(sorted.filter((t) => t.parentId === null))).toEqual([4, 1]);
+    expect(ids(sorted.filter((t) => t.parentId === 1))).toEqual([3, 2]);
+  });
+
+  it("changes nothing when they are already in order", () => {
+    const todos = [ranked(1, null, 1), ranked(2, null, 2), ranked(3, null)];
+
+    expect(ids(sortByPriority(todos))).toEqual([1, 2, 3]);
   });
 });

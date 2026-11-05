@@ -1347,3 +1347,70 @@ describe("moving the completed to the bottom", () => {
     expect(screen.queryByRole("button", { name: /Completed to bottom/ })).toBeNull();
   });
 });
+
+describe("priorities", () => {
+  const titles = (region: string) => within(section(region)).getAllByRole("checkbox").map((box) => (box.getAttribute("aria-label") ?? "").replace(": done", ""));
+  const openPriority = (name: string) => fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
+
+  it("sets a priority from the menu on a row, and shows it as a badge", async () => {
+    const { todos } = await openList([item(1, null, "Buy milk")]);
+
+    openPriority("Set the priority of Buy milk");
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "P2 – High" }));
+
+    await waitFor(() => expect(todos.getSnapshot().todos[0].priority).toBe(2));
+    expect(await screen.findByLabelText("Priority P2, High")).toBeTruthy();
+  });
+
+  it("changes and clears a priority from its badge", async () => {
+    const { todos } = await openList([{ ...item(1, null, "Buy milk"), priority: 3 }]);
+
+    openPriority("Change the priority of Buy milk (now P3, Medium)");
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "P1 – Critical" }));
+    await waitFor(() => expect(todos.getSnapshot().todos[0].priority).toBe(1));
+
+    openPriority("Change the priority of Buy milk (now P1, Critical)");
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "No priority" }));
+    await waitFor(() => expect(todos.getSnapshot().todos[0].priority).toBeUndefined());
+    expect(screen.queryByLabelText(/^Priority P/)).toBeNull();
+  });
+
+  it("offers all five priorities by name", async () => {
+    await openList([item(1, null, "Buy milk")]);
+
+    openPriority("Set the priority of Buy milk");
+
+    for (const name of ["P1 – Critical", "P2 – High", "P3 – Medium", "P4 – Low", "P5 – Nice to have"]) {
+      expect(await screen.findByRole("menuitemradio", { name })).toBeTruthy();
+    }
+  });
+
+  it("sorts this week by priority, P1 first and those with none last, and the backlog too", async () => {
+    const { todos } = await openList([
+      item(1, null, "None"),
+      { ...item(2, null, "Low"), priority: 4 },
+      { ...item(3, null, "Critical"), priority: 1 },
+      { ...item(4, null, "Later low"), priority: 5, status: "backlog" },
+      { ...item(5, null, "Later high"), priority: 2, status: "backlog" },
+    ]);
+
+    fireEvent.click(within(section("This week")).getByRole("button", { name: /Sort by priority/ }));
+
+    await waitFor(() => expect(titles("This week")).toEqual(["Critical", "Low", "None"]));
+    expect(todos.getSnapshot().todos.filter((t) => t.status === "backlog").map((t) => t.title)).toEqual(["Later high", "Later low"]);
+    expect(titles("Backlog")).toEqual(["Later high", "Later low"]);
+  });
+
+  it("is off while the list is already in priority order", async () => {
+    await openList([{ ...item(1, null, "Critical"), priority: 1 }, item(2, null, "None")]);
+    const button = () => within(section("This week")).getByRole("button", { name: /Sort by priority/ }) as HTMLButtonElement;
+    expect(button().disabled).toBe(true);
+
+    openPriority("Set the priority of None");
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "P1 – Critical" }));
+    openPriority("Change the priority of Critical (now P1, Critical)");
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: "P5 – Nice to have" }));
+
+    await waitFor(() => expect(button().disabled).toBe(false));
+  });
+});

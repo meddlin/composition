@@ -15,6 +15,25 @@ export type TodoStatus = (typeof TODO_STATUSES)[number];
 
 export const isTodoStatus = (value: unknown): value is TodoStatus => TODO_STATUSES.includes(value as TodoStatus);
 
+/** How urgent an item is, 1 (critical) to 5 (nice to have). An item with none set has no priority. */
+export const TODO_PRIORITIES = [1, 2, 3, 4, 5] as const;
+
+export type TodoPriority = (typeof TODO_PRIORITIES)[number];
+
+export const isTodoPriority = (value: unknown): value is TodoPriority => TODO_PRIORITIES.includes(value as TodoPriority);
+
+/** What each priority is called, for the menu and the tooltip. */
+export const TODO_PRIORITY_NAMES: Record<TodoPriority, string> = {
+  1: "Critical",
+  2: "High",
+  3: "Medium",
+  4: "Low",
+  5: "Nice to have",
+};
+
+/** A priority as it is written: "P1". */
+export const priorityTag = (priority: TodoPriority): string => `P${priority}`;
+
 /**
  * One to-do item. An item with a `parentId` is a sub-item of that item; sub-items nest without limit. `done` is
  * `status === "done"`, kept as a field because the list view ticks items off.
@@ -25,6 +44,8 @@ export type Todo = {
   title: string;
   status: TodoStatus;
   done: boolean;
+  /** How urgent it is; absent while none is set. Kept when it is archived and restored. */
+  priority?: TodoPriority;
   createdAt: string;
   updatedAt: string;
   /** When it was ticked off (an instant, ISO); absent while it is not done. */
@@ -109,6 +130,8 @@ export interface TodosApi {
   setTodoDone(id: number, done: boolean): Promise<Todo>;
   /** Moves the item to a status ("done" is the same as ticking it). Its sub-items are left as they are. Rejects a missing item. */
   setTodoStatus(id: number, status: TodoStatus): Promise<Todo>;
+  /** Sets the item's priority, or clears it with null. Its sub-items are left as they are. Rejects a priority that is not one, or a missing item. */
+  setTodoPriority(id: number, priority: TodoPriority | null): Promise<Todo>;
   /**
    * Puts the item immediately before `beforeId` among its siblings (the items under the same parent), or last among them
    * when `beforeId` is null or not one of them. The order is kept; it is not a change to the item, so it is not logged.
@@ -117,6 +140,8 @@ export interface TodosApi {
   moveTodo(id: number, beforeId: number | null): Promise<void>;
   /** "Move completed to the bottom": among the siblings at every level, the done items go below the open ones, each keeping its order. */
   sortDoneTodosLast(): Promise<void>;
+  /** "Sort by priority": among the siblings at every level, P1 comes first and items with no priority last, each keeping its order among equals. */
+  sortTodosByPriority(): Promise<void>;
   /**
    * Deletes the item and everything under it, for good, archived or not, with their rows in the activity log ("Delete
    * permanently"). Deleting an item that is already gone is not an error.
@@ -181,8 +206,10 @@ export const TODO_METHODS = [
   "renameTodo",
   "setTodoDone",
   "setTodoStatus",
+  "setTodoPriority",
   "moveTodo",
   "sortDoneTodosLast",
+  "sortTodosByPriority",
   "deleteTodo",
   "previewTodoDelete",
   "loadTodoReports",

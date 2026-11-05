@@ -5,7 +5,7 @@ import { isLocalDate } from "./todoWeeks";
 import { cleanTodoTitle } from "./todos";
 import { isTodoLook } from "./todoLook";
 import { isRetention, RETENTION_ERROR, validateTodoSettings } from "./todoSettings";
-import { isReportKind, isTodoStatus, type TodosApi } from "./todosApi";
+import { isReportKind, isTodoPriority, isTodoStatus, type TodosApi } from "./todosApi";
 import * as todosRepo from "./todosRepo";
 import { loadWebSettings, saveWebSettings } from "./webSettings";
 
@@ -66,12 +66,23 @@ export const setTodoStatus: TodosApi["setTodoStatus"] = async (id, status) => {
   return todo;
 };
 
+export const setTodoPriority: TodosApi["setTodoPriority"] = async (id, priority) => {
+  if (priority !== null && !isTodoPriority(priority)) throw new Error("That is not a to-do priority.");
+  const todo = todosRepo.updateTodo(id, { priority });
+  if (!todo) throw new Error("That to-do no longer exists.");
+  return todo;
+};
+
 export const moveTodo: TodosApi["moveTodo"] = async (id, beforeId) => {
   if (!todosRepo.placeTodo(id, beforeId)) throw new Error("That to-do no longer exists.");
 };
 
 export const sortDoneTodosLast: TodosApi["sortDoneTodosLast"] = async () => {
   todosRepo.sortDoneLast();
+};
+
+export const sortTodosByPriority: TodosApi["sortTodosByPriority"] = async () => {
+  todosRepo.sortByPriority();
 };
 
 export const deleteTodo: TodosApi["deleteTodo"] = async (id) => {

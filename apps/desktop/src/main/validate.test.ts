@@ -458,6 +458,18 @@ describe("TODO_VALIDATORS", () => {
     }
   });
 
+  it("passes on an id and a priority (or null) for setTodoPriority, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.setTodoPriority([4, 1, "extra"])).toEqual([4, 1]);
+    expect(TODO_VALIDATORS.setTodoPriority([4, null])).toEqual([4, null]);
+    for (const args of [[], [4], [4, 0], [4, 6], [4, 1.5], [4, "1"], [4, undefined], ["4", 1], [null, 1]]) {
+      expect(() => TODO_VALIDATORS.setTodoPriority(args)).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("takes nothing from the page for sortTodosByPriority", () => {
+    expect(TODO_VALIDATORS.sortTodosByPriority(["/etc/passwd"])).toEqual([]);
+  });
+
   it("takes nothing from the page for sortDoneTodosLast", () => {
     expect(TODO_VALIDATORS.sortDoneTodosLast(["/etc/passwd"])).toEqual([]);
   });
