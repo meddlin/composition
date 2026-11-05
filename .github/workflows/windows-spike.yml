@@ -1,0 +1,312 @@
+name: Windows spike
+
+# THROWAWAY. Step 0 of docs/windows-build-plan.md: does the stack run on Windows at all? It changes no
+# app code. Delete this file and scripts/windows-spike/ once Gate A has been decided.
+#
+# Runs on two Windows images (2022 is the closest hosted stand-in for an older Windows) and checks:
+#   1. Node 26 + node:ffi + OpenTUI's native library, under node.exe and under the renamed composition-node.exe
+#   2. better-sqlite3's win32-x64 prebuild, under Node 26 and under Electron 45
+#   3. Meilisearch: start, hard kill mid-index, restart, a second server on the same data
+#   4. the real terminal app inside a ConPTY (draws its UI, quits on q)
+#   5. the existing desktop smoke test, unpackaged
+#   6. every unit-test suite (2025 only), counted
+#   7. facts: OS, line endings after checkout, LongPathsEnabled, wmic, the bundled binaries' signatures
+# Every check is allowed to fail so one run reports all of them; the summary at the end is the result.
+#
+# Trigger: "Run workflow" on the Actions tab (once this file is on the default branch), or any pull
+# request that touches this file or scripts/windows-spike/.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-spike.yml"
+      - "scripts/windows-spike/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  spike:
+    name: spike (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    defaults:
+      run:
+        shell: bash
+    # The first run died because apps/web pins pnpm 12.8.1 and the other apps pin 11.0.3: pnpm 11 switches to
+    # the pinned version for `--dir apps/web`, and that restart fails on Windows. These turn the switching off
+    # for everything below (the probe step lifts them to measure the default). Whether pnpm honours them is
+    # itself one of the things this run finds out.
+    env:
+      npm_config_manage_package_manager_versions: "false"
+      pnpm_config_manage_package_manager_versions: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up the scratch folders
+        run: |
+          mkdir -p "$RUNNER_TEMP/spike/out"
+          {
+            echo "SPIKE_DIR=$RUNNER_TEMP/spike"
+            echo "SPIKE_OUT=$RUNNER_TEMP/spike/out"
+            echo "SPIKE_RESULTS=$RUNNER_TEMP/spike/results.jsonl"
+            echo "SPIKE_TITLE=Windows spike on ${{ matrix.os }}"
+          } >> "$GITHUB_ENV"
+
+      - name: Facts about this machine
+        id: facts
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $os = Get-CimInstance Win32_OperatingSystem
+          $facts = @(
+            "OS: $($os.Caption) $($os.Version) ($($os.OSArchitecture))",
+            "git core.autocrlf: $(git config --show-origin --get core.autocrlf)",
+            "LongPathsEnabled: $((Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -ErrorAction SilentlyContinue).LongPathsEnabled)",
+            "wmic on PATH: $([bool](Get-Command wmic -ErrorAction SilentlyContinue))",
+            "ps on PATH: $([bool](Get-Command ps.exe -ErrorAction SilentlyContinue))"
+          )
+          $facts | ForEach-Object { Write-Host $_ }
+          "### Facts`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $facts | ForEach-Object { "- $_" } | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/web/pnpm-lock.yaml
+            apps/desktop/pnpm-lock.yaml
+            apps/cli/pnpm-lock.yaml
+
+      - name: Facts about pnpm on this machine
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $found = (Get-Command pnpm -All -ErrorAction SilentlyContinue | ForEach-Object { $_.Source }) -join ", "
+          Write-Host "pnpm resolves to: $found"
+          "- pnpm resolves to: $found (spawnSync('pnpm') with no shell needs a .exe among these)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # What did the first run's pnpm failure depend on? Each line shows which pnpm actually ran (the user agent
+      # carries its version) or the error. "default" lifts the switching-off variables set for the job.
+      - name: Probe pnpm's version switching
+        id: probe
+        continue-on-error: true
+        run: |
+          probe() {
+            label="$1"; shift
+            if out=$("$@" 2>&1); then result="ran: ${out//$'\n'/ }"; else result="FAILED: ${out//$'\n'/ }"; fi
+            echo "- pnpm probe, $label: ${result:0:320}" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          probe "root (pinned 11.0.3)" pnpm exec node -p "process.env.npm_config_user_agent"
+          probe "apps/desktop (pinned 11.0.3)" pnpm --dir apps/desktop exec node -p "process.env.npm_config_user_agent"
+          probe "apps/web, default (pinned 12.8.1)" env -u npm_config_manage_package_manager_versions -u pnpm_config_manage_package_manager_versions pnpm --dir apps/web exec node -p "process.env.npm_config_user_agent"
+          probe "apps/web, switching off" pnpm --dir apps/web exec node -p "process.env.npm_config_user_agent"
+          probe "npx pnpm@12.8.1 in apps/web" npx --yes pnpm@12.8.1 --dir apps/web exec node -p "process.env.npm_config_user_agent"
+
+      - name: Line endings after checkout
+        continue-on-error: true
+        run: |
+          echo "core.autocrlf: $(git config --show-origin --get core.autocrlf)"
+          # i/ is what git stores, w/ is what is on disk. i/lf with w/crlf means a shell script was converted.
+          { echo "- line endings (index / working tree):"; git ls-files --eol apps/desktop/cli/composition apps/cli/bin/composition.mjs docs/index.md | sed 's/^/    /'; } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Download Node 26 and Meilisearch (checksummed)
+        run: node scripts/windows-spike/fetch-binaries.mjs
+
+      - name: Signatures and versions of the bundled binaries
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $lines = @()
+          foreach ($name in "node.exe", "meilisearch.exe") {
+            $path = Join-Path $env:SPIKE_DIR $name
+            $sig = Get-AuthenticodeSignature $path
+            $lines += "- $name signature: $($sig.Status), signer: $($sig.SignerCertificate.Subject)"
+          }
+          $lines += "- node.exe --version: $(& (Join-Path $env:SPIKE_DIR 'node.exe') --version)"
+          $lines += "- meilisearch.exe --version: $(& (Join-Path $env:SPIKE_DIR 'meilisearch.exe') --version)"
+          $lines | ForEach-Object { Write-Host $_ }
+          $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # Separate steps so one failure doesn't hide the rest. CLI and desktop pin the same pnpm as the root, so
+      # they install as before. Web needs pnpm 12.8.1 itself: `npx pnpm@12.8.1` matches its pin, so nothing switches.
+      - name: Install CLI dependencies
+        id: install-cli
+        continue-on-error: true
+        run: pnpm --dir apps/cli install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        id: install-desktop
+        continue-on-error: true
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Install web dependencies (pnpm 12.8.1 through npx)
+        id: install-web
+        continue-on-error: true
+        run: npx --yes pnpm@12.8.1 --dir apps/web install --frozen-lockfile
+
+      # 1. Node 26 + ffi + OpenTUI, then the same under the name the plan proposes for the bundled runtime.
+      - name: Check native modules under Node 26
+        id: native-node
+        continue-on-error: true
+        run: |
+          "$SPIKE_DIR/node.exe" scripts/windows-spike/native-check.mjs --label node.exe --sqlite apps/cli --opentui apps/cli
+          "$SPIKE_DIR/composition-node.exe" scripts/windows-spike/native-check.mjs --label composition-node.exe --sqlite apps/cli --opentui apps/cli
+
+      # 2. better-sqlite3 inside Electron's own Node (Electron downloads its binary on first use).
+      - name: Check better-sqlite3 under Electron
+        id: native-electron
+        continue-on-error: true
+        run: |
+          node apps/desktop/node_modules/electron/install.js
+          electron=$(node -p "require(require.resolve('electron', { paths: [process.cwd() + '/apps/desktop'] }))")
+          echo "electron: $electron"
+          ELECTRON_RUN_AS_NODE=1 "$electron" scripts/windows-spike/native-check.mjs --label electron --sqlite apps/desktop
+
+      # 3. Meilisearch.
+      - name: Check Meilisearch
+        id: meili
+        continue-on-error: true
+        env:
+          MEILI_BIN: ${{ runner.temp }}/spike/meilisearch.exe
+        run: node scripts/windows-spike/meili-check.mjs
+
+      # 4. The terminal app in a pseudo-console, on the downloaded Node under both names.
+      - name: Build the CLI bundle
+        id: cli-build
+        continue-on-error: true
+        run: pnpm --dir apps/cli build
+
+      - name: Install the pseudo-console harness
+        id: harness
+        continue-on-error: true
+        run: |
+          mkdir -p "$SPIKE_DIR/harness"
+          npm install --prefix "$SPIKE_DIR/harness" node-pty@1.1.0 @xterm/headless@6.0.0
+
+      - name: Run the terminal app in a ConPTY
+        id: tui
+        if: steps.cli-build.outcome == 'success' && steps.harness.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        env:
+          CLI_DIR: apps/cli
+          HARNESS_DIR: ${{ runner.temp }}/spike/harness
+          MEILI_BIN: ${{ runner.temp }}/spike/meilisearch.exe
+        run: |
+          NODE_EXE="$SPIKE_DIR/node.exe" node scripts/windows-spike/tui-check.mjs
+          NODE_EXE="$SPIKE_DIR/composition-node.exe" node scripts/windows-spike/tui-check.mjs
+
+      # 5. The existing smoke test against the unpackaged app. It is not Windows-aware yet (it points HOME at a
+      # scratch folder, which Windows ignores), so USERPROFILE is set here to keep it off the runner's profile.
+      # Failures here are findings, not bugs in the spike.
+      - name: Build the desktop app, as it is today
+        id: desktop-build
+        continue-on-error: true
+        working-directory: apps/desktop
+        run: pnpm build
+
+      # What `pnpm build` runs, with spawn('pnpm') given a shell (see spawn-shell.mjs). Only if the plain build failed.
+      - name: Build the desktop app, with the spawn workaround
+        id: desktop-build-shim
+        if: steps.desktop-build.outcome != 'success'
+        continue-on-error: true
+        working-directory: apps/desktop
+        run: |
+          shim=../../scripts/windows-spike/spawn-shell.mjs
+          node --import "$shim" scripts/build-renderer.mjs
+          node scripts/build-main.mjs
+          node --import "$shim" scripts/collect-licenses.mjs
+
+      - name: Smoke test the desktop app (unpackaged)
+        id: smoke
+        if: steps.desktop-build.outcome == 'success' || steps.desktop-build-shim.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 15
+        working-directory: apps/desktop
+        env:
+          COMPOSITION_MEILI_BIN: ${{ runner.temp }}/spike/meilisearch.exe
+          USERPROFILE: ${{ runner.temp }}/spike/smoke-profile
+          SMOKE_OUT: ${{ runner.temp }}/spike/out/smoke-screenshots
+        run: |
+          mkdir -p "$USERPROFILE"
+          # `node scripts/smoke.mjs` is what `pnpm smoke` runs; going direct keeps pnpm itself off the scratch profile.
+          node scripts/smoke.mjs 2>&1 | tee "$SPIKE_OUT/smoke.log"
+
+      # 6. The unit tests, to count what fails on Windows. One run is enough for this.
+      - name: Unit tests, repo scripts
+        id: tests-scripts
+        if: matrix.os == 'windows-2025'
+        continue-on-error: true
+        run: pnpm run test:scripts 2>&1 | tee "$SPIKE_OUT/scripts.log"
+
+      - name: Unit tests, web
+        id: tests-web
+        if: matrix.os == 'windows-2025'
+        continue-on-error: true
+        run: pnpm run test:web 2>&1 | tee "$SPIKE_OUT/web.log"
+
+      - name: Unit tests, desktop
+        id: tests-desktop
+        if: matrix.os == 'windows-2025'
+        continue-on-error: true
+        run: pnpm run test:desktop 2>&1 | tee "$SPIKE_OUT/desktop.log"
+
+      # The CLI's tests need Node 26 itself, so this goes last: it changes `node` for the steps after it.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: matrix.os == 'windows-2025'
+        with:
+          node-version: 26
+
+      - name: Unit tests, CLI
+        id: tests-cli
+        if: matrix.os == 'windows-2025'
+        continue-on-error: true
+        run: pnpm run test:cli 2>&1 | tee "$SPIKE_OUT/cli.log"
+
+      - name: Summary
+        if: always()
+        env:
+          STEP_OUTCOMES: >-
+            {
+              "pnpm switching probe": "${{ steps.probe.outcome }}",
+              "install CLI dependencies": "${{ steps.install-cli.outcome }}",
+              "install desktop dependencies": "${{ steps.install-desktop.outcome }}",
+              "install web dependencies (pnpm 12.8.1)": "${{ steps.install-web.outcome }}",
+              "native modules under Node 26": "${{ steps.native-node.outcome }}",
+              "better-sqlite3 under Electron": "${{ steps.native-electron.outcome }}",
+              "Meilisearch": "${{ steps.meili.outcome }}",
+              "build the CLI bundle": "${{ steps.cli-build.outcome }}",
+              "terminal app in a ConPTY": "${{ steps.tui.outcome }}",
+              "build the desktop app (as is)": "${{ steps.desktop-build.outcome }}",
+              "build the desktop app (spawn workaround)": "${{ steps.desktop-build-shim.outcome }}",
+              "desktop smoke test": "${{ steps.smoke.outcome }}",
+              "unit tests: repo scripts": "${{ steps.tests-scripts.outcome }}",
+              "unit tests: web": "${{ steps.tests-web.outcome }}",
+              "unit tests: desktop": "${{ steps.tests-desktop.outcome }}",
+              "unit tests: CLI": "${{ steps.tests-cli.outcome }}"
+            }
+        run: node scripts/windows-spike/render-summary.mjs
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: windows-spike-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/spike/out
+            ${{ runner.temp }}/spike/results.jsonl
+            ${{ runner.temp }}/spike/meili-check/*.log
+          if-no-files-found: warn
+          retention-days: 14
