@@ -32,6 +32,7 @@ const hidden = Decoration.replace({});
 const syntax = Decoration.mark({ class: "cm-live-syntax" });
 const headingLine = [1, 2, 3, 4, 5, 6].map((level) => Decoration.line({ class: `cm-live-heading cm-live-h${level}` }));
 const frontmatterLine = Decoration.line({ class: "cm-live-frontmatter" });
+const ruleLine = Decoration.line({ class: "cm-live-rule" });
 /** The tint behind the text of a `<Mark color="…">`, which is the same one the plain editor paints (see `.md-mark`). */
 const tintMarks = new Map(HIGHLIGHT_COLORS.map((color) => [color, Decoration.mark({ class: "md-mark", attributes: { "data-color": color } })]));
 const styles = new Map(Object.values(INLINE).map(({ class: name }) => [name, Decoration.mark({ class: name })]));
@@ -131,6 +132,14 @@ export function liveDecorations(
           return;
         }
 
+        if (node.name === "HorizontalRule") {
+          // Drawn as a line across the page, with the `---` hidden, unless the caret is on it (typing it, or editing it).
+          if (touches(state, node.from, node.to)) return;
+          decorations.push(ruleLine.range(doc.lineAt(node.from).from));
+          decorations.push(hidden.range(node.from, node.to));
+          return;
+        }
+
         const inline = INLINE[node.name];
         if (!inline) return;
         decorations.push(styles.get(inline.class)!.range(node.from, node.to));
@@ -218,6 +227,14 @@ const liveTheme = EditorView.baseTheme({
   ".cm-live-h1": { fontSize: "2em", lineHeight: "1.3" },
   ".cm-live-h2": { fontSize: "1.5em" },
   ".cm-live-h3": { fontSize: "1.25em" },
+  // A horizontal rule: the line's `---` is hidden, so the line is empty and the rule is drawn through its middle.
+  ".cm-live-rule": {
+    // Not `--border`: that is a hairline tint meant for panel edges, too faint to read as a rule on the page.
+    backgroundImage: "linear-gradient(color-mix(in srgb, var(--foreground) 35%, transparent), color-mix(in srgb, var(--foreground) 35%, transparent))",
+    backgroundSize: "100% 1px",
+    backgroundPosition: "0 50%",
+    backgroundRepeat: "no-repeat",
+  },
   ".cm-live-frontmatter": {
     fontFamily: "var(--editor-font, var(--font-mono))",
     fontSize: "0.85em",
