@@ -41,6 +41,13 @@ jobs:
     defaults:
       run:
         shell: bash
+    # The first run died because apps/web pins pnpm 12.8.1 and the other apps pin 11.0.3: pnpm 11 switches to
+    # the pinned version for `--dir apps/web`, and that restart fails on Windows. These turn the switching off
+    # for everything below (the probe step lifts them to measure the default). Whether pnpm honours them is
+    # itself one of the things this run finds out.
+    env:
+      npm_config_manage_package_manager_versions: "false"
+      pnpm_config_manage_package_manager_versions: "false"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -63,7 +70,6 @@ jobs:
           $facts = @(
             "OS: $($os.Caption) $($os.Version) ($($os.OSArchitecture))",
             "git core.autocrlf: $(git config --show-origin --get core.autocrlf)",
-            "CR characters in apps/desktop/cli/composition (a shell script that must stay LF): $((Select-String -Path apps/desktop/cli/composition -Pattern "`r" -AllMatches | Measure-Object).Count) lines",
             "LongPathsEnabled: $((Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem' -ErrorAction SilentlyContinue).LongPathsEnabled)",
             "wmic on PATH: $([bool](Get-Command wmic -ErrorAction SilentlyContinue))",
             "ps on PATH: $([bool](Get-Command ps.exe -ErrorAction SilentlyContinue))"
@@ -92,6 +98,30 @@ jobs:
           Write-Host "pnpm resolves to: $found"
           "- pnpm resolves to: $found (spawnSync('pnpm') with no shell needs a .exe among these)" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
+      # What did the first run's pnpm failure depend on? Each line shows which pnpm actually ran (the user agent
+      # carries its version) or the error. "default" lifts the switching-off variables set for the job.
+      - name: Probe pnpm's version switching
+        id: probe
+        continue-on-error: true
+        run: |
+          probe() {
+            label="$1"; shift
+            if out=$("$@" 2>&1); then result="ran: ${out//$'\n'/ }"; else result="FAILED: ${out//$'\n'/ }"; fi
+            echo "- pnpm probe, $label: ${result:0:320}" | tee -a "$GITHUB_STEP_SUMMARY"
+          }
+          probe "root (pinned 11.0.3)" pnpm exec node -p "process.env.npm_config_user_agent"
+          probe "apps/desktop (pinned 11.0.3)" pnpm --dir apps/desktop exec node -p "process.env.npm_config_user_agent"
+          probe "apps/web, default (pinned 12.8.1)" env -u npm_config_manage_package_manager_versions -u pnpm_config_manage_package_manager_versions pnpm --dir apps/web exec node -p "process.env.npm_config_user_agent"
+          probe "apps/web, switching off" pnpm --dir apps/web exec node -p "process.env.npm_config_user_agent"
+          probe "npx pnpm@12.8.1 in apps/web" npx --yes pnpm@12.8.1 --dir apps/web exec node -p "process.env.npm_config_user_agent"
+
+      - name: Line endings after checkout
+        continue-on-error: true
+        run: |
+          echo "core.autocrlf: $(git config --show-origin --get core.autocrlf)"
+          # i/ is what git stores, w/ is what is on disk. i/lf with w/crlf means a shell script was converted.
+          { echo "- line endings (index / working tree):"; git ls-files --eol apps/desktop/cli/composition apps/cli/bin/composition.mjs docs/index.md | sed 's/^/    /'; } | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Download Node 26 and Meilisearch (checksummed)
         run: node scripts/windows-spike/fetch-binaries.mjs
 
@@ -110,12 +140,22 @@ jobs:
           $lines | ForEach-Object { Write-Host $_ }
           $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
 
-      - name: Install web, CLI and desktop dependencies
-        id: install
-        run: |
-          pnpm --dir apps/web install --frozen-lockfile
-          pnpm --dir apps/cli install --frozen-lockfile
-          pnpm --dir apps/desktop install --frozen-lockfile
+      # Separate steps so one failure doesn't hide the rest. CLI and desktop pin the same pnpm as the root, so
+      # they install as before. Web needs pnpm 12.8.1 itself: `npx pnpm@12.8.1` matches its pin, so nothing switches.
+      - name: Install CLI dependencies
+        id: install-cli
+        continue-on-error: true
+        run: pnpm --dir apps/cli install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        id: install-desktop
+        continue-on-error: true
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Install web dependencies (pnpm 12.8.1 through npx)
+        id: install-web
+        continue-on-error: true
+        run: npx --yes pnpm@12.8.1 --dir apps/web install --frozen-lockfile
 
       # 1. Node 26 + ffi + OpenTUI, then the same under the name the plan proposes for the bundled runtime.
       - name: Check native modules under Node 26
@@ -172,15 +212,27 @@ jobs:
       # 5. The existing smoke test against the unpackaged app. It is not Windows-aware yet (it points HOME at a
       # scratch folder, which Windows ignores), so USERPROFILE is set here to keep it off the runner's profile.
       # Failures here are findings, not bugs in the spike.
-      - name: Build the desktop app
+      - name: Build the desktop app, as it is today
         id: desktop-build
         continue-on-error: true
         working-directory: apps/desktop
         run: pnpm build
 
+      # What `pnpm build` runs, with spawn('pnpm') given a shell (see spawn-shell.mjs). Only if the plain build failed.
+      - name: Build the desktop app, with the spawn workaround
+        id: desktop-build-shim
+        if: steps.desktop-build.outcome != 'success'
+        continue-on-error: true
+        working-directory: apps/desktop
+        run: |
+          shim=../../scripts/windows-spike/spawn-shell.mjs
+          node --import "$shim" scripts/build-renderer.mjs
+          node scripts/build-main.mjs
+          node --import "$shim" scripts/collect-licenses.mjs
+
       - name: Smoke test the desktop app (unpackaged)
         id: smoke
-        if: steps.desktop-build.outcome == 'success'
+        if: steps.desktop-build.outcome == 'success' || steps.desktop-build-shim.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 15
         working-directory: apps/desktop
@@ -229,13 +281,17 @@ jobs:
         env:
           STEP_OUTCOMES: >-
             {
-              "install dependencies": "${{ steps.install.outcome }}",
+              "pnpm switching probe": "${{ steps.probe.outcome }}",
+              "install CLI dependencies": "${{ steps.install-cli.outcome }}",
+              "install desktop dependencies": "${{ steps.install-desktop.outcome }}",
+              "install web dependencies (pnpm 12.8.1)": "${{ steps.install-web.outcome }}",
               "native modules under Node 26": "${{ steps.native-node.outcome }}",
               "better-sqlite3 under Electron": "${{ steps.native-electron.outcome }}",
               "Meilisearch": "${{ steps.meili.outcome }}",
               "build the CLI bundle": "${{ steps.cli-build.outcome }}",
               "terminal app in a ConPTY": "${{ steps.tui.outcome }}",
-              "build the desktop app": "${{ steps.desktop-build.outcome }}",
+              "build the desktop app (as is)": "${{ steps.desktop-build.outcome }}",
+              "build the desktop app (spawn workaround)": "${{ steps.desktop-build-shim.outcome }}",
               "desktop smoke test": "${{ steps.smoke.outcome }}",
               "unit tests: repo scripts": "${{ steps.tests-scripts.outcome }}",
               "unit tests: web": "${{ steps.tests-web.outcome }}",

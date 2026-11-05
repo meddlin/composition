@@ -196,7 +196,25 @@ Every new `uses:` is pinned to a commit SHA (`pnpm lint:actions`, [AGENTS.md](..
    `LongPathsEnabled`, `wmic`, whether `pnpm.exe` exists, and the signatures on the bundled `node.exe` and
    `meilisearch.exe`. The harness was exercised on macOS (Node 26.10): native check, Meilisearch
    check and the full ConPTY run of the terminal app all pass there, so a failure on Windows is a Windows
-   finding. **Not yet run on Windows.**
+   finding.
+
+   *First run (PR 239, `windows-2022` and `windows-2025`):* it stopped at the dependency install, so none of
+   the checks ran. Findings anyway:
+   - **pnpm's version switch fails on Windows.** `apps/web` pins `pnpm@12.8.1`; the root, CLI and desktop pin
+     `11.0.3`. `pnpm --dir apps/web install` under pnpm 11 tries to restart as 12.8.1 and Windows reports the
+     path as "not recognized". Every Windows CI job and every build that touches `apps/web` hits this, so the
+     pins have to be aligned, or switching turned off, before anything else works (second run tests the options).
+   - **There is no `pnpm.exe`**, only `pnpm.cmd` and an extensionless shim, so `spawnSync("pnpm")` in
+     `build-renderer.mjs` and `collect-licenses.mjs` will fail without a shell.
+   - **`meilisearch.exe` is not signed**; the bundled `node.exe` is (OpenJS Foundation). Signing Meilisearch
+     is ours to do (Step 7).
+   - `wmic` is absent on Server 2025 (present on 2022), which supports the PowerShell lookup in `meili.ts`.
+     The hosted images have `LongPathsEnabled=1`, so CI will not show a 260-character path problem that a
+     user's machine could. `ps.exe` was on the runner's PATH (Git for Windows' bundled tools), so a `ps`
+     result from CI means nothing about a real machine.
+
+   The second run splits the installs, installs web through `npx pnpm@12.8.1`, probes the switching
+   settings, and adds a spawn workaround for the desktop build.
 1. **Hygiene.** `.gitattributes`; the Windows unit-test leg in `unit-tests.yml` as non-blocking; fix what
    it finds, then make it required. Needs only `main`.
 2. **Fetch and lock.** `win-x64` entries in `meilisearch.lock.json` and `node.lock.json`; validators
