@@ -64,10 +64,10 @@ function Popout({ shared, windowId }: { shared: SharedWorkspace; windowId: Windo
     if (!window_) window.close();
   }, [window_]);
 
-  // The window is named for the panel in front.
+  // The window is named for the panel in front, under the app's name: "Composition - To-do".
   const title = window_ ? panelTitle(snapshot.panels.byId[focusedPanelId(window_)], snapshot.notes, snapshot.deleted) : "";
   useEffect(() => {
-    if (title) document.title = title;
+    if (title) document.title = title === "Composition" ? title : `Composition - ${title}`;
   }, [title]);
 
   if (!window_) return null;
