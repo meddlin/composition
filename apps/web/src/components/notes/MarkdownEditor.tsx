@@ -23,6 +23,7 @@ import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
 import { useWriting } from "./WritingProvider";
+import { wrapsBeforeColumn } from "./wrapsBeforeColumn";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
@@ -349,7 +350,8 @@ export function MarkdownEditor({
       column: writing.reflowColumn,
       keepTables: writing.reflowKeepsTables,
     });
-    if (edit) applyReflow(el, edit);
+    // A pane narrower than the column has already wrapped the line on screen; a break at the column would land mid-row.
+    if (edit && !wrapsBeforeColumn(el, el.selectionStart, writing.reflowColumn)) applyReflow(el, edit);
   }
 
   function applyReflow(el: HTMLTextAreaElement, edit: ReflowEdit) {
