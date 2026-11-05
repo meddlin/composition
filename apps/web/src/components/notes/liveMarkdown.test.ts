@@ -127,6 +127,32 @@ describe("headings", () => {
   });
 });
 
+describe("horizontal rules", () => {
+  const text = "above\n\n---\n\nbelow";
+
+  it("hides the --- and draws the line as a rule while the caret is elsewhere", () => {
+    const { hidden, lines } = decorate(text, 0);
+    expect(spans(hidden)).toEqual([[7, 10]]);
+    expect(lines).toEqual([{ from: 7, to: 7, kind: "cm-live-rule" }]);
+  });
+
+  it("shows the --- while the caret is on it, so it can be edited", () => {
+    for (const caret of [7, 8, 10]) {
+      const { hidden, lines } = decorate(text, caret);
+      expect(hidden).toEqual([]);
+      expect(lines).toEqual([]);
+    }
+  });
+
+  it("draws *** and ___ the same way", () => {
+    for (const rule of ["***", "___"]) expect(decorate(`a\n\n${rule}\n\nb`, 0).hidden).toHaveLength(1);
+  });
+
+  it("does not take a setext heading's underline for a rule", () => {
+    expect(decorate("title\n---\n\nbody", 12).hidden).toEqual([]);
+  });
+});
+
 describe("frontmatter", () => {
   const text = "---\ntitle: Note\n---\n# Heading\n\n**bold** tail";
 
@@ -268,7 +294,7 @@ describe("the tags of a highlight", () => {
       { from: 4, to: 5, kind: "" },
       { from: 4 + 1 + OPEN.length + 1 + CLOSE.length, to: 4 + 1 + OPEN.length + 1 + CLOSE.length + 1, kind: "" },
     ]);
-    const fm = `---\ntitle: "${OPEN}x${CLOSE}"\n---\nbody`;
+    const fm = `---\ntitle: '${OPEN}x${CLOSE}'\n---\nbody`;
     expect(spans(decorate(fm, fm.length).hidden)).toEqual([]);
   });
 
