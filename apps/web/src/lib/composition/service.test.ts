@@ -251,6 +251,8 @@ describe("saveWritingSettings", () => {
     reflowColumn: 72,
     reflowKeepsTables: false,
     wordCountEnabled: true,
+    headingRailEnabled: false,
+    headingRailSide: "right" as const,
   };
 
   it("stores the settings and leaves the rest alone", async () => {
@@ -263,6 +265,29 @@ describe("saveWritingSettings", () => {
     expect(loadWebSettings()).toMatchObject({ writing, previewFont: "lora", ...DEFAULT_LAYOUT });
     expect((await loadSettings()).writing).toEqual(writing);
     expect((await loadWorkspace()).writing).toEqual(writing);
+  });
+
+  it("changes only the settings it is given", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveWritingSettings } = await import("./service");
+    await saveWritingSettings(writing);
+
+    expect(await saveWritingSettings({ headingRailEnabled: true })).toEqual({});
+    expect(loadWebSettings().writing).toEqual({ ...writing, headingRailEnabled: true });
+
+    const { headingRailEnabled: _kept, ...own } = writing;
+    expect(await saveWritingSettings({ ...own, rulerColumn: 90 })).toEqual({});
+    expect(loadWebSettings().writing).toEqual({ ...writing, headingRailEnabled: true, rulerColumn: 90 });
+  });
+
+  it("rejects a heading rail side it doesn't offer", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveWritingSettings } = await import("./service");
+
+    const result = await saveWritingSettings({ headingRailSide: "top" as never });
+
+    expect(result.error).toMatch(/Unknown writing setting/);
+    expect(loadWebSettings().writing).toEqual(DEFAULT_WRITING_SETTINGS);
   });
 
   it("rejects a column outside the allowed range without writing anything", async () => {

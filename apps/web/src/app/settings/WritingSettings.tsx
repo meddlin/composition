@@ -23,10 +23,14 @@ type Draft = {
   wordCountEnabled: boolean;
 };
 
-const toDraft = (settings: Settings): Draft => ({
-  ...settings,
+// The heading rail is chosen under Styling, so this form neither shows nor sends it.
+const toDraft = (settings: Omit<Settings, "headingRailEnabled" | "headingRailSide">): Draft => ({
+  rulerEnabled: settings.rulerEnabled,
   rulerColumn: String(settings.rulerColumn),
+  reflowEnabled: settings.reflowEnabled,
   reflowColumn: String(settings.reflowColumn),
+  reflowKeepsTables: settings.reflowKeepsTables,
+  wordCountEnabled: settings.wordCountEnabled,
 });
 
 const toNumber = (text: string) => (text.trim() === "" ? Number.NaN : Number(text));
@@ -52,6 +56,8 @@ export function WritingSettings({ initial }: { initial: Settings }) {
     event.preventDefault();
     const checked = validateWritingSettings({
       ...draft,
+      headingRailEnabled: initial.headingRailEnabled,
+      headingRailSide: initial.headingRailSide,
       rulerColumn: toNumber(draft.rulerColumn),
       reflowColumn: toNumber(draft.reflowColumn),
     });
@@ -59,7 +65,8 @@ export function WritingSettings({ initial }: { initial: Settings }) {
       setError(checked.error);
       return;
     }
-    const settings = checked.settings;
+    const { rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled } = checked.settings;
+    const settings = { rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled };
     startTransition(async () => {
       const result = await saveWritingSettings(settings);
       if (result.error) {

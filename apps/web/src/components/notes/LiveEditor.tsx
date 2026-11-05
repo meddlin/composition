@@ -39,7 +39,7 @@ const editorTheme = EditorView.theme({
   "&": { height: "100%", backgroundColor: "transparent", color: "var(--foreground)" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--preview-font, inherit)", lineHeight: "1.7", overflow: "auto" },
-  ".cm-content": { padding: "1rem", caretColor: "var(--foreground)" },
+  ".cm-content": { padding: "1rem var(--note-pad-right, 1rem) 1rem var(--note-pad-left, 1rem)", caretColor: "var(--foreground)" },
   ".cm-line": { padding: "0" },
   ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--foreground)" },
   "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground": {

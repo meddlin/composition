@@ -40,8 +40,11 @@ describe("VALIDATORS", () => {
       reflowColumn: 100,
       reflowKeepsTables: true,
       wordCountEnabled: true,
+      headingRailEnabled: false,
+      headingRailSide: "right",
     };
     expect(VALIDATORS.saveWritingSettings([{ ...writing, extra: 1 }])).toEqual([writing]);
+    expect(VALIDATORS.saveWritingSettings([{ headingRailEnabled: true }])).toEqual([{ headingRailEnabled: true }]);
     expect(VALIDATORS.savePluginSettings([{ todo: false, "reading-list": true, rss: false, extra: 1 }])).toEqual([{ todo: false, "reading-list": true, rss: false }]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
@@ -167,7 +170,8 @@ describe("VALIDATORS", () => {
     ["saveNoteBackground", [{}]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
-    ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true }]],
+    ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],
+    ["saveWritingSettings", [{ headingRailSide: 3 }]],
     ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["savePluginSettings", [null]],

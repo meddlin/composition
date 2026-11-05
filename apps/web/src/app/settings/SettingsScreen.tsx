@@ -117,6 +117,8 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
               currentPreviewFont={snapshot.previewFont}
               currentEditorFont={snapshot.editorFont}
               currentNoteBackground={snapshot.noteBackground}
+              currentHeadingRail={snapshot.writing.headingRailEnabled}
+              currentHeadingRailSide={snapshot.writing.headingRailSide}
               currentCity={snapshot.city}
               currentSunTimes={snapshot.sunTimes}
             />

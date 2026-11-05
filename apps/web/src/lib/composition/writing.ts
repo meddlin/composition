@@ -10,6 +10,13 @@ export const MIN_WRITING_COLUMN = 20;
 export const MAX_WRITING_COLUMN = 200;
 export const DEFAULT_WRITING_COLUMN = 80;
 
+export const HEADING_RAIL_SIDES = ["left", "right"] as const;
+export type HeadingRailSide = (typeof HEADING_RAIL_SIDES)[number];
+
+export function isHeadingRailSide(value: unknown): value is HeadingRailSide {
+  return HEADING_RAIL_SIDES.some((side) => side === value);
+}
+
 export type WritingSettings = {
   /** Draw a vertical guide line at `rulerColumn`. */
   rulerEnabled: boolean;
@@ -24,6 +31,13 @@ export type WritingSettings = {
   reflowKeepsTables: boolean;
   /** Show a live word count for the active note in the bar under it. */
   wordCountEnabled: boolean;
+  /**
+   * A rail of ticks beside the text, one per heading, with the heading you are reading lit. Unlike the rest it is a
+   * look rather than a writing aid, so it is set under Settings > Styling and is on unless switched off.
+   */
+  headingRailEnabled: boolean;
+  /** Which edge of the text the heading rail is on. */
+  headingRailSide: HeadingRailSide;
 };
 
 export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
@@ -33,6 +47,8 @@ export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
   reflowColumn: DEFAULT_WRITING_COLUMN,
   reflowKeepsTables: true,
   wordCountEnabled: false,
+  headingRailEnabled: true,
+  headingRailSide: "left",
 };
 
 /** Whether `value` is a whole number of columns the editor can use. */
@@ -64,6 +80,8 @@ export function parseWritingSettings(data: unknown): WritingSettings {
     reflowColumn: column(value.reflowColumn),
     reflowKeepsTables: flag(value.reflowKeepsTables, defaults.reflowKeepsTables),
     wordCountEnabled: flag(value.wordCountEnabled, defaults.wordCountEnabled),
+    headingRailEnabled: flag(value.headingRailEnabled, defaults.headingRailEnabled),
+    headingRailSide: isHeadingRailSide(value.headingRailSide) ? value.headingRailSide : defaults.headingRailSide,
   };
 }
 
@@ -75,9 +93,10 @@ export function validateWritingSettings(
   data: unknown,
 ): { settings: WritingSettings; error?: undefined } | { error: string; settings?: undefined } {
   const value = (data ?? {}) as Record<string, unknown>;
-  for (const key of ["rulerEnabled", "reflowEnabled", "reflowKeepsTables", "wordCountEnabled"] as const) {
+  for (const key of ["rulerEnabled", "reflowEnabled", "reflowKeepsTables", "wordCountEnabled", "headingRailEnabled"] as const) {
     if (typeof value[key] !== "boolean") return { error: "Unknown writing setting." };
   }
+  if (!isHeadingRailSide(value.headingRailSide)) return { error: "Unknown writing setting." };
   for (const key of ["rulerColumn", "reflowColumn"] as const) {
     if (!isWritingColumn(value[key])) {
       return { error: `Use a whole number of characters from ${MIN_WRITING_COLUMN} to ${MAX_WRITING_COLUMN}.` };

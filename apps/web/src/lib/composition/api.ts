@@ -228,8 +228,11 @@ export interface CompositionApi {
   saveEditorFont(font: string): Promise<{ error?: string }>;
   /** Chooses the pattern behind the window; a name not in `NOTE_BACKGROUND_CHOICES` comes back as `error`. */
   saveNoteBackground(background: string): Promise<{ error?: string }>;
-  /** Saves the editor's ruler and reflow; a column outside the allowed range comes back as `error`. */
-  saveWritingSettings(settings: WritingSettings): Promise<{ error?: string }>;
+  /**
+   * Saves the editor's ruler, reflow and heading rail; a column outside the allowed range comes back as `error`.
+   * Only what is given changes, so a page that owns some of the settings can save just those.
+   */
+  saveWritingSettings(settings: Partial<WritingSettings>): Promise<{ error?: string }>;
   /** Saves how the home page is laid out; a layout it doesn't offer comes back as `error`. */
   saveHomeSettings(settings: HomeSettings): Promise<{ error?: string }>;
   /** Saves which built-in plugins are on; a plugin that is missing, or not known, comes back as `error`. */

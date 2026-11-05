@@ -3,9 +3,11 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { HEADING_RAIL_SIDES, type HeadingRailSide } from "@/lib/composition/writing";
 import { EDITOR_FONT_CHOICES, editorFontStack, type EditorFontName } from "@/lib/composition/editorFonts";
 import {
   PREVIEW_FONT_CHOICES,
@@ -20,6 +22,7 @@ import {
   saveNoteBackground,
   savePreviewFont,
   saveTheme,
+  saveWritingSettings,
   type SaveLocationResult,
 } from "@/lib/composition/client";
 import { TodoLookSettings } from "./TodoLookSettings";
@@ -41,6 +44,8 @@ type Props = {
   currentPreviewFont: PreviewFontName;
   currentEditorFont: EditorFontName;
   currentNoteBackground: NoteBackgroundName;
+  currentHeadingRail: boolean;
+  currentHeadingRailSide: HeadingRailSide;
   currentCity: string;
   /** Today's times at the saved city, so the page can confirm the lookup worked. */
   currentSunTimes?: { sunrise?: string; sunset?: string };
@@ -74,6 +79,8 @@ export function StylingSettings({
   currentPreviewFont,
   currentEditorFont,
   currentNoteBackground,
+  currentHeadingRail,
+  currentHeadingRailSide,
   currentCity,
   currentSunTimes,
 }: Props) {
@@ -93,6 +100,10 @@ export function StylingSettings({
   const [noteBackground, setNoteBackground] = useState<NoteBackgroundName>(currentNoteBackground);
   const [noteBackgroundError, setNoteBackgroundError] = useState<string>();
   const [, startNoteBackgroundTransition] = useTransition();
+  const [headingRail, setHeadingRail] = useState(currentHeadingRail);
+  const [headingRailError, setHeadingRailError] = useState<string>();
+  const [, startHeadingRailTransition] = useTransition();
+  const [headingRailSide, setHeadingRailSide] = useState<HeadingRailSide>(currentHeadingRailSide);
 
   // Apply the scheme immediately rather than waiting for the server round trip.
   useEffect(() => {
@@ -161,6 +172,34 @@ export function StylingSettings({
         setNoteBackground(previous);
         setNoteBackgroundError(result.error);
         document.documentElement.dataset.noteBackground = previous;
+      }
+    });
+  }
+
+  // Saved as soon as it is switched, like the rest of this page; only this one writing setting is sent, so the
+  // Writing page's own are left as they are. Editors pick it up the next time notes are opened.
+  function selectHeadingRail(next: boolean) {
+    const previous = headingRail;
+    setHeadingRail(next);
+    setHeadingRailError(undefined);
+    startHeadingRailTransition(async () => {
+      const result = await saveWritingSettings({ headingRailEnabled: next });
+      if (result.error) {
+        setHeadingRail(previous);
+        setHeadingRailError(result.error);
+      }
+    });
+  }
+
+  function selectHeadingRailSide(next: HeadingRailSide) {
+    const previous = headingRailSide;
+    setHeadingRailSide(next);
+    setHeadingRailError(undefined);
+    startHeadingRailTransition(async () => {
+      const result = await saveWritingSettings({ headingRailSide: next });
+      if (result.error) {
+        setHeadingRailSide(previous);
+        setHeadingRailError(result.error);
       }
     });
   }
@@ -288,6 +327,42 @@ export function StylingSettings({
           {"## Site visit, Tuesday\n- Check the **load path** at gridline C"}
         </p>
         {noteBackgroundError && <FieldError>{noteBackgroundError}</FieldError>}
+      </FieldSet>
+
+      <FieldSet className="gap-2 text-sm">
+        <FieldLegend variant="label">Heading rail</FieldLegend>
+        <FieldDescription className="text-xs">
+          A column of small ticks beside a note, one for each heading (longer for a higher level), with the heading
+          you are reading lit. Click a tick to jump to its heading. It is shown in the Markdown, Preview and Live
+          views of a note with two or more headings, and reaches notes you open from now on.
+        </FieldDescription>
+        <Field orientation="horizontal" className="w-fit gap-3">
+          <Checkbox
+            id="heading-rail"
+            checked={headingRail}
+            onCheckedChange={(checked) => selectHeadingRail(checked === true)}
+          />
+          <FieldLabel htmlFor="heading-rail" className="cursor-pointer font-normal">
+            Show the heading rail
+          </FieldLabel>
+        </Field>
+        <RadioGroup
+          value={headingRailSide}
+          onValueChange={(next) => selectHeadingRailSide(next as HeadingRailSide)}
+          aria-label="Heading rail side"
+          disabled={!headingRail}
+          className="gap-2"
+        >
+          {HEADING_RAIL_SIDES.map((side) => (
+            <Field key={side} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={side} id={`heading-rail-side-${side}`} />
+              <FieldLabel htmlFor={`heading-rail-side-${side}`} className="cursor-pointer gap-3 font-normal">
+                {side === "left" ? "Left of the text" : "Right of the text"}
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+        {headingRailError && <FieldError>{headingRailError}</FieldError>}
       </FieldSet>
 
       <TodoLookSettings />
