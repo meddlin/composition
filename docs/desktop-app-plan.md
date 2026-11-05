@@ -22,7 +22,7 @@ Store, a universal binary.
 
 | Question | Answer |
 |---|---|
-| Platforms | macOS only for now; Windows and Linux builds later. |
+| Platforms | macOS first. Linux x64 (`.deb`, AppImage) added 2026-11-05; Windows and Linux arm64 later. |
 | Database | All products share `composition.db` for now. The intended later split (desktop + CLI share one; web gets its own) is documented in [product-builds.md](product-builds.md). |
 | Meilisearch | v1 bundles it. Licensing is cleared with conditions; see [Licensing Meilisearch](#licensing-meilisearch). |
 | Updates | Manual downloads in v1. Over-the-air updates were added afterwards: [desktop-updates-plan.md](desktop-updates-plan.md). |

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { downloadUrl, validateLock } from "./node-lock.mjs";
+import { assetName, downloadUrl, validateLock } from "./node-lock.mjs";
 
 const good = {
   version: "v26.12.0",
@@ -11,12 +11,12 @@ const good = {
 };
 
 describe("node.lock.json", () => {
-  it("the committed lock is valid, covers both Mac architectures, and satisfies the CLI's engines", () => {
+  it("the committed lock is valid, covers both Mac architectures and Linux x64, and satisfies the CLI's engines", () => {
     const lock = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../node.lock.json"), "utf-8"));
     const cli = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../cli/package.json"), "utf-8"));
 
     expect(validateLock(lock)).toEqual([]);
-    expect(Object.keys(lock.assets).sort()).toEqual(["mac-arm64", "mac-x64"]);
+    expect(Object.keys(lock.assets).sort()).toEqual(["linux-x64", "mac-arm64", "mac-x64"]);
     // engines.node is ">=26.10": the bundled Node must be at least that.
     const [major, minor] = cli.engines.node.replace(/^>=/, "").split(".").map(Number);
     const [lockMajor, lockMinor] = lock.version.slice(1).split(".").map(Number);
@@ -25,6 +25,14 @@ describe("node.lock.json", () => {
 
   it("accepts a well-formed lock", () => {
     expect(validateLock(good)).toEqual([]);
+  });
+
+  it("names a Linux tarball linux, not darwin", () => {
+    const linux = { ...structuredClone(good), assets: { "linux-x64": { name: "node-v26.12.0-linux-x64.tar.gz", sha256: "a".repeat(64), size: 10 } } };
+    expect(validateLock(linux)).toEqual([]);
+
+    linux.assets["linux-x64"].name = "node-v26.12.0-darwin-x64.tar.gz";
+    expect(validateLock(linux).join("\n")).toMatch(/must be node-v26\.12\.0-linux-x64\.tar\.gz/);
   });
 
   it("refuses a Node older than the one that has node:ffi switched on", () => {
@@ -51,5 +59,6 @@ describe("node.lock.json", () => {
 
   it("builds the official nodejs.org URL", () => {
     expect(downloadUrl(good, "mac-arm64")).toBe("https://nodejs.org/dist/v26.12.0/node-v26.12.0-darwin-arm64.tar.gz");
+    expect(assetName("v26.12.0", "linux-x64")).toBe("node-v26.12.0-linux-x64.tar.gz");
   });
 });

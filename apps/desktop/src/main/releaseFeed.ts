@@ -17,6 +17,12 @@ export const STABLE_FEED_URL = `https://github.com/${RELEASE_REPO}/releases/late
 /** Releases for other products in this repo (the CLI) are not ours to offer. */
 const DESKTOP_TAG_PREFIX = "desktop-v";
 
+/**
+ * The ending of the update file electron-builder writes for a platform: `latest-mac.yml`, `latest-linux.yml`.
+ * Linux on ARM would be `latest-linux-arm64.yml`, which this build doesn't ship, so it isn't matched.
+ */
+const UPDATE_FILE_ENDING: Partial<Record<NodeJS.Platform, string>> = { darwin: "-mac.yml", linux: "-linux.yml" };
+
 /** A generic-provider feed: the folder holding the update file, and which update file to read. */
 export type ReleaseFeed = { url: string; channel: string };
 
@@ -27,13 +33,15 @@ type GitHubRelease = {
 };
 
 /**
- * Picks the newest published desktop release that carries a macOS update file. GitHub lists
- * releases newest first, so the first match wins. The update file's name is the channel:
- * `latest-mac.yml` is channel "latest", `beta-mac.yml` (what electron-builder writes for a
- * `1.0.0-beta.1` version) is channel "beta".
+ * Picks the newest published desktop release that carries an update file for this platform
+ * (macOS and Linux builds are attached to the same release). GitHub lists releases newest first,
+ * so the first match wins. The update file's name is the channel: `latest-mac.yml` is channel
+ * "latest", `beta-mac.yml` (what electron-builder writes for a `1.0.0-beta.1` version) is
+ * channel "beta"; on Linux the same with `-linux.yml`.
  */
-export function pickRelease(releases: unknown): ReleaseFeed | null {
-  if (!Array.isArray(releases)) return null;
+export function pickRelease(releases: unknown, platform: NodeJS.Platform = process.platform): ReleaseFeed | null {
+  const ending = UPDATE_FILE_ENDING[platform];
+  if (!ending || !Array.isArray(releases)) return null;
   for (const release of releases as GitHubRelease[]) {
     if (release?.draft === true) continue;
     const tag = release?.tag_name;
@@ -41,10 +49,10 @@ export function pickRelease(releases: unknown): ReleaseFeed | null {
     const assets = Array.isArray(release.assets) ? (release.assets as { name?: unknown }[]) : [];
     for (const asset of assets) {
       const name = asset?.name;
-      if (typeof name === "string" && /^[a-z0-9.]+-mac\.yml$/i.test(name)) {
+      if (typeof name === "string" && name.toLowerCase().endsWith(ending) && /^[a-z0-9.]+$/i.test(name.slice(0, -ending.length))) {
         return {
           url: `https://github.com/${RELEASE_REPO}/releases/download/${encodeURIComponent(tag)}`,
-          channel: name.slice(0, -"-mac.yml".length),
+          channel: name.slice(0, -ending.length),
         };
       }
     }
@@ -53,7 +61,10 @@ export function pickRelease(releases: unknown): ReleaseFeed | null {
 }
 
 /** Asks GitHub for the newest release to update from, pre-releases included; null when there is none. */
-export async function findLatestRelease(fetchJson: typeof fetch = fetch): Promise<ReleaseFeed | null> {
+export async function findLatestRelease(
+  fetchJson: typeof fetch = fetch,
+  platform: NodeJS.Platform = process.platform,
+): Promise<ReleaseFeed | null> {
   const response = await fetchJson(`https://api.github.com/repos/${RELEASE_REPO}/releases?per_page=30`, {
     headers: { Accept: "application/vnd.github+json" },
   });
@@ -62,5 +73,5 @@ export async function findLatestRelease(fetchJson: typeof fetch = fetch): Promis
       statusCode: response.status,
     });
   }
-  return pickRelease(await response.json());
+  return pickRelease(await response.json(), platform);
 }

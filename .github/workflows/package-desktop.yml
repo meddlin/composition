@@ -1,8 +1,8 @@
 name: Package desktop
 
 # Builds the desktop app unsigned, with the command line tool inside it, and runs that tool.
-# build-apps.yml only compiles the app on Linux; this is the one check that the macOS bundle
-# (Node 26, native modules, launcher) still comes together. It needs no secrets.
+# build-apps.yml only compiles the app; these are the checks that the macOS bundle and the
+# Linux packages (Node 26, native modules, launcher) still come together. They need no secrets.
 on:
   pull_request:
     paths:
@@ -67,3 +67,75 @@ jobs:
           actual=$(release/mac-arm64/Composition.app/Contents/Resources/cli/composition --version)
           echo "composition --version: $actual"
           test "$actual" = "$expected"
+
+  # The Ubuntu build: a .deb and an AppImage, from a Linux runner (electron-builder can't make them on a Mac).
+  # The .deb is then installed with apt, as a person would, and the installed app is driven by the smoke test.
+  package-desktop-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            apps/web/pnpm-lock.yaml
+            apps/desktop/pnpm-lock.yaml
+            apps/cli/pnpm-lock.yaml
+
+      # The desktop build bundles code from apps/web, and the CLI bundle does too.
+      - name: Install web dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: Install CLI dependencies
+        run: pnpm --dir apps/cli install --frozen-lockfile
+
+      - name: Install desktop dependencies
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      - name: Fetch Meilisearch and Node, and assemble the command line tool
+        working-directory: apps/desktop
+        run: |
+          pnpm fetch:meilisearch linux-x64
+          pnpm fetch:node linux-x64
+          pnpm stage:cli linux-x64
+
+      - name: Build the .deb and the AppImage
+        working-directory: apps/desktop
+        run: pnpm dist:linux
+
+      - name: Run the command line tool from inside the AppImage
+        working-directory: apps/desktop
+        run: |
+          expected=$(node -p "require('../cli/package.json').version")
+          appimage=$(ls release/*.AppImage)
+          chmod +x "$appimage"
+          # Unpacks the image instead of mounting it, so the runner needs no FUSE.
+          (cd release && "../$appimage" --appimage-extract >/dev/null)
+          actual=$(release/squashfs-root/resources/cli/composition --version)
+          echo "composition --version: $actual"
+          test "$actual" = "$expected"
+
+      - name: Install the .deb
+        working-directory: apps/desktop
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb ./release/*.deb
+          test -x /opt/Composition/composition-desktop
+          expected=$(node -p "require('../cli/package.json').version")
+          actual=$(/opt/Composition/resources/cli/composition --version)
+          echo "composition --version: $actual"
+          test "$actual" = "$expected"
+
+      # Drives the installed app against a throwaway HOME. The .deb's install script has put Ubuntu's
+      # AppArmor profile in place, which is what lets Chromium's sandbox start on 24.04.
+      - name: Smoke test the installed app
+        working-directory: apps/desktop
+        env:
+          SMOKE_EXECUTABLE: /opt/Composition/composition-desktop
+        run: xvfb-run --auto-servernum pnpm smoke

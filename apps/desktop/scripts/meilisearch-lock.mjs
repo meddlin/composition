@@ -11,7 +11,7 @@ export function validateLock(lock) {
   const assets = lock?.assets ?? {};
   if (Object.keys(assets).length === 0) problems.push("no assets listed");
   for (const [platform, asset] of Object.entries(assets)) {
-    if (!/^mac-(arm64|x64)$/.test(platform)) problems.push(`${platform}: unsupported platform key`);
+    if (!/^(mac-(arm64|x64)|linux-x64)$/.test(platform)) problems.push(`${platform}: unsupported platform key`);
     // Enterprise builds are BUSL-licensed and not allowed in production.
     if (/enterprise/i.test(asset?.name ?? "")) problems.push(`${platform}: ${asset.name} is an Enterprise Edition build`);
     if (!/^meilisearch-[a-z0-9.-]+$/.test(asset?.name ?? "")) problems.push(`${platform}: unexpected asset name ${asset?.name}`);

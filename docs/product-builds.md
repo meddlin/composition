@@ -29,7 +29,7 @@ Details and build steps: [apps/desktop/README.md](../apps/desktop/README.md#the-
   whatever `apps/cli` had at the desktop tag, and the app's updater replaces it along with everything else.
 - **Same database, same version.** A combined install can never have the CLI and desktop disagree
   about the schema, since they ship together. Both use better-sqlite3 13 (N-API).
-- **macOS only.** A Linux CLI still runs from source.
+- **macOS and Linux x64.** The Linux desktop app (`.deb`, AppImage) bundles the CLI the same way, in `resources/cli/`; the Linux `.deb` can put it on the PATH from the Help menu. A standalone Linux CLI still runs from source.
 
 ## Data storage: today
 
@@ -153,6 +153,7 @@ It is mostly configuration, and small:
 ## Decisions recorded
 
 - 2026-09-30: macOS only for now; Windows and Linux builds come later.
+- 2026-11-05: Linux x64 desktop builds added (`.deb` and AppImage, Ubuntu first, unsigned). The `.deb` is updated by hand, the AppImage updates itself. Linux arm64 and Windows are still later.
 - 2026-09-30: for now all products share `composition.db`; this page is the record of the
   intended later split.
 - 2026-09-30: the desktop app bundles Meilisearch in v1.

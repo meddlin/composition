@@ -313,6 +313,11 @@ the tag itself was wrong, delete it (`git push origin :refs/tags/desktop-v0.1.0`
 | Creates the GitHub Release | No: use the runbook's step 8 | Yes, as a draft |
 | Unit tests and smoke test | Not run | Not run. Pull requests run the unit tests ([unit-tests.yml](../../.github/workflows/unit-tests.yml)) |
 
+The Linux x64 packages are a second job, `release-linux`, which runs after the macOS job has created the draft
+release and adds the `.deb`, the AppImage, `latest-linux.yml` and `SHA256SUMS-linux.txt` to it. It uses no
+secrets (nothing is signed) and no `release` environment approval. If it fails, the draft keeps the Mac files;
+use **Re-run failed jobs**, which re-runs only the Linux job. Building them by hand: [apps/desktop/README.md](../../apps/desktop/README.md#linux-ubuntu).
+
 Every `uses:` in the workflow is pinned to a commit SHA ([AGENTS.md](../../AGENTS.md)); run
 `pnpm lint:actions` after touching it. The workflow has only been checked by parsing and by that
 lint. Its first real run is the test, so expect to fix a small thing.
@@ -392,5 +397,5 @@ existing installs.
 
 ### Does any of this cover Windows?
 
-No. Your Apple membership doesn't sign Windows builds, and the desktop app targets macOS only
-for now.
+No. Your Apple membership doesn't sign Windows builds, and there is no Windows build yet. Linux (x64) is
+built unsigned by the same workflow, in its own job; none of the Apple credentials apply to it.

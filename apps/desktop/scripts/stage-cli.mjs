@@ -1,21 +1,22 @@
 // Assembles the command line tool that ships inside the desktop app, one folder per
-// architecture, in resources/cli/<platform>/ (electron-builder copies it to
-// Contents/Resources/cli/):
+// platform, in resources/cli/<platform>/ (electron-builder copies it to Contents/Resources/cli/
+// in the macOS app, resources/cli/ in the Linux one):
 //
 //   composition        launcher (cli/composition), the file the app links onto the PATH
 //   node               the pinned Node 26 (pnpm fetch:node)
 //   app/               apps/cli's bundle, plus a production-only node_modules for that architecture
 //
-//   pnpm stage:cli                 both macOS architectures
-//   pnpm stage:cli mac-arm64       one of them
+//   pnpm stage:cli                 every platform (the Linux one only when run on Linux)
+//   pnpm stage:cli mac-arm64       one of them (mac-arm64, mac-x64, linux-x64)
 //   pnpm stage:cli --skip-build    reuse apps/cli/dist instead of rebuilding it
 //
 // Run `pnpm fetch:node` first, and install apps/cli's dependencies (the bundle is built there).
 //
-// Why a separate install per architecture: OpenTUI's native library is its own per-platform
+// Why a separate install per platform: OpenTUI's native library is its own per-platform
 // package, and an install normally fetches only the running machine's. pnpm's
 // `supportedArchitectures` fetches the other one, so the Intel app is staged correctly from an
 // Apple Silicon Mac. The lockfile is apps/cli's own, so the versions are the ones CLI tests ran on.
+// The Linux build needs the glibc packages (Ubuntu), not the musl ones (Alpine), hence `libc`.
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -23,12 +24,20 @@ import { fileURLToPath } from "node:url";
 
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cliDir = path.resolve(desktopDir, "..", "cli");
-const CPU = { "mac-arm64": { cpu: "arm64", lipo: "arm64" }, "mac-x64": { cpu: "x64", lipo: "x86_64" } };
+// `os`/`cpu` are Node's names, as pnpm and the native packages use them; `arch` is what `lipo` (macOS) and
+// `file` (Linux) report for a native file of that architecture.
+const TARGETS = {
+  "mac-arm64": { os: "darwin", cpu: "arm64", arch: "arm64" },
+  "mac-x64": { os: "darwin", cpu: "x64", arch: "x86_64" },
+  "linux-x64": { os: "linux", cpu: "x64", arch: "x86-64" },
+};
 
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
 const requested = args.filter((arg) => !arg.startsWith("--"));
-const platforms = requested.length > 0 ? requested : Object.keys(CPU);
+// With no platform named, every one this machine can check: a Mac stages the Mac apps, Linux stages the Linux app.
+const hostOs = process.platform === "darwin" ? "darwin" : "linux";
+const platforms = requested.length > 0 ? requested : Object.keys(TARGETS).filter((platform) => TARGETS[platform].os === hostOs);
 
 function run(label, command, commandArgs, cwd) {
   console.log(`\n==> ${label}\n$ ${command} ${commandArgs.join(" ")}`);
@@ -45,7 +54,7 @@ function fail(message) {
 }
 
 for (const platform of platforms) {
-  if (!CPU[platform]) fail(`unknown platform ${platform} (expected ${Object.keys(CPU).join(" or ")})`);
+  if (!TARGETS[platform]) fail(`unknown platform ${platform} (expected ${Object.keys(TARGETS).join(", ")})`);
 }
 if (!fs.existsSync(path.join(cliDir, "node_modules"))) {
   fail("apps/cli has no node_modules. Run `pnpm --dir ../cli install --frozen-lockfile` first.");
@@ -63,8 +72,17 @@ function walk(dir, base = dir) {
   });
 }
 
+const NATIVE_EXTENSIONS = new Set(["node", "dylib", "so"]);
+
+/** A native library by its name: addon.node, libfoo.dylib, libfoo.so, or a versioned libfoo.so.1.2 (not a regex: nothing to backtrack). */
+function isNativeFile(file) {
+  const parts = path.basename(file).split(".");
+  while (parts.length > 2 && /^\d+$/.test(parts[parts.length - 1])) parts.pop();
+  return parts.length > 1 && NATIVE_EXTENSIONS.has(parts[parts.length - 1]);
+}
+
 for (const platform of platforms) {
-  const { cpu, lipo } = CPU[platform];
+  const { os: targetOs, cpu, arch } = TARGETS[platform];
   const nodeBinary = path.join(desktopDir, "resources", "node", platform, "node");
   if (!fs.existsSync(nodeBinary)) fail(`${platform}: ${path.relative(desktopDir, nodeBinary)} is missing. Run \`pnpm fetch:node ${platform}\`.`);
 
@@ -91,8 +109,9 @@ for (const platform of platforms) {
       "nodeLinker: hoisted",
       "# Fetch this architecture's native packages, whatever machine this runs on.",
       "supportedArchitectures:",
-      "  os: [darwin]",
+      `  os: [${targetOs}]`,
       `  cpu: [${cpu}]`,
+      ...(targetOs === "linux" ? ["  libc: [glibc]"] : []),
       "# Nothing is built or run at install: better-sqlite3 13 ships N-API prebuilds.",
       "allowBuilds:",
       "  better-sqlite3: false",
@@ -111,29 +130,34 @@ for (const platform of platforms) {
   // TypeScript and the @types packages arrive only as peers of OpenTUI's React bindings, for types.
   for (const name of ["typescript", "@typescript", "@types"]) fs.rmSync(path.join(app, "node_modules", name), { recursive: true, force: true });
 
-  // better-sqlite3 13: keep only this architecture's prebuild. A foreign-OS binary would also
-  // fail code signing, which expects every executable to be Mach-O.
+  // better-sqlite3 13: keep only this platform's prebuild. On the Mac a foreign-OS binary would also
+  // fail code signing, which expects every executable to be Mach-O. On Linux, "linux-x64.node" is the
+  // glibc build; "linuxmusl-x64.node" (Alpine) is dropped with the rest.
   const sqlite = path.join(app, "node_modules", "better-sqlite3");
   for (const name of ["deps", "src", "binding.gyp", "build"]) fs.rmSync(path.join(sqlite, name), { recursive: true, force: true });
   const prebuilds = path.join(sqlite, "prebuilds");
-  if (!fs.existsSync(path.join(prebuilds, `darwin-${cpu}.node`))) fail(`${platform}: better-sqlite3 has no darwin-${cpu} prebuild`);
+  const prebuild = `${targetOs}-${cpu}.node`;
+  if (!fs.existsSync(path.join(prebuilds, prebuild))) fail(`${platform}: better-sqlite3 has no ${targetOs}-${cpu} prebuild`);
   for (const file of fs.readdirSync(prebuilds)) {
-    if (file !== `darwin-${cpu}.node`) fs.rmSync(path.join(prebuilds, file), { force: true });
+    if (file !== prebuild) fs.rmSync(path.join(prebuilds, file), { force: true });
   }
 
   // OpenTUI's native library: exactly this architecture's package must be present.
   const opentui = fs.readdirSync(path.join(app, "node_modules", "@opentui")).filter((name) => name.startsWith("core-"));
-  if (opentui.join() !== `core-darwin-${cpu}`) fail(`${platform}: expected only @opentui/core-darwin-${cpu}, found ${opentui.join(", ") || "none"}`);
+  if (opentui.join() !== `core-${targetOs}-${cpu}`) fail(`${platform}: expected only @opentui/core-${targetOs}-${cpu}, found ${opentui.join(", ") || "none"}`);
 
-  // Every native file must be this architecture (checked where `lipo` exists, i.e. on a Mac).
-  if (process.platform === "darwin") {
-    const native = walk(app).filter((file) => /\.(node|dylib|so)$/.test(file));
-    for (const file of native) {
-      const result = spawnSync("lipo", ["-archs", path.join(app, file)], { encoding: "utf-8" });
-      const archs = result.stdout.trim();
-      if (result.status !== 0 || !archs.split(/\s+/).includes(lipo)) fail(`${platform}: ${file} is ${archs || "not a Mach-O file"}, expected ${lipo}`);
+  // Every native file, and the Node binary, must be this architecture. Checked where a tool can tell:
+  // `lipo` on a Mac, `file` on Linux. (The other machine's apps are checked when they are built there.)
+  const native = walk(app).filter(isNativeFile);
+  const checker = targetOs === "darwin" && process.platform === "darwin" ? "lipo" : targetOs === "linux" && process.platform === "linux" ? "file" : null;
+  if (checker) {
+    for (const file of [...native.map((name) => path.join(app, name)), nodeBinary]) {
+      const result = checker === "lipo" ? spawnSync("lipo", ["-archs", file], { encoding: "utf-8" }) : spawnSync("file", ["-b", file], { encoding: "utf-8" });
+      const found = result.stdout.trim();
+      const matches = checker === "lipo" ? found.split(/\s+/).includes(arch) : /^ELF 64-bit/.test(found) && found.includes(arch);
+      if (result.status !== 0 || !matches) fail(`${platform}: ${path.relative(out, file)} is ${found || "unreadable"}, expected ${arch}`);
     }
-    console.log(`${platform}: ${native.length} native file(s), all ${lipo}`);
+    console.log(`${platform}: ${native.length} native file(s) and Node, all ${arch}`);
   }
 
   fs.copyFileSync(nodeBinary, path.join(out, "node"));

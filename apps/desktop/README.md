@@ -1,6 +1,6 @@
 # Composition desktop app
 
-The Composition web UI in Electron, for macOS. It is the same notes workspace, the same
+The Composition web UI in Electron, for macOS and for Linux (Ubuntu, x64). It is the same notes workspace, the same
 shadcn/ui components, Tailwind styling and color schemes as `apps/web`, with no server to run and a bundled
 Meilisearch for search. Plan, decisions and status: [docs/desktop-app-plan.md](../../docs/desktop-app-plan.md).
 
@@ -38,10 +38,11 @@ Run `pnpm install` in `apps/web` first: the desktop build bundles code and style
 | `pnpm smoke` | Launches the built app and drives it end to end against a throwaway `HOME`. Never touches real notes. |
 | `pnpm package` | Unsigned, unpacked `.app` in `release/`. For checking a build. |
 | `pnpm dist` | Signed and notarized DMG and ZIP for this Mac's architecture. Needs the credentials below. |
+| `pnpm dist:linux` | On Linux only: a `.deb` and an `.AppImage` for x64, plus `latest-linux.yml`, in `release/`. Unsigned. Run the three fetch/stage commands for `linux-x64` first; see [Linux](#linux-ubuntu). |
 | `pnpm release` | Signed, notarized and verified DMG and ZIP for both architectures, plus checksums; warns about missing requirements first (`--check` only checks, `--unsigned` skips signing). The release workflow runs the same script. |
-| `pnpm fetch:meilisearch` | Downloads the pinned, checksum-verified Meilisearch binaries (about 116 MiB each) into `resources/meilisearch/`. |
+| `pnpm fetch:meilisearch` | Downloads the pinned, checksum-verified Meilisearch binaries (about 116 MiB each; `mac-arm64`, `mac-x64`, `linux-x64`) into `resources/meilisearch/`. |
 | `pnpm fetch:node` | Downloads the pinned, checksum-verified Node 26 (about 57 MiB each) into `resources/node/`, for the command line tool. |
-| `pnpm stage:cli` | Builds `apps/cli` and assembles the command line tool for each architecture in `resources/cli/` (needs `apps/cli` installed and `pnpm fetch:node` run). |
+| `pnpm stage:cli` | Builds `apps/cli` and assembles the command line tool for each platform in `resources/cli/` (needs `apps/cli` installed and `pnpm fetch:node` run). With no argument it stages this machine's platforms: both Macs on a Mac, `linux-x64` on Linux. |
 
 Check a packaged build end to end:
 
@@ -56,8 +57,8 @@ SMOKE_EXECUTABLE="$PWD/release/mac-arm64/Composition.app/Contents/MacOS/Composit
 |---|---|
 | Notes database | `~/.composition/composition.db` (shared with the CLI and web app, for now; [product-builds.md](../../docs/product-builds.md)) |
 | Attached files | `~/.composition/attachments/` ([docs/architecture/attachments.md](../../docs/architecture/attachments.md)) |
-| Desktop settings | `~/Library/Application Support/Composition/settings.json` |
-| Search index, key, log | `~/Library/Application Support/Composition/search/` |
+| Desktop settings | `~/Library/Application Support/Composition/settings.json` (Linux: `~/.config/Composition/settings.json`) |
+| Search index, key, log | `~/Library/Application Support/Composition/search/` (Linux: `~/.config/Composition/search/`) |
 
 ## Meilisearch
 
@@ -104,7 +105,44 @@ then checks the packaged app: the launcher is there, its Node matches the app's 
 `composition --version` runs; when signing, that every Mach-O file under `cli/` is signed and the
 bundled Node has the hardened runtime.
 
-## Signing and releases
+## Linux (Ubuntu)
+
+x64 only, as a `.deb` (the recommended install) and an `.AppImage`. electron-builder can't make them on a
+Mac, so they are built on Linux: the **Package desktop** workflow builds them on Ubuntu 24.04 for every
+desktop pull request, installs the `.deb` with `apt`, and runs the smoke test against the installed app;
+the release workflow attaches them to the same draft release as the Mac builds.
+
+```bash
+sudo apt install ./Composition-0.6.2-linux-amd64.deb     # installs to /opt/Composition, command: composition-desktop
+./Composition-0.6.2-linux-x86_64.AppImage                # needs libfuse2 (libfuse2t64 on 24.04), or --appimage-extract-and-run
+```
+
+To build one yourself, on Linux (or in an Ubuntu container) with Node 22 and pnpm: install `apps/web`,
+`apps/cli` and `apps/desktop` as for the Mac, then in `apps/desktop`:
+
+```bash
+pnpm fetch:meilisearch linux-x64 && pnpm fetch:node linux-x64 && pnpm stage:cli linux-x64
+pnpm dist:linux
+```
+
+What differs from the Mac app:
+
+- **Install vs. update.** The `.deb` is the package manager's, so it does not update itself (Settings >
+  Updates says so); install the newer `.deb` over it. The AppImage updates itself from `latest-linux.yml`
+  (`updateSupport` in `src/main/updates.ts`, which looks for the `APPIMAGE` variable the AppImage runtime sets).
+- **The `composition` command.** "Install Command Line Tool…" is in the **Help** menu (the Mac has it
+  under the app menu) and links the launcher into `/usr/local/bin` or `~/.local/bin`. It refuses an AppImage,
+  whose files only exist while it runs, so use the `.deb` for the command line tool.
+- **Chromium's sandbox on Ubuntu 24.04.** 24.04 restricts unprivileged user namespaces with AppArmor. The `.deb`
+  installs an AppArmor profile (electron-builder's own install script) so the app starts normally. An AppImage
+  has no install step to add one; if it stops with a `chrome-sandbox` error, run it with `--no-sandbox` or
+  allow it in AppArmor.
+- **Window look.** The see-through window setting is macOS-only; on Linux the window is opaque and the setting is hidden.
+- **Dependencies.** The `.deb` depends on GTK 3, NSS, ALSA and the other libraries Electron needs
+  (`deb.depends` in `electron-builder.yml`); `apt` installs them. Needs glibc (Ubuntu, Debian); musl (Alpine) is not supported.
+- **Not signed.** There is no signing or notarization for Linux, so the release's `SHA256SUMS-linux.txt` is the way to check a download.
+
+## Signing and releases (macOS)
 
 Credentials are read from the environment, never from files:
 `CSC_LINK` and `CSC_KEY_PASSWORD` (Developer ID Application certificate) and `APPLE_API_KEY`,
