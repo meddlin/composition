@@ -2,10 +2,11 @@ import { getDb } from "./db";
 import type { Attachment } from "./attachmentsApi";
 
 /** An attachment plus where its bytes are: the name of the file in `<application data>/attachments/`. */
-export type StoredAttachment = Attachment & { storedName: string };
+export type StoredAttachment = Attachment & { uuid: string; storedName: string };
 
 type AttachmentRow = {
   id: number;
+  uuid: string;
   note_id: number;
   file_name: string;
   stored_name: string;
@@ -16,6 +17,7 @@ type AttachmentRow = {
 function fromRow(row: AttachmentRow): StoredAttachment {
   return {
     id: row.id,
+    uuid: row.uuid,
     noteId: row.note_id,
     fileName: row.file_name,
     storedName: row.stored_name,

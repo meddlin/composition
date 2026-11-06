@@ -74,7 +74,8 @@ CREATE TABLE notes (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
     group_id INTEGER,
-    position INTEGER
+    position INTEGER,
+    uuid TEXT
 );
 
 CREATE TABLE groups (
@@ -83,7 +84,8 @@ CREATE TABLE groups (
     parent_id INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
-    position INTEGER
+    position INTEGER,
+    uuid TEXT
 );
 ```
 
@@ -97,6 +99,53 @@ Every other table is a `CREATE TABLE IF NOT EXISTS`, for the same reason. `db.te
 databases as each earlier version created them and checks every column arrives with the data
 intact.
 
+### Identity: the `uuid` column
+
+`notes`, `groups`, `notebooks`, `trashed_notes`, `trashed_groups` and `attachments` each carry a
+`uuid TEXT`: 128 random bits as 32 lowercase hex characters, the same for the life of the row. It is
+the name a second device (the iPad app, a sync server) will know the row by; a per-device
+`AUTOINCREMENT` id would collide there. It was added ahead of both, as the one change the others need
+from the shared schema (the iPad app's design and the cross-device sync design, both still being
+written, say why).
+
+**The integer `id` stays the local handle.** Nothing that refers to a row by it changed: foreign keys
+by convention (`group_id`, `parent_id`, `notebook_id`, `attachments.note_id`), the favorites list,
+`note:<id>` links, the search index, the IPC methods and their validators all still speak integers.
+The uuid is not in the search index, and not on the renderer-facing `Attachment` or the Trash Can
+listing; on the models it is an optional `uuid` on `Note`, `Group` and `Notebook` (optional so that
+fixtures and clients that predate the column still compile; it is always set on a row read from the
+database) and a required one on the repo-level `StoredAttachment`.
+
+How it gets there, all in `db.ts` and safe for every older build that opens the file:
+
+- **Column, trigger and index** go in together, in one transaction, by the same additive rule as the
+  other columns: `ensureColumn` adds the `uuid`, an `AFTER INSERT` trigger (`trg_<table>_fill_uuid`)
+  fills it when it is `NULL`, and a unique index (`idx_<table>_uuid`) enforces it. The trigger uses
+  built-in SQL only (`lower(hex(randomblob(16)))`), so a row inserted by an older build, which does not
+  know the column and has no user-defined functions, still gets a uuid. Only that build's *Trash move*
+  loses something: it does not carry the uuid, so the trashed row (and, on restore, the note) is
+  issued a new one. That reads as a delete plus a create to anything that syncs, a degradation and
+  not a loss.
+- **Backfill.** On the first open of a database without them, the rows that have no uuid get one,
+  200 rows per write transaction so the writer (a running terminal app, say) is never held for long.
+  The unique index goes in *before* the backfill, so finding the rows left to fill, and learning on
+  every later open that there are none, is an index lookup and not a scan of every note. An open that
+  was cut short finishes the job next time, keeping the uuids already given. The second open of a
+  current database writes nothing.
+- **The Trash Can carries it.** `trashNote` and `trashGroup` copy the uuid into `trashed_*`, and
+  `restoreNote` and `restoreGroup` put it back, so a restored note keeps its uuid (a trashed row only
+  gives its uuid up if a live row already holds it, which would mean the database was swapped
+  underneath the app; the trigger then issues a fresh one, as it does for a taken id). Every other
+  move (to another group or notebook, a rename, a reorder) is an `UPDATE` and leaves it alone;
+  `adoptOrphans` only inserts the default "Notebook", which the trigger covers.
+- **Backups.** The `VACUUM INTO` snapshot is a copy of the schema as well as the rows, so a backup
+  holds the column, the trigger and the index, and restoring it brings every uuid back. Restoring a
+  backup made before the column existed is backfilled on the next open like any other old database.
+
+`db.test.ts` covers each of these: a database without the column (as the build before left it, and
+the oldest one), an insert that leaves the column out, a second open that changes nothing, a Trash
+round trip for notes and groups, and a backup round trip in both directions.
+
 ## Notebooks
 
 A **notebook** holds groups, sub-groups and notes; the web and desktop sidebar shows one notebook's
@@ -107,7 +156,8 @@ CREATE TABLE notebooks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    uuid TEXT
 );
 ```
 
@@ -135,8 +185,8 @@ Three more groups of tables belong to features the older apps never had:
 
 ```sql
 -- the Trash Can: the same columns as notes and groups, plus when it was deleted
-CREATE TABLE trashed_notes  (id INTEGER PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, group_id INTEGER, deleted_at TEXT NOT NULL);
-CREATE TABLE trashed_groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, parent_id INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NOT NULL);
+CREATE TABLE trashed_notes  (id INTEGER PRIMARY KEY, title TEXT NOT NULL, content TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '', description TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL, updated_at TEXT NOT NULL, group_id INTEGER, deleted_at TEXT NOT NULL, uuid TEXT);
+CREATE TABLE trashed_groups (id INTEGER PRIMARY KEY, name TEXT NOT NULL, parent_id INTEGER, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, deleted_at TEXT NOT NULL, uuid TEXT);
 
 -- files attached to a note (desktop only)
 CREATE TABLE attachments (
@@ -145,7 +195,8 @@ CREATE TABLE attachments (
     file_name TEXT NOT NULL,
     stored_name TEXT NOT NULL,
     size INTEGER NOT NULL,
-    created_at TEXT NOT NULL
+    created_at TEXT NOT NULL,
+    uuid TEXT
 );
 ```
 

@@ -3,6 +3,8 @@ import { placeBefore } from "./ordering";
 
 export type Notebook = {
   id: number;
+  /** See `Note.uuid`. */
+  uuid?: string;
   name: string;
   createdAt: string;
   updatedAt: string;
@@ -10,6 +12,7 @@ export type Notebook = {
 
 type NotebookRow = {
   id: number;
+  uuid: string;
   name: string;
   created_at: string;
   updated_at: string;
@@ -20,7 +23,13 @@ export class NotebookNotEmptyError extends Error {}
 export class LastNotebookError extends Error {}
 
 function fromRow(row: NotebookRow): Notebook {
-  return { id: row.id, name: row.name, createdAt: row.created_at, updatedAt: row.updated_at };
+  return {
+    id: row.id,
+    uuid: row.uuid,
+    name: row.name,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
 }
 
 function nowIso(): string {
