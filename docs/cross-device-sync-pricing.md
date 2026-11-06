@@ -202,7 +202,8 @@ subscribers. Its advantage is nothing to run, not a lower bill.
 ## What is not in the model
 
 - **Your time.** Support, abuse, outages, and answering "I lost my recovery key" (end-to-end encryption makes that
-  unrecoverable by design). At 100 paying users this is likely the real cost.
+  unrecoverable by design). At 100 paying users this is likely the real cost; the chores are listed in
+  [cross-device-sync-operations.md](cross-device-sync-operations.md), with a guess at the hours.
 - **Income tax, a business entity, accounting, and a privacy policy and terms of service.**
 - **Refunds and chargebacks,** and failed renewals.
 - **Clerk's per-user pricing** past 50,000 retained users (irrelevant here).

@@ -1022,6 +1022,23 @@ choose which to use. Nothing about self-hosting is built now, but a few cheap ch
 
 Not decided: packaging (a container image), how a self-hoster upgrades and backs up, who supports it.
 
+## Running it in production
+
+Most of the ongoing cost of an outside-user service is not servers but chores: payments, abuse, customer requests, security and
+vendor upkeep. They are listed, with what is worth automating, in
+[cross-device-sync-operations.md](cross-device-sync-operations.md). They add a few things the service itself needs, none of them
+built yet:
+
+- an **entitlement** record per account (plan, state, source: Apple, Paddle or Stripe), kept current by webhooks, with a lapse
+  lifecycle (grace period, paused sync, retention, deletion warnings);
+- an **account deletion pipeline** that removes the account's records, blobs and Clerk user, and an **export** of what the server
+  holds;
+- a **support console** showing read-only account metadata (plan, devices, storage, last sync, error counts), never note
+  content, with an audit log of every action taken in it;
+- an in-app **diagnostics bundle** (versions, cursor, epoch, last error; no content) that a user can send;
+- **rate limits and quotas** per account and per device, with alerts on outliers;
+- scheduled **hygiene jobs** (expired retry records and sessions, tombstone compaction, orphaned blobs).
+
 ## Observability
 
 The server and the clients report, without content:
@@ -1119,14 +1136,49 @@ The simulation test gets a "two devices across a week boundary, online and offli
 | **S3** | **Protocol and latency on a stub server.** In-process server, two desktop engines, fault-injecting transport; then a real network. Measure typical and p95 propagation. | The 20 s budget, the napkin numbers, R3 | p95 ≤ 10 s; the simulation converges |
 | **S4** | **Sign-in broker.** Our sign-in page with Clerk's components; the desktop (deep link, PKCE) and the iPad (`ASWebAuthenticationSession`) swap a one-time code for a device session; token storage in the Keychain; revoke a device. Compare with using Clerk's Electron and iOS SDKs directly. | D5, R7, R18 | Both sign in, refresh after a week offline, and revoke; the verifier is swappable |
 | **S5** | **Encryption.** One set of test vectors that Node and Swift both encrypt, decrypt and unwrap: AEAD records, chunked blobs, Argon2id wrapping, the recovery key. Pick the cipher and the iPad's Argon2 source. Time unlock on the M2 iPad and a laptop. | D18, R13, R14 | Both sides decrypt each other's data; unlock under about a second on both |
-| **S6** | **Lean server (the self-hosted candidate).** One node with SQLite and continuous replication: load test the push path, restart under load, restore from the replica and time it, and check that the `epoch` makes devices resync and re-push. Check the current replication tool, and settle one database file or a file per user. | D3, D20, R15, R19 | Latency and durability numbers; a restored server heals from the clients |
+| **S6** | **Lean server (the self-hosted candidate).** One node with SQLite and continuous replication: load test the push path, restart under load, restore from the replica and time it, and check that the `epoch` makes devices resync and re-push. Check the current replication tool, and settle one database file or a file per user. S8 runs this same setup beside the other two. | D3, D20, R15, R19 | Latency and durability numbers; a restored server heals from the clients |
 | **S7** | **The weekly cycle on two devices.** Two databases across a week boundary, online and offline, then synced. | D19, R16 | Same closed weeks, same roll counts, no unintended duplicates |
-| **S8** | **Hosted candidates.** Prototype push, pull and the hint on managed Postgres (Neon, PlanetScale) and on Convex: gap-free versions under concurrent pushes, wake-up delay after idle, push latency, restoring a backup. For Convex, first resolve backups, export, regions and production terms, and confirm its mutations are serializable. | D3, R7, R20 | A short list of hosts that meet the latency budget and have backups you can rely on |
+| **S8** | **All three hosted candidates, side by side.** Build one thin prototype of the protocol (push, pull, hint) behind the storage interface and deploy it three ways: the lean setup (SQLite on one VM), managed Postgres (Neon, and PlanetScale if the free tier is too limited) and Convex, reached through HTTP actions so the same test client and contract suite run against all three. Point the app's server address at each in turn and fill in [the scorecard](#comparing-the-three-by-hand). For Convex, first resolve backups, export, regions and production terms, and confirm its mutations are serializable. | D3, D20, R7, R20 | The scorecard filled in for all three, and a recommendation for D3 |
 | **S9** | **Lean to Postgres move.** Rehearse [the move](#moving-from-lean-to-hosted-postgres) on a copy: restore, copy through the storage interface, check, switch two test devices over. | D3, D20 | Devices carry on with no re-upload; time and steps recorded |
 
 **Gate A** (after S1 and S2): commit to `uuid` + triggers + outbox; tell the iPad design its schema. **Gate B**
 (after S3): freeze the protocol and record shapes; start the server. **Gate C** (before any user data leaves the
 machine): S5 passes, D5 is settled and the privacy policy is written. **Gate D** (before release to other users): the fast follow is complete and has passed the same simulation tests.
+
+### Comparing the three by hand
+
+The point of S8 is to run all three and judge them with your own hands, not from vendor claims. It is possible because the
+protocol and the storage interface are fixed by Gate B (after S3): each candidate is a thin implementation of the same few
+operations, so one test client and one contract suite run against all of them. Nothing here is built yet.
+
+**How the comparison works**
+
+1. One scripted client drives every candidate through the same scenarios: two simulated devices making normal edits, a burst of
+   500 edits, a first sync of a 10 MB library, and faults (kill the API, kill the database, restore from a backup).
+2. The app's server address is a setting from the first release (D6), so a development build can be pointed at each candidate in
+   turn and used by hand: edit on the desktop and watch a second window or the iPad simulator.
+3. Each candidate runs on its real host (a VM, Neon, Convex), not on a laptop, so latency and wake-up delays are real.
+4. Fill in the scorecard as you go.
+
+Running all three costs little: free tiers cover Neon, Convex Starter and the first 10 GB of R2, plus a small VM (about $2 to $5
+a month on Fly at the prices in [Hosting it cheaply](#hosting-it-cheaply)).
+
+| Question | How to measure | Lean | Managed Postgres | Convex |
+|---|---|---|---|---|
+| Push latency (typical and p95) | Local save to the server's acknowledgement | | | |
+| Propagation to the other device | Save on one, time until the other shows it | | | |
+| First sync after idle | Leave it 10 minutes, then push | | | |
+| First sync of a 10 MB library | Paged initial pull on an empty device | | | |
+| Gap-free versions under concurrent pushes | Two clients pushing at once; look for gaps and duplicates | | | |
+| Kill the API | Time to recover, and what devices see | | | |
+| Lose the database | Restore from backup: time, steps, and whether the `epoch` heals the devices | | | |
+| Data lost in a failure | Records missing after the drill | | | |
+| Monthly cost at 100 users | The real bill, extrapolated | | | |
+| Setup effort | Steps and time from nothing to a working server | | | |
+| Monthly chores | What you would do each month ([production chores](cross-device-sync-operations.md)) | | | |
+| Local development and tests | Can it run on a laptop and in CI? | | | |
+| Cost to leave | Effort to move to another candidate (S9) | | | |
+| Unknowns resolved | Backups, export, regions and terms (Convex); replication monitoring (lean) | | | |
 
 ## Decisions
 
@@ -1136,7 +1188,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 |---|---|---|:-:|
 | D1 | How to read the 20 s assumption. | A propagation deadline, not a sync interval ([The assumption](#the-assumption)). | **Decided** (you) |
 | D2 | Server language. | TypeScript on Node. The server never parses notes. | Proposed |
-| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). Two alternatives are kept as spikes: the lean SQLite setup (S6) and Convex (S8). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. | **Open: you** |
+| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). All three (managed Postgres, lean and Convex) are prototyped side by side in S8, with a scorecard to fill in by hand ([how](#comparing-the-three-by-hand)). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. | **Open: you** |
 | D4 | End-to-end encryption. | Yes, in v1. Design in [End-to-end encryption](#end-to-end-encryption); details settled in S5. | **Decided** (you) |
 | D5 | **Sign-in.** | **Hosted: Clerk, behind our server** ([Using Clerk](#using-clerk)): our own device sessions, Clerk only for the sign-in step. **Self-hosted: its own sign-in on an adopted library.** Separate products; accounts do not move between them. | **Decided** (you) |
 | D6 | Hosted or self-hosted. | Hosted first; self-hostable later, chosen by the user. Preparation: [Hosted now, self-hosted later](#hosted-now-self-hosted-later). | **Decided** (you) |
@@ -1243,3 +1295,7 @@ and that its mutations are serializable; Litestream's data-loss window (its page
   "Convex as the hosted server", and a Convex diagram beside the other two. Lean is kept as a spike (S6) and is the likely
   self-hosted shape (D20). New spikes S8 (hosted candidates) and S9 (the move), and risks R19 and R20. Lean now uses one
   database file rather than a file per user. The hosted web client is ruled out for now.
+- 2026-11-05: **comparison and chores.** S8 now prototypes all three hosted candidates (lean, managed Postgres, Convex) side by
+  side, with a scorecard to fill in by hand. New [cross-device-sync-operations.md](cross-device-sync-operations.md) lists the
+  production chores (payments, abuse, customer requests, operations, security, legal and finance), and a new "Running it in
+  production" section lists what the service needs to support them.
