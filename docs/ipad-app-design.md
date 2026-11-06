@@ -3,8 +3,9 @@
 A native iPad app for Composition, written in Swift (with Objective-C, C and C++ only where something needs
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
-**Design, plus spikes S1 and S2** (`apps/ios/CompositionCore`: the data layer, backup, the Trash Can and search, with their
-tests; see [S1 status](#s1-status) and [S2 status](#s2-status)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
+**Design, spikes S1 and S2, and a first prototype app** (`apps/ios/CompositionCore`: the data layer, backup, the Trash Can and
+search, with their tests; `apps/ios/Composition`: a read-only viewer on it; see [S1 status](#s1-status), [S2 status](#s2-status) and
+[The first app](#the-first-app)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
 Simulator only. Dates are 2026-11-05.
 
 **Direction (changed 2026-11-05).** The two earlier research sessions leaned towards the existing web UI in a
@@ -37,7 +38,7 @@ Legend for the tracker:
 | **Plan** | **M1**, **M2** or **M3†**: the [milestone](#v1-scope-and-milestones) that builds it (**†** is release polish, first to drop from v1) · **Later** · **Never** (a deliberate decision, see the compromise) |
 | **Status** | ⬜ not started · 🔬 spiked (answer found, not built) · 🔨 built · 📱 verified on the iPad · ⛔ dropped |
 
-**Verified working on a device today: nothing.** A row only gets 📱 after a person has used it on the iPad.
+**Verified working on a device today: nothing.** A row only gets 📱 after a person has used it on the iPad. (The prototype app has run in the Simulator only; [manual-tests/ipad.md](manual-tests/ipad.md) is the first test on a real one.)
 
 ## Summary
 
@@ -509,7 +510,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| App shell, scenes, lifecycle | 🆕 | M1 | ⬜ | SwiftUI `App`; flush on leaving the foreground |
+| App shell, scenes, lifecycle | 🆕 | M1 | 🔨 | SwiftUI `App` with a split view, in the prototype ([The first app](#the-first-app)); flushing on leaving the foreground is not needed until there is editing |
 | Six colour schemes | 🔁 | M1 | ⬜ | `Theme` tokens ported from `themes.ts`; add a **System** scheme (⭐) |
 | "Follow the sun" scheme | 🔁 | M3† | ⬜ | Port `sunTimes.ts`; needs a saved city |
 | Fonts | 🔁 | M1 | ⬜ | System fonts by default; bundled open-source families as options |
@@ -531,7 +532,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | Same rules; conformance corpus |
 | Notebooks: switch, colours | 🔁 | M1 | ⬜ | Sidebar |
 | Favorites | 🔁 | M1 | ⬜ | |
-| Trash Can (60 days) | 🔁 | M1 | 🔬 | The core is built and checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)); no screen yet, and the search index and attachment clean-up around it are not |
+| Trash Can (60 days) | 🔁 | M1 | 🔨 | The core is checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)), and the prototype has its screen (swipe to trash, restore, delete for good), in the Simulator; attached files of purged notes are not removed |
 | Drag and drop of notes and groups | ⭐ | M1 | ⬜ | Native drag and drop, reorder, and drops from Files and Photos |
 | Home page (recent, pinned) | 🔁 | M3† | ⬜ | |
 | Heading rail | 🔁 | M3† | ⬜ | An outline popover or trailing rail |
@@ -548,7 +549,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB, in an index file of its own ([S2 status](#s2-status)); present and fast on the Mac and in the Simulator; not wired to the store; not checked on the device |
 | Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus ([C1](#compromise-register), [S2 status](#s2-status)) |
 | Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔬 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
-| Search bar | ⭐ | M1 | ⬜ | `.searchable`, with tokens for filters |
+| Search bar | ⭐ | M1 | 🔨 | `.searchable` in the prototype (no tokens yet), with a readout of how long each search took |
 | Find in a note | ⭐ | M1 | ⬜ | `UIFindInteraction` |
 | Spotlight indexing | 🆕 | Later | ⬜ | Core Spotlight |
 
@@ -593,7 +594,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Images page: browse, reuse, find unused | 🔁 | M3† | ⬜ | |
 | Image size limit | 🔁 | M1 | ⬜ | None, as on desktop; the data stays on the device |
 | Attachments | ⭐ | Later | ⬜ | Document picker, share sheet, Quick Look |
-| Backup and restore | 🔁 | M1 | 🔬 | The core (create, stage, apply with rollback) is built and checked against the desktop both ways ([S1 status](#s1-status)); tar in Swift, gzip via the system zlib. No Files picker or screen yet ([C14](#compromise-register)) |
+| Backup and restore | 🔁 | M1 | 🔨 | The core (create, stage, apply with rollback) is checked against the desktop both ways ([S1 status](#s1-status)); the prototype imports through the system file picker and exports through the share sheet. The Simulator ran the export and a debug-launch import; choosing a file in the picker is untested ([C14](#compromise-register)) |
 
 ### Plugins and other products
 
@@ -881,13 +882,43 @@ this corpus (0.98) was not worth keeping. That is why the top result differs mor
 
 **Not done, or not known:**
 
-- The index is not wired to the store: nothing calls `upsert`, `remove` or `rebuild` when a note is saved, trashed or
-  restored, and nothing notices that it is stale after a restore. The first version can rebuild on open and after a restore.
+- The index is only partly wired to the store. The prototype app keeps it in step on trash (`remove`) and restore (`rebuild`) and
+  rebuilds it when a restore left it stale (`rebuildIfStale`, added after S2); nothing calls `upsert` yet, because there is no editing.
 - The notes are synthetic. They repeat their words and their titles (74 different titles in 100 notes); real notes will
   not, which is why R7 stays open for your judgement.
 - Phrases are exact (no typos inside quotes), which was not checked against Meilisearch beyond the five phrase queries.
 - Nothing ran on the iPad, and the iPadOS floor was not tried: only the Simulator's SQLite 3.51.0 and the Mac's 3.54.0.
 - Spotlight and the `.searchable` tokens remain Later.
+
+### The first app
+
+**A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
+your own notes before the real app exists, chiefly to judge search (R7). It is `apps/ios/Composition.xcodeproj` with one
+target, `Composition` (SwiftUI, Swift 6, iPad only, iPadOS 17.0), about 630 lines over 9 files, on `CompositionCore`. How to
+install it and what to try: [manual-tests/ipad.md](manual-tests/ipad.md).
+
+- **It does:** imports a desktop backup through the system file picker (replacing everything, after a confirmation); lists the
+  notes newest first; searches as you type, with the typo rules and filters, and shows how long each search took; opens a note
+  as its Markdown source; moves a note to the Trash Can (swipe, or the button on an open note), restores it or deletes it for good,
+  keeping the search index in step; exports a backup through the share sheet; and has an *About this build* page (SQLite
+  version, Debug or Release, whether the index was rebuilt at launch).
+- **It does not:** edit, render Markdown, show images or attached files, have groups or notebooks, colour schemes, settings,
+  ink, or any of the design's M1 beyond what is above.
+- **What ran in the Simulator** (an iPad Pro 11-inch (M5), driven by hand): the first-launch screen; importing a 1,000-note
+  backup made with plain `tar`; the list; a search with a mistake (`kuberntes`: 50 results in 9.7 ms, in a debug build) with title
+  hits first; opening a note; trash, the Trash Can screen and a restore, with the search results following; an export, whose
+  archive passes `gzip -t` and holds 1,000 notes with 1,000 distinct uuids and a clean integrity check; the file picker
+  opening. A Release build for a physical iPad (unsigned, arm64) and a generic Simulator build both compile, and CI builds the app.
+- **Not verified:** choosing a file in the picker (the Simulator's Files app would not show a file I placed there, so the
+  security-scoped route is untested; a debug launch argument that runs the same import code was used instead); anything on a
+  real iPad, including its speed; swipes by a finger; rotation, Split View and Slide Over; VoiceOver and Dynamic Type.
+- **Placeholders I chose, which are yours to replace:** the bundle id `com.rushinglabs.composition.ipad.dev` (not the id the
+  real app will keep, which is still to settle before M1's first install), no Apple team (choose yours in Xcode), no icon, data in
+  the app's Application Support folder, and no safety backup before an import.
+- **Core changes it needed:** a note's full text and a lookup of notes by id in search order; the tags on a list row; the SQLite
+  version; and `SearchIndex.rebuildIfStale` and `markCurrent`, which close S2's "nothing notices the index is stale after a restore".
+- **How the project is made:** the `.xcodeproj` is written by hand (no generator is installed), using Xcode's folder-synchronized
+  groups, so source files in `apps/ios/Composition/` need no entry in it, and it depends on the local `CompositionCore` package.
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
@@ -998,6 +1029,12 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   joined and split words, and ordering by attribute and recency replaced bm25. Changed from the first proposal: the index is
   a separate file, not tables in `composition.db`, and tags are not searched as text. C1 resolved on the acceptance corpus;
   R7 lowered; D3 has its evidence; the tracker's search rows, the opening line and this log updated. Not wired to the store.
+
+- 2026-11-05: **First prototype app.** `apps/ios/Composition`: a read-only SwiftUI viewer on the Swift core (import and export of
+  backups, list, search with typos, the note's source, the Trash Can), run in the iPad Simulator and built for a device, with a
+  manual test page (`docs/manual-tests/ipad.md`) and a script for a 1,000-note test backup. Core additions: note lookup,
+  `rebuildIfStale`. Placeholders chosen: the bundle id, no team, no icon. Untried on a real iPad and through the picker. The
+  tracker's shell, search bar, Trash Can and backup rows moved to 🔨; the docs index no longer says nothing is built.
 
 ## Sources
 

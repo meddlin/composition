@@ -59,6 +59,7 @@ public final class SearchIndex: Sendable {
                 CREATE VIRTUAL TABLE IF NOT EXISTS notes_fts USING fts5(
                     title, content, description, tokenize = 'unicode61 remove_diacritics 2', prefix = '2 3 4');
                 CREATE VIRTUAL TABLE IF NOT EXISTS notes_vocab USING fts5vocab(notes_fts, 'row');
+                CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 """)
         }
         return SearchIndex(pool: pool)
@@ -70,8 +71,27 @@ public final class SearchIndex: Sendable {
 
     // MARK: Keeping it in step
 
+    /// Rebuilds the index if it was not built from the notes as they are now (it is new, or the notes changed some way other
+    /// than through `upsert` and `remove`, such as a restore). Returns whether it rebuilt.
+    @discardableResult
+    public func rebuildIfStale(from database: CompositionDatabase) throws -> Bool {
+        let current = try database.notesFingerprint()
+        let stored = try pool.read { try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key = 'notes'") }
+        guard stored != current else { return false }
+        try rebuild(from: database)
+        return true
+    }
+
+    /// Records that the index now matches `database`: call it after `upsert` or `remove` has made it so, or the next
+    /// `rebuildIfStale` will think the notes changed behind its back.
+    public func markCurrent(with database: CompositionDatabase) throws {
+        let current = try database.notesFingerprint()
+        try pool.write { try $0.execute(sql: "INSERT OR REPLACE INTO meta (key, value) VALUES ('notes', ?)", arguments: [current]) }
+    }
+
     /// Empties the index and fills it from every note in `database`.
     public func rebuild(from database: CompositionDatabase) throws {
+        let fingerprint = try database.notesFingerprint()
         let notes = try database.pool.read { db in
             try Row.fetchAll(db, sql: "SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map {
                 IndexedNote(id: $0["id"], title: $0["title"], description: $0["description"], content: $0["content"], tags: $0["tags"], createdAt: $0["created_at"], updatedAt: $0["updated_at"])
@@ -80,6 +100,7 @@ public final class SearchIndex: Sendable {
         try pool.write { db in
             try db.execute(sql: "DELETE FROM notes_fts; DELETE FROM docs; DELETE FROM doc_tags;")
             try Self.insert(notes, db)
+            try db.execute(sql: "INSERT OR REPLACE INTO meta (key, value) VALUES ('notes', ?)", arguments: [fingerprint])
         }
         vocabulary.withLock { $0 = nil }
     }

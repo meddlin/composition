@@ -61,3 +61,9 @@ jobs:
 
       - name: Conformance, desktop to Swift and back
         run: apps/ios/scripts/conformance.sh
+
+      # Unsigned and for no particular simulator: this only keeps the app compiling (it is not tested here).
+      - name: Build the iPad app
+        run: >
+          xcodebuild build -project apps/ios/Composition.xcodeproj -scheme Composition
+          -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO
