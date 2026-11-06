@@ -22,6 +22,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   search-corpus-100.db, search-corpus-1000.db, search-queries.json, search-parse-expected.json, search-expected.json
  *                                  spike S2: generated notes, the queries, what the real parseSearchQuery made of each, and
  *                                  (committed, not regenerated here) what a real Meilisearch answered for each
+ *   mdx-notes.json, mdx-expected.json
+ *                                  spike S4: the notes in apps/ios/conformance/mdx-notes.json, and what the real preview
+ *                                  pipeline (remark-mdx and the desktop's own plugins) makes of each: valid or not, the
+ *                                  components with their props, the headings and the footnotes
+ *   component-cases.json, component-expected.json
+ *                                  spike S4: inputs for the helpers behind the components (chart CSV, repo and YouTube
+ *                                  addresses, image width and path) and what the real functions answer for each
  *
  * "reads what the Swift core wrote" restores swift-backup.tar.gz and swift-backup-large.tar.gz with the real
  * `stageBackup` and `applyStagedBackup`, opens the result with the real `db.ts`, and compares it with what Swift said it
@@ -379,6 +386,109 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
       fs.copyFileSync(searchExpectedFile, path.join(outDir!, "search-expected.json"));
     }
   }, 300_000);
+
+  it("writes the MDX notes and what the real preview pipeline makes of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/mdx-notes.json");
+    const { notes } = JSON.parse(fs.readFileSync(file, "utf8")) as { notes: { name: string; body: string }[] };
+    expect(new Set(notes.map((n) => n.name)).size).toBe(notes.length);
+
+    const mdxDir = path.resolve(__dirname, "../src/components/notes/mdx");
+    const { unified } = await import("unified");
+    const { default: remarkParse } = await import("remark-parse");
+    const { default: remarkGfm } = await import("remark-gfm");
+    const { default: remarkMdx } = await import("remark-mdx");
+    const { remarkIndentedCode } = await import(path.join(mdxDir, "remarkIndentedCode"));
+    const { remarkRestrictMdx, renderKey } = await import(path.join(mdxDir, "remarkRestrictMdx"));
+    const { remarkHeadings } = await import(path.join(mdxDir, "remarkHeadings"));
+    const { mdxComponents, usesMdxComponent } = await import(path.join(mdxDir, "components"));
+    const allowed = Object.keys(mdxComponents);
+    const processor = unified().use(remarkParse).use(remarkGfm).use(remarkMdx).use(remarkIndentedCode).use(remarkRestrictMdx, { allowed }).use(remarkHeadings);
+
+    type Node = { type: string; name?: string | null; depth?: number; value?: string; alt?: string | null; identifier?: string; attributes?: { name?: string; value?: unknown }[]; children?: Node[] };
+    const plainText = (node: Node): string => node.value ?? node.alt ?? node.children?.map(plainText).join("") ?? "";
+    const prefix = renderKey("");
+
+    const expected = Object.fromEntries(
+      notes.map(({ name, body }) => {
+        if (!usesMdxComponent(body)) return [name, { mdx: false, valid: true, elements: [], headings: [], footnotes: [] }];
+        try {
+          const tree = processor.runSync(processor.parse(body)) as unknown as Node;
+          const elements: { name: string; props: Record<string, string | null>; flow: boolean; depth: number }[] = [];
+          const headings: { depth: number; text: string }[] = [];
+          const definitions = new Map<string, Node>();
+          const order: string[] = [];
+          const walk = (node: Node, depth: number) => {
+            if (node.type === "mdxJsxFlowElement" || node.type === "mdxJsxTextElement") {
+              const props: Record<string, string | null> = {};
+              for (const a of node.attributes ?? []) {
+                if (a.name && a.name !== "headings") props[a.name] = typeof a.value === "string" ? a.value : null;
+              }
+              elements.push({ name: (node.name ?? "").slice(prefix.length), props, flow: node.type === "mdxJsxFlowElement", depth });
+              node.children?.forEach((child) => walk(child, depth + 1));
+              return;
+            }
+            if (node.type === "heading" && node.depth) headings.push({ depth: node.depth, text: plainText(node).trim() });
+            if (node.type === "footnoteDefinition" && node.identifier !== undefined && !definitions.has(node.identifier)) definitions.set(node.identifier, node);
+            node.children?.forEach((child) => walk(child, depth));
+          };
+          walk(tree, 0);
+          // Footnotes are numbered by where they are first cited (the notes of a footnote after those of the text).
+          const cite = (node: Node) => {
+            if (node.type === "footnoteReference" && node.identifier !== undefined && definitions.has(node.identifier) && !order.includes(node.identifier)) order.push(node.identifier);
+            if (node.type !== "footnoteDefinition") node.children?.forEach(cite);
+          };
+          cite(tree);
+          for (let i = 0; i < order.length; i++) definitions.get(order[i])?.children?.forEach(cite);
+          return [name, { mdx: true, valid: true, elements, headings, footnotes: order }];
+        } catch (error) {
+          return [name, { mdx: true, valid: false, error: error instanceof Error ? error.message : String(error), elements: [], headings: [], footnotes: [] }];
+        }
+      }),
+    );
+    fs.copyFileSync(file, path.join(outDir!, "mdx-notes.json"));
+    fs.writeFileSync(path.join(outDir!, "mdx-expected.json"), JSON.stringify(expected, null, 2));
+    expect(Object.keys(expected).length).toBe(notes.length);
+  }, 60_000);
+
+  it("writes the component helper cases and what the real functions answer", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/component-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      chart: { type?: string; x?: string; y?: string; csv: string }[];
+      repo: string[];
+      youtube: { url: string; start?: string }[];
+      start: string[];
+      width: string[];
+      imageRef: string[];
+    };
+    const mdxDir = path.resolve(__dirname, "../src/components/notes/mdx");
+    const { parseChart } = await import(path.join(mdxDir, "chartData"));
+    const { parseRepo } = await import(path.join(mdxDir, "repoRef"));
+    const { parseYouTube, parseStart, youtubeEmbedUrl, youtubeWatchUrl } = await import(path.join(mdxDir, "youtubeRef"));
+    const { parseImageWidth } = await import(path.join(mdxDir, "imageWidth"));
+    const { imageNameFromRef } = await import(path.join(lib, "imageRefs"));
+
+    const expected = {
+      chart: cases.chart.map((input) => {
+        const parsed = parseChart(input);
+        if (!parsed.spec) return { error: parsed.error };
+        const { type, x, y, rows } = parsed.spec;
+        return { type, x, y, rows: rows.map((row: Record<string, string | number>) => ({ label: String(row[x]), values: Object.fromEntries(y.filter((name: string) => name in row).map((name: string) => [name, row[name]])) })) };
+      }),
+      repo: cases.repo.map((url) => parseRepo(url)),
+      youtube: cases.youtube.map(({ url, start }) => {
+        const ref = parseYouTube(url, start);
+        return ref ? { ...ref, embed: youtubeEmbedUrl(ref), watch: youtubeWatchUrl(ref) } : null;
+      }),
+      start: cases.start.map((value) => parseStart(value)),
+      width: cases.width.map((value) => parseImageWidth(value)),
+      imageRef: cases.imageRef.map((value) => imageNameFromRef(value)),
+    };
+    fs.copyFileSync(file, path.join(outDir!, "component-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "component-expected.json"), JSON.stringify(expected, null, 2));
+    expect(expected.repo.length).toBe(cases.repo.length);
+  }, 60_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
   //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)

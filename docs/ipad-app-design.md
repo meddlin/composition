@@ -3,10 +3,11 @@
 A native iPad app for Composition, written in Swift (with Objective-C, C and C++ only where something needs
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
-**Design, spikes S1 and S2, and a first prototype app** (`apps/ios/CompositionCore`: the data layer, backup, the Trash Can and
-search, with their tests; `apps/ios/Composition`: a read-only viewer on it; see [S1 status](#s1-status), [S2 status](#s2-status) and
-[The first app](#the-first-app)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
-Simulator only. Dates are 2026-11-05.
+**Design, spikes S1 and S2, the parse-and-draw half of S4, and a prototype app** (`apps/ios/CompositionCore`: the data layer, backup,
+the Trash Can, search and the Markdown and MDX layer, with their tests; `apps/ios/Composition`: a viewer on it; see [S1 status](#s1-status),
+[S2 status](#s2-status), [S4 status](#s4-status) and [The first app](#the-first-app)). **On a device:** you reported on 2026-11-06 that
+the prototype runs on your iPad with a backup of your real notes and works as expected for where it was; the preview added after that
+(S4) has run in the iPad Simulator only. Dates are 2026-11-05 and 2026-11-06.
 
 **Direction (changed 2026-11-05).** The two earlier research sessions leaned towards the existing web UI in a
 `WKWebView` shell with a native PencilKit plugin. You then asked for the app to feel **as native as possible**,
@@ -35,10 +36,10 @@ Legend for the tracker:
 | 🆕 | **New** on the iPad |
 | ⚠️ | **Risky:** unknown until tried on a device |
 | ❌ | Not on the iPad |
-| **Plan** | **M1**, **M2** or **M3†**: the [milestone](#v1-scope-and-milestones) that builds it (**†** is release polish, first to drop from v1) · **Later** · **Never** (a deliberate decision, see the compromise) |
+| **Plan** | **M1**, **M2** or **M3†**: the [milestone](#v1-scope-and-milestones) that builds it (**†** is release polish, first to drop from v1) · **Later** · **Parked** (deliberately not planned for now, and to be discussed; see the decision) · **Never** (a deliberate decision, see the compromise) |
 | **Status** | ⬜ not started · 🔬 spiked (answer found, not built) · 🔨 built · 📱 verified on the iPad · ⛔ dropped |
 
-**Verified working on a device today: nothing.** A row only gets 📱 after a person has used it on the iPad. (The prototype app has run in the Simulator only; [manual-tests/ipad.md](manual-tests/ipad.md) is the first test on a real one.)
+**Marked 📱 today: nothing, yet.** A row only gets 📱 after a person has used it on the iPad. You told me on 2026-11-06 that the prototype works as expected on your iPad with your own notes, but not which of the [manual-test](manual-tests/ipad.md) items you ran, so I have not turned any row to 📱 on that; say which and I will. The preview (S4) is untried on the device.
 
 ## Summary
 
@@ -81,7 +82,9 @@ Legend for the tracker:
 **Non-goals for v1**
 
 - The sync engine, sign-in and server ([D8](#decisions): later, designed separately), and ink *editing* on Windows ([D11](#decisions)).
-- The To-do, RSS Reader, Reading List and AI helper plugins ([C6](#compromise-register)).
+- The To-do, RSS Reader and Reading List plugins ([C6](#compromise-register)).
+- **No AI helper in the iPad app at all, neither the local one (Ollama) nor the ChatGPT one** ([D19](#decisions); decided by you on 2026-11-06,
+  and to be discussed later). It is not "later": nothing for it is planned, designed or spiked until you raise it.
 - The terminal app, the panel grid and pop-out windows ([C5](#compromise-register), [C7](#compromise-register)).
 - iPhone, macOS (Catalyst) and Android. The core package is kept free of UIKit so it *could* be reused; that is not a goal.
 - Apple Pencil Pro features (squeeze, barrel roll). The test iPad does not support that Pencil.
@@ -215,8 +218,9 @@ change to the TypeScript behaviour fails until the fixtures and the Swift side a
 
 - **Parse:** swift-markdown for the CommonMark and GFM layer. A small restricted-MDX scanner of our own handles
   the allowlisted tags (string attributes, flow and inline), rejects what `remarkRestrictMdx` rejects, and, like
-  `usesMdxComponent`, only runs on notes that mention a component. How cmark-gfm treats footnotes (`[^1]`, which
-  the web side handles in `rehypeFootnotes.ts`) is **unverified**.
+  `usesMdxComponent`, only runs on notes that mention a component. **Measured (S4): swift-markdown 0.9.0 has no footnotes** (`[^1]`
+  stays text and `[^1]: text` is a paragraph), so the scanner reads them itself, and it leaves a note's tags as raw HTML, so the scanner
+  also finds the tags, over the note's own text, before swift-markdown sees the rest ([S4 status](#s4-status)).
 - **Draw:** one read-only `UITextView` for the preview, with the non-text blocks as view-based attachments, so
   text selection works across blocks (the preview's highlight menu needs it). The same engine, made editable,
   is the Live tab.
@@ -558,7 +562,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
 | Markdown tab | ⭐ | M1 | ⬜ | TextKit 2 with attribute runs; no overlay |
-| Preview tab | 🔁 | M1 | ⬜ | Read-only text view with view-based attachments |
+| Preview tab | 🔁 | M1 | 🔨 | Prototype: SwiftUI blocks from `CompositionCore`'s model, in the Simulator ([S4 status](#s4-status)). The design's read-only text view with view-based attachments (selection across blocks) is not built |
 | Split tab | 🔁 | M1 | ⬜ | One column at narrow widths |
 | Live tab | ⚠️ | Later | ⬜ | Hidden marks away from the caret ([C12](#compromise-register), S3) |
 | Scribble, autocorrect, dictation, Writing Tools | ⭐ | M1 | ⬜ | System text engine |
@@ -577,12 +581,12 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Component | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| `<Info>`, `<Warning>`, `<Toc>`, `<Mark>`, `<Footnotes>` | 🔁 | M1 | ⬜ | See the table under [Markdown and MDX](#markdown-and-mdx) |
-| `<Image>` | 🔁 | M1 | ⬜ | |
-| `<Chart>` | ⭐ | M1 | ⬜ | Swift Charts |
-| `<Repo>` | 🔁 | M1 | ⬜ | `SFSafariViewController` |
-| `<YouTube>` | ⚠️ | M3† | ⬜ | A `WKWebView` exception ([C8](#compromise-register)) |
-| `<Drawio>` shown | 🔁 | M1 | ⬜ | The PNG |
+| `<Info>`, `<Warning>`, `<Toc>`, `<Mark>`, `<Footnotes>` | 🔁 | M1 | 🔨 | Drawn in the prototype and checked against the desktop's preview ([S4 status](#s4-status)); `<Mark>` has one set of colours, not one per scheme. See the table under [Markdown and MDX](#markdown-and-mdx) |
+| `<Image>` | 🔁 | M1 | 🔨 | Drawn from `app_data/` at the `width` asked for; a web address is a link, nothing is fetched |
+| `<Chart>` | ⭐ | M1 | 🔨 | Swift Charts: bar, line, area and pie, from the same CSV block; series colours are the system's, not theme tokens |
+| `<Repo>` | 🔁 | M1 | 🔨 | A card that opens the address (`openURL`; `SFSafariViewController` not used yet) |
+| `<YouTube>` | ⚠️ | M3† | 🔨 | **Only a link card so far:** no player. The `WKWebView` exception ([C8](#compromise-register)) is not built |
+| `<Drawio>` shown | 🔁 | M1 | 🔨 | The PNG, at half its stored pixels unless `width` says |
 | `<Drawio>` edited | ❌ | Never | ⛔ | [C9](#compromise-register) |
 | `<Ink>` | 🆕 | M2 | ⬜ | PencilKit; see [Ink and the Pencil](#ink-and-the-pencil) |
 
@@ -603,8 +607,8 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | To-do panel and weekly cycle | 🔁 | Later | ⬜ | SwiftUI list and board ([C6](#compromise-register)) |
 | RSS Reader | 🔁 | Later | ⬜ | `URLSession` and `XMLParser`; port the private-address guard |
 | Reading List | ⭐ | Later | ⬜ | `SFSafariViewController`; the Electron `<webview>` has no twin |
-| AI helper: Ollama | 🔁 | Later | ⬜ | `URLSession` streaming; plain `http://` and Local Network permission ([C19](#compromise-register)) |
-| AI helper: ChatGPT sign-in | ⚠️ | Later | ⬜ | The desktop flow redirects to `http://127.0.0.1:1455`; an iOS app cannot rely on that ([C19](#compromise-register)) |
+| AI helper: Ollama | 🔁 | Parked | ⬜ | **Not in the iPad app** ([D19](#decisions)). What it would take, if reopened: `URLSession` streaming; plain `http://` and Local Network permission ([C19](#compromise-register)) |
+| AI helper: ChatGPT sign-in | ⚠️ | Parked | ⬜ | **Not in the iPad app** ([D19](#decisions)). If reopened: the desktop flow redirects to `http://127.0.0.1:1455`, which an iOS app cannot rely on ([C19](#compromise-register)) |
 | Terminal app (CLI) | ❌ | Never | ⛔ | [C7](#compromise-register) |
 
 ### Ink and the Pencil (new)
@@ -646,7 +650,7 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 | **C3** | **The notes rules and the MDX renderer exist twice** (TypeScript and Swift). Behaviour can drift; a new MDX component must be built twice; the iPad's rendering will differ in small ways from the desktop's. | Med | The price of a native app. | The conformance corpus. A component is not "done" until both sides draw it. Revisit if drift bites repeatedly. | Proposed |
 | **C4** | **The iPad looks like iPadOS, not like the desktop app.** Native navigation, controls and materials; the six schemes are re-expressed, not copied; no panel grid. | Low | It is the point of the requirement. | A **System** scheme, and the six schemes kept for colour. | Proposed |
 | **C5** | **No panel grid or pop-out windows.** iPadOS windows, Split View and Stage Manager do that job. No command palette. | Med | Panels and pop-outs are desktop-only, and pop-outs are Electron windows. | Open in New Window ships after v1; the iPadOS menu bar can stand in for the palette. | Proposed |
-| **C6** | **The plugins wait:** To-do and its weekly cycle, RSS Reader, Reading List, AI helper. | Med | Each needs its own port. Keeps v1 to notes, search, images, ink, settings, Trash Can, backup. | Add one at a time after v1, cheapest first. | Proposed |
+| **C6** | **The plugins wait:** To-do and its weekly cycle, RSS Reader, Reading List. (The AI helper is not waiting: it is out of the iPad app, [D19](#decisions).) | Med | Each needs its own port. Keeps v1 to notes, search, images, ink, settings, Trash Can, backup. | Add one at a time after v1, cheapest first. | Proposed |
 | **C7** | **No terminal app on the iPad.** | Low | No terminal and no bundled runtimes. | None needed. | Proposed |
 | **C8** | **A few things stay web views:** the `<YouTube>` player, and later the draw.io editor. Sign-in pages use the system browser sheet, not our own web view. | Low | No native equivalent exists. | Listed exceptions to the native bar; any other web view fails N2. | Proposed |
 | **C9** | **`<Drawio>` diagrams are shown but not edited in v1.** | Med | Editing needs the vendored draw.io editor in a web view on its own origin, and touch behaviour is unknown. `<Ink>` covers sketching. | Revisit after v1 if S8 shows the editor works with touch and Pencil. | Proposed |
@@ -659,7 +663,7 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 | **C16** | **Contributors need a Mac, Xcode and Swift to touch the iPad app,** and CI needs a macOS runner. The Windows and Linux builds cannot build it. | Low | Native toolchain. | Keep the core package buildable with `swift test` on a Mac without a simulator. New workflow actions are pinned to commit SHAs ([AGENTS.md](../AGENTS.md)). | Proposed |
 | **C17** | **Swift packages enter the supply chain:** GRDB, swift-markdown, perhaps Yams. | Low | Writing a SQLite wrapper and a Markdown parser ourselves is worse. | Exact versions, `Package.resolved` checked in, a row in [Languages](#languages-and-dependencies) before each addition. | Proposed |
 | **C18** | **Photos from the Photos app are converted from HEIC to JPEG** on import. | Low | `images.ts` accepts only PNG, JPEG, GIF and WebP, and the desktop cannot show HEIC. | Allow HEIC only if conversion proves too lossy. | Proposed |
-| **C19** | **The AI helper needs more than a `localhost` address,** and ChatGPT sign-in may not work. Ollama on a LAN host needs plain-`http://` exceptions in Info.plist and the Local Network permission, or Tailscale and HTTPS. ChatGPT sign-in redirects to a loopback address that an iOS app cannot count on. | Med | App Transport Security and sandbox rules. | Handle when the AI helper moves from Later to In. | Deferred |
+| **C19** | **The AI helper needs more than a `localhost` address,** and ChatGPT sign-in may not work. Ollama on a LAN host needs plain-`http://` exceptions in Info.plist and the Local Network permission, or Tailscale and HTTPS. ChatGPT sign-in redirects to a loopback address that an iOS app cannot count on. | Med | App Transport Security and sandbox rules. | Nothing to handle unless [D19](#decisions) is reopened; then this is the list of what the AI helper needs. | Parked ([D19](#decisions)) |
 
 **Web-route compromises this design avoids** (kept so the trade is visible): hover-only controls becoming always
 visible; drag and drop falling back to a "Move to…" menu; right-click highlighting replaced by long-press;
@@ -669,7 +673,7 @@ the web view being reclaimed while typing; layouts that break at a third of the 
 
 ## Decisions
 
-Recommendations are proposals until the status says *Decided*. **Needs your input:** none right now; the proposals settle at their gates.
+Recommendations are proposals until the status says *Decided*. **Needs your input:** none right now; the proposals settle at their gates. **To discuss later, when you raise it:** whether the iPad app ever gets an AI helper ([D19](#decisions)).
 
 | Id | Decision | Recommendation | Status |
 |---|---|---|:-:|
@@ -690,8 +694,9 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D14 | Test hardware. | iPad Pro (M2) and a 2nd-generation Pencil. | **Decided** (you) |
 | D15 | A handwritten note may leave "Markdown only" on the iPad. | Acceptable; the design keeps it Markdown anyway. | **Decided** (you) |
 | D16 | Deployment floor. | iPadOS 17 (C15), confirmed against the iPad's actual version. | Proposed |
-| D17 | Panels, pop-outs and plugins stay out of v1. | See C5 and C6. | Proposed |
+| D17 | Panels, pop-outs and plugins stay out of v1. | See C5 and C6. (The AI helper is a separate decision: D19.) | Proposed |
 | D18 | `<Drawio>` is not edited on the iPad in v1. | See C9. | Proposed |
+| D19 | **No AI helper in the iPad app: no local one (Ollama), no ChatGPT sign-in.** | Nothing is built, designed or spiked for it, and the iPad's tracker rows for it are *Parked*, not *Later*. **Open for the discussion** (none looked at yet): whether the iPad ever gets one and in what form, what it does with any AI settings that arrive inside a desktop backup, and the cost recorded in [C19](#compromise-register). | **Decided for now** (you, 2026-11-06); to be discussed later |
 
 ## Risks and unknowns
 
@@ -703,7 +708,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R2 | View-based attachments (images, charts, ink in the text) are fragile: undocumented behaviour, and TextKit 1 fallback removes them. | Medium, high | S3; never touch `layoutManager`; test with a long note. |
 | R3 | The rewrite is larger than v1 can afford: about 12,000 lines of UI plus the logic subset. | High, high | D13 scope; the D6 scaffold. **S1 measured the logic subset:** about 1,000 code lines still to port, 1,800 at most ([S1 status](#s1-status)), so the risk is the UI and the editor, not the data layer. The rating stays: nothing yet measures the UI in Swift. |
 | R4 | The TypeScript and Swift implementations drift. | High, high | D7: the conformance corpus; run in CI on both sides. |
-| R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. |
+| R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. **Partly done:** footnotes are not in swift-markdown at all (handled by our own pass, which agrees with the desktop on the corpus); tables, task lists, strikethrough and autolinks drew as the desktop's do on the showcase note; the full divergence list is in [S4 status](#s4-status). |
 | R6 | FTS5 is not available in the system SQLite, or GRDB's configuration lacks it. | Low–medium, high | S1 runs it; fallback: a custom SQLite build. |
 | R7 | FTS5 plus the typo layer is not good enough for you. | Low–medium, high | **S2 done:** the same result sets as Meilisearch on the 267 acceptance queries that returned fewer than 50 results, top 10 overlapping 96%. What remains is your judgement on your own notes, which are not like the synthetic ones. |
 | R8 | The iPad's schema starts before the desktop has landed the rest of the sync prerequisites (capture triggers, outbox, `sync_*` tables), so the "identical schema" rule breaks or the iPad is delayed. The `uuid` part landed in #244, which retired the worst of it. | Low–medium, medium | Gate A takes the schema from the desktop as it is then; fallback decided and in effect: start from the `uuid` ([Sync](#sync-and-the-data-model)). |
@@ -724,11 +729,11 @@ Each spike is small and answers one question before anything is built for real. 
 | **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (the pass writes nothing; GRDB's own pool open does, see [S1 status](#s1-status)); every uuid survives a Trash round trip and a backup in each direction |
 | **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes. **Done: [S2 status](#s2-status)** |
 | **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4) |
-| **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws |
+| **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws. **Mostly done:** [S4 status](#s4-status); what is left is the text-view renderer and the player |
 | **S5** | **Ink.** PencilKit full-screen and inline; export to the stroke JSON and back; the PNG with its chunk; render in every scheme, in dark mode too; the desktop and CLI show it from a backup. Real handwriting through Vision. | R11, R12; D9, C10, C11 | **Gate C**: format frozen; a dense page's size measured |
 | **S6** | **Lifecycle.** Background while typing, kill and relaunch, state restoration, a second window on the same database. | N5; R4 | No lost keystrokes |
 | **S7** | **The native-bar audit:** VoiceOver, Dynamic Type, the Cmd-hold list, trackpad, a third-width window, Stage Manager. | N1–N7 | The table above, filled in |
-| **S8** | **Web exceptions.** `<YouTube>` in a `WKWebView` (Referer), the draw.io editor on its own origin, and whether a ChatGPT sign-in can complete on iOS. | C8, C9, C19 | Optional |
+| **S8** | **Web exceptions.** `<YouTube>` in a `WKWebView` (Referer), the draw.io editor on its own origin, and (parked, [D19](#decisions)) whether a ChatGPT sign-in can complete on iOS. | C8, C9, C19 | Optional |
 
 ### S1 status
 
@@ -926,6 +931,71 @@ so its guesses would have to be intersected with the notes' vocabulary; it would
 - Nothing ran on the iPad, and the iPadOS floor was not tried: only the Simulator's SQLite 3.51.0 and the Mac's 3.54.0.
 - Spotlight and the `.searchable` tokens remain Later.
 
+### S4 status
+
+**Built and compared 2026-11-06; run in the iPad Simulator and on the Mac, not on the iPad.** The parse half is in
+`apps/ios/CompositionCore/Sources/CompositionCore/Markdown/` (`NoteScanner`: the restricted MDX layer; `NoteComponents`: ports of
+`chartData`, `repoRef`, `youtubeRef`, `imageWidth` and the `app_data/` part of `imageRefs`; `NotePreview`: the model a view draws;
+`NoteFrontmatter`) on swift-markdown 0.9.0 (pinned exactly, with its swift-cmark 0.9.0). The draw half is in the app
+(`MarkdownView.swift`, `NotePreviewView.swift`, and a Preview and Source switch on the note screen).
+
+**How it was judged.** The desktop's real preview pipeline (remark-parse, remark-gfm, remark-mdx, `remarkIndentedCode`,
+`remarkRestrictMdx`, `remarkHeadings`) was run over the notes in `apps/ios/conformance/mdx-notes.json`, and the Swift scanner
+must agree with it on whether each note is valid, which components it holds with which props, whether each is a block or sits in a line
+of text, the headings, and the order of the footnotes (the error messages are not compared). The helpers behind the components
+were run the same way over `component-cases.json`. Both run in `apps/ios/scripts/conformance.sh` and in CI.
+
+| Check | Result |
+|---|---|
+| 115 notes (valid, invalid, in code, in lists and quotes, every prop form, footnotes, headings) | **115 of 115 agree.** The first 70 gave 69 (swift-markdown keeps the backticks of inline code in a heading's text); 40 harder ones gave 107 of 110, and the three differences were real rules (below); 5 probes written for those rules agreed |
+| 166 inputs to the chart, repo, YouTube, image-width and image-path helpers (addresses with ports, dot segments, `www.`, scp-style, percent signs; CSV with quotes, gaps and 500 rows) | **166 of 166 agree** |
+| Does the test fail when it should? | Four answers corrupted in a copy were all caught |
+
+**What the desktop does that I did not expect, found by the corpus:** `a < b` and a lone `}` are fine in an MDX note, `x <3 y` and
+`<https://example.com>` are errors; a tag in a line of text must close in the same paragraph, and a pair of tags must both be
+blocks or both be in text (`</Info> tail` is an error); a tag alone after a list marker (`- <Info>`) is still a block; `<Info>one line</Info>`
+is text, not a block; and any line starting `import ` or `export ` is rejected.
+
+**Found about swift-markdown 0.9.0:** it has no footnotes; it leaves `<Info>` as raw HTML (a block HTML node ends at a blank line, so
+it cannot be trusted for what is code next to a tag, which is why the scanner finds code itself); its `plainText` keeps the
+backticks of inline code; and a footnote citation cannot be swapped for its number in the *source*: `**back up <Mark>first</Mark>**[^a]` stops
+closing its bold when `[` becomes a digit, because CommonMark's flanking rule looks at the neighbouring character. The citation is numbered
+after parsing instead (found by looking at the Simulator, fixed, covered by a test).
+
+**Every component draws** in the Simulator, from one showcase note (`apps/ios/conformance/preview-showcase/`, also the 1,001st note of
+`make-test-backup.sh`): `<Toc>` (taps scroll to the heading), `<Info>` and `<Warning>` (with Markdown and a list inside), `<Mark>` (inline,
+inside bold), `<Footnotes>` (numbered by citation), `<Image>` (at 50% of the note's column) and `<Drawio>` (a PNG at half its pixels), `<Chart>` as a
+line and a pie, `<Repo>` and `<YouTube>` as cards, and the notice for a `url` that is not a repository.
+
+**Side by side with the desktop's own preview of the same note** (the web app on a throwaway home folder, in its dark theme, against the iPad
+Simulator in light; one note, one pass, so this is a first list, not a complete one). The same blocks come out in the same order, with the same
+numbers, the same contents list and the same picture sizes. The differences:
+
+| What | Desktop | iPad prototype |
+|---|---|---|
+| `<YouTube>` | The embedded player, full width | A link card: no player ([C8](#compromise-register), not built) |
+| Code | Syntax-coloured | One colour |
+| `<Chart>` | Smooth lines, theme-token colours | Straight lines with markers, system colours |
+| Footnotes | A ↩ link back from each, citations are links | Numbers and the list only |
+| `<Repo>` card | Icon, name, description, then host | Icon, name, host, then description |
+| A `<Repo>` or `<YouTube>` notice | Plain grey italic text | A boxed notice with an icon |
+| Task lists, quotes | Bullets with checkboxes; italic quotes in curly quotes | Checkboxes only; a plain quote bar |
+| Tables | Full width | As wide as their contents |
+| The note's header | A card with the description, tag chips and both dates | Title, updated time and tags |
+| `<Mark>` colours | Tinted to each colour scheme, with legible text (`markContrast`) | One set, not scheme-aware |
+| Frontmatter | Read as YAML | A block of `key:` lines is accepted without a YAML parser (differs for odd YAML) |
+| A picture at a web address | Loaded | A link; nothing is fetched |
+
+**Not done, or not known:**
+
+- **The design's renderer is not built.** What draws is SwiftUI, a block at a time, so text cannot be selected across blocks and the
+  highlight and recolour menus the desktop's preview has are not there. The design's single read-only `UITextView` with view-based attachments
+  (and the TextKit 2 rules above) is S3's job, on the device; the model `NotePreview` builds is meant to feed it too.
+- Nothing ran on the iPad, the Simulator was one size, light mode only, and Dynamic Type and VoiceOver were not tried.
+- A tag split over several lines *inside* a quote or list item (the `>` or indent between its lines) is not read; the corpus has none.
+- An escaped citation (`\[^a]`) is numbered like any other, because the parsed text has lost the backslash.
+- The footnote and frontmatter code was checked against the desktop only through the notes above, not on large or odd ones.
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -935,11 +1005,11 @@ install it and what to try: [manual-tests/ipad.md](manual-tests/ipad.md).
 
 - **It does:** imports a desktop backup through the system file picker (replacing everything, after a confirmation); lists the
   notes newest first; searches as you type, with the forgiving typo rules and filters, and shows how long each search took; opens a note
-  as its Markdown source; moves a note to the Trash Can (swipe, or the button on an open note), restores it or deletes it for good,
+  as a preview (Markdown and the ten components, [S4](#s4-status)) or as its Markdown source; moves a note to the Trash Can (swipe, or the button on an open note), restores it or deletes it for good,
   keeping the search index in step; exports a backup through the share sheet; and has an *About this build* page (SQLite
   version, Debug or Release, whether the index was rebuilt at launch).
-- **It does not:** edit, render Markdown, show images or attached files, have groups or notebooks, colour schemes, settings,
-  ink, or any of the design's M1 beyond what is above.
+- **It does not:** edit, show attached files, have groups or notebooks, colour schemes, settings, ink, or any of the design's M1
+  beyond what is above. (Since S4 it does draw Markdown and the components, and the images stored with the notes.)
 - **What ran in the Simulator** (an iPad Pro 11-inch (M5), driven by hand): the first-launch screen; importing a 1,000-note
   backup made with plain `tar`; the list; a search with a mistake (`kuberntes`: 50 results in 9.7 ms, in a debug build) with title
   hits first; opening a note; trash, the Trash Can screen and a restore, with the search results following; an export, whose
@@ -1078,6 +1148,18 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   mistake costs one; when nothing is found, short words get one mistake), which the prototype app uses. A coverage test prints
   what each mode forgives by word length and kind of mistake. Typo libraries looked at (spellfix1, trigram, Swift fuzzy
   matchers, `UITextChecker`): none adopted. Not tried on real notes or on an iPad.
+
+- 2026-11-06: **S4 Markdown and MDX built and compared.** swift-markdown 0.9.0 plus our own restricted-MDX scanner, the helpers behind the
+  ten components, a model for the preview, and SwiftUI views in the prototype (Preview and Source on the note screen; every component draws in
+  the Simulator). Against the desktop's real pipeline: 115 of 115 notes and 166 of 166 helper inputs agree. swift-markdown has no footnotes and
+  leaves the tags as raw HTML, so the scanner reads both. A side-by-side with the desktop's preview gives the divergence list under
+  [S4 status](#s4-status). The `UITextView` renderer and the YouTube player are not built; not tried on the iPad. You reported the prototype
+  works on your iPad with your real notes; the header, the 📱 line and R5 say so. The tracker's preview and component rows moved to 🔨.
+
+- 2026-11-06: **No AI helper in the iPad app (D19).** You decided the iPad app will have no AI helper plugin, neither local (Ollama) nor ChatGPT, and that
+  this is to be discussed later. Recorded as a non-goal, as D19 (*Decided for now*), and in the tracker as *Parked* (a new Plan value, not
+  *Later*, which promises a port); C6 no longer lists it, C19 is parked with it, and S8's ChatGPT-sign-in question is parked. Nothing was built or
+  removed: no AI code existed on the iPad side.
 
 ## Sources
 

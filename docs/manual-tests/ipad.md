@@ -1,11 +1,12 @@
 # Manual test: the iPad app (prototype)
 
-A read-only viewer on the Swift core, to try your own notes on the iPad before the real app exists. It can import a
-desktop backup, list and search the notes (typos included), show a note's text, use the Trash Can, and export a backup
-the desktop can restore. It cannot edit, render Markdown, show images or attachments, or draw ink: see
+A viewer on the Swift core, to try your own notes on the iPad before the real app exists. It can import a
+desktop backup, list and search the notes (typos included), draw a note's Markdown and the ten components (or show its source),
+use the Trash Can, and export a backup the desktop can restore. It cannot edit, show attachments, or draw ink: see
 [What it leaves out](#what-it-leaves-out). Design and status: [ipad-app-design.md](../ipad-app-design.md).
 
-**It has been run in the iPad Simulator only, never on an iPad.** Part of what you do here is the first real run.
+**You have run it on your iPad with a backup of your real notes** (reported 2026-11-06). **The preview is newer than that run and has
+been tried in the iPad Simulator only**, so items 7 and 13 below are the first time on the device.
 
 ## Install it on your iPad
 
@@ -48,7 +49,8 @@ Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unk
 5. **Filters:** `tag: yourtag`, `created: >2026-01-01`, `updated: <2026-01-01`, `title: something`. Text must come before a
    filter (`roadmap tag: infra`), as on the desktop.
 6. **Speed.** The line under the list gives how long each search took. Note the typical figure and the first search after launch.
-7. **Open a note.** You see its Markdown source with the frontmatter, as stored.
+7. **Open a note.** It opens as a **Preview** (Markdown and components; **Source** is the switch beside it, with the frontmatter, as
+   stored). Open one of your own notes that uses components (`<Info>`, `<Chart>`, footnotes) and compare it with the desktop: see 13.
 8. **Trash Can:** swipe a note, or use the trash button on an open one. Open the Trash Can (top left): swipe a row right
    to restore, left to delete for good. A trashed note must stop appearing in search, and appear again once restored.
 9. **Export a backup** (the ⋯ menu, then **Save or share…**) and restore it in the desktop app (Settings, Restore).
@@ -56,18 +58,23 @@ Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unk
 10. **Replace with a backup,** and choose a file that is not a backup (any other file). It must say so and change nothing.
 11. **Quit and reopen.** The notes are still there, and *About this build* says the search index was **not** rebuilt at launch.
 12. **Turn the iPad, then use Split View and Slide Over.** Does the list and note still make sense?
+13. **The preview, against the desktop's.** The generated backup (`make-test-backup.sh`) ends with a note, **Preview showcase**, that
+   uses every component; open it, and open the same note in the desktop app (restore that backup there). Tap an entry in the
+   contents box (it scrolls). Known differences, so you need not report them: no video player (a link card), no code colouring, charts are
+   plainer, no ↩ back-links on footnotes, highlight colours are not tinted per colour scheme, and a picture at a web address is a link
+   (list in [S4 status](../ipad-app-design.md#s4-status)). Please report anything else: a note that comes out differently, a component
+   that does not draw, a note shown as plain Markdown with a notice that the desktop draws fine.
 
 ## What it leaves out
 
-Editing and autosave; rendering Markdown (you see the source); images and attached files (they come in with a backup and
-go out again, but are not shown); groups and notebooks (notes are one flat list); the colour schemes and settings; the
-Pencil; sync. A note's `[[links]]` and MDX components are plain text.
+Editing and autosave; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+the preview); groups and notebooks (notes are one flat list); the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
+are plain text, selecting text across blocks of the preview, and the video player of `<YouTube>`.
 
 ## What is not yet verified
 
-- **Everything on a real iPad.** The Simulator ran the whole flow except choosing a file in the system picker: its Files
-  app would not show a file I put there, so that route (security-scoped access to a file you pick) is untested. If
-  **Choose a backup…** fails, that is the first suspect.
+- **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not
+  tried in the Simulator; you used a backup of your real notes on the iPad, which I take to mean that route worked there.)
 - Search speed on the iPad's own CPU and SQLite.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 
