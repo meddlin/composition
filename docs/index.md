@@ -152,3 +152,5 @@ See [ui/panels.md](ui/panels.md) for how the desktop app's panels behave (a resi
 and [panel-system-research.md](panel-system-research.md) for the pop-out spike and the facts behind it.
 
 See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
+
+See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Design only; nothing is built.
