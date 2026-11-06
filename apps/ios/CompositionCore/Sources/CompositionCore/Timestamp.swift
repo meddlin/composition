@@ -64,11 +64,11 @@ enum Timestamp {
 
     private static func isLeap(_ year: Int64) -> Bool { year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) }
 
-    private static func daysInMonth(year: Int64, month: Int64) -> Int64 {
+    static func daysInMonth(year: Int64, month: Int64) -> Int64 {
         month == 2 ? (isLeap(year) ? 29 : 28) : [4, 6, 9, 11].contains(month) ? 30 : 31
     }
 
-    private static func daysFromCivil(year: Int64, month: Int64, day: Int64) -> Int64 {
+    static func daysFromCivil(year: Int64, month: Int64, day: Int64) -> Int64 {
         let y = month <= 2 ? year - 1 : year
         let era = floorDivide(y, 400)
         let yearOfEra = y - era * 400

@@ -1,5 +1,7 @@
+import { spawn } from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +19,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   trash-start.db, trash-script.json, trash-script.expected.json
  *                                  the Trash Can: a starting database, the steps in apps/ios/conformance/trash-script.json,
  *                                  and what the real trashRepo.ts did at every step (result and every row afterwards)
+ *   search-corpus-100.db, search-corpus-1000.db, search-queries.json, search-parse-expected.json, search-expected.json
+ *                                  spike S2: generated notes, the queries, what the real parseSearchQuery made of each, and
+ *                                  (committed, not regenerated here) what a real Meilisearch answered for each
  *
  * "reads what the Swift core wrote" restores swift-backup.tar.gz and swift-backup-large.tar.gz with the real
  * `stageBackup` and `applyStagedBackup`, opens the result with the real `db.ts`, and compares it with what Swift said it
@@ -198,6 +203,92 @@ async function runTrashStep(step: ScriptStep): Promise<unknown> {
   }
 }
 
+// --- Search (spike S2) --------------------------------------------------------------------------------------------------
+
+/** The clock the generated notes are made against, so a corpus is the same on every machine and every day. */
+const SEARCH_NOW = Date.parse("2026-11-05T12:00:00.000Z");
+const SEARCH_CORPUS_SIZES = [100, 1000] as const;
+const searchQueriesFile = path.resolve(__dirname, "../../ios/conformance/search-queries.json");
+const searchExpectedFile = path.resolve(__dirname, "../../ios/conformance/search-expected.json");
+
+function searchQueries(): string[] {
+  const { groups } = JSON.parse(fs.readFileSync(searchQueriesFile, "utf8")) as { groups: { queries: string[] }[] };
+  return groups.flatMap((group) => group.queries);
+}
+
+/** The dummy notes of `pnpm search:playground`, written with real frontmatter the way `seedNotes` does, through the real data layer. */
+async function fillSearchCorpus(count: number): Promise<void> {
+  const { generateNotes } = await import(path.resolve(__dirname, "../../cli/src/tools/dummyNotes"));
+  const frontmatter = await import(path.join(lib, "frontmatter"));
+  const { getDb } = await import(path.join(lib, "db"));
+  const db = getDb();
+  const insert = db.prepare(
+    "INSERT INTO notes (title, content, tags, description, created_at, updated_at, group_id, notebook_id) VALUES (?, ?, ?, '', ?, ?, NULL, 1)",
+  );
+  db.transaction(() => {
+    for (const note of generateNotes(count, 42, SEARCH_NOW) as { title: string; body: string; tags: string; createdAt: string }[]) {
+      const content =
+        frontmatter.generate(note.title, {
+          createdAt: note.createdAt,
+          updatedAt: note.createdAt,
+          tags: frontmatter.tagsFromString(note.tags),
+        }) + note.body;
+      insert.run(note.title, content, note.tags, note.createdAt, note.createdAt);
+    }
+  })();
+}
+
+/** What identifies the notes in a corpus, so committed Meilisearch answers can be tied to exactly these notes. */
+async function corpusHash(): Promise<string> {
+  const { getDb } = await import(path.join(lib, "db"));
+  const rows = getDb().prepare("SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").all();
+  return crypto.createHash("sha256").update(JSON.stringify(rows)).digest("hex");
+}
+
+async function freePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address() as net.AddressInfo;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
+/** A throwaway Meilisearch, started the way the desktop starts its own (apps/desktop/src/main/meili.ts). */
+async function withMeilisearch<T>(work: (server: { host: string; apiKey: string; version: string }) => Promise<T>): Promise<T> {
+  const binary = process.env.COMPOSITION_MEILI_BIN || "meilisearch";
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "composition-ios-meili-"));
+  const port = await freePort();
+  const apiKey = crypto.randomBytes(16).toString("hex");
+  const child = spawn(
+    binary,
+    ["--db-path", path.join(dir, "data"), "--http-addr", `127.0.0.1:${port}`, "--dump-dir", path.join(dir, "dumps"), "--snapshot-dir", path.join(dir, "snapshots"), "--no-analytics"],
+    { cwd: dir, stdio: "ignore", env: { ...process.env, MEILI_MASTER_KEY: apiKey, MEILI_ENV: "production" } },
+  );
+  const failed = new Promise<never>((_, reject) => child.once("error", (error) => reject(new Error(`Could not start ${binary}: ${error.message}`))));
+  try {
+    const host = `http://127.0.0.1:${port}`;
+    const ready = (async () => {
+      for (let attempt = 0; attempt < 150; attempt++) {
+        try {
+          if ((await fetch(`${host}/health`)).ok) return;
+        } catch {
+          // not listening yet
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      throw new Error("Meilisearch did not become healthy");
+    })();
+    await Promise.race([ready, failed]);
+    const version = ((await (await fetch(`${host}/version`, { headers: { Authorization: `Bearer ${apiKey}` } })).json()) as { pkgVersion: string }).pkgVersion;
+    return await work({ host, apiKey, version });
+  } finally {
+    child.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllEnvs();
@@ -256,6 +347,74 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     });
     expect(fs.existsSync(path.join(outDir!, "trash-script.expected.json"))).toBe(true);
   });
+
+  it("writes the search corpora and what the real parseSearchQuery makes of each query", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const { parseSearchQuery } = await import(path.join(lib, "searchQuery"));
+    const queries = searchQueries();
+    expect(queries.length).toBeGreaterThan(200);
+    fs.copyFileSync(searchQueriesFile, path.join(outDir!, "search-queries.json"));
+    fs.writeFileSync(
+      path.join(outDir!, "search-parse-expected.json"),
+      JSON.stringify(Object.fromEntries(queries.map((query) => [query, parseSearchQuery(query)])), null, 2),
+    );
+
+    const hashes: Record<string, string> = {};
+    for (const count of SEARCH_CORPUS_SIZES) {
+      const { home } = await withDesktop(async () => {
+        await fillSearchCorpus(count);
+        hashes[count] = await corpusHash();
+      });
+      fs.copyFileSync(path.join(home, ".composition", "composition.db"), path.join(outDir!, `search-corpus-${count}.db`));
+    }
+    fs.writeFileSync(path.join(outDir!, "search-corpus-hashes.json"), JSON.stringify(hashes, null, 2));
+
+    // The committed answers must be for exactly these notes and these queries, or the comparison means nothing.
+    if (fs.existsSync(searchExpectedFile)) {
+      const expected = JSON.parse(fs.readFileSync(searchExpectedFile, "utf8")) as { corpora: Record<string, { hash: string; results: { query: string }[] }> };
+      for (const count of SEARCH_CORPUS_SIZES) {
+        expect(expected.corpora[count].hash, `the ${count}-note corpus changed: regenerate apps/ios/conformance/search-expected.json`).toBe(hashes[count]);
+        expect(expected.corpora[count].results.map((r) => r.query), "the queries changed: regenerate search-expected.json").toEqual(queries);
+      }
+      fs.copyFileSync(searchExpectedFile, path.join(outDir!, "search-expected.json"));
+    }
+  }, 300_000);
+
+  // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
+  //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)
+  it.skipIf(!process.env.IOS_REGENERATE_SEARCH)("regenerates the committed Meilisearch answers", async () => {
+    const queries = searchQueries();
+    const corpora: Record<string, { hash: string; results: { query: string; ids: number[] }[] }> = {};
+    let meilisearch = "";
+    await withMeilisearch(async (server) => {
+      meilisearch = server.version;
+      for (const count of SEARCH_CORPUS_SIZES) {
+        await withDesktop(async () => {
+          await fillSearchCorpus(count);
+          const search = await import(path.join(lib, "searchIndex"));
+          const { listNotes } = await import(path.join(lib, "notesRepo"));
+          search.configureSearch({ host: server.host, apiKey: server.apiKey });
+          await search.reindexAll(listNotes());
+          const results: { query: string; ids: number[] }[] = [];
+          for (const query of queries) results.push({ query, ids: await search.searchNoteIds(query) });
+          corpora[count] = { hash: await corpusHash(), results };
+        });
+      }
+    });
+    fs.writeFileSync(
+      searchExpectedFile,
+      JSON.stringify(
+        {
+          about: "What a real Meilisearch answered, through the desktop's own searchIndex.ts and searchQuery.ts, for each query in search-queries.json over the generated notes (see search-queries.json). Regenerate with apps/ios/scripts/regenerate-search-expected.sh; the conformance run fails if the notes or the queries no longer match these.",
+          meilisearch,
+          corpora,
+        },
+        null,
+        1,
+      ) + "\n",
+    );
+    expect(Object.keys(corpora)).toEqual(SEARCH_CORPUS_SIZES.map(String));
+  }, 600_000);
 
   it.each(["swift-backup", "swift-backup-large"])(
     "reads what the Swift core wrote: %s",

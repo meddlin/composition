@@ -3,8 +3,8 @@
 A native iPad app for Composition, written in Swift (with Objective-C, C and C++ only where something needs
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
-**Design, plus the first slice of spike S1** (`apps/ios/CompositionCore`: the schema pass and its tests, see
-[S1 status](#s1-status)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
+**Design, plus spikes S1 and S2** (`apps/ios/CompositionCore`: the data layer, backup, the Trash Can and search, with their
+tests; see [S1 status](#s1-status) and [S2 status](#s2-status)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
 Simulator only. Dates are 2026-11-05.
 
 **Direction (changed 2026-11-05).** The two earlier research sessions leaned towards the existing web UI in a
@@ -308,21 +308,24 @@ other MDX tags as text.
 
 The query parser ports as it is. **SQLite FTS5 replaces Meilisearch.**
 
-- An external-content FTS5 table over title, description, content and tags, kept in step by the store (the same
-  places that call `indexNote` today), `unicode61` with diacritics removed, prefix indexes, `bm25` weights with
-  the title heaviest. `tag:`, `title:`, `description:`, `created:` and `updated:` become SQL clauses and
-  column-scoped `MATCH`. Results stay capped at 50.
+- **Built in S2, and changed from the first proposal:** the index is a **file of its own** (`search.db`), not tables in
+  `composition.db`. It is derived data that can be rebuilt, and FTS objects and triggers in the shared file would change the
+  iPad's schema from the desktop's and travel in every backup. (An FTS5 table that reads its text from `notes` cannot live
+  in another file, so this one is a plain FTS5 table over title, content and description with its own copy of the text.)
+  `unicode61` with diacritics removed, prefix indexes. Tags are not searchable text, as in Meilisearch; `tag:`, `created:`
+  and `updated:` are SQL clauses over a small table beside it, and `title:` and `description:` are column-scoped `MATCH`.
+  Results stay capped at 50. The store has to keep it in step (`upsert`, `remove`, `rebuild`), as it does `indexNote` today;
+  nothing calls them yet.
 - **FTS5 availability.** FTS5 is a compile-time option of SQLite. GRDB's author says the system SQLite has it from
   iOS 11.4 and that GRDB's package build enables it ([secondhand](https://github.com/steipete/GRDB.swift/blob/master/Documentation/CustomSQLiteBuilds.md)).
   **S1 result (2026-11-05):** present, with the `unicode61`, `porter`, `ascii` and `trigram` tokenizers, in the SQLite
   GRDB 7.12.0 links on the Mac (3.54.0) and in the iPad Pro 11-inch (M5) Simulator runtime (3.51.0). **Not yet
   checked on the iPad itself,** whose iPadOS version is not recorded. The fallback, if the device lacks it, is a custom SQLite build.
-- **Typo tolerance is the regression** ([C1](#compromise-register)): today `title: routng` finds "routing", and
-  FTS5 has no fuzzy matching. In the order I would try them: (1) rescore titles and descriptions in memory by
-  edit distance, cheap at personal-notes scale and plain Swift; (2) expand each query word against the index's
-  `fts5vocab` table; (3) the trigram tokenizer. C++ only if (2) measures too slow. **Acceptance test (proposed):**
-  the 100-note corpus from `pnpm search:playground` in `apps/cli`, exact queries return the same top results as
-  Meilisearch, and one-edit typos in titles are still found.
+- **Typo tolerance was the regression** ([C1](#compromise-register)): `title: routng` finds "routing", and FTS5 has no fuzzy
+  matching. **S2 built option (2), expanding each typed word against the index's `fts5vocab` table,** which reproduces
+  Meilisearch's rules (below) closely enough that the result *sets* are identical on every acceptance query. C++ was not
+  needed ([S2 status](#s2-status)). The acceptance test was the 100-note corpus from `pnpm search:playground` in `apps/cli`,
+  with the answers of a real Meilisearch; its criteria and results are in the S2 status section.
 - Native extras: search tokens in `.searchable` for the `tag:` style filters, and **Spotlight** indexing
   (`CSSearchableIndex`), both ⭐ and Later.
 
@@ -542,9 +545,9 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB ([C1](#compromise-register)); present in the Simulator and on the Mac, trigram included; the typo layer is S2; not checked on the device |
-| Typo-tolerant search | ⚠️ | M1 | ⬜ | A rescoring layer; not out of the box ([C1](#compromise-register)) |
-| Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | ⬜ | Port `searchQuery.ts` (pure); fixtures |
+| Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB, in an index file of its own ([S2 status](#s2-status)); present and fast on the Mac and in the Simulator; not wired to the store; not checked on the device |
+| Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus ([C1](#compromise-register), [S2 status](#s2-status)) |
+| Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔬 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
 | Search bar | ⭐ | M1 | ⬜ | `.searchable`, with tokens for filters |
 | Find in a note | ⭐ | M1 | ⬜ | `UIFindInteraction` |
 | Spotlight indexing | 🆕 | Later | ⬜ | Core Spotlight |
@@ -637,7 +640,7 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 
 | Id | Compromise | Impact | Why | Mitigation and when to revisit | Status |
 |---|---|:-:|---|---|:-:|
-| **C1** | **Search is no longer typo-tolerant out of the box.** FTS5 replaces Meilisearch, which has no fuzzy matching. | High | iOS cannot spawn Meilisearch, in any approach. [desktop-app-plan.md](desktop-app-plan.md) calls search the product's differentiator. | Rescoring titles in memory, `fts5vocab` expansion or trigrams, measured against the acceptance test. Revisit if S2 cannot reach one-edit tolerance on titles. | Proposed |
+| **C1** | **Search is no longer typo-tolerant out of the box.** FTS5 replaces Meilisearch, which has no fuzzy matching. | High | iOS cannot spawn Meilisearch, in any approach. [desktop-app-plan.md](desktop-app-plan.md) calls search the product's differentiator. | Rescoring titles in memory, `fts5vocab` expansion or trigrams, measured against the acceptance test. Revisit if S2 cannot reach one-edit tolerance on titles. **S2 (2026-11-05): `fts5vocab` expansion reaches one- and two-edit tolerance and the same results as Meilisearch on the acceptance corpus,** so the cost is now only that real notes may differ (R7). | Resolved on the acceptance corpus; your judgement on real notes pending |
 | **C2** | **The iPad has its own database.** It cannot see the Mac's `~/.composition`. Moving data is by backup and restore. | High | App sandbox. Sync arrives later ([D8](#decisions)). | Revisit when the sync engine ships. | Accepted for v1 (you, 2026-11-05) |
 | **C3** | **The notes rules and the MDX renderer exist twice** (TypeScript and Swift). Behaviour can drift; a new MDX component must be built twice; the iPad's rendering will differ in small ways from the desktop's. | Med | The price of a native app. | The conformance corpus. A component is not "done" until both sides draw it. Revisit if drift bites repeatedly. | Proposed |
 | **C4** | **The iPad looks like iPadOS, not like the desktop app.** Native navigation, controls and materials; the six schemes are re-expressed, not copied; no panel grid. | Low | It is the point of the requirement. | A **System** scheme, and the six schemes kept for colour. | Proposed |
@@ -672,7 +675,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D0 | Design before code. | Nothing is built until this page is agreed. | **Decided** (you) |
 | D1 | **Native app in Swift, Objective-C, C and C++ where necessary.** | O3. Languages per [Languages](#languages-and-dependencies); Swift first. | **Decided** (you); details proposed |
 | D2 | Storage. | **SQLite is the source of truth, not a folder of `.md` files.** Access through GRDB on the identical schema, `ensureColumn` migrations, no Core Data or SwiftData. | SQLite: **Decided** (you, 2026-11-05). GRDB and the rest: proposed; settled at Gate A |
-| D3 | Search. | FTS5 plus a typo-tolerance layer, accepting C1 if the acceptance test passes. | Proposed; settled at Gate A |
+| D3 | Search. | FTS5 plus a typo-tolerance layer, accepting C1 if the acceptance test passes. **It passed (S2):** the index is its own file, ranked by attribute then recency, with the vocabulary expansion described under Search. | Proposed; S2's evidence is in, settled at Gate A |
 | D4 | Markdown and MDX engine. | swift-markdown plus our restricted MDX scanner, drawing native views in a TextKit 2 text view. | Proposed; settled at Gate B |
 | D5 | Editor. | `UITextView` on TextKit 2; Markdown, Preview and Split first, Live after v1 unless S3 makes it cheap (C12). | Proposed; settled at Gate B |
 | D6 | May the existing web renderer be used as a **temporary** preview scaffold (O4)? | Yes, only to get the editor and store to a usable app sooner; it must be removed once the native renderer passes the fixtures, and it counts against N2 until then. | Proposed |
@@ -701,7 +704,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R4 | The TypeScript and Swift implementations drift. | High, high | D7: the conformance corpus; run in CI on both sides. |
 | R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. |
 | R6 | FTS5 is not available in the system SQLite, or GRDB's configuration lacks it. | Low–medium, high | S1 runs it; fallback: a custom SQLite build. |
-| R7 | FTS5 plus the typo layer is not good enough for you. | Medium, high | The S2 acceptance test, then your judgement on a real corpus. |
+| R7 | FTS5 plus the typo layer is not good enough for you. | Low–medium, high | **S2 done:** the same result sets as Meilisearch on the 267 acceptance queries that returned fewer than 50 results, top 10 overlapping 96%. What remains is your judgement on your own notes, which are not like the synthetic ones. |
 | R8 | The iPad's schema starts before the desktop has landed the rest of the sync prerequisites (capture triggers, outbox, `sync_*` tables), so the "identical schema" rule breaks or the iPad is delayed. The `uuid` part landed in #244, which retired the worst of it. | Low–medium, medium | Gate A takes the schema from the desktop as it is then; fallback decided and in effect: start from the `uuid` ([Sync](#sync-and-the-data-model)). |
 | R9 | YAML parsing differs from `js-yaml` (dates, quoting), so a frontmatter round trip changes a note. | Medium, medium | Fixtures from real notes; a hand parser if Yams cannot match. |
 | R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. **Done 2026-11-05 on the Mac and the Simulator** ([S1 status](#s1-status)); not yet on the device. |
@@ -718,7 +721,7 @@ Each spike is small and answers one question before anything is built for real. 
 | # | Spike | Answers | Exit criteria |
 |---|---|---|---|
 | **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (the pass writes nothing; GRDB's own pool open does, see [S1 status](#s1-status)); every uuid survives a Trash round trip and a backup in each direction |
-| **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes |
+| **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes. **Done: [S2 status](#s2-status)** |
 | **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4) |
 | **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws |
 | **S5** | **Ink.** PencilKit full-screen and inline; export to the stroke JSON and back; the PNG with its chunk; render in every scheme, in dark mode too; the desktop and CLI show it from a backup. Real handwriting through Vision. | R11, R12; D9, C10, C11 | **Gate C**: format frozen; a dense page's size measured |
@@ -815,10 +818,76 @@ What S1 found, beyond the criteria:
   point seconds can write back a millisecond early. Checked against Foundation's calendar over 5,000 random moments.
 - **A restore with an explicit id moves the id counter.** Restoring trashed row 77 left `sqlite_sequence` for `notes` at
   77, so the next note is 78. The desktop does the same (the conformance script records it), so it is kept, not "fixed".
-- **Not built, and not part of S1:** the search index (a note leaving it when trashed and re-entering when restored, and
-  the rebuild after a restore: S2); removing the attached files of notes purged for good; clearing expired items when the
+- **Not built, and not part of S1:** wiring the search index into the store (a note leaving it when trashed and re-entering
+  when restored, and the rebuild after a restore; S2 built the index, see below); removing the attached files of notes purged for good; clearing expired items when the
   workspace opens (the app layer calls `purgeExpired`); the safety backup taken before a restore (the app layer's job,
   once the data location on the iPad is decided); and the Files picker.
+
+### S2 status
+
+**Built and measured 2026-11-05 on the Mac and in the iPad Pro 11-inch (M5) Simulator; not tried on the iPad.** The code is
+`apps/ios/CompositionCore/Sources/CompositionCore/Search/`: the query parser (`SearchQuery`), the typo rules (`TypoMatching`)
+and the index (`SearchIndex`). 70 tests pass on the Mac and 67 in the Simulator.
+
+**How it was judged.** The notes are the 100 (and, for speed, 1,000) dummy notes of `pnpm search:playground`, written through
+the desktop's real data layer. The queries are 274 in 18 groups (`conformance/search-queries.json`): exact words, prefixes,
+phrases, one- and two-edit typos, typos on the word being typed, words too short for a typo, partial matches, every filter,
+and half-typed input. A real **Meilisearch 1.53.1** answered each through the desktop's own `searchIndex.ts`; those answers
+are committed (`conformance/search-expected.json`, with a hash of the notes so they cannot go stale unnoticed), so CI needs
+no Meilisearch. `apps/ios/scripts/regenerate-search-expected.sh` rewrites them. The criteria were written before the first run:
+
+| Criterion | First run | Final |
+|---|---|---|
+| **A.** No typos: the same *set* of results as Meilisearch wherever it returned fewer than the cap of 50, and on average 8 of its top 10 in our top 10 | 158 of 159; top 10 at 0.71 | **159 of 159; top 10 at 0.93** |
+| **B.** Typos: nothing Meilisearch finds is missed | 1 of 95 missed | **0 of 95** |
+| **C.** Every query under 200 ms on 1,000 notes | | **Median 0.6 to 1.5 ms, slowest 2 to 13 ms** (a debug build; the Simulator's slowest was 13 ms). Index built in 45 to 84 ms |
+
+- **On the 267 queries that returned fewer than 50 results, the result sets are identical** to Meilisearch's; the other 7 hit
+  the cap, where which 50 come back is mostly ties and was not judged. Across all 274 the top ten overlap 96% on average. The
+  top *one* result agrees on 71%, which is not a criterion (below).
+- **The parser** makes the same text, filters and attributes as the desktop's on all 274 queries.
+- **On 1,000 notes** most queries hit the cap of 50 and the ordering is mostly ties, so that corpus is for speed, and its
+  agreement (92% recall, 73% top 10) is reported, not judged.
+- **It scales with the number of different words, and release builds are what ships.** Random words, 1,000 notes, a
+  release build: 2,000 / 20,000 / 100,000 different words answer in a median of 0.4 / 2.4 / 9.2 ms and at worst 0.9 / 6.0 / 30.8 ms
+  (the first search, which reads the vocabulary, takes 3 / 14 / 34 ms). A debug build, which is what Xcode runs by default,
+  is 10 to 20 times slower: 5 / 49 / 178 ms median. Run it with `swift test -c release -Xswiftc -enable-testing --filter SearchScaleTests`.
+  If a debug build ever becomes too slow there is a cheaper scan (an edit at the first letter costs two, so a word allowed one
+  edit only needs the words that start with the same letter); it is not built and not measured.
+
+**What Meilisearch does, measured** (against 1.53.1; none of it was in its documentation as I read it, and the first
+version of this search got these wrong until the queries said so):
+
+- **Typos by length:** none up to 4 letters (`gitt` and `dnss` find nothing), one for 5 to 8, two from 9. A swapped pair of
+  neighbouring letters is one edit (`rdeis`, `raect` find Redis and React).
+- **An edit at the first letter costs two.** So a word allowed only one edit cannot have a wrong first letter (`ocker`,
+  `qedis`, `eract` find nothing) but a 9-letter word can (`xubernetes`, `ebassembly` do), and cannot with another edit as well
+  (`xubrnetes`: none).
+- **The word being typed is also a prefix,** with typos: `kuber` finds Kubernetes, `obsrv` finds observability.
+- **Words are dropped from the end:** `kubernetes zzzzqq` finds Kubernetes, `zzzzqq kubernetes` finds nothing. Notes matching
+  more words come first, then fewer typos.
+- **Neighbouring words are joined and words are split:** `postgre sql` finds PostgreSQL, `sql ite` finds SQLite, `nextjs`
+  finds Next.js. A quoted phrase is order-sensitive (`"deep dive"` finds 12, `"dive deep"` none).
+- **No stop words, no stemming; tags are not searchable text; the frontmatter is** (in a probe, a search for `title` matched every note).
+- **Order:** words, typos, proximity, then which attribute (title before content before description), then how early the
+  word is in the text in about eleven coarse steps, then exactness; and what is still tied is in the order the desktop
+  indexed the notes, `position`, then `updated_at` descending, then `id` descending.
+
+**How this search orders results, and what it leaves out.** Notes matching more words first, then fewer typos, then title
+hits before content hits, then most recently updated. It does **not** use SQLite's bm25: Meilisearch ignores how often a word
+occurs, and bm25 gave a top-10 overlap of 0.71. It does **not** order by how early a word appears: the steps are coarse
+and depend on separators in ways I could not derive, and a guess made it worse (0.82 against 0.92 without), so a fit to
+this corpus (0.98) was not worth keeping. That is why the top result differs more often than the top ten.
+
+**Not done, or not known:**
+
+- The index is not wired to the store: nothing calls `upsert`, `remove` or `rebuild` when a note is saved, trashed or
+  restored, and nothing notices that it is stale after a restore. The first version can rebuild on open and after a restore.
+- The notes are synthetic. They repeat their words and their titles (74 different titles in 100 notes); real notes will
+  not, which is why R7 stays open for your judgement.
+- Phrases are exact (no typos inside quotes), which was not checked against Meilisearch beyond the five phrase queries.
+- Nothing ran on the iPad, and the iPadOS floor was not tried: only the Simulator's SQLite 3.51.0 and the Mac's 3.54.0.
+- Spotlight and the `.searchable` tokens remain Later.
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
@@ -920,6 +989,15 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   `macos-26` with Xcode 26.6 and Node 22, then moved to the `xcode-27` preview image with Xcode 27.2 and Node 24 to match the
   local toolchain). The CI job has not run on GitHub; it needs a pull request. R3 and R15 and the facts table updated. Every S1
   exit criterion is now done except the device (FTS5, and everything else, has not been tried on the iPad).
+
+- 2026-11-05: **S2 search built and measured.** FTS5 in an index file of its own, with Meilisearch's typo rules over the
+  index's vocabulary, ranked by attribute then recency, and the query parser ported. Against a real Meilisearch 1.53.1 over
+  274 queries on the 100 playground notes: the same result sets on the 267 that returned fewer than 50, the top ten
+  overlapping 96%, nothing missed with a typo; under 200 ms with a large margin (and at 100,000 different words in a release build). Passed the three
+  criteria written beforehand; the first run did not (158 of 159, top 10 at 0.71, one typo missed) until the first-letter rule,
+  joined and split words, and ordering by attribute and recency replaced bm25. Changed from the first proposal: the index is
+  a separate file, not tables in `composition.db`, and tags are not searched as text. C1 resolved on the acceptance corpus;
+  R7 lowered; D3 has its evidence; the tracker's search rows, the opening line and this log updated. Not wired to the store.
 
 ## Sources
 

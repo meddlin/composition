@@ -12,6 +12,7 @@ on:
       - "apps/ios/**"
       - "apps/web/src/lib/composition/**"
       - "apps/web/scripts/ios-conformance-fixtures.test.ts"
+      - "apps/cli/src/tools/dummyNotes.ts"
       - "apps/web/package.json"
       - "apps/web/pnpm-lock.yaml"
       - ".github/workflows/ios-core.yml"
