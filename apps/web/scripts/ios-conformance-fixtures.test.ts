@@ -19,6 +19,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   trash-start.db, trash-script.json, trash-script.expected.json
  *                                  the Trash Can: a starting database, the steps in apps/ios/conformance/trash-script.json,
  *                                  and what the real trashRepo.ts did at every step (result and every row afterwards)
+ *   store-start.db, store-script.json, store-script.expected.json
+ *                                  build plan Step 2: notes, groups and notebooks: a starting database, the steps in
+ *                                  apps/ios/conformance/store-script.json, and what the real service.ts (its search index
+ *                                  stubbed) did at every step (result and every row afterwards)
  *   search-corpus-100.db, search-corpus-1000.db, search-queries.json, search-parse-expected.json, search-expected.json
  *                                  spike S2: generated notes, the queries, what the real parseSearchQuery made of each, and
  *                                  (committed, not regenerated here) what a real Meilisearch answered for each
@@ -29,8 +33,16 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   component-cases.json, component-expected.json
  *                                  spike S4: inputs for the helpers behind the components (chart CSV, repo and YouTube
  *                                  addresses, image width and path) and what the real functions answer for each
+ *   frontmatter-cases.json, frontmatter-expected.json
+ *                                  build plan Step 3: notes' text through the real frontmatter.ts (parse, generate,
+ *                                  withHeaderImage, tag helpers)
+ *   settings-cases.json, settings-expected.json
+ *                                  build plan Step 1: favorites, themes and saved cities, and what parseWebSettings makes
+ *                                  of each; and desktop-backup*.settings.json, the (non-default) settings the desktop
+ *                                  backups carry
  *
- * "reads what the Swift core wrote" restores swift-backup.tar.gz and swift-backup-large.tar.gz with the real
+ * "reads what the Swift core wrote" restores swift-backup.tar.gz and swift-backup-large.tar.gz (which carry the settings
+ * the iPad was handed, with its favorites changed) with the real
  * `stageBackup` and `applyStagedBackup`, opens the result with the real `db.ts`, and compares it with what Swift said it
  * had put in. The Swift tests make those files, so the order matters; apps/ios/scripts/conformance.sh runs all three steps.
  */
@@ -210,6 +222,137 @@ async function runTrashStep(step: ScriptStep): Promise<unknown> {
   }
 }
 
+// --- Notes, groups and notebooks (build plan, Step 2) ---------------------------------------------------------------------
+
+/** The database the store script starts from, built with the real repos (ids are in the script's "about"). */
+function buildStoreStart({ repos }: Context): void {
+  const { notebooks, groups, notes } = repos;
+  const work = notebooks.createNotebook("Work");
+  notebooks.createNotebook("Archive");
+  const projects = groups.createGroup("Projects", null, work.id);
+  const sub = groups.createGroup("Sub", projects.id);
+  groups.createGroup("Deep", sub.id);
+  const loose = groups.createGroup("Loose");
+  for (const name of ["Empty", "Second", "Third"]) groups.createGroup(name);
+  notes.createNote("Alpha", "x,y");
+  notes.createNote("Beta", "", projects.id);
+  notes.createNote("Gamma", "", sub.id);
+  notes.createNote("Delta", "", 3);
+  notes.createNote("Epsilon", "", loose.id);
+  for (const title of ["Zeta", "Eta", "Theta"]) notes.createNote(title);
+  notes.createNote("Iota", "", loose.id);
+  notes.createNote("Kappa", "", loose.id);
+  notes.createNote("Work note", "", null, work.id);
+}
+
+type StoreStep = {
+  op: string;
+  at?: string;
+  id?: number;
+  title?: string;
+  name?: string;
+  content?: string;
+  groupId?: number | null;
+  notebookId?: number;
+  parentId?: number | null;
+  beforeId?: number | null;
+  sql?: string;
+  note?: string;
+};
+
+/** Every table the store script touches, as plain JSON. */
+async function dumpStoreTables() {
+  const { getDb } = await import(path.join(lib, "db"));
+  const db = getDb();
+  const dump: Record<string, unknown> = {};
+  for (const table of ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups"]) {
+    dump[table] = db.prepare(`SELECT * FROM ${table} ORDER BY id`).all();
+  }
+  dump.sqlite_sequence = db.prepare("SELECT name, seq FROM sqlite_sequence ORDER BY name").all();
+  return dump;
+}
+
+/** Runs one step through the real service, with the clock set to the step's time; an error comes back as its kind. */
+async function runStoreStep(step: StoreStep): Promise<unknown> {
+  const service = await import(path.join(lib, "service"));
+  const { getDb } = await import(path.join(lib, "db"));
+  const notesRepo = await import(path.join(lib, "notesRepo"));
+  const groupsRepo = await import(path.join(lib, "groupsRepo"));
+  const notebooksRepo = await import(path.join(lib, "notebooksRepo"));
+  if (step.at) vi.setSystemTime(new Date(step.at));
+
+  // The service answers some refusals with a message and throws others; both come back as the kind of error.
+  const kinds: Record<string, string> = {
+    "That group can't be moved there.": "invalidGroupMove",
+    "This group still has sub-groups or notes — empty it first.": "groupNotEmpty",
+    "The last notebook can't be deleted.": "lastNotebook",
+    "This notebook still has groups or notes — empty it first.": "notebookNotEmpty",
+  };
+  /** A refusal as its kind; null when there was none. */
+  const refusal = (value: { error?: string }) => (value.error ? { error: kinds[value.error] ?? value.error } : null);
+  /** What a restore answered with; the service words "not in the Trash Can" as an error, the Swift core as nothing. */
+  const restored = (value: { error?: string } | null) => (value?.error ? null : (value ?? null));
+  /** The group a move answered with, or its refusal. */
+  const movedGroup = (value: { group?: unknown; error?: string }) => refusal(value) ?? value.group;
+  try {
+    switch (step.op) {
+      case "createNote":
+        return await service.createNote(step.title!, step.groupId ?? null, step.notebookId ?? null);
+      case "saveNoteContent":
+        return await service.saveNoteContent(step.id!, step.content!);
+      case "deleteNote":
+        await service.deleteNote(step.id!);
+        return null;
+      case "restoreNote":
+        return restored(await service.restoreNote(step.id!));
+      case "moveNoteToGroup":
+        return await service.moveNoteToGroup(step.id!, step.groupId ?? null);
+      case "placeNote":
+        return await service.placeNote(step.id!, step.groupId ?? null, step.beforeId ?? null);
+      case "createGroup":
+        return await service.createGroup(step.name!, step.parentId ?? null, step.notebookId ?? null);
+      case "renameGroup":
+        return await service.renameGroup(step.id!, step.name!);
+      case "deleteGroup":
+        return refusal(await service.deleteGroup(step.id!));
+      case "restoreGroup":
+        return restored(await service.restoreGroup(step.id!));
+      case "moveGroup":
+        return movedGroup(await service.moveGroup(step.id!, step.parentId ?? null));
+      case "moveGroupToNotebook":
+        return movedGroup(await service.moveGroupToNotebook(step.id!, step.notebookId!));
+      case "placeGroup":
+        return movedGroup(await service.placeGroup(step.id!, step.parentId ?? null, step.beforeId ?? null));
+      case "groupIsEmpty":
+        return groupsRepo.groupIsEmpty(step.id!);
+      case "createNotebook":
+        return await service.createNotebook(step.name!);
+      case "renameNotebook":
+        return await service.renameNotebook(step.id!, step.name!);
+      case "placeNotebook":
+        return (await service.placeNotebook(step.id!, step.beforeId ?? null)).map((notebook: { id: number }) => notebook.id);
+      case "deleteNotebook":
+        return refusal(await service.deleteNotebook(step.id!));
+      case "listNotes":
+        return notesRepo.listNotes().map((note: { id: number }) => note.id);
+      case "listGroups":
+        return groupsRepo.listGroups().map((group: { id: number }) => group.id);
+      case "listNotebooks":
+        return notebooksRepo.listNotebooks().map((notebook: { id: number }) => notebook.id);
+      case "sql":
+        getDb().exec(step.sql!);
+        return null;
+      default:
+        throw new Error(`Unknown step: ${step.op}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/not found/i.test(message)) return { error: "notFound" };
+    if (message === "There are no notebooks.") return { error: "noNotebooks" };
+    throw error;
+  }
+}
+
 // --- Search (spike S2) --------------------------------------------------------------------------------------------------
 
 /** The clock the generated notes are made against, so a corpus is the same on every machine and every day. */
@@ -318,10 +461,24 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
       await withDesktop(async (context) => {
         populate(context, megabytes);
         const { getDb } = await import(path.join(lib, "db"));
-        const { loadWebSettings } = await import(path.join(lib, "webSettings"));
+        const { loadWebSettings, saveWebSettings } = await import(path.join(lib, "webSettings"));
         const { createBackup } = await import(path.join(lib, "backup"));
+        // Not the defaults, so a restore that loses or resets a key shows: a scheme, a city, columns, favorites, and more.
+        saveWebSettings({
+          ...loadWebSettings(),
+          theme: "forest",
+          sidebarWidth: 321,
+          editorRatio: 0.4,
+          favorites: [
+            { type: "note", id: 1 },
+            { type: "group", id: 1 },
+          ],
+          location: { name: "Reykjavik", latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik" },
+        });
         const file = path.join(outDir!, `${name}.tar.gz`);
         fs.rmSync(file, { force: true });
+        const { appDataDir: _dataDir, dbPath: _dbPath, ...portable } = loadWebSettings();
+        fs.writeFileSync(path.join(outDir!, `${name}.settings.json`), JSON.stringify(portable, null, 2));
         const summary = await createBackup({ file, db: getDb(), appDataDir: context.dataDir, settings: loadWebSettings() });
         const expected = await describeDataDirectory(context.dataDir, summary.counts);
         fs.writeFileSync(path.join(outDir!, `${name}.expected.json`), JSON.stringify(expected, null, 2));
@@ -354,6 +511,40 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     });
     expect(fs.existsSync(path.join(outDir!, "trash-script.expected.json"))).toBe(true);
   });
+
+  it("writes the store script and what the desktop's service did with it", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const scriptFile = path.resolve(__dirname, "../../ios/conformance/store-script.json");
+    const script = JSON.parse(fs.readFileSync(scriptFile, "utf8")) as { steps: StoreStep[] };
+
+    await withDesktop(async (context) => {
+      buildStoreStart(context);
+      const { closeDb, getDb } = await import(path.join(lib, "db"));
+      closeDb(); // folds the write-ahead log in, so the copy is the whole database
+      fs.copyFileSync(path.join(context.home, ".composition", "composition.db"), path.join(outDir!, "store-start.db"));
+      getDb();
+
+      // Meilisearch isn't running; the service indexes best-effort, so a stub keeps the run quiet (as in service.test.ts).
+      vi.doMock(path.join(lib, "searchIndex"), () => ({
+        indexNote: async () => {},
+        deleteNoteFromIndex: async () => {},
+        searchNoteIds: async () => [],
+        unavailableMessage: () => "unavailable",
+      }));
+
+      vi.useFakeTimers({ toFake: ["Date"] });
+      const steps: { op: string; result: unknown; dump: unknown }[] = [];
+      for (const step of script.steps) {
+        const result = await runStoreStep(step);
+        steps.push({ op: step.op, result: result ?? null, dump: await dumpStoreTables() });
+      }
+      vi.useRealTimers();
+      vi.doUnmock(path.join(lib, "searchIndex"));
+      fs.copyFileSync(scriptFile, path.join(outDir!, "store-script.json"));
+      fs.writeFileSync(path.join(outDir!, "store-script.expected.json"), JSON.stringify({ steps }, null, 2));
+    });
+    expect(fs.existsSync(path.join(outDir!, "store-script.expected.json"))).toBe(true);
+  }, 60_000);
 
   it("writes the search corpora and what the real parseSearchQuery makes of each query", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
@@ -490,6 +681,45 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     expect(expected.repo.length).toBe(cases.repo.length);
   }, 60_000);
 
+  it("writes the settings cases and what the real parseWebSettings makes of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/settings-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { favorites: unknown[]; theme: unknown[]; location: unknown[] };
+    const { parseWebSettings } = await import(path.join(lib, "webSettings"));
+    const expected = {
+      favorites: cases.favorites.map((value) => parseWebSettings({ favorites: value }).favorites),
+      theme: cases.theme.map((value) => parseWebSettings({ theme: value }).theme),
+      location: cases.location.map((value) => parseWebSettings({ location: value }).location ?? null),
+    };
+    fs.copyFileSync(file, path.join(outDir!, "settings-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "settings-expected.json"), JSON.stringify(expected, null, 2));
+    expect(expected.favorites.length).toBe(cases.favorites.length);
+  }, 60_000);
+
+  it("writes the frontmatter cases and what the real frontmatter.ts makes of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/frontmatter-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      parse: string[];
+      generate: { title: string; createdAt: string; updatedAt: string; tags: string[]; description: string }[];
+      header: { content: string; header: { image: string; layout: "full" | "centered" } | null; fallback: { title: string; createdAt: string; updatedAt: string } }[];
+      tags: { toString: string[][]; fromString: string[] };
+    };
+    const fm = await import(path.join(lib, "frontmatter"));
+    const expected = {
+      parse: cases.parse.map((content) => {
+        const [frontmatter, body] = fm.parse(content);
+        return { frontmatter, body };
+      }),
+      generate: cases.generate.map(({ title, ...rest }) => fm.generate(title, rest)),
+      header: cases.header.map(({ content, header, fallback }) => fm.withHeaderImage(content, header, fallback)),
+      tags: { toString: cases.tags.toString.map((tags) => fm.tagsToString(tags)), fromString: cases.tags.fromString.map((text) => fm.tagsFromString(text)) },
+    };
+    fs.copyFileSync(file, path.join(outDir!, "frontmatter-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "frontmatter-expected.json"), JSON.stringify(expected, null, 2));
+    expect(expected.parse.length).toBe(cases.parse.length);
+  }, 60_000);
+
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
   //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)
   it.skipIf(!process.env.IOS_REGENERATE_SEARCH)("regenerates the committed Meilisearch answers", async () => {
@@ -544,6 +774,23 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
         const staged = await stageBackup(file, dataDir);
         expect(staged.counts).toEqual(expected.counts);
         applyStagedBackup(staged, { appDataDir: dataDir, dbPath: resolvedDbPath(loadWebSettings()) });
+
+        // What the desktop's service does after a restore (service.ts): the backup's settings replace the current ones.
+        const { saveWebSettings } = await import(path.join(lib, "webSettings"));
+        expect(staged.settings, "the iPad's backup carries the settings it was handed").not.toBeNull();
+        saveWebSettings({ ...staged.settings, appDataDir: dataDir });
+        const original = JSON.parse(fs.readFileSync(path.join(outDir!, `${name.replace("swift", "desktop")}.settings.json`), "utf8")) as Record<string, unknown>;
+        const { appDataDir: _dir, dbPath: _db, favorites, ...kept } = loadWebSettings() as Record<string, unknown>;
+        const { favorites: originalFavorites, ...originalKept } = original;
+        expect(kept, "every key but the favorites is the desktop's own, unchanged").toEqual(originalKept);
+        expect(originalFavorites).toEqual([
+          { type: "note", id: 1 },
+          { type: "group", id: 1 },
+        ]);
+        expect(favorites, "the favorites the iPad changed").toEqual([
+          { type: "group", id: 1 },
+          { type: "note", id: 2 },
+        ]);
 
         // The real data layer opens the Swift-made database (its schema pass runs) and finds what Swift said was in it.
         const actual = await describeDataDirectory(dataDir, expected.counts);

@@ -15,21 +15,22 @@ restore both ways; installed on your iPad from Xcode.
 
 Facts, checked 2026-11-06:
 
-- **Of the 43 M1 rows in the tracker, 15 are built, 3 are spiked and 25 are not started** (after correcting five rows that had gone stale:
-  search, its filters, the backup round trip and the stable `uuid`). What exists is the **read side**: the data layer, backup and restore,
-  the Trash Can, search with typo tolerance, the Markdown and MDX layer, a Preview that draws all ten components, and a prototype app that
-  runs on your iPad with your notes. What does not exist is the **write side**: creating and editing notes, groups, notebooks, favorites,
-  images, themes, and anything that saves.
+- **Of the 43 M1 rows in the tracker, 15 were built, 3 were spiked and 25 were not started when this plan was written** (after correcting five rows
+  that had gone stale: search, its filters, the backup round trip and the stable `uuid`). What existed was the **read side**: the data layer,
+  backup and restore, the Trash Can, search with typo tolerance, the Markdown and MDX layer, a Preview that draws all ten components, and a
+  prototype app that runs on your iPad with your notes. **Steps 1 to 3 (2026-11-06) added the core's write side**: settings and favorites, the
+  store operations for notes, groups and notebooks, and frontmatter. No screen uses them yet. Still missing: images, themes, and everything that
+  saves from the app (autosave, the editor, the organization screens).
 - **Every port so far was checked against the desktop's own TypeScript** (the Trash Can, search, the MDX scanner and the helpers behind the
-  components): a script or corpus is run through the real code, and Swift must give the same answers. 103 Swift tests pass, and
+  components): a script or corpus is run through the real code, and Swift must give the same answers. 137 Swift tests pass with the fixtures, and
   `apps/ios/scripts/conformance.sh` runs the desktop-to-Swift-and-back check in CI. The plan keeps that rule: **no port without an oracle**.
-- **What is left to port is small.** `notesRepo.ts` 169 lines, `groupsRepo.ts` 203, `notebooksRepo.ts` 116, `favorites.ts` 47, `images.ts` 145,
-  `frontmatter.ts` 183, `themes.ts` 30. (`trashRepo.ts`, 226 lines, is already ported.)
+- **What is left to port is small.** `images.ts` 145 lines and `themes.ts` 30. (`trashRepo.ts`, `notesRepo.ts`, `groupsRepo.ts`, `notebooksRepo.ts`,
+  `favorites.ts` and `frontmatter.ts`, 1,000 lines in all, are ported and checked.)
 - **S3 (the editor spike) and S4 (Markdown) are done in the Simulator.** The editor stays on TextKit 2; find, a completion list and views
   in the text work; a full re-colour of a 5,030-line note costs 87 ms an edit even in a Release build, so the editor needs an incremental one
   ([S3 status](ipad-app-design.md#s3-status)). Not tried: Scribble, the Pencil, arrow keys across hidden marks, VoiceOver, the iPad's own speed.
-- **Settings are a gap.** The colour scheme, the saved city and **favorites** live in the desktop's `settings.json`, which a backup carries
-  (`backup.ts`). The Swift core reads that file and keeps it as bytes, but never writes one, so favorites cannot round-trip yet. **And a restore
+- **Settings were a gap (closed by Step 1).** The colour scheme, the saved city and **favorites** live in the desktop's `settings.json`, which a backup carries
+  (`backup.ts`). The Swift core used to keep that file as bytes and never write one, so favorites could not round-trip. **And a restore
   replaces the desktop's settings with the backup's** (`service.ts` saves `{ ...staged.settings, appDataDir, dbPath }`, with defaults filled in for
   missing keys), so an iPad backup carrying a partial `settings.json` would reset the desktop's colour scheme ([G5](#decisions-to-make)).
 - **Not verified:** the iPad's speed and the Pencil's behaviour in a text view. (The iPad is on iPadOS 27.0.1, and you chose an iPadOS 17 floor on 2026-11-06, so D16 is closed.)
@@ -60,7 +61,7 @@ Recommendations are mine. **G1 and G2 were decided on 2026-11-06 (Gate A is pass
 | **G3** | **Bundle id, Apple team, app name and icon, licence notices.** | **Keep the placeholders (`com.rushinglabs.composition.ipad.dev`) for M1; settle them before M3's TestFlight.** | The design says to settle them before M1's first install, but you already have a placeholder install, and a test install that changes id costs a backup and restore. The id becomes effectively permanent at the first release, so decide it deliberately then. The licence notices for GRDB and swift-markdown are small and I will add them in Step 11 whatever you choose. |
 | G4 | **Change-capture triggers and the outbox.** | **Fallback stays: the iPad runs on the `uuid` alone.** Re-check `main` at Gate B. | They are not on `main` yet ([D8](ipad-app-design.md#decisions)). Safe for v1; they can arrive as a later `CREATE … IF NOT EXISTS`. |
 | G5 | **What the iPad writes to `settings.json` in a backup.** Today it writes none, so favorites are lost both ways; a *partial* file would reset the desktop's colour scheme and city on restore (it replaces, above). | **When the iPad was set up from a desktop backup, keep that backup's `settings.json` and change only the favorites (and city); otherwise write one only after you first favorite something, with defaults for the rest, and say so when you export.** | It makes the round trip keep the desktop's own scheme. The remaining cost: an iPad that never saw a desktop backup still hands the desktop default settings along with its favorites. Step 1 builds it and tests it through the real restore. |
-| G6 | **How to read frontmatter's YAML.** | **A small parser for the known keys, checked against the desktop's `js-yaml` over a corpus; Yams only if the corpus shows it is not enough.** | Yams is a new dependency (the design wants a row for it first), and libyaml and `js-yaml` disagree on some edge cases, so a corpus is needed either way. The desktop falls back to "no frontmatter" when the block is not a YAML mapping; the parser must do the same. |
+| G6 | **How to read frontmatter's YAML.** | **A small parser for the known keys, checked against the desktop's `js-yaml` over a corpus; Yams only if the corpus shows it is not enough.** | Yams is a new dependency (the design wants a row for it first), and libyaml and `js-yaml` disagree on some edge cases, so a corpus is needed either way. The desktop falls back to "no frontmatter" when the block is not a YAML mapping; the parser must do the same. **Outcome (2026-11-06): neither Yams nor a hand parser; a port of js-yaml's loader and dumper, with no new dependency (Step 3).** |
 | G7 | **The Live tab stays after v1.** | **Yes. Reopen only if the on-device checks in [manual-tests/ipad.md](manual-tests/ipad.md) (items 14 to 19) go well.** | One way of hiding marks works in the Simulator, but arrow keys, selection and VoiceOver are untried. |
 
 ## Build order
@@ -75,14 +76,32 @@ the core is developed with `swift test` and the app is built only to look at it.
    `settings.json` in the data folder, keeping every key it does not use as it came ([G5](#decisions-to-make)); `Backup` carries it both ways.
    Check: a corpus through the desktop's `parseWebSettings`, and `conformance.sh`'s backup round trip with favorites changed on the iPad and the
    desktop's other settings left as they were, restored through the real `stageBackup` and `applyStagedBackup`.
+   **Done 2026-11-06:** `Settings.swift` (`SettingsStore`), `Backup` carrying `settings.json` both ways; 66 of 66 inputs in `settings-cases.json` read as the desktop
+   reads them, a Swift backup with changed favorites restores on the desktop with every other key unchanged, and the check fails when an answer is corrupted. 111 tests pass.
 2. **Store operations.** Ports of `notesRepo`, `groupsRepo` and `notebooksRepo`: the same SQL, errors (`GroupNotEmptyError`,
    `InvalidGroupMoveError`, `LastNotebookError`…), ordering (`placeNote`, `placeGroup`, `placeNotebook`), `updated_at`, and the `uuid` left to
    the trigger. Every write also keeps `search.db` in step (`upsert` and `remove`, then `markCurrent`). A script like the Trash Can's
    (`apps/ios/conformance/store-script.json`) is run through the desktop's real repos, every table dumped after each step; Swift runs the
    same script and compares. Check: the script passes, and a copy of your own database opens, takes a hundred operations and still restores on the desktop.
+   **Done 2026-11-06 (the core; no screens yet):** `Store/` has the three repositories (`NotebooksStore`, `GroupsStore`, `NotesStore`: the desktop's SQL, errors and
+   ordering) and `NoteStore`, the data operations of `service.ts` with the search index kept in step. The 98 steps of `store-script.json` (every create, save, move,
+   place, rename and refusal, the Trash Can through the service, and a database with no notebook left) give the same results and leave the same rows in
+   `notes`, `groups`, `notebooks`, `trashed_notes`, `trashed_groups` and `sqlite_sequence` as the desktop's real `service.ts`, and the check fails when an answer or
+   a row is corrupted. The backup round trip now also puts about a hundred of those operations through the restored desktop database before Swift backs it up
+   again, and the desktop restores the result. Two choices differ from the wording above: a write marks `search.db` as matching the notes only if it matched them
+   *before* the write (so a stale index stays stale until the next launch rebuilds it, instead of being blessed), and `listNotebooks` does not re-run the
+   desktop's adoption of rows an older CLI wrote, because opening the database already does it. **Not done:** the hundred operations on a *copy of your own
+   database* (yours is on your Mac and iPad, and I did not touch it); Step 6 repeats the script from the UI, which is the better place for it.
 3. **Frontmatter.** `parse`, `generate`, `render` and `withHeaderImage` ([G6](#decisions-to-make)); the note's `title`, `description` and tags are
    kept in step with the columns as the desktop does. Check: a corpus of frontmatter variants (quoted and unquoted, lists, dates, a block
    that is not a mapping, CRLF) through the desktop's `parse` and `render`, and byte-identical output where the desktop rewrites it.
+   **Done 2026-11-06:** G6 went further than "a small parser": the oracle showed that whether a block is a mapping, a title is a string or a date, and a long title is
+   folded at 78 columns all depend on js-yaml's details, so `YAML/` is a port of js-yaml 4's loader and dumper (no dependency). 111 of 111 blocks in
+   `frontmatter-cases.json` read as the desktop reads them (tabs, anchors, merge keys, block scalars, bad escapes, dates that roll over, CRLF, blocks that are not
+   mappings), 123 of 123 titles, descriptions and tag lists are written byte for byte, 16 of 16 header-image edits and the tag helpers agree, and the check fails
+   when an answer is corrupted. `NoteFrontmatter.split`, which the Preview and the colouring use, now asks the same reader, so a header block the desktop shows as
+   text is text here too. The columns are kept in step with the frontmatter by `saveNoteContent` (in the store, Step 2's script covers it). A document nested past 100
+   levels or past the thread's stack, and a list built from aliases of aliases, are refused or cut short rather than crashing.
 4. **Autosave and lifecycle (spike S6).** One write path: debounce, then flush on leaving the foreground, on a scene change and on
    termination; a second window shares the one database pool. Check, in the Simulator and scripted: type, `simctl terminate`, relaunch, and
    the text is there; the same with the app backgrounded mid-word. **S6 exit: no lost keystrokes.**

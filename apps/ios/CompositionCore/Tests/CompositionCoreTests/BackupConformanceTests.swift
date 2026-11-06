@@ -46,6 +46,39 @@ struct BackupConformanceTests {
         return Expected(counts: counts, notes: notes.0, trashedNotes: notes.1, files: files)
     }
 
+    /// About a hundred operations of every kind: a notebook, groups and sub-groups, notes in them, saves that rewrite the
+    /// frontmatter, moves and placements, deletions and restores. Returns how many more notes, groups and trashed notes there are.
+    private func editALot(_ store: NoteStore) throws -> (notes: Int, groups: Int, trashedNotes: Int) {
+        var clock = Date(timeIntervalSince1970: 1_800_000_000)
+        func tick() -> Date {
+            clock.addTimeInterval(1)
+            return clock
+        }
+        let notebook = try store.createNotebook(name: "Ops", now: tick())
+        var groups: [NoteGroup] = []
+        for index in 0..<8 {
+            let parent = index % 3 == 2 ? groups[index - 1].id : nil
+            groups.append(try store.createGroup(name: "Group \(index)", parentId: parent, notebookId: notebook.id, now: tick()))
+        }
+        var notes: [NoteDetail] = []
+        for index in 0..<40 {
+            notes.append(try store.createNote(title: "Op note \(index): colon", groupId: groups[index % groups.count].id, now: tick()))
+        }
+        for note in notes.prefix(20) {
+            _ = try store.saveNoteContent(id: note.id, content: "---\ntitle: Edited \(note.id)\ntags: a, b\n---\n# Heading\n\nBody \(note.id)\n", now: tick())
+        }
+        for (index, note) in notes.enumerated() where index % 4 == 0 {
+            _ = try store.placeNote(id: note.id, groupId: groups[(index + 1) % groups.count].id, before: nil)
+        }
+        for note in notes.prefix(5) { _ = try store.moveNote(id: note.id, toGroup: nil) }
+        for group in groups.suffix(3) { _ = try? store.moveGroup(id: group.id, parentId: groups[0].id, now: tick()) }
+        _ = try store.placeGroup(id: groups[1].id, parentId: nil, before: groups[0].id, now: tick())
+        _ = try store.renameGroup(id: groups[0].id, name: "Renamed", now: tick())
+        for note in notes[30..<40] { try store.deleteNote(id: note.id, now: tick()) }
+        for note in notes[30..<33] { _ = try store.restoreNote(id: note.id) }
+        return (notes: 40 - 10 + 3, groups: 8, trashedNotes: 10 - 3)
+    }
+
     @Test("restores a backup the desktop made, and backs up the result for the desktop to restore", arguments: ["desktop-backup", "desktop-backup-large"])
     func desktopToSwiftAndBack(name: String) throws {
         let directory = try #require(conformanceDirectory)
@@ -67,11 +100,30 @@ struct BackupConformanceTests {
             #expect(restored.files == expected.files, "every image and attachment, byte for byte")
             #expect(!restored.files.isEmpty && !expected.notes.isEmpty)
 
+            // Settings: the desktop's file arrives whole, the iPad reads it, and changes only the favorites.
+            let original = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: directory.appendingPathComponent("\(name).settings.json"))) as? [String: Any])
+            let arrived = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: target.settingsURL)) as? [String: Any])
+            #expect(NSDictionary(dictionary: arrived) == NSDictionary(dictionary: original), "settings.json arrives as the desktop wrote it")
+            let settings = SettingsStore(location: target)
+            #expect(settings.favorites() == [Favorite(.note, 1), Favorite(.group, 1)] && settings.theme() == "forest")
+            #expect(settings.location() == SavedLocation(name: "Reykjavik", latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik"))
+            try settings.toggleFavorite(.note, 1)  // unpin
+            try settings.toggleFavorite(.note, 2)  // pin
+            #expect(settings.favorites() == [Favorite(.group, 1), Favorite(.note, 2)])
+
+            // A hundred edits through the store, on the desktop's own database, before it is backed up again: the desktop has to
+            // restore the result as well, and find every row.
+            let edits = try editALot(NoteStore(database: database))
+
             // Swift -> desktop
             let output = directory.appendingPathComponent(name.replacingOccurrences(of: "desktop", with: "swift") + ".tar.gz")
             try? FileManager.default.removeItem(at: output)
             let summary = try Backup.create(database: database, location: target, to: output)
-            #expect(summary.counts == expected.counts)
+            var changed = expected.counts
+            changed.notes += edits.notes
+            changed.groups += edits.groups
+            changed.trashedNotes += edits.trashedNotes
+            #expect(summary.counts == changed, "the counts follow the edits")
             try database.close()
 
             let description = try describe(target, counts: summary.counts)

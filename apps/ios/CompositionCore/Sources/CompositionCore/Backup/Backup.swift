@@ -5,7 +5,7 @@ import GRDB
 // (docs/architecture/backup-restore.md, `backup.ts`): one `.tar.gz` that plain `tar` can open.
 //
 //   composition-backup.json   what this is, the format version, when, counts
-//   settings.json             optional; the iPad leaves it out (see `Backup.create`)
+//   settings.json             optional: favorites, colour scheme and saved city, and every other key the desktop keeps (see `SettingsStore`)
 //   composition.db            a consistent snapshot of the database (VACUUM INTO)
 //   app_data/<image>          every pasted image
 //   attachments/<file>        every attached file
@@ -51,7 +51,7 @@ public struct StagedBackup: Sendable {
     public let directory: URL
     public let createdAt: String
     public let counts: BackupCounts
-    /// The backup's `settings.json` as it was, or nil when it had none. The iPad has no portable settings to apply yet.
+    /// The backup's `settings.json` as it was, or nil when it had none. `apply` writes it to the data folder as it is.
     public let settings: Data?
     public let hasImages: Bool
     public let hasAttachments: Bool
@@ -98,8 +98,9 @@ public enum Backup {
     /// `VACUUM INTO`, which is consistent while the app is writing (copying a WAL-mode database by hand is not). Written
     /// to a temporary name and renamed, so `file` is never a half-written archive.
     ///
-    /// No `settings.json` is written. When the desktop restores a backup that has none it keeps its own settings, which
-    /// is right until the iPad has settings worth carrying (colour scheme, favorites).
+    /// The data folder's `settings.json` goes in when there is a usable one (a JSON object, not over 1 MB), exactly as it is,
+    /// which `SettingsStore` keeps as the desktop wrote it. A backup of an iPad with none has none, and the desktop then keeps
+    /// its own settings; with one, a restore *replaces* the desktop's settings with it (`service.ts`), so the file must never be partial.
     public static func create(
         database: CompositionDatabase, location: DataLocation, to file: URL, now: Date = Date()
     ) throws -> BackupSummary {
@@ -121,6 +122,7 @@ public enum Backup {
         counts.images = images.count
         let createdAt = Timestamp.now(now)
 
+        let settings = usableSettings(at: location.settingsURL)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .withoutEscapingSlashes]
         let manifest = try encoder.encode(Manifest(format: BackupNames.format, version: BackupNames.formatVersion, createdAt: createdAt, counts: counts))
@@ -132,6 +134,7 @@ public enum Backup {
             defer { try? output.close() }
             let tar = TarWriter(gzip: try GzipWriter(file: output), now: now)
             try tar.addFile(named: BackupNames.manifest, contents: manifest + Data("\n".utf8))
+            if let settings { try tar.addFile(named: BackupNames.settings, contents: settings) }
             try tar.addFile(named: BackupNames.database, from: snapshot)
             for name in images {
                 try tar.addFile(named: "\(BackupNames.imageDirectory)/\(name)", from: location.imagesURL.appendingPathComponent(name))
@@ -149,6 +152,14 @@ public enum Backup {
         }
         let bytes = (try fileManager.attributesOfItem(atPath: file.path)[.size] as? NSNumber)?.int64Value ?? 0
         return BackupSummary(file: file, bytes: bytes, createdAt: createdAt, counts: counts)
+    }
+
+    /// The bytes of `settings.json` when it is a JSON object small enough to be one.
+    private static func usableSettings(at url: URL) -> Data? {
+        guard let data = try? Data(contentsOf: url), data.count <= BackupNames.maxJSONBytes,
+            (try? JSONSerialization.jsonObject(with: data)) is [String: Any]
+        else { return nil }
+        return data
     }
 
     private struct Manifest: Codable {
@@ -351,9 +362,17 @@ public enum Backup {
         let aside = staged.directory.appendingPathComponent("previous", isDirectory: true)
         try fileManager.createDirectory(at: aside, withIntermediateDirectories: false)
 
+        // The backup's settings go in as they are; a backup without any leaves the current ones alone, as the desktop does.
+        var settingsSwap: [(current: URL, replacement: URL?)] = []
+        if let settings = staged.settings {
+            let file = staged.directory.appendingPathComponent(BackupNames.settings)
+            try settings.write(to: file)
+            settingsSwap = [(location.settingsURL, file)]
+        }
+
         // (where it lives now, what the staged copy replaces it with; nil means nothing, the backup had none)
         let db = location.databaseURL
-        let swaps: [(current: URL, replacement: URL?)] =
+        let swaps: [(current: URL, replacement: URL?)] = settingsSwap +
             [(db, staged.directory.appendingPathComponent(BackupNames.database))]
             + BackupNames.databaseSuffixes.map { (URL(fileURLWithPath: db.path + $0), nil) }
             + [

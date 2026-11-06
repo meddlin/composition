@@ -4,7 +4,7 @@ A native iPad app for Composition, written in Swift (with Objective-C, C and C++
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
 **Design, spikes S1 and S2, the parse-and-draw half of S4, the Simulator half of S3, and a prototype app** (`apps/ios/CompositionCore`: the data layer, backup,
-the Trash Can, search and the Markdown and MDX layer, with their tests; `apps/ios/Composition`: a viewer on it; see [S1 status](#s1-status),
+the Trash Can, search, the Markdown and MDX layer, and (build plan Steps 1 to 3) settings and favorites, frontmatter and the store operations for notes, groups and notebooks, with their tests; `apps/ios/Composition`: a viewer on it; see [S1 status](#s1-status),
 [S2 status](#s2-status), [S3 status](#s3-status), [S4 status](#s4-status) and [The first app](#the-first-app)). **On a device:** you reported on 2026-11-06 that
 the prototype runs on your iPad with a backup of your real notes and works as expected for where it was; the preview (S4) and the editor
 lab (S3), added after that, have run in the iPad Simulator only. Dates are 2026-11-05 and 2026-11-06.
@@ -158,7 +158,7 @@ supply-chain posture ([SECURITY.md](../SECURITY.md), Dependabot, pinned Actions)
 |---|---|---|---|
 | [GRDB.swift](https://github.com/groue/GRDB.swift) | SQLite, FTS5, observation | MIT | Core Data and SwiftData hide the store, cannot keep our schema identical, and give no control over FTS5. |
 | [swift-markdown](https://github.com/apple/swift-markdown) | CommonMark and GFM parsing (cmark-gfm) | Apache-2.0 | No Markdown parser in the SDK suited to a syntax tree with source ranges. |
-| Yams (or a hand parser) | Frontmatter YAML | MIT | Decided with the frontmatter fixtures; `frontmatter.ts` may be small enough to port by hand. |
+| ~~Yams (or a hand parser)~~ | ~~Frontmatter YAML~~ | | **Not needed (2026-11-06).** The frontmatter fixtures showed the details that matter are js-yaml's, so the core ports its loader and dumper (`YAML/`) instead of adding a dependency. |
 
 ## Proposed architecture
 
@@ -213,6 +213,10 @@ MDX parsing) exist **twice**: TypeScript and Swift. The old Python CLI showed wh
 
 The corpus lives in the repo (for example `fixtures/conformance/`) and the TypeScript tests read it too, so a
 change to the TypeScript behaviour fails until the fixtures and the Swift side are updated together.
+
+**Status (2026-11-06):** built under `apps/ios/conformance/` and run by `apps/ios/scripts/conformance.sh` for the schema, backups both ways (now with settings
+and about a hundred store operations in the round trip), the Trash Can, search, MDX and the component helpers, settings, frontmatter, and the store script
+(notes, groups, notebooks). The detail is in the [build plan](ipad-build-plan.md).
 
 ### Markdown and MDX
 
@@ -531,11 +535,11 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Create, edit, delete notes, autosave | 🔁 | M1 | ⬜ | GRDB; debounce plus flush |
-| Frontmatter (title, description, tags, dates) | ⚠️ | M1 | ⬜ | `js-yaml` rules (dates) vs Yams or a hand parser; fixtures |
-| Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | Same rules; conformance corpus |
-| Notebooks: switch, colours | 🔁 | M1 | ⬜ | Sidebar |
-| Favorites | 🔁 | M1 | ⬜ | |
+| Create, edit, delete notes, autosave | 🔁 | M1 | ⬜ | GRDB; debounce plus flush. The core's create, save and delete (with the title, tags and description columns kept in step, and `search.db` following) match the desktop's `service.ts` over a 98-step script ([build plan](ipad-build-plan.md), Step 2); autosave and the editor are Steps 4 to 6 |
+| Frontmatter (title, description, tags, dates) | 🔁 | M1 | 🔨 | A port of `js-yaml`'s loader and dumper (Step 3, no dependency): 111 of 111 blocks read, and 123 of 123 written byte for byte, as the desktop does; the header-image edits and tag helpers agree. No screen of its own: the editor and the note header use it |
+| Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | The core's operations (create, rename, move, move to a notebook, place, trash and restore) match `groupsRepo.ts` and the Trash Can step for step; no screen yet (Step 7) |
+| Notebooks: switch, colours | 🔁 | M1 | ⬜ | Create, rename, order and delete match `notebooksRepo.ts` in the core; the sidebar is Step 7 |
+| Favorites | 🔁 | M1 | ⬜ | The core now stores them in `settings.json`, as the desktop does, and carries them through backups both ways ([build plan](ipad-build-plan.md), Step 1); no screen yet |
 | Trash Can (60 days) | 🔁 | M1 | 🔨 | The core is checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)), and the prototype has its screen (swipe to trash, restore, delete for good), in the Simulator; attached files of purged notes are not removed |
 | Drag and drop of notes and groups | ⭐ | M1 | ⬜ | Native drag and drop, reorder, and drops from Files and Photos |
 | Home page (recent, pinned) | 🔁 | M3† | ⬜ | |
@@ -712,7 +716,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R6 | FTS5 is not available in the system SQLite, or GRDB's configuration lacks it. | Low–medium, high | S1 runs it; fallback: a custom SQLite build. |
 | R7 | FTS5 plus the typo layer is not good enough for you. | Low–medium, high | **S2 done:** the same result sets as Meilisearch on the 267 acceptance queries that returned fewer than 50 results, top 10 overlapping 96%. What remains is your judgement on your own notes, which are not like the synthetic ones. |
 | R8 | The iPad's schema starts before the desktop has landed the rest of the sync prerequisites (capture triggers, outbox, `sync_*` tables), so the "identical schema" rule breaks or the iPad is delayed. The `uuid` part landed in #244, which retired the worst of it. | Low–medium, medium | Gate A takes the schema from the desktop as it is then; fallback decided and in effect: start from the `uuid` ([Sync](#sync-and-the-data-model)). |
-| R9 | YAML parsing differs from `js-yaml` (dates, quoting), so a frontmatter round trip changes a note. | Medium, medium | Fixtures from real notes; a hand parser if Yams cannot match. |
+| R9 | YAML parsing differs from `js-yaml` (dates, quoting), so a frontmatter round trip changes a note. | Medium, medium | **Retired in the core (2026-11-06):** a port of js-yaml's loader and dumper agrees with the real library on 111 blocks read and 123 written byte for byte (build plan, Step 3). The fixtures are synthetic; your own notes' frontmatter is the remaining check. |
 | R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. **Done 2026-11-05 on the Mac and the Simulator** ([S1 status](#s1-status)); not yet on the device. |
 | R11 | Vision reads handwriting poorly, so handwritten notes stay unsearchable. | Medium, medium | C11; S5 with your handwriting. |
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
@@ -1031,7 +1035,7 @@ numbers, the same contents list and the same picture sizes. The differences:
 | Tables | Full width | As wide as their contents |
 | The note's header | A card with the description, tag chips and both dates | Title, updated time and tags |
 | `<Mark>` colours | Tinted to each colour scheme, with legible text (`markContrast`) | One set, not scheme-aware |
-| Frontmatter | Read as YAML | A block of `key:` lines is accepted without a YAML parser (differs for odd YAML) |
+| Frontmatter | Read as YAML | Read by the same rules as the desktop's (a port of its YAML reader, build plan Step 3), so a block is a header here exactly when it is there |
 | A picture at a web address | Loaded | A link; nothing is fetched |
 
 **Not done, or not known:**
@@ -1225,6 +1229,17 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
 - 2026-11-06: **Gate A passed.** You accepted D2 (SQLite through GRDB, `ensureColumn` migrations, no Core Data or SwiftData), D3 (FTS5 plus the typo layer, in its own `search.db`) and
   D7 (the conformance corpus), set the deployment floor at iPadOS 17 (D16; the iPad is on 27.0.1, C15 decided with it) and closed D6 (no web-renderer scaffold). Nothing is open for
   you now; the M1 build plan starts at its Step 1.
+
+- 2026-11-06: **Build plan Step 1, settings, done.** `SettingsStore` reads and writes `settings.json` (favorites, the colour scheme, the saved city) and keeps every other key as the desktop
+  wrote it; `Backup` now carries the file both ways. Checked against the desktop: 66 of 66 favorites, theme and city inputs read as `parseWebSettings` reads them, and a Swift backup with
+  the favorites changed, restored through the desktop's real restore, leaves every other setting as it was. A restore on the desktop replaces its settings with the backup's, which is why
+  the iPad never writes a partial file. The Swift backup used to leave `settings.json` out, so favorites and the desktop's settings did not survive an iPad round trip; they do now.
+
+- 2026-11-06: **Build plan Steps 2 and 3 done in the core** (details in [ipad-build-plan.md](ipad-build-plan.md)). Frontmatter is a port of js-yaml's loader and dumper
+  (111 blocks read, 123 written byte for byte, 16 header-image edits and the tag helpers agree with the real library). The store operations for notes, groups and
+  notebooks, with the search index following, match the desktop's real `service.ts` over a 98-step script, and about a hundred of them go through the backup round
+  trip, which the desktop still restores. Tracker rows updated (Frontmatter 🔨; the others note the core and stay ⬜ until they have a screen); the Yams dependency
+  row struck out; R9 retired for the core. Nothing is verified on the device.
 
 ## Sources
 

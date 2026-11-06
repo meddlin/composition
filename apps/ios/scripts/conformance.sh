@@ -2,9 +2,11 @@
 # Checks the iPad app's Swift core against the desktop's real TypeScript code, both ways, in the order that needs:
 #
 #   1. the desktop writes databases, real backups, the result of running apps/ios/conformance/trash-script.json
-#      through its real trashRepo, and the notes and parser answers for the search queries   (apps/web/scripts/ios-conformance-fixtures.test.ts)
-#   2. Swift reads them, restores the backups, runs the same Trash Can script and compares every step, and writes backups
-#      of its own, and compares its search with the committed Meilisearch answers   (apps/ios/CompositionCore tests)
+#      through its real trashRepo and store-script.json through its real service, the notes and parser answers for the
+#      search queries, and what its settings and frontmatter code make of the committed cases   (apps/web/scripts/ios-conformance-fixtures.test.ts)
+#   2. Swift reads them, restores the backups, runs the same two scripts and compares every step, reads the same settings
+#      and frontmatter cases, and writes backups of its own (after about a hundred store operations), and compares its
+#      search with the committed Meilisearch answers   (apps/ios/CompositionCore tests)
 #      (those answers are regenerated, with a real Meilisearch, by regenerate-search-expected.sh; this script needs none)
 #   3. the desktop restores the Swift backups with its real stageBackup/applyStagedBackup and opens them with db.ts
 #

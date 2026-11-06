@@ -102,6 +102,14 @@ public final class SearchIndex: Sendable {
         return true
     }
 
+    /// Whether the index was built from the notes as they are now: nothing has changed them behind its back since the last
+    /// `rebuild` or `markCurrent`.
+    public func isCurrent(with database: CompositionDatabase) throws -> Bool {
+        let current = try database.notesFingerprint()
+        let stored = try pool.read { try String.fetchOne($0, sql: "SELECT value FROM meta WHERE key = 'notes'") }
+        return stored == current
+    }
+
     /// Records that the index now matches `database`: call it after `upsert` or `remove` has made it so, or the next
     /// `rebuildIfStale` will think the notes changed behind its back.
     public func markCurrent(with database: CompositionDatabase) throws {
