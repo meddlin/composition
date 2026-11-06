@@ -26,13 +26,15 @@ concurrency:
 
 jobs:
   conformance:
-    # The stable macOS 26 image. Xcode 27 is only a preview image so far (runner-images: xcode-27); move to it, and
-    # to Xcode 27.x below, once it is generally available, since that is the toolchain the app is developed with.
-    runs-on: macos-26
+    # The toolchain the app is developed with: Xcode 27.2 and Node 24, so red here means the same as red locally. Xcode 27
+    # is only a *preview* image on the runners so far (actions/runner-images#14404): it can be unstable or queue. It carries
+    # 27.2 as a release candidate (27B48), one build behind the 27B52 used locally. If the preview misbehaves, `macos-26`
+    # with Xcode_26.6.app is the stable fallback, and once Xcode 27 is generally available this should move to its image.
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
       # Pinned, so a new default Xcode on the image cannot change what is being tested (design R15).
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -41,7 +43,9 @@ jobs:
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 22
+          # Node 24, as used locally (24.21). The unit-tests workflow uses 22 for the web app; this job only runs the
+          # desktop's data layer and its test runner, which work on both.
+          node-version: 24
           cache: pnpm
           cache-dependency-path: apps/web/pnpm-lock.yaml
 

@@ -709,7 +709,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
 | R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. |
 | R14 | Only one test device: no mini or Air, no Pencil Pro; the Simulator is believed not to emulate Pencil pressure, tilt or hover (unverified). | Certain, low | Recorded in D14; the Simulator covers sizes. |
-| R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. **Done in `.github/workflows/ios-core.yml`:** `macos-26`, Xcode 26.6 pinned, only on the paths that can break the agreement (the repo is public, so macOS minutes are free). Not yet run on GitHub. |
+| R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. **Done in `.github/workflows/ios-core.yml`:** the `xcode-27` image with Xcode 27.2 pinned and Node 24, the toolchain used locally, only on the paths that can break the agreement (the repo is public, so macOS minutes are free). That image is still a GitHub *preview* (it can be unstable or queue), so the stable fallback is `macos-26` with Xcode 26.6. Not yet run on GitHub. |
 
 ## Spikes and gates
 
@@ -741,7 +741,7 @@ Each spike is small and answers one question before anything is built for real. 
 | FTS5 present (R6) | **Done** for the Mac and the Simulator; **not the device** |
 | Every uuid survives a Trash round trip | **Done.** The Swift Trash Can (trash, restore, purge, expiry) runs the 44-step script in `apps/ios/conformance/trash-script.json` beside the desktop's real `trashRepo.ts`, from the same database, and every step's result and every row afterwards are equal. That includes a note whose group is gone, whose id is taken, whose uuid a live row holds, whose notebook was deleted, and a trashed row from an older build with no uuid |
 | Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Done, both ways, with the real desktop code on the other side.** Swift restores a backup made by the desktop's `createBackup` and finds every note, uuid, Trash Can row and file (by hash). Swift's own backup is then restored by the desktop's `stageBackup` and `applyStagedBackup` and opened by `db.ts`, and the system `gzip -t` and `tar -t` read it. Done at 100 MB, and the streaming measured up to 1 GB (below). System zlib, above |
-| The harness runs one fixture on both sides, in CI | **Written, not yet run on GitHub.** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and `.github/workflows/ios-core.yml` runs it on `macos-26` with Xcode 26.6 pinned, on pull requests that touch `apps/ios`, the data layer or the generator. What was checked: the repo's pinning linter, the YAML, and the same steps run from a fresh copy of the committed files (Xcode 27.2, Node 24). **Not checked:** Xcode 26.6 and Node 22, which are what the job uses; the first pull request will show |
+| The harness runs one fixture on both sides, in CI | **Written, not yet run on GitHub.** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and `.github/workflows/ios-core.yml` runs it on the `xcode-27` image with Xcode 27.2 pinned and Node 24, on pull requests that touch `apps/ios`, the data layer or the generator. What was checked: the repo's pinning linter, the YAML, and the same steps run from a fresh copy of the committed files (Xcode 27.2 build 27B52, Node 24.21). **Not checked:** the runner itself. The image carries Xcode 27.2 as a release candidate (27B48), one build behind the local one, and is a preview image; the first pull request will show |
 | Measure the v1 logic subset (R3) | **Done:** [below](#the-v1-logic-subset) |
 
 #### The v1 logic subset
@@ -916,8 +916,9 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
 
 - 2026-11-05: **S1's remaining items done.** Measured the v1 logic subset (at most 2,818 of 9,914 data-layer code lines,
   989 done; `measure-logic-subset.mjs`, classification in `conformance/logic-subset.json`) and wrote the CI job
-  (`.github/workflows/ios-core.yml`: `macos-26`, Xcode 26.6, the conformance script, only on the paths that can break the
-  agreement). The CI job has not run on GitHub; it needs a pull request. R3 and R15 and the facts table updated. Every S1
+  (`.github/workflows/ios-core.yml`: the conformance script, only on the paths that can break the agreement; first on
+  `macos-26` with Xcode 26.6 and Node 22, then moved to the `xcode-27` preview image with Xcode 27.2 and Node 24 to match the
+  local toolchain). The CI job has not run on GitHub; it needs a pull request. R3 and R15 and the facts table updated. Every S1
   exit criterion is now done except the device (FTS5, and everything else, has not been tried on the iPad).
 
 ## Sources
