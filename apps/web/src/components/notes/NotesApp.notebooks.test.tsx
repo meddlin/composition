@@ -18,6 +18,16 @@ import { NotesApp } from "./NotesApp";
 import { resetNotebookPanelPrefs } from "./notebookPanelPrefs";
 import type { Group, Note, Notebook } from "./types";
 
+// The attachments panel reads through Server Actions; unmocked, they would open the real database.
+vi.mock("@/lib/composition/attachmentsClient", () => ({
+  attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
+  listAttachments: vi.fn(async () => []),
+  addAttachments: vi.fn(),
+  revealAttachment: vi.fn(),
+  saveAttachmentCopy: vi.fn(),
+  removeAttachment: vi.fn(),
+}));
+
 vi.mock("@/lib/composition/client", () => ({
   createGroup: vi.fn(),
   createNote: vi.fn(),
