@@ -11,6 +11,7 @@ struct AboutView: View {
                 Section("This build") {
                     LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (prototype)")
                     LabeledContent("Does", value: "Browse, search, Trash Can, backups")
+                    LabeledContent("Search forgives", value: "Typos, also in first letters and short words")
                     LabeledContent("Does not yet", value: "Edit, render Markdown, images, ink")
                 }
                 Section("Your notes") {

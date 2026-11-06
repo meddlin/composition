@@ -81,7 +81,7 @@ final class AppModel {
                 let database = try CompositionDatabase.open(in: location)
                 // As the desktop does when it opens: items past their 60 days are gone.
                 try database.purgeExpired()
-                let index = try SearchIndex.open(at: location.directory.appendingPathComponent("search.db"))
+                let index = try SearchIndex.open(at: location.directory.appendingPathComponent("search.db"), tolerance: .forgiving)
                 let rebuilt = try index.rebuildIfStale(from: database)
                 return Stores(database: database, index: index, rebuilt: rebuilt)
             }

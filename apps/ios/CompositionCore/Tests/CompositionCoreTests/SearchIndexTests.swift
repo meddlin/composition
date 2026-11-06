@@ -123,4 +123,62 @@ struct SearchIndexTests {
             #expect(try index.search("three").isEmpty)
         }
     }
+
+    // MARK: Forgiving search
+
+    private func scalars(_ text: String) -> [UInt32] { text.unicodeScalars.map(\.value) }
+
+    @Test("the rules differ only in what a first-letter mistake costs and whether a short word gets a mistake")
+    func rules() {
+        // Meilisearch: a first-letter edit is 2, a swap of the first pair is 2, any other edit is 1.
+        #expect(Typo.distance(scalars("dedis"), to: scalars("redis"), limit: 2) == 2)
+        #expect(Typo.distance(scalars("redis"), to: scalars("redis"), limit: 2) == 0)
+        #expect(Typo.distance(scalars("erdis"), to: scalars("redis"), limit: 2) == 2)
+        #expect(Typo.distance(scalars("rdis"), to: scalars("redis"), limit: 2) == 1)
+        // Forgiving: the same mistakes cost 1 each.
+        let first = Typo.Rules.forgiving.firstLetterCost
+        #expect(Typo.distance(scalars("dedis"), to: scalars("redis"), limit: 1, firstLetterCost: first) == 1)
+        #expect(Typo.distance(scalars("erdis"), to: scalars("redis"), limit: 1, firstLetterCost: first) == 1)
+        #expect(Typo.distance(scalars("edis"), to: scalars("redis"), limit: 1, firstLetterCost: first) == 1, "a missing first letter")
+        #expect(Typo.distance(scalars("rredis"), to: scalars("redis"), limit: 1, firstLetterCost: first) == 1, "an extra first letter")
+        #expect(Typo.distance(scalars("dedis"), to: scalars("redis"), limit: 1) == nil, "still two in Meilisearch's rules")
+        #expect(Typo.prefixDistance(scalars("dedi"), to: scalars("redis"), limit: 1, firstLetterCost: first)?.distance == 1)
+
+        #expect(Typo.Rules.meilisearch.budget(forLength: 4) == 0 && Typo.Rules.forgiving.budget(forLength: 4) == 0)
+        #expect(Typo.Rules.forgivingFallback.budget(forLength: 3) == 1 && Typo.Rules.forgivingFallback.budget(forLength: 4) == 1)
+        #expect(Typo.Rules.forgivingFallback.budget(forLength: 2) == 0, "two letters are too few to guess at")
+        #expect(Typo.Rules.forgivingFallback.budget(forLength: 5) == 1 && Typo.Rules.forgivingFallback.budget(forLength: 9) == 2)
+    }
+
+    @Test("a forgiving search catches a mistake in the first letter and, when nothing else is found, in a short word")
+    func forgiving() throws {
+        try withScratch { scratch in
+            let database = try CompositionDatabase.open(at: scratch.databaseURL)
+            let strict = try SearchIndex.open(at: scratch.directory.appendingPathComponent("strict.db"))
+            let forgiving = try SearchIndex.open(at: scratch.directory.appendingPathComponent("forgiving.db"), tolerance: .forgiving)
+            defer { try? database.close(); try? strict.close(); try? forgiving.close() }
+
+            let redis = try insert(database, "Redis cheat sheet", content: "keys and values")
+            let the = try insert(database, "Pending", content: "the cat sat")
+            let cut = try insert(database, "Carpentry", content: "a clean cut")
+            try strict.rebuild(from: database)
+            try forgiving.rebuild(from: database)
+
+            // The first letter: two edits in Meilisearch's rules, so beyond a five-letter word; one edit here.
+            #expect(try strict.search("dedis").isEmpty)
+            #expect(try forgiving.search("dedis") == [redis])
+            #expect(try forgiving.search("edis") == [redis], "a missing first letter")
+            #expect(try forgiving.search("redis") == [redis], "and what is spelt right is unchanged")
+
+            // A short word: nothing at all in Meilisearch's rules, one mistake here, but only when nothing is found without.
+            #expect(try strict.search("teh").isEmpty)
+            #expect(try forgiving.search("teh") == [the])
+            #expect(try forgiving.search("cat") == [the], "the word is in the notes, so it is not read as a mistake for `cut`")
+            #expect(try forgiving.search("cut") == [cut])
+            #expect(try forgiving.search("zzq").isEmpty, "and a word that is near nothing finds nothing")
+
+            // More than one word: the fallback applies to all of them.
+            #expect(try forgiving.search("teh cat") == [the])
+        }
+    }
 }

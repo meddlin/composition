@@ -18,6 +18,9 @@ import os
 //      in the order the desktop indexes them: most recently updated first. That is what Meilisearch comes to (its ranking
 //      rules ignore how often a word occurs, which is why bm25 is not used); where it also orders by how early in the text
 //      a word appears, in coarse steps that could not be derived from its documentation, this does not.
+//
+// How forgiving step 1 is can be chosen (`SearchTolerance`). The default reproduces Meilisearch, which is what the
+// conformance tests hold it to; the iPad app asks for the forgiving one, which Meilisearch cannot be compared against.
 
 /// A note as the index needs it: the columns of `notes`.
 public struct IndexedNote: Equatable, Sendable {
@@ -36,6 +39,20 @@ public struct IndexedNote: Equatable, Sendable {
     }
 }
 
+/// How forgiving a search is of mistakes in what was typed.
+public enum SearchTolerance: Sendable {
+    /// Exactly Meilisearch's rules, as the desktop searches: no mistakes up to 4 letters, one up to 8, two beyond; a wrong,
+    /// missing or extra first letter counts as two. This is what the conformance tests check.
+    case matchesMeilisearch
+    /// More forgiving, for a keyboard that is easy to mistype on: a first-letter mistake counts as one, like any other, and
+    /// when a search finds nothing it is repeated allowing one mistake in words of 3 and 4 letters (`teh` for `the`).
+    case forgiving
+
+    var rules: Typo.Rules { self == .forgiving ? .forgiving : .meilisearch }
+    /// What to try when `rules` found nothing, if anything.
+    var fallback: Typo.Rules? { self == .forgiving ? .forgivingFallback : nil }
+}
+
 public final class SearchIndex: Sendable {
     /// The most results a search returns, as on the desktop.
     public static let resultLimit = 50
@@ -44,10 +61,11 @@ public final class SearchIndex: Sendable {
     static let columns = ["title", "content", "description"]
 
     private let pool: DatabasePool
+    private let tolerance: SearchTolerance
     private let vocabulary = OSAllocatedUnfairLock<Vocabulary?>(initialState: nil)
 
     /// Opens (creating if needed) the index file at `url`.
-    public static func open(at url: URL) throws -> SearchIndex {
+    public static func open(at url: URL, tolerance: SearchTolerance = .matchesMeilisearch) throws -> SearchIndex {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let pool = try DatabasePool(path: url.path)
         try pool.writeWithoutTransaction { db in
@@ -62,10 +80,12 @@ public final class SearchIndex: Sendable {
                 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 """)
         }
-        return SearchIndex(pool: pool)
+        return SearchIndex(pool: pool, tolerance: tolerance)
     }
 
-    private init(pool: DatabasePool) { self.pool = pool }
+    private init(pool: DatabasePool, tolerance: SearchTolerance) {
+        (self.pool, self.tolerance) = (pool, tolerance)
+    }
 
     public func close() throws { try pool.close() }
 
@@ -196,36 +216,45 @@ public final class SearchIndex: Sendable {
             LIMIT \(Self.resultLimit)
             """
 
-        var found: [Int64] = []
-        var seen = Set<Int64>()
         let lastIsPrefix = query.endsWithWord
         // The words as typed first, then any other way of reading them (run together, or cut in two).
         let readings = [query.words] + (query.words.isEmpty ? [] : vocabulary.rewordings(of: query.words, lastIsPrefix: lastIsPrefix))
-        for words in readings {
-            let expansions = words.enumerated().map { index, word in
-                vocabulary.expand(word, asPrefix: index == words.count - 1 && lastIsPrefix)
-            }
-            // All the words, then all but the last, and so on; at each, no typos first. Phrases are never dropped.
-            let wordCounts = words.isEmpty ? [0] : Array((1...words.count).reversed())
-            for count in wordCounts {
-                let used = Array(expansions.prefix(count))
-                let tiers = max(used.map(\.budget).max() ?? 0, 0)
-                var previous: [String]?
-                for tier in 0...tiers {
-                    let units = used.map { $0.expression(upToDistance: tier) } + query.phrases.map { SearchTerms.phraseExpression($0) }
-                    guard previous != units else { continue }  // this tier added no new spelling to any word
-                    previous = units
-                    for columns in passes {
-                        let match = columns + "(" + units.joined(separator: " AND ") + ")"
-                        let ids = try Int64.fetchAll(db, sql: sql, arguments: StatementArguments([match] + arguments))
-                        for id in ids where seen.insert(id).inserted {
-                            found.append(id)
-                            if found.count == Self.resultLimit { return found }
+
+        func answer(_ rules: Typo.Rules) throws -> [Int64] {
+            var found: [Int64] = []
+            var seen = Set<Int64>()
+            for words in readings {
+                let expansions = words.enumerated().map { index, word in
+                    vocabulary.expand(word, asPrefix: index == words.count - 1 && lastIsPrefix, rules: rules)
+                }
+                // All the words, then all but the last, and so on; at each, no typos first. Phrases are never dropped.
+                let wordCounts = words.isEmpty ? [0] : Array((1...words.count).reversed())
+                for count in wordCounts {
+                    let used = Array(expansions.prefix(count))
+                    let tiers = max(used.map(\.budget).max() ?? 0, 0)
+                    var previous: [String]?
+                    for tier in 0...tiers {
+                        let units = used.map { $0.expression(upToDistance: tier) } + query.phrases.map { SearchTerms.phraseExpression($0) }
+                        guard previous != units else { continue }  // this tier added no new spelling to any word
+                        previous = units
+                        for columns in passes {
+                            let match = columns + "(" + units.joined(separator: " AND ") + ")"
+                            let ids = try Int64.fetchAll(db, sql: sql, arguments: StatementArguments([match] + arguments))
+                            for id in ids where seen.insert(id).inserted {
+                                found.append(id)
+                                if found.count == Self.resultLimit { return found }
+                            }
                         }
                     }
                 }
             }
+            return found
         }
+
+        let found = try answer(tolerance.rules)
+        // Nothing at all: read the short words as if one letter of each might be wrong, which is too noisy to do when
+        // there is something to show.
+        if found.isEmpty, let fallback = tolerance.fallback { return try answer(fallback) }
         return found
     }
 
@@ -351,9 +380,10 @@ final class Vocabulary: Sendable {
         return Array(variants.prefix(4))
     }
 
-    func expand(_ word: [UInt32], asPrefix: Bool) -> Expansion {
+    func expand(_ word: [UInt32], asPrefix: Bool, rules: Typo.Rules = .meilisearch) -> Expansion {
         let text = String(String.UnicodeScalarView(word.compactMap(Unicode.Scalar.init)))
-        let budget = Typo.budget(forLength: word.count)
+        let budget = rules.budget(forLength: word.count)
+        let first = rules.firstLetterCost
         var spellings: [(text: String, distance: Int)] = []
         if budget > 0 {
             if asPrefix {
@@ -362,7 +392,7 @@ final class Vocabulary: Sendable {
                 for (length, indexes) in byLength where length + budget >= word.count {
                     for index in indexes {
                         let entry = entries[index]
-                        guard let near = Typo.prefixDistance(word, to: entry.scalars, limit: budget) else { continue }
+                        guard let near = Typo.prefixDistance(word, to: entry.scalars, limit: budget, firstLetterCost: first) else { continue }
                         let start = String(String.UnicodeScalarView(entry.scalars.prefix(near.prefixLength).compactMap(Unicode.Scalar.init)))
                         if seenPrefixes.insert(start).inserted { spellings.append((start, near.distance)) }
                     }
@@ -371,7 +401,7 @@ final class Vocabulary: Sendable {
                 for length in max(1, word.count - budget)...(word.count + budget) {
                     for index in byLength[length] ?? [] {
                         let entry = entries[index]
-                        if let distance = Typo.distance(word, to: entry.scalars, limit: budget) { spellings.append((entry.text, distance)) }
+                        if let distance = Typo.distance(word, to: entry.scalars, limit: budget, firstLetterCost: first) { spellings.append((entry.text, distance)) }
                     }
                 }
             }

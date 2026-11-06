@@ -547,7 +547,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
 | Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB, in an index file of its own ([S2 status](#s2-status)); present and fast on the Mac and in the Simulator; not wired to the store; not checked on the device |
-| Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus ([C1](#compromise-register), [S2 status](#s2-status)) |
+| Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus. The prototype app uses a more forgiving mode (first letters, short words) on top ([C1](#compromise-register), [S2 status](#s2-status)) |
 | Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔬 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
 | Search bar | ⭐ | M1 | 🔨 | `.searchable` in the prototype (no tokens yet), with a readout of how long each search took |
 | Find in a note | ⭐ | M1 | ⬜ | `UIFindInteraction` |
@@ -880,6 +880,42 @@ occurs, and bm25 gave a top-10 overlap of 0.71. It does **not** order by how ear
 and depend on separators in ways I could not derive, and a guess made it worse (0.82 against 0.92 without), so a fit to
 this corpus (0.98) was not worth keeping. That is why the top result differs more often than the top ten.
 
+**A more forgiving mode, added 2026-11-06 after the first hands-on report ("search doesn't seem to have typo-tolerance").**
+Nothing was broken: Meilisearch's rules allow no mistake in a word of 4 letters or fewer, one in 5 to 8, and count a wrong first
+letter as two, so `dedis` (for Redis), `rsut` and `teh` find nothing in it either. The index now takes a `SearchTolerance`:
+
+- **`.matchesMeilisearch`** (the default, and what the acceptance test runs): unchanged. The conformance run still gives 159 of
+  159, top 10 at 0.93, 0 of 95 typo misses.
+- **`.forgiving`** (what the app opens the index with): a mistake at the first letter costs one edit like any other, and when
+  a search finds *nothing*, it is repeated with one mistake allowed in words of 3 and 4 letters (`teh` finds "the"). The second
+  pass runs only on an empty result because it is noisy: a 3-letter word typed as a prefix then stands for about 350 different
+  words. A word the notes really have is never read as a mistake for another when it finds something itself.
+
+What each finds, from `SearchTypoCoverageTests`: the same notes and the same misspelt queries (dictionary words, 8 to 40 per
+length, a mistake made at random) through both modes. Found as a share of tries, Meilisearch's rules then forgiving:
+
+| Mistake | 3 letters | 4 letters | 5 letters | 6 to 8 letters |
+|---|---|---|---|---|
+| a wrong letter in the middle | 0% → 88% | 0% → 100% | 100% → 100% | 100% → 100% |
+| a letter missing in the middle | n/a | 0% → 50% | 0% → 88% | 100% → 100% |
+| two letters swapped | n/a | 0% → 88% | 100% → 100% | 100% → 100% |
+| the first letter wrong | 0% → 75% | 0% → 100% | 0% → 100% | 0% → 100% |
+| the first letter missing | n/a | 0% → 88% | 0% → 100% | 0 to 13% → 100% |
+
+(The figures are from a debug build over a vocabulary of 3,000 words; a release build uses 12,000 words and more queries.)
+Still not forgiven: a letter missing from a 3-letter word (two letters are too few to guess at), two mistakes in a word of 5 to
+8 letters, and a short word whose misspelling happens to begin some other word (it then has results, so the second pass does not
+run). A longer word with a mistake costs extra matches rather than missing ones; the first-letter change added about one extra
+similar word per ten typed words when measured on the dictionary, and was not measured on real notes.
+
+**Libraries considered for this (2026-11-06), none adopted.** SQLite's own `spellfix1` is not compiled into the SQLite that ships
+on the Mac (3.54.0) or in the iOS Simulator (3.51.0), so using it would mean building our own SQLite. The FTS5 `trigram`
+tokenizer is available but matches on 3-letter chunks, so a word of 3 or 4 letters with a mistake in it (`rsut`) shares no chunk with the right one.
+Swift fuzzy matchers (Fuse-Swift, Ifrit, FuzzyFind) score strings in memory and do not talk to FTS5, so they would replace the
+vocabulary expansion above without changing what it can forgive. Apple's `UITextChecker` is the one helper that adds knowledge
+(it knows `teh`, `recieeve`), at about 1 ms a word, on the main actor, for dictionary words only (it does not know `kubernetes`),
+so its guesses would have to be intersected with the notes' vocabulary; it would be a further fallback and is not built.
+
 **Not done, or not known:**
 
 - The index is only partly wired to the store. The prototype app keeps it in step on trash (`remove`) and restore (`rebuild`) and
@@ -898,7 +934,7 @@ target, `Composition` (SwiftUI, Swift 6, iPad only, iPadOS 17.0), about 630 line
 install it and what to try: [manual-tests/ipad.md](manual-tests/ipad.md).
 
 - **It does:** imports a desktop backup through the system file picker (replacing everything, after a confirmation); lists the
-  notes newest first; searches as you type, with the typo rules and filters, and shows how long each search took; opens a note
+  notes newest first; searches as you type, with the forgiving typo rules and filters, and shows how long each search took; opens a note
   as its Markdown source; moves a note to the Trash Can (swipe, or the button on an open note), restores it or deletes it for good,
   keeping the search index in step; exports a backup through the share sheet; and has an *About this build* page (SQLite
   version, Debug or Release, whether the index was rebuilt at launch).
@@ -1035,6 +1071,13 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   manual test page (`docs/manual-tests/ipad.md`) and a script for a 1,000-note test backup. Core additions: note lookup,
   `rebuildIfStale`. Placeholders chosen: the bundle id, no team, no icon. Untried on a real iPad and through the picker. The
   tracker's shell, search bar, Trash Can and backup rows moved to 🔨; the docs index no longer says nothing is built.
+
+- 2026-11-06: **A forgiving search mode.** The first hands-on report was that search had no typo tolerance: Meilisearch's rules,
+  which the index copied, allow nothing in words of 4 letters or fewer and count a wrong first letter as two. `SearchTolerance`
+  now has `.matchesMeilisearch` (the default, unchanged, so the acceptance test is untouched) and `.forgiving` (first-letter
+  mistake costs one; when nothing is found, short words get one mistake), which the prototype app uses. A coverage test prints
+  what each mode forgives by word length and kind of mistake. Typo libraries looked at (spellfix1, trigram, Swift fuzzy
+  matchers, `UITextChecker`): none adopted. Not tried on real notes or on an iPad.
 
 ## Sources
 

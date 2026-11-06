@@ -39,9 +39,11 @@ Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unk
 
 1. **Import.** The alert counts what it restored. The list is newest first. Does the count match the desktop's?
 2. **Search a word you know is in a title, then a word only in a note's text.** Title hits should come first.
-3. **Search with a mistake:** a letter missing, an extra one, two swapped, a wrong letter in the middle. Words of 5 to 8
-   letters allow one mistake and 9 or more allow two; a wrong *first* letter counts as two. Try the same query in the
-   desktop app and note where they differ.
+3. **Search with a mistake:** a letter missing, an extra one, two swapped, a wrong letter, including the first letter
+   (`dedis` for Redis). Words of 5 to 8 letters allow one mistake and 9 or more allow two. This app is *more forgiving than
+   the desktop*: a wrong first letter counts as one mistake, not two, and when a search finds nothing, words of 3 and 4 letters
+   are allowed one mistake too (`teh`, `rsut`). Try the same queries in the desktop app. Where this one finds something the
+   desktop does not, is it what you meant? Where it finds too much, say which query. *About this build* says search is forgiving.
 4. **Search the start of a word** (`kube` for Kubernetes), and two words (`redis cheat`).
 5. **Filters:** `tag: yourtag`, `created: >2026-01-01`, `updated: <2026-01-01`, `title: something`. Text must come before a
    filter (`roadmap tag: infra`), as on the desktop.
