@@ -60,6 +60,8 @@ Legend for the tracker:
   ([S3](#spikes-and-gates)).
 - **Sync is decided for v1 (D8):** the iPad ships with backup and restore, built **sync-ready**, and does not wait
   for the sync service. Syncing with the Mac, Windows and Linux desktop apps comes later from a separate design.
+  The `uuid` column the shared schema needed first has landed on the desktop (2026-11-05). The change-capture
+  triggers and the outbox have not, so the decided fallback is the working plan ([Sync](#sync-and-the-data-model)).
 - **Nothing is waiting on you.** Every decision in the [log](#decisions) is decided or a proposal that its gate settles.
 
 ## Goals and non-goals
@@ -97,8 +99,8 @@ Facts that drive the design, checked against `main`.
 | Fact | What it means for a native app | Source |
 |---|---|---|
 | **A note is Markdown text in a SQLite row** (`notes.content`, frontmatter included). It is not a file. Images and diagrams are files in `app_data/`, which the Markdown refers to by path. | The iPad keeps the same model. A handwritten note is a smaller departure than it feels: "Markdown that points at a binary side-asset" is how images and `<Drawio>` already work. | [data-model.md](architecture/data-model.md), [images.md](architecture/images.md) |
-| **Ids are `INTEGER PRIMARY KEY AUTOINCREMENT`**, and notes link as `[text](note:id)`. | Two devices would both create "note 57". This blocks record-level sync until ids change; the sync design answers it with a `uuid` column (see [Sync](#sync-and-the-data-model)). The earlier chats did not raise it. See [Sync](#sync-and-the-data-model). | [data-model.md](architecture/data-model.md), [note-links.md](ui/note-links.md) |
-| **Schema changes are additive `ensureColumn` checks** (`PRAGMA table_info`, then `ALTER TABLE … ADD COLUMN`), not numbered migrations. `db.ts` turns WAL on. | The Swift core must migrate the same way, so a database either side has touched is a no-op for the other. Not GRDB's `DatabaseMigrator`, whose bookkeeping table the desktop would not know. | [data-model.md](architecture/data-model.md), [db.ts](../apps/web/src/lib/composition/db.ts) |
+| **Ids are `INTEGER PRIMARY KEY AUTOINCREMENT`**, and notes link as `[text](note:id)`. Since 2026-11-05 every note, group, notebook, trashed item and attachment **also carries a `uuid`**: 32 lowercase hex characters, the same for the life of the row, kept by the Trash Can and by backups. | Two devices would both create "note 57", which blocks record-level sync on integer ids alone. The `uuid` is the name a second device knows a row by. The integer id stays the **local handle**, so favorites, `note:<id>` links and the search index are unchanged. The Swift core must keep the column, its trigger and its index ([Sync](#sync-and-the-data-model)). The earlier chats did not raise any of this. | [data-model.md](architecture/data-model.md#identity-the-uuid-column), [note-links.md](ui/note-links.md) |
+| **Schema changes are additive `ensureColumn` checks** (`PRAGMA table_info`, then `ALTER TABLE … ADD COLUMN`), not numbered migrations. `db.ts` turns WAL on. | The Swift core must migrate the same way, so a database either side has touched is a no-op for the other. Not GRDB's `DatabaseMigrator`, whose bookkeeping table the desktop would not know. The `uuid` pass (`ensureUuids`) is the newest of these and adds a trigger and an index as well as a column, so the Swift core must reproduce it exactly. | [data-model.md](architecture/data-model.md), [db.ts](../apps/web/src/lib/composition/db.ts) |
 | **The preview parses MDX at run time** with a restricted layer: tags from an allowlist of ten (`Info`, `Warning`, `Image`, `Drawio`, `Toc`, `Mark`, `Footnotes`, `YouTube`, `Repo`, `Chart`), with string or bare attributes only. `{expressions}`, `import`/`export` and fragments are rejected. Only notes that mention a component are parsed as MDX; the rest stay plain Markdown. | The Swift side needs its own small parser for exactly this subset. **No MDX parser for Swift was found**, but the subset is small. | [remarkRestrictMdx.ts](../apps/web/src/components/notes/mdx/remarkRestrictMdx.ts), [components.ts](../apps/web/src/components/notes/mdx/components.ts) |
 | **There are two writing surfaces.** The Markdown tab is a `<textarea>` with a colour overlay. The Live tab is CodeMirror 6, drawing the note as it will read with the syntax shown only at the caret. Both go through one `EditorSurface`. | A native editor does not need the overlay (attributed text colours directly). The Live tab's behaviour, written down in [live-editor.md](ui/live-editor.md), is the spec to port, and it is the hardest part. | [MarkdownEditor.tsx](../apps/web/src/components/notes/MarkdownEditor.tsx), [LiveEditor.tsx](../apps/web/src/components/notes/LiveEditor.tsx) |
 | **The UI reaches its backend through one contract.** `CompositionApi` has 42 methods (`API_METHODS`); desktop adds nine more groups (attachments, backup, panels, to-dos, Reading List, feeds, updates, window, AI stream). | In Swift this becomes the public surface of the core package. The v1 subset excludes the AI and data-location methods, plus the plugin groups. | [api.ts](../apps/web/src/lib/composition/api.ts), [desktopBridge.ts](../apps/web/src/lib/composition/desktopBridge.ts) |
@@ -354,14 +356,25 @@ Windows app today, so "show the ink on a Windows PC" currently means the web app
 | **A folder of `.md` files as a sync engine** | Not chosen. A folder of Markdown files that a file-sync tool (iCloud Drive, Dropbox, Syncthing, git) carries between devices, with no Composition server. Earlier research (committed as `2a207d3`, `docs/markdown-files-git-research.md` on branch `claude/markdown-files-git-portability-16ee92`) recommended against making files the source of truth, and the two-way version needs a per-note sync state, file watchers and conflict handling. Plain `.md` files in a shared folder also cannot be end-to-end encrypted by us. Kept as an **export** for backup, history and portability ([Later](#feature-tracker)), not as sync. |
 | **The database in iCloud Drive** | **Never.** Unsafe: WAL's sidecar files can be delivered out of order by cloud sync and corrupt the database ([SQLite forum](https://sqlite.org/forum/info/47107ab818977549?t=h)). |
 
+**Where the desktop's prerequisites stand** (checked against `main` at `df801fd`, 2026-11-05):
+
+| Prerequisite | On `main`? |
+|---|---|
+| **A `uuid` on notes, groups, notebooks, trashed notes, trashed groups and attachments**: the column, an `AFTER INSERT` fill trigger, a unique index, a batched backfill, carried both ways by the Trash Can and by backups | **Landed** in [#244](https://github.com/meddlin/composition/pull/244). Spec: [data-model.md](architecture/data-model.md#identity-the-uuid-column) |
+| Change-capture triggers feeding a `sync_outbox` table | Not on `main` |
+| The `sync_*` bookkeeping tables | Not on `main` |
+
+The fallback's minimum is therefore met: the iPad can start S1 against a schema that has the `uuid`. Whether the
+capture triggers and the outbox are in M1 depends on whether they reach `main` before Gate A.
+
 **Sync-ready means** (proposed; each item is the sync design's, adopted here):
 
 - **The shared schema carries what sync needs, and the iPad starts from it.** A `uuid` column on notes, groups,
   notebooks, the `trashed_*` tables and attachments (added the `ensureColumn` way, backfilled, uniquely indexed, and
   filled by an insert trigger so rows written by an older build still get one); the Trash Can carrying the uuid;
-  SQLite triggers feeding a `sync_outbox` table; and the `sync_*` bookkeeping tables. These land on the desktop
-  first (the sync design's P1: "ships alone, changes nothing a user can see") and the iPad's "identical schema"
-  rule then covers them. The integer ids stay as the local handle.
+  SQLite triggers feeding a `sync_outbox` table; and the `sync_*` bookkeeping tables. The first two have landed
+  (table above). The rest are the sync design's P1 ("ships alone, changes nothing a user can see"), and the iPad's
+  "identical schema" rule covers them once they land. The integer ids stay as the local handle.
 - **The triggers ship in v1 even though no engine exists, if they are ready by Gate A** (otherwise see the fallback
   below). They are built-in SQL only, so GRDB runs the same text.
   The outbox holds at most one row per changed record, and shipping them now means the sync release needs no schema
@@ -373,13 +386,30 @@ Windows app today, so "show the ink on a Windows PC" currently means the web app
 - **Data made before sync is not stranded.** An iPad used alone and signed in later is merged by union: nothing is
   overwritten or deleted on either side (the sync design's first-sign-in rule).
 
+**What the Swift core does with the `uuid`** (from [data-model.md](architecture/data-model.md#identity-the-uuid-column);
+each point is a conformance fixture, [D7](#decisions)):
+
+- **Runs the same pass on every open.** In one immediate transaction, for each of the six tables: add the column, an
+  `AFTER INSERT … WHEN NEW.uuid IS NULL` trigger (`trg_<table>_fill_uuid`) and a unique index (`idx_<table>_uuid`).
+  Then fill the rows that have none, 200 per write transaction. The fill is `lower(hex(randomblob(16)))`: built-in SQL
+  only, so GRDB runs the same text and an older desktop build that opens the file still gets a uuid on its inserts.
+  The second open of a current database writes nothing.
+- **Leaves the `uuid` out of its inserts** and lets the trigger fill it, as the desktop does.
+- **Carries it through the Trash Can.** Delete copies the uuid into `trashed_*` and restore puts it back, so a restored
+  note keeps it (a fresh one is issued only if a live row already holds it). Moves, renames and reorders are
+  `UPDATE`s and leave it alone.
+- **Keeps it out of the search index and out of the interface.**
+- **Backups carry it,** because the snapshot copies the schema as well as the rows. A backup from before the column is
+  backfilled on the next open. What an *older desktop build* loses is the uuid across a Trash move, which it issues
+  anew; to a future sync that reads as a delete plus a create, a degradation and not a loss.
+
 **The one dependency that could delay the iPad, and the fallback (decided 2026-11-05, you).** The sync design says
-the uuid and trigger work must land on the desktop **before the iPad's Gate A**. If that slips, the iPad starts
+the uuid and trigger work must land on the desktop **before the iPad's Gate A**. If the triggers slip, the iPad starts
 from the `uuid` column alone and adds the triggers, outbox and `sync_*` tables in a later release, since they are
 `CREATE … IF NOT EXISTS`. That is safe for v1: a first sign-in uploads everything, and an iPad used alone merges by
-union. The `uuid` column itself is the minimum and must still land on the desktop first, because the schema is
-shared; if even that slips, the iPad waits for it. The fallback relaxes the sync design's ordering, so that page
-should be updated to match.
+union. The `uuid` column itself is the minimum and had to land on the desktop first, because the schema is shared.
+**Status (2026-11-05): the minimum has landed and the rest has not, so the fallback is the working plan until the
+triggers reach `main`.** The fallback relaxes the sync design's ordering, so that page should be updated to match.
 
 A note's content is one text blob, so two devices editing it need a conflict rule. That rule belongs to the sync
 design (keep both versions as a conflicted copy); the iPad does not need one in v1.
@@ -455,8 +485,9 @@ expires after 7 days on a free account).
 **When sync and encryption arrive:** the privacy label stops being "no data collected", and the encryption
 export-compliance questions apply. The specifics are unverified.
 
-Two dependencies to plan around. M1 cannot start before Gate A and the desktop's `uuid` work ([D8](#decisions)).
-And M2 changes the desktop app and the CLI as well as the iPad, because ink must be drawn there too.
+Two dependencies to plan around. M1 cannot start before Gate A. The desktop's `uuid` work, which M1 also needed,
+landed in #244 ([D8](#decisions)); the capture triggers and the outbox are the open part, and the fallback covers
+them. And M2 changes the desktop app and the CLI as well as the iPad, because ink must be drawn there too.
 
 ## Feature tracker
 
@@ -584,7 +615,8 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
 | Backup round trip, iPad to desktop and back | ⚠️ | M1 | ⬜ | The schema must stay identical; the corpus tests it |
-| Sync-ready schema: `uuid`, capture triggers, outbox, `sync_*` tables | 🆕 | M1 | ⬜ | Lands on the desktop first; the iPad starts from it. `uuid` is the minimum; the triggers may follow in a later release ([Sync](#sync-and-the-data-model)) |
+| Stable `uuid` on notes, groups, notebooks, the Trash Can and attachments | 🔁 | M1 | ⬜ | **Landed on the desktop** (#244, 2026-11-05). The Swift core runs the same pass (column, fill trigger, unique index, batched backfill), copies it through the Trash Can and leaves it out of inserts ([Sync](#sync-and-the-data-model)) |
+| Change capture: triggers, `sync_outbox`, `sync_*` tables | 🆕 | Later | ⬜ | Not on `main`. Moves to M1 if it lands before Gate A; otherwise the fallback adds it in a later release ([D8](#decisions)) |
 | Sign-in and the sync engine | 🆕 | Later | ⬜ | Own account-based service, designed separately ([D8](#decisions)) |
 | Export as `.md` files plus assets | 🆕 | Later | ⬜ | Optional export for backup, history and portability only; never storage and not a sync engine |
 | The database in iCloud Drive | ❌ | Never | ⛔ | WAL corruption risk |
@@ -637,7 +669,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D5 | Editor. | `UITextView` on TextKit 2; Markdown, Preview and Split first, Live after v1 unless S3 makes it cheap (C12). | Proposed; settled at Gate B |
 | D6 | May the existing web renderer be used as a **temporary** preview scaffold (O4)? | Yes, only to get the editor and store to a usable app sooner; it must be removed once the native renderer passes the fixtures, and it counts against N2 until then. | Proposed |
 | D7 | Keeping the rules in step. | The shared conformance corpus. | Proposed; settled at Gate A |
-| D8 | **Sync.** | **v1 is backup and restore, built sync-ready; the iPad does not wait for the sync service.** Syncing with the Mac, Windows and Linux desktop apps comes later, from `docs/cross-device-sync-design.md`. Sync-ready is defined in [Sync](#sync-and-the-data-model). **Fallback:** if the desktop's trigger work slips, the iPad starts from `uuid` alone. | **Decided** (you, 2026-11-05) |
+| D8 | **Sync.** | **v1 is backup and restore, built sync-ready; the iPad does not wait for the sync service.** Syncing with the Mac, Windows and Linux desktop apps comes later, from `docs/cross-device-sync-design.md`. Sync-ready is defined in [Sync](#sync-and-the-data-model). **Fallback:** if the desktop's trigger work slips, the iPad starts from `uuid` alone. **Status:** the `uuid` landed on `main` in #244 (2026-11-05); the capture triggers, outbox and `sync_*` tables have not, so the fallback is in effect. | **Decided** (you, 2026-11-05) |
 | D9 | Ink storage format. | A PNG with embedded versioned stroke JSON using semantic colours, plus an optional PencilKit blob. The stroke JSON also keeps each stroke's **ink type** and per-point data, so the iPad can rebuild textured strokes after another platform edits the drawing, and **preserves unknown fields on edit**. An edit elsewhere makes the PencilKit blob stale, so the iPad prefers the JSON afterwards. | Proposed; frozen at Gate C |
 | D10 | Which Pencil layers ship. | Scribble and PencilKit in v1; Pencil events after. No web ink canvas on the iPad. | Proposed |
 | D11 | **Does Windows ever edit ink, or only view it?** | **View only first** on every non-Apple client (the Windows and Linux desktop apps and the web app): ink shows from the stroke JSON in theme colours, with the PNG as fallback. The stroke format keeps the door open for editing later (see D9). Revisit when sync ships, or when a pen-capable non-Apple device is in daily use. | **Decided** (you, 2026-11-05) |
@@ -662,7 +694,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. |
 | R6 | FTS5 is not available in the system SQLite, or GRDB's configuration lacks it. | Low–medium, high | S1 runs it; fallback: a custom SQLite build. |
 | R7 | FTS5 plus the typo layer is not good enough for you. | Medium, high | The S2 acceptance test, then your judgement on a real corpus. |
-| R8 | The iPad's schema starts before the desktop has landed the sync prerequisites (`uuid`, triggers, outbox), so the "identical schema" rule breaks or the iPad is delayed. | Medium, high | Gate A takes the schema from the desktop; fallback decided: start from `uuid` alone ([Sync](#sync-and-the-data-model)). |
+| R8 | The iPad's schema starts before the desktop has landed the rest of the sync prerequisites (capture triggers, outbox, `sync_*` tables), so the "identical schema" rule breaks or the iPad is delayed. The `uuid` part landed in #244, which retired the worst of it. | Low–medium, medium | Gate A takes the schema from the desktop as it is then; fallback decided and in effect: start from the `uuid` ([Sync](#sync-and-the-data-model)). |
 | R9 | YAML parsing differs from `js-yaml` (dates, quoting), so a frontmatter round trip changes a note. | Medium, medium | Fixtures from real notes; a hand parser if Yams cannot match. |
 | R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. |
 | R11 | Vision reads handwriting poorly, so handwritten notes stay unsearchable. | Medium, medium | C11; S5 with your handwriting. |
@@ -677,7 +709,7 @@ Each spike is small and answers one question before anything is built for real. 
 
 | # | Spike | Answers | Exit criteria |
 |---|---|---|---|
-| **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including the sync prerequisites: `uuid`, outbox triggers), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides |
+| **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (a second open writes nothing); every uuid survives a Trash round trip and a backup in each direction |
 | **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes |
 | **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4) |
 | **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws |
@@ -687,7 +719,7 @@ Each spike is small and answers one question before anything is built for real. 
 | **S8** | **Web exceptions.** `<YouTube>` in a `WKWebView` (Referer), the draw.io editor on its own origin, and whether a ChatGPT sign-in can complete on iOS. | C8, C9, C19 | Optional |
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
-the desktop (D8); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
+the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
 [windows-build-plan.md](windows-build-plan.md)). **Gate B** (after S3 and S4): commit to the editor and renderer,
 decide whether the Live tab is in v1, and whether the D6 scaffold is needed. **Gate C** (after S5): freeze D9. A
 final pass on the device is yours.
@@ -723,7 +755,7 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
 2. **The editor is no longer one textarea.** Both chats described a textarea with a colour overlay. `main` also has the Live tab (CodeMirror 6, PRs #223, #234, #235), whose behaviour is now the spec for the hardest native feature.
 3. **Hover-only controls** (five files in the second chat) are in ten files now. They matter less natively, but their behaviour is a spec: `group-hover` appears in `GroupTree`, `NotebookPanel`, `HeadingRail`, `HomePage`, `Drawio` and `Repo`, plus four desktop-only panel files.
 4. **The seam is bigger than `CompositionApi`.** The chats said "a third implementation of `CompositionApi`"; desktop's bridge adds nine more groups. For a native app these are a checklist of what the core must eventually offer.
-5. **Integer ids block record-level sync.** New in this page; the sync design answers it with a `uuid` column.
+5. **Integer ids block record-level sync.** New in this page; the sync design answers it with a `uuid` column, which landed on `main` the same day (#244).
 6. **The thin-client route** from the first chat is rejected (O1).
 7. **"Notes stay `.md` files"** in [mdx-components.md](ui/mdx-components.md) is loose; the second chat corrected the premise.
 
@@ -755,6 +787,13 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   split: SQLite is decided; GRDB on the identical schema stays proposed until Gate A.
 - 2026-11-05: **D13 decided (you): v1 is the full notes editor.** Three milestones: M1 and M2 are test installs on the dev iPad (pre-v1); M3 combines them into the first release. Tracker column `v1` became `Plan`; added the scope section, the cut line and exit criteria.
 - 2026-11-05: **D11 and D12 decided (you).** D11: ink is view-only on every non-Apple client first, and the stroke JSON keeps ink type, per-point data, a version and unknown fields so editing can be added later (folded into D9). D12: Xcode installs for M1 and M2, TestFlight for M3, the App Store waits (not part of M3; revisit once M3 is in daily use); added the distribution checklist to the scope section. C10 accepted for v1.
+- 2026-11-05: **The desktop's `uuid` work landed on `main`** (#244; #245, which keeps the web tests off the real
+  `~/.composition`, merged after it). The `uuid` column, fill trigger, unique index, batched backfill and Trash Can carry-through
+  are in; the capture triggers, `sync_outbox` and `sync_*` tables are not, so the D8 fallback is in effect. Changed: a
+  status table and a list of what the Swift core must do with the `uuid` (Sync); the facts table; the tracker row, split
+  into the `uuid` (M1, desktop part landed) and change capture (Later, M1 if it lands before Gate A); R8 lowered to
+  low–medium chance and medium impact; S1 unblocked, with exit criteria for a no-op second open and uuid round trips;
+  Gate A and the D8 status. The sync design page still needs its line about the fallback.
 
 ## Sources
 
