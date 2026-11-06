@@ -3,7 +3,9 @@
 A native iPad app for Composition, written in Swift (with Objective-C, C and C++ only where something needs
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
-**Design only: no code is written, and nothing here has been tried on a device.** Dates are 2026-11-05.
+**Design, plus the first slice of spike S1** (`apps/ios/CompositionCore`: the schema pass and its tests, see
+[S1 status](#s1-status)). **Nothing has been tried on a device;** the code has run on the Mac and in the iPad
+Simulator only. Dates are 2026-11-05.
 
 **Direction (changed 2026-11-05).** The two earlier research sessions leaned towards the existing web UI in a
 `WKWebView` shell with a native PencilKit plugin. You then asked for the app to feel **as native as possible**,
@@ -308,7 +310,9 @@ The query parser ports as it is. **SQLite FTS5 replaces Meilisearch.**
   column-scoped `MATCH`. Results stay capped at 50.
 - **FTS5 availability.** FTS5 is a compile-time option of SQLite. GRDB's author says the system SQLite has it from
   iOS 11.4 and that GRDB's package build enables it ([secondhand](https://github.com/steipete/GRDB.swift/blob/master/Documentation/CustomSQLiteBuilds.md)).
-  Treat as unverified until S1 runs it; the fallback is a custom SQLite build.
+  **S1 result (2026-11-05):** present, with the `unicode61`, `porter`, `ascii` and `trigram` tokenizers, in the SQLite
+  GRDB 7.12.0 links on the Mac (3.54.0) and in the iPad Pro 11-inch (M5) Simulator runtime (3.51.0). **Not yet
+  checked on the iPad itself,** whose iPadOS version is not recorded. The fallback, if the device lacks it, is a custom SQLite build.
 - **Typo tolerance is the regression** ([C1](#compromise-register)): today `title: routng` finds "routing", and
   FTS5 has no fuzzy matching. In the order I would try them: (1) rescore titles and descriptions in memory by
   edit distance, cheap at personal-notes scale and plain Swift; (2) expand each query word against the index's
@@ -534,7 +538,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Full-text search | ⚠️ | M1 | ⬜ | FTS5 through GRDB ([C1](#compromise-register)); availability unverified |
+| Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB ([C1](#compromise-register)); present in the Simulator and on the Mac, trigram included; the typo layer is S2; not checked on the device |
 | Typo-tolerant search | ⚠️ | M1 | ⬜ | A rescoring layer; not out of the box ([C1](#compromise-register)) |
 | Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | ⬜ | Port `searchQuery.ts` (pure); fixtures |
 | Search bar | ⭐ | M1 | ⬜ | `.searchable`, with tokens for filters |
@@ -709,7 +713,7 @@ Each spike is small and answers one question before anything is built for real. 
 
 | # | Spike | Answers | Exit criteria |
 |---|---|---|---|
-| **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (a second open writes nothing); every uuid survives a Trash round trip and a backup in each direction |
+| **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (the pass writes nothing; GRDB's own pool open does, see [S1 status](#s1-status)); every uuid survives a Trash round trip and a backup in each direction |
 | **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes |
 | **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4) |
 | **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws |
@@ -717,6 +721,45 @@ Each spike is small and answers one question before anything is built for real. 
 | **S6** | **Lifecycle.** Background while typing, kill and relaunch, state restoration, a second window on the same database. | N5; R4 | No lost keystrokes |
 | **S7** | **The native-bar audit:** VoiceOver, Dynamic Type, the Cmd-hold list, trackpad, a third-width window, Stage Manager. | N1–N7 | The table above, filled in |
 | **S8** | **Web exceptions.** `<YouTube>` in a `WKWebView` (Referer), the draw.io editor on its own origin, and whether a ChatGPT sign-in can complete on iOS. | C8, C9, C19 | Optional |
+
+### S1 status
+
+**Started 2026-11-05; not finished.** The package is `apps/ios/CompositionCore` (Swift 6, GRDB 7.12.0 pinned exactly,
+`Package.resolved` committed; `swift test` on a Mac needs no simulator). 10 tests pass on the Mac and in the iPad Pro
+11-inch (M5) Simulator.
+
+| Exit criterion | State |
+|---|---|
+| Opens a *copy* of a desktop `composition.db` and lists its notes | **Done,** against databases made by the real `db.ts` and repos |
+| The schema a Swift-created database gets is the desktop's | **Done:** `sqlite_master` is identical, object by object, to a fresh desktop database, trigger whitespace included |
+| A current desktop database is a no-op for the Swift pass | **Done** for a populated database (two notebooks, nested groups, notes, an attachment, a trashed note and a trashed group): schema and every row unchanged. Running the pass again writes nothing (log size, schema cookie and change count) |
+| `ensureColumn`, `ensureUuids` (column, trigger, unique index, batched backfill) and `adoptOrphans` ported | **Done,** plus a database from before groups, tags and notebooks, and a backfill across more than one batch |
+| FTS5 present (R6) | **Done** for the Mac and the Simulator; **not the device** |
+| Every uuid survives a Trash round trip | **Not done:** needs the Swift Trash Can. Only the desktop's uuids being well formed and distinct is checked |
+| Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Not started** |
+| The harness runs one fixture on both sides, in CI | **Partly:** the fixtures are generated by `apps/web/scripts/ios-conformance-fixtures.test.ts` and read by `ConformanceTests.swift`. Not in CI, and the other direction (the TypeScript reading something Swift made) is not built |
+| Measure the v1 logic subset (R3) | **Not started** |
+
+What S1 found, beyond the criteria:
+
+- **GRDB's pool open writes.** On every open where the write-ahead log is missing or empty (always, after a clean
+  close), `DatabasePool` runs `CREATE TABLE grdb_issue_102; DROP TABLE grdb_issue_102`
+  (`setUpWALMode`, GRDB/Core/Database.swift). A few pages are written and the schema cookie moves, whatever our pass does.
+  So "a second open writes nothing" is true of the pass and not of the pool; the criterion is reworded above. Harmless
+  for a single-process app; worth knowing before anything compares file hashes or watches the file.
+- **Trigger text is part of the schema file.** SQLite keeps a trigger's text verbatim, so the TypeScript source's
+  indentation is in the desktop's `sqlite_master`. The Swift string reproduces it, and the conformance test would fail
+  if `db.ts` is reformatted without it.
+- **Fixtures are generated, not committed** (`*.db` is gitignored, and a binary would go stale silently). To run the conformance tests:
+
+  ```sh
+  cd apps/web && IOS_FIXTURE_DIR=/some/dir node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts
+  cd apps/ios/CompositionCore && COMPOSITION_CONFORMANCE_DIR=/some/dir swift test
+  ```
+
+  Without the variable they are reported as *skipped*. For the Simulator, name the variable `TEST_RUNNER_COMPOSITION_CONFORMANCE_DIR`.
+- **Plugin tables are created too.** The iPad has no plugins in v1 (C6), but its file has the desktop's shape, so a
+  desktop backup restores without a missing table.
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
@@ -794,6 +837,11 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   into the `uuid` (M1, desktop part landed) and change capture (Later, M1 if it lands before Gate A); R8 lowered to
   low–medium chance and medium impact; S1 unblocked, with exit criteria for a no-op second open and uuid round trips;
   Gate A and the D8 status. The sync design page still needs its line about the fallback.
+- 2026-11-05: **Spike S1 started.** `apps/ios/CompositionCore` ports the schema pass (`ensureColumn`, `ensureUuids`,
+  `adoptOrphans`) and is checked against databases made by the real `db.ts`. Changed: the opening line, the FTS5
+  availability note (present on the Mac and in the Simulator, trigram included; not yet the device), the full-text search
+  row (🔬), the S1 exit criterion about a second open, and a new [S1 status](#s1-status) section. The restore and write
+  of `.tar.gz`, the Trash round trip of uuids and the logic-subset measurement are not done.
 
 ## Sources
 
