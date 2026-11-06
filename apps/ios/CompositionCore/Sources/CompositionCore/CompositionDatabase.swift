@@ -41,6 +41,11 @@ public final class CompositionDatabase: Sendable {
         return CompositionDatabase(pool: pool)
     }
 
+    /// Opens the database in `location`, creating the data directory if needed.
+    public static func open(in location: DataLocation) throws -> CompositionDatabase {
+        try open(at: location.databaseURL)
+    }
+
     /// Flushes the write-ahead log into the main file and closes every connection. Needed before the file is copied or
     /// archived as a backup.
     public func close() throws {

@@ -13,9 +13,6 @@ import Testing
 //
 // Without the variable these tests are reported as skipped, never as passed.
 
-private let conformanceDirectory: URL? = ProcessInfo.processInfo.environment["COMPOSITION_CONFORMANCE_DIR"]
-    .map { URL(fileURLWithPath: $0, isDirectory: true) }
-
 @Suite("Conformance with the desktop", .enabled(if: conformanceDirectory != nil, "COMPOSITION_CONFORMANCE_DIR is not set"))
 struct ConformanceTests {
     /// Every schema object the file declares, in a stable order: the text of each `CREATE`, which carries column order,
@@ -60,7 +57,10 @@ struct ConformanceTests {
 
     @Test("a database the Swift core creates has exactly the schema the desktop creates")
     func freshSchemaMatchesDesktop() throws {
-        let desktop = try schemaObjects(try fixture("desktop-empty.db"))
+        // Always from a copy: opening a WAL-mode file for reading leaves -wal and -shm files beside it.
+        let desktop = try withScratch { scratch in
+            try schemaObjects(try copy(try fixture("desktop-empty.db"), into: scratch))
+        }
         try withScratch { scratch in
             let database = try CompositionDatabase.open(at: scratch.databaseURL)
             try database.close()
@@ -95,9 +95,11 @@ struct ConformanceTests {
 
     @Test("every desktop uuid is a uuid, and none repeats across the six tables")
     func desktopUuidsAreWellFormed() throws {
-        let url = try fixture("desktop-populated.db")
-        let uuids: [String] = try rawConnection(url).read { db in
-            try Schema.uuidTables.flatMap { try String.fetchAll(db, sql: "SELECT uuid FROM \($0)") }
+        let source = try fixture("desktop-populated.db")
+        let uuids: [String] = try withScratch { scratch in
+            try rawConnection(try copy(source, into: scratch)).read { db in
+                try Schema.uuidTables.flatMap { try String.fetchAll(db, sql: "SELECT uuid FROM \($0)") }
+            }
         }
         #expect(uuids.count >= 6)
         #expect(uuids.allSatisfy { isUuid($0) })

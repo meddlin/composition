@@ -133,14 +133,18 @@ newest language that reaches the API, and no more.**
 | **SwiftUI** | Screens, navigation, lists, settings, the To-do board later | `CompositionUI` |
 | **UIKit** | Where SwiftUI falls short, wrapped in `UIViewRepresentable`: the text editor and preview (`UITextView`, TextKit 2), the ink canvas (`PKCanvasView`), key commands, Pencil interactions, fine drag and drop | `CompositionUI`, `CompositionInk` |
 | **Objective-C** | **Not planned.** Only if a spike finds an Apple API with no Swift surface, or a C++ library needs an Objective-C++ wrapper. | none |
-| **C** | Reached through packages and the system, not hand-written: SQLite (inside GRDB, or the `sqlite3` C API), **zlib for gzip** (below), cmark-gfm (inside swift-markdown), libyaml (inside Yams, if used). A bridging module map where a system library has none. | `CompositionCore`, `CompositionMarkdown` |
+| **C** | Reached through packages and the system, not hand-written: SQLite (inside GRDB, or the `sqlite3` C API), **zlib for gzip** (below), cmark-gfm (inside swift-markdown), libyaml (inside Yams, if used). A bridging module map where a system library has none (zlib did not need one, below). | `CompositionCore`, `CompositionMarkdown` |
 | **C++** | **Not planned.** Only for a measured hot path (for example edit-distance matching over a large search vocabulary, or processing very large ink strokes), through Swift's C++ interoperability first and Objective-C++ second. | none |
 
 Why zlib is the first honest C use: Apple's Compression framework's `COMPRESSION_ZLIB` produces **raw DEFLATE**,
 without a zlib or gzip header ([Apple](https://developer.apple.com/documentation/compression/compression_zlib.md)),
 and backups are `.tar.gz`. Either the gzip header and CRC-32 trailer are written by hand in Swift around the
-Compression framework, or the system zlib is linked from C. Decided in S1 by whichever restores a desktop
-archive and produces one the desktop restores, on a large backup, with the least code.
+Compression framework, or the system zlib is linked from C. **Decided in S1 (2026-11-05): the system zlib.** The SDK
+already exposes it as a Swift module, so `import zlib` is all it takes: no C shim and no module map of ours, on the
+Mac and in the iPad Simulator SDK alike. zlib writes and checks the gzip header (with its optional name, comment and
+extra fields) and the CRC-32 and length trailer itself. I did not build the Compression-framework route to compare, so
+this was decided by what that route would have to add, not by trying both; it stays open if a system library ever
+causes trouble in the app target.
 
 **Dependencies.** Apple frameworks first, then a short list of well-known Swift packages. Each gets a row here
 before it is added, pinned to an exact version, with `Package.resolved` checked in, in line with the repo's
@@ -586,7 +590,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Images page: browse, reuse, find unused | 🔁 | M3† | ⬜ | |
 | Image size limit | 🔁 | M1 | ⬜ | None, as on desktop; the data stays on the device |
 | Attachments | ⭐ | Later | ⬜ | Document picker, share sheet, Quick Look |
-| Backup and restore | ⚠️ | M1 | ⬜ | Tar in Swift, gzip via zlib ([Languages](#languages-and-dependencies)); Files picker ([C14](#compromise-register)) |
+| Backup and restore | 🔁 | M1 | 🔬 | The core (create, stage, apply with rollback) is built and checked against the desktop both ways ([S1 status](#s1-status)); tar in Swift, gzip via the system zlib. No Files picker or screen yet ([C14](#compromise-register)) |
 
 ### Plugins and other products
 
@@ -700,7 +704,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R7 | FTS5 plus the typo layer is not good enough for you. | Medium, high | The S2 acceptance test, then your judgement on a real corpus. |
 | R8 | The iPad's schema starts before the desktop has landed the rest of the sync prerequisites (capture triggers, outbox, `sync_*` tables), so the "identical schema" rule breaks or the iPad is delayed. The `uuid` part landed in #244, which retired the worst of it. | Low–medium, medium | Gate A takes the schema from the desktop as it is then; fallback decided and in effect: start from the `uuid` ([Sync](#sync-and-the-data-model)). |
 | R9 | YAML parsing differs from `js-yaml` (dates, quoting), so a frontmatter round trip changes a note. | Medium, medium | Fixtures from real notes; a hand parser if Yams cannot match. |
-| R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. |
+| R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. **Done 2026-11-05 on the Mac and the Simulator** ([S1 status](#s1-status)); not yet on the device. |
 | R11 | Vision reads handwriting poorly, so handwritten notes stay unsearchable. | Medium, medium | C11; S5 with your handwriting. |
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
 | R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. |
@@ -725,8 +729,8 @@ Each spike is small and answers one question before anything is built for real. 
 ### S1 status
 
 **Started 2026-11-05; not finished.** The package is `apps/ios/CompositionCore` (Swift 6, GRDB 7.12.0 pinned exactly,
-`Package.resolved` committed; `swift test` on a Mac needs no simulator). 10 tests pass on the Mac and in the iPad Pro
-11-inch (M5) Simulator.
+`Package.resolved` committed; `swift test` on a Mac needs no simulator). 36 tests pass on the Mac, and 33 in the iPad Pro
+11-inch (M5) Simulator, which cannot run the three that shell out to the system `gzip` and `tar`.
 
 | Exit criterion | State |
 |---|---|
@@ -736,8 +740,8 @@ Each spike is small and answers one question before anything is built for real. 
 | `ensureColumn`, `ensureUuids` (column, trigger, unique index, batched backfill) and `adoptOrphans` ported | **Done,** plus a database from before groups, tags and notebooks, and a backfill across more than one batch |
 | FTS5 present (R6) | **Done** for the Mac and the Simulator; **not the device** |
 | Every uuid survives a Trash round trip | **Not done:** needs the Swift Trash Can. Only the desktop's uuids being well formed and distinct is checked |
-| Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Not started** |
-| The harness runs one fixture on both sides, in CI | **Partly:** the fixtures are generated by `apps/web/scripts/ios-conformance-fixtures.test.ts` and read by `ConformanceTests.swift`. Not in CI, and the other direction (the TypeScript reading something Swift made) is not built |
+| Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Done, both ways, with the real desktop code on the other side.** Swift restores a backup made by the desktop's `createBackup` and finds every note, uuid, Trash Can row and file (by hash). Swift's own backup is then restored by the desktop's `stageBackup` and `applyStagedBackup` and opened by `db.ts`, and the system `gzip -t` and `tar -t` read it. Done at 100 MB, and the streaming measured up to 1 GB (below). System zlib, above |
+| The harness runs one fixture on both sides, in CI | **Mostly:** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and the same archives were restored from the Simulator. **Not in CI** |
 | Measure the v1 logic subset (R3) | **Not started** |
 
 What S1 found, beyond the criteria:
@@ -750,16 +754,28 @@ What S1 found, beyond the criteria:
 - **Trigger text is part of the schema file.** SQLite keeps a trigger's text verbatim, so the TypeScript source's
   indentation is in the desktop's `sqlite_master`. The Swift string reproduces it, and the conformance test would fail
   if `db.ts` is reformatted without it.
-- **Fixtures are generated, not committed** (`*.db` is gitignored, and a binary would go stale silently). To run the conformance tests:
-
-  ```sh
-  cd apps/web && IOS_FIXTURE_DIR=/some/dir node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts
-  cd apps/ios/CompositionCore && COMPOSITION_CONFORMANCE_DIR=/some/dir swift test
-  ```
-
-  Without the variable they are reported as *skipped*. For the Simulator, name the variable `TEST_RUNNER_COMPOSITION_CONFORMANCE_DIR`.
+- **Fixtures are generated, not committed** (`*.db` is gitignored, and a binary would go stale silently). After
+  `cd apps/web && pnpm install --frozen-lockfile`, run `apps/ios/scripts/conformance.sh` (add a directory to keep the
+  fixtures; `IOS_FIXTURE_LARGE_MB=20` makes the large backup smaller). Without `COMPOSITION_CONFORMANCE_DIR` the
+  Swift conformance tests are reported as *skipped*. For the Simulator, name the variable `TEST_RUNNER_COMPOSITION_CONFORMANCE_DIR`.
+- **Streaming needs an autorelease pool per chunk.** The first large-backup measurement showed peak memory growing with
+  the attachment, about 2.3 times its size (314 MB at 64 MB, 1.2 GB at 512 MB): `FileHandle.read` returns autoreleased
+  data, and a tight loop on a background thread keeps all of it until the thread's pool drains. With an
+  `autoreleasepool` around each 64 KiB chunk, peak memory is flat at 122 to 142 MB for 16 MB, 64 MB and **1 GB**
+  attachments (the Mac, a debug build; most of that is the test process itself). On the iPad that difference is a
+  backup finishing or the system ending the app. Measured with `/usr/bin/time -l`; the Simulator and the device were not measured.
+- **A WAL-flagged database in an archive.** A database file copied after a clean close has WAL mode in its header, and
+  the system SQLite cannot open it with a plain read-only connection (it needs to create `-wal` and `-shm`: error 14).
+  The desktop's `better-sqlite3` opens the same file, so an archive the desktop restores would have been refused
+  here. Backups made by `VACUUM INTO` (the desktop's and ours) are not affected. Validation and counting now open the
+  staged file `immutable=1`, which also means no side files are ever created in the staging folder.
+- **The iPad's backup has no `settings.json`.** The desktop keeps its own settings when a backup has none, which is right
+  until the iPad has settings worth carrying (colour scheme, favorites). A `settings.json` in a backup the iPad restores
+  is handed back to the caller as it was and not applied.
 - **Plugin tables are created too.** The iPad has no plugins in v1 (C6), but its file has the desktop's shape, so a
   desktop backup restores without a missing table.
+- **Not built, and not part of S1:** the safety backup taken before a restore (the app layer's job, once the data
+  location on the iPad is decided), the search index rebuilt after a restore (the FTS layer is S2), and the Files picker.
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
@@ -842,6 +858,12 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   availability note (present on the Mac and in the Simulator, trigram included; not yet the device), the full-text search
   row (🔬), the S1 exit criterion about a second open, and a new [S1 status](#s1-status) section. The restore and write
   of `.tar.gz`, the Trash round trip of uuids and the logic-subset measurement are not done.
+- 2026-11-05: **S1 backup and restore built; gzip decided.** `Backup.create`, `stage` and `apply` over a streaming tar and
+  gzip in Swift, checked in both directions against the desktop's real `createBackup`, `stageBackup` and `applyStagedBackup`
+  (R10: done on the Mac and the Simulator). Decided: the system zlib through `import zlib`, no C shim (the alternative was
+  not built). Found: streaming needs an autorelease pool per chunk (memory was 2.3 times the attachment before, flat after), and
+  a WAL-flagged database in an archive needs an `immutable=1` open to match the desktop. R10 and the backup row updated;
+  the S1 status rows and counts changed. Still open in S1: the Trash round trip of uuids, CI, the logic-subset measurement.
 
 ## Sources
 
