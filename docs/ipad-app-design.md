@@ -528,7 +528,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | Same rules; conformance corpus |
 | Notebooks: switch, colours | 🔁 | M1 | ⬜ | Sidebar |
 | Favorites | 🔁 | M1 | ⬜ | |
-| Trash Can (60 days) | 🔁 | M1 | ⬜ | |
+| Trash Can (60 days) | 🔁 | M1 | 🔬 | The core is built and checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)); no screen yet, and the search index and attachment clean-up around it are not |
 | Drag and drop of notes and groups | ⭐ | M1 | ⬜ | Native drag and drop, reorder, and drops from Files and Photos |
 | Home page (recent, pinned) | 🔁 | M3† | ⬜ | |
 | Heading rail | 🔁 | M3† | ⬜ | An outline popover or trailing rail |
@@ -729,7 +729,7 @@ Each spike is small and answers one question before anything is built for real. 
 ### S1 status
 
 **Started 2026-11-05; not finished.** The package is `apps/ios/CompositionCore` (Swift 6, GRDB 7.12.0 pinned exactly,
-`Package.resolved` committed; `swift test` on a Mac needs no simulator). 36 tests pass on the Mac, and 33 in the iPad Pro
+`Package.resolved` committed; `swift test` on a Mac needs no simulator). 59 tests pass on the Mac, and 56 in the iPad Pro
 11-inch (M5) Simulator, which cannot run the three that shell out to the system `gzip` and `tar`.
 
 | Exit criterion | State |
@@ -739,7 +739,7 @@ Each spike is small and answers one question before anything is built for real. 
 | A current desktop database is a no-op for the Swift pass | **Done** for a populated database (two notebooks, nested groups, notes, an attachment, a trashed note and a trashed group): schema and every row unchanged. Running the pass again writes nothing (log size, schema cookie and change count) |
 | `ensureColumn`, `ensureUuids` (column, trigger, unique index, batched backfill) and `adoptOrphans` ported | **Done,** plus a database from before groups, tags and notebooks, and a backfill across more than one batch |
 | FTS5 present (R6) | **Done** for the Mac and the Simulator; **not the device** |
-| Every uuid survives a Trash round trip | **Not done:** needs the Swift Trash Can. Only the desktop's uuids being well formed and distinct is checked |
+| Every uuid survives a Trash round trip | **Done.** The Swift Trash Can (trash, restore, purge, expiry) runs the 44-step script in `apps/ios/conformance/trash-script.json` beside the desktop's real `trashRepo.ts`, from the same database, and every step's result and every row afterwards are equal. That includes a note whose group is gone, whose id is taken, whose uuid a live row holds, whose notebook was deleted, and a trashed row from an older build with no uuid |
 | Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Done, both ways, with the real desktop code on the other side.** Swift restores a backup made by the desktop's `createBackup` and finds every note, uuid, Trash Can row and file (by hash). Swift's own backup is then restored by the desktop's `stageBackup` and `applyStagedBackup` and opened by `db.ts`, and the system `gzip -t` and `tar -t` read it. Done at 100 MB, and the streaming measured up to 1 GB (below). System zlib, above |
 | The harness runs one fixture on both sides, in CI | **Mostly:** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and the same archives were restored from the Simulator. **Not in CI** |
 | Measure the v1 logic subset (R3) | **Not started** |
@@ -774,8 +774,20 @@ What S1 found, beyond the criteria:
   is handed back to the caller as it was and not applied.
 - **Plugin tables are created too.** The iPad has no plugins in v1 (C6), but its file has the desktop's shape, so a
   desktop backup restores without a missing table.
-- **Not built, and not part of S1:** the safety backup taken before a restore (the app layer's job, once the data
-  location on the iPad is decided), the search index rebuilt after a restore (the FTS layer is S2), and the Files picker.
+- **The Trash Can is checked by running one script through both implementations.** The TypeScript builds the starting
+  database with the real repos, runs each step through the real `trashRepo.ts` with a set clock, and records the result
+  and every row after it; Swift runs the same steps and must record the same. The only thing normalised is a uuid that
+  was not in the starting database (a restore that cannot keep one draws a random one). I broke the Swift port three quiet
+  ways (purging at `<=`, breaking ties by the lower id, a 59-day window) and each was caught, naming the step and field.
+- **Timestamps are whole milliseconds, not `Date`.** `deleted_at` is compared as text and the 60 days is added to it, so
+  `Timestamp` parses and writes the `toISOString` form with integer arithmetic. Going through a `Date`'s floating
+  point seconds can write back a millisecond early. Checked against Foundation's calendar over 5,000 random moments.
+- **A restore with an explicit id moves the id counter.** Restoring trashed row 77 left `sqlite_sequence` for `notes` at
+  77, so the next note is 78. The desktop does the same (the conformance script records it), so it is kept, not "fixed".
+- **Not built, and not part of S1:** the search index (a note leaving it when trashed and re-entering when restored, and
+  the rebuild after a restore: S2); removing the attached files of notes purged for good; clearing expired items when the
+  workspace opens (the app layer calls `purgeExpired`); the safety backup taken before a restore (the app layer's job,
+  once the data location on the iPad is decided); and the Files picker.
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
@@ -863,7 +875,13 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   (R10: done on the Mac and the Simulator). Decided: the system zlib through `import zlib`, no C shim (the alternative was
   not built). Found: streaming needs an autorelease pool per chunk (memory was 2.3 times the attachment before, flat after), and
   a WAL-flagged database in an archive needs an `immutable=1` open to match the desktop. R10 and the backup row updated;
-  the S1 status rows and counts changed. Still open in S1: the Trash round trip of uuids, CI, the logic-subset measurement.
+  the S1 status rows and counts changed. Still open in S1: the Trash round trip of uuids (since done, below), CI, the logic-subset measurement.
+
+- 2026-11-05: **S1 Trash Can built.** `trashNote`, `trashGroup`, `listTrash`, `restoreNote`, `restoreGroup`, `purgeNote`,
+  `purgeGroup` and `purgeExpired` on `CompositionDatabase`, with the desktop's SQL, and `Timestamp` rewritten on integer
+  milliseconds. Checked by running one 44-step script through the desktop's real `trashRepo.ts` and through Swift and
+  comparing every step (Mac and Simulator), and mutation-tested. Closes the "every uuid survives a Trash round trip"
+  criterion. Still open in S1: CI and the logic-subset measurement.
 
 ## Sources
 
