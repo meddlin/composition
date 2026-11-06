@@ -1,0 +1,58 @@
+name: iPad core
+
+# Keeps the iPad app's Swift core (apps/ios/CompositionCore) in step with the desktop's TypeScript data layer
+# (docs/ipad-app-design.md, "Keeping two implementations honest"). apps/ios/scripts/conformance.sh has the desktop
+# write databases, real backups and a Trash Can script, Swift read and run them and write backups of its own, and the
+# desktop restore those. A change to the TypeScript that Swift does not follow (or the reverse) fails here.
+#
+# It runs only when something that can break that agreement changes, so other pull requests do not spend macOS time.
+on:
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "apps/web/src/lib/composition/**"
+      - "apps/web/scripts/ios-conformance-fixtures.test.ts"
+      - "apps/web/package.json"
+      - "apps/web/pnpm-lock.yaml"
+      - ".github/workflows/ios-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    # The stable macOS 26 image. Xcode 27 is only a preview image so far (runner-images: xcode-27); move to it, and
+    # to Xcode 27.x below, once it is generally available, since that is the toolchain the app is developed with.
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      # Pinned, so a new default Xcode on the image cannot change what is being tested (design R15).
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      # The desktop's own data layer (db.ts, backup.ts, trashRepo.ts) is what Swift is checked against.
+      - name: Install web dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Conformance, desktop to Swift and back
+        run: apps/ios/scripts/conformance.sh

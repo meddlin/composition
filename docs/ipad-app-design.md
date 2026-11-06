@@ -109,7 +109,7 @@ Facts that drive the design, checked against `main`.
 | **The data layer is synchronous and Node-bound:** `better-sqlite3` in `db.ts`, `backup.ts`, `groupsRepo.ts`, `todosRepo.ts`; 13 files in `lib/composition` import `node:` modules. Backup is tar and gzip over `node:zlib`. | Nothing here is reused as code. The SQL, the rules and the file formats are the spec. | [service.ts](../apps/web/src/lib/composition/service.ts), [tarArchive.ts](../apps/web/src/lib/composition/tarArchive.ts) |
 | **Frontmatter is parsed with `js-yaml`** (YAML 1.1 rules; unquoted dates become dates and are un-quoted again on write). | Swift's YAML options resolve some scalars differently. This is a classic drift spot; it needs fixtures. | [frontmatter.ts](../apps/web/src/lib/composition/frontmatter.ts) |
 | **Search is a Meilisearch child process.** Only the query parser (`parseSearchQuery`) and the index shape carry over. | iOS apps cannot spawn bundled executables. The index is derived data. | [search.md](architecture/search.md) |
-| **Size** (measured 2026-11-03): `apps/web/src` about 36,000 non-test lines; notes UI and MDX about 12,000; `lib/composition` about 13,000. The v1 subset of the 13,000 has not been measured. | Sets the scale of the rewrite. Measure the v1 subset in S1. | earlier session |
+| **Size** (measured 2026-11-03): `apps/web/src` about 36,000 non-test lines; notes UI and MDX about 12,000; `lib/composition` about 13,000. **S1 measured the data layer (2026-11-05):** of its 9,914 code lines, v1 needs at most 2,818 (28%), 989 of them already ported ([S1 status](#s1-status)). | Sets the scale of the rewrite. The data layer is the small part; the notes UI and editor logic (`components/notes`, about 10,700 code lines) is the large one. | earlier session; `measure-logic-subset.mjs` |
 | **Already iPad-aware:** `useIsMac` counts iPad as a Mac. Fonts are open-source families bundled by `next/font`. | Nothing to port; the font files can be bundled in the app if you want the same choices. | [useIsMac.ts](../apps/web/src/components/shortcuts/useIsMac.ts), [editorFonts.ts](../apps/web/src/lib/composition/editorFonts.ts) |
 
 ## Options considered
@@ -697,7 +697,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 |---|---|---|---|
 | R1 | TextKit 2 cannot hide Markdown marks cleanly (caret, selection, undo), so the Live tab is not viable natively. | Medium, medium | S3; C12 lets v1 ship without it. |
 | R2 | View-based attachments (images, charts, ink in the text) are fragile: undocumented behaviour, and TextKit 1 fallback removes them. | Medium, high | S3; never touch `layoutManager`; test with a long note. |
-| R3 | The rewrite is larger than v1 can afford: about 12,000 lines of UI plus the logic subset. | High, high | D13 scope; the D6 scaffold; measure the logic subset in S1. |
+| R3 | The rewrite is larger than v1 can afford: about 12,000 lines of UI plus the logic subset. | High, high | D13 scope; the D6 scaffold. **S1 measured the logic subset:** about 1,000 code lines still to port, 1,800 at most ([S1 status](#s1-status)), so the risk is the UI and the editor, not the data layer. The rating stays: nothing yet measures the UI in Swift. |
 | R4 | The TypeScript and Swift implementations drift. | High, high | D7: the conformance corpus; run in CI on both sides. |
 | R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. |
 | R6 | FTS5 is not available in the system SQLite, or GRDB's configuration lacks it. | Low–medium, high | S1 runs it; fallback: a custom SQLite build. |
@@ -709,7 +709,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
 | R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. |
 | R14 | Only one test device: no mini or Air, no Pencil Pro; the Simulator is believed not to emulate Pencil pressure, tilt or hover (unverified). | Certain, low | Recorded in D14; the Simulator covers sizes. |
-| R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. |
+| R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. **Done in `.github/workflows/ios-core.yml`:** `macos-26`, Xcode 26.6 pinned, only on the paths that can break the agreement (the repo is public, so macOS minutes are free). Not yet run on GitHub. |
 
 ## Spikes and gates
 
@@ -728,7 +728,7 @@ Each spike is small and answers one question before anything is built for real. 
 
 ### S1 status
 
-**Started 2026-11-05; not finished.** The package is `apps/ios/CompositionCore` (Swift 6, GRDB 7.12.0 pinned exactly,
+**Built 2026-11-05; two things unverified** (CI has not run on GitHub, and nothing has run on the iPad). The package is `apps/ios/CompositionCore` (Swift 6, GRDB 7.12.0 pinned exactly,
 `Package.resolved` committed; `swift test` on a Mac needs no simulator). 59 tests pass on the Mac, and 56 in the iPad Pro
 11-inch (M5) Simulator, which cannot run the three that shell out to the system `gzip` and `tar`.
 
@@ -741,8 +741,39 @@ Each spike is small and answers one question before anything is built for real. 
 | FTS5 present (R6) | **Done** for the Mac and the Simulator; **not the device** |
 | Every uuid survives a Trash round trip | **Done.** The Swift Trash Can (trash, restore, purge, expiry) runs the 44-step script in `apps/ios/conformance/trash-script.json` beside the desktop's real `trashRepo.ts`, from the same database, and every step's result and every row afterwards are equal. That includes a note whose group is gone, whose id is taken, whose uuid a live row holds, whose notebook was deleted, and a trashed row from an older build with no uuid |
 | Restore a desktop `.tar.gz` and write one it restores; zlib or hand-written gzip (R10) | **Done, both ways, with the real desktop code on the other side.** Swift restores a backup made by the desktop's `createBackup` and finds every note, uuid, Trash Can row and file (by hash). Swift's own backup is then restored by the desktop's `stageBackup` and `applyStagedBackup` and opened by `db.ts`, and the system `gzip -t` and `tar -t` read it. Done at 100 MB, and the streaming measured up to 1 GB (below). System zlib, above |
-| The harness runs one fixture on both sides, in CI | **Mostly:** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and the same archives were restored from the Simulator. **Not in CI** |
-| Measure the v1 logic subset (R3) | **Not started** |
+| The harness runs one fixture on both sides, in CI | **Written, not yet run on GitHub.** `apps/ios/scripts/conformance.sh` runs the three steps in order (the desktop writes, Swift reads and writes, the desktop reads), and `.github/workflows/ios-core.yml` runs it on `macos-26` with Xcode 26.6 pinned, on pull requests that touch `apps/ios`, the data layer or the generator. What was checked: the repo's pinning linter, the YAML, and the same steps run from a fresh copy of the committed files (Xcode 27.2, Node 24). **Not checked:** Xcode 26.6 and Node 22, which are what the job uses; the first pull request will show |
+| Measure the v1 logic subset (R3) | **Done:** [below](#the-v1-logic-subset) |
+
+#### The v1 logic subset
+
+`node apps/ios/scripts/measure-logic-subset.mjs` (add `--files v1` to list the files) counts the web app's data layer,
+`apps/web/src/lib/composition`, by the category each file is given in `apps/ios/conformance/logic-subset.json`. The
+classification is a judgement, made from the tracker's Plan and status columns rather than from size; the script fails
+if a file is missing from it, so the numbers cannot go stale quietly. "Code" is lines that are not blank or only a comment.
+
+| Category | Files | Code lines | Meaning |
+|---|--:|--:|---|
+| Ported | 5 | 989 | Built in Swift in S1 |
+| v1, to port | 16 | 991 | `notesRepo`, `groupsRepo`, `notebooksRepo`, `frontmatter`, `searchQuery`, `images`, `imageRefs`, `ordering`, `favorites`, the themes and fonts, and a few small ones |
+| v1, mixed | 2 | 838 | `service.ts` and `webSettings.ts`: v1 logic among to-dos, feeds and the AI helper. Counted whole, so an upper bound |
+| Release polish (M3) | 4 | 438 | Home page, writing column, "Follow the sun" |
+| Later or Never | 8 | 464 | Attachments, notebook backgrounds, `<Drawio>` editing, no tracker row |
+| Replaced | 1 | 131 | `searchIndex.ts`: Meilisearch becomes FTS5 (S2) |
+| Plugins (C6) | 57 | 4,920 | To-dos, RSS Reader, Reading List, the AI helper |
+| Shell | 31 | 1,143 | IPC, Next.js actions, windows, updates, panels, type contracts |
+| **Total** | **124** | **9,914** | |
+
+- **v1 needs at most 2,818 of 9,914 code lines (28%),** and 989 are done. About 1,000 remain, 1,800 at most. Half the
+  folder is plugins, which v1 leaves out (C6).
+- **What it cost so far:** 989 TypeScript code lines became 1,204 Swift source lines, about 1.2 times, with the tests
+  about even (1,461 Swift test lines against 1,394). That ratio is for plain data logic; it says nothing about SwiftUI or
+  the editor. Applied to the data layer alone, the rest is roughly 1,200 to 2,200 Swift lines.
+- **So R3's risk is the UI.** `components/notes`, the notes UI and editor logic, is about 10,700 code lines: 4,258 in 73
+  logic files (`.ts`: stores, hooks, Markdown and MDX helpers) and 6,458 in 54 view files (`.tsx`). Much of the logic
+  there is replaced, not ported (state held by SwiftUI, hooks that UIKit does itself), so it is not a forecast either.
+  This spike does not size it; S3 and S4 are where that shows.
+- **Not counted:** the tests a port has to meet (3,905 lines in the ported and v1 files' own tests) are the specification,
+  not code to write.
 
 What S1 found, beyond the criteria:
 
@@ -882,6 +913,12 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   milliseconds. Checked by running one 44-step script through the desktop's real `trashRepo.ts` and through Swift and
   comparing every step (Mac and Simulator), and mutation-tested. Closes the "every uuid survives a Trash round trip"
   criterion. Still open in S1: CI and the logic-subset measurement.
+
+- 2026-11-05: **S1's remaining items done.** Measured the v1 logic subset (at most 2,818 of 9,914 data-layer code lines,
+  989 done; `measure-logic-subset.mjs`, classification in `conformance/logic-subset.json`) and wrote the CI job
+  (`.github/workflows/ios-core.yml`: `macos-26`, Xcode 26.6, the conformance script, only on the paths that can break the
+  agreement). The CI job has not run on GitHub; it needs a pull request. R3 and R15 and the facts table updated. Every S1
+  exit criterion is now done except the device (FTS5, and everything else, has not been tried on the iPad).
 
 ## Sources
 
