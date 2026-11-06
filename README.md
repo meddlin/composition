@@ -56,6 +56,14 @@ pnpm test:cli:types
 Backup and restore have a guided manual test for each app: `pnpm manual:backup cli|web|desktop`
 ([docs/manual-tests/backup-restore.md](docs/manual-tests/backup-restore.md)).
 
+No test touches your real notes. Opening the database runs its schema migrations, so a test that reached
+`~/.composition/composition.db` would migrate your own file. The web suite points `HOME` at a fresh temp
+directory for every test file (`apps/web/vitest.setup.ts`), so a test that forgets to isolate itself still
+lands in a throwaway database; one that wants its own `HOME` can still `vi.stubEnv("HOME", …)`. Component
+tests should also mock the module that calls the Server Actions (`@/lib/composition/client`,
+`attachmentsClient`) rather than rely on that. The CLI's tests run over a temp sandbox of their own
+(`apps/cli/src/testing.tsx`).
+
 The CLI needs a newer Node than the other two (OpenTUI uses `node:ffi`), which is why it is not part
 of `pnpm test`. On a machine with Node 22 as the default, `nvm use 26` first.
 

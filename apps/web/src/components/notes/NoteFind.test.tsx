@@ -6,6 +6,16 @@ import type { Note } from "./types";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 
+// The attachments panel reads through Server Actions; unmocked, they would open the real database.
+vi.mock("@/lib/composition/attachmentsClient", () => ({
+  attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
+  listAttachments: vi.fn(async () => []),
+  addAttachments: vi.fn(),
+  revealAttachment: vi.fn(),
+  saveAttachmentCopy: vi.fn(),
+  removeAttachment: vi.fn(),
+}));
+
 const at = "2026-01-01T00:00:00.000Z";
 const note: Note = {
   id: 1,
