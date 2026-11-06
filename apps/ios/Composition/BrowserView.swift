@@ -7,6 +7,7 @@ struct BrowserView: View {
     var chooseBackup: () -> Void
     @State private var showingTrash = false
     @State private var showingAbout = false
+    @State private var showingLab = false
     @State private var confirmingReplace = false
 
     var body: some View {
@@ -43,6 +44,7 @@ struct BrowserView: View {
                     Menu {
                         Button("Export a backup…", systemImage: "square.and.arrow.up") { Task { await model.exportBackup() } }
                         Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
+                        Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
                         Button("About this build", systemImage: "info.circle") { showingAbout = true }
                     } label: {
                         Label("More", systemImage: "ellipsis.circle")
@@ -58,6 +60,7 @@ struct BrowserView: View {
         }
         .sheet(isPresented: $showingTrash) { TrashView(model: model) }
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
+        .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
         .confirmationDialog("Replace everything on this iPad?", isPresented: $confirmingReplace, titleVisibility: .visible) {
             Button("Choose a backup…", role: .destructive, action: chooseBackup)
         } message: {

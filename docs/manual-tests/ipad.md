@@ -65,6 +65,28 @@ Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unk
    (list in [S4 status](../ipad-app-design.md#s4-status)). Please report anything else: a note that comes out differently, a component
    that does not draw, a note shown as plain Markdown with a notice that the desktop draws fine.
 
+## The editor lab (spike S3)
+
+**More menu, Editor lab (spike S3).** It is a lab, not the editor: nothing in it is saved, and *Text* offers a sample, the note selected in the list (to type in
+without changing it), and a 5,000-line note with and without views in it. The line under the text says whether it is still on TextKit 2 and what the colouring
+costs. It has been run in the Simulator only (what it showed is in [S3 status](../ipad-app-design.md#s3-status)); these are the things only the iPad can show.
+Use a **Release** build (install step 6) for the numbers.
+
+14. **Scribble.** With the Pencil, write a few words into the text on the *Sample* note, between lines and at the end. They should turn into text, and the colours
+   should carry on (a stray half-word of colouring while you write is fine; text lost or doubled is not). Try it inside a bold word too.
+15. **Typing in a long note.** Choose *5,000 lines*, tap into the middle, and type for a few seconds on the on-screen keyboard and on a hardware one. Does it keep up?
+   Read *last edit* and *worst* in the line under the text. Then *5,000 lines with views*, and scroll all the way down and up.
+16. **Views in the text.** In *5,000 lines with views* (or with *Insert a view*), draw in the grey canvas with the **Pencil**. The text must not scroll under the stroke, and
+   the stroke must be there after you scroll away and back.
+17. **Hide syntax.** Choose *Hide: tiny and clear* on the *Sample* note. Tap into a paragraph (its marks should come back), then use the arrow keys to cross from one
+   paragraph to the next, and drag the selection handles over a hidden mark. Note anything odd: the caret stuck for a press or two, a selection that includes marks you
+   cannot see, a jump when a paragraph reflows. If you use VoiceOver, move over a bold word and note whether it says "asterisk".
+18. **Find, and the `<` list.** *Find* should open the system find bar and mark every match. Type `<` at the start of a line: the list should sit by the caret, also with the
+   keyboard up and the caret near the bottom of the screen.
+19. **Rotate and Split View** with the lab open, with a canvas in the text. Does it lay out again without a jump or a blank?
+
+What to tell me for each: what you did, what you expected, what happened, and Debug or Release.
+
 ## What it leaves out
 
 Editing and autosave; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in

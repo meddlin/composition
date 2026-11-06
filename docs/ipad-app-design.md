@@ -3,11 +3,11 @@
 A native iPad app for Composition, written in Swift (with Objective-C, C and C++ only where something needs
 them), with Apple Pencil support. This page is the one place for the design, for which features work (or are
 expected to) on the iPad, and for every compromise made to get it running.
-**Design, spikes S1 and S2, the parse-and-draw half of S4, and a prototype app** (`apps/ios/CompositionCore`: the data layer, backup,
+**Design, spikes S1 and S2, the parse-and-draw half of S4, the Simulator half of S3, and a prototype app** (`apps/ios/CompositionCore`: the data layer, backup,
 the Trash Can, search and the Markdown and MDX layer, with their tests; `apps/ios/Composition`: a viewer on it; see [S1 status](#s1-status),
-[S2 status](#s2-status), [S4 status](#s4-status) and [The first app](#the-first-app)). **On a device:** you reported on 2026-11-06 that
-the prototype runs on your iPad with a backup of your real notes and works as expected for where it was; the preview added after that
-(S4) has run in the iPad Simulator only. Dates are 2026-11-05 and 2026-11-06.
+[S2 status](#s2-status), [S3 status](#s3-status), [S4 status](#s4-status) and [The first app](#the-first-app)). **On a device:** you reported on 2026-11-06 that
+the prototype runs on your iPad with a backup of your real notes and works as expected for where it was; the preview (S4) and the editor
+lab (S3), added after that, have run in the iPad Simulator only. Dates are 2026-11-05 and 2026-11-06.
 
 **Direction (changed 2026-11-05).** The two earlier research sessions leaned towards the existing web UI in a
 `WKWebView` shell with a native PencilKit plugin. You then asked for the app to feel **as native as possible**,
@@ -554,20 +554,20 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus. The prototype app uses a more forgiving mode (first letters, short words) on top ([C1](#compromise-register), [S2 status](#s2-status)) |
 | Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔬 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
 | Search bar | ⭐ | M1 | 🔨 | `.searchable` in the prototype (no tokens yet), with a readout of how long each search took |
-| Find in a note | ⭐ | M1 | ⬜ | `UIFindInteraction` |
+| Find in a note | ⭐ | M1 | 🔬 | `UIFindInteraction`. S3: the system find bar works on the editor's text, with the colours intact |
 | Spotlight indexing | 🆕 | Later | ⬜ | Core Spotlight |
 
 ### Writing
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Markdown tab | ⭐ | M1 | ⬜ | TextKit 2 with attribute runs; no overlay |
+| Markdown tab | ⭐ | M1 | 🔬 | TextKit 2 with attribute runs; no overlay. S3: the colours work in the lab on a 5,000-line note, but a full re-colour per keystroke is too slow there, so it needs an incremental one ([S3 status](#s3-status)); nothing is saved yet |
 | Preview tab | 🔁 | M1 | 🔨 | Prototype: SwiftUI blocks from `CompositionCore`'s model, in the Simulator ([S4 status](#s4-status)). The design's read-only text view with view-based attachments (selection across blocks) is not built |
 | Split tab | 🔁 | M1 | ⬜ | One column at narrow widths |
-| Live tab | ⚠️ | Later | ⬜ | Hidden marks away from the caret ([C12](#compromise-register), S3) |
-| Scribble, autocorrect, dictation, Writing Tools | ⭐ | M1 | ⬜ | System text engine |
+| Live tab | ⚠️ | Later | 🔬 | Hidden marks away from the caret ([C12](#compromise-register)). S3, Simulator only: a tiny clear font on the syntax, except in the caret's paragraph, works; swapping the displayed paragraph does not (the text comes out garbled). Not tried with the Pencil, arrow keys, selection handles or VoiceOver ([S3 status](#s3-status)) |
+| Scribble, autocorrect, dictation, Writing Tools | ⭐ | M1 | ⬜ | System text engine. Scribble cannot be tried in the Simulator: the Editor lab on your iPad is the test ([manual-tests/ipad.md](manual-tests/ipad.md)) |
 | Tab and Shift+Tab indent | 🔁 | M1 | ⬜ | `UIKeyCommand` plus accessory-bar buttons |
-| `<` component, prop and value completion | 🔁 | M1 | ⬜ | Popover at `caretRect(for:)` |
+| `<` component, prop and value completion | 🔁 | M1 | 🔬 | Popover at `caretRect(for:)`. S3: the list opens at the caret, narrows as you type, flips above the caret near the keyboard, and inserts the tag with the caret inside; only the component names, not props or values |
 | Note links: `[[` and the picker | 🔁 | M1 | ⬜ | Popover; tap a link to open |
 | Insert a stored image | 🔁 | M1 | ⬜ | Picker sheet |
 | Paste an image | ⭐ | M1 | ⬜ | `UITextPasteDelegate` |
@@ -656,7 +656,7 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 | **C9** | **`<Drawio>` diagrams are shown but not edited in v1.** | Med | Editing needs the vendored draw.io editor in a web view on its own origin, and touch behaviour is unknown. `<Ink>` covers sketching. | Revisit after v1 if S8 shows the editor works with touch and Pencil. | Proposed |
 | **C10** | **Ink is fully editable on Apple devices only.** We store our own stroke JSON beside a PNG. PencilKit's textured inks do not re-render identically elsewhere, so off Apple the promise is "view always, edit basic strokes". | Med | PencilKit's binary is not an interchange format. A PNG alone cannot be re-edited or recoloured for themes. | View only first (D11, decided); revisit when sync ships or a pen-capable non-Apple device is in daily use. | Accepted for v1 (you, 2026-11-05) |
 | **C11** | **Handwriting is searchable only through recognised text** written into `alt`. Quality on real handwriting is unknown. | Med | Handwriting is opaque to search. | Keep the transcript editable. Revisit after S5 with real pages. | Proposed |
-| **C12** | **The Live tab may arrive after v1, or ship reduced,** and the Markdown tab is the first writing surface. | Med | Hiding Markdown marks away from the caret in TextKit 2 is the riskiest part of the editor and is unverified. | Decide at Gate B from S3. | Deferred |
+| **C12** | **The Live tab may arrive after v1, or ship reduced,** and the Markdown tab is the first writing surface. | Med | Hiding Markdown marks away from the caret in TextKit 2 is the riskiest part of the editor. **S3 (Simulator): one way works** (a tiny clear font on the marks outside the caret's paragraph) **and one does not** (substituting the displayed paragraph); the open parts are the Pencil, arrow keys, selection and VoiceOver, which need the iPad. | Decide at Gate B, after the on-device checks in [manual-tests/ipad.md](manual-tests/ipad.md). | Deferred |
 | **C13** | **No in-app updater and no data location setting.** TestFlight or the App Store updates the app. | Low | Sandbox and platform rules. | None needed. | Proposed |
 | **C14** | **Backup and restore go through the Files picker,** by hand. | Med | No sync in v1 (C2). | Stays until the sync engine ships; backup then remains as a safety net. | Accepted for v1 (you, 2026-11-05) |
 | **C15** | **A minimum iPadOS version** (proposed: 17, for `CKSyncEngine` and the Observation framework). Older iPads are left out. | Low | Newer text and sync APIs. The device's iPadOS version is not recorded. | Set the floor at Gate A. | Proposed |
@@ -704,8 +704,8 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 
 | Id | Risk | Chance and impact | Mitigation |
 |---|---|---|---|
-| R1 | TextKit 2 cannot hide Markdown marks cleanly (caret, selection, undo), so the Live tab is not viable natively. | Medium, medium | S3; C12 lets v1 ship without it. |
-| R2 | View-based attachments (images, charts, ink in the text) are fragile: undocumented behaviour, and TextKit 1 fallback removes them. | Medium, high | S3; never touch `layoutManager`; test with a long note. |
+| R1 | TextKit 2 cannot hide Markdown marks cleanly (caret, selection, undo), so the Live tab is not viable natively. | Medium, medium | S3; C12 lets v1 ship without it. **S3 (Simulator): not ruled out.** Hiding by a tiny clear font outside the caret's paragraph keeps the text, typing and undo intact; swapping the displayed paragraph garbles it. Still to try on the iPad: arrow keys and selection across hidden marks, the Pencil, and VoiceOver, which will read marks that are only invisible ([S3 status](#s3-status)). |
+| R2 | View-based attachments (images, charts, ink in the text) are fragile: undocumented behaviour, and TextKit 1 fallback removes them. | Medium, high | S3; never touch `layoutManager`; test with a long note. **S3 (Simulator): holds.** A picture, a SwiftUI panel and a PencilKit canvas drew in a 5,036-line note, the canvas took strokes without the text scrolling, and the text view stayed on TextKit 2 through every test ([S3 status](#s3-status)). Not yet tried with the real Pencil, with a view that changes height, or after rotating the iPad. |
 | R3 | The rewrite is larger than v1 can afford: about 12,000 lines of UI plus the logic subset. | High, high | D13 scope; the D6 scaffold. **S1 measured the logic subset:** about 1,000 code lines still to port, 1,800 at most ([S1 status](#s1-status)), so the risk is the UI and the editor, not the data layer. The rating stays: nothing yet measures the UI in Swift. |
 | R4 | The TypeScript and Swift implementations drift. | High, high | D7: the conformance corpus; run in CI on both sides. |
 | R5 | cmark-gfm treats some Markdown (footnotes, tables, autolinks) differently from the web renderer. | Medium, medium | S4 compares the same notes side by side and lists divergences. **Partly done:** footnotes are not in swift-markdown at all (handled by our own pass, which agrees with the desktop on the corpus); tables, task lists, strikethrough and autolinks drew as the desktop's do on the showcase note; the full divergence list is in [S4 status](#s4-status). |
@@ -716,7 +716,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. **Done 2026-11-05 on the Mac and the Simulator** ([S1 status](#s1-status)); not yet on the device. |
 | R11 | Vision reads handwriting poorly, so handwritten notes stay unsearchable. | Medium, medium | C11; S5 with your handwriting. |
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
-| R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. |
+| R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. **S3 (Simulator, Release build): it does, with a full re-colour on every keystroke.** An edit in a 5,030-line note took 87 ms (22 ms to read the Markdown, 45 ms to apply the colours); the apply is UIKit's and not helped by a Release build. The editor therefore has to re-colour only what changed, and read the Markdown off the main thread or after a pause ([S3 status](#s3-status)). The iPad's own speed is not measured. |
 | R14 | Only one test device: no mini or Air, no Pencil Pro; the Simulator is believed not to emulate Pencil pressure, tilt or hover (unverified). | Certain, low | Recorded in D14; the Simulator covers sizes. |
 | R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. **Done in `.github/workflows/ios-core.yml`:** the `xcode-27` image with Xcode 27.2 pinned and Node 24, the toolchain used locally, only on the paths that can break the agreement (the repo is public, so macOS minutes are free). That image is still a GitHub *preview* (it can be unstable or queue), so the stable fallback is `macos-26` with Xcode 26.6. Not yet run on GitHub. |
 
@@ -728,7 +728,7 @@ Each spike is small and answers one question before anything is built for real. 
 |---|---|---|---|
 | **S1** | **Core and store.** A Swift package with GRDB opens a *copy* of a desktop `composition.db` in the Simulator, lists notes, leaves it unchanged under the `ensureColumn` pass (including `ensureUuids`, which the desktop landed in #244, and the outbox triggers if they have landed by then), and checks FTS5. Restores a desktop `.tar.gz` and writes one the desktop restores (zlib or hand-written gzip). Sets up the conformance harness. Measures the v1 logic subset. **Unblocked:** the `uuid` schema it needs is on `main`. | R6, R9, R10; D2, D7, C15 | Round trip both ways; FTS5 present; the harness runs one fixture on both sides; a current desktop database is a no-op for the Swift pass (the pass writes nothing; GRDB's own pool open does, see [S1 status](#s1-status)); every uuid survives a Trash round trip and a backup in each direction |
 | **S2** | **Search.** FTS5 plus the typo layer on 1,000 notes, with the `pnpm search:playground` corpus. | R7; D3, C1 | Under 200 ms end to end; the C1 acceptance test passes. **Done: [S2 status](#s2-status)** |
-| **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4) |
+| **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4). **Simulator half done:** [S3 status](#s3-status); the Pencil, Scribble and the iPad's speed are left for the device |
 | **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws. **Mostly done:** [S4 status](#s4-status); what is left is the text-view renderer and the player |
 | **S5** | **Ink.** PencilKit full-screen and inline; export to the stroke JSON and back; the PNG with its chunk; render in every scheme, in dark mode too; the desktop and CLI show it from a backup. Real handwriting through Vision. | R11, R12; D9, C10, C11 | **Gate C**: format frozen; a dense page's size measured |
 | **S6** | **Lifecycle.** Background while typing, kill and relaunch, state restoration, a second window on the same database. | N5; R4 | No lost keystrokes |
@@ -930,6 +930,54 @@ so its guesses would have to be intersected with the notes' vocabulary; it would
 - Phrases are exact (no typos inside quotes), which was not checked against Meilisearch beyond the five phrase queries.
 - Nothing ran on the iPad, and the iPadOS floor was not tried: only the Simulator's SQLite 3.51.0 and the Mac's 3.54.0.
 - Spotlight and the `.searchable` tokens remain Later.
+
+### S3 status
+
+**Built and measured 2026-11-06 in the iPad Pro 11-inch (M5) Simulator (iOS 26.4, on a Mac); not tried on an iPad, and not with the Pencil.** The
+colouring is `apps/ios/CompositionCore/Sources/CompositionCore/Markdown/MarkdownHighlighter.swift`, which reads a note with swift-markdown's source
+ranges and says where headings, bold, code, links, list markers, quotes, tags, the frontmatter and the *syntax marks* are, as UTF-16 ranges (7 tests,
+including text with two-, three- and four-byte characters). The experiments are in the app: `EditorLab.swift` and `EditorLabView.swift`, reached
+from the More menu as **Editor lab (spike S3)**: a `UITextView` on TextKit 2 with the experiments around it and a line of numbers. It is a lab, not
+the editor: nothing is saved, and "Selected note" opens a note's text to type in without changing it.
+
+| Question | Answer, from the Simulator |
+|---|---|
+| Does it stay on TextKit 2? | **Yes**, through everything below. The text view is made with `usingTextLayoutManager: true`; its `textStorage` is read and written (attributes only) without a fallback, and `layoutManager` is never touched. The lab shows "TextKit 2" and would say so if it fell back |
+| Markdown colours as attributes | **Work.** Only attributes change, never the characters, and not while a composition is under way (`markedTextRange`), so the selection and the undo stack survive. Typing, then undo, left the text as it was (561 characters again) |
+| Find | **Works.** `isFindInteractionEnabled` and `presentFindNavigator` give the system find bar: "3 of 3" for a word, matches highlighted over our colours |
+| A completion list at the caret | **Works.** Typing `<I` lists `<Info>` and `<Image>` just under the caret (above it when the keyboard leaves no room); picking one inserts the tag and puts the caret inside. Component names only, not props or values |
+| Views inside the text | **Work.** A picture, a SwiftUI panel (`UIHostingConfiguration`) and a PencilKit canvas, each as an `NSTextAttachmentViewProvider`, in a 5,036-line note. The canvas took a stroke and the text did not scroll under it (a finger path in the Simulator; the Pencil is not tried) |
+| Hiding the syntax, way 1: a tiny clear font | **Works in the Simulator.** The `#`, `**`, backticks, `[`, `](url)` and `>` outside the caret's paragraph vanish and the text keeps its styling; entering a paragraph shows its marks again (the paragraph reflows). The lab re-colours the note to do it, which is the cost problem below. A hidden `](url)` leaves a gap of a few points |
+| Hiding the syntax, way 2: swap the displayed paragraph | **Does not work.** `textContentStorage(_:textParagraphWith:)` returning a paragraph without the marks makes the shown text drift from the stored text: in the test the `c` of `code` and the space after a closing backtick were gone. It did not crash |
+| A 5,000-line note | See below |
+
+**What a 5,030-line, 100,615-character note with 20 views costs** (8,088 colour spans; the Simulator on a Mac, so the iPad's own speed is not measured):
+
+| | Debug | Release |
+|---|---|---|
+| Read the Markdown (swift-markdown plus the spans) | 58 ms | 17 to 22 ms (28 ms for 7,005 lines in a Mac test) |
+| Apply the colours to the whole text | 47 ms | 45 ms |
+| One edit, all of it | 125 ms | 87 ms |
+| Lay out the whole note | 110 ms | 112 ms |
+
+The applying is UIKit's work, so a Release build does not shorten it, and reading the Markdown is proportional to the note: both are paid
+on every keystroke when the whole note is re-coloured, which is what the lab does. At 87 ms that is far over one frame. **For the real editor:** colour
+only the paragraphs around the edit and let an idle pause redo the whole note (so what a one-paragraph read gets wrong, such as a fenced block
+or a list that spans a blank line, is put right a moment later), and read the Markdown off the main thread. Not built or measured: it is what the lab
+exists to show is needed. A note of 37 lines costs 0.5 ms.
+
+**Not tried, and why it matters:**
+
+- **Scribble, and the Pencil in a text view.** Neither can be driven in the Simulator. The colouring skips a composition in progress, which is what Scribble and
+  dictation use, but that is by reading the code, not by trying it.
+- **Arrow keys and selection across hidden marks.** An arrow key probably needs one press for each hidden character, and a selection handle can probably land inside a
+  hidden mark. Not tried, and the reason way 1 is "works in the Simulator" and not "works".
+- **VoiceOver** would probably read text that is only invisible, so the hidden marks aloud. Not tried; a fix is likely to need a custom layout rather than attributes.
+- The hardware keyboard's shortcuts, Dynamic Type, Writing Tools, a note that is edited while it is also on screen in another window, and rotation.
+
+**What it means for Gate B** (a proposal, for you): D5 (a `UITextView` on TextKit 2) is supported for the Markdown and Split tabs; R2 holds in the Simulator; R13
+needs an incremental re-colour in the editor's design before M1; the Live tab (C12) is *not ruled out* but stays after v1 until the on-device items above pass.
+Gate B also waits for the same on-device checks, listed in [manual-tests/ipad.md](manual-tests/ipad.md).
 
 ### S4 status
 
@@ -1160,6 +1208,13 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   this is to be discussed later. Recorded as a non-goal, as D19 (*Decided for now*), and in the tracker as *Parked* (a new Plan value, not
   *Later*, which promises a port); C6 no longer lists it, C19 is parked with it, and S8's ChatGPT-sign-in question is parked. Nothing was built or
   removed: no AI code existed on the iPad side.
+
+- 2026-11-06: **S3 editor spike, Simulator half.** `MarkdownHighlighter` in the core and an *Editor lab* in the app (a TextKit 2 `UITextView` with colours, find, a
+  completion list at the caret, a picture, a SwiftUI panel and a PencilKit canvas inside the text, two ways of hiding the syntax, and a 5,000-line note). Found: it
+  stays on TextKit 2; find, completion and views in the text work; hiding by a tiny clear font works and swapping the displayed paragraph garbles the text; a full
+  re-colour of a 5,030-line note costs 87 ms an edit even in Release (45 ms of it UIKit applying attributes), so the editor must re-colour only what changed.
+  R1, R2, R13, C12 and the tracker's Markdown, Live, completion and find rows updated. Not done: Scribble and the Pencil, arrow keys and selection across hidden
+  marks, VoiceOver, and the iPad's own speed, which need the device (new items in the manual test page). Gate B is not passed.
 
 ## Sources
 
