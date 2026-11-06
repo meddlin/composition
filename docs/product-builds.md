@@ -154,6 +154,11 @@ It is mostly configuration, and small:
 
 - 2026-09-30: macOS only for now; Windows and Linux builds come later.
 - 2026-11-05: Linux x64 desktop builds added (`.deb` and AppImage, Ubuntu first, unsigned). The `.deb` is updated by hand, the AppImage updates itself. Linux arm64 and Windows are still later.
+- 2026-11-05: every note, group, notebook, trashed item and attachment carries a stable `uuid` in the shared schema, the one change the
+  iPad app and cross-device sync both need first. It is additive and safe for older builds: a nullable column, an `AFTER INSERT` trigger
+  that fills it from built-in SQL (so an older build's inserts still get one), a unique index, and a backfill on first open in
+  200-row transactions. The integer `id` stays the local handle (favorites, `note:<id>` links, the search index and IPC are unchanged),
+  and the Trash Can carries the uuid both ways. See [data-model.md](architecture/data-model.md#identity-the-uuid-column).
 - 2026-09-30: for now all products share `composition.db`; this page is the record of the
   intended later split.
 - 2026-09-30: the desktop app bundles Meilisearch in v1.

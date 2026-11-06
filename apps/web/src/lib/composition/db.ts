@@ -215,11 +215,57 @@ function ensureColumn(db: Database.Database, table: string, column: string, ddl:
 }
 
 /**
+ * Every row of these tables carries a `uuid`: a random 128-bit value as 32 lowercase hex characters, the same for the
+ * life of the row on every device (docs/architecture/data-model.md). The integer `id` stays the local handle, so
+ * nothing that refers to one (favorites, `note:<id>` links, the search index) changes. Trash moves carry the uuid
+ * across (trashRepo.ts), so a restored note keeps it.
+ */
+const UUID_TABLES = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"] as const;
+
+/** Built-in SQL only: an older build opening this file has no user-defined functions, and its inserts must still work. */
+const NEW_UUID = "lower(hex(randomblob(16)))";
+
+/** Rows filled per write transaction, so the backfill never holds the writer (a running CLI, say) for long. */
+const UUID_BACKFILL_BATCH = 200;
+
+/**
+ * Adds `uuid` to every table that carries one and fills it for the rows that have none. The column, the `AFTER INSERT`
+ * trigger and the unique index go in together, in one transaction: from then on a row written by an older build, which
+ * does not know the column, gets a uuid from the trigger. The index goes in before the backfill so that finding the
+ * rows still to fill (and knowing, on every later open, that there are none) is a lookup, not a scan of every note.
+ * Safe to run on every open, and from two processes at once.
+ */
+function ensureUuids(db: Database.Database): void {
+  db.transaction(() => {
+    for (const table of UUID_TABLES) {
+      ensureColumn(db, table, "uuid", `ALTER TABLE ${table} ADD COLUMN uuid TEXT`);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_${table}_fill_uuid AFTER INSERT ON ${table} WHEN NEW.uuid IS NULL
+        BEGIN
+          UPDATE ${table} SET uuid = ${NEW_UUID} WHERE rowid = NEW.rowid;
+        END;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_${table}_uuid ON ${table} (uuid);
+      `);
+    }
+  }).immediate();
+
+  for (const table of UUID_TABLES) {
+    const fill = db.prepare(
+      `UPDATE ${table} SET uuid = ${NEW_UUID}
+       WHERE rowid IN (SELECT rowid FROM ${table} WHERE uuid IS NULL LIMIT ${UUID_BACKFILL_BATCH})`,
+    );
+    while (fill.run().changes > 0);
+  }
+}
+
+/**
  * Makes sure there is a notebook, and that every note and group is in one. A database
  * from before notebooks gets a single "Notebook" holding everything it had; rows
  * written by an older CLI (which knows nothing of notebooks) join the first notebook.
  */
 export function adoptOrphans(db: Database.Database): void {
+  // Immediate: it reads and then writes, and a deferred transaction that has to upgrade fails at once (no busy
+  // timeout) if another app committed in between, as another app's first-open backfill does (ensureUuids).
   db.transaction(() => {
     let first = db.prepare("SELECT MIN(id) AS id FROM notebooks").get() as { id: number | null };
     if (first.id === null) {
@@ -232,7 +278,7 @@ export function adoptOrphans(db: Database.Database): void {
     for (const table of ["notes", "groups", "trashed_notes", "trashed_groups"]) {
       db.prepare(`UPDATE ${table} SET notebook_id = ? WHERE notebook_id IS NULL`).run(first.id);
     }
-  })();
+  }).immediate();
 }
 
 function openConnection(dbPath: string): Database.Database {
@@ -273,6 +319,7 @@ function openConnection(dbPath: string): Database.Database {
   for (const table of ["notes", "groups", "trashed_notes", "trashed_groups"]) {
     ensureColumn(db, table, "notebook_id", `ALTER TABLE ${table} ADD COLUMN notebook_id INTEGER`);
   }
+  ensureUuids(db);
   adoptOrphans(db);
   return db;
 }

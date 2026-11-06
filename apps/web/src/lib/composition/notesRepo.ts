@@ -6,6 +6,11 @@ import { placeBefore } from "./ordering";
 
 export type Note = {
   id: number;
+  /**
+   * Stable across devices and Trash moves (db.ts); `id` remains the local handle. Always set on a row read from the
+   * database. Optional on the model so that code and fixtures built before the column existed still compile.
+   */
+  uuid?: string;
   title: string;
   content: string;
   tags: string;
@@ -18,6 +23,7 @@ export type Note = {
 
 export type NoteRow = {
   id: number;
+  uuid: string;
   title: string;
   content: string;
   tags: string;
@@ -31,6 +37,7 @@ export type NoteRow = {
 export function fromRow(row: NoteRow): Note {
   return {
     id: row.id,
+    uuid: row.uuid,
     title: row.title,
     content: row.content,
     tags: row.tags,

@@ -1,3 +1,4 @@
+import type Database from "better-sqlite3";
 import { getDb } from "./db";
 import { fromRow as noteFromRow, type Note, type NoteRow } from "./notesRepo";
 import { defaultNotebookId } from "./notebooksRepo";
@@ -23,8 +24,8 @@ export function trashNote(id: number): void {
   db.transaction(() => {
     db.prepare(
       `INSERT OR REPLACE INTO trashed_notes
-         (id, title, content, tags, description, created_at, updated_at, group_id, notebook_id, deleted_at)
-       SELECT id, title, content, tags, description, created_at, updated_at, group_id, notebook_id, ?
+         (id, uuid, title, content, tags, description, created_at, updated_at, group_id, notebook_id, deleted_at)
+       SELECT id, uuid, title, content, tags, description, created_at, updated_at, group_id, notebook_id, ?
        FROM notes WHERE id = ?`,
     ).run(nowIso(), id);
     db.prepare("DELETE FROM notes WHERE id = ?").run(id);
@@ -45,8 +46,8 @@ export function trashGroup(id: number): void {
     }
     db.prepare(
       `INSERT OR REPLACE INTO trashed_groups
-         (id, name, parent_id, notebook_id, created_at, updated_at, deleted_at)
-       SELECT id, name, parent_id, notebook_id, created_at, updated_at, ?
+         (id, uuid, name, parent_id, notebook_id, created_at, updated_at, deleted_at)
+       SELECT id, uuid, name, parent_id, notebook_id, created_at, updated_at, ?
        FROM groups WHERE id = ?`,
     ).run(nowIso(), id);
     db.prepare("DELETE FROM groups WHERE id = ?").run(id);
@@ -86,6 +87,15 @@ export function getTrashedNotes(ids: number[]): Note[] {
   return rows.map(noteFromRow);
 }
 
+/**
+ * The uuid a restored row goes back with: the one it was trashed with. Like its id, it is only given up if something
+ * else already holds it (the database was swapped underneath us), and null makes the table's trigger issue a fresh one.
+ */
+function restoredUuid(db: Database.Database, table: "notes" | "groups", uuid: string | null): string | null {
+  if (uuid === null) return null;
+  return db.prepare(`SELECT 1 FROM ${table} WHERE uuid = ?`).get(uuid) ? null : uuid;
+}
+
 /** The notebook an item was trashed from if it still exists, else the default one. */
 function survivingNotebookId(notebookId: number | null): number {
   const exists =
@@ -105,6 +115,7 @@ export function restoreNote(id: number): { restoredToTopLevel: boolean } | null 
   return db.transaction(() => {
     const row = db.prepare("SELECT * FROM trashed_notes WHERE id = ?").get(id) as
       | {
+          uuid: string | null;
           title: string;
           content: string;
           tags: string;
@@ -130,10 +141,11 @@ export function restoreNote(id: number): { restoredToTopLevel: boolean } | null 
     // mean the database was swapped underneath us, and a fresh id is still correct.
     const idTaken = db.prepare("SELECT 1 FROM notes WHERE id = ?").get(id);
     db.prepare(
-      `INSERT INTO notes (id, title, content, tags, description, created_at, updated_at, group_id, notebook_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO notes (id, uuid, title, content, tags, description, created_at, updated_at, group_id, notebook_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       idTaken ? null : id,
+      restoredUuid(db, "notes", row.uuid),
       row.title,
       row.content,
       row.tags,
@@ -157,6 +169,7 @@ export function restoreGroup(id: number): { restoredToTopLevel: boolean } | null
   return db.transaction(() => {
     const row = db.prepare("SELECT * FROM trashed_groups WHERE id = ?").get(id) as
       | {
+          uuid: string | null;
           name: string;
           parent_id: number | null;
           notebook_id: number | null;
@@ -176,9 +189,17 @@ export function restoreGroup(id: number): { restoredToTopLevel: boolean } | null
     const notebookId = parent?.notebook_id ?? survivingNotebookId(row.notebook_id);
     const idTaken = db.prepare("SELECT 1 FROM groups WHERE id = ?").get(id);
     db.prepare(
-      `INSERT INTO groups (id, name, parent_id, notebook_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(idTaken ? null : id, row.name, parentId, notebookId, row.created_at, row.updated_at);
+      `INSERT INTO groups (id, uuid, name, parent_id, notebook_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      idTaken ? null : id,
+      restoredUuid(db, "groups", row.uuid),
+      row.name,
+      parentId,
+      notebookId,
+      row.created_at,
+      row.updated_at,
+    );
     db.prepare("DELETE FROM trashed_groups WHERE id = ?").run(id);
     return { restoredToTopLevel: row.parent_id !== null && parentId === null };
   })();

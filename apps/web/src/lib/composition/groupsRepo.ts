@@ -6,6 +6,8 @@ import { placeBefore } from "./ordering";
 
 export type Group = {
   id: number;
+  /** See `Note.uuid`. */
+  uuid?: string;
   name: string;
   parentId: number | null;
   notebookId: number;
@@ -15,6 +17,7 @@ export type Group = {
 
 type GroupRow = {
   id: number;
+  uuid: string;
   name: string;
   parent_id: number | null;
   notebook_id: number;
@@ -31,6 +34,7 @@ export class InvalidNotebookMoveError extends Error {}
 function fromRow(row: GroupRow): Group {
   return {
     id: row.id,
+    uuid: row.uuid,
     name: row.name,
     parentId: row.parent_id,
     notebookId: row.notebook_id,
