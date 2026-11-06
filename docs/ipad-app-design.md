@@ -95,7 +95,7 @@ Legend for the tracker:
 |---|---|
 | Design before code | Nothing is built until this page is agreed. |
 | **Native, in Swift and Objective-C, with C and C++ where necessary** | Stated 2026-11-05. Reflected in [Languages](#languages-and-dependencies). |
-| Test hardware | iPad Pro with the M2 chip and a wireless-charging Apple Pencil. Assumed to be the **2nd generation**, since Apple lists the Pencil Pro only for M4/M5 iPad Pro and M2-and-later iPad Air ([Apple](https://support.apple.com/guide/ipad/aside/ipad47ee2e98/ipados)). It has hover and double-tap and no squeeze or barrel roll. The screen size and the iPadOS version are not recorded. |
+| Test hardware | iPad Pro with the M2 chip and a wireless-charging Apple Pencil. Assumed to be the **2nd generation**, since Apple lists the Pencil Pro only for M4/M5 iPad Pro and M2-and-later iPad Air ([Apple](https://support.apple.com/guide/ipad/aside/ipad47ee2e98/ipados)). It has hover and double-tap and no squeeze or barrel roll. The iPad is on **iPadOS 27.0.1** (you, 2026-11-06); the screen size is not recorded. |
 | A handwritten note may depart from "Markdown only" on the iPad | Stated as acceptable. The design below keeps it Markdown anyway. |
 
 ## What the app is today
@@ -325,7 +325,7 @@ The query parser ports as it is. **SQLite FTS5 replaces Meilisearch.**
   iOS 11.4 and that GRDB's package build enables it ([secondhand](https://github.com/steipete/GRDB.swift/blob/master/Documentation/CustomSQLiteBuilds.md)).
   **S1 result (2026-11-05):** present, with the `unicode61`, `porter`, `ascii` and `trigram` tokenizers, in the SQLite
   GRDB 7.12.0 links on the Mac (3.54.0) and in the iPad Pro 11-inch (M5) Simulator runtime (3.51.0). **Not yet
-  checked on the iPad itself,** whose iPadOS version is not recorded. The fallback, if the device lacks it, is a custom SQLite build.
+  checked on the iPad itself** (iPadOS 27.0.1). The fallback, if the device lacks it, is a custom SQLite build.
 - **Typo tolerance was the regression** ([C1](#compromise-register)): `title: routng` finds "routing", and FTS5 has no fuzzy
   matching. **S2 built option (2), expanding each typed word against the index's `fts5vocab` table,** which reproduces
   Meilisearch's rules (below) closely enough that the result *sets* are identical on every acceptance query. C++ was not
@@ -550,9 +550,9 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Full-text search | ⚠️ | M1 | 🔬 | FTS5 through GRDB, in an index file of its own ([S2 status](#s2-status)); present and fast on the Mac and in the Simulator; not wired to the store; not checked on the device |
-| Typo-tolerant search | 🔁 | M1 | 🔬 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus. The prototype app uses a more forgiving mode (first letters, short words) on top ([C1](#compromise-register), [S2 status](#s2-status)) |
-| Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔬 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
+| Full-text search | ⚠️ | M1 | 🔨 | FTS5 through GRDB, in an index file of its own ([S2 status](#s2-status)); present and fast on the Mac and in the Simulator; the prototype keeps it in step on trash and restore, and nothing calls `upsert` yet because nothing edits; not measured on the device |
+| Typo-tolerant search | 🔁 | M1 | 🔨 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus. The prototype app uses a more forgiving mode (first letters, short words) on top ([C1](#compromise-register), [S2 status](#s2-status)) |
+| Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔨 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
 | Search bar | ⭐ | M1 | 🔨 | `.searchable` in the prototype (no tokens yet), with a readout of how long each search took |
 | Find in a note | ⭐ | M1 | 🔬 | `UIFindInteraction`. S3: the system find bar works on the editor's text, with the colours intact |
 | Spotlight indexing | 🆕 | Later | ⬜ | Core Spotlight |
@@ -630,8 +630,8 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Backup round trip, iPad to desktop and back | ⚠️ | M1 | ⬜ | The schema must stay identical; the corpus tests it |
-| Stable `uuid` on notes, groups, notebooks, the Trash Can and attachments | 🔁 | M1 | ⬜ | **Landed on the desktop** (#244, 2026-11-05). The Swift core runs the same pass (column, fill trigger, unique index, batched backfill), copies it through the Trash Can and leaves it out of inserts ([Sync](#sync-and-the-data-model)) |
+| Backup round trip, iPad to desktop and back | ⚠️ | M1 | 🔨 | The schema must stay identical; the corpus tests it, both ways on the Mac (the desktop restores what the Swift core writes), and the prototype exports through the share sheet. Not yet round-tripped by hand on the iPad |
+| Stable `uuid` on notes, groups, notebooks, the Trash Can and attachments | 🔁 | M1 | 🔨 | **Landed on the desktop** (#244, 2026-11-05). The Swift core runs the same pass (column, fill trigger, unique index, batched backfill), copies it through the Trash Can and leaves it out of inserts ([Sync](#sync-and-the-data-model)) |
 | Change capture: triggers, `sync_outbox`, `sync_*` tables | 🆕 | Later | ⬜ | Not on `main`. Moves to M1 if it lands before Gate A; otherwise the fallback adds it in a later release ([D8](#decisions)) |
 | Sign-in and the sync engine | 🆕 | Later | ⬜ | Own account-based service, designed separately ([D8](#decisions)) |
 | Export as `.md` files plus assets | 🆕 | Later | ⬜ | Optional export for backup, history and portability only; never storage and not a sync engine |
@@ -659,7 +659,7 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 | **C12** | **The Live tab may arrive after v1, or ship reduced,** and the Markdown tab is the first writing surface. | Med | Hiding Markdown marks away from the caret in TextKit 2 is the riskiest part of the editor. **S3 (Simulator): one way works** (a tiny clear font on the marks outside the caret's paragraph) **and one does not** (substituting the displayed paragraph); the open parts are the Pencil, arrow keys, selection and VoiceOver, which need the iPad. | Decide at Gate B, after the on-device checks in [manual-tests/ipad.md](manual-tests/ipad.md). | Deferred |
 | **C13** | **No in-app updater and no data location setting.** TestFlight or the App Store updates the app. | Low | Sandbox and platform rules. | None needed. | Proposed |
 | **C14** | **Backup and restore go through the Files picker,** by hand. | Med | No sync in v1 (C2). | Stays until the sync engine ships; backup then remains as a safety net. | Accepted for v1 (you, 2026-11-05) |
-| **C15** | **A minimum iPadOS version** (proposed: 17, for `CKSyncEngine` and the Observation framework). Older iPads are left out. | Low | Newer text and sync APIs. The device's iPadOS version is not recorded. | Set the floor at Gate A. | Proposed |
+| **C15** | **A minimum iPadOS version** (proposed: 17, for `CKSyncEngine` and the Observation framework). Older iPads are left out. | Low | Newer text and sync APIs. The device is on iPadOS 27.0.1, well above it. | **Decided with D16 (you, 2026-11-06): the floor is 17.** | Decided |
 | **C16** | **Contributors need a Mac, Xcode and Swift to touch the iPad app,** and CI needs a macOS runner. The Windows and Linux builds cannot build it. | Low | Native toolchain. | Keep the core package buildable with `swift test` on a Mac without a simulator. New workflow actions are pinned to commit SHAs ([AGENTS.md](../AGENTS.md)). | Proposed |
 | **C17** | **Swift packages enter the supply chain:** GRDB, swift-markdown, perhaps Yams. | Low | Writing a SQLite wrapper and a Markdown parser ourselves is worse. | Exact versions, `Package.resolved` checked in, a row in [Languages](#languages-and-dependencies) before each addition. | Proposed |
 | **C18** | **Photos from the Photos app are converted from HEIC to JPEG** on import. | Low | `images.ts` accepts only PNG, JPEG, GIF and WebP, and the desktop cannot show HEIC. | Allow HEIC only if conversion proves too lossy. | Proposed |
@@ -673,18 +673,18 @@ the web view being reclaimed while typing; layouts that break at a third of the 
 
 ## Decisions
 
-Recommendations are proposals until the status says *Decided*. **Needs your input:** none right now; the proposals settle at their gates. **To discuss later, when you raise it:** whether the iPad app ever gets an AI helper ([D19](#decisions)).
+Recommendations are proposals until the status says *Decided*. **Needs your input:** none right now. Gate A was passed on 2026-11-06 (D2, D3, D7 and D16 decided, D6 closed); the other proposals settle at their gates. **To discuss later, when you raise it:** whether the iPad app ever gets an AI helper ([D19](#decisions)).
 
 | Id | Decision | Recommendation | Status |
 |---|---|---|:-:|
 | D0 | Design before code. | Nothing is built until this page is agreed. | **Decided** (you) |
 | D1 | **Native app in Swift, Objective-C, C and C++ where necessary.** | O3. Languages per [Languages](#languages-and-dependencies); Swift first. | **Decided** (you); details proposed |
-| D2 | Storage. | **SQLite is the source of truth, not a folder of `.md` files.** Access through GRDB on the identical schema, `ensureColumn` migrations, no Core Data or SwiftData. | SQLite: **Decided** (you, 2026-11-05). GRDB and the rest: proposed; settled at Gate A |
-| D3 | Search. | FTS5 plus a typo-tolerance layer, accepting C1 if the acceptance test passes. **It passed (S2):** the index is its own file, ranked by attribute then recency, with the vocabulary expansion described under Search. | Proposed; S2's evidence is in, settled at Gate A |
+| D2 | Storage. | **SQLite is the source of truth, not a folder of `.md` files.** Access through GRDB on the identical schema, `ensureColumn` migrations, no Core Data or SwiftData. | **Decided** (you): SQLite on 2026-11-05; GRDB and the rest at Gate A, 2026-11-06 |
+| D3 | Search. | FTS5 plus a typo-tolerance layer, accepting C1 if the acceptance test passes. **It passed (S2):** the index is its own file, ranked by attribute then recency, with the vocabulary expansion described under Search. | **Decided** (you, at Gate A, 2026-11-06) |
 | D4 | Markdown and MDX engine. | swift-markdown plus our restricted MDX scanner, drawing native views in a TextKit 2 text view. | Proposed; settled at Gate B |
 | D5 | Editor. | `UITextView` on TextKit 2; Markdown, Preview and Split first, Live after v1 unless S3 makes it cheap (C12). | Proposed; settled at Gate B |
-| D6 | May the existing web renderer be used as a **temporary** preview scaffold (O4)? | Yes, only to get the editor and store to a usable app sooner; it must be removed once the native renderer passes the fixtures, and it counts against N2 until then. | Proposed |
-| D7 | Keeping the rules in step. | The shared conformance corpus. | Proposed; settled at Gate A |
+| D6 | May the existing web renderer be used as a **temporary** preview scaffold (O4)? | Yes, only to get the editor and store to a usable app sooner; it must be removed once the native renderer passes the fixtures, and it counts against N2 until then. | **Closed** (you, at Gate A, 2026-11-06): not needed, because S4 built a native Preview |
+| D7 | Keeping the rules in step. | The shared conformance corpus. | **Decided** (you, at Gate A, 2026-11-06) |
 | D8 | **Sync.** | **v1 is backup and restore, built sync-ready; the iPad does not wait for the sync service.** Syncing with the Mac, Windows and Linux desktop apps comes later, from `docs/cross-device-sync-design.md`. Sync-ready is defined in [Sync](#sync-and-the-data-model). **Fallback:** if the desktop's trigger work slips, the iPad starts from `uuid` alone. **Status:** the `uuid` landed on `main` in #244 (2026-11-05); the capture triggers, outbox and `sync_*` tables have not, so the fallback is in effect. | **Decided** (you, 2026-11-05) |
 | D9 | Ink storage format. | A PNG with embedded versioned stroke JSON using semantic colours, plus an optional PencilKit blob. The stroke JSON also keeps each stroke's **ink type** and per-point data, so the iPad can rebuild textured strokes after another platform edits the drawing, and **preserves unknown fields on edit**. An edit elsewhere makes the PencilKit blob stale, so the iPad prefers the JSON afterwards. | Proposed; frozen at Gate C |
 | D10 | Which Pencil layers ship. | Scribble and PencilKit in v1; Pencil events after. No web ink canvas on the iPad. | Proposed |
@@ -693,7 +693,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D13 | **v1 scope.** | **The full notes editor without plugins**, built in three milestones: M1 and M2 as test installs on the dev iPad, M3 as the first release combining them ([v1 scope and milestones](#v1-scope-and-milestones)). A capture-and-read companion was rejected: with no sync in v1 it would be a data silo, and it saves only UI polish. | **Decided** (you, 2026-11-05) |
 | D14 | Test hardware. | iPad Pro (M2) and a 2nd-generation Pencil. | **Decided** (you) |
 | D15 | A handwritten note may leave "Markdown only" on the iPad. | Acceptable; the design keeps it Markdown anyway. | **Decided** (you) |
-| D16 | Deployment floor. | iPadOS 17 (C15), confirmed against the iPad's actual version. | Proposed |
+| D16 | Deployment floor. | iPadOS 17 (C15), confirmed against the iPad's actual version. | **Decided** (you, 2026-11-06): the floor is 17; the iPad is on iPadOS 27.0.1 |
 | D17 | Panels, pop-outs and plugins stay out of v1. | See C5 and C6. (The AI helper is a separate decision: D19.) | Proposed |
 | D18 | `<Drawio>` is not edited on the iPad in v1. | See C9. | Proposed |
 | D19 | **No AI helper in the iPad app: no local one (Ollama), no ChatGPT sign-in.** | Nothing is built, designed or spiked for it, and the iPad's tracker rows for it are *Parked*, not *Later*. **Open for the discussion** (none looked at yet): whether the iPad ever gets one and in what form, what it does with any AI settings that arrive inside a desktop backup, and the cost recorded in [C19](#compromise-register). | **Decided for now** (you, 2026-11-06); to be discussed later |
@@ -1076,8 +1076,8 @@ install it and what to try: [manual-tests/ipad.md](manual-tests/ipad.md).
 
 **Gate A** (after S1 and S2): commit to the native data layer, GRDB and FTS5; take the sync-ready schema from
 the desktop as it is then (D8: the `uuid` is on `main`; take the capture triggers too if they have landed); set the iPadOS floor (D2, D3, D7, D16); then write the build plan as its own page (`ipad-build-plan.md`, in the style of
-[windows-build-plan.md](windows-build-plan.md)). **Gate B** (after S3 and S4): commit to the editor and renderer,
-decide whether the Live tab is in v1, and whether the D6 scaffold is needed. **Gate C** (after S5): freeze D9. A
+[windows-build-plan.md](windows-build-plan.md)). **Gate A was passed on 2026-11-06** (you accepted D2, D3 and D7, set the floor at iPadOS 17 and closed D6); the build plan is [ipad-build-plan.md](ipad-build-plan.md). **Gate B** (after S3 and S4): commit to the editor and renderer,
+decide whether the Live tab is in v1 (the D6 scaffold was closed at Gate A). **Gate C** (after S5): freeze D9. A
 final pass on the device is yours.
 
 ## Testing
@@ -1215,6 +1215,16 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   re-colour of a 5,030-line note costs 87 ms an edit even in Release (45 ms of it UIKit applying attributes), so the editor must re-colour only what changed.
   R1, R2, R13, C12 and the tracker's Markdown, Live, completion and find rows updated. Not done: Scribble and the Pencil, arrow keys and selection across hidden
   marks, VoiceOver, and the iPad's own speed, which need the device (new items in the manual test page). Gate B is not passed.
+
+- 2026-11-06: **The M1 build plan is written** ([ipad-build-plan.md](ipad-build-plan.md)): twelve steps from Gate A to the first device install, with the decisions it needs (G1 to G7),
+  the risks, and which steps can run side by side. Five tracker rows that had gone stale were corrected (full-text search, typo tolerance and the filters to built, since the
+  prototype uses them; the backup round trip and the stable `uuid` to built, since conformance checks both). Found while planning: favorites, the colour scheme and the saved
+  city live in the desktop's `settings.json`, which a backup carries; the Swift core never writes one, so favorites cannot round-trip yet, and a restore *replaces* the
+  desktop's settings with the backup's, so the iPad must not hand over a partial file. D6 is recommended closed; D17 and the rest are unchanged.
+
+- 2026-11-06: **Gate A passed.** You accepted D2 (SQLite through GRDB, `ensureColumn` migrations, no Core Data or SwiftData), D3 (FTS5 plus the typo layer, in its own `search.db`) and
+  D7 (the conformance corpus), set the deployment floor at iPadOS 17 (D16; the iPad is on 27.0.1, C15 decided with it) and closed D6 (no web-renderer scaffold). Nothing is open for
+  you now; the M1 build plan starts at its Step 1.
 
 ## Sources
 
