@@ -11,8 +11,18 @@ final class EditorHandle {
     var location: DataLocation?
     var noteTitle: () -> String = { "" }
     var problem: (String) -> Void = { _ in }
+    /// The notes the picker after `[[` offers (the latest first), and this note, which it leaves out.
+    var noteCandidates: () -> [NoteLinks.Candidate] = { [] }
+    var noteID: Int64?
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
+
+    /// The Link button: a link to another note at the caret, or over the selected words.
+    func linkToNote() {
+        guard let view = textView else { return }
+        view.becomeFirstResponder()
+        view.assist?.openNoteLink()
+    }
 
     /// Stores each picture and writes the Markdown that shows it at the caret (in place of the selection), as a paste does on the desktop; several go
     /// one to a paragraph. A picture that cannot be stored is reported and left out.
@@ -90,6 +100,82 @@ final class NoteTextView: UITextView {
 
     /// Pictures pasted from the clipboard go here (set by the editor) instead of the text view's own paste, which has no use for them.
     var pastePictures: (([ImageInput]) -> Void)?
+    /// The list at the caret (`<`, `[[`, the highlight colours), which takes some keys while it is open.
+    weak var assist: EditorAssist?
+
+    /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
+    func apply(_ edit: LineEdit) {
+        selectedRange = NSRange(location: edit.start, length: edit.end - edit.start)
+        insertText(edit.text)
+        selectedRange = NSRange(location: edit.selection.lowerBound, length: edit.selection.count)
+    }
+
+    // MARK: Hardware keyboard
+
+    /// Tab and Shift+Tab, ⌃] and ⌃[ for indenting, ⌘B and ⌘I, ⌘⇧K for a note link and ⌘⇧H for a highlight: the desktop's keys. Each has a title, which
+    /// is what holding ⌘ lists. Tab has priority over the system, which would otherwise move focus.
+    override var keyCommands: [UIKeyCommand]? { (super.keyCommands ?? []) + Self.shortcuts + [Self.escape] }
+
+    /// Escape closes an open list (and does nothing otherwise). It is a key command, the usual way to take Escape, as well as being read in `pressesBegan`;
+    /// it has no title, so the ⌘-hold list leaves it out. The UI tests cannot send Escape (it never reaches the app), so it is a manual-test item.
+    private static let escape: UIKeyCommand = {
+        let command = UIKeyCommand(input: UIKeyCommand.inputEscape, modifierFlags: [], action: #selector(escapePressed))
+        command.wantsPriorityOverSystemBehavior = true
+        return command
+    }()
+
+    @objc private func escapePressed() { assist?.dismiss() }
+
+    private static let shortcuts: [UIKeyCommand] = {
+        func key(_ input: String, _ modifiers: UIKeyModifierFlags, _ action: Selector, _ title: String) -> UIKeyCommand {
+            let command = UIKeyCommand(input: input, modifierFlags: modifiers, action: action)
+            command.discoverabilityTitle = title
+            command.wantsPriorityOverSystemBehavior = true
+            return command
+        }
+        return [
+            key("\t", [], #selector(tabPressed), "Indent Selected Lines, or Type a Tab"),
+            key("\t", .shift, #selector(shiftTabPressed), "Outdent Lines"),
+            key("]", .control, #selector(indentLines), "Indent Lines"),
+            key("[", .control, #selector(outdentLines), "Outdent Lines"),
+            key("b", .command, #selector(makeBold), "Bold"),
+            key("i", .command, #selector(makeItalic), "Italic"),
+            key("k", [.command, .shift], #selector(linkToNote), "Link to a Note"),
+            key("h", [.command, .shift], #selector(highlightSelection), "Highlight"),
+        ]
+    }()
+
+    /// Tab takes the choice in an open list; over several lines it indents them; anywhere else it types a tab, for nested list items.
+    @objc private func tabPressed() {
+        if assist?.accept() == true { return }
+        let range = selectedRange
+        if (nativeText as NSString).substring(with: range).contains("\n") { indent(.indent) } else { insertText("\t") }
+    }
+
+    @objc private func shiftTabPressed() { indent(.outdent) }
+    @objc private func indentLines() { indent(.indent) }
+    @objc private func outdentLines() { indent(.outdent) }
+    @objc private func makeBold() { emphasize(.bold) }
+    @objc private func makeItalic() { emphasize(.italic) }
+    @objc private func linkToNote() { assist?.openNoteLink() }
+    @objc private func highlightSelection() { assist?.openColors() }
+
+    private func indent(_ command: IndentLines.Command) {
+        let range = selectedRange
+        if let edit = IndentLines.edit(nativeText, from: range.location, to: range.location + range.length, command: command) { apply(edit) }
+    }
+
+    private func emphasize(_ emphasis: EmphasisToggle) {
+        let range = selectedRange
+        if let edit = EmphasisToggle.toggle(nativeText, from: range.location, to: range.location + range.length, emphasis) { apply(edit) }
+    }
+
+    /// While the list is open it takes the arrows, Return and Escape (Tab is a key command above); the rest of the keys go on to the text.
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        guard let assist, assist.isOpen else { return super.pressesBegan(presses, with: event) }
+        let rest = presses.filter { !assist.handle($0) }
+        if !rest.isEmpty { super.pressesBegan(rest, with: event) }
+    }
 
     override func paste(_ sender: Any?) {
         if let pastePictures, let pictures = ImageImport.fromPasteboard() {
@@ -115,8 +201,8 @@ final class NoteTextView: UITextView {
 
 /// The Markdown tab (build plan Step 6): a text view on TextKit 2, bound to a note's `NoteSession`. What is typed goes to the session at once and
 /// the session saves it (Step 4); the Markdown is coloured as it is typed, a block at a time (Step 5); find is the system's. Two windows on one
-/// note share the session, so a change made in the other window shows here. Completion, `[[` links, indenting and the other typing aids are
-/// Step 9; the colour schemes, Step 10.
+/// note share the session, so a change made in the other window shows here. The typing aids (the list after `<`, the `[[` note picker, indenting,
+/// bold and italic, highlighting) are `EditorAssist` and the keys of `NoteTextView` (Step 9); the colour schemes are Step 10.
 struct NoteEditorView: UIViewRepresentable {
     let session: NoteSession
     let handle: EditorHandle
@@ -151,6 +237,10 @@ struct NoteEditorView: UIViewRepresentable {
         view.pastePictures = { [weak handle] pictures in handle?.insertImages(pictures) }
         view.addInteraction(UIDropInteraction(delegate: context.coordinator))
         context.coordinator.handle = handle
+        let assist = EditorAssist(textView: view)
+        assist.handle = handle
+        view.assist = assist
+        context.coordinator.assist = assist
         context.coordinator.attach(view)
         // The size of the text changed (Settings, Control Centre): the fonts in the colours are stale.
         view.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { [weak coordinator = context.coordinator] (_: UITextView, _: UITraitCollection) in
@@ -175,6 +265,7 @@ struct NoteEditorView: UIViewRepresentable {
     final class Coordinator: NSObject, UITextViewDelegate, UIDropInteractionDelegate {
         let session: NoteSession
         weak var handle: EditorHandle?
+        var assist: EditorAssist?
         var caretMoved: (Int) -> Void
         private(set) var styler: MarkdownStyler?
         private weak var textView: UITextView?
@@ -229,6 +320,18 @@ struct NoteEditorView: UIViewRepresentable {
             session.edit(textView.nativeText, from: observation)
             styler?.textDidChange()
             #endif
+            assist?.textChanged()
+        }
+
+        /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+            !(text == "\n" && assist?.accept() == true)
+        }
+
+        /// A Highlight submenu in the edit menu over a selection, or inside a highlight.
+        func textView(_ textView: UITextView, editMenuForTextIn range: NSRange, suggestedActions: [UIMenuElement]) -> UIMenu? {
+            guard let highlight = assist?.highlightMenu(for: range) else { return nil }
+            return UIMenu(children: [highlight] + suggestedActions)
         }
 
         // MARK: Pictures dropped on the text
@@ -262,10 +365,16 @@ struct NoteEditorView: UIViewRepresentable {
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
         #endif
 
-        func textViewDidChangeSelection(_ textView: UITextView) { caretMoved(textView.selectedRange.location) }
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            caretMoved(textView.selectedRange.location)
+            assist?.selectionChanged()
+        }
 
         /// Leaving the field is a good moment to write: it is cheap, and the keyboard going away often means the app is too.
-        func textViewDidEndEditing(_ textView: UITextView) { session.autosaver.flush() }
+        func textViewDidEndEditing(_ textView: UITextView) {
+            session.autosaver.flush()
+            assist?.focusLost()
+        }
 
         #if DEBUG || EDITOR_TEST_HOOKS
         /// Inserts `text` at the end of the note one character at a time, as the keyboard does (`insertText` calls the delegate), and leaves

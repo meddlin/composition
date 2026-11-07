@@ -2,8 +2,8 @@
 
 A viewer on the Swift core, to try your own notes on the iPad before the real app exists. It can import a
 desktop backup, list and search the notes (typos included), draw a note's Markdown and the ten components (or show its source),
-use the Trash Can, and export a backup the desktop can restore. Since build plan Steps 4 to 6 it also **edits**: a *Markdown* tab with colours and find, a *Split* tab, a + button, and autosave. It has no
-completion, links, images or groups yet. It cannot show attachments, or draw ink: see
+use the Trash Can, and export a backup the desktop can restore. Since build plan Steps 4 to 6 it also **edits**: a *Markdown* tab with colours and find, a *Split* tab, a + button, and autosave. Since Steps 7 to 9 it also has notebooks and groups, pictures, and
+typing aids (the lists after `<` and `[[`, indenting, bold, italic and highlighting). It cannot show attachments, or draw ink: see
 [What it leaves out](#what-it-leaves-out). Design and status: [ipad-app-design.md](../ipad-app-design.md).
 
 **You have run it on your iPad with a backup of your real notes** (reported 2026-11-06). **The preview is newer than that run and has
@@ -175,13 +175,32 @@ On the *Markdown* or *Split* tab, the **Image** button (a picture with a plus, b
 51. **The same picture twice.** Add the same photo to the same note twice: the note then points at one file, not two. Add it to a different note: a second file, named for that note.
 52. **Back and forth with the desktop.** Make a backup (⋯, *Export a backup…*) and restore it in the desktop app: the pictures show in the notes there. Add a picture in the desktop app, make a backup there, restore it here: it shows here.
 
+## Typing aids (build plan Step 9)
+
+A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for the keys, not for the lists: on the on-screen keyboard you tap a line. Do these on the *Markdown* or *Split* tab, in a note you do not mind changing.
+
+53. **The list after `<`.** On a new line type `<`: the ten components appear under the caret, each with a line on what it is (above the caret when the on-screen keyboard leaves no room). Type `I`: only Info and Image are left. Tap one, or press ↓ then Return (or Tab): the tag goes in with the caret inside it, ready to type (inside `<Info>…</Info>`, inside the quotes of `<Image src="">`). **Esc** closes the list and writes nothing (the UI tests cannot press it, so try it).
+54. **Props and values.** Type `<Chart ` (with the space): the props of a chart are listed (`type`, `x`, `y`, `title`, `height`). Choose `type`: it is written as `type=""` with the caret in the quotes, and the values (bar, line, area, pie) are listed; choose one: the closing quote is passed. Try `<Mark `, `<Image ` and `<YouTube ` too; compare with the desktop if you can.
+55. **Frontmatter.** At the top of a note, put the caret on an empty line inside the `---` lines: the properties the note does not have yet are listed (title, description, tags …). Choose one. (On an empty line Return takes the first one, as on the desktop; Esc leaves it.)
+56. **Snippets.** On a new line type `/`: table, codeblock, tasks and divider are listed; `/ta` narrows it. Choose `table`: a table goes in with the caret in its first cell.
+57. **Linking to a note.** Type `[[` and a few letters of another note's title: the notes that contain them are listed (the ones that start with them first, eight at most, never this note). Choose one: `[Title](note:12)` replaces what you typed. Then select a few words, tap the **Link** button (a chain, beside Find) or press ⌘⇧K: the notes named like those words are listed, and the link keeps your words as its text. With only a caret, the button types the `[[` for you.
+58. **Opening a link.** On the *Preview* tab, tap the link from item 57: that note opens, and the list beside it shows where it is. Put a note in the Trash Can and tap a link to it: a message says it is not there.
+59. **Indenting.** With a hardware keyboard, type a few lines of a list, select all of them and press Tab: every line moves in by a tab; Shift+Tab takes one step off. ⌃] and ⌃[ do the same wherever the caret is. With only a caret, Tab types a tab.
+60. **Bold and italic.** Select a word and press ⌘B: `**word**`; again: back to `word`. ⌘I does `*word*`; on a bold word it makes `***word***`, and again takes the italic off.
+61. **Highlighting.** Select words on one line (long-press, or double-tap one) and look in the edit menu: *Highlight* opens yellow, green, blue, pink and orange; choose one: `<Mark color="…">words</Mark>`, the words still selected. Put the caret inside the highlight: the menu now has *Remove Highlight* too. With a hardware keyboard ⌘⇧H opens the same colours as a list (1 to 5, or ↓ and Return; 0 takes it off). Try it on a line with `*` in it, on code, inside a tag and over two lines: each refuses with a message that says why.
+62. **The ⌘-hold list.** Hold ⌘ with the editor active: the list shows Indent, Outdent, Bold, Italic, Link to a Note and Highlight (and Find, and the Image menu's *Turn Images into Image Tags*). **Not tried in the Simulator, which cannot hold ⌘.**
+63. **Both ways round.** Do items 53 to 57 in portrait and in landscape, and with the keyboard hidden and shown: the list must stay fully on screen and readable. Make the text larger (Settings, Display, Text Size): the lines grow with it.
+64. **Typing speed.** In a note of a few thousand lines, type quickly after a `<` and in the middle of the note: the list must keep up and the letters must not lag.
+
+**Not built, so do not expect it:** highlighting in the *Preview* tab (do it in the editor; the preview follows), and buttons for Tab and Shift+Tab on the on-screen keyboard.
+
 What to tell me for each: what you did, what you expected, what happened.
 
 ## What it leaves out
 
-Completion, links, indenting and shortcuts in the editor, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
-the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
-are plain text, selecting text across blocks of the preview, and the video player of `<YouTube>`.
+Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; the colour schemes and settings; the Pencil; sync. Selecting text
+across blocks of the preview, and the video player of `<YouTube>`, are not there either.
 
 ## What is not yet verified
 

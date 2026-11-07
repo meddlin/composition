@@ -104,6 +104,18 @@ extension AppModel {
         if let id { history.record(.note(id)) }
     }
 
+    /// A `note:` link was opened in a preview: show that note, in the list that holds it.
+    func followNoteLink(_ id: Int64) {
+        guard let note = orderedNotes.first(where: { $0.id == id }) else {
+            errorMessage = "That note is not here any more. It may be in the Trash Can."
+            return
+        }
+        if !notes(in: sidebar ?? .all).contains(where: { $0.id == id }) {
+            visit(note.groupId.map(SidebarItem.group) ?? note.notebookId.map(SidebarItem.notebook) ?? .all)
+        }
+        open(id)
+    }
+
     /// Opens the groups above an item, so that it is in view.
     func reveal(_ item: SidebarItem) {
         switch item {

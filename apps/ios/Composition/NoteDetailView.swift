@@ -52,6 +52,7 @@ struct NoteDetailView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if mode != .preview {
                     Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                    Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                     Menu {
                         Button("Photo Library…", systemImage: "photo.on.rectangle") { showingPhotos = true }
                         if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
@@ -112,6 +113,8 @@ struct NoteDetailView: View {
         handle.location = model.location
         handle.noteTitle = { [session] in session.map { NoteFrontmatter.parse($0.text).frontmatter?.title ?? "" } ?? "" }
         handle.problem = { [weak model] message in model?.errorMessage = message }
+        handle.noteCandidates = { [weak model] in model?.linkCandidates ?? [] }
+        handle.noteID = noteID
     }
 
     /// The pictures chosen in the Photos picker, as the bytes the library has (often HEIC, which becomes JPEG on the way in).
@@ -200,6 +203,12 @@ struct NoteReader: View {
                 .frame(maxWidth: NoteTextView.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            // A link to another note (`[title](note:12)`) opens that note.
+            .environment(\.openURL, OpenURLAction { url in
+                guard url.scheme == "note", let id = NoteLinks.id(fromRef: url.absoluteString) else { return .systemAction }
+                model.followNoteLink(id)
+                return .handled
+            })
             .environment(\.scrollToHeading, { ordinal in withAnimation { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             .environment(\.imageFolder, model.location.imagesURL)
         }

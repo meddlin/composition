@@ -29,6 +29,8 @@ final class AppModel {
     private(set) var notebooks: [Notebook] = []
     private(set) var groups: [NoteGroup] = []
     private(set) var orderedNotes: [NoteSummary] = []
+    /// Every note, the latest first, as the picker after `[[` offers them.
+    private(set) var linkCandidates: [NoteLinks.Candidate] = []
     private(set) var favorites: [Favorite] = []
     /// How many times the notes, groups and notebooks have been read: the screen restores where it was after the first.
     private(set) var loads = 0
@@ -183,6 +185,7 @@ final class AppModel {
                     favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups, sqliteVersion: try database.sqliteVersion())
             }
             orderedNotes = snapshot.ordered
+            linkCandidates = snapshot.all.map { NoteLinks.Candidate(id: $0.id, title: $0.title) }
             notebooks = snapshot.notebooks
             groups = snapshot.groups
             favorites = snapshot.favorites

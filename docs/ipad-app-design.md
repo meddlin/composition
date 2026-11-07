@@ -261,8 +261,8 @@ system find bar (`isFindInteractionEnabled`, `UIFindInteraction`, iOS 16+,
 | **Live** | The source text with marks hidden away from the caret, headings and rules drawn large, images inline | **High.** TextKit 2 offers ways to substitute what a paragraph displays and to draw custom layout fragments, but hiding characters without breaking the caret, selection and undo is **unverified**. See [C12](#compromise-register). |
 
 Typing features port as UIKit pieces: the `<` component and prop completion and the `[[` note-link picker as
-popovers at `caretRect(for:)`; Tab and Shift+Tab indent as `UIKeyCommand`s plus buttons on the keyboard
-accessory bar; image paste through `UITextPasteDelegate`; highlight, recolour and remove as edit-menu actions in
+popovers at `caretRect(for:)` (built in Step 9 as a view inside the text view, so that it scrolls with the text); Tab and Shift+Tab indent as `UIKeyCommand`s plus buttons on the keyboard
+accessory bar (the buttons are not built); image paste through `UITextPasteDelegate`; highlight, recolour and remove as edit-menu actions in
 both the editor and the preview (which replaces right-click); the ruler and reflow ported from `liveReflow.ts`.
 
 ### Ink and the Pencil
@@ -530,8 +530,8 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | "Follow the sun" scheme | 🔁 | M3† | ⬜ | Port `sunTimes.ts`; needs a saved city |
 | Fonts | 🔁 | M1 | ⬜ | System fonts by default; bundled open-source families as options |
 | Dynamic Type, VoiceOver, Reduce Motion | ⭐ | M1 | ⬜ | The native bar, N6 |
-| Hardware-keyboard shortcuts | ⭐ | M1 | ⬜ | `UIKeyCommand`; audit iPadOS-reserved combinations |
-| Shortcuts helper (Cmd+/) | ⭐ | M1 | ⬜ | Replaced by the system's Cmd-hold list |
+| Hardware-keyboard shortcuts | ⭐ | M1 | 🔨 | `UIKeyCommand`s with titles. **Editor's built (Step 9):** Tab, Shift+Tab, ⌃], ⌃[, ⌘B, ⌘I, ⌘⇧K, ⌘⇧H; ⌘⇧X is the Image menu's; ⌘F is the system's. Sent by UI tests (not Esc, which they cannot send), not looked at on a real keyboard. **Not audited:** iPadOS-reserved combinations, shortcuts outside the editor (new note, switching tabs) |
+| Shortcuts helper (Cmd+/) | ⭐ | M1 | 🔨 | Replaced by the system's Cmd-hold list: the editor's key commands carry titles for it. The list itself has not been looked at (the Simulator cannot hold ⌘) |
 | Portrait and landscape | ⭐ | M1 | 🔨 | Both orientations everywhere; landscape is the main one ([App structure](#app-structure-windows-and-themes), N3). Checked in the Simulator, not on the iPad |
 | Split View, Slide Over, Stage Manager | ⭐ | M1 | ⬜ | Size classes (N3) |
 | Window translucency | ❌ | Never | ⛔ | macOS setting; system materials may be used in the UI, not as a setting |
@@ -578,14 +578,14 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Split tab | 🔁 | M1 | 🔨 | Editor and preview side by side, or one above the other in a narrow window (Step 6, Simulator); the preview follows the typing. No synchronised scrolling yet |
 | Live tab | ⚠️ | Later | 🔬 | Hidden marks away from the caret ([C12](#compromise-register)). S3, Simulator only: a tiny clear font on the syntax, except in the caret's paragraph, works; swapping the displayed paragraph does not (the text comes out garbled). Not tried with the Pencil, arrow keys, selection handles or VoiceOver ([S3 status](#s3-status)) |
 | Scribble, autocorrect, dictation, Writing Tools | ⭐ | M1 | ⬜ | System text engine. Scribble cannot be tried in the Simulator: the Editor lab on your iPad is the test ([manual-tests/ipad.md](manual-tests/ipad.md)) |
-| Tab and Shift+Tab indent | 🔁 | M1 | ⬜ | `UIKeyCommand` plus accessory-bar buttons |
-| `<` component, prop and value completion | 🔁 | M1 | 🔬 | Popover at `caretRect(for:)`. S3: the list opens at the caret, narrows as you type, flips above the caret near the keyboard, and inserts the tag with the caret inside; only the component names, not props or values |
-| Note links: `[[` and the picker | 🔁 | M1 | ⬜ | Popover; tap a link to open |
+| Tab and Shift+Tab indent | 🔁 | M1 | 🔨 | `indentLines` ported and checked over 948 cases. Tab over several selected lines indents them, Shift+Tab takes a step off (one line too, a small change from the desktop), ⌃] and ⌃[ anywhere, Tab elsewhere types a tab. UI-tested with key events. **Accessory-bar buttons for the on-screen keyboard are not built:** it needs a hardware keyboard ([Step 9 status](#step-9-status)) |
+| `<` component, prop and value completion | 🔁 | M1 | 🔨 | Built (Step 9) as a list view inside the text view, under the caret (above it near the keyboard): the components, a tag's props, a prop's values, the frontmatter's properties and the `/` snippets, all from the desktop's catalogues, checked through its own code. Tap a line, or ↑ ↓ and Return or Tab; Esc closes it. Tried in the Simulator in both orientations ([Step 9 status](#step-9-status)) |
+| Note links: `[[` and the picker | 🔁 | M1 | 🔨 | Built (Step 9): `[[` lists up to eight notes by title, the Link button and ⌘⇧K do the same at the caret or over selected words, a link is `[title](note:id)`, and tapping one in the preview opens that note (in the list that holds it) |
 | Insert a stored image | 🔁 | M1 | ⬜ | Picker sheet. **Not built:** Step 8 stores a new image each time one is chosen, and the desktop's list of images already stored (Shift+M) is not on the iPad yet |
 | Paste an image | ⭐ | M1 | 🔨 | The editor's `paste` takes pictures on the clipboard (as copied, their own PNG or JPEG bytes) when it holds no text; the Markdown goes in as a paragraph of its own, after the frontmatter if the caret is in it. Tried in the Simulator through a launch shortcut, not with a real clipboard |
 | Add a photo, a camera shot or a file | ⭐ | M1 | 🔨 | An *Image* menu on the Markdown and Split tabs: the system's Photos picker (up to ten at once), the Files browser, and the camera; HEIC and other formats become JPEG ([C18](#compromise-register)). Pictures can also be dropped on the text. **Tried in the Simulator: the Photos picker (two photos, one HEIC), a paste through the launch shortcut. Not tried: the camera (the Simulator offers it, I did not open it), Files, a drop from another app, a real clipboard** |
 | Markdown image to `<Image />`, and its width | 🔁 | M1 | 🔨 | The desktop's `imagesToMdx` ported and checked over 1,504 cursors and selections; an item of the *Image* menu and ⌘⇧X; the caret is left inside the tag, ready for ` width="50%"`. **A width control is not built** |
-| Highlight text with `<Mark>` | ⭐ | M1 | ⬜ | Edit-menu action in the editor *and* the preview; replaces right-click |
+| Highlight text with `<Mark>` | ⭐ | M1 | 🔨 | **Editor only (Step 9):** the edit menu's *Highlight* (five colours, *Remove Highlight* inside one) and ⌘⇧H, over plain words on one line. **Not built in the preview:** its text is SwiftUI `Text`, which reports no selection; it needs the design's single read-only text view. The editor's rule is smaller than the desktop's MDX-aware one and has no oracle ([Step 9 status](#step-9-status)) |
 | Ruler, reflow, editor and preview fonts | 🔁 | M3† | ⬜ | Port `liveReflow.ts` |
 | Header image | 🔁 | M3† | ⬜ | |
 
@@ -1213,6 +1213,32 @@ in the system's Photos picker (a 4.1 MB JPEG and the HEIC), and *Turn Images int
 **Not done, or not known:** the iPad (the camera, Files, a real clipboard, a drop from another app, large photos and many of them), choosing a picture that is already stored (the desktop's Shift+M list), the Images page (browse, find unused: M3†), the header image, attachments, a control for the width of an `<Image />` (type it), editing a picture's alt text from the preview, and
 clearing out files that no note uses any more.
 
+### Step 9 status
+
+**Built and checked 2026-11-07 in the iPad Pro 11-inch (M5) Simulator; not on an iPad.** Build plan Step 9: typing aids.
+
+**What it is.** On the Markdown and Split tabs:
+
+- **A list under the caret.** After a `<` it lists the ten components with a line on each; inside a tag, the props the tag does not have yet; inside the quotes of a prop that has suggested values (a `color`, a chart's `type`, an image's `width`, a `height`, `maxDepth`, `start`), those values; on an empty line of the frontmatter, the properties the note lacks; and after a `/`, four Markdown snippets (table, code block, task list, divider). It narrows as you type, shows up to six lines
+  (the arrows scroll it) and opens above the caret when the keyboard leaves no room. Tap a line, or press ↑ ↓ and Return or Tab on a hardware keyboard; Esc closes it and it stays shut until you start another. On the on-screen keyboard Return also takes the highlighted line. Choosing a prop writes `name=""` with the caret inside the quotes, which opens its values; a value closes the quote and puts the caret after it.
+- **`[[`** lists the notes whose title contains what follows (those that start with it first, at most eight, never the note you are in), and a choice becomes `[title](note:12)`. The **Link** button beside Find and ⌘⇧K do the same: with only a caret they type the `[[` for you; over selected words they list the notes named like the words (all of them when none is) and keep the words as the link's text.
+- **A link in the preview opens its note,** in the list that holds it (a message says so when the note is gone).
+- **Keys** (hardware keyboard; each has a title for the ⌘-hold list): Tab over several selected lines indents them and Shift+Tab takes a step off; Tab anywhere else types a tab; ⌃] and ⌃[ indent and outdent anywhere; ⌘B and ⌘I put `**` or `*` round the selected words, or take them off; ⌘⇧K links a note; ⌘⇧H opens a list of the five colours (1 to 5 pick one, 0 takes the highlight off).
+- **Highlight** from the edit menu: over a selection, *Highlight* opens the five colours; inside a highlight it also offers *Remove Highlight*. What goes in is `<Mark color="pink">words</Mark>`, and the words stay selected.
+
+**Decisions made while building (say if you disagree).** (1) **`<Mark>` in the preview is not built.** The preview draws its text with SwiftUI `Text`, which tells nothing about what is selected; the design's single read-only text view (the Preview tab's row) would, and would also give selection across blocks. It is the larger job, and your call whether it is the next one. On *Split* the preview follows a highlight made in the editor.
+(2) **The editor's highlight rule is my own, smaller one**: plain words on one line, and it refuses (with a message) code, the inside of a tag, the frontmatter, several lines and words that carry marks (`*`, `_`, `[`, `<`…). The desktop's `highlightText.ts` understands MDX structure; porting it was out of proportion for this step, and there is no oracle for the smaller rule (unit tests only).
+(3) **Shift+Tab outdents a line even with only a caret** (the desktop only does so over several lines; elsewhere the browser moves focus, which an iPad does not need).
+(4) **Buttons for Tab and Shift+Tab on the on-screen keyboard are not built** (the design said accessory-bar buttons). Without a hardware keyboard there is no way to indent.
+(5) **Return on the empty frontmatter line takes the first property** (as on the desktop, where the list is open there too); Esc, or tapping elsewhere, leaves it.
+(6) **The picker takes the notes' titles as the app has them**, so the title of a note being typed in the other half of Split is the saved one.
+
+**Checks.** The pure parts were ported with an oracle, as before: the desktop's `completions.ts`, `props.ts`, `frontmatterProps.ts`, `snippets.ts`, `indentLines.ts`, `emphasis.ts` and `noteRefs.ts`/`noteLinks.ts` are run over `apps/ios/conformance/editing-cases.json` (95 texts for the `<` list and props at every caret position that matters, 33 for the frontmatter, 20 for `/`, 948 indent and outdent cases, 1,004 bold and italic cases, 16 `[[` triggers, 52 note matches, 12 links, 20 link targets, 15 note references and 19 queries), and the catalogues themselves (every component, prop and value, the frontmatter properties, the snippets) are read through the
+desktop's own code; Swift gives every answer, and breaking details of the ports on purpose makes the checks fail. The conformance run is 208 Swift tests (192 before). The highlight rule has unit tests (`EditingTests`). **UI tests** (`TypingAidsUITests`, nine; all 19 pass, though in one full run, with three simulators at once, Step 7's drag test failed on timing and passed alone straight after): the list after `<` and Return writing the component; narrowing and closing at a space; arrow and Tab; a prop and then its values drawn (a bug found by hand: after a prop was chosen the values list drew blank lines, because the stack was measured against the list's old height, and it is sized by hand now); Tab and Shift+Tab and ⌃] over two lines; Tab typing a tab; ⌘B and ⌘I; ⌘⇧H and a number key, and 0 to remove;
+⌘⇧K, the picker, the link written, and a tap on it in the preview opening the other note. By hand in the Simulator: `<M` and Return, `[[ci` with ↓ ↓ and Return, the edit menu's *Highlight* and *Pink*, and `<Chart ` through a prop and its values, in both orientations. Speed: finding what to offer takes 1.1 ms on a note of 350,000 characters (a Release build on a Mac), once for each keystroke.
+
+**Not done, or not known:** `<Mark>` in the preview, buttons for the on-screen keyboard, **Esc** (the UI tests' Esc never reaches the app, so it is only a manual-test item), the ⌘-hold list itself, everything on a real keyboard on a real iPad, VoiceOver and Dynamic Type for the list (its lines have labels; not tried), and a check of the editor's highlight rule against the desktop's.
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1255,8 +1281,8 @@ final pass on the device is yours.
   `swift test`: migrations from each earlier schema (the intent of `db.test.ts`), the operation scripts, FTS5
   queries, the C1 corpus, backup round trips.
 - **The conformance corpus** runs on both sides ([Keeping two implementations honest](#keeping-two-implementations-honest)).
-- **UI:** XCUITest for the main flows (the first ten are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
-  favorites, back and forward, a drag of a note onto a group, and a picture put in a note), snapshot tests for the ten components in the six schemes, Instruments for
+- **UI:** XCUITest for the main flows (the first nineteen are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
+  favorites, back and forward, a drag of a note onto a group, a picture put in a note, and the typing aids: the lists, the keys and a link opened from the preview), snapshot tests for the ten components in the six schemes, Instruments for
   typing and ink latency.
 - **A manual test page,** `docs/manual-tests/ipad.md`, written when something is built: install, create and
   search a note, every MDX component, Scribble, ink, backup and restore to and from the desktop, background
@@ -1427,6 +1453,8 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   between the columns and in a list, text files dropped in become notes, back and forward (⌘[ and ⌘]), and the place restored after a relaunch. The desktop's `navHistory.ts`, `dropEdge.ts` and `groupListing.ts` ported and checked against it. The project's first XCUITests. Tracker rows for groups, notebooks, favorites, drag and drop, back and forward and columns updated. Not tried on the iPad.
 - 2026-11-07: **Build plan Step 8, images, done in the Simulator.** An *Image* menu (Photos picker, camera, file, turn images into tags), paste and drop of pictures, HEIC to JPEG (C18), stored in `app_data/` under the desktop's names. The desktop's `sniffImage`, `imageFileName`, `storeImage`, `imageAlt`, `imageMarkdown`, `imageTag`, `findImageRefs` and `imagesToMdx` ported and checked against it
   (`images-cases.json`). Tracker rows for stored images, size limit, paste, add a photo or file, and Markdown image to tag updated. Not tried on the iPad, and the camera, Files and a drop from another app not tried at all.
+- 2026-11-07: **Build plan Step 9, typing aids, done in the Simulator.** The list at the caret for `<` (components, a tag's props and values), the frontmatter's properties and `/` snippets; the `[[` note picker, the Link button and ⌘⇧K, and `note:` links opening their note from the preview; Tab, Shift+Tab, ⌃], ⌃[, ⌘B, ⌘I and ⌘⇧H with titles for the ⌘-hold list; the edit menu's *Highlight*. The desktop's `completions.ts`, `props.ts`, `frontmatterProps.ts`, `snippets.ts`, `indentLines.ts`, `emphasis.ts` and the note-link code run as an oracle over `editing-cases.json`; 208 Swift tests; nine more UI tests. Tracker rows for the shortcuts, the ⌘-hold list, indent, completion, note links and highlight updated.
+  **Not built:** `<Mark>` in the preview (needs the single read-only text view), accessory-bar buttons for Tab and Shift+Tab. Not tried on the iPad, with a real keyboard, or with VoiceOver.
 
 ## Sources
 

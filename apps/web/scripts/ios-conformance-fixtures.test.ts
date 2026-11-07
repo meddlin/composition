@@ -40,6 +40,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *                                  build plan Step 1: favorites, themes and saved cities, and what parseWebSettings makes
  *                                  of each; and desktop-backup*.settings.json, the (non-default) settings the desktop
  *                                  backups carry
+ *   editing-cases.json, editing-expected.json
+ *                                  build plan Step 9: typing aids, through the real completions.ts (findTrigger, matchCompletions,
+ *                                  expandCompletion), props.ts (findPropTarget), snippets.ts (findSnippetTarget), indentLines.ts,
+ *                                  emphasis.ts (toggleEmphasis) and noteLinks.ts, with noteRefs.ts; and the catalogues they offer
  *   images-cases.json, images-expected.json
  *                                  build plan Step 8: images, through the real sniffImage, imageFileName and storeImage
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
@@ -833,6 +837,78 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     fs.writeFileSync(path.join(outDir!, "images-expected.json"), JSON.stringify(expected));
     expect(expected.toMdx.filter((edit: unknown) => edit !== null).length).toBeGreaterThan(300);
     expect(stored.filter((item) => item.name !== undefined).length).toBeGreaterThan(10);
+  }, 120_000);
+
+  it("writes the typing-aid cases and what the real completions, props, snippets, indentLines, emphasis and noteLinks make of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/editing-cases.json");
+    type Carets = { text: string; carets: number[] };
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      tags: Carets[];
+      fronts: Carets[];
+      slashes: Carets[];
+      indents: { text: string; from: number; to: number; command: "indent" | "outdent" }[];
+      emphasis: { text: string; from: number; to: number; emphasis: "bold" | "italic" }[];
+      noteTriggers: Carets[];
+      noteMatches: { notes: { id: number; title: string }[]; query: string; excludeId: number | null }[];
+      links: { label: string; id: number }[];
+      linkTo: { note: { id: number; title: string }; label: string | null }[];
+      refs: { href: string }[];
+      queries: string[];
+    };
+    const notes = path.resolve(__dirname, "../src/components/notes");
+    const completions = await import(path.join(notes, "mdx/completions"));
+    const { findPropTarget } = await import(path.join(notes, "mdx/props"));
+    const { findSnippetTarget } = await import(path.join(notes, "mdx/snippets"));
+    const { findFrontmatterTarget } = await import(path.join(notes, "mdx/frontmatterProps"));
+    const { indentLines } = await import(path.join(notes, "indentLines"));
+    const { toggleEmphasis } = await import(path.join(notes, "emphasis"));
+    const noteLinks = await import(path.join(notes, "noteLinks"));
+    const noteRefs = await import(path.join(lib, "noteRefs"));
+
+    // The catalogues, read through the desktop's own code: the components, each one's props, and each prop's values.
+    const props: Record<string, { name: string; description: string; values: { value: string; description: string }[] }[]> = {};
+    for (const { name } of completions.mdxCompletions) {
+      const text = `<${name} `;
+      const offered = findPropTarget(text, text.length)?.items ?? [];
+      props[name] = offered.map((item: { name: string; description: string }) => {
+        const quoted = `<${name} ${item.name}="`;
+        const values = findPropTarget(quoted, quoted.length)?.items ?? [];
+        return { name: item.name, description: item.description, values: values.map((v: { name: string; description: string }) => ({ value: v.name, description: v.description })) };
+      });
+    }
+    const slashCatalog = findSnippetTarget("/", 1).items;
+    const each = <T>(items: Carets[], read: (text: string, caret: number) => T) => items.map(({ text, carets }) => carets.map((caret) => read(text, caret)));
+
+    const expected = {
+      catalog: { completions: completions.mdxCompletions, props, snippets: slashCatalog },
+      matches: cases.queries.map((query) => completions.matchCompletions(query).map((c: { name: string }) => c.name)),
+      expansions: completions.mdxCompletions.map((c: unknown) => completions.expandCompletion(c)),
+      triggers: each(cases.tags, (text, caret) => completions.findTrigger(text, caret)),
+      props: each(cases.tags, (text, caret) => findPropTarget(text, caret)),
+      fronts: each(cases.fronts, (text, caret) => findFrontmatterTarget(text, caret)),
+      // What the list offers at each caret of every text above, in the order useMdxCompletion.ts looks (its `findTarget` is not exported).
+      targets: [...cases.tags, ...cases.fronts, ...cases.slashes].map(({ text, carets }) =>
+        carets.map((caret) => {
+          const tag = completions.findTrigger(text, caret);
+          if (tag) return { start: tag.start, end: caret, query: tag.query, items: completions.matchCompletions(tag.query), label: "MDX components" };
+          return findPropTarget(text, caret) ?? findFrontmatterTarget(text, caret) ?? findSnippetTarget(text, caret);
+        }),
+      ),
+      slashes: each(cases.slashes, (text, caret) => findSnippetTarget(text, caret)),
+      indents: cases.indents.map(({ text, from, to, command }) => indentLines(text, from, to, command)),
+      emphasis: cases.emphasis.map(({ text, from, to, emphasis }) => toggleEmphasis(text, from, to, emphasis)),
+      noteTriggers: each(cases.noteTriggers, (text, caret) => noteLinks.findNoteTrigger(text, caret)),
+      noteMatches: cases.noteMatches.map(({ notes: list, query, excludeId }) => noteLinks.matchNotes(list, query, excludeId ?? undefined).map((n: { id: number }) => n.id)),
+      links: cases.links.map(({ label, id }) => noteRefs.noteLink(label, id)),
+      linkTo: cases.linkTo.map(({ note, label }) => noteLinks.linkTo(note, label ?? undefined)),
+      refs: cases.refs.map(({ href }) => noteRefs.noteIdFromRef(href)),
+    };
+    fs.copyFileSync(file, path.join(outDir!, "editing-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "editing-expected.json"), JSON.stringify(expected));
+    expect(expected.props.flat().filter((t) => t !== null && t.items.length > 0).length).toBeGreaterThan(60);
+    expect(expected.indents.filter((e) => e !== null).length).toBeGreaterThan(300);
+    expect(expected.emphasis.filter((e) => e !== null).length).toBeGreaterThan(300);
   }, 120_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
