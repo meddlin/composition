@@ -7,6 +7,7 @@ const appearance: AppearanceMessage = {
   previewFont: "default",
   editorFont: "default",
   noteBackground: "plain",
+  sunPair: "classic",
   translucent: false,
   opacity: 0.8,
   sun: { tone: "dark", autoLight: "0.2" },
@@ -33,10 +34,11 @@ describe("notifyAppearanceChanges", () => {
     saveEditorFont: vi.fn(async (_font: string): Promise<{ error?: string }> => ({})),
     saveLocation: vi.fn(async (_city: string): Promise<{ error?: string }> => ({})),
     saveNoteBackground: vi.fn(async (_background: string): Promise<{ error?: string }> => ({})),
+    saveSunPair: vi.fn(async (_pair: string): Promise<{ error?: string }> => ({})),
     saveFavorites: vi.fn(async () => {}),
   });
 
-  it.each(["saveTheme", "savePreviewFont", "saveEditorFont", "saveLocation", "saveNoteBackground"] as const)(
+  it.each(["saveTheme", "savePreviewFont", "saveEditorFont", "saveLocation", "saveNoteBackground", "saveSunPair"] as const)(
     "announces the new appearance once %s has gone through, and returns what it returned",
     async (method) => {
       const inner = api();

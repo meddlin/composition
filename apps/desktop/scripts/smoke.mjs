@@ -43,6 +43,7 @@ const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../w
 const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { TODO_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/todosApi.ts"));
 const { READING_LIST_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/readingListApi.ts"));
+const { CONTACTS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/contactsApi.ts"));
 const { FEED_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/feedsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
@@ -54,6 +55,7 @@ const expectedBridge = [
   ...PANELS_METHODS,
   ...TODO_METHODS,
   ...READING_LIST_METHODS,
+  ...CONTACTS_METHODS,
   ...FEED_METHODS,
   ...UPDATE_METHODS,
   ...WINDOW_METHODS,
@@ -146,6 +148,10 @@ async function waitFor(fn, { timeout = 20_000, interval = 250 } = {}) {
   }
   throw last ?? new Error("timed out");
 }
+
+/** Opens a page of the Settings screen from the list down its side (the app's window opens wide enough to show it). */
+const openSettingsPage = (page, name) =>
+  page.getByRole("navigation", { name: "Settings sections" }).getByRole("button", { name, exact: true }).click();
 
 function meiliProcessesFor(dir) {
   try {
@@ -450,7 +456,7 @@ try {
   // ---- AI helper (Settings). The server is a stand-in on a free local port; nothing leaves this machine.
   const ollama = await startFakeOllama();
   const decoy = await startFakeOllama();
-  await page.getByRole("tab", { name: "AI Configuration" }).click();
+  await openSettingsPage(page, "AI Configuration");
   const helper = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: "AI helper" }) });
   await helper.waitFor();
   await helper.getByLabel("Server address").fill(ollama.url);
@@ -647,7 +653,7 @@ try {
     (await palette(page).count()) === 1 &&
       (await page.getByRole("combobox", { name: "Search commands" }).evaluate((el) => el === document.activeElement)) &&
       // The seven panel commands, the Open commands for the plugins that are on (Reading List and RSS Reader start off), and the rail's.
-      (await palette(page).getByRole("option").count()) === 11,
+      (await palette(page).getByRole("option").count()) === 12,
   );
   await page.keyboard.type("next");
   await page.keyboard.press("Enter");
@@ -707,7 +713,7 @@ try {
   const railIconsFresh = await railIcons();
   check(
     "the plugin rail has an icon for each panel that can be opened and whose plugin is on, in the empty panel's order",
-    JSON.stringify(railIconsFresh) === JSON.stringify(["Notes browser", "AI helper", "To-do"]),
+    JSON.stringify(railIconsFresh) === JSON.stringify(["Notes browser", "AI helper", "To-do", "Contacts"]),
     railIconsFresh.join(", "),
   );
 
@@ -768,7 +774,7 @@ try {
   await closePalette();
   check(
     "Hide from Rail takes one icon off the rail, and that kind is still in the palette",
-    hidden && stillInPalette && (await railIcons()).length === 2,
+    hidden && stillInPalette && (await railIcons()).length === 3,
     (await railIcons()).join(", "),
   );
   // Put the icon back, as Settings does, so the relaunch below starts from the defaults.
@@ -915,7 +921,7 @@ try {
     console.log("SKIP  the update toggles  (development build or a .deb install: they are not shown)");
   }
 
-  await page.getByRole("tab", { name: "Styling" }).click();
+  await openSettingsPage(page, "Styling");
   await page.getByLabel("Light", { exact: true }).check();
   await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).theme === "light");
   check("changing the theme applies it immediately", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
@@ -924,7 +930,19 @@ try {
   check("the theme is stored in the app's own settings file", fs.existsSync(path.join(userData, "settings.json")) && JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).theme === "light");
   check("the web app's settings file was not touched", !fs.existsSync(path.join(home, ".composition-web", "settings.json")));
   await page.screenshot({ path: path.join(out, "4-settings-light.png") });
-  await page.getByRole("tab", { name: "General" }).click();
+
+  // ---- Follow the sun (Settings > Styling > Follow the sun): the pair of colors it moves between.
+  await openSettingsPage(page, "Follow the sun");
+  await page.getByRole("radio", { name: "Cream to dark amber" }).check();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunPair === "cream-amber");
+  check("choosing a pair of Follow the sun colors puts it on the page at once", (await page.evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber");
+  await waitFor(async () => (await popoutPage().evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber").catch(() => {});
+  check("a pop-out follows it", (await popoutPage().evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber");
+  check("the pair is stored in the app's own settings file", JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).sunPair === "cream-amber");
+  check("a pair that doesn't exist is refused with a reason", typeof (await page.evaluate(() => window.composition.saveSunPair("neon-pink"))).error === "string");
+  await page.getByRole("radio", { name: "Light and dark", exact: true }).check();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunPair === "classic");
+  await openSettingsPage(page, "General");
 
   // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real
   // main-process code and the real files are exercised; only the OS picker is not.

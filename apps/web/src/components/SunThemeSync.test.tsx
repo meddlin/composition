@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SunEvent } from "@/lib/composition/sunSchedule";
+import { RAMP_HALF_WIDTH_MS, sunLevel, type SunEvent } from "@/lib/composition/sunSchedule";
 import type { SunSchedule } from "@/lib/composition/sunTimes";
 import { SUN_SETTINGS_CHANGED, SunThemeSync } from "./SunThemeSync";
 
@@ -35,7 +35,34 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   root.removeAttribute("data-tone");
+  root.removeAttribute("data-sun-pair");
   root.style.removeProperty("--auto-light");
+});
+
+describe("SunThemeSync and the pair of colors", () => {
+  // Just before sunrise, where the ramp has the surfaces about 47% of the way to light: past the classic pair's
+  // ink flip (0.45) but not the cream and dark amber pair's (0.5).
+  const sunrise = events[0].at;
+  const now = sunrise + (0.482 - 0.5) * 2 * RAMP_HALF_WIDTH_MS;
+
+  it("flips the ink where the classic pair does when no pair is named", () => {
+    vi.setSystemTime(now);
+
+    render(<SunThemeSync initial={schedule()} />);
+
+    expect(sunLevel(events, now)).toBeGreaterThan(0.45);
+    expect(sunLevel(events, now)).toBeLessThan(0.5);
+    expect(root.dataset.tone).toBe("light");
+  });
+
+  it("flips the ink where the window's pair does", () => {
+    root.dataset.sunPair = "cream-amber";
+    vi.setSystemTime(now);
+
+    render(<SunThemeSync initial={schedule()} />);
+
+    expect(root.dataset.tone).toBe("dark");
+  });
 });
 
 describe("SunThemeSync", () => {

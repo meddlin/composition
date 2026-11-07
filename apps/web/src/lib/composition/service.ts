@@ -53,6 +53,7 @@ import {
 import { sunThemeAttributes } from "./sunSchedule";
 import { isEditorFontName } from "./editorFonts";
 import { isNoteBackgroundName } from "./noteBackgrounds";
+import { inkFlipLevelOf, isSunPairName } from "./sunPairs";
 import { validateHomeSettings, type HomeSettings } from "./home";
 import { validatePluginSettings, type PluginSettings } from "./plugins";
 import { validateWritingSettings, type WritingSettings } from "./writing";
@@ -117,6 +118,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     previewFont: settings.previewFont,
     editorFont: settings.editorFont,
     noteBackground: settings.noteBackground,
+    sunPair: settings.sunPair,
     writing: settings.writing,
     home: settings.home,
     plugins: settings.plugins,
@@ -740,6 +742,14 @@ export async function saveNoteBackground(background: string): Promise<{ error?: 
   return {};
 }
 
+export async function saveSunPair(pair: string): Promise<{ error?: string }> {
+  if (!isSunPairName(pair)) {
+    return { error: "Unknown pair of colors." };
+  }
+  saveWebSettings({ ...loadWebSettings(), sunPair: pair });
+  return {};
+}
+
 export async function saveWritingSettings(writing: Partial<WritingSettings>): Promise<{ error?: string }> {
   // What isn't sent stays as saved, so the Writing and Styling pages can each save their own part.
   const current = loadWebSettings();
@@ -802,8 +812,8 @@ export async function loadSunSchedule(): Promise<SunSchedule | null> {
  * Undefined when another scheme is selected.
  */
 export function initialSunTheme(): { tone: "light" | "dark"; autoLight: string } | undefined {
-  const { theme, location } = loadWebSettings();
-  return theme === "auto" ? sunThemeAttributes(cachedSunSchedule(location).level) : undefined;
+  const { theme, location, sunPair } = loadWebSettings();
+  return theme === "auto" ? sunThemeAttributes(cachedSunSchedule(location).level, inkFlipLevelOf(sunPair)) : undefined;
 }
 
 // The AI helper's settings and model list live in assistantService.ts; they are part of this module's surface.
@@ -843,6 +853,7 @@ const _implementsApi: CompositionApi = {
   savePreviewFont,
   saveEditorFont,
   saveNoteBackground,
+  saveSunPair,
   saveWritingSettings,
   saveHomeSettings,
   savePluginSettings,

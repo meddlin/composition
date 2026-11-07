@@ -84,7 +84,7 @@ function setup(
   };
   const feeds = createFeedsStore(api);
   const readingList = createReadingListStore(readingListApi);
-  const plugins = createPluginsStore({ savePluginSettings: vi.fn(async () => ({})) }, { todo: true, "reading-list": readingListOn, rss: true });
+  const plugins = createPluginsStore({ savePluginSettings: vi.fn(async () => ({})) }, { todo: true, "reading-list": readingListOn, rss: true, contacts: true });
   let state = start;
   const setPanelState = vi.fn((_id: string, next: unknown) => {
     state = next as RssPanelState;

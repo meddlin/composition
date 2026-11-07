@@ -40,6 +40,19 @@ export type ReadingListPanelState = { selectedId: number | null; listWidth: numb
 /** What an RSS Reader panel saves: the feed it shows (none, for all of them) and the entry it has open. The feeds and entries themselves are the workspace's. */
 export type RssPanelState = { selectedFeedId: number | null; selectedEntryId: number | null };
 
+/** Which contacts a Contacts panel lists. */
+export type ContactsFilter = "all" | "personal" | "work";
+
+const CONTACTS_FILTERS: readonly unknown[] = ["all", "personal", "work"] satisfies ContactsFilter[];
+
+/** The least width, in px, the list beside a contact can be dragged to, and the least the contact keeps. */
+export const CONTACTS_LIST_MIN_WIDTH = 160;
+export const CONTACT_CARD_MIN_WIDTH = 240;
+export const DEFAULT_CONTACTS_LIST_WIDTH = 260;
+
+/** What a Contacts panel saves: the contact it has open (none yet, or one since deleted), which kinds it lists, and how wide its list is. The contacts themselves are the workspace's. */
+export type ContactsPanelState = { selectedId: number | null; filter: ContactsFilter; listWidth: number };
+
 /** What a kind may check a saved state against: the workspace as it is now. */
 export type RestoreContext = {
   hasNote(noteId: number): boolean;
@@ -146,6 +159,22 @@ export const KINDS: Record<
         selectedFeedId: Number.isSafeInteger(selectedFeedId) ? (selectedFeedId as number) : null,
         selectedEntryId: Number.isSafeInteger(selectedEntryId) ? (selectedEntryId as number) : null,
       } satisfies RssPanelState;
+    },
+  },
+  contacts: {
+    minWidth: 480,
+    plugin: "contacts",
+    initialState: (): ContactsPanelState => ({ selectedId: null, filter: "all", listWidth: DEFAULT_CONTACTS_LIST_WIDTH }),
+    restore(saved) {
+      if (!isRecord(saved)) return null;
+      const { selectedId, filter, listWidth } = saved;
+      // The contact may be gone since; the panel then asks for another to be picked, so it is not checked here.
+      return {
+        selectedId: Number.isSafeInteger(selectedId) ? (selectedId as number) : null,
+        filter: CONTACTS_FILTERS.includes(filter) ? (filter as ContactsFilter) : "all",
+        listWidth:
+          typeof listWidth === "number" && Number.isFinite(listWidth) ? Math.max(CONTACTS_LIST_MIN_WIDTH, Math.round(listWidth)) : DEFAULT_CONTACTS_LIST_WIDTH,
+      } satisfies ContactsPanelState;
     },
   },
 };

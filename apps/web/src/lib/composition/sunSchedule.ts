@@ -15,7 +15,8 @@ export const RAMP_HALF_WIDTH_MS = 45 * 60 * 1000;
 /**
  * Text flips between its dark-scheme and light-scheme color at this level
  * rather than cross-fading: a blend of the two inks is unreadable against the
- * half-way background. ~0.45 is where both inks have equal contrast against it.
+ * half-way background. ~0.45 is where both inks have equal contrast against it
+ * for the classic light and dark pair; the other pairs have their own (sunPairs.ts).
  */
 export const INK_FLIP_LEVEL = 0.45;
 
@@ -44,13 +45,17 @@ export function sunLevel(events: readonly SunEvent[], now: number): number {
   return next.kind === "sunrise" ? 0 : 1;
 }
 
-export function toneForLevel(level: number): "light" | "dark" {
-  return level >= INK_FLIP_LEVEL ? "light" : "dark";
+/** `flipLevel` is the pair's own point (see `inkFlipLevelOf` in sunPairs.ts); the classic pair's by default. */
+export function toneForLevel(level: number, flipLevel = INK_FLIP_LEVEL): "light" | "dark" {
+  return level >= flipLevel ? "light" : "dark";
 }
 
 /** What goes on `<html>`: `data-tone` and the `--auto-light` percentage (see globals.css). */
-export function sunThemeAttributes(level: number): { tone: "light" | "dark"; autoLight: string } {
-  return { tone: toneForLevel(level), autoLight: `${(level * 100).toFixed(1)}%` };
+export function sunThemeAttributes(
+  level: number,
+  flipLevel = INK_FLIP_LEVEL,
+): { tone: "light" | "dark"; autoLight: string } {
+  return { tone: toneForLevel(level, flipLevel), autoLight: `${(level * 100).toFixed(1)}%` };
 }
 
 /**

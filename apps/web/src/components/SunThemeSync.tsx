@@ -8,6 +8,7 @@ import {
   sunLevel,
   type SunEvent,
 } from "@/lib/composition/sunSchedule";
+import { inkFlipLevelOf } from "@/lib/composition/sunPairs";
 import type { SunSchedule } from "@/lib/composition/sunTimes";
 
 const TICK_MS = 30 * 1000;
@@ -17,9 +18,9 @@ const REFRESH_MS = 10 * 60 * 1000;
 /** Dispatch on `window` after the color scheme or the saved city changes, so this re-reads the schedule. */
 export const SUN_SETTINGS_CHANGED = "composition:sun-settings-changed";
 
-/** Sets the CSS variable and attribute the `auto` color scheme reads (see globals.css). */
+/** Sets the CSS variable and attribute the `auto` color scheme reads (see globals.css), for the pair of colors `data-sun-pair` names. */
 export function applySunTheme(root: HTMLElement, events: readonly SunEvent[], now: number) {
-  const { tone, autoLight } = sunThemeAttributes(sunLevel(events, now));
+  const { tone, autoLight } = sunThemeAttributes(sunLevel(events, now), inkFlipLevelOf(root.dataset.sunPair));
   root.style.setProperty("--auto-light", autoLight);
   root.dataset.tone = tone;
 }

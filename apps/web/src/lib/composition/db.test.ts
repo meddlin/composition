@@ -118,6 +118,7 @@ describe("opening the database", () => {
       .filter((name) => !name.startsWith("sqlite_"));
     expect(tables.sort()).toEqual([
       "attachments",
+      "contacts",
       "feed_items",
       "feeds",
       "groups",

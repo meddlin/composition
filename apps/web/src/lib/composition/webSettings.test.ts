@@ -46,9 +46,10 @@ describe("web settings layout", () => {
       previewFont: "default",
       editorFont: "default",
       noteBackground: "plain",
+      sunPair: "classic",
       todoLook: { background: "notes", color: null },
       todos: DEFAULT_TODO_SETTINGS,
-      plugins: { todo: true, "reading-list": false, rss: false },
+      plugins: { todo: true, "reading-list": false, rss: false, contacts: true },
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       ...DEFAULT_LAYOUT,
@@ -60,13 +61,13 @@ describe("web settings layout", () => {
     const { loadWebSettings } = await import("./webSettings");
 
     writeSettings({ appDataDir: "/data", plugins: { todo: false, unknown: false } });
-    expect(loadWebSettings().plugins).toEqual({ todo: false, "reading-list": false, rss: false });
+    expect(loadWebSettings().plugins).toEqual({ todo: false, "reading-list": false, rss: false, contacts: true });
 
-    writeSettings({ appDataDir: "/data", plugins: { todo: "no", "reading-list": true, rss: false } });
-    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": true, rss: false });
+    writeSettings({ appDataDir: "/data", plugins: { todo: "no", "reading-list": true, rss: false, contacts: true } });
+    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": true, rss: false, contacts: true });
 
     writeSettings({ appDataDir: "/data" });
-    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": false, rss: false });
+    expect(loadWebSettings().plugins).toEqual({ todo: true, "reading-list": false, rss: false, contacts: true });
   });
 
   it("loads the saved to-do look, repairing any part that is invalid", async () => {
@@ -158,6 +159,15 @@ describe("web settings layout", () => {
 
     writeSettings({ appDataDir: "/data", noteBackground: "polka-dots" });
     expect(loadWebSettings().noteBackground).toBe("plain");
+  });
+
+  it("loads a saved pair of Follow the sun colors, and falls back to the classic pair for one it doesn't know", async () => {
+    writeSettings({ appDataDir: "/data", sunPair: "mint-forest" });
+    const { loadWebSettings } = await import("./webSettings");
+    expect(loadWebSettings().sunPair).toBe("mint-forest");
+
+    writeSettings({ appDataDir: "/data", sunPair: "neon-pink" });
+    expect(loadWebSettings().sunPair).toBe("classic");
   });
 
   it("loads a saved layout", async () => {

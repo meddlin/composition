@@ -9,7 +9,7 @@ const kinds = (enabled: PluginSettings) => availableLaunchers(enabled).map((laun
 
 describe("the launchers", () => {
   it("are every kind but the empty panel and a note, each once, in the empty panel's order", () => {
-    expect(LAUNCHERS.map((launcher) => launcher.kind)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
+    expect(LAUNCHERS.map((launcher) => launcher.kind)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss", "contacts"]);
     expect(Object.keys(KINDS).filter((kind) => !isLauncherKind(kind as never))).toEqual(["empty", "note"]);
   });
 
@@ -29,12 +29,12 @@ describe("the launchers", () => {
 
 describe("the launchers on offer", () => {
   it("are all of them while every plugin is on", () => {
-    expect(kinds(allOn)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
+    expect(kinds(allOn)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss", "contacts"]);
   });
 
   it("leave out a kind whose plugin is off, and only that one", () => {
-    expect(kinds({ ...allOn, rss: false })).toEqual(["notes-browser", "ai", "todo", "reading-list"]);
-    expect(kinds({ ...allOn, todo: false, "reading-list": false })).toEqual(["notes-browser", "ai", "rss"]);
+    expect(kinds({ ...allOn, rss: false })).toEqual(["notes-browser", "ai", "todo", "reading-list", "contacts"]);
+    expect(kinds({ ...allOn, todo: false, "reading-list": false })).toEqual(["notes-browser", "ai", "rss", "contacts"]);
   });
 
   it("keep the kinds that belong to no plugin when every plugin is off", () => {
@@ -42,7 +42,7 @@ describe("the launchers on offer", () => {
   });
 
   it("follow the defaults: Reading List and RSS Reader are not offered until turned on", () => {
-    expect(kinds(DEFAULT_PLUGIN_SETTINGS)).toEqual(["notes-browser", "ai", "todo"]);
+    expect(kinds(DEFAULT_PLUGIN_SETTINGS)).toEqual(["notes-browser", "ai", "todo", "contacts"]);
   });
 
   it("say whether any kind is offered, the empty panel and a note always being so", () => {

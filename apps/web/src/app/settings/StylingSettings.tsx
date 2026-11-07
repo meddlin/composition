@@ -1,11 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
-import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { HEADING_RAIL_SIDES, type HeadingRailSide } from "@/lib/composition/writing";
 import { EDITOR_FONT_CHOICES, editorFontStack, type EditorFontName } from "@/lib/composition/editorFonts";
@@ -18,13 +16,12 @@ import { NOTE_BACKGROUND_CHOICES, type NoteBackgroundName } from "@/lib/composit
 import { THEME_CHOICES, type ThemeName } from "@/lib/composition/themes";
 import {
   saveEditorFont,
-  saveLocation,
   saveNoteBackground,
   savePreviewFont,
-  saveTheme,
   saveWritingSettings,
-  type SaveLocationResult,
 } from "@/lib/composition/client";
+import { useColorScheme } from "./ColorSchemeProvider";
+import { useOpenSettingsPage } from "./SettingsShell";
 import { TodoLookSettings } from "./TodoLookSettings";
 import { WindowSettings } from "./WindowSettings";
 
@@ -40,57 +37,25 @@ const THEME_SWATCHES: Record<ThemeName, [string, string, string]> = {
 };
 
 type Props = {
-  currentTheme: ThemeName;
   currentPreviewFont: PreviewFontName;
   currentEditorFont: EditorFontName;
   currentNoteBackground: NoteBackgroundName;
   currentHeadingRail: boolean;
   currentHeadingRailSide: HeadingRailSide;
-  currentCity: string;
-  /** Today's times at the saved city, so the page can confirm the lookup worked. */
-  currentSunTimes?: { sunrise?: string; sunset?: string };
 };
 
-/** The result of the last city save, plus what to show in the field afterwards. */
-type LocationState = SaveLocationResult & { query?: string };
-
-function formatSunTimes(times: { sunrise?: string; sunset?: string }): string {
-  const parts = [
-    times.sunrise && `sunrise ${times.sunrise}`,
-    times.sunset && `sunset ${times.sunset}`,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "the sun doesn't rise or set there today";
-}
-
-async function saveLocationFromForm(
-  _previous: LocationState,
-  formData: FormData,
-): Promise<LocationState> {
-  const city = String(formData.get("city") ?? "");
-  const result = await saveLocation(city);
-  // After an error keep what was typed; after a save, show the matched name.
-  const query = result.saved?.name ?? (result.error ? city : "");
-  if (!result.error) window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
-  return { ...result, query };
-}
+/** The id of the Follow the sun page under this one (see SettingsScreen). */
+export const FOLLOW_THE_SUN_PAGE = "follow-the-sun";
 
 export function StylingSettings({
-  currentTheme,
   currentPreviewFont,
   currentEditorFont,
   currentNoteBackground,
   currentHeadingRail,
   currentHeadingRailSide,
-  currentCity,
-  currentSunTimes,
 }: Props) {
-  const [locationState, locationAction, locationPending] = useActionState(
-    saveLocationFromForm,
-    {} as LocationState,
-  );
-  const [theme, setTheme] = useState<ThemeName>(currentTheme);
-  const [themeError, setThemeError] = useState<string>();
-  const [, startThemeTransition] = useTransition();
+  const { theme, themeError, selectTheme } = useColorScheme();
+  const openPage = useOpenSettingsPage();
   const [previewFont, setPreviewFont] = useState<PreviewFontName>(currentPreviewFont);
   const [previewFontError, setPreviewFontError] = useState<string>();
   const [, startPreviewFontTransition] = useTransition();
@@ -104,29 +69,6 @@ export function StylingSettings({
   const [headingRailError, setHeadingRailError] = useState<string>();
   const [, startHeadingRailTransition] = useTransition();
   const [headingRailSide, setHeadingRailSide] = useState<HeadingRailSide>(currentHeadingRailSide);
-
-  // Apply the scheme immediately rather than waiting for the server round trip.
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
-  // Like the CLI, a scheme applies and saves as soon as it's picked,
-  // independent of the location fields below.
-  function selectTheme(next: ThemeName) {
-    const previous = theme;
-    setTheme(next);
-    setThemeError(undefined);
-    startThemeTransition(async () => {
-      const result = await saveTheme(next);
-      if (result.error) {
-        setTheme(previous);
-        setThemeError(result.error);
-      } else {
-        // "auto" takes its starting point from the sun times; tell it to load them.
-        window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
-      }
-    });
-  }
 
   // Likewise for the preview font: show it straight away, save in the background.
   function selectPreviewFont(next: PreviewFontName) {
@@ -232,6 +174,22 @@ export function StylingSettings({
             </Field>
           ))}
         </RadioGroup>
+        <FieldDescription className="text-xs">
+          Follow the sun fades between a light and a dark set of colors with sunrise and sunset in your city.
+          {openPage && (
+            <>
+              {" "}
+              <Button
+                type="button"
+                variant="link"
+                className="h-auto p-0 text-xs underline"
+                onClick={() => openPage(FOLLOW_THE_SUN_PAGE)}
+              >
+                Choose its colors and city
+              </Button>
+            </>
+          )}
+        </FieldDescription>
         {themeError && <FieldError>{themeError}</FieldError>}
       </FieldSet>
 
@@ -366,43 +324,6 @@ export function StylingSettings({
       </FieldSet>
 
       <TodoLookSettings />
-
-      <form action={locationAction} className="flex flex-col gap-2 text-sm">
-        <Field className="gap-1">
-          <FieldLabel htmlFor="city">City</FieldLabel>
-          <FieldDescription className="text-xs">
-            Sets the sunrise and sunset that &ldquo;Follow the sun&rdquo; tracks. Try{" "}
-            <span className="font-mono">Austin, TX</span>.
-          </FieldDescription>
-          <Input
-            id="city"
-            type="text"
-            name="city"
-            defaultValue={locationState.query ?? currentCity}
-            placeholder="Austin, TX"
-            spellCheck={false}
-          />
-        </Field>
-        <Button type="submit" variant="outline" size="lg" disabled={locationPending} className="w-fit px-4">
-          {locationPending ? "Looking up…" : "Save city"}
-        </Button>
-        {locationState.error && <FieldError>{locationState.error}</FieldError>}
-        {locationState.saved && (
-          <p role="status" className="text-success">
-            Using {locationState.saved.name}: {formatSunTimes(locationState.saved)}.
-          </p>
-        )}
-        {!locationState.saved && !locationState.error && currentCity && currentSunTimes && (
-          <p className="text-muted-foreground">
-            Using {currentCity}: {formatSunTimes(currentSunTimes)}.
-          </p>
-        )}
-        {theme === "auto" && !currentCity && !locationState.saved && (
-          <p className="text-warning">
-            No city saved yet, so &ldquo;Follow the sun&rdquo; is using 6:30 AM and 6:30 PM.
-          </p>
-        )}
-      </form>
     </div>
   );
 }

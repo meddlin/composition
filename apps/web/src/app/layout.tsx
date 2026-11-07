@@ -5,6 +5,7 @@ import { SunThemeSync } from "@/components/SunThemeSync";
 import { loadSunSchedule } from "@/lib/composition/service";
 import { editorFontStack } from "@/lib/composition/editorFonts";
 import { previewFontStack } from "@/lib/composition/previewFonts";
+import { inkFlipLevelOf } from "@/lib/composition/sunPairs";
 import { sunThemeAttributes } from "@/lib/composition/sunSchedule";
 import { loadWebSettings } from "@/lib/composition/webSettings";
 import { fontVariables } from "./fonts";
@@ -19,18 +20,19 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const { theme, previewFont, editorFont, noteBackground } = loadWebSettings();
+  const { theme, previewFont, editorFont, noteBackground, sunPair } = loadWebSettings();
 
   // "Follow the sun" renders at the right point on the ramp up front, so there's
   // no flash of the wrong scheme; SunThemeSync then keeps it moving client-side.
   const sun = await loadSunSchedule();
-  const attributes = sun ? sunThemeAttributes(sun.level) : undefined;
+  const attributes = sun ? sunThemeAttributes(sun.level, inkFlipLevelOf(sunPair)) : undefined;
 
   return (
     <html
       lang="en"
       data-theme={theme}
       data-note-background={noteBackground}
+      data-sun-pair={sunPair}
       data-tone={attributes?.tone}
       style={
         {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { CONTACTS_METHODS } from "../../../web/src/lib/composition/contactsApi";
 import { FEED_METHODS } from "../../../web/src/lib/composition/feedsApi";
 import { READING_LIST_METHODS } from "../../../web/src/lib/composition/readingListApi";
 import { TODO_METHODS } from "../../../web/src/lib/composition/todosApi";
@@ -9,7 +10,7 @@ import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -45,7 +46,7 @@ describe("VALIDATORS", () => {
     };
     expect(VALIDATORS.saveWritingSettings([{ ...writing, extra: 1 }])).toEqual([writing]);
     expect(VALIDATORS.saveWritingSettings([{ headingRailEnabled: true }])).toEqual([{ headingRailEnabled: true }]);
-    expect(VALIDATORS.savePluginSettings([{ todo: false, "reading-list": true, rss: false, extra: 1 }])).toEqual([{ todo: false, "reading-list": true, rss: false }]);
+    expect(VALIDATORS.savePluginSettings([{ todo: false, "reading-list": true, rss: false, contacts: true, extra: 1 }])).toEqual([{ todo: false, "reading-list": true, rss: false, contacts: true }]);
     expect(VALIDATORS.moveGroup([4, null])).toEqual([4, null]);
     expect(VALIDATORS.moveGroup([4, 2])).toEqual([4, 2]);
     expect(VALIDATORS.placeNote([3, null, 5])).toEqual([3, null, 5]);
@@ -168,6 +169,7 @@ describe("VALIDATORS", () => {
     ["savePreviewFont", [{}]],
     ["saveEditorFont", [{}]],
     ["saveNoteBackground", [{}]],
+    ["saveSunPair", [{}]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],
@@ -597,5 +599,47 @@ describe("FEED_VALIDATORS", () => {
     ["markFeedRead", ["all"]],
   ] as const)("refuses %s with %j", (method, args) => {
     expect(() => FEED_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("CONTACTS_VALIDATORS", () => {
+  const contact = { kind: "work", firstName: "Grace", lastName: "Hopper", email: "grace@navy.mil", phone: "", notes: "", birthDate: "1906-12-09", title: "Rear Admiral", manager: "Chester Nimitz" };
+
+  it("has a validator for every method of the Contacts API, and no extras", () => {
+    expect(Object.keys(CONTACTS_VALIDATORS).sort()).toEqual([...CONTACTS_METHODS].sort());
+  });
+
+  it("lists without taking anything from the page", () => {
+    expect(CONTACTS_VALIDATORS.listContacts(["/etc/passwd"])).toEqual([]);
+  });
+
+  it("passes on a contact as the shared rule writes it, and nothing else the page sent", () => {
+    expect(CONTACTS_VALIDATORS.addContact([{ ...contact, firstName: "  Grace ", id: 9, admin: true }, "extra"])).toEqual([contact]);
+    expect(CONTACTS_VALIDATORS.updateContact([4, contact, "extra"])).toEqual([4, contact]);
+    expect(CONTACTS_VALIDATORS.deleteContact([4, "extra"])).toEqual([4]);
+  });
+
+  it("empties a personal contact's work fields on the way through", () => {
+    expect(CONTACTS_VALIDATORS.addContact([{ ...contact, kind: "personal" }])).toEqual([{ ...contact, kind: "personal", title: "", manager: "" }]);
+  });
+
+  it.each([
+    ["addContact", []],
+    ["addContact", [null]],
+    ["addContact", ["Grace"]],
+    ["addContact", [{ ...contact, kind: "boss" }]],
+    ["addContact", [{ ...contact, firstName: "", lastName: "" }]],
+    ["addContact", [{ ...contact, email: "nope" }]],
+    ["addContact", [{ ...contact, birthDate: "2999-01-01" }]],
+    ["addContact", [{ ...contact, notes: 5 }]],
+    ["addContact", [{ ...contact, notes: "x".repeat(20000) }]],
+    ["updateContact", ["4", contact]],
+    ["updateContact", [1.5, contact]],
+    ["updateContact", [4]],
+    ["updateContact", [4, { ...contact, title: ["x"] }]],
+    ["deleteContact", [null]],
+    ["deleteContact", ["4"]],
+  ] as const)("refuses %s with %j", (method, args) => {
+    expect(() => CONTACTS_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });

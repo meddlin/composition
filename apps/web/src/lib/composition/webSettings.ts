@@ -10,6 +10,7 @@ import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./ed
 import { DEFAULT_TODO_LOOK, readTodoLook, type TodoLook } from "./todoLook";
 import { DEFAULT_TODO_SETTINGS, parseTodoSettings, type TodoSettings } from "./todoSettings";
 import { DEFAULT_NOTE_BACKGROUND, isNoteBackgroundName, type NoteBackgroundName } from "./noteBackgrounds";
+import { DEFAULT_SUN_PAIR, isSunPairName, type SunPairName } from "./sunPairs";
 import { DEFAULT_PLUGIN_SETTINGS, parsePluginSettings, type PluginSettings } from "./plugins";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
 import type { SavedLocation } from "./sunTimes";
@@ -65,6 +66,8 @@ export type WebSettings = {
   editorFont: EditorFontName;
   /** Pattern drawn behind the window. */
   noteBackground: NoteBackgroundName;
+  /** The light and dark colors the "auto" color scheme (Follow the sun) moves between. */
+  sunPair: SunPairName;
   /** The background of the desktop app's to-do panels, apart from the notes' (all of them share it). */
   todoLook: TodoLook;
   /** How the to-do cycle runs: the week's first day, how long the archive is kept, the fiscal year (Settings > To-dos). */
@@ -98,6 +101,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   previewFont: DEFAULT_PREVIEW_FONT,
   editorFont: DEFAULT_EDITOR_FONT,
   noteBackground: DEFAULT_NOTE_BACKGROUND,
+  sunPair: DEFAULT_SUN_PAIR,
   todoLook: DEFAULT_TODO_LOOK,
   todos: DEFAULT_TODO_SETTINGS,
   plugins: DEFAULT_PLUGIN_SETTINGS,
@@ -143,6 +147,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     previewFont: isPreviewFontName(value.previewFont) ? value.previewFont : DEFAULT_PREVIEW_FONT,
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
     noteBackground: isNoteBackgroundName(value.noteBackground) ? value.noteBackground : DEFAULT_NOTE_BACKGROUND,
+    sunPair: isSunPairName(value.sunPair) ? value.sunPair : DEFAULT_SUN_PAIR,
     todoLook: readTodoLook(value.todoLook),
     todos: parseTodoSettings(value.todos),
     plugins: parsePluginSettings(value.plugins),

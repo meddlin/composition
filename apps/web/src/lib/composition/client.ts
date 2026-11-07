@@ -48,6 +48,7 @@ export {
   saveNoteContent,
   savePreviewFont,
   saveSettings,
+  saveSunPair,
   saveTheme,
   saveWritingSettings,
   searchNotes,

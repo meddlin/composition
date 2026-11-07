@@ -49,6 +49,8 @@ See [plugin-launcher-plan.md](plugin-launcher-plan.md) for opening a plugin's pa
 
 See [rss-reader-plan.md](rss-reader-plan.md) for the RSS Reader plugin (desktop only, off until switched on): subscribe to RSS and Atom feeds, read their entries and unsubscribe; [ui/panels.md](ui/panels.md#the-rss-reader-panel) describes it and [manual-tests/rss.md](manual-tests/rss.md) checks it by hand.
 
+See [ui/panels.md](ui/panels.md#the-contacts-panel) for the Contacts plugin (desktop only, on by default): a rolodex of personal and work contacts in a panel that moves between windows like the others, and is part of backups; [manual-tests/contacts.md](manual-tests/contacts.md) checks it by hand.
+
 See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for how the to-do list tidies itself each week (finished items archived, unfinished ones rolled over, a history kept for a window you set, and weekly, monthly and quarterly reports written as notes), [ui/panels.md](ui/panels.md#the-to-do-panel) for what the panel does, [manual-tests/todo-archival.md](manual-tests/todo-archival.md) for checking it by hand, and [todo-archival-plan.md](todo-archival-plan.md) for the design and its decisions.
 
 See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.

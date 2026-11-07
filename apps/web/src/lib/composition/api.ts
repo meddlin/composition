@@ -9,6 +9,7 @@ import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import type { EditorFontName } from "./editorFonts";
 import type { NoteBackgroundName } from "./noteBackgrounds";
+import type { SunPairName } from "./sunPairs";
 import type { PreviewFontName } from "./previewFonts";
 import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
@@ -60,6 +61,8 @@ export type SettingsSnapshot = {
   previewFont: PreviewFontName;
   editorFont: EditorFontName;
   noteBackground: NoteBackgroundName;
+  /** The light and dark colors "Follow the sun" moves between. */
+  sunPair: SunPairName;
   writing: WritingSettings;
   home: HomeSettings;
   /** Which built-in plugins are on. */
@@ -228,6 +231,8 @@ export interface CompositionApi {
   saveEditorFont(font: string): Promise<{ error?: string }>;
   /** Chooses the pattern behind the window; a name not in `NOTE_BACKGROUND_CHOICES` comes back as `error`. */
   saveNoteBackground(background: string): Promise<{ error?: string }>;
+  /** Chooses the light and dark colors "Follow the sun" moves between; a name not in `SUN_PAIR_CHOICES` comes back as `error`. */
+  saveSunPair(pair: string): Promise<{ error?: string }>;
   /**
    * Saves the editor's ruler, reflow and heading rail; a column outside the allowed range comes back as `error`.
    * Only what is given changes, so a page that owns some of the settings can save just those.
@@ -294,6 +299,7 @@ export const API_METHODS = [
   "savePreviewFont",
   "saveEditorFont",
   "saveNoteBackground",
+  "saveSunPair",
   "saveWritingSettings",
   "saveHomeSettings",
   "savePluginSettings",

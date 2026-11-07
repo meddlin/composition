@@ -29,7 +29,9 @@ The database holds the notes, groups, the Trash Can and the attachment records, 
 back too. So do the **to-dos**: the live list, the archive, the activity log, which weeks, months and quarters the weekly cycle has
 closed, and the links to the reports (the reports themselves are ordinary notes). The counts in the description, and the line the Settings
 screen shows after a backup or restore, say `… and 8 to-dos (31 archived)` when there are any; there is no to-do code in the backup itself,
-because the whole database file is the snapshot ([todo-weekly-cycle.md](todo-weekly-cycle.md)). Two things are deliberately **not** in it:
+because the whole database file is the snapshot ([todo-weekly-cycle.md](todo-weekly-cycle.md)). So are the **contacts** of the Contacts plugin
+(the `contacts` table, in the same file): the counts add `… and 40 contacts` when there are any, a backup made before the plugin has no such
+table and restores to an empty rolodex, and turning the plugin off does not leave contacts out of a backup. Two things are deliberately **not** in it:
 
 - **The search index.** It is derived from the database ([search.md](search.md)); a restore
   rebuilds it.

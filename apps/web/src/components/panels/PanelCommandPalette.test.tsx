@@ -120,10 +120,11 @@ describe("the command palette", () => {
       expect.stringMatching(/^Previous Panel/),
       expect.stringMatching(/^Move to New Window/),
       expect.stringMatching(/^Move to Main Window/),
-      // Reading List and RSS Reader are off until turned on, so the palette does not list them yet.
+      // Reading List and RSS Reader are off until turned on, so the palette does not list them yet; Contacts is on from the start.
       expect.stringMatching(/^Open Notes Browser/),
       expect.stringMatching(/^Open AI Helper/),
       expect.stringMatching(/^Open To-do/),
+      expect.stringMatching(/^Open Contacts/),
       expect.stringMatching(/^Toggle Plugin Rail/),
     ]);
     const keys = (name: string) => Array.from(screen.getByRole("option", { name: new RegExp(name) }).querySelectorAll("kbd")).map((k) => k.textContent);
@@ -189,7 +190,7 @@ describe("the command palette", () => {
 
     press("KeyP");
 
-    expect(screen.getAllByRole("option")).toHaveLength(11);
+    expect(screen.getAllByRole("option")).toHaveLength(12);
     expect((search() as HTMLInputElement).value).toBe("");
   });
 

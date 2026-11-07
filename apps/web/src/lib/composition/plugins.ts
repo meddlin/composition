@@ -30,6 +30,13 @@ export const PLUGINS = [
     host: "desktop",
     defaultEnabled: false,
   },
+  {
+    id: "contacts",
+    name: "Contacts",
+    description:
+      "A rolodex in a panel of its own: people with their email, phone, birthday and notes, and for work contacts a title and a manager. Turning it off hides the panel; your contacts are kept, and they are part of backups either way.",
+    host: "desktop",
+  },
 ] as const satisfies readonly {
   id: string;
   name: string;
