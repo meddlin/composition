@@ -111,17 +111,22 @@ export class Context {
     return dev;
   }
 
+  /** Admin calls retry on 5xx: right after a restore a server may refuse writes for a few seconds. */
   async admin(path: string, body: unknown): Promise<unknown> {
     const token = adminToken();
     if (!token) throw new Error("SYNC_ADMIN_TOKEN is not set");
-    const res = await fetch(this.baseUrl + path, {
-      method: "POST",
-      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120_000),
-    });
-    if (!res.ok) throw new Error(`${path} answered ${res.status}: ${(await res.text()).slice(0, 200)}`);
-    return res.json();
+    for (let attempt = 1; ; attempt++) {
+      const res = await fetch(this.baseUrl + path, {
+        method: "POST",
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (res.ok) return res.json();
+      const text = (await res.text()).slice(0, 200);
+      if (res.status < 500 || attempt >= 15) throw new Error(`${path} answered ${res.status}: ${text}`);
+      await sleep(1000);
+    }
   }
 
   async reset(user: string): Promise<void> {

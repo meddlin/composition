@@ -24,7 +24,8 @@ export async function outage(ctx: Context): Promise<Result> {
   await ctx.reset(user);
 
   const received = new Map<string, number>();
-  const a = await ctx.device(user, "a", { device: { retry: { baseMs: 200, maxMs: 2000 } } });
+  const ackTimes: number[] = [];
+  const a = await ctx.device(user, "a", { device: { retry: { baseMs: 200, maxMs: 2000 }, onAck: (e) => ackTimes.push(e.at) } });
   const b = await ctx.device(user, "b", { device: { onRemote: (e) => received.set(e.key.split("/")[1]!, editIdOf(e.payload)), retry: { baseMs: 200, maxMs: 2000 } } });
   await Promise.all([a.syncNow(), b.syncNow()]);
 
@@ -52,13 +53,15 @@ export async function outage(ctx: Context): Promise<Result> {
   const up = upCmd ? await sh(upCmd) : { ms: 0, stdout: "", code: 0 };
   const tUpEnd = nowMs();
 
-  // Recovery as the device sees it: the first success after the failures that began with the outage.
+  // Recovery as the device sees it: the first acknowledged push after the server is back. A device may see
+  // errors (connection refused, 502) or a hang (a proxy queueing the request), so do not wait for an error.
   let recoveredAt = NaN;
   try {
-    await waitFor(() => a.stats.recoveries.some((r) => r.at > tDown) || a.stats.failures.length === failuresBefore, 180_000, "device A to recover", 100);
-    recoveredAt = a.stats.recoveries.filter((r) => r.at > tDown).at(0)?.at ?? NaN;
+    await waitFor(() => ackTimes.some((t) => t > tUpEnd), ctx.num("recover-timeout", 180) * 1000, "device A's first acknowledged push after the server returned", 100);
+    recoveredAt = ackTimes.find((t) => t > tUpEnd) ?? NaN;
   } catch (e) {
     result.notes.push(String(e));
+    result.notes.push(`device A: dirty=${a.dirtyCount()} cursor=${a.cursor} stats=${JSON.stringify({ ...a.stats, failures: a.stats.failures.length })} transport=${JSON.stringify(a.transportStats)}`);
   }
   await sleep(8000);
   editing = false;
@@ -69,21 +72,24 @@ export async function outage(ctx: Context): Promise<Result> {
   const server = await readServerState(ctx, user, "a");
   const lost = [...expected].filter(([u, id]) => editIdOf(server.records.get(`note/${u}`)?.payload ?? new Uint8Array(4)) !== id).length;
   const firstFailure = a.stats.failures.at(failuresBefore);
+  // The longest time between two acknowledged pushes while edits arrive every second is the sync pause a user feels.
+  const gaps = ackTimes.slice(1).map((t, i) => t - ackTimes[i]!);
+  const longestSilentGapMs = gaps.length ? Math.round(Math.max(...gaps)) : null;
   const failureKinds = [...new Set(a.stats.failures.slice(failuresBefore).map((f) => f.message.replace(/\d{4,}/g, "N").slice(0, 80)))].slice(0, 6);
   result.metrics = {
     downCommandMs: Math.round(down.ms),
     upCommandMs: Math.round(up.ms),
-    deviceFirstFailureAfterDownMs: firstFailure ? Math.round(firstFailure.at - tDown) : null,
-    deviceRecoveredAfterUpCommandEndedMs: Number.isNaN(recoveredAt) ? null : Math.round(recoveredAt - tUpEnd),
-    outageSeenByDeviceMs: firstFailure && !Number.isNaN(recoveredAt) ? Math.round(recoveredAt - firstFailure.at) : null,
-    retriesDuringOutage: a.stats.failures.length - failuresBefore,
+    longestSilentGapMs,
+    firstAckAfterServerReturnedMs: Number.isNaN(recoveredAt) ? null : Math.round(recoveredAt - tUpEnd),
+    deviceSawAnErrorAfterMs: firstFailure ? Math.round(firstFailure.at - tDown) : null,
+    retriesDuringOutage: a.stats.failures.length - failuresBefore, // 0 with a hang: the proxy queued the request
     editsMade: editId,
     editsLost: lost,
-    whatTheDeviceSaw: failureKinds,
+    whatTheDeviceSaw: failureKinds.length ? failureKinds : ["no error: requests hung until the server returned"],
     upCommandSecondsFromDown: Math.round((tUp - tDown) / 100) / 10,
   };
   check(result, "down command succeeded", down.code === 0, `exit ${down.code}`);
   check(result, "no edit was lost: the server holds the last text of every note", lost === 0, `${lost} lost`);
-  check(result, "the device noticed the outage and recovered", Boolean(firstFailure) && !Number.isNaN(recoveredAt));
+  check(result, "the device resumed syncing after the server came back", !Number.isNaN(recoveredAt));
   return result;
 }

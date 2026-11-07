@@ -33,8 +33,16 @@ export interface DeviceOptions {
   retry?: { baseMs: number; maxMs: number };
   /** A remote record has been applied to the local store. */
   onRemote?: (e: { key: string; version: number; deleted: boolean; payload: Uint8Array; at: number }) => void;
+  /** Start from a saved local state, as a device that was switched off and is coming back. */
+  initial?: DeviceState;
   /** A push got its acknowledgement. */
   onAck?: (e: { changes: number; ms: number; at: number }) => void;
+}
+
+export interface DeviceState {
+  records: Map<string, LocalRecord>;
+  cursor: number;
+  epoch: string | undefined;
 }
 
 export interface DeviceStats {
@@ -103,6 +111,19 @@ export class Device {
       retry: { baseMs: 200, maxMs: 3000 },
       ...opts,
     };
+    if (opts.initial) {
+      for (const [k, rec] of opts.initial.records) {
+        this.records.set(k, { ...rec, reconcile: false });
+        if (rec.dirty) this.dirty.add(k);
+      }
+      this.cursor = opts.initial.cursor;
+      this.epoch = opts.initial.epoch;
+    }
+  }
+
+  /** A copy of the local state, to start a "returning" device from. */
+  exportState(): DeviceState {
+    return { records: new Map([...this.records].map(([k, r]) => [k, { ...r }])), cursor: this.cursor, epoch: this.epoch };
   }
 
   // ── local edits ────────────────────────────────────────────────────────────

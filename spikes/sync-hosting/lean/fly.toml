@@ -1,0 +1,36 @@
+# Lean candidate on Fly: one always-on machine, one volume for the SQLite file, Litestream to R2.
+# The app name is passed on the command line by scripts/deploy-lean.sh (names must be globally unique).
+app = "comp-sync-lean-REPLACED-BY-DEPLOY-SCRIPT"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/sync.db"
+  LOG = "1"
+
+[[mounts]]
+  source = "data"
+  destination = "/data"
+  initial_size = "1gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # One API process holds each user's head in memory and the SSE connections: never scale to zero or out.
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

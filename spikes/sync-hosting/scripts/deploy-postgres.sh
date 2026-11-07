@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Deploy the Postgres candidate's API to Fly, pointed at Neon. Idempotent.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+source scripts/drills/lib.sh
+
+APP=$(fly_app pg); REGION=$(need FLY_REGION); ORG=$(need FLY_ORG)
+
+if ! fly apps list --json | jq -e --arg a "$APP" '.[] | select(.Name==$a)' >/dev/null; then
+  fly apps create "$APP" --org "$ORG"
+fi
+{
+  printf 'SYNC_DEV_TOKENS=%s\n'  "$(need SYNC_DEV_TOKENS)"
+  printf 'SYNC_ADMIN_TOKEN=%s\n' "$(need SYNC_ADMIN_TOKEN)"
+  printf 'DATABASE_URL=%s\n'     "$(need NEON_DATABASE_URL)"
+} | fly secrets import -a "$APP" --stage
+
+fly deploy -a "$APP" -c postgres/fly.toml --dockerfile postgres/Dockerfile --primary-region "$REGION" --ha=false -y .
+URL="https://$APP.fly.dev"
+touch .env.candidates.local; grep -v '^SYNC_URL_POSTGRES=' .env.candidates.local > .env.candidates.local.tmp || true
+echo "SYNC_URL_POSTGRES=$URL" >> .env.candidates.local.tmp; mv .env.candidates.local.tmp .env.candidates.local
+wait_ready "$URL" 300
+echo "postgres candidate is serving at $URL"

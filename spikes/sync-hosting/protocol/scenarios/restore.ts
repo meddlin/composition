@@ -1,4 +1,7 @@
 // Restore from backup and let the epoch heal the devices.
+//   --devices offline (default)  the devices are switched off during the incident and come back afterwards, so the
+//                                server's loss is measured before anything can heal it
+//   --devices live               they stay connected and notice by themselves (hint reconnect or poll)
 //   1. A and B sync 100 notes.      2. --backup-cmd marks a restore point (or we note the time).
 //   3. A writes 70 more records, B receives them.     4. --restore-cmd puts the server back to the point.
 //   5. Count what the server lost.  6. Rotate the epoch if the candidate did not (the step is recorded).
@@ -13,8 +16,9 @@ export async function restore(ctx: Context): Promise<Result> {
   const restoreCmd = ctx.str("restore-cmd");
   const backupCmd = ctx.str("backup-cmd");
   const settleMs = ctx.num("settle-ms", 3000);
+  const devicesMode = ctx.str("devices") ?? "offline";
   const rotate = ctx.str("rotate") ?? "if-needed";
-  const result = newResult(ctx, "restore", { before: 100, after: 70, settleMs, rotate, backupCmd: backupCmd ? "(script)" : null });
+  const result = newResult(ctx, "restore", { before: 100, after: 70, settleMs, rotate, devices: devicesMode, backupCmd: backupCmd ? "(script)" : null });
   if (!restoreCmd) {
     result.notes.push("no --restore-cmd given");
     result.metrics = { skipped: true };
@@ -24,8 +28,9 @@ export async function restore(ctx: Context): Promise<Result> {
   const user = "s-drill";
   await ctx.reset(user);
 
-  const a = await ctx.device(user, "a", { device: { retry: { baseMs: 200, maxMs: 2000 } } });
-  const b = await ctx.device(user, "b", { device: { retry: { baseMs: 200, maxMs: 2000 } } });
+  const retry = { baseMs: 200, maxMs: 2000 };
+  let a = await ctx.device(user, "a", { device: { retry } });
+  let b = await ctx.device(user, "b", { device: { retry } });
   const uuids: string[] = [];
   for (let i = 0; i < 100; i++) {
     uuids.push(newUuid());
@@ -48,6 +53,13 @@ export async function restore(ctx: Context): Promise<Result> {
   await sleep(settleMs);
 
   const epochBefore = await ctx.epoch();
+  const offline = devicesMode === "offline";
+  const savedA = a.exportState();
+  const savedB = b.exportState();
+  if (offline) {
+    a.stop();
+    b.stop();
+  }
   const tRestore = nowMs();
   const r = await sh(restoreCmd, { RESTORE_POINT: point, BASE_URL: ctx.baseUrl });
   // The script should return once the server answers again; make sure.
@@ -63,17 +75,29 @@ export async function restore(ctx: Context): Promise<Result> {
     rotatedByHand = true;
     epochAfter = await ctx.epoch();
   }
+  if (offline) {
+    // The devices come back, with the state they had when they went away.
+    a = await ctx.device(user, "a", { device: { retry, initial: savedA } });
+    b = await ctx.device(user, "b", { device: { retry, initial: savedB } });
+  }
   const tRotated = nowMs();
 
+  // The devices find out by themselves: their hint stream reconnects (or their poll fires), they send the old
+  // epoch, the server answers resync, and they compare and re-push. Wait for that, not just for the server.
+  let noticedMs = NaN;
   let healMs = NaN;
   try {
+    await waitFor(() => a.epoch === epochAfter && b.epoch === epochAfter, 180_000, "both devices to move to the new epoch", 100);
+    noticedMs = nowMs() - tRotated;
     await waitFor(async () => {
+      if (a.dirtyCount() > 0 || b.dirtyCount() > 0) return false;
       const s = await readServerState(ctx, user, "c");
       return [...expected].every(([k, h]) => s.records.has(k) && sha256(s.records.get(k)!.payload) === h);
-    }, 180_000, "the devices to re-push what the server lacked", 500);
+    }, 180_000, "the devices to re-push what the server lacked", 250);
     healMs = nowMs() - tRotated;
   } catch (e) {
     result.notes.push(String(e));
+    result.notes.push(`devices: a.epoch=${a.epoch} b.epoch=${b.epoch} want=${epochAfter} a.dirty=${a.dirtyCount()} b.dirty=${b.dirtyCount()}`);
   }
 
   const fresh = await ctx.device(user, "c", { hints: "none" });
@@ -88,8 +112,9 @@ export async function restore(ctx: Context): Promise<Result> {
     epochRotatedByHandStep: rotatedByHand,
     recordsExpected: expected.size,
     recordsOnServerRightAfterRestore: onServer,
-    recordsLostByServerInRestore: expected.size - onServer,
-    healMsAfterEpochSettled: Number.isNaN(healMs) ? null : Math.round(healMs),
+    recordsLostByServerInRestore: expected.size - onServer, // exact in offline mode; in live mode devices may have healed first
+    devicesNoticedNewEpochAfterMs: Number.isNaN(noticedMs) ? null : Math.round(noticedMs),
+    healedAfterMs: Number.isNaN(healMs) ? null : Math.round(healMs),
     resyncs: { a: a.stats.resyncs, b: b.stats.resyncs },
     repushed: { a: a.stats.repushed, b: b.stats.repushed },
     recordsLostPermanently: [...expected].filter(([k, h]) => !(afterRestore.records.get(k) && sha256(afterRestore.records.get(k)!.payload) === h) && !(fresh.records.has(k) && sha256(fresh.records.get(k)!.payload) === h)).length,
@@ -97,6 +122,7 @@ export async function restore(ctx: Context): Promise<Result> {
   };
   check(result, "restore command succeeded", r.code === 0, `exit ${r.code}`);
   check(result, "the epoch changed (by the restore or by the hand step)", epochAfter !== epochBefore);
+  check(result, "both devices noticed the new epoch on their own and resynced", !Number.isNaN(noticedMs) && a.stats.resyncs >= 1 && b.stats.resyncs >= 1, `resyncs a=${a.stats.resyncs} b=${b.stats.resyncs}`);
   check(result, "devices healed the server: it holds every record again", !Number.isNaN(healMs));
   check(result, "a brand-new device sees everything", freshHolds === expected.size, `${freshHolds}/${expected.size}`);
   return result;
