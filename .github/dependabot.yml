@@ -19,6 +19,13 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    groups:
+      # react-dom throws at load if its version isn't exactly react's, and both are pinned
+      # exactly, so a PR that bumps only one breaks every component test.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
 
   - package-ecosystem: "npm"
     directory: "/apps/desktop"
