@@ -773,9 +773,11 @@ Why this shape:
 - **Idempotent.** A retry carries the same `batchId`, and the server returns the stored response. Safe on flaky
   mobile networks and after a lost response.
 - **Initial sync is the same call** with `cursor = 0`, paged by `more`. No second code path.
-- **Pull excludes nothing by device id.** The client skips a record whose version it already holds. Device ids
-  are informational only: a cloned machine or a restored backup would share an id and starve itself if the id were
-  used to suppress echoes.
+- **The pull half omits what the same request just applied, and nothing else.** The device sent those records and
+  already holds them; returning them doubles a push's data (a whole note re-downloaded on every autosave, which a
+  hotspot feels). Matching is by record version in that one response, never by device id: device ids are informational
+  only, and a cloned machine or a restored backup would share an id and starve itself if the id were used to suppress
+  echoes. The cursor still moves past them. The client still skips any record whose version it already holds.
 - **SSE and not WebSocket:** one direction is all that's needed, it passes proxies, and `URLSession` and
   Electron's `fetch` both stream it. A hint only says "go pull", so a missed hint costs one poll interval.
 - **No APNs in v1.** An iPad in the background cannot hold a connection, but it doesn't need one: it pulls when it
@@ -1194,12 +1196,12 @@ then `scripts/deploy-all.sh` and `scripts/run-all.sh real`. *Yours* is a judgeme
 
 | Question | How to measure | Lean | Managed Postgres | Convex |
 |---|---|---|---|---|
-| Push latency (typical and p95) | Local save to the server's acknowledgement | Pending. local: 10 / 21 ms | Pending. local: 16 / 32 ms | Pending. local: 17 / 47 ms |
-| Propagation to the other device | Save on one, time until the other shows it | Pending. local: 16 / 28 ms (SSE hint) | Pending. local: 19 / 33 ms (SSE hint) | Pending. local: 21 / 51 ms (live-query hint) |
+| Push latency (typical and p95) | Local save to the server's acknowledgement | Pending. local: 12 / 75 ms | Pending. local: 20 / 26 ms | Pending. local: 24 / 28 ms |
+| Propagation to the other device | Save on one, time until the other shows it | Pending. local: 17 / 89 ms (SSE hint) | Pending. local: 24 / 31 ms (SSE hint) | Pending. local: 27 / 34 ms (live-query hint) |
 | First sync after idle | Leave it 10 minutes, then push | Pending. (local, 20 s idle: no effect) | Pending. This is the Neon wake-up row. | Pending. |
-| First sync of a 10 MB library | Paged initial pull on an empty device | Pending. local: upload 0.44 s, pull 0.23 s | Pending. local: upload 0.58 s, pull 0.54 s | Pending. local: upload 3.7 s, pull 3.0 s. Documented write cap of 4 MiB/s on Starter means about 2.5 s at best. |
-| Gap-free versions under concurrent pushes | Two clients pushing at once; look for gaps and duplicates | **Pass (local).** 8 devices x 40 pushes: versions exactly 1..head, none repeated, 0 retries. One writer, no lock to engineer. | **Pass (local).** Same, 0 retries, p95 53 ms (the per-user row lock serializes them). | **Pass (local)**, but 6 of 320 contended pushes ran out of optimistic-concurrency retries (a 503); the client's same-`batchId` retry fixed each one, max 1.5 s. Only under the unhappy path: one user's devices pushing at once. |
-| Kill the API | Time to recover, and what devices see | Pending (Fly restart time). local: 0 edits lost, longest sync pause 15.7 s around a 10 s outage. | Pending. local: 0 lost, 12.5 s pause. | **Not drillable:** Convex runs the API. |
+| First sync of a 10 MB library | Paged initial pull on an empty device | Pending. local: upload 0.42 s, pull 0.33 s | Pending. local: upload 0.55 s, pull 0.27 s | Pending. local: upload 3.5 s, pull 1.9 s. Documented write cap of 4 MiB/s on Starter means about 2.5 s at best. |
+| Gap-free versions under concurrent pushes | Two clients pushing at once; look for gaps and duplicates | **Pass (local).** 8 devices x 40 pushes: versions exactly 1..head, none repeated, 0 retries. One writer, no lock to engineer. | **Pass (local).** Same, 0 retries, p95 33 ms (the per-user row lock serializes them). | **Pass (local)**, but 1 to 6 of 320 contended pushes (it varies by run) ran out of optimistic-concurrency retries (a 503); the client's same-`batchId` retry fixed each one, slowest 1.2 to 1.5 s. Only under the unhappy path: one user's devices pushing at once. |
+| Kill the API | Time to recover, and what devices see | Pending (Fly restart time). local: 0 edits lost, longest sync pause 15.8 s around a 10 s outage. | Pending. local: 0 lost, 11.2 s pause. | **Not drillable:** Convex runs the API. |
 | Lose the database | Restore from backup: time, steps, and whether the `epoch` heals the devices | Local (S3 mock, **not R2**): destroy the disk, start empty, the entrypoint restores from the replica and **rotates the epoch by itself**; both devices noticed in 0.1 s and healed. Real R2 restore: pending. | Local `pg_restore` passes and devices heal in 0.1 s, but **rotating the epoch is a manual step** (the restored DB carries the old one): forgetting it is the risk. Neon branch restore: pending, untested. | Local export then `import --replace-all` passes and devices heal; **epoch rotation is also manual**. Starter has no scheduled backup (Pro only) and keeps two manual ones. |
 | Data lost in a failure | Records missing after the drill | **Measured (local):** 0 when replication had caught up; **the last transaction (70 records) when the disk was destroyed right after a write**, i.e. inside Litestream's ~1 s interval. The devices re-pushed all 70: 0 lost for good. The R2 window: pending. | Not measurable by drill: the restore goes to a point chosen 70 writes back, so the loss is by construction and the row tests healing (0 lost for good). Neon's durability for an acknowledged write is the provider's claim, not tested. | Same as Postgres. The Convex FAQ says it never deletes a record from a successful mutation; not tested. |
 | Monthly cost at 100 users | The real bill, extrapolated | Pending. Estimate from prices read 2026-11-05: about $2 to $5. | Pending. Estimate: Fly API about $2 to $5, Neon Free $0. | Pending. Estimate: about $0.25 of usage. |
@@ -1228,9 +1230,30 @@ These are findings from the prototype, not decisions. Each says what the protoco
 - **Retries must reuse the `batchId`, and the server must be idempotent.** The fault scenario's solo phase (duplicated and lost-response pushes
   from one device) sees zero conflicts only because a repeated batch returns its stored answer. Without that, every lost response would
   become a false conflict copy.
-- **Pull returns the device's own writes, so a bulk upload should skip the pull and move its cursor.** The draft has `pullLimit: 0` for push
-  only, and the engine advances its cursor past its own writes when they are the next consecutive versions. Without that, a 10 MB first
-  sync downloads itself back.
+- **A push's response must not hand the device its own writes back.** The first draft did, and a simulated typing session on the iPad
+  downloaded 615 KB while uploading 612 KB. The draft now omits records the same request applied (see
+  [The protocol](#the-protocol)); `pullLimit: 0` stays for bulk uploads, and the engine advances its cursor past its own writes when
+  they are the next consecutive versions.
+- **The request budget on a hotspot was three defects in the first draft, not a limit of the design.** The scenario `typing` models the iPad on a mobile hotspot
+  (100 to 300 ms added to every request, 1% of requests and responses lost): autosave every 500 ms in bursts of 10 to 25 s, 4 to 10 s
+  thinking pauses, the design's 2 s push debounce, a second device idle and told by hints. Same seeded 98-second session, 121 autosaves:
+
+  | | First engine | After the three fixes |
+  |---|---|---|
+  | iPad requests (lean / Postgres) | 56 / 113 (34 / 69 a minute) | **9 (5.5 a minute)** |
+  | iPad data up / down | 612 / 615 KB (Postgres: 793 / 796 KB) | **109 KB / 2 KB** |
+  | Desktop requests, of which no-ops | 56, 15 (Postgres: 70, 12) | **9, 0** |
+  | Last autosave until the desktop holds it, median | 2.0 s (Postgres: 1.3 s) | 2.5 s |
+
+  The causes: **(1)** the "debounce" was a throttle, so the engine pushed every 2 s for as long as the person typed (it now restarts on
+  every write, with the design's 10 s maximum wait); **(2)** a push's own hint arrived before its response was processed and left a stale
+  "something is new" flag, so a device asked a question the response had already answered (worse on the slower backend: 44 of 113 iPad
+  requests on Postgres); **(3)** the echo of a push's own writes, above. The cost is real and small: the other device now has the final
+  text about 2.5 s after the last autosave instead of 1.3 to 2.0 s, inside the 3 to 4 s typical budget. Not measured: a real cellular
+  radio (battery and the cost of waking it), a cold connection, and whether a URLSession shares one HTTP/2 connection between the event
+  stream and sync requests on the same host. **Options not built:** carry a small change inside the hint so the receiving device makes no
+  request at all; compress the plaintext before encrypting it (ciphertext does not compress, and base64 adds a third); lengthen the
+  15 s event-stream heartbeat (it keeps a cellular radio awake; the proxy's idle limit is unverified); and a 10 to 15 s request timeout.
 - **Convex's hot counter row is a hot document.** Concurrent pushes from one user retry, and rarely exhaust the retries (a 503, then a
   successful client retry). Its change hint is a live query over its WebSocket, because an HTTP action cannot hold a stream open
   cheaply, so the Convex client library ends up in each app (R20), and its 4 MiB/s write cap shapes first sync and restores.
@@ -1366,3 +1389,8 @@ its docs (above); its **production terms** and the Terms of Service text are sti
   teardown script. S8 may now start before Gate B on a draft protocol subset and feeds S3 and Gate B. Convex's backups, export, regions and
   serializability were resolved from its docs (production terms were not). The scorecard has local numbers and the judgement cells marked;
   the real-host column waits for your accounts.
+- 2026-11-07: **fewer requests on a hotspot.** A simulated iPad typing session on a mobile hotspot (new scenario `typing`) showed the first
+  engine and draft protocol making 56 to 113 requests and downloading as much as it uploaded. Three fixes cut it to 9 requests and 2 KB
+  down (a true restart-on-write debounce with a 10 s maximum wait, no stale "something is new" flag after a hint, and a push response that
+  omits the records the same push applied). The protocol's pull rule changed accordingly, all three candidates pass the updated 30-test
+  suite, and the local baseline was re-run. See "What building them taught".
