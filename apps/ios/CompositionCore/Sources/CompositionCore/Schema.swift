@@ -122,6 +122,24 @@ enum Schema {
     CREATE INDEX IF NOT EXISTS idx_feed_items_feed_published ON feed_items (feed_id, published_at);
     """
 
+    /// The Contacts plugin's rolodex (the desktop's `CONTACTS_SCHEMA`).
+    static let contacts = """
+    CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        kind TEXT NOT NULL DEFAULT 'personal',
+        first_name TEXT NOT NULL DEFAULT '',
+        last_name TEXT NOT NULL DEFAULT '',
+        email TEXT NOT NULL DEFAULT '',
+        phone TEXT NOT NULL DEFAULT '',
+        notes TEXT NOT NULL DEFAULT '',
+        birth_date TEXT NOT NULL DEFAULT '',
+        title TEXT NOT NULL DEFAULT '',
+        manager TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """
+
     static let todoCycle = """
     CREATE TABLE IF NOT EXISTS todo_events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

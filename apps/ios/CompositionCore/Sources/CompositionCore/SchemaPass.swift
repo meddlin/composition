@@ -15,6 +15,7 @@ enum SchemaPass {
             try db.execute(sql: Schema.todos)
             try db.execute(sql: Schema.readingList)
             try db.execute(sql: Schema.feeds)
+            try db.execute(sql: Schema.contacts)
 
             // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
             if try !hasColumn(db, "todos", "status") {

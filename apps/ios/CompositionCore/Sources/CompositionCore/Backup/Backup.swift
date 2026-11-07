@@ -38,6 +38,8 @@ public struct BackupCounts: Codable, Equatable, Sendable {
     public var attachments = 0
     public var todos = 0
     public var archivedTodos = 0
+    /// The Contacts plugin's rolodex (the iPad has no plugins, C6, but a backup carries the rows through).
+    public var contacts = 0
 }
 
 public struct BackupSummary: Equatable, Sendable {
@@ -217,6 +219,7 @@ public enum Backup {
             counts.attachments = count("attachments")
             counts.archivedTodos = count("todos", where: "archived_at IS NOT NULL")
             counts.todos = count("todos") - counts.archivedTodos
+            counts.contacts = count("contacts")
             return counts
         }
     }

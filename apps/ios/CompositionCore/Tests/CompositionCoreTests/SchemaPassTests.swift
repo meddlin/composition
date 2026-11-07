@@ -17,7 +17,7 @@ struct SchemaPassTests {
                 let tables = Set(try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type = 'table'"))
                 for table in [
                     "notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments", "todos",
-                    "reading_list", "feeds", "feed_items", "todo_events", "todo_closed", "todo_reports", "todo_places",
+                    "reading_list", "feeds", "feed_items", "contacts", "todo_events", "todo_closed", "todo_reports", "todo_places",
                 ] {
                     #expect(tables.contains(table), "missing table \(table)")
                 }
