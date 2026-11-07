@@ -169,9 +169,13 @@ so sync never has to rewrite it:
 ### Reading
 
 pdf.js (`pdfjs-dist`, Apache-2.0) in a new panel kind, `pdf`. The renderer never supplies a path: the panel asks for a
-document by id, and the main process serves its bytes over the app scheme with `Range` support, so a 300 MB textbook opens
-without reading all of it. The route is found from the row, answers only to the app's own pages, and is never navigable
-(`nosniff`, no display of the file as a page), mirroring the attachment download rules.
+document by id, and the main process serves its bytes over the app scheme, streamed from disk with `Range` support (the
+handler in [`protocol.ts`](../apps/desktop/src/main/protocol.ts) reads whole files into memory, so documents get a streaming
+path of their own). **pdf.js does not use `Range` itself on an `app://` URL** (spike A), so the panel hands it a
+`PDFDataRangeTransport` that fetches ranges from that route, with a small `rangeChunkSize` (16 KB) and `disableAutoFetch`.
+That is what lets a 400 MB textbook open after reading about 10 MB ([Spike A findings](#spike-a-findings-2026-11-07)). The
+route is found from the row, answers only to the app's own pages, and is never navigable (`nosniff`, no display of the file as
+a page), mirroring the attachment download rules.
 
 - **Reader basics** (my pick): continuous vertical scroll, fit-to-width on first open, zoom, and **find in the open PDF**
   (pdf.js has it; it is separate from the library-wide full-text search that P8 defers). Position and zoom are remembered
@@ -187,12 +191,15 @@ without reading all of it. The route is found from the row, answers only to the 
   already uses `Mod+Shift+H` (highlight), `K` (note link), `D` (diagram), `M` (images), `X` (width) and `L` (AI helper), so the
   PDF panel's keys are checked against those first.
 - **Untrusted files.** A restored database can come from someone else, so a PDF is treated as hostile: pin a recent pdf.js
-  (the script-execution bug CVE-2024-4367 was fixed in 4.2.67; confirm the version when pinning), turn `isEvalSupported` off,
-  load no PDF scripting, and open a link in a PDF through the same external-link path a note's links use (**unverified** that
-  path exists as needed).
-- **CSP.** Scripts and workers are `'self'`, so pdf.js's worker, CMaps and standard fonts are vendored and pinned like draw.io
-  (a `pdfjs.lock.json` and a fetch script) and served from the app origin. Whether the pinned version needs WebAssembly (for
-  JPEG 2000 or color profiles), and so `'wasm-unsafe-eval'`, is **unverified** and is part of spike A.
+  (spike A ran 6.5.438, well past 4.2.67, which fixed the script-execution bug CVE-2024-4367), turn `isEvalSupported` off (the
+  app's CSP blocks `eval` anyway; spike A ran only with it off), load no PDF scripting, and open a link in a PDF through the
+  same external-link path a note's links use (**unverified** that path exists as needed).
+- **CSP.** Measured in spike A: pdf.js's module worker, CMaps, standard fonts and text layer all work under the app's CSP, with
+  no violations, when served from the app origin. They are vendored and pinned like draw.io (a `pdfjs.lock.json` and a fetch
+  script). **WebAssembly is blocked** (the CSP has no `'wasm-unsafe-eval'`): pdf.js logs a warning and falls back to its
+  JavaScript decoders, and a JPEG 2000 page rendered correctly. Allowing `'wasm-unsafe-eval'` (it permits compiling
+  WebAssembly, not `eval`) made the same page 2 to 3 times faster in a small test. **My pick:** leave the CSP as it is for
+  the first release, since scans are out of scope (P7), and revisit when scans and OCR come.
 
 ### The panel pair
 
@@ -308,8 +315,10 @@ the iPad; on the desktop, as far as I know, nothing is built in, so a bundled en
 Each step ends with something checkable. **Your steps** are G3 and G7; everything else I can do and show you.
 
 0. **Spikes** (before anything is built for real):
-   - **A, pdf.js on the desktop.** Under the real CSP, with the vendored worker, served by the app scheme with `Range`, on a
-     300 MB, 600-page file: time to first page, memory, scrolling, whether WebAssembly is needed.
+   - **A, pdf.js on the desktop. Done 2026-11-07;** see [Spike A findings](#spike-a-findings-2026-11-07). Under the real CSP,
+     with the worker served by the app scheme, on a 405 MB, 600-page file. It changed the plan: ranges need a transport, a
+     small chunk size and a streaming handler. Scrolling in a visible window with pdf.js's viewer components, and a cold disk,
+     are still untested.
    - **C, coordinates.** One convention (above), fixtures with rotated and cropped pages, a mark made in pdf.js drawn in the same
      place by PDFKit. PDFKit also runs on macOS, so its half can be a command-line Swift script on this Mac with no simulator.
    - **D, the export writer.** Which library writes native annotations and flattens, with a licence and a size check.
@@ -332,11 +341,43 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
    page); Pencil ink on PDFs; handwritten notes beside the PDF; export on the iPad; then standalone `<Ink>` pages.
 10. **Gate P2 (yours):** the iPad manual test, extending `docs/manual-tests/ipad.md`.
 
+## Spike A findings (2026-11-07)
+
+The prototype is [`spikes/pdf-reader`](../spikes/pdf-reader/README.md): a minimal Electron main process (45.2.1, the desktop
+app's locked version) with the app's scheme privileges and the CSP string copied from
+[`protocol.ts`](../apps/desktop/src/main/protocol.ts), serving a test PDF from a streaming handler, and `pdfjs-dist` 6.5.438.
+
+**The test file** is generated, and is harder than the plan's bound in one way and easier in others: 600 pages, **405 MB**
+(the bound is 300), real selectable text, a 79-entry outline, printed page labels (i to viii, then 1 to 592), and one
+0.7 MB incompressible JPEG on every page. A real book has fewer figures, so its pages are cheaper to render, but real print
+PDFs also scatter their page objects through the file the way this one does. **The numbers** are one run each on this Mac,
+with a warm file cache and a hidden window.
+
+| Question | Answer |
+|---|---|
+| Does pdf.js run under the real CSP? | **Yes.** The module worker, CMaps, standard fonts, text layer, outline and page labels all work, with no CSP violation except WebAssembly (below). |
+| Does it use `Range` on `app://`? | **No.** pdf.js sets `isHttp` from the URL's protocol and turns range requests off when it is false (`pdf.mjs`, `validateRangeRequestCapabilities`). Opened by URL, it made one request for the whole 405 MB file, and the renderer's working set was about 800 MB straight after open. |
+| With a `PDFDataRangeTransport` that fetches ranges itself? | **Yes, and the chunk size decides the cost.** Opening walks the page tree to the last page, and here every page object sits between images, so it reads one chunk per page: **297 MB at 512 KB chunks, 37.5 MB at 64 KB, 9.5 MB at 16 KB, 4.9 MB at 8 KB** (about 600 requests at every size). At 16 KB the open took 125 ms in Electron. |
+| How fast is it? (16 KB chunks) | First page with its text layer 34 ms; jumps to pages 300, 450 and 600 took 22 to 33 ms; 100 pages in a row averaged 33 ms (p95 34 ms); the outline took under 2 ms and the labels were right. |
+| Is find-in-PDF feasible? | **Yes:** the text of all 600 pages (22,800 items) took 1.3 s. It read 325 MB doing it, because each page's resources pull its figure in. |
+| Memory | The renderer's working set was 174 MB after open, 345 MB after reading 100 pages (67 MB), and about 700 MB after reading most of the file. pdf.js keeps what it has read until the document closes, so a long session trends toward the file's size; closing the panel frees it. |
+| WebAssembly | **Blocked by the CSP** (no `'wasm-unsafe-eval'`). pdf.js logs a warning and falls back to its JavaScript decoders, and a JPEG 2000 page rendered correctly (140 to 234 ms). With `'wasm-unsafe-eval'` allowed it took 58 to 80 ms and the warning went away. |
+
+**What it changed in the plan:** ranges need a transport (not a URL), a 16 KB chunk size and `disableAutoFetch`, and a
+streaming handler (the existing one reads whole files into memory); the CSP question has an answer and a pick (above); and
+risk X1 is mostly answered.
+
+**What it did not test:** scrolling in a visible window with pdf.js's viewer components (`pdfjs-dist/web`), which is where a
+page-canvas pool and the memory trend would show; a cold disk; JBIG2 and ICC color (the other WebAssembly paths); encrypted
+PDFs; a balanced page tree (the open may be cheaper than here); and Windows and Linux. The test file's incompressible images
+and interleaved layout are not typical, and a handwritten generator is not a real book: **run the same phases on two or three
+real PDFs of yours** (the README says how) before treating any number as a promise.
+
 ## Risks and unknowns
 
 | # | Risk | Mitigation |
 |---|---|---|
-| X1 | pdf.js is slow or heavy on a 300 MB, 600-page file, or does not work under the CSP. | Spike A first; `Range` serving; render only visible pages. |
+| X1 | pdf.js is slow or heavy on a 300 MB, 600-page file. **Mostly answered by spike A:** it works under the CSP and opens in about 0.1 s reading about 10 MB, but memory trends toward the file's size over a long session (it keeps what it has read until the document closes). | Range transport, 16 KB chunks, render only visible pages; closing the panel frees it. Still untested: scrolling in a real window, a cold disk. |
 | X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). | One coordinate convention and spike C, before any markup is saved. |
 | X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. | Spike B; Pencil-only input; overlays only on visible pages. |
 | X4 | Quoted text comes out jumbled on multi-column or odd PDFs (selection order), or a highlight's rectangles merge badly. | Keep the rectangles per line; test on a two-column paper and a scanned-then-OCR file; the user can correct the quote in the note. |
@@ -371,3 +412,6 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
 ## Change log
 
 - 2026-11-07: first version, from a design session with the owner (P1 to P19). Nothing built.
+- 2026-11-07: **spike A done** ([findings](#spike-a-findings-2026-11-07)). pdf.js works under the real CSP but does not use
+  `Range` on `app://`: the reader needs a range transport, 16 KB chunks and a streaming handler. WebAssembly is blocked and
+  pdf.js falls back to JavaScript; the CSP is left alone (my pick). Prototype in `spikes/pdf-reader`.
