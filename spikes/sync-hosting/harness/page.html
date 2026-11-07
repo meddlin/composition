@@ -21,6 +21,8 @@
   .cand small { display:block; color:var(--muted); font-weight:400; font-size:11px; }
   select, button.act { font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:5px 8px; }
   button.act { cursor:pointer; }
+  #status { border-radius:8px; padding:8px 12px; margin:-4px 0 14px; font-size:13.5px; border:1px solid var(--line); }
+  #status.info { color:var(--muted); } #status.ok { color:var(--ok); border-color:var(--ok); } #status.error { color:var(--bad); border-color:var(--bad); background:color-mix(in srgb, var(--bad) 8%, transparent); }
   .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
   @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
   .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
@@ -52,6 +54,8 @@
     <button class="act" id="reconnect">Reconnect</button>
   </div>
 
+  <div id="status" role="status" aria-live="polite" hidden></div>
+
   <div class="grid">
     <section class="card" id="card-a"><h2><span>Device A</span><span><span class="pill" id="pill-a">…</span> <button class="act" data-off="a">Go offline</button></span></h2>
       <textarea id="text-a" placeholder="Type here…" aria-label="Device A note"></textarea><div class="meta" id="meta-a"></div><div class="copies" id="copies-a"></div></section>
@@ -72,13 +76,26 @@ let cfg = null;
 const timers = {};
 const percentile = (xs, p) => { const s = [...xs].sort((a,b)=>a-b); return s.length ? s[Math.min(s.length-1, Math.ceil(p/100*s.length)-1)] : NaN; };
 
-async function post(path, body) { const r = await fetch(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) }); return r.json(); }
+function setStatus(kind, text) { const el = $('status'); el.hidden = !text; el.className = kind; el.textContent = text || ''; }
+
+// Every action goes through here so a dead server or a failed connect is shown, never swallowed.
+async function post(path, body) {
+  try {
+    const r = await fetch(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok && !$('status').classList.contains('error')) setStatus('error', j.error || ('The harness answered ' + r.status));
+    return j;
+  } catch {
+    setStatus('error', 'Cannot reach the harness server at ' + location.host + '. Nothing you click will work until it is running again: start it with `pnpm harness` (this page reconnects by itself).');
+  }
+}
 
 function renderConfig() {
   const box = $('cands'); box.textContent = '';
   for (const c of cfg.candidates) {
     const b = document.createElement('button'); b.className = 'cand'; b.disabled = !c.ok; b.setAttribute('aria-pressed', String(c.name === cfg.candidate));
     b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = c.name; b.lastChild.textContent = c.ok ? c.where + ' · ' + c.hint : 'not reachable';
+    b.title = c.ok ? c.url : 'Not reachable at ' + c.url + '. Start it first (see the README).';
     b.onclick = () => post('/api/connect', { candidate: c.name, debounceMs: Number($('deb').value), hintMode: $('hint').value });
     box.appendChild(b);
   }
@@ -108,6 +125,10 @@ function renderTimings(t) {
   $('stats').textContent = server.length ? `minus debounce: p50 ${Math.round(percentile(server,50))} ms · p95 ${Math.round(percentile(server,95))} ms · n=${server.length}` : '';
 }
 const es = new EventSource('/api/events');
+es.onopen = () => { if ($('status').classList.contains('error')) setStatus('', ''); };
+es.onerror = () => setStatus('error', 'Lost the connection to the harness server. Start it with `pnpm harness`; this page reconnects by itself.');
+es.addEventListener('status', (e) => { const s = JSON.parse(e.data); setStatus(s.kind, s.text); });
+es.addEventListener('candidates', (e) => { if (!cfg) return; const m = JSON.parse(e.data); cfg.candidates = m.list; cfg.candidate = m.candidate; renderConfig(); });
 es.addEventListener('config', (e) => { cfg = JSON.parse(e.data); renderConfig(); });
 es.addEventListener('state', (e) => renderState(JSON.parse(e.data)));
 es.addEventListener('timing', (e) => renderTimings(JSON.parse(e.data)));

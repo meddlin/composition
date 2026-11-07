@@ -79,44 +79,62 @@ function snapshot(name: "a" | "b") {
 }
 
 async function connect(next: CandidateName): Promise<void> {
-  if (sides) for (const s of Object.values(sides)) s.device.stop();
-  candidate = next;
+  emit("status", { kind: "info", text: `Connecting to ${next}…` });
   const { url } = resolveBaseUrl(next);
-  const info = (await (await fetch(url + "/v1/info", { signal: AbortSignal.timeout(30_000) })).json()) as InfoResponse;
-  const make = async (name: "a" | "b"): Promise<Side> => {
-    const net = new SwitchTransport(new HttpTransport(url, tokenFor(USER, name)));
-    const device = new Device({
-      name,
-      transport: net,
-      pushDebounceMs: debounceMs,
-      onAck: (e) => {
-        const p = pending.find((x) => x.from === name && x.ackMs === undefined);
-        if (p) p.ackMs = e.at - p.t0;
-        emit("state", snapshot(name));
-      },
-      onRemote: (e) => {
-        if (!e.key.endsWith(MAIN)) return;
-        const text = dec.decode(e.payload);
-        const idx = pending.findIndex((x) => x.from !== name && x.text === text);
-        if (idx >= 0) {
-          const p = pending.splice(idx, 1)[0]!;
-          const t = { from: p.from.toUpperCase(), to: name.toUpperCase(), totalMs: Math.round(e.at - p.t0), ackMs: p.ackMs === undefined ? null : Math.round(p.ackMs), debounceMs, at: new Date().toLocaleTimeString() };
-          timings.unshift(t);
-          timings.length = Math.min(timings.length, 50);
-          emit("timing", { latest: t, all: timings });
-        }
-        emit("state", snapshot(name));
-      },
-    });
-    const source = hintMode === "poll" ? pollHints(5000, (h) => device.onHint(h)) : await openHints(url, info, tokenFor(USER, name), (h) => device.onHint(h));
-    device.attachHints(source);
-    return { device, net, hints: source };
-  };
-  sides = { a: await make("a"), b: await make("b") };
-  await Promise.all([sides.a.device.syncNow(), sides.b.device.syncNow()]);
-  pending = [];
-  emit("state", snapshot("a"));
-  emit("state", snapshot("b"));
+  const old = sides;
+  try {
+    const info = (await (await fetch(url + "/v1/info", { signal: AbortSignal.timeout(15_000) })).json()) as InfoResponse;
+    const make = async (name: "a" | "b"): Promise<Side> => {
+      const net = new SwitchTransport(new HttpTransport(url, tokenFor(USER, name)));
+      const device = new Device({
+        name,
+        transport: net,
+        pushDebounceMs: debounceMs,
+        onAck: (e) => {
+          const p = pending.find((x) => x.from === name && x.ackMs === undefined);
+          if (p) p.ackMs = e.at - p.t0;
+          emit("state", snapshot(name));
+        },
+        onRemote: (e) => {
+          if (!e.key.endsWith(MAIN)) return;
+          const text = dec.decode(e.payload);
+          const idx = pending.findIndex((x) => x.from !== name && x.text === text);
+          if (idx >= 0) {
+            const p = pending.splice(idx, 1)[0]!;
+            const t = { from: p.from.toUpperCase(), to: name.toUpperCase(), totalMs: Math.round(e.at - p.t0), ackMs: p.ackMs === undefined ? null : Math.round(p.ackMs), debounceMs, at: new Date().toLocaleTimeString() };
+            timings.unshift(t);
+            timings.length = Math.min(timings.length, 50);
+            emit("timing", { latest: t, all: timings });
+          }
+          emit("state", snapshot(name));
+        },
+      });
+      const source = hintMode === "poll" ? pollHints(5000, (h) => device.onHint(h)) : await openHints(url, info, tokenFor(USER, name), (h) => device.onHint(h));
+      device.attachHints(source);
+      return { device, net, hints: source };
+    };
+    const fresh = { a: await make("a"), b: await make("b") };
+    // Swap first so the new devices' callbacks read their own state, and put the old pair back if the first sync fails.
+    sides = fresh;
+    try {
+      await Promise.all([fresh.a.device.syncNow(), fresh.b.device.syncNow()]);
+    } catch (err) {
+      fresh.a.device.stop();
+      fresh.b.device.stop();
+      sides = old;
+      throw err;
+    }
+    if (old) for (const side of Object.values(old)) side.device.stop();
+    candidate = next;
+    pending = [];
+    emit("state", snapshot("a"));
+    emit("state", snapshot("b"));
+    emit("status", { kind: "ok", text: `Connected to ${next} (${url}).` });
+  } catch (err) {
+    const reason = err instanceof Error ? (err.cause instanceof Error ? err.cause.message : err.message) : String(err);
+    emit("status", { kind: "error", text: `Could not connect to ${next} at ${url}: ${reason}. ${old ? "Still on the previous candidate." : "Start that candidate first (see the README)."}` });
+    throw err;
+  }
 }
 
 async function candidates() {
@@ -196,6 +214,10 @@ const server = http.createServer(async (req, res) => {
     json(res, 500, { error: err instanceof Error ? err.message : String(err) });
   }
 });
+
+setInterval(() => {
+  if (streams.size > 0) void candidates().then((list) => emit("candidates", { candidate, list }));
+}, 5000).unref();
 
 setInterval(() => {
   if (sides) {

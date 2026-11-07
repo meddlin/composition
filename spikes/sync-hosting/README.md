@@ -112,7 +112,9 @@ pnpm harness            # http://127.0.0.1:8799
 ```
 
 Type on device A and watch device B, with a readout of how long the other device took to hold the text. Switch candidate with the
-buttons (greyed out when a candidate is not reachable), change the push debounce (0 ms shows the infrastructure alone, 2000 ms is the
+buttons. A candidate has to be running to be chosen (an unreachable one is greyed out, with its address in the tooltip, and the
+list refreshes every 5 s); a switch that fails says why and leaves you on the previous candidate; if the harness itself stops, a red
+banner says so and the page reconnects when it is back. Other controls: change the push debounce (0 ms shows the infrastructure alone, 2000 ms is the
 design), choose live hints or a 5 s poll, and take either device offline to edit both and see the conflict rule: the first writer to
 reach the server wins and the other text becomes a conflict copy on both devices. Local only; it binds to 127.0.0.1.
 
