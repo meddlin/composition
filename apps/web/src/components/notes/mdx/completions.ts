@@ -57,6 +57,11 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     // Blank lines around the fence are what make it a code block (see Chart).
     template: '<Chart type="bar">\n\n```csv\n$0\n```\n\n</Chart>',
   },
+  Sheet: {
+    description: "A spreadsheet-style grid of a CSV table written inside the tag",
+    // As for Chart: blank lines around the fence make it a code block, and the caret is where the header row goes.
+    template: "<Sheet>\n\n```csv\n$0\n```\n\n</Sheet>",
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));

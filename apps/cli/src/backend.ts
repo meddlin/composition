@@ -75,6 +75,8 @@ export { parseYouTube, youtubeWatchUrl } from "../../web/src/components/notes/md
 export { parseRepo, repoLabel } from "../../web/src/components/notes/mdx/repoRef";
 export { parseChart } from "../../web/src/components/notes/mdx/chartData";
 export type { ChartSpec } from "../../web/src/components/notes/mdx/chartData";
+export { columnLabel, isNumberCell, parseSheet } from "../../web/src/components/notes/mdx/sheetData";
+export type { Sheet } from "../../web/src/components/notes/mdx/sheetData";
 export { remarkIndentedCode } from "../../web/src/components/notes/mdx/remarkIndentedCode";
 export { remarkHeadings, HEADINGS_PROP } from "../../web/src/components/notes/mdx/remarkHeadings";
 export type { TocHeading } from "../../web/src/components/notes/mdx/remarkHeadings";

@@ -61,6 +61,25 @@ describe("NoteMarkdown", () => {
     expect(screen.getByText("After.")).toBeDefined();
   });
 
+  it("draws a <Sheet> from the CSV block inside it, and leaves a formulas block unread", () => {
+    renderNote('Before.\n\n<Sheet title="Q3">\n\n```csv\nRegion,Units\nWest,120\n```\n\n```formulas\nB2 =A2*2\n```\n\n</Sheet>\n\nAfter.');
+
+    expect(screen.getByRole("region", { name: "Q3: 1 row by 2 columns" })).toBeDefined();
+    expect(screen.getByRole("cell", { name: "120" })).toBeDefined();
+    // The table is the sheet's data, not text left in the note.
+    expect(screen.queryByText(/Region,Units/)).toBeNull();
+    expect(screen.queryByText(/A2\*2/)).toBeNull();
+    expect(screen.getByText("After.")).toBeDefined();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says why a <Sheet> can't be drawn, without dropping the rest of the note", () => {
+    renderNote("<Sheet>\n\n```csv\n\n```\n\n</Sheet>\n\nAfter.");
+
+    expect(screen.getByRole("img", { name: "Sheet not drawn" }).textContent).toMatch(/add a ```csv block/);
+    expect(screen.getByText("After.")).toBeDefined();
+  });
+
   it("renders <Warning> next to <Info>, each with its own label", () => {
     renderNote("<Info>\n\nfyi\n\n</Info>\n\n<Warning>\n\nSome **danger**.\n\n</Warning>");
 
@@ -136,7 +155,7 @@ describe("NoteMarkdown", () => {
   });
 
   it.each([
-    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>."],
+    ["an unknown component", "<Danger>x</Danger>", "Unknown component <Danger>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>, <Sheet>."],
     ["a fragment", "<>\n\nx\n\n</>", "Fragments"],
     ["a flow expression", "{globalThis.pwned = true}", "{expressions} are not supported"],
     ["a text expression", "text {globalThis.pwned = true}", "{expressions} are not supported"],
