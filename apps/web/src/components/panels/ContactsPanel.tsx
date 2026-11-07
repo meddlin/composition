@@ -322,14 +322,20 @@ export function ContactsPanel({ store, panelId, state }: { store: WorkspaceStore
 
   const list = (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 p-2">
-      <div className="flex items-center gap-1">
-        <div className="relative min-w-0 flex-1">
-          <SearchIcon aria-hidden className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label="Search contacts" placeholder="Search" value={query} spellCheck={false} className="h-7 pl-7" onChange={(event) => setQuery(event.target.value)} />
-        </div>
-        <Button variant="outline" size="icon-sm" aria-label="New contact" title="New contact" onClick={startNew}>
-          <PlusIcon />
-        </Button>
+      <Button variant="default" size="sm" className="w-full" onClick={startNew}>
+        <PlusIcon /> New contact
+      </Button>
+      <div className="relative">
+        <SearchIcon aria-hidden className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          aria-label="Search contacts"
+          placeholder="Search..."
+          value={query}
+          spellCheck={false}
+          className="h-8 pl-8 placeholder:text-foreground/60"
+          onChange={(event) => setQuery(event.target.value)}
+        />
       </div>
       <div role="group" aria-label="Show" className="flex gap-1">
         {FILTERS.map(({ value, label }) => (
@@ -354,7 +360,7 @@ export function ContactsPanel({ store, panelId, state }: { store: WorkspaceStore
         ) : status !== "ready" ? (
           <p className="p-1 text-sm text-muted-foreground">Loading…</p>
         ) : contacts.length === 0 ? (
-          <p className="p-1 text-sm text-muted-foreground">No contacts yet. Add one with the plus button.</p>
+          <p className="p-1 text-sm text-muted-foreground">No contacts yet. Choose New contact to add one.</p>
         ) : shown.length === 0 ? (
           <p className="p-1 text-sm text-muted-foreground">No contacts match.</p>
         ) : (

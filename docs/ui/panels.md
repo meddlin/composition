@@ -301,7 +301,7 @@ in an empty panel, or **Open Contacts** in the palette; it is on from the start,
   on one line. A refusal is shown in the form and nothing is saved. The birth date is a calendar date, so no time zone moves it; the card shows it in words with the age.
 - **The list.** Sorted by last name (first name when there is no last), then first name. **Search** matches every word you type against the name, email, phone, title, manager and notes.
   **All / Personal / Work** narrows it, and the panel remembers that choice.
-- **Adding and changing.** **+** opens a form (a new contact starts as work while only Work is listed); **Edit** on a card opens the same form with its details. **Save** keeps it and
+- **Adding and changing.** The **New contact** button at the top of the list opens a form (a new contact starts as work while only Work is listed); **Edit** on a card opens the same form with its details. **Save** keeps it and
   opens its card; **Cancel** leaves it as it was. Picking another contact while a form is open drops what was typed.
 - **Deleting asks first**, naming the contact, and says it is removed for good and not sent to the Trash Can. A backup made earlier still has it.
 - **Backups.** Contacts live in the notes database, so they are in every backup and come back with a restore; see [backup-restore.md](../architecture/backup-restore.md).
