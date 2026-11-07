@@ -1,0 +1,11 @@
+node_modules/
+# Secrets and per-machine state: written by scripts/wizard.sh and scripts/gen-tokens.ts, never committed.
+.env
+.env.*
+!.env.example
+.local/
+data/
+*.db
+*.db-shm
+*.db-wal
+.convex/

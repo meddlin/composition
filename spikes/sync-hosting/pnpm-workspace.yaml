@@ -1,0 +1,5 @@
+# pnpm 11 keeps install settings here. This is NOT a workspace: the spike is one package,
+# with its own lockfile, and is not part of anything under apps/.
+allowBuilds:
+  # Convex's CLI bundles with esbuild; the install script only checks the platform binary.
+  esbuild: true

@@ -1,0 +1,29 @@
+{
+  "name": "sync-hosting-spike",
+  "private": true,
+  "description": "Throwaway spike S8: three hosted sync-server candidates behind one protocol and one contract suite. Not part of any workspace; not for merging to main.",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.0.3",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "gen-tokens": "node scripts/gen-tokens.ts",
+    "lean": "node --env-file-if-exists=.env.tokens.local lean/main.ts",
+    "postgres": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.postgres.local postgres/main.ts",
+    "contract": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local --test protocol/contract/suite.test.ts",
+    "scenario": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local protocol/scenarios/run.ts",
+    "harness": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local harness/server.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1163.0",
+    "convex": "^1.49.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "typescript": "^7.0.2"
+  }
+}
