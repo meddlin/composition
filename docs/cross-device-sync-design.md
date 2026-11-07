@@ -544,9 +544,21 @@ the smallest size listed).
 
 **Open concerns**
 
-- Backups, export, regions and production terms on the Starter plan are **unconfirmed**. Backups decide whether it can be the
-  only copy of the server's data.
-- That its mutations are serializable transactions, which version assignment relies on, is my understanding, not confirmed.
+- **Backups (read from the docs, 2026-11-06; details in `spikes/sync-hosting/convex/FINDINGS.md`).** Manual backups are kept 7
+  days and Free or Starter hold at most two per deployment. **Daily and weekly backups need the Professional plan** ($25 per
+  developer a month). `npx convex export` and `npx convex import --replace-all` work with a deploy key, so a restore can be
+  scripted, but on Starter there is no scheduled backup, so Starter cannot be the only copy of the server's data unless the
+  clients' full copies are the backstop (they are, by design, through the `epoch` and re-push).
+- **Regions:** US East (N. Virginia) at the standard price, plus EU West, Sydney and Canada Central. A deployment's region
+  cannot be changed (move by export and import).
+- **Production terms are still unresolved.** The pricing FAQ and the limits page say nothing that forbids production use on
+  Starter, and give no SLA or support terms; the Terms of Service text did not load. Read it before relying on Starter.
+- **Serializability is confirmed in the docs:** Convex "provides true serializability" with optimistic concurrency control, so a
+  mutation that reads and writes the user's counter row is retried until it commits. A hot counter row does mean concurrent
+  pushes from one user retry and, at eight at once, occasionally exhaust the retries (the spike saw this and the client's
+  retry recovered every time).
+- **Mutation write throughput is capped at 4 MiB on Starter** (8 MiB on Professional): a 10 MB first sync is at the limit and a
+  large restore import can be refused for a moment.
 - It is a third vendor dependency beside Clerk and the payment provider (R20).
 - The backend can be self-hosted under a "fair source" license ([self-hosting](https://docs.convex.dev/self-hosting)), but that
   is heavier for a self-hoster than the lean setup.
@@ -1136,9 +1148,9 @@ The simulation test gets a "two devices across a week boundary, online and offli
 | **S3** | **Protocol and latency on a stub server.** In-process server, two desktop engines, fault-injecting transport; then a real network. Measure typical and p95 propagation. | The 20 s budget, the napkin numbers, R3 | p95 ≤ 10 s; the simulation converges |
 | **S4** | **Sign-in broker.** Our sign-in page with Clerk's components; the desktop (deep link, PKCE) and the iPad (`ASWebAuthenticationSession`) swap a one-time code for a device session; token storage in the Keychain; revoke a device. Compare with using Clerk's Electron and iOS SDKs directly. | D5, R7, R18 | Both sign in, refresh after a week offline, and revoke; the verifier is swappable |
 | **S5** | **Encryption.** One set of test vectors that Node and Swift both encrypt, decrypt and unwrap: AEAD records, chunked blobs, Argon2id wrapping, the recovery key. Pick the cipher and the iPad's Argon2 source. Time unlock on the M2 iPad and a laptop. | D18, R13, R14 | Both sides decrypt each other's data; unlock under about a second on both |
-| **S6** | **Lean server (the self-hosted candidate).** One node with SQLite and continuous replication: load test the push path, restart under load, restore from the replica and time it, and check that the `epoch` makes devices resync and re-push. Check the current replication tool, and settle one database file or a file per user. S8 runs this same setup beside the other two. | D3, D20, R15, R19 | Latency and durability numbers; a restored server heals from the clients |
+| **S6** | **Lean server (the self-hosted candidate).** One node with SQLite and continuous replication: load test the push path, restart under load, restore from the replica and time it, and check that the `epoch` makes devices resync and re-push. Check the current replication tool, and settle one database file or a file per user. S8 runs this same setup beside the other two. **Partly done in the S8 prototype:** restore from the replica with the epoch healing the devices works locally against an S3 mock; load, R2 and the real loss window are pending. | D3, D20, R15, R19 | Latency and durability numbers; a restored server heals from the clients |
 | **S7** | **The weekly cycle on two devices.** Two databases across a week boundary, online and offline, then synced. | D19, R16 | Same closed weeks, same roll counts, no unintended duplicates |
-| **S8** | **All three hosted candidates, side by side.** Build one thin prototype of the protocol (push, pull, hint) behind the storage interface and deploy it three ways: the lean setup (SQLite on one VM), managed Postgres (Neon, and PlanetScale if the free tier is too limited) and Convex, reached through HTTP actions so the same test client and contract suite run against all three. Point the app's server address at each in turn and fill in [the scorecard](#comparing-the-three-by-hand). For Convex, first resolve backups, export, regions and production terms, and confirm its mutations are serializable. | D3, D20, R7, R20 | The scorecard filled in for all three, and a recommendation for D3 |
+| **S8** | **All three hosted candidates, side by side.** Build one thin prototype of the protocol (push, pull, hint) behind the storage interface and deploy it three ways: the lean setup (SQLite on one VM), managed Postgres (Neon, and PlanetScale if the free tier is too limited) and Convex, reached through HTTP actions so the same test client and contract suite run against all three. Fill in [the scorecard](#comparing-the-three-by-hand); until the app has a server-address setting, a two-device harness stands in for pointing the app at each in turn. For Convex, first resolve backups, export, regions and production terms, and confirm its mutations are serializable. **May start before Gate B, on a draft protocol subset:** its findings feed S3 and Gate B (record shapes, limits, the `epoch` and resync rules), not the other way round. | D3, D20, R7, R20 | The scorecard filled in for all three, and a recommendation for D3 |
 | **S9** | **Lean to Postgres move.** Rehearse [the move](#moving-from-lean-to-hosted-postgres) on a copy: restore, copy through the storage interface, check, switch two test devices over. | D3, D20 | Devices carry on with no re-upload; time and steps recorded |
 
 **Gate A** (after S1 and S2): commit to `uuid` + triggers + outbox; tell the iPad design its schema. **Gate B**
@@ -1147,38 +1159,87 @@ machine): S5 passes, D5 is settled and the privacy policy is written. **Gate D**
 
 ### Comparing the three by hand
 
-The point of S8 is to run all three and judge them with your own hands, not from vendor claims. It is possible because the
-protocol and the storage interface are fixed by Gate B (after S3): each candidate is a thin implementation of the same few
-operations, so one test client and one contract suite run against all of them. Nothing here is built yet.
+The point of S8 is to run all three and judge them with your own hands, not from vendor claims. It is possible because each
+candidate is a thin implementation of the same few operations, so one test client and one contract suite run against all of
+them. That needs a *draft* of the protocol and the storage interface, not the frozen one: S8 starts before Gate B on a draft
+subset and its findings feed S3 and Gate B.
+
+**Status (2026-11-06): built as a throwaway prototype, not merged.** It lives in `spikes/sync-hosting/` on the draft PR
+branch `claude/quirky-khayyam-837226` (it is deleted once D3 is decided, and does not touch `apps/`). It holds the draft
+protocol, the shared Node core, the three candidates, a 30-test HTTP contract suite, a simulated two-device client with fault
+injection, the scenarios below, a two-device harness page, and the wizard, deploy, drill and teardown scripts. All three pass the
+contract suite and every scenario **on a laptop**; the real-host column below needs your accounts (the wizard asks for them) and
+is still empty. Records are random bytes (encryption is S5), devices use static dev tokens (sign-in is S4), and the harness is
+not the desktop app, which has no server-address setting or sync engine yet.
 
 **How the comparison works**
 
 1. One scripted client drives every candidate through the same scenarios: two simulated devices making normal edits, a burst of
    500 edits, a first sync of a 10 MB library, and faults (kill the API, kill the database, restore from a backup).
 2. The app's server address is a setting from the first release (D6), so a development build can be pointed at each candidate in
-   turn and used by hand: edit on the desktop and watch a second window or the iPad simulator.
+   turn and used by hand: edit on the desktop and watch a second window or the iPad simulator. **Until that exists,** the
+   spike's harness (`pnpm harness`, a local page with two simulated devices, a timing readout, offline switches and a switch
+   for which candidate) does the same job.
 3. Each candidate runs on its real host (a VM, Neon, Convex), not on a laptop, so latency and wake-up delays are real.
 4. Fill in the scorecard as you go.
 
 Running all three costs little: free tiers cover Neon, Convex Starter and the first 10 GB of R2, plus a small VM (about $2 to $5
 a month on Fly at the prices in [Hosting it cheaply](#hosting-it-cheaply)).
 
+**How to read the cells.** *local* means measured on one laptop with everything on it (the real image and entrypoint for lean,
+a Postgres container, Convex's local backend), so it shows what the software adds and none of the network, the host or the
+provider. *Pending* means it needs the deployed hosts and has not been run: it needs your accounts (`spikes/sync-hosting/scripts/wizard.sh`),
+then `scripts/deploy-all.sh` and `scripts/run-all.sh real`. *Yours* is a judgement left for you. Raw numbers are in
+`spikes/sync-hosting/results/`.
+
 | Question | How to measure | Lean | Managed Postgres | Convex |
 |---|---|---|---|---|
-| Push latency (typical and p95) | Local save to the server's acknowledgement | | | |
-| Propagation to the other device | Save on one, time until the other shows it | | | |
-| First sync after idle | Leave it 10 minutes, then push | | | |
-| First sync of a 10 MB library | Paged initial pull on an empty device | | | |
-| Gap-free versions under concurrent pushes | Two clients pushing at once; look for gaps and duplicates | | | |
-| Kill the API | Time to recover, and what devices see | | | |
-| Lose the database | Restore from backup: time, steps, and whether the `epoch` heals the devices | | | |
-| Data lost in a failure | Records missing after the drill | | | |
-| Monthly cost at 100 users | The real bill, extrapolated | | | |
-| Setup effort | Steps and time from nothing to a working server | | | |
-| Monthly chores | What you would do each month ([production chores](cross-device-sync-operations.md)) | | | |
-| Local development and tests | Can it run on a laptop and in CI? | | | |
-| Cost to leave | Effort to move to another candidate (S9) | | | |
-| Unknowns resolved | Backups, export, regions and terms (Convex); replication monitoring (lean) | | | |
+| Push latency (typical and p95) | Local save to the server's acknowledgement | Pending. local: 10 / 21 ms | Pending. local: 16 / 32 ms | Pending. local: 17 / 47 ms |
+| Propagation to the other device | Save on one, time until the other shows it | Pending. local: 16 / 28 ms (SSE hint) | Pending. local: 19 / 33 ms (SSE hint) | Pending. local: 21 / 51 ms (live-query hint) |
+| First sync after idle | Leave it 10 minutes, then push | Pending. (local, 20 s idle: no effect) | Pending. This is the Neon wake-up row. | Pending. |
+| First sync of a 10 MB library | Paged initial pull on an empty device | Pending. local: upload 0.44 s, pull 0.23 s | Pending. local: upload 0.58 s, pull 0.54 s | Pending. local: upload 3.7 s, pull 3.0 s. Documented write cap of 4 MiB/s on Starter means about 2.5 s at best. |
+| Gap-free versions under concurrent pushes | Two clients pushing at once; look for gaps and duplicates | **Pass (local).** 8 devices x 40 pushes: versions exactly 1..head, none repeated, 0 retries. One writer, no lock to engineer. | **Pass (local).** Same, 0 retries, p95 53 ms (the per-user row lock serializes them). | **Pass (local)**, but 6 of 320 contended pushes ran out of optimistic-concurrency retries (a 503); the client's same-`batchId` retry fixed each one, max 1.5 s. Only under the unhappy path: one user's devices pushing at once. |
+| Kill the API | Time to recover, and what devices see | Pending (Fly restart time). local: 0 edits lost, longest sync pause 15.7 s around a 10 s outage. | Pending. local: 0 lost, 12.5 s pause. | **Not drillable:** Convex runs the API. |
+| Lose the database | Restore from backup: time, steps, and whether the `epoch` heals the devices | Local (S3 mock, **not R2**): destroy the disk, start empty, the entrypoint restores from the replica and **rotates the epoch by itself**; both devices noticed in 0.1 s and healed. Real R2 restore: pending. | Local `pg_restore` passes and devices heal in 0.1 s, but **rotating the epoch is a manual step** (the restored DB carries the old one): forgetting it is the risk. Neon branch restore: pending, untested. | Local export then `import --replace-all` passes and devices heal; **epoch rotation is also manual**. Starter has no scheduled backup (Pro only) and keeps two manual ones. |
+| Data lost in a failure | Records missing after the drill | **Measured (local):** 0 when replication had caught up; **the last transaction (70 records) when the disk was destroyed right after a write**, i.e. inside Litestream's ~1 s interval. The devices re-pushed all 70: 0 lost for good. The R2 window: pending. | Not measurable by drill: the restore goes to a point chosen 70 writes back, so the loss is by construction and the row tests healing (0 lost for good). Neon's durability for an acknowledged write is the provider's claim, not tested. | Same as Postgres. The Convex FAQ says it never deletes a record from a successful mutation; not tested. |
+| Monthly cost at 100 users | The real bill, extrapolated | Pending. Estimate from prices read 2026-11-05: about $2 to $5. | Pending. Estimate: Fly API about $2 to $5, Neon Free $0. | Pending. Estimate: about $0.25 of usage. |
+| Setup effort | Steps and time from nothing to a working server | Your steps: 2 accounts (Fly, R2); an app, a volume, a bucket and a token; 7 secrets. Time: *yours*. | Your steps: 2 accounts (Fly, Neon); an app and a project; 3 secrets. Time: *yours*. | Your steps: 1 account; a project and a production deploy key; 2 env vars. Time: *yours*. |
+| Monthly chores | What you would do each month ([production chores](cross-device-sync-operations.md)) | *Yours.* | *Yours.* | *Yours.* |
+| Local development and tests | Can it run on a laptop and in CI? | Yes: `node:sqlite` in process, no dependencies. CI needs nothing. | Yes with a Postgres container, locally and as a CI service. | Yes with caveats: a local anonymous backend (the CLI downloads its binary on first use, and `convex dev` must stay running). 30 of 30 pass on it. |
+| Cost to leave | Effort to move to another candidate (S9) | *Yours.* S9 is not run. Input: the protocol is plain HTTP and records are opaque, so lean and Postgres swap behind the storage interface with no client change. | *Yours.* Same input. | *Yours.* Input: devices need Convex's client library for the live-query hint (polling works without), and the move is an export of JSONL. |
+| Unknowns resolved | Backups, export, regions and terms (Convex); replication monitoring (lean) | Replication monitoring is **not built**; the spike only read Litestream's own log lines. A silent stop (R19) is still an open chore. | Neon's restore call and restore window: pending, untested. | Backups, export, regions and serializability **resolved** (`spikes/sync-hosting/convex/FINDINGS.md`). **Production terms still unresolved:** the Terms of Service text did not load. |
+
+### What building them taught (feeds S3 and Gate B)
+
+These are findings from the prototype, not decisions. Each says what the protocol or engine should do about it.
+
+- **The contract suite earns its keep.** On its first run against Postgres it caught a real disagreement with the SQLite adapter (a
+  pull page stopped *after* the record that crossed the byte cap instead of before). Convex, a second implementation of the contract,
+  then passed 30 of 30 unchanged, which is the evidence that the protocol, not an implementation, is the contract.
+- **"Gap-free" has to be defined as versions handed out, not versions stored.** Only the latest state of each record is kept, so a pull
+  shows holes where records were superseded. The check that holds is: the versions returned by every push are exactly `1..head`, each once.
+- **The epoch is the part most likely to be forgotten.** Only the lean entrypoint rotates it on restore. After a Neon restore or a Convex
+  import, someone has to call rotate-epoch, and until they do, a device whose cursor the restored history has caught up with would silently miss
+  records. For hosted Postgres and Convex this wants automating (the API can notice its own remembered head exceeding the database's) or a
+  runbook line (R15, R19). With the epoch rotated, returning devices noticed within 0.1 s of reconnecting and had healed the server within 0.4 s.
+- **An outage can look like a hang, not an error.** Against a local Docker port proxy, requests sent while the server was down were
+  queued instead of refused, so a device saw no failure at all for several seconds. The engine needs a request timeout shorter than the
+  45 s the spike uses (10 to 15 s), and "sync paused" should be judged by time since the last acknowledgement, not by the last error.
+- **Retries must reuse the `batchId`, and the server must be idempotent.** The fault scenario's solo phase (duplicated and lost-response pushes
+  from one device) sees zero conflicts only because a repeated batch returns its stored answer. Without that, every lost response would
+  become a false conflict copy.
+- **Pull returns the device's own writes, so a bulk upload should skip the pull and move its cursor.** The draft has `pullLimit: 0` for push
+  only, and the engine advances its cursor past its own writes when they are the next consecutive versions. Without that, a 10 MB first
+  sync downloads itself back.
+- **Convex's hot counter row is a hot document.** Concurrent pushes from one user retry, and rarely exhaust the retries (a 503, then a
+  successful client retry). Its change hint is a live query over its WebSocket, because an HTTP action cannot hold a stream open
+  cheaply, so the Convex client library ends up in each app (R20), and its 4 MiB/s write cap shapes first sync and restores.
+- **Postgres takes up to seven round trips per push** (begin, lock the counter row and read the head, batch lookup, existing records, upsert,
+  update the head and store the batch, commit). Fine inside one region; it is the number to watch if Neon sits far from the API.
+- **The change hint has to be a per-candidate mechanism advertised in `GET /v1/info`.** SSE for lean and Postgres, a live query for Convex, polling
+  for all. D17's "a client adapts to a server" is not optional.
+- **The first-sync-after-idle row is only honest if nothing else touches the host.** The scenario runner idles all three candidates
+  together and runs everything else afterwards; running it beside other traffic would keep a Neon database awake and hide the wake-up.
 
 ## Decisions
 
@@ -1188,7 +1249,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 |---|---|---|:-:|
 | D1 | How to read the 20 s assumption. | A propagation deadline, not a sync interval ([The assumption](#the-assumption)). | **Decided** (you) |
 | D2 | Server language. | TypeScript on Node. The server never parses notes. | Proposed |
-| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). All three (managed Postgres, lean and Convex) are prototyped side by side in S8, with a scorecard to fill in by hand ([how](#comparing-the-three-by-hand)). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. | **Open: you** |
+| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). All three (managed Postgres, lean and Convex) are prototyped side by side in S8 (built; local results in, real-host results pending), with a scorecard to fill in by hand ([how](#comparing-the-three-by-hand)). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. | **Open: you** |
 | D4 | End-to-end encryption. | Yes, in v1. Design in [End-to-end encryption](#end-to-end-encryption); details settled in S5. | **Decided** (you) |
 | D5 | **Sign-in.** | **Hosted: Clerk, behind our server** ([Using Clerk](#using-clerk)): our own device sessions, Clerk only for the sign-in step. **Self-hosted: its own sign-in on an adopted library.** Separate products; accounts do not move between them. | **Decided** (you) |
 | D6 | Hosted or self-hosted. | Hosted first; self-hostable later, chosen by the user. Preparation: [Hosted now, self-hosted later](#hosted-now-self-hosted-later). | **Decided** (you) |
@@ -1253,7 +1314,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 - Server storage: [SQLite WAL (one writer at a time)](https://www.sqlite.org/wal.html), [Litestream releases](https://github.com/benbjohnson/litestream/releases) (v0.5.18 dated 2026-11-03), [Fly.io on Litestream 0.5.1](https://community.fly.io/t/litestream-v0-5-1-released/26176) (0.5.0 had bugs the patch releases fixed)
 - Hosting prices (read 2026-11-05): [Cloudflare R2](https://developers.cloudflare.com/r2/pricing/), [Fly.io](https://fly.io/pricing.md), [Hetzner Cost-Optimized](https://www.hetzner.com/cloud/cost-optimized/), [Railway](https://railway.com/pricing), [Neon](https://neon.com/pricing), [PlanetScale](https://planetscale.com/pricing), [Supabase](https://supabase.com/pricing)
 - Postgres hosting prices (read 2026-11-05): [Heroku](https://www.heroku.com/pricing/), [DigitalOcean](https://www.digitalocean.com/pricing/managed-databases), [Aiven](https://aiven.io/pricing?product=pg), [Prisma](https://www.prisma.io/pricing); Render's figure is from a [third-party comparison](https://dev.to/selfhost/managed-postgresql-comparison-2026-0-to-475month-1g1b)
-- Convex (read 2026-11-05): [pricing](https://www.convex.dev/pricing), [limits](https://docs.convex.dev/production/state/limits), [self-hosting](https://docs.convex.dev/self-hosting), [Swift client](https://docs.convex.dev/client/swift). Litestream: [how it works](https://litestream.io/how-it-works/), [configuration](https://litestream.io/reference/config/)
+- Convex (read 2026-11-05): [pricing](https://www.convex.dev/pricing), [limits](https://docs.convex.dev/production/state/limits), [self-hosting](https://docs.convex.dev/self-hosting), [Swift client](https://docs.convex.dev/client/swift); read 2026-11-06 for S8: [backups](https://docs.convex.dev/database/backup-restore), [optimistic concurrency control](https://docs.convex.dev/database/advanced/occ), [regions](https://docs.convex.dev/production/regions), [pricing FAQ](https://www.convex.dev/pricing/faq), [HTTP actions](https://docs.convex.dev/functions/http-actions). Litestream: [how it works](https://litestream.io/how-it-works/), [configuration](https://litestream.io/reference/config/)
 - Repo (fast follow): `todoCycle.ts`, `todosRepo.ts`, `feedsRepo.ts`, `readingListRepo.ts`, `attachmentsRepo.ts` in `apps/web/src/lib/composition/`, and [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md)
 
 **Unverified:** Apple's system SQLite and the session extension; whether Turso's offline-write sync has since shipped
@@ -1262,8 +1323,9 @@ figure above (estimates until S3); that Apple has no built-in Argon2 and which l
 continuous-replication tool for SQLite; Clerk's current pricing, token lifetimes and SDK maturity; and whether
 Clerk's OAuth tokens can be validated by a custom backend (its docs call resource-server support a feature request). Hosting prices change, and none has been tried under load;
 Hetzner's availability is unclear on its page; Render's own prices did not load, so its figure is from a third-party guide, and Railway's Postgres cost is my estimate; and Neon's wake-up
-delay after idle is not measured. Also unverified: Convex's backups, export, regions and production terms on its Starter plan,
-and that its mutations are serializable; Litestream's data-loss window (its page gives no number) and restore time.
+delay after idle is not measured. Litestream's data-loss window and restore time: **measured locally only** (S3 mock, not R2; see
+[the S8 results](#comparing-the-three-by-hand)). Convex's backups, export, regions and mutation serializability are now read from
+its docs (above); its **production terms** and the Terms of Service text are still unread.
 
 ## Change log
 
@@ -1299,3 +1361,8 @@ and that its mutations are serializable; Litestream's data-loss window (its page
   side, with a scorecard to fill in by hand. New [cross-device-sync-operations.md](cross-device-sync-operations.md) lists the
   production chores (payments, abuse, customer requests, operations, security, legal and finance), and a new "Running it in
   production" section lists what the service needs to support them.
+- 2026-11-06: **S8 prototypes built (throwaway, not merged).** The three hosted candidates exist in `spikes/sync-hosting/` on a draft PR
+  branch, with a draft protocol, a 30-test HTTP contract suite that all three pass, scenarios, drills, a two-device harness, a wizard and a
+  teardown script. S8 may now start before Gate B on a draft protocol subset and feeds S3 and Gate B. Convex's backups, export, regions and
+  serializability were resolved from its docs (production terms were not). The scorecard has local numbers and the judgement cells marked;
+  the real-host column waits for your accounts.
