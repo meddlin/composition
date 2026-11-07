@@ -8,7 +8,7 @@ import { decodeBase64, encodeBase64 } from "../b64.ts";
 import { PROTOCOL_VERSION, type SyncRequest, type SyncResponse, type WireChange, type WireRecord } from "../types.ts";
 import { equalBytes, newBatchId, newUuid, sleep } from "./bytes.ts";
 import type { HintSource } from "./hints.ts";
-import { TransportError, type Transport } from "./transport.ts";
+import { TransportError, type Transport, type TransportStats } from "./transport.ts";
 
 export interface LocalRecord {
   entity: string;
@@ -140,6 +140,14 @@ export class Device {
     return this.dirty.size;
   }
 
+  get transport(): Transport {
+    return this.opts.transport;
+  }
+
+  get transportStats(): TransportStats {
+    return this.opts.transport.stats;
+  }
+
   // ── scheduling ─────────────────────────────────────────────────────────────
 
   /** Attach a hint stream: every hint that is news triggers a sync. */
@@ -149,8 +157,9 @@ export class Device {
 
   /** Called by a hint source. `undefined` means "unknown, go and look". */
   onHint(hint: { head: number; epoch: string } | undefined): void {
-    // Our own push produces a hint too; by the time it arrives we have usually moved past it.
-    if (hint && hint.epoch === this.epoch && hint.head <= this.cursor) return;
+    // Our own push produces a hint too; by the time it arrives we are usually exactly at it. A head BELOW the
+    // cursor means the server's history went backwards (a restore): go and look, the server will say resync.
+    if (hint && hint.epoch === this.epoch && hint.head === this.cursor) return;
     this.needPull = true;
     this.kick(true);
   }
