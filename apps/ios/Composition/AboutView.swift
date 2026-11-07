@@ -15,6 +15,10 @@ struct AboutView: View {
                     LabeledContent("Search forgives", value: "Typos, also in first letters and short words")
                     LabeledContent("Does not yet", value: "Follow the sun, ink")
                 }
+                Section {
+                    NavigationLink("Open-source licences") { LicencesView() }.accessibilityIdentifier("licences")
+                }
+                .listRowBackground(look.surface)
                 Section("Your notes") {
                     LabeledContent("Notes", value: "\(model.noteCount)")
                     LabeledContent("In the Trash Can", value: "\(model.trashedNotes.count + model.trashedGroups.count)")

@@ -50,7 +50,7 @@ struct TrashView: View {
                 if let expiresAt { Text("\(TrashRetention.daysLeft(expiresAt: expiresAt)) days left") }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(look.mutedText)
         }
     }
 }

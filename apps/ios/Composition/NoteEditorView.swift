@@ -235,6 +235,7 @@ struct NoteEditorView: UIViewRepresentable {
         view.textColor = look.uiForeground
         view.tintColor = look.uiBrand
         view.accessibilityIdentifier = "note-editor"
+        view.accessibilityLabel = "Note text"
         view.text = session.text
         view.selectedRange = NSRange(location: min(max(0, initialCaret), (view.text as NSString).length), length: 0)
         view.delegate = context.coordinator

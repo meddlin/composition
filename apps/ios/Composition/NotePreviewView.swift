@@ -109,7 +109,7 @@ private struct NoticeView: View {
     var body: some View {
         Label(text, systemImage: "exclamationmark.circle")
             .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(look.mutedText)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(look.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
@@ -125,8 +125,8 @@ private struct TocView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Contents").font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
-            if entries.isEmpty { Text("No headings yet.").foregroundStyle(.secondary) }
+            Text("Contents").font(.caption.weight(.semibold)).foregroundStyle(look.mutedText).textCase(.uppercase)
+            if entries.isEmpty { Text("No headings yet.").foregroundStyle(look.mutedText) }
             ForEach(entries.indices, id: \.self) { index in
                 let entry = entries[index]
                 Button(entry.text) { scrollToHeading(entry.ordinal) }
@@ -148,11 +148,11 @@ private struct FootnotesView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Rectangle().fill(look.border).frame(height: 1)
-            Text("Footnotes").font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
-            if entries.isEmpty { Text("No footnotes yet.").foregroundStyle(.secondary) }
+            Text("Footnotes").font(.caption.weight(.semibold)).foregroundStyle(look.mutedText).textCase(.uppercase)
+            if entries.isEmpty { Text("No footnotes yet.").foregroundStyle(look.mutedText) }
             ForEach(entries.indices, id: \.self) { index in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(entries[index].number).").monospacedDigit().foregroundStyle(.secondary)
+                    Text("\(entries[index].number).").monospacedDigit().foregroundStyle(look.mutedText)
                     MarkdownView(blocks: entries[index].blocks).font(.callout)
                 }
             }
@@ -310,11 +310,11 @@ private struct RepoCard: View {
                     Image(systemName: "shippingbox").font(.title2).foregroundStyle(look.link)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ref.label).font(.headline).foregroundStyle(.primary)
-                        Text(ref.service ?? ref.host).font(.caption).foregroundStyle(.secondary)
-                        if let description { Text(description).font(.subheadline).foregroundStyle(.secondary).padding(.top, 2) }
+                        Text(ref.service ?? ref.host).font(.caption).foregroundStyle(look.mutedText)
+                        if let description { Text(description).font(.subheadline).foregroundStyle(look.mutedText).padding(.top, 2) }
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "arrow.up.right").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.up.right").foregroundStyle(look.mutedText)
                 }
                 .padding(12)
                 .background(look.surface, in: RoundedRectangle(cornerRadius: 10))
@@ -338,10 +338,10 @@ private struct YouTubeCard: View {
                     Image(systemName: "play.rectangle.fill").font(.title).foregroundStyle(.red)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(title).font(.headline).foregroundStyle(.primary)
-                        Text("youtube.com\(ref.start > 0 ? " · from \(Self.clock(ref.start))" : "")").font(.caption).foregroundStyle(.secondary)
+                        Text("youtube.com\(ref.start > 0 ? " · from \(Self.clock(ref.start))" : "")").font(.caption).foregroundStyle(look.mutedText)
                     }
                     Spacer(minLength: 0)
-                    Image(systemName: "arrow.up.right").foregroundStyle(.secondary)
+                    Image(systemName: "arrow.up.right").foregroundStyle(look.mutedText)
                 }
                 .padding(12)
                 .background(look.surface, in: RoundedRectangle(cornerRadius: 10))

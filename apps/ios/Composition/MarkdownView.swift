@@ -39,7 +39,7 @@ private struct MdBlockView: View {
         case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
                 Rectangle().fill(look.mutedText).frame(width: 3)
-                MarkdownView(blocks: blocks).foregroundStyle(.secondary)
+                MarkdownView(blocks: blocks).foregroundStyle(look.mutedText)
             }
         case .list(let ordered, let start, let items):
             VStack(alignment: .leading, spacing: 6) {
@@ -63,7 +63,7 @@ private struct MdBlockView: View {
                 }
             }
         case .html(let raw):
-            Text(raw).font(.system(.callout, design: .monospaced)).foregroundStyle(.secondary)
+            Text(raw).font(.system(.callout, design: .monospaced)).foregroundStyle(look.mutedText)
         }
     }
 
@@ -83,9 +83,9 @@ private struct MdBlockView: View {
         if let checked {
             Image(systemName: checked ? "checkmark.square.fill" : "square").foregroundStyle(checked ? look.brand : look.mutedText)
         } else if ordered {
-            Text("\(number).").monospacedDigit().foregroundStyle(.secondary)
+            Text("\(number).").monospacedDigit().foregroundStyle(look.mutedText)
         } else {
-            Text("•").foregroundStyle(.secondary)
+            Text("•").foregroundStyle(look.mutedText)
         }
     }
 

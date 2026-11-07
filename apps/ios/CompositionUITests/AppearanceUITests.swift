@@ -94,7 +94,8 @@ final class AppearanceUITests: XCTestCase {
     private func checkPaint(of scheme: Scheme) throws {
         let screen = try window()
         expect(try pixel(screen, x: screen.width - 300, y: screen.height - 40), scheme.background, "\(scheme.name): the editor's page")
-        expect(try pixel(screen, x: 600, y: 450), scheme.surface, "\(scheme.name): the list beside the note")
+        // The list's own background at the bottom edge of the window, to the left of the home indicator: no row, divider or text is ever there.
+        expect(try pixel(screen, x: 400, y: screen.height - 4), scheme.surface, "\(scheme.name): the list beside the note")
         keepScreenshot("\(scheme.name) scheme")
     }
 

@@ -56,8 +56,36 @@ struct AppearanceTests {
             for (name, colour) in [("comment", theme.syntax.comment), ("keyword", theme.syntax.keyword), ("string", theme.syntax.string), ("number", theme.syntax.number),
                 ("function", theme.syntax.function), ("type", theme.syntax.type), ("attr", theme.syntax.attr)] {
                 #expect(ThemeColor.contrast(colour, theme.surface) >= 4.5, "\(theme.name): \(name) on the surface")
+                #expect(ThemeColor.contrast(colour, theme.background) >= 4.5, "\(theme.name): \(name) on the page, where the editor draws it")
             }
         }
+    }
+
+    @Test("a selected row's text reads at 4.5 on its fill in every scheme, and Forest, whose accent is too pale for white, takes its dimmer one")
+    func selection() throws {
+        for theme in Theme.all {
+            let selection = theme.selection
+            #expect(ThemeColor.contrast(selection.fill, selection.text) >= Theme.readable, "\(theme.name)")
+        }
+        let forest = try #require(Theme.named("forest"))
+        #expect(ThemeColor.contrast(forest.brand, ThemeColor(red: 255, green: 255, blue: 255)) < Theme.readable, "the accent alone would not do")
+        #expect(forest.selection.fill == forest.brandDim)
+        let dark = try #require(Theme.named("dark"))
+        #expect(dark.selection.fill == dark.brand && dark.selection.text == ThemeColor(red: 255, green: 255, blue: 255))
+    }
+
+    @Test("grey text reads at the target (5.5, a margin over 4.5) on the page, a card and the panel in every scheme, and is never lighter than the desktop's 60%")
+    func mutedText() throws {
+        for theme in Theme.all {
+            for (name, page) in [("background", theme.background), ("surface", theme.surface), ("panel", theme.panel)] {
+                let grey = theme.foreground.over(page, alpha: theme.mutedShare)
+                #expect(ThemeColor.contrast(grey, page) >= Theme.mutedTarget, "\(theme.name): grey on \(name)")
+                #expect(ThemeColor.contrast(grey, page) >= Theme.readable)
+            }
+            #expect(theme.mutedShare >= Theme.Share.mutedForeground && theme.mutedShare <= 1, "\(theme.name)")
+        }
+        #expect((Theme.named("cream")?.mutedShare ?? 0) > (Theme.named("dark")?.mutedShare ?? 1), "the light schemes need more raising than the dark ones")
+        #expect((Theme.named("cream")?.mutedShare ?? 0) > Theme.Share.mutedForeground, "Cream's grey had to be raised")
     }
 
     @Test("an unknown or missing highlight colour is yellow, and a colour name may be in any case")

@@ -42,6 +42,7 @@ struct NotesColumnView: View {
         .overlay { empty }
         .scrollContentBackground(.hidden)
         .background(look.surface)
+        .tint(look.selectionFill)
         .dropList()
         .textDrop(into: item, model: model)
         .navigationTitle(searching ? "Search" : model.title(of: item))
@@ -104,8 +105,8 @@ struct NotesColumnView: View {
                 Label(group.name, systemImage: "folder")
                 Spacer()
                 if model.isFavorite(.group, group.id) { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow) }
-                Text("\(model.totals.groups[group.id] ?? 0)").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
+                Text("\(model.totals.groups[group.id] ?? 0)").font(.callout.monospacedDigit()).foregroundStyle(look.mutedText)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(look.mutedText).accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }

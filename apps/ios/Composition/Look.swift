@@ -8,6 +8,8 @@ struct Look: Equatable {
     var theme: Theme
     var editorFont: FontFamily
     var previewFont: FontFamily
+    /// The system's Increase Contrast: grey text is made darker and the faint lines firmer.
+    var increasedContrast = false
 
     static let standard = Look(theme: .default, editorFont: .editorDefault, previewFont: .previewDefault)
 
@@ -24,10 +26,14 @@ struct Look: Equatable {
     var warning: Color { theme.warning.color }
     var success: Color { theme.success.color }
     var error: Color { theme.error.color }
+    /// A selected row's fill and its text (`Theme.selection`: the accent, or its dimmer self where white on the accent would not read).
+    var selectionFill: Color { theme.selection.fill.color }
+    var selectionText: Color { theme.selection.text.color }
     /// The grey text, and the faint fill and line the desktop makes of the foreground (`--muted-foreground`, `--muted`, `--border`).
-    var mutedText: Color { theme.foreground.color(opacity: Theme.Share.mutedForeground) }
+    /// (Raised above the desktop's 60% where that would read at under 4.5 on the scheme's pages: `Theme.mutedShare`.)
+    var mutedText: Color { theme.foreground.color(opacity: increasedContrast ? max(theme.mutedShare, 0.85) : theme.mutedShare) }
     var mutedFill: Color { theme.foreground.color(opacity: Theme.Share.muted) }
-    var border: Color { theme.foreground.color(opacity: Theme.Share.border) }
+    var border: Color { theme.foreground.color(opacity: increasedContrast ? 0.4 : Theme.Share.border) }
 
     /// The scheme the system controls (the keyboard, sheets, alerts, the bars) should be drawn in to suit this one.
     var colorScheme: ColorScheme { theme.isDark ? .dark : .light }
@@ -72,7 +78,9 @@ extension Appearance {
         }
     }
 
-    func look(system: ColorScheme) -> Look { Look(theme: theme(system: system), editorFont: editorFont, previewFont: previewFont) }
+    func look(system: ColorScheme, contrast: ColorSchemeContrast = .standard) -> Look {
+        Look(theme: theme(system: system), editorFont: editorFont, previewFont: previewFont, increasedContrast: contrast == .increased)
+    }
 }
 
 extension FontFamily {

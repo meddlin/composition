@@ -20,10 +20,14 @@ struct BrowserView: View {
     @State private var moving: DraggedItem?
     @State private var restored = false
     @State private var width: CGFloat = 0
+    @Environment(\.look) private var look
+    @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columns) {
             SidebarView(model: model, prompt: $prompt, moving: $moving)
+                // Wider where the text is large, so that the names of notebooks are not broken to fit.
+                .navigationSplitViewColumnWidth(min: 250, ideal: textSize.isAccessibilitySize ? 420 : 320, max: 520)
                 .navigationTitle("Notebooks")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
@@ -48,6 +52,7 @@ struct BrowserView: View {
                 }
         } content: {
             NotesColumnView(model: model, prompt: $prompt, moving: $moving, footer: AnyView(footer))
+                .navigationSplitViewColumnWidth(min: 300, ideal: textSize.isAccessibilitySize ? 440 : 360, max: 560)
         } detail: {
             if let id = model.selection {
                 NoteDetailView(model: model, noteID: id)
@@ -120,34 +125,46 @@ struct BrowserView: View {
     private var footer: some View {
         VStack(spacing: 2) {
             Text(model.resultLine).font(.footnote.monospacedDigit())
-            if model.query.isEmpty {
+            // The hint goes at the accessibility sizes, where it would fill the column.
+            if model.query.isEmpty, !textSize.isAccessibilitySize {
                 Text("Try  tag: infra  ·  created: >2026-01-01  ·  title: routng").font(.caption2)
             }
         }
-        .foregroundStyle(.secondary)
+        .foregroundStyle(look.mutedText)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(.bar)
+        // Solid, so that the words on it have a known colour behind them (a material changes with what scrolls under it).
+        .background(look.surface)
+        .overlay(alignment: .top) { Rectangle().fill(look.border).frame(height: 1) }
     }
 }
 
 struct NoteRow: View {
     let note: NoteSummary
     var favorite = false
+    @Environment(\.look) private var look
+    @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Text(note.title.isEmpty ? "Untitled" : note.title).font(.headline).lineLimit(2)
+                // At the accessibility sizes a title is given as many lines as it needs, not cut at two.
+                Text(note.title.isEmpty ? "Untitled" : note.title).font(.headline).lineLimit(textSize.isAccessibilitySize ? nil : 2)
                 if favorite { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow) }
             }
-            HStack(spacing: 8) {
-                if let date = Stamp.date(note.updatedAt) { Text(date, format: .dateTime.year().month().day()) }
-                if !note.tags.tagLine.isEmpty { Text(note.tags.tagLine).lineLimit(1) }
+            // The date and the tags side by side when they fit, one under the other when they do not.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { detail(tagLines: 1) }
+                VStack(alignment: .leading, spacing: 2) { detail(tagLines: nil) }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(look.mutedText)
         }
         .padding(.vertical, 2)
+    }
+
+    @ViewBuilder private func detail(tagLines: Int?) -> some View {
+        if let date = Stamp.date(note.updatedAt) { Text(date, format: .dateTime.year().month().day()) }
+        if !note.tags.tagLine.isEmpty { Text(note.tags.tagLine).lineLimit(tagLines) }
     }
 }

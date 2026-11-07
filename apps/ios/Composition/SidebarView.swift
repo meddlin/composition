@@ -64,32 +64,50 @@ struct SidebarView: View {
 private struct SidebarRowView: View {
     let model: AppModel
     let row: SidebarRow
+    @Environment(\.look) private var look
+    @Environment(\.dynamicTypeSize) private var textSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(alignment: textSize.isAccessibilitySize ? .top : .center, spacing: 0) {
             Color.clear.frame(width: CGFloat(row.depth) * 16, height: 1)
             if row.expandable {
                 Button {
-                    withAnimation(.snappy(duration: 0.2)) { model.toggleExpanded(row.item) }
+                    withAnimation(reduceMotion ? nil : .snappy(duration: 0.2)) { model.toggleExpanded(row.item) }
                 } label: {
                     Image(systemName: row.isExpanded ? "chevron.down" : "chevron.right")
                         .font(.caption.weight(.semibold))
-                        .frame(width: 22, height: 30)
+                        // A finger needs 44 points each way.
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(row.isExpanded ? "Close \(row.title)" : "Open \(row.title)")
-            } else {
-                Color.clear.frame(width: 22, height: 1)
+            } else if !textSize.isAccessibilitySize {
+                Color.clear.frame(width: 44, height: 1)
             }
             // The name and its count read as one thing; the disclosure button beside them stays a button of its own.
-            HStack(spacing: 6) {
-                Label(row.title, systemImage: row.systemImage).lineLimit(1)
-                Spacer(minLength: 4)
-                if case .group(let id) = row.item, model.isFavorite(.group, id) {
-                    Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+            Group {
+                if textSize.isAccessibilitySize {
+                    // At the accessibility sizes the name has the whole width and the count goes under it, so that no word is broken to fit.
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label(row.title, systemImage: row.systemImage).fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 6) {
+                            if case .group(let id) = row.item, model.isFavorite(.group, id) { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow) }
+                            Text("\(row.count)").font(.callout.monospacedDigit()).foregroundStyle(look.mutedText)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                } else {
+                    HStack(spacing: 6) {
+                        Label(row.title, systemImage: row.systemImage).lineLimit(2)
+                        Spacer(minLength: 4)
+                        if case .group(let id) = row.item, model.isFavorite(.group, id) {
+                            Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow)
+                        }
+                        Text("\(row.count)").font(.callout.monospacedDigit()).foregroundStyle(look.mutedText)
+                    }
                 }
-                Text("\(row.count)").font(.callout.monospacedDigit()).foregroundStyle(.secondary)
             }
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("sidebar-\(row.item.stored)")

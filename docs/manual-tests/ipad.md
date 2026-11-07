@@ -208,6 +208,16 @@ A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for
 
 **Not built, so do not expect it:** "Follow the sun", and the desktop's own font families (Geist, Lora …): the iPad has the system's three. The footer under the list, and the system's own pickers, are not in the scheme.
 
+## Accessibility and window sizes (build plan Step 11)
+
+74. **VoiceOver.** Turn VoiceOver on (Settings, Accessibility) and go through: the sidebar, a note's row, the three tabs, the toolbar buttons (each is named), a note's text in the editor ("Note text") and in the preview, a chart, a link. Say where it reads something wrong, in the wrong order, or not at all; and how the list after `<` and the note picker are announced.
+75. **Larger text.** In Settings, Display & Brightness, Text Size (and Accessibility ▸ Display & Text Size ▸ Larger Text), go to the largest size: the notes list shows whole titles, the sidebar shows whole words with the count under each name, the note's date is not broken, nothing sits on top of anything. Do it in landscape and portrait, in the Markdown and Preview tabs.
+76. **Reduce Motion.** With it on, tapping a heading in a note's contents scrolls without animating, and opening a notebook does not slide.
+77. **Increase Contrast.** With it on, the grey text (dates, tags, counts) is darker and the faint lines are firmer, in every scheme.
+78. **A narrow window.** Put the app in Slide Over, or a third of the screen in Split View, or a small Stage Manager window. The toolbar has a View menu (Markdown, Preview, Split) and an Edit menu (Find, Link to Note, Image) beside Trash; the notebooks and the list are behind a back button. Type in a note and use the list after `<`: it stays inside the window. Turn the iPad while it is narrow.
+79. **Split View and Stage Manager.** Resize the window slowly from full screen to the smallest: the layout changes at a width and never overlaps or loses a control.
+80. **Licences.** *More*, *About this build*, *Open-source licences*: GRDB.swift, swift-markdown and swift-cmark, each opening its licence text.
+
 What to tell me for each: what you did, what you expected, what happened.
 
 ## What it leaves out

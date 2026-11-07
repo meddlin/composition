@@ -17,9 +17,10 @@ struct CompositionApp: App {
 struct ThemedRoot: View {
     let model: AppModel
     @Environment(\.colorScheme) private var systemScheme
+    @Environment(\.colorSchemeContrast) private var contrast
 
     var body: some View {
-        let look = model.appearance.look(system: systemScheme)
+        let look = model.appearance.look(system: systemScheme, contrast: contrast)
         RootView(model: model)
             .environment(\.look, look)
             .tint(look.brand)

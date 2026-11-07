@@ -12,6 +12,7 @@ struct NoteDetailView: View {
     let model: AppModel
     let noteID: Int64
     @Environment(\.look) private var look
+    @Environment(\.horizontalSizeClass) private var sizeClass
     // What the system brings back after the app was ended: the tab, and where the caret was.
     @SceneStorage("noteMode") private var mode = Mode.preview
     @SceneStorage("caretOffset") private var caret = 0
@@ -50,23 +51,33 @@ struct NoteDetailView: View {
         .task(id: noteID) { await open() }
         .onDisappear { close() }
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented).frame(minWidth: 210, maxWidth: 300)
+            // Three words side by side where there is room. In a narrow window (a third of the screen, Slide Over) there is no room for them, and a
+            // toolbar drops what does not fit: the three become one menu, and Find, Link and Image another, so that every one stays reachable.
+            if sizeClass != .compact {
+                ToolbarItem(placement: .principal) {
+                    Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented).frame(minWidth: 210, maxWidth: 300)
+                }
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                if mode != .preview {
+                if sizeClass == .compact {
+                    Menu {
+                        Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }
+                    } label: {
+                        Label("View: \(mode.rawValue)", systemImage: "rectangle.split.2x1")
+                    }
+                    if mode != .preview {
+                        Menu {
+                            Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                            Button("Link to Note", systemImage: "link") { handle.linkToNote() }
+                            Menu("Image", systemImage: "photo.badge.plus") { imageItems }
+                        } label: {
+                            Label("Edit", systemImage: "ellipsis.circle")
+                        }
+                    }
+                } else if mode != .preview {
                     Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
                     Button("Link to Note", systemImage: "link") { handle.linkToNote() }
-                    Menu {
-                        Button("Photo Library…", systemImage: "photo.on.rectangle") { showingPhotos = true }
-                        if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
-                        Button("Choose File…", systemImage: "folder") { showingFiles = true }
-                        Divider()
-                        Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
-                            .keyboardShortcut("x", modifiers: [.command, .shift])
-                    } label: {
-                        Label("Image", systemImage: "photo.badge.plus")
-                    }
+                    Menu { imageItems } label: { Label("Image", systemImage: "photo.badge.plus") }
                 }
                 Button("Move to Trash Can", systemImage: "trash") { confirmingTrash = true }
             }
@@ -91,6 +102,16 @@ struct NoteDetailView: View {
         } message: {
             Text("It stays there for 60 days and can be restored.")
         }
+    }
+
+    /// What the Image menu holds (the same in the wide toolbar and in the narrow one).
+    @ViewBuilder private var imageItems: some View {
+        Button("Photo Library…", systemImage: "photo.on.rectangle") { showingPhotos = true }
+        if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
+        Button("Choose File…", systemImage: "folder") { showingFiles = true }
+        Divider()
+        Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
+            .keyboardShortcut("x", modifiers: [.command, .shift])
     }
 
     private func editor(_ session: NoteSession) -> some View {
@@ -181,6 +202,7 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
 /// after the last change.
 struct NoteReader: View {
     let model: AppModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.look) private var look
     @State private var live: LivePreview
 
@@ -189,17 +211,23 @@ struct NoteReader: View {
         _live = State(initialValue: LivePreview(session: session))
     }
 
+    @ViewBuilder private var header: some View {
+        if !live.updated.isEmpty { Label(live.updated, systemImage: "clock").fixedSize(horizontal: false, vertical: true) }
+        if !live.tags.isEmpty { Text(live.tags) }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     Text(live.title.isEmpty ? "Untitled" : live.title).font(.largeTitle.bold())
-                    HStack(spacing: 12) {
-                        if !live.updated.isEmpty { Label(live.updated, systemImage: "clock") }
-                        if !live.tags.isEmpty { Text(live.tags) }
+                    // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 12) { header }
+                        VStack(alignment: .leading, spacing: 4) { header }
                     }
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(look.mutedText)
                     Divider()
                     if let preview = live.preview { NotePreviewView(preview: preview) } else { ProgressView() }
                 }
@@ -217,7 +245,7 @@ struct NoteReader: View {
                 model.followNoteLink(id)
                 return .handled
             })
-            .environment(\.scrollToHeading, { ordinal in withAnimation { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
+            .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             .environment(\.imageFolder, model.location.imagesURL)
         }
     }

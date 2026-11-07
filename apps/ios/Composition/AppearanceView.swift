@@ -11,11 +11,13 @@ struct AppearanceView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Colour scheme") {
+                Section {
                     row("System", detail: "Light by day and dark at night, as the iPad is set", choice: .system, id: "system") { SystemSwatch() }
                     ForEach(Theme.all, id: \.name) { theme in
                         row(theme.label, detail: nil, choice: .theme(theme.name), id: theme.name) { SchemeSwatch(theme: theme) }
                     }
+                } header: {
+                    Text("Colour scheme").foregroundStyle(look.mutedText)
                 }
                 .listRowBackground(look.surface)
 
@@ -29,9 +31,9 @@ struct AppearanceView: View {
                     }
                     .accessibilityIdentifier("preview-font")
                 } header: {
-                    Text("Fonts")
+                    Text("Fonts").foregroundStyle(look.mutedText)
                 } footer: {
-                    Text("The iPad's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not on the iPad yet, and “Follow the sun” is not either.")
+                    Text("The iPad's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not on the iPad yet, and “Follow the sun” is not either.").foregroundStyle(look.mutedText)
                 }
                 .listRowBackground(look.surface)
             }
