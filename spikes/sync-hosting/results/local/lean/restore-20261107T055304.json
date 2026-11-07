@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:8787",
   "where": "local",
   "serverKind": "lean",
-  "startedAt": "2026-11-07T04:55:38.443Z",
-  "finishedAt": "2026-11-07T04:55:47.800Z",
+  "startedAt": "2026-11-07T05:53:04.209Z",
+  "finishedAt": "2026-11-07T05:53:12.914Z",
   "params": {
     "before": 100,
     "after": 70,
@@ -16,16 +16,16 @@
     "backupCmd": null
   },
   "metrics": {
-    "restorePoint": "2026-11-07T04:55:38.513Z",
-    "restoreCommandMs": 2082,
-    "serverServingAgainAfterMs": 2085,
+    "restorePoint": "2026-11-07T05:53:04.291Z",
+    "restoreCommandMs": 1434,
+    "serverServingAgainAfterMs": 1436,
     "epochChangedByRestore": true,
     "epochRotatedByHandStep": false,
     "recordsExpected": 150,
     "recordsOnServerRightAfterRestore": 150,
     "recordsLostByServerInRestore": 0,
-    "devicesNoticedNewEpochAfterMs": 102,
-    "healedAfterMs": 117,
+    "devicesNoticedNewEpochAfterMs": 100,
+    "healedAfterMs": 110,
     "resyncs": {
       "a": 1,
       "b": 1

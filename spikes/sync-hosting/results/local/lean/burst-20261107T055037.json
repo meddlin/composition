@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:8787",
   "where": "local",
   "serverKind": "lean",
-  "startedAt": "2026-11-07T04:54:51.470Z",
-  "finishedAt": "2026-11-07T04:54:56.775Z",
+  "startedAt": "2026-11-07T05:50:37.485Z",
+  "finishedAt": "2026-11-07T05:50:42.796Z",
   "params": {
     "edits": 500,
     "notes": 100,
@@ -13,19 +13,19 @@
     "payloadBytes": 4096
   },
   "metrics": {
-    "editPhaseMs": 5279,
+    "editPhaseMs": 5286,
     "lastEditToConvergedMs": 6,
-    "pushes": 499,
+    "pushes": 495,
     "editsPerPush": 1,
-    "requestsFromA": 744,
+    "requestsFromA": 497,
     "pushAckMs": {
-      "n": 499,
-      "min": 0.8,
-      "p50": 2.2,
-      "p95": 7.9,
-      "p99": 15.4,
-      "max": 32.2,
-      "mean": 3.1
+      "n": 495,
+      "min": 1,
+      "p50": 2.4,
+      "p95": 5.3,
+      "p99": 19.4,
+      "max": 45.5,
+      "mean": 2.9
     },
     "conflicts": 0,
     "retries": 0,

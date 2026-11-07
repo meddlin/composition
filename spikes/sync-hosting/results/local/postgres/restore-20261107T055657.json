@@ -1,11 +1,11 @@
 {
   "scenario": "restore",
-  "candidate": "convex",
-  "baseUrl": "http://127.0.0.1:3211",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
   "where": "local",
-  "serverKind": "convex",
-  "startedAt": "2026-11-07T04:59:23.535Z",
-  "finishedAt": "2026-11-07T04:59:34.972Z",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T05:56:57.265Z",
+  "finishedAt": "2026-11-07T05:57:04.912Z",
   "params": {
     "before": 100,
     "after": 70,
@@ -16,16 +16,16 @@
     "backupCmd": "(script)"
   },
   "metrics": {
-    "restorePoint": "2026-11-07T04:59:25Z",
-    "restoreCommandMs": 4240,
-    "serverServingAgainAfterMs": 4246,
+    "restorePoint": "2026-11-07T05:56:59Z",
+    "restoreCommandMs": 648,
+    "serverServingAgainAfterMs": 649,
     "epochChangedByRestore": false,
     "epochRotatedByHandStep": true,
     "recordsExpected": 150,
     "recordsOnServerRightAfterRestore": 80,
     "recordsLostByServerInRestore": 70,
-    "devicesNoticedNewEpochAfterMs": 100,
-    "healedAfterMs": 378,
+    "devicesNoticedNewEpochAfterMs": 101,
+    "healedAfterMs": 110,
     "resyncs": {
       "a": 1,
       "b": 1

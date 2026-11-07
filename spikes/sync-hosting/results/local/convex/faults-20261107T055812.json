@@ -1,11 +1,11 @@
 {
   "scenario": "faults",
-  "candidate": "lean",
-  "baseUrl": "http://127.0.0.1:8787",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
   "where": "local",
-  "serverKind": "lean",
-  "startedAt": "2026-11-07T04:54:57.770Z",
-  "finishedAt": "2026-11-07T04:55:08.520Z",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T05:58:12.019Z",
+  "finishedAt": "2026-11-07T05:58:23.551Z",
   "params": {
     "rounds": 25,
     "devices": 3,
@@ -24,15 +24,15 @@
   },
   "metrics": {
     "editsMade": 133,
-    "serverHead": 145,
+    "serverHead": 144,
     "faultsInjected": {
-      "dropRequest": 30,
-      "dropResponse": 22,
-      "duplicate": 22,
+      "dropRequest": 29,
+      "dropResponse": 21,
+      "duplicate": 21,
       "http503": 6,
-      "delayed": 215
+      "delayed": 212
     },
-    "retries": 58,
+    "retries": 56,
     "conflicts": 7,
     "conflictCopies": 4,
     "lostEdits": 0,

@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:8788",
   "where": "local",
   "serverKind": "postgres",
-  "startedAt": "2026-11-07T04:53:38.236Z",
-  "finishedAt": "2026-11-07T04:54:00.900Z",
+  "startedAt": "2026-11-07T05:49:23.827Z",
+  "finishedAt": "2026-11-07T05:49:46.484Z",
   "params": {
     "idleSeconds": 20,
     "warmPushes": 5,
@@ -14,31 +14,31 @@
   "metrics": {
     "warmAckMs": {
       "n": 5,
-      "min": 7.9,
-      "p50": 12.2,
-      "p95": 18.4,
-      "p99": 18.4,
-      "max": 18.4,
-      "mean": 12.5
+      "min": 8.7,
+      "p50": 11.6,
+      "p95": 13,
+      "p99": 13,
+      "max": 13,
+      "mean": 11.3
     },
     "warmPropagationMs": {
       "n": 5,
-      "min": 9.8,
-      "p50": 14.6,
-      "p95": 20.3,
-      "p99": 20.3,
-      "max": 20.3,
-      "mean": 14.7
+      "min": 10,
+      "p50": 13.1,
+      "p95": 15.5,
+      "p99": 15.5,
+      "max": 15.5,
+      "mean": 12.9
     },
     "afterIdle": {
-      "ackMs": 18,
-      "propagationMs": 20
+      "ackMs": 29,
+      "propagationMs": 32
     },
     "secondAfterIdle": {
-      "ackMs": 6,
-      "propagationMs": 8
+      "ackMs": 13,
+      "propagationMs": 16
     },
-    "afterIdleVsWarmMedian": 1.5
+    "afterIdleVsWarmMedian": 2.5
   },
   "checks": [
     {

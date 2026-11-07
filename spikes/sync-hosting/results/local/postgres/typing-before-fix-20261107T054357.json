@@ -1,0 +1,69 @@
+{
+  "scenario": "typing-before-fix",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:18788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T05:43:57.494Z",
+  "finishedAt": "2026-11-07T05:45:36.647Z",
+  "params": {
+    "seconds": 90,
+    "autosaveMs": 500,
+    "pushDebounceMs": 2000,
+    "burstSeconds": "10-25",
+    "pauseSeconds": "4-10",
+    "noteBytes": 8192,
+    "hotspot": {
+      "delayMs": [
+        100,
+        300
+      ],
+      "dropRequest": 0.01,
+      "dropResponse": 0.01
+    }
+  },
+  "metrics": {
+    "elapsedS": 99,
+    "autosaves": 125,
+    "bursts": 5,
+    "ipad": {
+      "requests": 113,
+      "perMinute": 68.7,
+      "push": 69,
+      "pullOnly": 0,
+      "wasted": 44,
+      "resync": 0,
+      "bytesUpKB": 793.4,
+      "bytesDownKB": 796.4,
+      "retries": 3
+    },
+    "desktop": {
+      "requests": 70,
+      "push": 0,
+      "pullOnly": 57,
+      "wasted": 12,
+      "resync": 0,
+      "bytesDownKB": 623.7
+    },
+    "lastKeystrokeToDesktopMs": {
+      "n": 5,
+      "min": 389.6,
+      "p50": 1324.1,
+      "p95": 1879.8,
+      "p99": 1879.8,
+      "max": 1879.8,
+      "mean": 1236.1
+    }
+  },
+  "checks": [
+    {
+      "name": "the desktop ended up with the last text typed",
+      "ok": true
+    },
+    {
+      "name": "no conflicts with one writer",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

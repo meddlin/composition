@@ -117,7 +117,9 @@ http.route({
         }
         head = Math.max(head, p.head);
         if (req.pullLimit > 0) {
-          changes = p.records.map((r) => ({
+          // The device already holds what this request just applied (it sent it): do not send it back.
+          const own = new Set(applied.map((x) => `${x.entity}/${x.uuid}/${x.version}`));
+          changes = p.records.filter((r) => !own.has(`${r.entity}/${r.uuid}/${r.version}`)).map((r) => ({
             entity: r.entity,
             uuid: r.uuid,
             version: r.version,

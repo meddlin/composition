@@ -325,15 +325,22 @@ describe(`contract against ${target.name} ${BASE}`, () => {
       assert.ok(pages >= 3, `6 x 400 KB should take at least 3 pages of 1 MiB, took ${pages}`);
     });
 
-    test("a push response also carries the pull, including the device's own writes", async () => {
+    test("a push response also carries the pull, but not what that same push just applied", async () => {
       const h0 = await a.head();
-      const ch = change();
-      const r = await a.sync({ cursor: h0, changes: [ch] });
+      const theirs = change();
+      await b.sync({ cursor: h0, changes: [theirs], pullLimit: 0 }); // someone else wrote after a's cursor
+      const mine = change();
+      const r = await a.sync({ cursor: h0, changes: [mine] });
+      assert.deepEqual(r.body.applied.map((x) => x.version), [h0 + 2]);
       assert.deepEqual(
         r.body.changes.map((x) => x.uuid),
-        [ch.uuid],
+        [theirs.uuid],
+        "the other device's write comes back; the device's own write does not (it already has it)",
       );
-      assert.equal(r.body.cursor, h0 + 1);
+      assert.equal(r.body.cursor, h0 + 2, "the cursor still moves past both");
+      assert.equal(r.body.more, false);
+      // A device that did not write it still sees it.
+      assert.deepEqual((await c.pullAll(h0)).map((x) => x.uuid), [theirs.uuid, mine.uuid]);
     });
   });
 

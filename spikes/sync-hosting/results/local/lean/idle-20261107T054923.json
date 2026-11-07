@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:8787",
   "where": "local",
   "serverKind": "lean",
-  "startedAt": "2026-11-07T04:53:38.238Z",
-  "finishedAt": "2026-11-07T04:54:00.866Z",
+  "startedAt": "2026-11-07T05:49:23.825Z",
+  "finishedAt": "2026-11-07T05:49:46.474Z",
   "params": {
     "idleSeconds": 20,
     "warmPushes": 5,
@@ -14,31 +14,31 @@
   "metrics": {
     "warmAckMs": {
       "n": 5,
-      "min": 6,
-      "p50": 7.6,
-      "p95": 8.8,
-      "p99": 8.8,
-      "max": 8.8,
-      "mean": 7.3
+      "min": 4.6,
+      "p50": 6.1,
+      "p95": 7.9,
+      "p99": 7.9,
+      "max": 7.9,
+      "mean": 6.2
     },
     "warmPropagationMs": {
       "n": 5,
-      "min": 11.8,
-      "p50": 12.1,
-      "p95": 14.1,
-      "p99": 14.1,
-      "max": 14.1,
-      "mean": 12.7
+      "min": 7,
+      "p50": 9.3,
+      "p95": 12.3,
+      "p99": 12.3,
+      "max": 12.3,
+      "mean": 9.7
     },
     "afterIdle": {
-      "ackMs": 15,
-      "propagationMs": 18
+      "ackMs": 22,
+      "propagationMs": 29
     },
     "secondAfterIdle": {
-      "ackMs": 4,
-      "propagationMs": 6
+      "ackMs": 5,
+      "propagationMs": 9
     },
-    "afterIdleVsWarmMedian": 1.9
+    "afterIdleVsWarmMedian": 3.7
   },
   "checks": [
     {

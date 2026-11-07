@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:3211",
   "where": "local",
   "serverKind": "convex",
-  "startedAt": "2026-11-07T04:58:52.143Z",
-  "finishedAt": "2026-11-07T04:58:57.586Z",
+  "startedAt": "2026-11-07T05:57:56.188Z",
+  "finishedAt": "2026-11-07T05:58:01.429Z",
   "params": {
     "edits": 500,
     "notes": 100,
@@ -13,19 +13,19 @@
     "payloadBytes": 4096
   },
   "metrics": {
-    "editPhaseMs": 5301,
-    "lastEditToConvergedMs": 20,
-    "pushes": 343,
-    "editsPerPush": 1.5,
-    "requestsFromA": 352,
+    "editPhaseMs": 5091,
+    "lastEditToConvergedMs": 11,
+    "pushes": 490,
+    "editsPerPush": 1,
+    "requestsFromA": 493,
     "pushAckMs": {
-      "n": 343,
-      "min": 8.4,
-      "p50": 11.6,
-      "p95": 34.8,
-      "p99": 73.1,
-      "max": 123.9,
-      "mean": 15.3
+      "n": 490,
+      "min": 6.8,
+      "p50": 8.6,
+      "p95": 11.5,
+      "p99": 17.1,
+      "max": 53.2,
+      "mean": 9
     },
     "conflicts": 0,
     "retries": 0,

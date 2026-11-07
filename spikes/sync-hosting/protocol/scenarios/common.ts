@@ -54,6 +54,8 @@ export interface DeviceSpec {
   pollMs?: number;
   faults?: FaultPlan;
   seed?: number;
+  /** Wrap the outermost transport, e.g. to count requests as the engine sent them (retries included). */
+  wrap?: (t: Transport) => Transport;
   device?: Partial<DeviceOptions>;
 }
 
@@ -97,6 +99,7 @@ export class Context {
   async device(user: string, name: string, spec: DeviceSpec = {}): Promise<Device> {
     let transport: Transport = this.transport(user, name);
     if (spec.faults) transport = new FaultyTransport(transport, spec.faults, mulberry32(spec.seed ?? 1));
+    if (spec.wrap) transport = spec.wrap(transport);
     const dev = new Device({ name, transport, ...spec.device });
     const mode = spec.hints ?? "native";
     let source: HintSource | undefined;

@@ -25,8 +25,10 @@ export interface LocalRecord {
 export interface DeviceOptions {
   name: string;
   transport: Transport;
-  /** 0 pushes as soon as the event loop is free (scenarios); the design uses 2000. */
+  /** Wait for typing to pause this long before pushing; every write restarts it. 0 = push at once (scenarios); the design uses 2000. */
   pushDebounceMs?: number;
+  /** ...but never hold the first unsent write longer than this (the design: 10 s). */
+  pushMaxWaitMs?: number;
   pullLimit?: number;
   batchRecords?: number;
   batchBytes?: number;
@@ -86,25 +88,32 @@ export class Device {
   cursor = 0;
   epoch: string | undefined;
 
-  private readonly opts: Required<Pick<DeviceOptions, "pushDebounceMs" | "pullLimit" | "batchRecords" | "batchBytes" | "retry">> & DeviceOptions;
+  private readonly opts: Required<Pick<DeviceOptions, "pushDebounceMs" | "pushMaxWaitMs" | "pullLimit" | "batchRecords" | "batchBytes" | "retry">> & DeviceOptions;
   private readonly dirty = new Set<string>();
   private pending: PendingBatch | null = null;
   private reconciling = false;
   private running: Promise<void> | null = null;
   private again = false;
   private timer: NodeJS.Timeout | null = null;
+  private hintTimer: NodeJS.Timeout | null = null;
   private stopped = false;
   private failing = false;
   private hints: HintSource | null = null;
   private wake: (() => void) | null = null;
-  /** A hint or an explicit syncNow() said the server may be ahead of our cursor. */
+  /** An explicit syncNow() or an "unknown, go and look" hint: do a round trip even if nothing looks new. */
   private needPull = true;
+  /** The highest head any hint has told us about. A pull is due while this is ahead of the cursor. */
+  private hintHead = 0;
+  /** Local edits are waiting out the push debounce: a cycle that runs now (a hint) may pull but must not push them. */
+  private pushHeld = false;
+  private firstUnsentAt: number | null = null;
   lastError: Error | null = null;
 
   constructor(opts: DeviceOptions) {
     this.name = opts.name;
     this.opts = {
       pushDebounceMs: 0,
+      pushMaxWaitMs: 10_000,
       pullLimit: 200,
       batchRecords: 100,
       batchBytes: 1_500_000,
@@ -178,38 +187,70 @@ export class Device {
 
   /** Called by a hint source. `undefined` means "unknown, go and look". */
   onHint(hint: { head: number; epoch: string } | undefined): void {
-    // Our own push produces a hint too; by the time it arrives we are usually exactly at it. A head BELOW the
-    // cursor means the server's history went backwards (a restore): go and look, the server will say resync.
-    if (hint && hint.epoch === this.epoch && hint.head === this.cursor) return;
-    this.needPull = true;
+    if (!hint) {
+      this.needPull = true;
+    } else if (hint.epoch !== this.epoch || hint.head < this.cursor) {
+      // A new epoch, or a head BELOW the cursor (history went backwards): go and look; the server will say resync.
+      this.needPull = true;
+    } else {
+      // Our own push produces a hint too, usually before we have processed its response. Remember how far it says
+      // the server is; if the response already took the cursor that far, no request is needed.
+      this.hintHead = Math.max(this.hintHead, hint.head);
+      if (hint.head === this.cursor) return;
+    }
     this.kick(true);
   }
 
-  /** Ask for a sync soon (after the push debounce for local edits, at once for hints). */
+  /**
+   * Ask for a sync. A local edit (default) waits for typing to pause, restarting on every write, but no longer than
+   * the max wait since the first unsent write. A hint (`immediate`) looks at the server now; unsent edits stay held.
+   */
   kick(immediate = false): void {
     if (this.stopped) return;
-    if (this.running) {
-      this.again = true;
+    if (immediate) {
+      if (this.running) {
+        this.again = true;
+        return;
+      }
+      if (this.hintTimer) return;
+      this.hintTimer = setTimeout(() => {
+        this.hintTimer = null;
+        this.run();
+      }, 0);
       return;
     }
-    if (this.timer) {
-      if (!immediate) return;
-      clearTimeout(this.timer);
-    }
+    const now = performance.now();
+    this.firstUnsentAt ??= now;
+    const wait = Math.max(0, Math.min(this.opts.pushDebounceMs, this.firstUnsentAt + this.opts.pushMaxWaitMs - now));
+    this.pushHeld = true;
+    if (this.timer) clearTimeout(this.timer);
     this.timer = setTimeout(() => {
       this.timer = null;
-      this.syncNow(false).catch((err: unknown) => {
-        this.lastError = err instanceof Error ? err : new Error(String(err));
-      });
-    }, immediate ? 0 : this.opts.pushDebounceMs);
+      this.firstUnsentAt = null;
+      this.pushHeld = false;
+      this.run();
+    }, wait);
+  }
+
+  private run(): void {
+    this.syncNow(false).catch((err: unknown) => {
+      this.lastError = err instanceof Error ? err : new Error(String(err));
+    });
   }
 
   /**
    * Run a sync cycle and resolve when the device is quiescent (nothing dirty, cursor at the head).
-   * An explicit call always does at least one round trip; internal kicks skip it when nothing is news.
+   * An explicit call flushes any held edits and always does at least one round trip; internal kicks skip the
+   * round trip when nothing is news.
    */
   syncNow(force = true): Promise<void> {
-    if (force) this.needPull = true;
+    if (force) {
+      this.needPull = true;
+      if (this.timer) clearTimeout(this.timer);
+      this.timer = null;
+      this.firstUnsentAt = null;
+      this.pushHeld = false;
+    }
     if (this.running) {
       this.again = true;
       return this.running;
@@ -230,6 +271,7 @@ export class Device {
   stop(): void {
     this.stopped = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.hintTimer) clearTimeout(this.hintTimer);
     this.hints?.close();
     this.wake?.();
   }
@@ -237,11 +279,13 @@ export class Device {
   // ── the sync cycle ─────────────────────────────────────────────────────────
 
   private async cycle(): Promise<void> {
-    if (!this.needPull && this.dirty.size === 0 && !this.pending && !this.reconciling) return;
+    const hinted = this.hintHead > this.cursor;
+    const sendable = this.dirty.size > 0 && !this.pushHeld;
+    if (!this.needPull && !hinted && !sendable && !this.pending && !this.reconciling) return;
     this.needPull = false;
     this.stats.cycles += 1;
     for (let guard = 0; guard < 100_000 && !this.stopped; guard++) {
-      const batch = this.pending ?? (this.reconciling ? null : this.buildBatch());
+      const batch = this.pending ?? (this.reconciling || this.pushHeld ? null : this.buildBatch());
       const moreBatchesAfter = batch !== null && this.dirty.size > batch.changes.length;
       const req: SyncRequest = {
         protocolVersion: PROTOCOL_VERSION,
@@ -279,7 +323,8 @@ export class Device {
       if (this.reconciling && !resp.more && req.pullLimit! > 0) this.finishReconcile();
 
       const behind = this.cursor < resp.head || resp.more;
-      if (!behind && this.dirty.size === 0 && !this.reconciling && this.pending === null) return;
+      const unsent = this.dirty.size > 0 && !this.pushHeld;
+      if (!behind && !unsent && !this.reconciling && this.pending === null) return;
     }
   }
 
@@ -454,6 +499,7 @@ export class Device {
     this.stats.resyncs += 1;
     this.epoch = resp.epoch;
     this.cursor = 0;
+    this.hintHead = 0; // hints described the old history
     this.pending = null; // nothing was applied; its records are still dirty
     this.reconciling = true;
     for (const rec of this.records.values()) {

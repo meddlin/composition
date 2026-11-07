@@ -1,11 +1,11 @@
 {
   "scenario": "normal",
-  "candidate": "convex",
-  "baseUrl": "http://127.0.0.1:3211",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
   "where": "local",
-  "serverKind": "convex",
-  "startedAt": "2026-11-07T04:58:01.555Z",
-  "finishedAt": "2026-11-07T04:58:52.134Z",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T05:49:47.049Z",
+  "finishedAt": "2026-11-07T05:50:37.474Z",
   "params": {
     "edits": 30,
     "gapMs": 1500,
@@ -16,24 +16,24 @@
   "metrics": {
     "ackMs": {
       "n": 30,
-      "min": 13,
-      "p50": 17.2,
-      "p95": 47.3,
-      "p99": 55.5,
-      "max": 55.5,
-      "mean": 22.8
+      "min": 4.5,
+      "p50": 11.7,
+      "p95": 74.8,
+      "p99": 83.7,
+      "max": 83.7,
+      "mean": 18.1
     },
     "propagationMs": {
       "n": 30,
-      "min": 16.2,
-      "p50": 20.9,
-      "p95": 50.6,
-      "p99": 55.2,
-      "max": 55.2,
-      "mean": 26.8
+      "min": 8.3,
+      "p50": 16.8,
+      "p95": 88.6,
+      "p99": 93.8,
+      "max": 93.8,
+      "mean": 24.7
     },
     "missedEdits": 0,
-    "requestsFromA": 67,
+    "requestsFromA": 35,
     "deviceAErrors": 0
   },
   "checks": [
@@ -49,7 +49,7 @@
     {
       "name": "propagation p95 within the design's 10 s target",
       "ok": true,
-      "detail": "p95 50.6 ms (excludes the app's 2 s push debounce)"
+      "detail": "p95 88.6 ms (excludes the app's 2 s push debounce)"
     }
   ],
   "notes": []

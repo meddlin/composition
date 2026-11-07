@@ -4,8 +4,8 @@
   "baseUrl": "http://127.0.0.1:3211",
   "where": "local",
   "serverKind": "convex",
-  "startedAt": "2026-11-07T04:59:06.718Z",
-  "finishedAt": "2026-11-07T04:59:11.124Z",
+  "startedAt": "2026-11-07T05:58:08.883Z",
+  "finishedAt": "2026-11-07T05:58:12.017Z",
   "params": {
     "devices": 8,
     "rounds": 40,
@@ -15,21 +15,21 @@
   },
   "metrics": {
     "pushes": 320,
-    "appliedRecords": 1747,
-    "head": 1747,
+    "appliedRecords": 1734,
+    "head": 1734,
     "duplicateVersions": 0,
     "versionsOutOfPlace": 0,
-    "conflictsOnSharedRecords": 173,
-    "retriesOn5xxOrNetwork": 6,
+    "conflictsOnSharedRecords": 186,
+    "retriesOn5xxOrNetwork": 1,
     "pushesGivenUp": 0,
     "latencyMs": {
       "n": 320,
-      "min": 8,
-      "p50": 44.9,
-      "p95": 142.6,
-      "p99": 1159.7,
-      "max": 1496.3,
-      "mean": 70.2
+      "min": 7,
+      "p50": 35.4,
+      "p95": 130.4,
+      "p99": 596.3,
+      "max": 1227.7,
+      "mean": 52.5
     },
     "errorSamples": [
       "HTTP 503: {\"error\":{\"code\":\"storage_unavailable\",\"message\":\"the server could not complete the request; retry\"}}"
@@ -39,7 +39,7 @@
     {
       "name": "versions handed out are exactly 1..head with none repeated",
       "ok": true,
-      "detail": "applied 1747, head 1747, dups 0, out of place 0"
+      "detail": "applied 1734, head 1734, dups 0, out of place 0"
     },
     {
       "name": "no push was given up on",

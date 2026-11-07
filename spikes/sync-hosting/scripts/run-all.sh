@@ -36,7 +36,7 @@ for c in "${cands[@]}"; do echo "--- idle $c"; tail -n 14 ".local/idle-$c.log"; 
 
 for c in "${cands[@]}"; do
   echo; echo "============================== $c ($mode)"
-  run pnpm -s scenario normal burst library concurrent faults --candidate "$c"
+  run pnpm -s scenario normal burst library concurrent faults typing --candidate "$c"
   case "$c" in
     lean)
       run pnpm -s scenario outage --candidate lean --what api --down-seconds 10 \

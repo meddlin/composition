@@ -34,6 +34,8 @@ const passed = (c: string, scenario: string): string => {
 const rows: [string, (c: string) => string][] = [
   ["Push ack, typical / p95 (ms)", (c) => `${fmt(g(c, "normal", "ackMs.p50"))} / ${fmt(g(c, "normal", "ackMs.p95"))}`],
   ["Propagation to device B, typical / p95 (ms)", (c) => `${fmt(g(c, "normal", "propagationMs.p50"))} / ${fmt(g(c, "normal", "propagationMs.p95"))}`],
+  ["Hotspot typing, 90 s: iPad requests / KB up / KB down", (c) => `${fmt(g(c, "typing", "ipad.requests"))} / ${fmt(g(c, "typing", "ipad.bytesUpKB"))} / ${fmt(g(c, "typing", "ipad.bytesDownKB"))}`],
+  ["Hotspot typing: last autosave to the other device holding it, p50 / max (ms)", (c) => `${fmt(g(c, "typing", "lastKeystrokeToDesktopMs.p50"))} / ${fmt(g(c, "typing", "lastKeystrokeToDesktopMs.max"))}`],
   ["Burst of 500: last edit to B converged (ms); edits per push", (c) => `${fmt(g(c, "burst", "lastEditToConvergedMs"))}; ${fmt(g(c, "burst", "editsPerPush"))}`],
   ["Burst push ack p95 (ms)", (c) => fmt(g(c, "burst", "pushAckMs.p95"))],
   ["First push after idle / warm median (ms)", (c) => `${fmt(g(c, "idle", "afterIdle.ackMs"))} / ${fmt(g(c, "idle", "warmAckMs.p50"))}`],
@@ -52,7 +54,7 @@ const rows: [string, (c: string) => string][] = [
 const out = [`# Scenario results (${where})`, "", `| Measure | ${CANDIDATES.join(" | ")} |`, `|---|${CANDIDATES.map(() => "---").join("|")}|`];
 for (const [label, f] of rows) out.push(`| ${label} | ${CANDIDATES.map(f).join(" | ")} |`);
 out.push("", "Restore rows: lean restores the latest replica, so what it lacks is replication lag; Postgres and Convex are restored to a backup point taken before the last 70 writes, on purpose, so \"lacked\" is 70 by construction there and the row tests the healing, not durability.");
-out.push("", "Checks: " + ["normal", "burst", "library", "concurrent", "faults", "idle", "outage-api", "outage-database", "restore", "restore-immediate"].map((s) => `${s} ${CANDIDATES.map((c) => `${c}=${passed(c, s)}`).join(" ")}`).join("; "));
+out.push("", "Checks: " + ["normal", "burst", "library", "concurrent", "faults", "typing", "idle", "outage-api", "outage-database", "restore", "restore-immediate"].map((s) => `${s} ${CANDIDATES.map((c) => `${c}=${passed(c, s)}`).join(" ")}`).join("; "));
 const when = [...latest.values()].map((r) => r.startedAt as string).sort();
 if (when.length) out.push("", `Runs from ${when[0]} to ${when.at(-1)}. Raw files sit beside this one.`);
 writeFileSync(join(dir, "SUMMARY.md"), out.join("\n") + "\n");

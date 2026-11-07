@@ -1,0 +1,69 @@
+{
+  "scenario": "typing-before-fix",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:18787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T05:43:57.494Z",
+  "finishedAt": "2026-11-07T05:45:36.625Z",
+  "params": {
+    "seconds": 90,
+    "autosaveMs": 500,
+    "pushDebounceMs": 2000,
+    "burstSeconds": "10-25",
+    "pauseSeconds": "4-10",
+    "noteBytes": 8192,
+    "hotspot": {
+      "delayMs": [
+        100,
+        300
+      ],
+      "dropRequest": 0.01,
+      "dropResponse": 0.01
+    }
+  },
+  "metrics": {
+    "elapsedS": 99,
+    "autosaves": 125,
+    "bursts": 5,
+    "ipad": {
+      "requests": 56,
+      "perMinute": 34.1,
+      "push": 55,
+      "pullOnly": 0,
+      "wasted": 1,
+      "resync": 0,
+      "bytesUpKB": 612.3,
+      "bytesDownKB": 615.2,
+      "retries": 1
+    },
+    "desktop": {
+      "requests": 56,
+      "push": 0,
+      "pullOnly": 40,
+      "wasted": 15,
+      "resync": 0,
+      "bytesDownKB": 449.3
+    },
+    "lastKeystrokeToDesktopMs": {
+      "n": 5,
+      "min": 969,
+      "p50": 2004.6,
+      "p95": 2464.8,
+      "p99": 2464.8,
+      "max": 2464.8,
+      "mean": 1809.1
+    }
+  },
+  "checks": [
+    {
+      "name": "the desktop ended up with the last text typed",
+      "ok": true
+    },
+    {
+      "name": "no conflicts with one writer",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

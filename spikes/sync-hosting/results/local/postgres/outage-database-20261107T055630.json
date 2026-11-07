@@ -1,28 +1,28 @@
 {
-  "scenario": "outage-api",
+  "scenario": "outage-database",
   "candidate": "postgres",
   "baseUrl": "http://127.0.0.1:8788",
   "where": "local",
   "serverKind": "postgres",
-  "startedAt": "2026-11-07T04:57:02.175Z",
-  "finishedAt": "2026-11-07T04:57:28.273Z",
+  "startedAt": "2026-11-07T05:56:30.782Z",
+  "finishedAt": "2026-11-07T05:56:56.843Z",
   "params": {
-    "what": "api",
+    "what": "database",
     "downSeconds": 10,
     "editEveryMs": 1000,
     "downCmd": "(script)"
   },
   "metrics": {
-    "downCommandMs": 47,
-    "upCommandMs": 559,
-    "longestSilentGapMs": 12534,
-    "firstAckAfterServerReturnedMs": 1994,
-    "deviceSawAnErrorAfterMs": 257,
+    "downCommandMs": 938,
+    "upCommandMs": 1007,
+    "longestSilentGapMs": 12467,
+    "firstAckAfterServerReturnedMs": 1482,
+    "deviceSawAnErrorAfterMs": 1012,
     "retriesDuringOutage": 8,
     "editsMade": 26,
     "editsLost": 0,
     "whatTheDeviceSaw": [
-      "network: connect ECONNREFUSED 127.0.0.1:N"
+      "HTTP 503: {\"error\":{\"code\":\"storage_unavailable\",\"message\":\"the server could not"
     ],
     "upCommandSecondsFromDown": 10
   },

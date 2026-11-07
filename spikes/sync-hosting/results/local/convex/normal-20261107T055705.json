@@ -1,11 +1,11 @@
 {
   "scenario": "normal",
-  "candidate": "postgres",
-  "baseUrl": "http://127.0.0.1:8788",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
   "where": "local",
-  "serverKind": "postgres",
-  "startedAt": "2026-11-07T04:55:52.595Z",
-  "finishedAt": "2026-11-07T04:56:42.918Z",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T05:57:05.392Z",
+  "finishedAt": "2026-11-07T05:57:56.179Z",
   "params": {
     "edits": 30,
     "gapMs": 1500,
@@ -16,24 +16,24 @@
   "metrics": {
     "ackMs": {
       "n": 30,
-      "min": 8.1,
-      "p50": 15.9,
-      "p95": 31.9,
-      "p99": 46.3,
-      "max": 46.3,
-      "mean": 17.8
+      "min": 12.7,
+      "p50": 24,
+      "p95": 28,
+      "p99": 31.4,
+      "max": 31.4,
+      "mean": 23.1
     },
     "propagationMs": {
       "n": 30,
-      "min": 10.5,
-      "p50": 19,
-      "p95": 32.6,
-      "p99": 53.9,
-      "max": 53.9,
-      "mean": 20.2
+      "min": 15.2,
+      "p50": 27.2,
+      "p95": 33.5,
+      "p99": 35,
+      "max": 35,
+      "mean": 26.9
     },
     "missedEdits": 0,
-    "requestsFromA": 68,
+    "requestsFromA": 35,
     "deviceAErrors": 0
   },
   "checks": [
@@ -49,7 +49,7 @@
     {
       "name": "propagation p95 within the design's 10 s target",
       "ok": true,
-      "detail": "p95 32.6 ms (excludes the app's 2 s push debounce)"
+      "detail": "p95 33.5 ms (excludes the app's 2 s push debounce)"
     }
   ],
   "notes": []

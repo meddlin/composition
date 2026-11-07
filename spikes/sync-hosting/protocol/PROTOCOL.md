@@ -60,8 +60,9 @@ and consumes no version. The whole batch is one transaction, and a user's writes
 **Retry.** `batchId` is random. A request carrying a `batchId` the server has seen returns that batch's stored `applied`
 and `conflicts` and applies nothing (retry records live a day). The pull half is computed fresh.
 
-**Pull.** `changes` holds records with `version > cursor`, ascending, **including the device's own writes** (the device
-skips a version it already holds). A page stops at `pullLimit` records (max 500) or about 1 MiB of payload, always
+**Pull.** `changes` holds records with `version > cursor`, ascending, **except the ones this same request just applied**:
+the device sent those and already holds them, so sending them back would double a push's data for nothing (on a hotspot, a
+note re-downloaded on every autosave). The cursor still moves past them. Other devices' writes in the same range do come back. A page stops at `pullLimit` records (max 500) or about 1 MiB of payload, always
 returning at least one record; `more` says to continue from `cursor`. `pullLimit: 0` is push-only. When `more` is false,
 `cursor` is at least the user's head when the pull began. Only latest state is kept, so a record edited twice appears once
 and the versions in a pull are not contiguous; gap-freeness is about versions handed out, not versions still stored.

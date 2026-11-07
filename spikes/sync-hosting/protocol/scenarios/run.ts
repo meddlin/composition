@@ -16,8 +16,9 @@ import { library } from "./library.ts";
 import { normal } from "./normal.ts";
 import { outage } from "./outage.ts";
 import { restore } from "./restore.ts";
+import { typing } from "./typing.ts";
 
-const SCENARIOS: Record<string, (ctx: Context) => Promise<Result>> = { normal, burst, library, concurrent, faults, idle, outage, restore };
+const SCENARIOS: Record<string, (ctx: Context) => Promise<Result>> = { normal, burst, library, concurrent, faults, idle, outage, restore, typing };
 const MEASURED = ["normal", "burst", "library", "concurrent", "faults"];
 
 // --key value, --key=value, or a bare --flag; anything else is a scenario name.

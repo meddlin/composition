@@ -73,6 +73,7 @@ bash scripts/run-all.sh local           # everything, including the drills, for 
 | `library` | A 10 MB library (2,000 notes plus placements): upload from a device that has it, then a pull from cursor 0 on an empty device, byte-compared. |
 | `concurrent` | 8 devices of one user push at once (fresh records plus contended ones). Checks versions are exactly `1..head`, none repeated; counts conflicts, 5xx retries and latency. |
 | `faults` | Three devices through dropped requests, dropped responses, duplicates, 503s and delays (seeded). Solo phase: no conflicts despite duplicates (idempotent retry). Then every device's last text per note must survive, and all replicas must agree. |
+| `typing` | The iPad on a simulated mobile hotspot (100-300 ms added per request, 1% loss): autosave every 500 ms in typing bursts, the 2 s push debounce, a second device told by hints. Counts requests by kind (push, pull-only, no-op) and bytes each way, and how long the last text takes to reach the other device. `--no-hotspot` leaves the link alone. |
 | `idle` | Warm pushes, an idle pause (`--idle-seconds`, default 600), then a push: the first sync after idle. |
 | `outage` | Takes the target down with `--down-cmd`, back with `--up-cmd`; measures the longest sync pause and checks no edit was lost. |
 | `restore` | Backs up, writes more, restores, counts what the server lost, then lets the devices heal through the epoch. `--devices offline` (default) measures loss before anything can heal it. |

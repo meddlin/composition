@@ -175,7 +175,9 @@ export async function createApp(opts: AppOptions): Promise<App> {
     let more = false;
     if (parsed.pullLimit > 0) {
       const page = await storage.pull(id.user, parsed.cursor, parsed.pullLimit, LIMITS.maxPullBytes);
-      changes = page.records.map(toWire);
+      // The device already holds what this request just applied (it sent it): do not send it back.
+      const own = new Set(applied.map((x) => `${x.entity}/${x.uuid}/${x.version}`));
+      changes = page.records.filter((r) => !own.has(`${r.entity}/${r.uuid}/${r.version}`)).map(toWire);
       const last = page.records.at(-1);
       more = page.more;
       cursor = more ? last!.version : Math.max(parsed.cursor, page.head, last?.version ?? 0);
