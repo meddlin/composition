@@ -19,7 +19,7 @@ describeParity("MarkdownEditor: turning a Markdown image into <Image />", (scena
     const editor = render();
 
     expect(editor.element().getAttribute("aria-keyshortcuts")).toBe(
-      "Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M Control+Shift+X Meta+Shift+X Control+Shift+D Meta+Shift+D Control+] Control+[",
+      "Control+Shift+K Meta+Shift+K Control+Shift+M Meta+Shift+M Control+Shift+X Meta+Shift+X Control+Shift+D Meta+Shift+D Control+] Control+[ Control+B Meta+B Control+I Meta+I",
     );
   });
 
