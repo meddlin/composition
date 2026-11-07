@@ -92,8 +92,22 @@ describe("the Settings screen", () => {
       "Plugins",
       "AI Configuration",
       "Keyboard shortcuts",
+      "Metrics",
     ]);
     expect(pages[0].getAttribute("aria-current")).toBe("page");
+  });
+
+  it("keeps the just-for-fun numbers on their own Metrics page, not on General", () => {
+    render(<SettingsScreen snapshot={snapshot} />);
+    const section = (name: string) => screen.getByRole("heading", { level: 2, name, hidden: true }).closest("section")!;
+
+    expect(within(section("Metrics")).getByText("Words written")).toBeTruthy();
+    expect(within(section("General")).queryByText("Words written")).toBeNull();
+
+    fireEvent.click(sidebar().getByRole("button", { name: "Metrics" }));
+
+    expect(section("Metrics").hidden).toBe(false);
+    expect(within(section("Metrics")).getByText("120")).toBeTruthy();
   });
 
   it("opens another page from the list", () => {
@@ -117,6 +131,7 @@ describe("searching the Settings screen", () => {
     ["Plugins", "Built-in plugins"],
     ["AI Configuration", "Server address"],
     ["Keyboard shortcuts", "shortcuts"],
+    ["Metrics", "words written"],
   ])("finds something on %s", (page, query) => {
     render(<SettingsScreen snapshot={snapshot} />);
 

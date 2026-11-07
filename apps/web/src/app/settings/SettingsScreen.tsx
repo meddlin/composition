@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  ChartColumnIcon,
   HouseIcon,
   KeyboardIcon,
   PaletteIcon,
@@ -97,8 +98,6 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           <BackupRestore defaultBackupDir={snapshot.backupDir} />
 
           <TrashCan initialTrash={snapshot.trash} />
-
-          <FunMetrics metrics={snapshot.metrics} />
         </>
       ),
     },
@@ -153,6 +152,12 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
       label: "Keyboard shortcuts",
       icon: <KeyboardIcon />,
       content: <KeyboardShortcuts />,
+    },
+    {
+      id: "metrics",
+      label: "Metrics",
+      icon: <ChartColumnIcon />,
+      content: <FunMetrics metrics={snapshot.metrics} />,
     },
   ];
 
