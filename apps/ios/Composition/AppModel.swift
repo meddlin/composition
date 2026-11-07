@@ -1,6 +1,7 @@
 import CompositionCore
 import Foundation
 import Observation
+import UIKit
 
 /// A backup just made, waiting to be shared or saved.
 struct ExportedBackup: Identifiable {
@@ -37,10 +38,18 @@ final class AppModel {
     private var searchIndex: SearchIndex?
     private var searchTask: Task<Void, Never>?
 
+    /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
+    private var sessions: NoteSessions?
+    private var reloadTask: Task<Void, Never>?
+    /// Set while a save has failed (the text is kept and saving is retried); nil otherwise.
+    private(set) var saveProblem: String?
+
     private struct Stores: Sendable {
         let database: CompositionDatabase
         let index: SearchIndex
         let rebuilt: Bool
+        let sessions: NoteSessions
+        let recovered: Int
     }
 
     private struct Snapshot: Sendable {
@@ -53,6 +62,16 @@ final class AppModel {
     /// Runs slow, blocking work off the main thread.
     nonisolated private static func perform<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
         try await Task.detached(priority: .userInitiated, operation: work).value
+    }
+
+    init() {
+        // Every way the app can stop being the one in front, or stop: what was typed is written first (the design's
+        // `scenePhase` and `willResignActive`, with the background-task assertion in `flushEditing`).
+        for name in [UIApplication.willResignActiveNotification, UIApplication.didEnterBackgroundNotification, UIApplication.willTerminateNotification] {
+            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.flushEditing() }
+            }
+        }
     }
 
     // MARK: Opening
@@ -76,6 +95,14 @@ final class AppModel {
         busyMessage = "Opening your notes…"
         defer { busyMessage = nil }
         let location = location
+        var timing = NoteAutosaver.Timing()
+        #if DEBUG
+        // Developer shortcut for scripts: `-autosaveQuiet 30` makes the pause before a save 30 seconds, so that only leaving the
+        // foreground (or the draft file) can save what was typed within a test.
+        let quiet = UserDefaults.standard.double(forKey: "autosaveQuiet")
+        if quiet > 0 { timing = NoteAutosaver.Timing(quiet: quiet, longest: max(quiet, 2 * quiet)) }
+        #endif
+        let sessionTiming = timing
         do {
             let stores = try await Self.perform {
                 let database = try CompositionDatabase.open(in: location)
@@ -83,12 +110,24 @@ final class AppModel {
                 try database.purgeExpired()
                 let index = try SearchIndex.open(at: location.directory.appendingPathComponent("search.db"), tolerance: .forgiving)
                 let rebuilt = try index.rebuildIfStale(from: database)
-                return Stores(database: database, index: index, rebuilt: rebuilt)
+                let sessions = NoteSessions(store: NoteStore(database: database, search: index), drafts: NoteDrafts(location: location), timing: sessionTiming)
+                // Text typed just before the app was last ended, and not yet in the database, goes in now.
+                let recovered = sessions.recoverDrafts().count
+                return Stores(database: database, index: index, rebuilt: rebuilt, sessions: sessions, recovered: recovered)
             }
             database = stores.database
             searchIndex = stores.index
+            sessions = stores.sessions
             indexRebuiltAtOpen = stores.rebuilt
+            if stores.recovered > 0 {
+                notice = "The app was closed while you were typing. What you had typed in \(stores.recovered == 1 ? "1 note" : "\(stores.recovered) notes") is back."
+            }
             phase = .ready
+            #if DEBUG
+            // Developer shortcut: `-openNote 12` selects that note at launch.
+            let forced = UserDefaults.standard.integer(forKey: "openNote")  // launch arguments arrive as text; 0 when absent
+            if forced != 0 { selection = Int64(forced) }
+            #endif
             await reload()
         } catch {
             errorMessage = "Couldn't open your notes: \(error.localizedDescription)"
@@ -166,10 +205,61 @@ final class AppModel {
         return try? await Self.perform { try database.note(id: id) }
     }
 
+    // MARK: Editing
+
+    /// Opens a note for editing, or joins the session another window already has for it.
+    func openSession(_ id: Int64) async -> NoteSession? {
+        guard let sessions else { return nil }
+        do {
+            let session = try await Self.perform { try sessions.open(noteId: id) }
+            session.autosaver.onSaved { [weak self] _ in
+                Task { @MainActor in
+                    self?.saveProblem = nil
+                    self?.scheduleReload()
+                }
+            }
+            session.autosaver.onFailure { [weak self] error in
+                let message = error.localizedDescription
+                Task { @MainActor in self?.saveProblem = message }
+            }
+            return session
+        } catch {
+            errorMessage = "Couldn't open the note for editing: \(error.localizedDescription)"
+            return nil
+        }
+    }
+
+    /// Lets go of a session; the last window to do so writes whatever is unsaved.
+    func closeSession(_ session: NoteSession) {
+        sessions?.close(session)
+        saveProblem = nil
+        scheduleReload()
+    }
+
+    /// Writes everything typed and unsaved, now, and waits. The app calls this whenever it may be about to stop. The work is held
+    /// inside a background-task assertion, which is what lets iOS finish it after the app has left the foreground.
+    func flushEditing() {
+        guard let sessions, sessions.hasUnsavedChanges else { return }
+        let assertion = SaveAssertion()
+        sessions.flushAll()
+        assertion.end()
+    }
+
+    /// The list is read again shortly after a save (and not on every one in a burst).
+    private func scheduleReload() {
+        reloadTask?.cancel()
+        reloadTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await self?.reload()
+        }
+    }
+
     // MARK: Trash Can
 
     func moveToTrash(_ id: Int64) async {
         guard let database, let index = searchIndex else { return }
+        flushEditing()  // what was typed goes into the note before the note goes to the Trash Can
         do {
             try await Self.perform {
                 try database.trashNote(id: id)
@@ -219,10 +309,13 @@ final class AppModel {
         busyMessage = "Restoring the backup…"
         defer { busyMessage = nil }
         // Close what is open, so nothing holds the files while they are swapped.
+        flushEditing()
         let closingDatabase = database, closingIndex = searchIndex
         database = nil
         searchIndex = nil
+        sessions = nil
         searchTask?.cancel()
+        reloadTask?.cancel()
         let location = location
         do {
             let counts = try await Self.perform {
@@ -252,6 +345,7 @@ final class AppModel {
     /// Makes a backup the desktop can restore, and offers it to share or save.
     func exportBackup() async {
         guard let database else { return }
+        flushEditing()  // the backup holds what was just typed
         busyMessage = "Making a backup…"
         defer { busyMessage = nil }
         let location = location
@@ -272,5 +366,23 @@ final class AppModel {
         let format = DateFormatter()
         format.dateFormat = "yyyy-MM-dd-HHmmss"
         return "composition-backup-\(format.string(from: Date())).tar.gz"
+    }
+}
+
+/// Asks iOS for time to finish writing while the app leaves the foreground, and gives it back when done.
+@MainActor
+private final class SaveAssertion {
+    private var identifier = UIBackgroundTaskIdentifier.invalid
+
+    init() {
+        identifier = UIApplication.shared.beginBackgroundTask(withName: "Save notes") { [weak self] in
+            MainActor.assumeIsolated { self?.end() }
+        }
+    }
+
+    func end() {
+        guard identifier != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(identifier)
+        identifier = .invalid
     }
 }

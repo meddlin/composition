@@ -105,6 +105,11 @@ the core is developed with `swift test` and the app is built only to look at it.
 4. **Autosave and lifecycle (spike S6).** One write path: debounce, then flush on leaving the foreground, on a scene change and on
    termination; a second window shares the one database pool. Check, in the Simulator and scripted: type, `simctl terminate`, relaunch, and
    the text is there; the same with the app backgrounded mid-word. **S6 exit: no lost keystrokes.**
+   **Done 2026-11-06 in the Simulator (not on the iPad):** `Autosave/` in the core (`NoteAutosaver`, `NoteDrafts`, `NoteSessions`), a plain-text *Edit* tab in the app to drive it, flushing on every way
+   the app leaves the foreground inside a background-task assertion, and `@SceneStorage` for the open note, tab and caret. **The plan's debounce-and-flush was not enough:** with the pause stretched to
+   30 s, a kill inside it lost everything typed and a kill mid-burst kept 1 of 26 characters, so each edit is also written to a draft file (coalesced, off the main thread) which the next launch applies; with it, all
+   three cases of `apps/ios/scripts/autosave-kill-test.sh` (kill inside the pause, background inside the pause, kill mid-burst) lose nothing, and the checks fail when the draft write or the flushes are disabled.
+   17 unit tests. Not done: the same on your iPad (manual-test items 20 to 26), and a second window (not enabled in the target; the shared session is tested in the core).
 5. **Incremental colouring (R13).** Re-colour only the paragraphs around an edit, redo the whole note on an idle pause (so what a one-paragraph
    read gets wrong, like a fenced block or a loose list, is corrected a moment later), and read the Markdown off the main thread; the Live-style reveal
    re-colours only the two paragraphs involved. Skip while a composition is under way. Check: the lab's line for *5,000 lines with views* in a

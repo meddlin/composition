@@ -24,6 +24,8 @@ public struct DataLocation: Sendable, Equatable {
     public var imagesURL: URL { directory.appendingPathComponent(BackupNames.imageDirectory, isDirectory: true) }
     /// Attached files.
     public var attachmentsURL: URL { directory.appendingPathComponent(BackupNames.attachmentDirectory, isDirectory: true) }
+    /// Text typed but not yet in the database (see `NoteDrafts`). Never part of a backup.
+    public var draftsURL: URL { directory.appendingPathComponent("drafts", isDirectory: true) }
 }
 
 /// How many of each thing a backup holds, under the names the desktop's manifest uses.
@@ -401,6 +403,8 @@ public enum Backup {
             }
             throw BackupError.restoreFailed((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
         }
+        // A draft belongs to a note of the database that was just replaced; applied to the new one it would overwrite the wrong text.
+        try? fileManager.removeItem(at: location.draftsURL)
         try? fileManager.removeItem(at: staged.directory)
     }
 

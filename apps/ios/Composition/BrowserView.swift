@@ -9,6 +9,8 @@ struct BrowserView: View {
     @State private var showingAbout = false
     @State private var showingLab = false
     @State private var confirmingReplace = false
+    /// The note that was open when the app was last ended; the system brings it back (0 is none).
+    @SceneStorage("selectedNote") private var storedSelection = 0
 
     var body: some View {
         NavigationSplitView {
@@ -58,6 +60,12 @@ struct BrowserView: View {
                 ContentUnavailableView("Select a note", systemImage: "doc.text")
             }
         }
+        .onAppear {
+            if model.selection == nil, storedSelection != 0, model.notes.contains(where: { $0.id == Int64(storedSelection) }) {
+                model.selection = Int64(storedSelection)
+            }
+        }
+        .onChange(of: model.selection) { storedSelection = Int($1 ?? 0) }
         .sheet(isPresented: $showingTrash) { TrashView(model: model) }
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }

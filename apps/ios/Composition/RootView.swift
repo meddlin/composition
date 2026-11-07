@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 struct RootView: View {
     @Bindable var model: AppModel
     @State private var choosingBackup = false
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         content
@@ -14,6 +15,8 @@ struct RootView: View {
                 case .failure(let error): model.errorMessage = error.localizedDescription
                 }
             }
+            // A window going to the background, or being closed, writes what was typed in it (the app-wide notifications cover the rest).
+            .onChange(of: scenePhase) { _, phase in if phase != .active { model.flushEditing() } }
             .overlay { if let message = model.busyMessage { BusyOverlay(message: message) } }
             .alert("Something went wrong", isPresented: Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })) {
                 Button("OK", role: .cancel) {}

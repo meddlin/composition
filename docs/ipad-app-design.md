@@ -518,7 +518,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| App shell, scenes, lifecycle | 🆕 | M1 | 🔨 | SwiftUI `App` with a split view, in the prototype ([The first app](#the-first-app)); flushing on leaving the foreground is not needed until there is editing |
+| App shell, scenes, lifecycle | 🆕 | M1 | 🔨 | SwiftUI `App` with a split view, in the prototype ([The first app](#the-first-app)). Typed text is flushed whenever the app leaves the foreground, inside a background-task assertion, and the system brings back the open note, its tab and the caret ([S6 status](#s6-status)); several windows are not enabled yet ([C5](#compromise-register)) |
 | Six colour schemes | 🔁 | M1 | ⬜ | `Theme` tokens ported from `themes.ts`; add a **System** scheme (⭐) |
 | "Follow the sun" scheme | 🔁 | M3† | ⬜ | Port `sunTimes.ts`; needs a saved city |
 | Fonts | 🔁 | M1 | ⬜ | System fonts by default; bundled open-source families as options |
@@ -535,7 +535,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Create, edit, delete notes, autosave | 🔁 | M1 | ⬜ | GRDB; debounce plus flush. The core's create, save and delete (with the title, tags and description columns kept in step, and `search.db` following) match the desktop's `service.ts` over a 98-step script ([build plan](ipad-build-plan.md), Step 2); autosave and the editor are Steps 4 to 6 |
+| Create, edit, delete notes, autosave | 🔁 | M1 | ⬜ | GRDB; debounce plus flush. The core's create, save and delete (with the title, tags and description columns kept in step, and `search.db` following) match the desktop's `service.ts` over a 98-step script ([build plan](ipad-build-plan.md), Step 2). **Autosave is built and tested by killing the app in the Simulator ([S6 status](#s6-status))**, behind a plain-text *Edit* tab in the prototype; the real editor is Steps 5 and 6 |
 | Frontmatter (title, description, tags, dates) | 🔁 | M1 | 🔨 | A port of `js-yaml`'s loader and dumper (Step 3, no dependency): 111 of 111 blocks read, and 123 of 123 written byte for byte, as the desktop does; the header-image edits and tag helpers agree. No screen of its own: the editor and the note header use it |
 | Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | The core's operations (create, rename, move, move to a notebook, place, trash and restore) match `groupsRepo.ts` and the Trash Can step for step; no screen yet (Step 7) |
 | Notebooks: switch, colours | 🔁 | M1 | ⬜ | Create, rename, order and delete match `notebooksRepo.ts` in the core; the sidebar is Step 7 |
@@ -735,7 +735,7 @@ Each spike is small and answers one question before anything is built for real. 
 | **S3** | **Editor, on the device.** `UITextView` on TextKit 2: Markdown colours as attributes, Scribble in the editor, a hidden-marks prototype for the Live tab, a view-provider attachment holding an image and a `PKCanvasView`, `UIFindInteraction`, a completion popover at the caret, a 5,000-line note. | R1, R2, R13; D4, D5, C12 | **Gate B** (with S4). **Simulator half done:** [S3 status](#s3-status); the Pencil, Scribble and the iPad's speed are left for the device |
 | **S4** | **Markdown and MDX.** Parse the repo's MDX test notes with swift-markdown and the restricted layer; draw the ten components natively; compare screenshots with the web preview for the same notes. | R5; D4, C3 | A list of divergences; every component draws. **Mostly done:** [S4 status](#s4-status); what is left is the text-view renderer and the player |
 | **S5** | **Ink.** PencilKit full-screen and inline; export to the stroke JSON and back; the PNG with its chunk; render in every scheme, in dark mode too; the desktop and CLI show it from a backup. Real handwriting through Vision. | R11, R12; D9, C10, C11 | **Gate C**: format frozen; a dense page's size measured |
-| **S6** | **Lifecycle.** Background while typing, kill and relaunch, state restoration, a second window on the same database. | N5; R4 | No lost keystrokes |
+| **S6** | **Lifecycle.** Background while typing, kill and relaunch, state restoration, a second window on the same database. | N5; R4 | No lost keystrokes. **Done in the Simulator: [S6 status](#s6-status)**; not yet on the iPad, and no second window yet |
 | **S7** | **The native-bar audit:** VoiceOver, Dynamic Type, the Cmd-hold list, trackpad, a third-width window, Stage Manager. | N1–N7 | The table above, filled in |
 | **S8** | **Web exceptions.** `<YouTube>` in a `WKWebView` (Referer), the draw.io editor on its own origin, and (parked, [D19](#decisions)) whether a ChatGPT sign-in can complete on iOS. | C8, C9, C19 | Optional |
 
@@ -1048,6 +1048,43 @@ numbers, the same contents list and the same picture sizes. The differences:
 - An escaped citation (`\[^a]`) is numbered like any other, because the parsed text has lost the backslash.
 - The footnote and frontmatter code was checked against the desktop only through the notes above, not on large or odd ones.
 
+### S6 status
+
+**Built and measured 2026-11-06 in the iPad Pro 11-inch (M5) Simulator; not tried on an iPad.** Build plan Step 4.
+
+**What was built.** In `CompositionCore/Autosave/`: `NoteAutosaver` (one note's write path: every edit is noted at once, the database is written after a pause
+in typing, 0.8 s, and at the latest 5 s into non-stop typing, saves run one at a time off the main thread, and a failed save is retried while the
+text is kept), `NoteDrafts` (below), and `NoteSessions` (the notes open for editing, shared by every window). In the app: an *Edit* tab (a plain `UITextView`
+on a session; the real editor is Step 6), flushing when the app resigns active, enters the background or terminates and when a window leaves the foreground, inside
+`beginBackgroundTask`, before a backup is made or a note trashed, and `@SceneStorage` for the open note, its tab and the caret.
+
+**The finding that shaped it: waiting for a pause is not enough.** The design said "debounce, and flush when the scene leaves the foreground". Measured, with the
+pause stretched to 30 seconds so that nothing else could save: a kill during the pause (`simctl terminate`, which runs nothing in the app, as iOS does
+when it ends an app that crashed or is being reclaimed) lost **everything typed in it**, and a kill in the middle of a slow burst of typing kept **1 of 26 characters**. So every
+edit is also written to a small file per note (`drafts/<id>.json`, coalesced and off the main thread: a newer text replaces one not yet written, so typing never waits for the disk), and the
+next launch puts what it finds into the database before listing the notes. With the draft, the same two kills lost nothing (all 26 of 26 characters kept). A draft is
+never applied to a note whose `uuid` differs, one that cannot be read is skipped, a restore deletes the drafts (they belong to the database it replaced), and a draft is
+removed when a save has what it holds.
+
+**Checks.** `AutosaveTests` (17, time moved by hand, plus a real-clock burst of 1,000 edits): saving after a pause and at the longest wait, flush, typing back to the stored text,
+typing during a save, a failing save, a note that is gone, recovery after a kill, drafts that are stale or cut off, a restore clearing them, two windows sharing one session,
+`flushAll`. Breaking the draft write, or the flush, makes them fail. `apps/ios/scripts/autosave-kill-test.sh` runs three cases in the Simulator, each from a fresh restore:
+**A** kill inside the pause (the note does not have the text, the draft does, and after a relaunch the note does); **B** send the app to the background inside the pause (the note has it at
+once, and after a kill and a relaunch); **C** kill during a slow burst (every character but, at most, the last). The typing is a Debug-only launch argument (`-autotype`) that calls
+`UITextView.insertText`, the keyboard's path. All three pass; with the draft write disabled A and C fail, with both flushes disabled B fails, so each check can fail. Typing with the
+Simulator's own keyboard also reached the note, and the frontmatter was reconciled as the desktop does.
+
+**State restoration.** After backgrounding the app and killing it, a plain relaunch came back on the same note in *Edit*. iOS saves a scene's state when the scene goes to the
+background, so a kill straight from the foreground restores nothing, and a force-quit from the app switcher discards it on purpose; that is the system's rule, not a bug here. The caret's
+offset is saved and applied, but only the note and the tab were checked.
+
+**The second window.** Several windows are not enabled in the target (no `UIApplicationSupportsMultipleScenes`; "open a note in another window" is *Later*, C5), so a second window was not
+tried. What is in place for it: one database pool for the whole app, and one shared `NoteSession` per open note, so two windows on one note keep one text and one saving and cannot overwrite each other
+(tested in the core with two holders). The text views of two windows hearing each other is built and untried.
+
+**Not done, or not known:** the iPad's own behaviour (jetsam, a real home-button press mid-word, the Pencil); a very large note's save time, which the draft write does not wait for but
+the database write does; and a draft for a note that is changed some other way before the next launch would overwrite it (nothing else changes notes yet).
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1240,6 +1277,11 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   notebooks, with the search index following, match the desktop's real `service.ts` over a 98-step script, and about a hundred of them go through the backup round
   trip, which the desktop still restores. Tracker rows updated (Frontmatter 🔨; the others note the core and stay ⬜ until they have a screen); the Yams dependency
   row struck out; R9 retired for the core. Nothing is verified on the device.
+
+- 2026-11-06: **Build plan Step 4, autosave and lifecycle (S6), done in the Simulator.** `NoteAutosaver`, `NoteDrafts` and `NoteSessions` in the core and a plain *Edit* tab in the prototype
+  (17 unit tests, and `autosave-kill-test.sh` in the Simulator). A kill during the pause before a save lost everything typed in it until every edit was also written to a draft file; with the
+  drafts, three ways of ending the app lose nothing. The lifecycle flush and state restoration (note, tab, caret) are in. Several windows are not enabled, so the second-window item is only covered in the
+  core. Nothing is verified on the iPad. Tracker rows for autosave and the app shell updated; S6 marked done in the Simulator.
 
 ## Sources
 

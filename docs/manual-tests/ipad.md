@@ -2,7 +2,8 @@
 
 A viewer on the Swift core, to try your own notes on the iPad before the real app exists. It can import a
 desktop backup, list and search the notes (typos included), draw a note's Markdown and the ten components (or show its source),
-use the Trash Can, and export a backup the desktop can restore. It cannot edit, show attachments, or draw ink: see
+use the Trash Can, and export a backup the desktop can restore. Since build plan Step 4 it has a **plain-text editor** (the *Edit*
+tab) that saves what you type, which is there to test saving, not to be the editor. It cannot show attachments, or draw ink: see
 [What it leaves out](#what-it-leaves-out). Design and status: [ipad-app-design.md](../ipad-app-design.md).
 
 **You have run it on your iPad with a backup of your real notes** (reported 2026-11-06). **The preview is newer than that run and has
@@ -87,9 +88,27 @@ Use a **Release** build (install step 6) for the numbers.
 
 What to tell me for each: what you did, what you expected, what happened, and Debug or Release.
 
+## Saving what you type (build plan Step 4, spike S6)
+
+The *Edit* tab beside *Preview* and *Source* is a plain text view on the note's text: no colours, no completion, nothing else (the real
+editor is Step 6). What you type is written to a small file at once, and into the notes after a pause of about a second (at the latest five seconds
+into non-stop typing), and every time the app is about to leave the front. In the Simulator, ending the app in the middle of typing lost nothing; these
+check it on the iPad. **Use a copy of your notes: this does edit them.**
+
+20. **Type, then leave.** In *Edit*, type a sentence and at once swipe up to the Home screen. Open the app again: the sentence is there, and so in *Preview*.
+21. **Type, then end the app at once.** Type a sentence and immediately swipe the app away in the app switcher (or hold the side button and restart the iPad, if you dare). Open the app:
+    an alert says the app was closed while you were typing, and the sentence is back. Tell me if any of it is missing, and how fast you were.
+22. **Type without stopping** for half a minute. Watch the list on the left: the note should move to the top, and its date change, *while* you are still typing (within about five seconds).
+23. **Edit, then look.** After a pause, *Preview* shows what you typed, and a search for a word you typed finds the note.
+24. **The frontmatter at the top of the note.** Change the `title:` line: after a pause the list shows the new title. Make it wrong (`title: [oops`): the title in the list stays as it was, and the text stays exactly as you typed it.
+25. **Back up right after typing.** Type a sentence, open the ⋯ menu at once and export a backup, and restore it in the desktop app: the sentence is in the note.
+26. **Come back to where you were.** Open a note, choose *Edit*, put the caret mid-note, press Home, then swipe the app away. Open it again from the Home screen: it should be on the same note, in *Edit*, with the caret about where it was.
+
+What to tell me for each: what you did, what you expected, what happened, and Debug or Release.
+
 ## What it leaves out
 
-Editing and autosave; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+Colour and completion in the editor, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
 the preview); groups and notebooks (notes are one flat list); the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
 are plain text, selecting text across blocks of the preview, and the video player of `<YouTube>`.
 
