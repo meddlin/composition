@@ -1,0 +1,21 @@
+{
+  "name": "composition-sync-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Self-hosted Composition sync server: Node 24, one SQLite file, no runtime dependencies",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node lean/main.ts",
+    "tokens": "node lean/tokens.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/contract.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "pnpm@11.0.3"
+}
