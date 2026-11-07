@@ -161,6 +161,22 @@ or group's sub-groups (tap one to go into it) and then its notes. For something 
 
 What to tell me for each: what you did, what you expected, what happened.
 
+## Pictures in a note (build plan Step 8)
+
+On the *Markdown* or *Split* tab, the **Image** button (a picture with a plus, beside Find) opens a menu: *Photo Library…*, *Take Photo…*, *Choose File…* and *Turn Images into Image Tags*. **Use a copy of your notes: this edits them, and every picture is copied into the app.**
+
+45. **A photo from the library.** Put the caret in a note, then Image, *Photo Library…*, and choose one or several (the picker holds up to ten). Each appears in the text as `![photo](app_data/…)` on a line of its own, after the frontmatter if the caret was in it, and the *Preview* shows it. Try a photo
+    taken with the camera app (HEIC): it must show correctly, the right way up, and the file the note points to ends in `.jpg`.
+46. **The camera.** *Take Photo…* opens the camera (it asks once for permission). The picture appears as in item 45, named `photo`. **Not tried in the Simulator.**
+47. **A file.** *Choose File…* picks one or more picture files from Files (also from iCloud Drive or a server). A PNG, a JPEG, a GIF and a WebP must come through unchanged; a file that is not a picture must say so and change nothing.
+48. **Paste.** Copy a picture (long-press one in Photos or Safari and choose Copy, or copy a screenshot), put the caret in a note and paste (⌘V or the edit menu): it comes in as in item 45, named `image`. Copy some cells from a spreadsheet and paste: that must still paste text.
+49. **Drop.** With Photos or Files beside this app (Split View or Slide Over), drag a picture onto the text: it goes in where you let go. **Not tried in the Simulator, which cannot drag between apps.**
+50. **Turn images into tags.** Put the caret on a `![…](app_data/…)` line (or select a few), then Image, *Turn Images into Image Tags* (⌘⇧X on a hardware keyboard): the line becomes `<Image src="…" alt="…" />` with the caret just before ` />`. Type ` width="50%"` and the *Preview* shows it at half the width. Undo takes it back in one step.
+51. **The same picture twice.** Add the same photo to the same note twice: the note then points at one file, not two. Add it to a different note: a second file, named for that note.
+52. **Back and forth with the desktop.** Make a backup (⋯, *Export a backup…*) and restore it in the desktop app: the pictures show in the notes there. Add a picture in the desktop app, make a backup there, restore it here: it shows here.
+
+What to tell me for each: what you did, what you expected, what happened.
+
 ## What it leaves out
 
 Completion, links, indenting and shortcuts in the editor, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in

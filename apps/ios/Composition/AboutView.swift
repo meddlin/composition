@@ -10,9 +10,9 @@ struct AboutView: View {
             Form {
                 Section("This build") {
                     LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (prototype)")
-                    LabeledContent("Does", value: "Browse, search, write, preview, organize, Trash Can, backups")
+                    LabeledContent("Does", value: "Browse, search, write, preview, organize, pictures, Trash Can, backups")
                     LabeledContent("Search forgives", value: "Typos, also in first letters and short words")
-                    LabeledContent("Does not yet", value: "Images, typing aids, themes, ink")
+                    LabeledContent("Does not yet", value: "Typing aids, themes, ink")
                 }
                 Section("Your notes") {
                     LabeledContent("Notes", value: "\(model.noteCount)")

@@ -14,7 +14,7 @@ trap 'rm -rf "$work"' EXIT
 
 "$here/make-organization-backup.sh" "$work/organization.tar.gz"
 cd "$here/.."
-TEST_RUNNER_COMPOSITION_UI_BACKUP="$work/organization.tar.gz" xcodebuild test \
+TEST_RUNNER_COMPOSITION_UI_BACKUP="$work/organization.tar.gz" TEST_RUNNER_COMPOSITION_UI_IMAGE="$here/../conformance/preview-showcase/demo-photo-0123456789ab.png" xcodebuild test \
   -project Composition.xcodeproj -scheme Composition -destination "platform=iOS Simulator,id=$udid" \
   -derivedDataPath "${IOS_DERIVED_DATA:-$work/dd}" -only-testing:"${IOS_UI_ONLY:-CompositionUITests}" \
   -test-timeouts-enabled YES -default-test-execution-time-allowance 240

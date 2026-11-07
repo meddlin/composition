@@ -1,5 +1,7 @@
 import CompositionCore
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// One note, with the three tabs of the design: **Markdown** (the editor), **Preview** (Markdown and the components, drawn from what is typed, not
 /// only from what is saved) and **Split** (both, side by side, or one above the other in a narrow window). The Live tab stays after v1 (C12).
@@ -17,6 +19,11 @@ struct NoteDetailView: View {
     @State private var handle = EditorHandle()
     @State private var focusOnOpen = false
     @State private var confirmingTrash = false
+    // Pictures for the note: from the Photos picker, a file, or the camera.
+    @State private var showingPhotos = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
+    @State private var showingFiles = false
+    @State private var showingCamera = false
 
     var body: some View {
         Group {
@@ -45,9 +52,34 @@ struct NoteDetailView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 if mode != .preview {
                     Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                    Menu {
+                        Button("Photo Library…", systemImage: "photo.on.rectangle") { showingPhotos = true }
+                        if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
+                        Button("Choose File…", systemImage: "folder") { showingFiles = true }
+                        Divider()
+                        Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
+                            .keyboardShortcut("x", modifiers: [.command, .shift])
+                    } label: {
+                        Label("Image", systemImage: "photo.badge.plus")
+                    }
                 }
                 Button("Move to Trash Can", systemImage: "trash") { confirmingTrash = true }
             }
+        }
+        .photosPicker(isPresented: $showingPhotos, selection: $pickedPhotos, maxSelectionCount: 10, matching: .images)
+        .onChange(of: pickedPhotos) { _, items in insertPhotos(items) }
+        .fileImporter(isPresented: $showingFiles, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): insertFiles(urls)
+            case .failure(let error): model.errorMessage = error.localizedDescription
+            }
+        }
+        .fullScreenCover(isPresented: $showingCamera) {
+            CameraView { image in
+                showingCamera = false
+                if let data = image?.jpegData(compressionQuality: 0.9) { handle.insertImages([ImageInput(data: data, fileName: "photo.jpg")]) }
+            }
+            .ignoresSafeArea()
         }
         .confirmationDialog("Move this note to the Trash Can?", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Move to Trash Can", role: .destructive) { Task { await model.moveToTrash(noteID) } }
@@ -76,6 +108,37 @@ struct NoteDetailView: View {
         focusOnOpen = model.takeFreshNote(noteID)
         if focusOnOpen { mode = .markdown }
         session = await model.openSession(noteID)
+        // What the editor needs to store a picture for this note.
+        handle.location = model.location
+        handle.noteTitle = { [session] in session.map { NoteFrontmatter.parse($0.text).frontmatter?.title ?? "" } ?? "" }
+        handle.problem = { [weak model] message in model?.errorMessage = message }
+    }
+
+    /// The pictures chosen in the Photos picker, as the bytes the library has (often HEIC, which becomes JPEG on the way in).
+    private func insertPhotos(_ items: [PhotosPickerItem]) {
+        guard !items.isEmpty else { return }
+        pickedPhotos = []
+        Task {
+            var pictures: [ImageInput] = []
+            for item in items {
+                if let data = try? await item.loadTransferable(type: Data.self) { pictures.append(ImageInput(data: data, fileName: "photo")) }
+            }
+            handle.insertImages(pictures)
+        }
+    }
+
+    /// Picture files chosen in the Files browser.
+    private func insertFiles(_ urls: [URL]) {
+        Task {
+            let pictures: [ImageInput] = await Task.detached {
+                urls.compactMap { url in
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                    return (try? Data(contentsOf: url)).map { ImageInput(data: $0, fileName: url.lastPathComponent) }
+                }
+            }.value
+            handle.insertImages(pictures)
+        }
     }
 
     private func close() {

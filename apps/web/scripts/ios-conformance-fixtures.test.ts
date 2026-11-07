@@ -40,6 +40,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *                                  build plan Step 1: favorites, themes and saved cities, and what parseWebSettings makes
  *                                  of each; and desktop-backup*.settings.json, the (non-default) settings the desktop
  *                                  backups carry
+ *   images-cases.json, images-expected.json
+ *                                  build plan Step 8: images, through the real sniffImage, imageFileName and storeImage
+ *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
+ *                                  imagesToMdx (imageToMdx.ts)
  *   organization-cases.json, organization-expected.json
  *                                  build plan Step 7: the pure rules behind the sidebar, run through the real navHistory.ts
  *                                  (record, back, forward), dropEdge.ts and groupListing.ts (buildGroupListing, groupPath)
@@ -777,6 +781,59 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     expect(expected.navHistory.length).toBe(cases.navHistory.length);
     expect(expected.groupListing.filter((l) => l !== null).length).toBeGreaterThan(50);
   }, 60_000);
+
+  it("writes the image cases and what the real images.ts, imageRefs.ts and imageToMdx.ts make of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/images-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      sniff: { hex: string }[];
+      fileName: { title: string; file: string; hex: string; ext: "png" | "jpg" | "gif" | "webp" }[];
+      store: { title: string; file: string; hex: string; maxBytes: number | null }[];
+      alt: { name: string }[];
+      markdown: { name: string; alt: string | null }[];
+      tag: { name: string }[];
+      refs: { text: string }[];
+      toMdx: { text: string; start: number; end: number }[];
+    };
+    const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
+    const images = await import(path.join(lib, "images"));
+    const refs = await import(path.join(lib, "imageRefs"));
+    const { imagesToMdx } = await import(path.resolve(__dirname, "../src/components/notes/mdx/imageToMdx"));
+
+    const stored = cases.store.map(({ title, file: fileName, hex, maxBytes }) => {
+      const folder = fs.mkdtempSync(path.join(os.tmpdir(), "composition-ios-images-"));
+      try {
+        const data = bytes(hex);
+        const result = images.storeImage(folder, { noteTitle: title, fileName, data }, maxBytes);
+        if (result.error !== undefined) return { error: result.error };
+        const written = fs.readFileSync(path.join(folder, "app_data", result.name));
+        const again = images.storeImage(folder, { noteTitle: title, fileName, data }, maxBytes);
+        return { name: result.name, size: written.byteLength, sha256: crypto.createHash("sha256").update(written).digest("hex"), reused: again.name === result.name };
+      } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+    });
+    const expected = {
+      sniff: cases.sniff.map(({ hex }) => images.sniffImage(bytes(hex))),
+      fileName: cases.fileName.map(({ title, file: fileName, hex, ext }) => images.imageFileName(title, fileName, bytes(hex), ext)),
+      store: stored,
+      alt: cases.alt.map(({ name }) => refs.imageAlt(name)),
+      markdown: cases.markdown.map(({ name, alt }) => refs.imageMarkdown(name, alt ?? undefined)),
+      tag: cases.tag.map(({ name }) => {
+        try {
+          return { tag: refs.imageTag(name) };
+        } catch (error) {
+          return { error: (error as Error).message };
+        }
+      }),
+      refs: cases.refs.map(({ text }) => [...refs.findImageRefs(text)].sort()),
+      toMdx: cases.toMdx.map(({ text, start, end }) => imagesToMdx(text, start, end)),
+    };
+    fs.copyFileSync(file, path.join(outDir!, "images-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "images-expected.json"), JSON.stringify(expected));
+    expect(expected.toMdx.filter((edit: unknown) => edit !== null).length).toBeGreaterThan(300);
+    expect(stored.filter((item) => item.name !== undefined).length).toBeGreaterThan(10);
+  }, 120_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
   //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)

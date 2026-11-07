@@ -549,7 +549,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Notebooks: switch, colours | 🔁 | M1 | 🔨 | Create, rename, order and delete match `notebooksRepo.ts` in the core; Step 7 draws them as the top level of the sidebar (a + button, a menu for rename, move up and down and delete, and drag to reorder from the list). **Colours are not built** (the desktop has none either) |
 | Favorites | 🔁 | M1 | 🔨 | The core stores them in `settings.json`, as the desktop does, and carries them through backups both ways ([build plan](ipad-build-plan.md), Step 1); Step 7 adds the screens: a Favorites entry in the sidebar, a star in the menu and on a swipe, pinned groups and notes listed in pin order |
 | Trash Can (60 days) | 🔁 | M1 | 🔨 | The core is checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)), and the prototype has its screen (swipe to trash, restore, delete for good), in the Simulator; attached files of purged notes are not removed |
-| Drag and drop of notes and groups | ⭐ | M1 | 🔨 | Native drag and drop (Step 7): a note onto a group or notebook, a group onto another group or notebook or between its siblings, in-list reordering by the system's own drag, and Markdown or text files and text selections dropped on a group or the list become notes. **Images and Photos come with Step 8.** Not tried with a finger or the Pencil, or with Files, which needs the iPad |
+| Drag and drop of notes and groups | ⭐ | M1 | 🔨 | Native drag and drop (Step 7; pictures dropped on the text came in Step 8): a note onto a group or notebook, a group onto another group or notebook or between its siblings, in-list reordering by the system's own drag, and Markdown or text files and text selections dropped on a group or the list become notes. **Pictures dropped on the editor's text (from Photos or Files) are stored and written in (Step 8; not tried, it needs another app).** Not tried with a finger or the Pencil, or with Files, which needs the iPad |
 | Home page (recent, pinned) | 🔁 | M3† | ⬜ | |
 | Heading rail | 🔁 | M3† | ⬜ | An outline popover or trailing rail |
 | Back and forward | 🔁 | M1 | 🔨 | The desktop's `navHistory.ts`, ported and checked against it (Step 7), behind two buttons and Cmd+[ and Cmd+]; not saved across launches, as on the desktop |
@@ -581,10 +581,10 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Tab and Shift+Tab indent | 🔁 | M1 | ⬜ | `UIKeyCommand` plus accessory-bar buttons |
 | `<` component, prop and value completion | 🔁 | M1 | 🔬 | Popover at `caretRect(for:)`. S3: the list opens at the caret, narrows as you type, flips above the caret near the keyboard, and inserts the tag with the caret inside; only the component names, not props or values |
 | Note links: `[[` and the picker | 🔁 | M1 | ⬜ | Popover; tap a link to open |
-| Insert a stored image | 🔁 | M1 | ⬜ | Picker sheet |
-| Paste an image | ⭐ | M1 | ⬜ | `UITextPasteDelegate` |
-| Add a photo, a camera shot or a file | ⭐ | M1 | ⬜ | `PHPickerViewController`, document picker; HEIC to JPEG ([C18](#compromise-register)) |
-| Markdown image to `<Image />`, and its width | 🔁 | M1 | ⬜ | Edit-menu action |
+| Insert a stored image | 🔁 | M1 | ⬜ | Picker sheet. **Not built:** Step 8 stores a new image each time one is chosen, and the desktop's list of images already stored (Shift+M) is not on the iPad yet |
+| Paste an image | ⭐ | M1 | 🔨 | The editor's `paste` takes pictures on the clipboard (as copied, their own PNG or JPEG bytes) when it holds no text; the Markdown goes in as a paragraph of its own, after the frontmatter if the caret is in it. Tried in the Simulator through a launch shortcut, not with a real clipboard |
+| Add a photo, a camera shot or a file | ⭐ | M1 | 🔨 | An *Image* menu on the Markdown and Split tabs: the system's Photos picker (up to ten at once), the Files browser, and the camera; HEIC and other formats become JPEG ([C18](#compromise-register)). Pictures can also be dropped on the text. **Tried in the Simulator: the Photos picker (two photos, one HEIC), a paste through the launch shortcut. Not tried: the camera (the Simulator offers it, I did not open it), Files, a drop from another app, a real clipboard** |
+| Markdown image to `<Image />`, and its width | 🔁 | M1 | 🔨 | The desktop's `imagesToMdx` ported and checked over 1,504 cursors and selections; an item of the *Image* menu and ⌘⇧X; the caret is left inside the tag, ready for ` width="50%"`. **A width control is not built** |
 | Highlight text with `<Mark>` | ⭐ | M1 | ⬜ | Edit-menu action in the editor *and* the preview; replaces right-click |
 | Ruler, reflow, editor and preview fonts | 🔁 | M3† | ⬜ | Port `liveReflow.ts` |
 | Header image | 🔁 | M3† | ⬜ | |
@@ -606,9 +606,9 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Stored images in `app_data/` | 🔁 | M1 | ⬜ | App container; same file names |
+| Stored images in `app_data/` | 🔁 | M1 | 🔨 | App container; the desktop's file names (`<note>-<name>-<hash>.<ext>`), format sniffing and store ported and checked against the desktop's own functions (Step 8); they go into a backup and come out of it |
 | Images page: browse, reuse, find unused | 🔁 | M3† | ⬜ | |
-| Image size limit | 🔁 | M1 | ⬜ | None, as on desktop; the data stays on the device |
+| Image size limit | 🔁 | M1 | 🔨 | None, as on the desktop app; a 4 MB photo went in and out in the Simulator |
 | Attachments | ⭐ | Later | ⬜ | Document picker, share sheet, Quick Look |
 | Backup and restore | 🔁 | M1 | 🔨 | The core (create, stage, apply with rollback) is checked against the desktop both ways ([S1 status](#s1-status)); the prototype imports through the system file picker and exports through the share sheet. The Simulator ran the export and a debug-launch import; choosing a file in the picker is untested ([C14](#compromise-register)) |
 
@@ -1193,6 +1193,26 @@ in portrait. **UI tests (XCUITest), the first of the project:** `apps/ios/Compos
 **Not done, or not known:** the iPad (touch and the Pencil, Files, VoiceOver and Dynamic Type for the new rows, the third-width window), the notes' sort order and date display (the desktop has both, in a per-viewer setting), notebook colours (the desktop has none), "Open in New Window", dragging notes and groups *out* to other apps (as Markdown or a link), moving a note up
 or down by menu (groups and notebooks have it; a note is moved by dragging), selecting several notes, and a landing page ("Home") for when nothing is selected. The tree is re-read from the database after every change, which is instant for the test notes and has not been timed for tens of thousands.
 
+### Step 8 status
+
+**Built and checked 2026-11-07 in the iPad Pro 11-inch (M5) Simulator; not on an iPad.** Build plan Step 8: images.
+
+**What it is.** The Markdown and Split tabs have an **Image** menu: *Photo Library…* (the system's picker, up to ten photos at once, and the app is given only what is chosen), *Take Photo…*, *Choose File…* and *Turn Images into Image Tags* (⌘⇧X). A picture also arrives by paste (when the clipboard holds
+pictures and no text) and by being dropped on the text. Whichever way, it is made into bytes the desktop can show (PNG, JPEG, GIF and WebP go in as they are; a HEIC photo and anything else the system can read becomes JPEG at quality 0.9, C18), stored in `app_data/` under the desktop's name
+(`<note title>-<file name>-<12 hex digits of the SHA-256>.<ext>`, so the same picture added to the same note twice is one file), and written into the note as `![name](app_data/…)`. The preview already drew `app_data/` pictures; it now shows the new one as the note is typed. There is **no size limit**, as on the desktop app.
+
+**Decisions made while building (say if you disagree).** (1) A picture goes in as a **paragraph of its own**, with a blank line before and after as needed; the desktop puts the Markdown exactly at the caret. The iPad's preview draws a picture that stands alone and shows only the alt text of one inside a line (an early test, which glued
+a picture to the next sentence, showed the word "photo" in italics where the picture should be). (2) It never goes into the **frontmatter**: a note opens with the caret at its start, which is inside it, so the picture goes just after it. (3) Photos from the library are named `photo` (the picker gives no file name), a file by its own name, a paste `image`; the alt text is that name.
+(4) The Photos picker, not a permission to read the whole library, so no prompt and nothing else is seen. (5) *Turn Images into Image Tags* needs the caret on the picture's Markdown (as on the desktop), so after an insert the caret is below the picture, ready to carry on writing.
+
+**Checks.** The pure parts were ported with an oracle: the desktop's `sniffImage`, `imageFileName` and `storeImage` (run for real, into a folder, twice), `imageAlt`, `imageMarkdown`, `imageTag`, `findImageRefs` and `imagesToMdx` are run over `apps/ios/conformance/images-cases.json` (75 byte strings, 160 names with accents, full-width letters, emoji,
+slashes and odd extensions, 24 stores, 19 names, 11 notes, and **1,504 cursors and selections** over 29 texts and 120 random ones, with fences, code spans, escapes, ampersands, quotes and emoji), and Swift gives every answer; breaking each of five details makes the check fail (a leading dash, the JPEG signature, the hash length, skipping code, escaping a quote). A found-and-fixed bug:
+the first port put a dash at the front of a name that started with punctuation. A stored picture goes into a backup and comes out of it (a unit test through `Backup.create` and `stage`). By hand in the Simulator: a PNG and a HEIC through the launch shortcut (`-pasteImage`, which does what choosing or pasting that file does; the HEIC came out as a JPEG), two photos chosen
+in the system's Photos picker (a 4.1 MB JPEG and the HEIC), and *Turn Images into Image Tags* from the menu (the tag came out as the desktop writes it). A UI test (`ImagesUITests`) checks the stored picture, its Markdown after the frontmatter, and the preview showing it.
+
+**Not done, or not known:** the iPad (the camera, Files, a real clipboard, a drop from another app, large photos and many of them), choosing a picture that is already stored (the desktop's Shift+M list), the Images page (browse, find unused: M3†), the header image, attachments, a control for the width of an `<Image />` (type it), editing a picture's alt text from the preview, and
+clearing out files that no note uses any more.
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1235,8 +1255,8 @@ final pass on the device is yours.
   `swift test`: migrations from each earlier schema (the intent of `db.test.ts`), the operation scripts, FTS5
   queries, the C1 corpus, backup round trips.
 - **The conformance corpus** runs on both sides ([Keeping two implementations honest](#keeping-two-implementations-honest)).
-- **UI:** XCUITest for the main flows (the first nine are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
-  favorites, back and forward, and a drag of a note onto a group), snapshot tests for the ten components in the six schemes, Instruments for
+- **UI:** XCUITest for the main flows (the first ten are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
+  favorites, back and forward, a drag of a note onto a group, and a picture put in a note), snapshot tests for the ten components in the six schemes, Instruments for
   typing and ink latency.
 - **A manual test page,** `docs/manual-tests/ipad.md`, written when something is built: install, create and
   search a note, every MDX component, Scribble, ink, backup and restore to and from the desktop, background
@@ -1405,6 +1425,8 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   About screen's lists of what the build does were out of date and are corrected. Nothing is verified on the iPad.
 - 2026-11-06: **Build plan Step 7, organization, done in the Simulator.** Three columns: a sidebar of All Notes, Favorites and notebooks with their group trees, a list of the sub-groups and notes of what is selected, and the note. Create, rename, delete, move and reorder for groups and notebooks, favorites in `settings.json`, drag and drop
   between the columns and in a list, text files dropped in become notes, back and forward (⌘[ and ⌘]), and the place restored after a relaunch. The desktop's `navHistory.ts`, `dropEdge.ts` and `groupListing.ts` ported and checked against it. The project's first XCUITests. Tracker rows for groups, notebooks, favorites, drag and drop, back and forward and columns updated. Not tried on the iPad.
+- 2026-11-07: **Build plan Step 8, images, done in the Simulator.** An *Image* menu (Photos picker, camera, file, turn images into tags), paste and drop of pictures, HEIC to JPEG (C18), stored in `app_data/` under the desktop's names. The desktop's `sniffImage`, `imageFileName`, `storeImage`, `imageAlt`, `imageMarkdown`, `imageTag`, `findImageRefs` and `imagesToMdx` ported and checked against it
+  (`images-cases.json`). Tracker rows for stored images, size limit, paste, add a photo or file, and Markdown image to tag updated. Not tried on the iPad, and the camera, Files and a drop from another app not tried at all.
 
 ## Sources
 
