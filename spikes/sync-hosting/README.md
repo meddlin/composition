@@ -26,7 +26,8 @@ decided. Nothing here touches `apps/`, the root `package.json`, `scripts/` or an
 | `protocol/client/` | The simulated device (outbox, same-batch retry, conflict copies, epoch resync), HTTP transport, hint sources (SSE, Convex live query, poll) and fault injection. |
 | `protocol/scenarios/` | The scenarios and the runner (`pnpm scenario`). |
 | `core/` | The shared Node server: auth, routing, `/v1/sync`, SSE hints, and the storage interface. |
-| `lean/` | SQLite adapter, Dockerfile, entrypoint (restore from the replica, rotate the epoch), Litestream config, `fly.toml`, a compose file with an S3 mock. |
+| `lean/` | SQLite adapter, device-token store and `tokens.ts` CLI, Dockerfile, entrypoint (restore from the replica or a backup folder, rotate the epoch), Litestream configs, `fly.toml`, a compose file with an S3 mock. |
+| `selfhost/` | The lean server as a container for a personal server: [compose file, optional HTTPS, guide](selfhost/README.md), and two checks. |
 | `postgres/` | Postgres adapter, Dockerfile, `fly.toml`, a compose file for a local Postgres. |
 | `convex/` | The Convex functions (`functions/`), and [FINDINGS.md](convex/FINDINGS.md) (backups, export, regions, terms, serializability). |
 | `harness/` | The two-device page. |

@@ -3,6 +3,7 @@
 // BEGIN IMMEDIATE ... COMMIT: versions come out gap-free with no lock to engineer (design: "How the lean
 // setup works"). The async interface is only there so the Postgres adapter can share it.
 
+import { createHash, randomBytes } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { BATCH_RETENTION_MS, newEpoch, type PullPage, type SyncStorage } from "../core/storage.ts";
 import type { Applied, Conflict, ParsedChange, PushResult, StoredRecord } from "../protocol/types.ts";
@@ -57,6 +58,13 @@ export class SqliteStorage implements SyncStorage {
         PRIMARY KEY (user_id, entity, uuid)
       ) WITHOUT ROWID;
       CREATE UNIQUE INDEX IF NOT EXISTS records_by_version ON records (user_id, version);
+      CREATE TABLE IF NOT EXISTS devices (
+        token_hash TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        device TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        revoked_at INTEGER
+      ) WITHOUT ROWID;
       CREATE TABLE IF NOT EXISTS batches (
         user_id TEXT NOT NULL,
         batch_id TEXT NOT NULL,
@@ -182,6 +190,56 @@ export class SqliteStorage implements SyncStorage {
     }
     const next = this.db.prepare("SELECT 1 AS x FROM records WHERE user_id = ? AND version > ? LIMIT 1").get(userId, from);
     return { records, more: next !== undefined, head };
+  }
+
+  // ── device tokens (self-hosting) ───────────────────────────────────────────
+  // A token is 256 random bits shown once; only its SHA-256 is stored. With a secret that long a fast hash is enough,
+  // and a stolen database file does not hand out working credentials.
+
+  private static hash(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
+  }
+
+  async authenticate(token: string): Promise<{ user: string; device: string } | null> {
+    const row = this.db.prepare("SELECT user_id, device FROM devices WHERE token_hash = ? AND revoked_at IS NULL").get(SqliteStorage.hash(token)) as
+      | { user_id: string; device: string }
+      | undefined;
+    return row ? { user: row.user_id, device: row.device } : null;
+  }
+
+  /** Creates a device token and returns it. This is the only time it exists in the clear. */
+  addDevice(user: string, device: string): { token: string; id: string } {
+    const token = `cst_${randomBytes(32).toString("base64url")}`;
+    const hash = SqliteStorage.hash(token);
+    this.db.prepare("INSERT INTO devices (token_hash, user_id, device, created_at) VALUES (?, ?, ?, ?)").run(hash, user, device, Date.now());
+    return { token, id: hash.slice(0, 8) };
+  }
+
+  listDevices(): { id: string; user: string; device: string; createdAt: string; revokedAt: string | null }[] {
+    const rows = this.db.prepare("SELECT token_hash, user_id, device, created_at, revoked_at FROM devices ORDER BY created_at").all() as {
+      token_hash: string;
+      user_id: string;
+      device: string;
+      created_at: number;
+      revoked_at: number | null;
+    }[];
+    return rows.map((r) => ({
+      id: r.token_hash.slice(0, 8),
+      user: r.user_id,
+      device: r.device,
+      createdAt: new Date(r.created_at).toISOString(),
+      revokedAt: r.revoked_at === null ? null : new Date(r.revoked_at).toISOString(),
+    }));
+  }
+
+  /** Revokes by the short id from `list`. Returns how many devices it matched. */
+  revokeDevice(id: string): number {
+    if (!/^[0-9a-f]{8}$/.test(id)) return 0;
+    return Number(this.db.prepare("UPDATE devices SET revoked_at = ? WHERE token_hash LIKE ? AND revoked_at IS NULL").run(Date.now(), `${id}%`).changes);
+  }
+
+  activeDeviceCount(): number {
+    return (this.db.prepare("SELECT COUNT(*) AS n FROM devices WHERE revoked_at IS NULL").get() as { n: number }).n;
   }
 
   async resetUser(userId: string): Promise<void> {

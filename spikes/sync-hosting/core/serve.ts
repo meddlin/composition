@@ -8,10 +8,12 @@ import type { ServerKind } from "../protocol/types.ts";
 export async function serve(kind: ServerKind, storage: SyncStorage, defaultPort: number): Promise<void> {
   const port = Number(process.env.PORT ?? defaultPort);
   const quiet = process.env.LOG === "0";
+  const staticTokens = process.env.SYNC_DEV_TOKENS ? parseTokens(process.env.SYNC_DEV_TOKENS) : undefined;
+  if (!staticTokens && !storage.authenticate) throw new Error("SYNC_DEV_TOKENS is not set (run `pnpm gen-tokens`) and this storage keeps no tokens of its own");
   const app = await createApp({
     kind,
     storage,
-    tokens: parseTokens(process.env.SYNC_DEV_TOKENS),
+    tokens: staticTokens,
     adminToken: process.env.SYNC_ADMIN_TOKEN,
     log: quiet ? undefined : (line) => console.log(JSON.stringify({ t: new Date().toISOString(), ...line })),
   });

@@ -10,4 +10,7 @@ mkdirSync(dirname(dbPath), { recursive: true });
 
 const storage = new SqliteStorage(dbPath);
 await storage.init();
+if (!process.env.SYNC_DEV_TOKENS && storage.activeDeviceCount() === 0) {
+  console.log(JSON.stringify({ ev: "no-devices", hint: "no device can sign in yet: run `node lean/tokens.ts add <user> <device>` (in a container: docker compose exec sync node lean/tokens.ts add <user> <device>)" }));
+}
 await serve("lean", storage, 8787);

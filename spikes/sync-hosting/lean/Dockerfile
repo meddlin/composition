@@ -23,8 +23,16 @@ COPY core ./core
 COPY protocol/types.ts protocol/validate.ts protocol/b64.ts ./protocol/
 COPY lean ./lean
 COPY lean/litestream.yml /etc/litestream.yml
+COPY lean/litestream-file.yml /etc/litestream-file.yml
 RUN chmod +x lean/entrypoint.sh
 
 ENV DB_PATH=/data/sync.db PORT=8080
 EXPOSE 8080
+VOLUME ["/data"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+LABEL org.opencontainers.image.title="Composition sync server (lean)" \
+      org.opencontainers.image.description="One Node process and one SQLite file, replicated by Litestream"
+# Stop gracefully so Litestream flushes its last second of changes.
+STOPSIGNAL SIGTERM
 ENTRYPOINT ["/app/lean/entrypoint.sh"]

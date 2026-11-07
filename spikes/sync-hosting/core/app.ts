@@ -28,8 +28,8 @@ export interface Identity {
 export interface AppOptions {
   kind: ServerKind;
   storage: SyncStorage;
-  /** token -> identity. Static dev tokens; sign-in is spike S4. */
-  tokens: Record<string, Identity>;
+  /** token -> identity. Static dev tokens from the environment; sign-in is spike S4. The storage may also know tokens. */
+  tokens?: Record<string, Identity>;
   adminToken?: string;
   log?: (line: Record<string, unknown>) => void;
   heartbeatMs?: number;
@@ -96,10 +96,10 @@ export async function createApp(opts: AppOptions): Promise<App> {
   let epoch = await storage.epoch();
   const streams = new Set<http.ServerResponse>();
 
-  function identify(req: http.IncomingMessage): Identity {
-    const header = req.headers.authorization ?? "";
-    const m = /^Bearer (.+)$/.exec(header);
-    const id = m ? opts.tokens[m[1]!] : undefined;
+  async function identify(req: http.IncomingMessage): Promise<Identity> {
+    const m = /^Bearer (.+)$/.exec(req.headers.authorization ?? "");
+    const token = m?.[1];
+    const id = token ? (opts.tokens?.[token] ?? (await storage.authenticate?.(token)) ?? undefined) : undefined;
     if (!id) throw new ProtocolError(401, "unauthorized", "missing or unknown token");
     return id;
   }
@@ -135,7 +135,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
   }
 
   async function handleSync(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const id = identify(req);
+    const id = await identify(req);
     const started = performance.now();
     let json: unknown;
     try {
@@ -199,7 +199,7 @@ export async function createApp(opts: AppOptions): Promise<App> {
   }
 
   async function handleEvents(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-    const id = identify(req);
+    const id = await identify(req);
     res.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-store",

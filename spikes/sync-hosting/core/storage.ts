@@ -32,6 +32,12 @@ export interface SyncStorage {
   /** Records with version > cursor in ascending order, up to `limit` records or `maxBytes` payload bytes. */
   pull(userId: string, cursor: number, limit: number, maxBytes: number): Promise<PullPage>;
 
+  /**
+   * Optional: look up a device token the storage itself holds (the lean server keeps hashed tokens in its database, so
+   * they are backed up and restored with the data). Absent on storages that rely on the environment's static tokens.
+   */
+  authenticate?(token: string): Promise<{ user: string; device: string } | null>;
+
   /** Dev only: delete one user's records, counter and retry records. */
   resetUser(userId: string): Promise<void>;
 

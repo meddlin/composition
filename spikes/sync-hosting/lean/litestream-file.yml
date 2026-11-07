@@ -1,0 +1,8 @@
+# Replicates the SQLite file to a folder: a second disk, a NAS mount, a USB drive. Used when LITESTREAM_FILE_PATH is set
+# and no S3 bucket is configured (see entrypoint.sh).
+dbs:
+  - path: ${DB_PATH}
+    replica:
+      type: file
+      path: ${LITESTREAM_FILE_PATH}
+      sync-interval: 1s
