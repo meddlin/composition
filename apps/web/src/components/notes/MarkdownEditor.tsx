@@ -21,6 +21,7 @@ import { highlightRange, removeHighlight, type TextRange } from "./highlightText
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
+import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
 import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
 import { useWriting } from "./WritingProvider";
 import { wrapsBeforeColumn } from "./wrapsBeforeColumn";
@@ -83,8 +84,8 @@ type Props = {
 
 const NO_NOTES: readonly Note[] = [];
 
-/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX and the diagram editor. */
-const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT}`;
+/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram editor and indenting lines. */
+const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT}`;
 
 export function MarkdownEditor({
   noteId,
@@ -382,6 +383,40 @@ export function MarkdownEditor({
       return;
     }
     features.onKeyDown(event);
+    if (event.defaultPrevented || event.isComposing || readOnly) return;
+    // Tab over several lines, Shift+Tab over several, and Ctrl+] / Ctrl+[ anywhere: the lines move, not the selection's text.
+    const { start, end } = surface.selection();
+    const text = surface.text();
+    const command = indentCommandFor(event, text, { start, end });
+    if (!command) return;
+    event.preventDefault();
+    const edit = indentLines(text, start, end, command);
+    if (edit) applyIndent(edit);
+  }
+
+  /** Swaps the lines for their indented (or outdented) copy and reselects them. */
+  function applyIndent(edit: IndentEdit) {
+    const view = showLive ? liveView.current : null;
+    if (view) {
+      view.dispatch({
+        changes: { from: edit.start, to: edit.end, insert: edit.text },
+        selection: { anchor: edit.selection.start, head: edit.selection.end },
+        scrollIntoView: true,
+        userEvent: "input.indent",
+      });
+      return;
+    }
+    const el = textarea.current;
+    if (!el) return;
+    const { start, end, insert } = changedSpan(el.value.slice(edit.start, edit.end), edit.text);
+    // execCommand keeps the browser's undo history; it is missing or refused in some environments.
+    el.setSelectionRange(edit.start + start, edit.start + end);
+    if (document.execCommand?.("insertText", false, insert)) {
+      el.setSelectionRange(edit.selection.start, edit.selection.end);
+      return;
+    }
+    pendingSelection.current = edit.selection;
+    replaceText(edit.start, edit.end, edit.text);
   }
 
   /** A textarea moves focus on Tab; in a writing surface it should type a tab (for nested list items, say). */

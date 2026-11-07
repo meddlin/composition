@@ -40,8 +40,10 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { combos: [["Mod", "Shift", "X"]], description: "Turn the Markdown image at the caret (or in the selection) into an <Image /> tag, which can be resized" },
       { combos: [["Mod", "F"]], description: "Find in the note" },
       { combos: [["Mod", "Shift", "L"]], description: "Open the AI helper beside the note (on the web, again to close it)" },
-      { combos: [["Tab"]], description: "Insert a tab (nested list items, code)" },
-      { combos: [["Shift", "Tab"]], description: "Leave the editor" },
+      { combos: [["Tab"]], description: "Insert a tab (nested list items, code); with several lines selected, indent each of them" },
+      { combos: [["Shift", "Tab"]], description: "Leave the editor; with several lines selected, outdent each of them" },
+      { combos: [["Ctrl", "]"]], description: "Indent the line at the caret, or every line in the selection (Ctrl on a Mac too, since Cmd+] is Forward)" },
+      { combos: [["Ctrl", "["]], description: "Outdent the line at the caret, or every line in the selection" },
     ],
   },
   {
