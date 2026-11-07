@@ -1,0 +1,340 @@
+{
+  "about": "Criteria, lookup, rounding and date behaviours, each run in real Microsoft Excel. 'formula' uses {NAME} for a range from 'layout'; 'excel' is what Excel returned (errors as their names). Meant as test cases for our own formula engine.",
+  "excelVersion": "16.114.4 (Microsoft Excel for Mac, run 2026-11-07)",
+  "layout": {
+    "A": {
+      "range": "$A$1:$A$5",
+      "cells": [
+        {
+          "addr": "A1",
+          "value": "Apple"
+        },
+        {
+          "addr": "A2",
+          "value": "apple"
+        },
+        {
+          "addr": "A3",
+          "value": "Banana"
+        },
+        {
+          "addr": "A4",
+          "value": "Cherry"
+        },
+        {
+          "addr": "A5",
+          "value": "Avocado"
+        }
+      ]
+    },
+    "B": {
+      "range": "$B$1:$B$5",
+      "cells": [
+        {
+          "addr": "B1",
+          "value": 10
+        },
+        {
+          "addr": "B2",
+          "value": 20
+        },
+        {
+          "addr": "B3",
+          "value": 30
+        },
+        {
+          "addr": "B4",
+          "value": 40
+        },
+        {
+          "addr": "B5",
+          "value": 50
+        }
+      ]
+    },
+    "C": {
+      "range": "$C$1:$C$4",
+      "cells": [
+        {
+          "addr": "C1",
+          "value": 1
+        },
+        {
+          "addr": "C2",
+          "value": "1",
+          "text": true
+        },
+        {
+          "addr": "C3",
+          "value": 2
+        },
+        {
+          "addr": "C4",
+          "value": "2",
+          "text": true
+        }
+      ]
+    },
+    "WILD": {
+      "range": "$D$1:$D$3",
+      "cells": [
+        {
+          "addr": "D1",
+          "value": "a*b"
+        },
+        {
+          "addr": "D2",
+          "value": "aXb"
+        },
+        {
+          "addr": "D3",
+          "value": "ab"
+        }
+      ]
+    },
+    "TXT": {
+      "range": "$E$1:$E$3",
+      "cells": [
+        {
+          "addr": "E1",
+          "value": 10
+        },
+        {
+          "addr": "E2",
+          "value": "20",
+          "text": true
+        },
+        {
+          "addr": "E3",
+          "value": 30
+        }
+      ]
+    },
+    "SAME": {
+      "range": "$F$1:$F$3",
+      "cells": [
+        {
+          "addr": "F1",
+          "value": "a"
+        },
+        {
+          "addr": "F2",
+          "value": "a"
+        },
+        {
+          "addr": "F3",
+          "value": "a"
+        }
+      ]
+    },
+    "T": {
+      "range": "$G$1:$H$3",
+      "cells": [
+        {
+          "addr": "G1",
+          "value": "West"
+        },
+        {
+          "addr": "H1",
+          "value": 1140
+        },
+        {
+          "addr": "G2",
+          "value": "East"
+        },
+        {
+          "addr": "H2",
+          "value": 760
+        },
+        {
+          "addr": "G3",
+          "value": "North"
+        },
+        {
+          "addr": "H3",
+          "value": 500
+        }
+      ]
+    },
+    "TA": {
+      "range": "$G$1:$G$3",
+      "cells": []
+    },
+    "TB": {
+      "range": "$H$1:$H$3",
+      "cells": []
+    }
+  },
+  "cases": [
+    {
+      "label": "SUMIFS text, case-insensitive",
+      "formula": "SUMIFS({B},{A},\"apple\")",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS wildcard *",
+      "formula": "SUMIFS({B},{A},\"A*\")",
+      "excel": 80
+    },
+    {
+      "label": "SUMIFS wildcard ?",
+      "formula": "SUMIFS({B},{A},\"?pple\")",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS <> text",
+      "formula": "SUMIFS({B},{A},\"<>apple\")",
+      "excel": 120
+    },
+    {
+      "label": "SUMIFS >25",
+      "formula": "SUMIFS({B},{B},\">25\")",
+      "excel": 120
+    },
+    {
+      "label": "SUMIFS two numeric criteria",
+      "formula": "SUMIFS({B},{B},\">=20\",{B},\"<50\")",
+      "excel": 90
+    },
+    {
+      "label": "SUMIFS criteria is a number",
+      "formula": "SUMIFS({B},{B},30)",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS ignores text in sum range",
+      "formula": "SUMIFS({TXT},{SAME},\"a\")",
+      "excel": 40
+    },
+    {
+      "label": "SUMIFS mismatched range sizes",
+      "formula": "SUMIFS({B},{SAME},\"a\")",
+      "excel": "#VALUE!"
+    },
+    {
+      "label": "SUMIF arg order (range,crit,sum)",
+      "formula": "SUMIF({A},\"A*\",{B})",
+      "excel": 80
+    },
+    {
+      "label": "COUNTIF number matches text '1' too",
+      "formula": "COUNTIF({C},1)",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF >1 ignores text '2'",
+      "formula": "COUNTIF({C},\">1\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF ~* escapes wildcard",
+      "formula": "COUNTIF({WILD},\"a~*b\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIFS two criteria",
+      "formula": "COUNTIFS({A},\"A*\",{B},\">10\")",
+      "excel": 2
+    },
+    {
+      "label": "AVERAGEIFS",
+      "formula": "AVERAGEIFS({B},{A},\"A*\")",
+      "excel": 26.666666666667
+    },
+    {
+      "label": "AVERAGEIFS no match",
+      "formula": "AVERAGEIFS({B},{A},\"zzz\")",
+      "excel": "#DIV/0!"
+    },
+    {
+      "label": "MAXIFS",
+      "formula": "MAXIFS({B},{A},\"A*\")",
+      "excel": 50
+    },
+    {
+      "label": "VLOOKUP exact",
+      "formula": "VLOOKUP(\"East\",{T},2,FALSE)",
+      "excel": 760
+    },
+    {
+      "label": "VLOOKUP exact, missing",
+      "formula": "VLOOKUP(\"South\",{T},2,FALSE)",
+      "excel": "#N/A"
+    },
+    {
+      "label": "XLOOKUP",
+      "formula": "XLOOKUP(\"East\",{TA},{TB})",
+      "excel": 760
+    },
+    {
+      "label": "XLOOKUP not found + default",
+      "formula": "XLOOKUP(\"South\",{TA},{TB},\"none\")",
+      "excel": "none"
+    },
+    {
+      "label": "XLOOKUP wildcard mode",
+      "formula": "XLOOKUP(\"N*\",{TA},{TB},,2)",
+      "excel": 500
+    },
+    {
+      "label": "INDEX/MATCH",
+      "formula": "INDEX({TB},MATCH(\"North\",{TA},0))",
+      "excel": 500
+    },
+    {
+      "label": "IFERROR around #N/A",
+      "formula": "IFERROR(VLOOKUP(\"zz\",{T},2,FALSE),\"x\")",
+      "excel": "x"
+    },
+    {
+      "label": "ROUND half away from zero",
+      "formula": "ROUND(2.5,0)",
+      "excel": 3
+    },
+    {
+      "label": "ROUND negative half",
+      "formula": "ROUND(-2.5,0)",
+      "excel": -3
+    },
+    {
+      "label": "ROUND(1.005,2) -> 1.01 in Excel",
+      "formula": "ROUND(1.005,2)",
+      "excel": 1.01
+    },
+    {
+      "label": "ROUND(2.675,2) -> 2.68 in Excel",
+      "formula": "ROUND(2.675,2)",
+      "excel": 2.68
+    },
+    {
+      "label": "SUM ignores text in a range",
+      "formula": "SUM({TXT})",
+      "excel": 40
+    },
+    {
+      "label": "AVERAGE ignores text in a range",
+      "formula": "AVERAGE({TXT})",
+      "excel": 20
+    },
+    {
+      "label": "COUNT counts numbers only",
+      "formula": "COUNT({C})",
+      "excel": 2
+    },
+    {
+      "label": "TEXT(0.256,\"0.0%\")",
+      "formula": "TEXT(0.256,\"0.0%\")",
+      "excel": "25.6%"
+    },
+    {
+      "label": "DATE(2026,3,4) serial",
+      "formula": "DATE(2026,3,4)",
+      "excel": 46085
+    },
+    {
+      "label": "EOMONTH serial",
+      "formula": "EOMONTH(DATE(2026,2,10),0)",
+      "excel": 46081
+    }
+  ]
+}
