@@ -38,6 +38,8 @@ export const SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
       { combos: [["Mod", "Shift", "K"]], description: "Link to another note" },
       { combos: [["Mod", "Shift", "M"]], description: "Insert an image that is already stored (type to filter by name)" },
       { combos: [["Mod", "Shift", "X"]], description: "Turn the Markdown image at the caret (or in the selection) into an <Image /> tag, which can be resized" },
+      { combos: [["Mod", "B"]], description: "Make the selected text bold (again to take it off)" },
+      { combos: [["Mod", "I"]], description: "Make the selected text italic (again to take it off)" },
       { combos: [["Mod", "F"]], description: "Find in the note" },
       { combos: [["Mod", "Shift", "L"]], description: "Open the AI helper beside the note (on the web, again to close it)" },
       { combos: [["Tab"]], description: "Insert a tab (nested list items, code); with several lines selected, indent each of them" },

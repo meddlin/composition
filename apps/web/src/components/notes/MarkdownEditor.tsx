@@ -21,6 +21,7 @@ import { highlightRange, removeHighlight, type TextRange } from "./highlightText
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
+import { BOLD_SHORTCUT, emphasisFor, ITALIC_SHORTCUT, toggleEmphasis } from "./emphasis";
 import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
 import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
 import { useWriting } from "./WritingProvider";
@@ -84,8 +85,8 @@ type Props = {
 
 const NO_NOTES: readonly Note[] = [];
 
-/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram editor and indenting lines. */
-const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT}`;
+/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram editor, indenting lines and bold and italic. */
+const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT} ${BOLD_SHORTCUT} ${ITALIC_SHORTCUT}`;
 
 export function MarkdownEditor({
   noteId,
@@ -384,6 +385,17 @@ export function MarkdownEditor({
     }
     features.onKeyDown(event);
     if (event.defaultPrevented || event.isComposing || readOnly) return;
+    // Cmd/Ctrl+B and Cmd/Ctrl+I over a selection: the browsers' own uses of them (bookmarks, page info) are not wanted here.
+    const emphasis = emphasisFor(event);
+    if (emphasis) {
+      const { start, end } = surface.selection();
+      const edit = toggleEmphasis(surface.text(), start, end, emphasis);
+      // With nothing selected there is nothing to mark, and the key is left for the browser.
+      if (!edit) return;
+      event.preventDefault();
+      applyEdit(edit, "input.emphasis");
+      return;
+    }
     // Tab over several lines, Shift+Tab over several, and Ctrl+] / Ctrl+[ anywhere: the lines move, not the selection's text.
     const { start, end } = surface.selection();
     const text = surface.text();
@@ -391,18 +403,18 @@ export function MarkdownEditor({
     if (!command) return;
     event.preventDefault();
     const edit = indentLines(text, start, end, command);
-    if (edit) applyIndent(edit);
+    if (edit) applyEdit(edit, "input.indent");
   }
 
-  /** Swaps the lines for their indented (or outdented) copy and reselects them. */
-  function applyIndent(edit: IndentEdit) {
+  /** Swaps the span for its edited copy (indented lines, a bold selection) and reselects as the edit says. */
+  function applyEdit(edit: IndentEdit, userEvent: string) {
     const view = showLive ? liveView.current : null;
     if (view) {
       view.dispatch({
         changes: { from: edit.start, to: edit.end, insert: edit.text },
         selection: { anchor: edit.selection.start, head: edit.selection.end },
         scrollIntoView: true,
-        userEvent: "input.indent",
+        userEvent,
       });
       return;
     }
