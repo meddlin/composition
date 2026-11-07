@@ -37,8 +37,9 @@ account-based, record-level sync service**, and it changes the schema the iPad's
   must be syncing before release to other users** (D10). See [Using Clerk](#using-clerk),
   [End-to-end encryption](#end-to-end-encryption), [Hosted now, self-hosted later](#hosted-now-self-hosted-later) and
   [Fast follow](#fast-follow-attachments-and-plugin-data).
-- **Still open:** [D3](#decisions) (managed Postgres, the lean SQLite setup or Convex for the hosted service). The lean
-  setup is kept as a spike and is the likely shape of the self-hosted server ([D20](#decisions)).
+- **Revised (2026-11-07): self-hosted first.** Sync will be user-run until the product has a user base, so the order in D6 is
+  reversed, **D20 (the lean SQLite server) is decided**, and **D3 (the hosted service's database) is deferred**, not open and
+  not blocking. The lean server exists as a container for a personal server (`spikes/sync-hosting/selfhost/`).
 
 ## The assumption
 
@@ -473,7 +474,8 @@ deletes by file, but every file must be migrated and replicated.
 leaves the backups stale, R19), and an occasional restore drill. Litestream is pre-1.0: its 0.5.0 release had bugs fixed in
 patch releases, and the latest release I saw was 0.5.18 (2026-11-03).
 
-**Status (2026-11-05).** Lean is kept as a spike ([S6](#spikes-and-gates)) and is the likely shape of the self-hosted server
+**Status (2026-11-07).** Lean is now the chosen shape of the self-hosted server (D20) and has a prototype container
+(`spikes/sync-hosting/selfhost/`). It was kept as a spike ([S6](#spikes-and-gates)) and is the likely shape of the self-hosted server
 ([D20](#decisions)): one container, one volume, nothing else to run.
 
 ### Moving from lean to hosted Postgres
@@ -1015,6 +1017,11 @@ v1. Padding sizes is also left out of v1.
 
 ## Hosted now, self-hosted later
 
+> **Revised 2026-11-07, by you: the order is reversed.** Sync is **self-hosted first** (you, and any customer, run the server);
+> a hosted service waits until there is a user base. The 2026-11-05 text below says "hosted now, self-hosted later" and is kept
+> for the record; read "self-hostable" as "the first thing built" and treat the hosted-only parts as later. A prototype container
+> exists (`spikes/sync-hosting/selfhost/`: compose file, device tokens, backup to a folder or a bucket, optional HTTPS proxy).
+
 **Decided (D6, 2026-11-05):** the first sync server is hosted by us. A self-hosted server comes later, and users will
 choose which to use. Nothing about self-hosting is built now, but a few cheap choices keep it open:
 
@@ -1170,8 +1177,8 @@ subset and its findings feed S3 and Gate B.
 branch `claude/quirky-khayyam-837226` (it is deleted once D3 is decided, and does not touch `apps/`). It holds the draft
 protocol, the shared Node core, the three candidates, a 30-test HTTP contract suite, a simulated two-device client with fault
 injection, the scenarios below, a two-device harness page, and the wizard, deploy, drill and teardown scripts. All three pass the
-contract suite and every scenario **on a laptop**; the real-host column below needs your accounts (the wizard asks for them) and
-is still empty. Records are random bytes (encryption is S5), devices use static dev tokens (sign-in is S4), and the harness is
+contract suite and every scenario **on a laptop**. The real-host column below is empty, and **parked since 2026-11-07**: it needs
+your accounts (the wizard asks for them) and is only worth doing when a hosted service is wanted again. Records are random bytes (encryption is S5), devices use static dev tokens (sign-in is S4), and the harness is
 not the desktop app, which has no server-address setting or sync engine yet.
 
 **How the comparison works**
@@ -1266,16 +1273,16 @@ These are findings from the prototype, not decisions. Each says what the protoco
 
 ## Decisions
 
-Recommendations are proposals until the status says *Decided*. **Needs your input:** D3 (the hosted server's database).
+Recommendations are proposals until the status says *Decided*. **Nothing is waiting on you:** D3 (the hosted server's database) is deferred (2026-11-07).
 
 | Id | Decision | Recommendation | Status |
 |---|---|---|:-:|
 | D1 | How to read the 20 s assumption. | A propagation deadline, not a sync interval ([The assumption](#the-assumption)). | **Decided** (you) |
 | D2 | Server language. | TypeScript on Node. The server never parses notes. | Proposed |
-| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). All three (managed Postgres, lean and Convex) are prototyped side by side in S8 (built; local results in, real-host results pending), with a scorecard to fill in by hand ([how](#comparing-the-three-by-hand)). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. | **Open: you** |
+| D3 | **Hosted server's database.** Re-opened by D4 and D6; reweighed after D5. | **Managed Postgres,** behind one storage interface ([side-by-side](#what-the-server-should-use)). All three (managed Postgres, lean and Convex) are prototyped side by side in S8 (built; local results in, real-host results pending), with a scorecard to fill in by hand ([how](#comparing-the-three-by-hand)). A close call: lean is sound if you prefer near-zero cost first, but the gap to a cheap managed Postgres is small ([Hosting it cheaply](#hosting-it-cheaply)). The move from lean to Postgres is small ([how](#moving-from-lean-to-hosted-postgres)). Clients stay SQLite. **Deferred (you, 2026-11-07):** no hosted service until there is a user base. The S8 prototypes and local results stay as the starting point; the real-host run (wizard, deploys, scorecard) is parked. | **Deferred** (you) |
 | D4 | End-to-end encryption. | Yes, in v1. Design in [End-to-end encryption](#end-to-end-encryption); details settled in S5. | **Decided** (you) |
 | D5 | **Sign-in.** | **Hosted: Clerk, behind our server** ([Using Clerk](#using-clerk)): our own device sessions, Clerk only for the sign-in step. **Self-hosted: its own sign-in on an adopted library.** Separate products; accounts do not move between them. | **Decided** (you) |
-| D6 | Hosted or self-hosted. | Hosted first; self-hostable later, chosen by the user. Preparation: [Hosted now, self-hosted later](#hosted-now-self-hosted-later). | **Decided** (you) |
+| D6 | Hosted or self-hosted. | **Self-hosted first (revised 2026-11-07); hosted later, once there is a user base.** Originally hosted first; self-hostable later. Preparation: [Hosted now, self-hosted later](#hosted-now-self-hosted-later). | **Decided** (you), revised |
 | D7 | **Note links.** | **Migrate once to `note:<uuid>`** ([Note links](#note-links)); a small normalizer for stragglers. Revised from "translate" because the migration is cheapest now and keeps the sync path simple. | **Decided** (you) |
 | D8 | Sync model. | State-based records + server version + tombstones. Keep-both on content conflict. No CRDT. | Proposed |
 | D9 | Does the CLI sync on its own? | No. It writes; the desktop app syncs its edits. A standalone CLI waits. | **Decided** (you) |
@@ -1289,7 +1296,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D17 | Self-hosting preparation. | Server address as a setting; the protocol as a public, versioned contract with a contract suite; `GET /v1/info`; few server dependencies. | Proposed |
 | D18 | Encryption design. | Random vault key wrapped by an Argon2id passphrase key and a recovery key; AEAD per record (AES-256-GCM proposed); keyed-hash blob ids; sign-in separate from the passphrase. | Proposed; settled in S5 |
 | D19 | Weekly cycle across devices. | Runs after the first pull; deferred if offline; decisions derived from the synced log; one report per period (keep both on a clash); first to the server wins `todo_places`. | Proposed |
-| D20 | **Self-hosted server's storage.** | The lean setup: SQLite with continuous replication, one container and a volume ([how it works](#how-the-lean-setup-works)). Kept as spike S6. | **Leaning** (you) |
+| D20 | **Self-hosted server's storage.** | The lean setup: SQLite with continuous replication, one container and a volume ([how it works](#how-the-lean-setup-works)). Prototype container built (`spikes/sync-hosting/selfhost/`). | **Decided** (you, 2026-11-07) |
 
 ## Risks
 
@@ -1394,3 +1401,9 @@ its docs (above); its **production terms** and the Terms of Service text are sti
   down (a true restart-on-write debounce with a 10 s maximum wait, no stale "something is new" flag after a hint, and a push response that
   omits the records the same push applied). The protocol's pull rule changed accordingly, all three candidates pass the updated 30-test
   suite, and the local baseline was re-run. See "What building them taught".
+- 2026-11-07: **self-hosted first (your decision).** Sync will be user-run until the product has a user base: D6 is reversed (self-hosted
+  first, hosted later), D20 (the lean SQLite server) is decided, and D3 (the hosted service's database) is deferred; the S8 real-host run is
+  parked. The lean server is now a container for a personal server (`spikes/sync-hosting/selfhost/`): device tokens kept hashed in its own
+  SQLite file, backup to a folder or an S3-compatible bucket with restore on an empty disk, an optional HTTPS proxy, a healthcheck and a
+  guide. Its smoke test (token, restart, lose the disk and restore, revoke) and the 27 non-admin contract tests pass against the container;
+  the arm64 image builds and starts under emulation. Not built: real sign-in, blobs, quotas, a published image.
