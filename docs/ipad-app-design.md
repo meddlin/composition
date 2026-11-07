@@ -526,9 +526,9 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
 | App shell, scenes, lifecycle | 🆕 | M1 | 🔨 | SwiftUI `App` with a split view, in the prototype ([The first app](#the-first-app)). Typed text is flushed whenever the app leaves the foreground, inside a background-task assertion, and the system brings back the open note, its tab and the caret ([S6 status](#s6-status)); several windows are not enabled yet ([C5](#compromise-register)) |
-| Six colour schemes | 🔁 | M1 | ⬜ | `Theme` tokens ported from `themes.ts`; add a **System** scheme (⭐) |
-| "Follow the sun" scheme | 🔁 | M3† | ⬜ | Port `sunTimes.ts`; needs a saved city |
-| Fonts | 🔁 | M1 | ⬜ | System fonts by default; bundled open-source families as options |
+| Six colour schemes | 🔁 | M1 | 🔨 | **Built (Step 10, Simulator): five** (Dark, Light, Forest, Wine, Cream) as a `Theme` of the desktop's tokens, **plus System** (Light or Dark as the iPad is set), chosen in More ▸ *Appearance…* and kept in `settings.json`. Every token is checked against the real `globals.css`. "Follow the sun" (the sixth) is the next row ([Step 10 status](#step-10-status)) |
+| "Follow the sun" scheme | 🔁 | M3† | ⬜ | Port `sunTimes.ts`, `sunSchedule.ts` and the five sun pairs; needs a saved city and a way to pick one (the settings file already carries a city). A desktop's `auto` reads as System on the iPad until then |
+| Fonts | 🔁 | M1 | 🔨 | **The system's own three families** (Sans serif, Serif, Monospaced), one for the editor and one for the preview, chosen in *Appearance…*. The desktop's ten open-source families are **not bundled** (font files would have to be added, with their licence notices): your call |
 | Dynamic Type, VoiceOver, Reduce Motion | ⭐ | M1 | ⬜ | The native bar, N6 |
 | Hardware-keyboard shortcuts | ⭐ | M1 | 🔨 | `UIKeyCommand`s with titles. **Editor's built (Step 9):** Tab, Shift+Tab, ⌃], ⌃[, ⌘B, ⌘I, ⌘⇧K, ⌘⇧H; ⌘⇧X is the Image menu's; ⌘F is the system's. Sent by UI tests (not Esc, which they cannot send), not looked at on a real keyboard. **Not audited:** iPadOS-reserved combinations, shortcuts outside the editor (new note, switching tabs) |
 | Shortcuts helper (Cmd+/) | ⭐ | M1 | 🔨 | Replaced by the system's Cmd-hold list: the editor's key commands carry titles for it. The list itself has not been looked at (the Simulator cannot hold ⌘) |
@@ -1078,7 +1078,7 @@ numbers, the same contents list and the same picture sizes. The differences:
 | Task lists, quotes | Bullets with checkboxes; italic quotes in curly quotes | Checkboxes only; a plain quote bar |
 | Tables | Full width | As wide as their contents |
 | The note's header | A card with the description, tag chips and both dates | Title, updated time and tags |
-| `<Mark>` colours | Tinted to each colour scheme, with legible text (`markContrast`) | One set, not scheme-aware |
+| `<Mark>` colours | Tinted to each colour scheme, with legible text (`markContrast`) | The same: the hue at the scheme's strength over its page (Step 10), and the contrast of the text on each tint comes to the desktop's own numbers |
 | Frontmatter | Read as YAML | Read by the same rules as the desktop's (a port of its YAML reader, build plan Step 3), so a block is a header here exactly when it is there |
 | A picture at a web address | Loaded | A link; nothing is fetched |
 
@@ -1239,6 +1239,27 @@ desktop's own code; Swift gives every answer, and breaking details of the ports 
 
 **Not done, or not known:** `<Mark>` in the preview, buttons for the on-screen keyboard, **Esc** (the UI tests' Esc never reaches the app, so it is only a manual-test item), the ⌘-hold list itself, everything on a real keyboard on a real iPad, VoiceOver and Dynamic Type for the list (its lines have labels; not tried), and a check of the editor's highlight rule against the desktop's.
 
+### Step 10 status
+
+**Built and checked 2026-11-07 in the iPad Pro 11-inch (M5) Simulator; not on an iPad.** Build plan Step 10: appearance.
+
+**What it is.** The app is drawn in one of five colour schemes, the desktop's **Dark, Light, Forest, Wine and Cream**, or in **System**, which is Light or Dark as the iPad is set (the scheme the design added). *More ▸ Appearance…* lists them, each with a swatch, and two type families, one for the editor and one for the preview (Sans serif, Serif or Monospaced: the system's SF, New York and SF Mono). A choice is written to `settings.json` at once and everything is drawn again, the sheet too. A scheme colours:
+the page behind a note, the list beside it (the desktop's *surface*), the sidebar (its *panel*), the accent (its brand colour: toolbar buttons, the selected row, switches), the links, the Info and Warning panels, cards, quotes and code in the preview, the table of contents, the charts (the desktop's own six series colours, from `Chart.tsx`), the `<Mark>` tints (the hue at the scheme's strength over its page), and the editor's Markdown colours (the desktop's `--syntax-*` tokens, assigned as its editor
+does: headings `function`, code `string`, list markers `number`, bold `type`, italics `attr`, tags `keyword`, links `link`, and the frontmatter, quotes, rules and web addresses `comment`). The system's own controls (the keyboard, sheets, alerts, the bars, the status bar) are drawn dark or light to suit it.
+
+**Where it is kept.** A named scheme is the desktop's own `theme` key, so a backup restored on the desktop looks the same there. System has no name on the desktop, so it is the iPad's own `followSystem` key, which leaves `theme` as it was; the two fonts are `iosEditorFont` and `iosPreviewFont`. The desktop keeps keys it does not know, so none is lost in a round trip. A new install, or a file with no scheme in it, is System, and a desktop's `auto` ("Follow the sun") reads as System.
+
+**Decisions made while building (say if you disagree).** (1) **"Follow the sun" is not built.** The tracker has it as release polish (M3†): five sun pairs and five more palettes, the port of `sunTimes.ts` and `sunSchedule.ts`, and a saved city with a way to pick one. (2) **The fonts are the iPad's own three families, not the desktop's ten** (Geist, JetBrains Mono, Source Code Pro, IBM Plex Mono, Inter, Atkinson, Source Serif, Lora and Literata). The design said bundled families as options; they are open source but would
+have to be downloaded and added to the app as font files, each with a licence notice (Step 11's list). The desktop's `editorFont` and `previewFont` keys are left as they are and not read. (3) **The scheme's ink is the text colour of the note only** (the editor and the preview). The lists and menus keep the system's black or white, because setting it everywhere also stopped a selected row turning its text white (found by looking at Light: dark text on a blue row), so in Cream the sidebar's text is black, not brown.
+(4) **Code in the editor stays monospaced** whatever the editor font. (5) The editor colours for kinds the desktop's editor does not colour (strikethrough, quotes, rules, `<Mark>`) are the `comment` colour. (6) The footer under the list, the Editor lab (a spike screen) and the system's own pickers are not themed.
+
+**Checks.** The tokens were ported with an oracle: the desktop's real `globals.css` (read the way `markContrast.test.ts` reads it) and `themes.ts`, `highlightColors.ts`, `Chart.tsx`, `editorFonts.ts` and `previewFonts.ts` are written to `appearance-expected.json`, and Swift agrees on **every token of every scheme** (eleven colours, the tint strength and seven code colours, five times), the derived shares (the foreground at 8, 60, 10, 10 and 15 per cent), the five `<Mark>` hues, the chart's series recipes, and, worked out by the desktop's own formula, **the contrast of text on each `<Mark>` tint in every scheme**
+(25 numbers, the lowest 5.4, all above the desktop's 4.5). Breaking five details on purpose (a digit of a colour, a tint strength, a share, a recipe, a hue) fails the check each time. More unit tests: hex, contrast and blending; text, links and code colours legible (at least 4.5) on every surface of every scheme (the stylesheet only promises it in a comment); and the settings (a fresh install, a desktop's scheme, `auto`, a refused name, and that the desktop's other keys survive). The conformance run is now 225 Swift tests (208 before).
+**UI tests** (`AppearanceUITests`, eight, 27 in all with the rest; Step 7's drag test failed again in a full run with several simulators at once and passed when its class ran alone, so it is load-sensitive): each scheme is painted as the stylesheet says, read from the screen's own pixels (the editor's page and the list beside it); a choice in the sheet restyles the app at once and is still there after the app is started again; the font pickers; and the "Preview showcase" note, which uses every component, on the Preview tab in each scheme, with the page's colour checked and a screenshot of each kept as an attachment (those
+are the snapshots, to be looked at, not compared pixel by pixel). By hand in the Simulator: all five in landscape and portrait, the live switch in the sheet (and `settings.json` read afterwards), and a serif editor beside a monospaced preview. **Found by looking:** a selected row had dark text on a blue pill in Light (fixed, decision 3); and the UI tests had to learn that a window's screenshot comes in the device's own portrait shape, a quarter turned from the app's landscape.
+
+**Not done, or not known:** Follow the sun; the desktop's font families; the footer, the Editor lab and the system's pickers in the scheme; the contrast of white text on each scheme's accent when a row is selected (it looks right, and is not measured); everything on a real iPad (the screen's colour rendering differs from the Simulator's), in sunlight and at night; Increase Contrast, Dynamic Type and VoiceOver with the schemes (Step 11).
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1281,8 +1302,8 @@ final pass on the device is yours.
   `swift test`: migrations from each earlier schema (the intent of `db.test.ts`), the operation scripts, FTS5
   queries, the C1 corpus, backup round trips.
 - **The conformance corpus** runs on both sides ([Keeping two implementations honest](#keeping-two-implementations-honest)).
-- **UI:** XCUITest for the main flows (the first nineteen are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
-  favorites, back and forward, a drag of a note onto a group, a picture put in a note, and the typing aids: the lists, the keys and a link opened from the preview), snapshot tests for the ten components in the six schemes, Instruments for
+- **UI:** XCUITest for the main flows (the first twenty-seven are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
+  favorites, back and forward, a drag of a note onto a group, a picture put in a note, the typing aids: the lists, the keys and a link opened from the preview, and the colour schemes read from the screen's pixels), snapshot tests for the ten components in the six schemes, Instruments for
   typing and ink latency.
 - **A manual test page,** `docs/manual-tests/ipad.md`, written when something is built: install, create and
   search a note, every MDX component, Scribble, ink, backup and restore to and from the desktop, background
@@ -1455,6 +1476,8 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   (`images-cases.json`). Tracker rows for stored images, size limit, paste, add a photo or file, and Markdown image to tag updated. Not tried on the iPad, and the camera, Files and a drop from another app not tried at all.
 - 2026-11-07: **Build plan Step 9, typing aids, done in the Simulator.** The list at the caret for `<` (components, a tag's props and values), the frontmatter's properties and `/` snippets; the `[[` note picker, the Link button and ⌘⇧K, and `note:` links opening their note from the preview; Tab, Shift+Tab, ⌃], ⌃[, ⌘B, ⌘I and ⌘⇧H with titles for the ⌘-hold list; the edit menu's *Highlight*. The desktop's `completions.ts`, `props.ts`, `frontmatterProps.ts`, `snippets.ts`, `indentLines.ts`, `emphasis.ts` and the note-link code run as an oracle over `editing-cases.json`; 208 Swift tests; nine more UI tests. Tracker rows for the shortcuts, the ⌘-hold list, indent, completion, note links and highlight updated.
   **Not built:** `<Mark>` in the preview (needs the single read-only text view), accessory-bar buttons for Tab and Shift+Tab. Not tried on the iPad, with a real keyboard, or with VoiceOver.
+- 2026-11-07: **Build plan Step 10, appearance, done in the Simulator.** Five colour schemes (Dark, Light, Forest, Wine, Cream) as a `Theme` of the desktop's tokens, plus **System**, chosen in *More ▸ Appearance…*, kept in `settings.json` (the desktop's `theme` key; System as the iPad's own `followSystem`), drawn in the sidebar, list, editor (its Markdown colours are the desktop's `--syntax-*`), preview, `<Mark>` tints, charts and sheets; the editor and preview type families (system sans, serif and monospaced). The real `globals.css`, `themes.ts`, `Chart.tsx` and the font lists are read as an oracle (`appearance-expected.json`): every token of every scheme and the contrast of text on every `<Mark>` tint agree; 225 Swift tests; eight more UI tests, which read the screen's pixels. Tracker rows for the schemes, fonts and `<Mark>` colours updated.
+  **Not built:** Follow the sun (M3†) and the desktop's ten font families (they need font files). Not tried on the iPad or in sunlight.
 
 ## Sources
 

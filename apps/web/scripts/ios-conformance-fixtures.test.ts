@@ -44,6 +44,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *                                  build plan Step 9: typing aids, through the real completions.ts (findTrigger, matchCompletions,
  *                                  expandCompletion), props.ts (findPropTarget), snippets.ts (findSnippetTarget), indentLines.ts,
  *                                  emphasis.ts (toggleEmphasis) and noteLinks.ts, with noteRefs.ts; and the catalogues they offer
+ *   appearance-expected.json       build plan Step 10: no cases of its own; the five colour schemes' tokens, <Mark> hues and tint strengths, the
+ *                                  contrast of the text on each tint, the derived tokens, the chart's series colours and the font choices,
+ *                                  read from the real globals.css, themes.ts, highlightColors.ts, Chart.tsx, editorFonts.ts and previewFonts.ts
  *   images-cases.json, images-expected.json
  *                                  build plan Step 8: images, through the real sniffImage, imageFileName and storeImage
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
@@ -910,6 +913,86 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     expect(expected.indents.filter((e) => e !== null).length).toBeGreaterThan(300);
     expect(expected.emphasis.filter((e) => e !== null).length).toBeGreaterThan(300);
   }, 120_000);
+
+  it("writes the colour schemes, <Mark> tints, fonts and chart colours the real globals.css, themes.ts, editorFonts.ts, previewFonts.ts and Chart.tsx hold", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const src = path.resolve(__dirname, "../src");
+    const css = fs.readFileSync(path.join(src, "app/globals.css"), "utf8");
+    const themes = await import(path.join(lib, "themes"));
+    const editorFonts = await import(path.join(lib, "editorFonts"));
+    const previewFonts = await import(path.join(lib, "previewFonts"));
+    const highlight = await import(path.join(src, "components/notes/mdx/highlightColors"));
+    const chart = fs.readFileSync(path.join(src, "components/notes/mdx/Chart.tsx"), "utf8");
+
+    // The same reading of globals.css as components/notes/mdx/markContrast.test.ts: a scheme is the block its selector opens.
+    const block = (selector: string) => css.match(new RegExp(`\\n${selector}[^{]*\\{([^}]*)\\}`))?.[1] ?? "";
+    const token = (body: string, name: string) => body.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1].trim();
+    const root = block(":root,");
+    const SCHEMES = ["dark", "light", "forest", "wine", "cream"] as const;
+    const TOKENS = ["background", "foreground", "surface", "panel", "brand", "brand-dim", "highlight", "warning", "error", "success", "link"];
+    const SYNTAX = ["comment", "keyword", "string", "number", "function", "type", "attr"];
+    const rgb = (hex: string) => [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+    const luminance = (hex: string) => {
+      const [r, g, b] = rgb(hex).map((c) => {
+        const v = c / 255;
+        return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const contrast = (a: string, b: string) => {
+      const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+      return (hi + 0.05) / (lo + 0.05);
+    };
+    const blend = (top: number[], bottom: number[], alpha: number) =>
+      `#${top.map((c, i) => Math.round(c * alpha + bottom[i] * (1 - alpha)).toString(16).padStart(2, "0")).join("")}`;
+    const hueOf = (color: string) =>
+      color === "yellow"
+        ? css.match(/\.md-mark \{[^}]*--mark-hue:\s*(#[0-9a-f]{6})/)?.[1]
+        : css.match(new RegExp(`\\[data-color="${color}"\\] \\{[^}]*--mark-hue:\\s*(#[0-9a-f]{6})`))?.[1];
+
+    const palettes: Record<string, unknown> = {};
+    const markContrast: Record<string, Record<string, number>> = {};
+    for (const scheme of SCHEMES) {
+      const body = block(`\\[data-theme="${scheme}"\\]`);
+      const palette: Record<string, unknown> = { colorScheme: body.match(/color-scheme:\s*(\w+);/)?.[1] };
+      for (const name of TOKENS) palette[name] = token(body, name);
+      palette.markAlpha = Number.parseFloat(token(body, "mark-alpha") ?? token(root, "mark-alpha") ?? "");
+      palette.syntax = Object.fromEntries(SYNTAX.map((name) => [name, token(body, `syntax-${name}`)]));
+      palettes[scheme] = palette;
+      markContrast[scheme] = {};
+      for (const color of highlight.HIGHLIGHT_COLORS) {
+        const tinted = blend(rgb(hueOf(color) ?? "#000000"), rgb(String(palette.background)), (palette.markAlpha as number) / 100);
+        markContrast[scheme][color] = contrast(String(palette.foreground), tinted);
+      }
+    }
+    const percent = (name: string) => Number(css.match(new RegExp(`--${name}:\\s*color-mix\\(in srgb, var\\(--foreground\\) (\\d+)%, transparent\\)`))?.[1]);
+    const seriesBlock = chart.match(/const SERIES_COLORS = \[([\s\S]*?)\];/)?.[1] ?? "";
+    const expected = {
+      themes: themes.THEME_CHOICES.map((c: { name: string; label: string }) => ({ name: c.name, label: c.label })),
+      defaultTheme: themes.DEFAULT_THEME,
+      palettes,
+      derived: { muted: percent("muted"), mutedForeground: percent("muted-foreground"), accent: percent("accent"), border: percent("border"), input: percent("input") },
+      aliases: { primary: css.match(/--primary:\s*var\(--([a-z-]+)\)/)?.[1], destructive: css.match(/--destructive:\s*var\(--([a-z-]+)\)/)?.[1], card: css.match(/--card:\s*var\(--([a-z-]+)\)/)?.[1] },
+      highlightColors: [...highlight.HIGHLIGHT_COLORS],
+      defaultHighlightColor: highlight.DEFAULT_HIGHLIGHT_COLOR,
+      markHues: Object.fromEntries(highlight.HIGHLIGHT_COLORS.map((color: string) => [color, hueOf(color)])),
+      markContrast,
+      series: [...seriesBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]),
+      editorFonts: editorFonts.EDITOR_FONT_CHOICES.map((c: { name: string; kind: string; label: string }) => ({ name: c.name, kind: c.kind, label: c.label })),
+      defaultEditorFont: editorFonts.DEFAULT_EDITOR_FONT,
+      previewFonts: previewFonts.PREVIEW_FONT_CHOICES.map((c: { name: string; label: string }) => ({ name: c.name, label: c.label })),
+      defaultPreviewFont: previewFonts.DEFAULT_PREVIEW_FONT,
+    };
+    fs.writeFileSync(path.join(outDir!, "appearance-expected.json"), JSON.stringify(expected, null, 2));
+    for (const scheme of SCHEMES) {
+      const palette = palettes[scheme] as Record<string, unknown>;
+      for (const name of TOKENS) expect(palette[name], `${scheme} ${name}`).toMatch(/^#[0-9a-f]{6}$/);
+      expect(palette.markAlpha, scheme).toBeGreaterThan(0);
+      for (const color of highlight.HIGHLIGHT_COLORS) expect(markContrast[scheme][color], `${scheme} ${color}`).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(expected.series.length).toBe(6);
+    expect(Object.values(expected.derived).every((n) => n > 0)).toBe(true);
+  }, 60_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
   //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)

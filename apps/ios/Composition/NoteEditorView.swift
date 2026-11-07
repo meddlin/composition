@@ -102,6 +102,8 @@ final class NoteTextView: UITextView {
     var pastePictures: (([ImageInput]) -> Void)?
     /// The list at the caret (`<`, `[[`, the highlight colours), which takes some keys while it is open.
     weak var assist: EditorAssist?
+    /// The colour scheme and font in force, which the list at the caret is drawn in too.
+    var look = Look.standard
 
     /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
     func apply(_ edit: LineEdit) {
@@ -226,9 +228,12 @@ struct NoteEditorView: UIViewRepresentable {
         view.alwaysBounceVertical = true
         view.keyboardDismissMode = .interactive
         view.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
-        view.backgroundColor = .systemBackground
-        view.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: 16, weight: .regular))
-        view.textColor = .label
+        let look = context.environment.look
+        view.look = look
+        view.backgroundColor = look.uiBackground
+        view.font = look.editorFont.uiFont(size: 16)
+        view.textColor = look.uiForeground
+        view.tintColor = look.uiBrand
         view.accessibilityIdentifier = "note-editor"
         view.text = session.text
         view.selectedRange = NSRange(location: min(max(0, initialCaret), (view.text as NSString).length), length: 0)
@@ -241,7 +246,7 @@ struct NoteEditorView: UIViewRepresentable {
         assist.handle = handle
         view.assist = assist
         context.coordinator.assist = assist
-        context.coordinator.attach(view)
+        context.coordinator.attach(view, look: look)
         // The size of the text changed (Settings, Control Centre): the fonts in the colours are stale.
         view.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { [weak coordinator = context.coordinator] (_: UITextView, _: UITraitCollection) in
             coordinator?.styler?.restyleAll()
@@ -260,7 +265,19 @@ struct NoteEditorView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ view: UITextView, context: Context) { context.coordinator.caretMoved = caretMoved }
+    func updateUIView(_ view: UITextView, context: Context) {
+        context.coordinator.caretMoved = caretMoved
+        // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
+        let look = context.environment.look
+        if let editor = view as? NoteTextView, editor.look != look {
+            editor.look = look
+            view.backgroundColor = look.uiBackground
+            view.font = look.editorFont.uiFont(size: 16)
+            view.textColor = look.uiForeground
+            view.tintColor = look.uiBrand
+            context.coordinator.styler?.apply(look)
+        }
+    }
 
     final class Coordinator: NSObject, UITextViewDelegate, UIDropInteractionDelegate {
         let session: NoteSession
@@ -276,9 +293,9 @@ struct NoteEditorView: UIViewRepresentable {
             self.caretMoved = caretMoved
         }
 
-        func attach(_ view: UITextView) {
+        func attach(_ view: UITextView, look: Look) {
             textView = view
-            let styler = MarkdownStyler(textView: view)
+            let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
             styler.reload()
             // Hears every edit of this note, this window's too, which it recognises by the text being the same.

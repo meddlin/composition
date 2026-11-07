@@ -7,6 +7,7 @@ struct BrowserView: View {
     var chooseBackup: () -> Void
     @State private var showingTrash = false
     @State private var showingAbout = false
+    @State private var showingAppearance = false
     @State private var showingLab = false
     @State private var confirmingReplace = false
     /// The note that was open when the app was last ended; the system brings it back (0 is none).
@@ -37,6 +38,7 @@ struct BrowserView: View {
                         Menu {
                             Button("Export a backup…", systemImage: "square.and.arrow.up") { Task { await model.exportBackup() } }
                             Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
+                            Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
                             Button("About this build", systemImage: "info.circle") { showingAbout = true }
                         } label: {
@@ -77,6 +79,7 @@ struct BrowserView: View {
         .onChange(of: prompt) { promptText = $1?.startingText(in: model) ?? "" }
         .sheet(isPresented: $showingTrash) { TrashView(model: model) }
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
+        .sheet(isPresented: $showingAppearance) { AppearanceView(model: model) }
         .sheet(item: $moving) { MoveSheet(model: model, item: $0) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in

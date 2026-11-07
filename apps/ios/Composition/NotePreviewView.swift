@@ -57,6 +57,7 @@ struct PreviewBlocksView: View {
 
 private struct PreviewBlockView: View {
     let block: PreviewBlock
+    @Environment(\.look) private var look
 
     var body: some View {
         switch block {
@@ -71,7 +72,7 @@ private struct PreviewBlockView: View {
         case .highlight(let color, let children):
             PreviewBlocksView(blocks: children)
                 .padding(8)
-                .background(MarkColor.color(named: color), in: RoundedRectangle(cornerRadius: 6))
+                .background(look.markTint(color), in: RoundedRectangle(cornerRadius: 6))
         case .notice(let text): NoticeView(text: text, tone: .warning)
         }
     }
@@ -82,8 +83,9 @@ private struct PreviewBlockView: View {
 private struct PanelView: View {
     let tone: PanelTone
     let children: [PreviewBlock]
+    @Environment(\.look) private var look
 
-    private var color: Color { tone == .info ? .accentColor : .orange }
+    private var color: Color { tone == .info ? look.brand : look.warning }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -102,6 +104,7 @@ private struct PanelView: View {
 private struct NoticeView: View {
     let text: String
     let tone: PanelTone
+    @Environment(\.look) private var look
 
     var body: some View {
         Label(text, systemImage: "exclamationmark.circle")
@@ -109,7 +112,7 @@ private struct NoticeView: View {
             .foregroundStyle(.secondary)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.orange.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
+            .background(look.warning.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -117,6 +120,7 @@ private struct NoticeView: View {
 
 private struct TocView: View {
     let entries: [TocEntry]
+    @Environment(\.look) private var look
     @Environment(\.scrollToHeading) private var scrollToHeading
 
     var body: some View {
@@ -127,22 +131,23 @@ private struct TocView: View {
                 let entry = entries[index]
                 Button(entry.text) { scrollToHeading(entry.ordinal) }
                     .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
+                    .foregroundStyle(look.link)
                     .padding(.leading, CGFloat(entry.level) * 16)
             }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+        .background(look.surface, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
 private struct FootnotesView: View {
     let entries: [FootnoteEntry]
+    @Environment(\.look) private var look
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Divider()
+            Rectangle().fill(look.border).frame(height: 1)
             Text("Footnotes").font(.caption.weight(.semibold)).foregroundStyle(.secondary).textCase(.uppercase)
             if entries.isEmpty { Text("No footnotes yet.").foregroundStyle(.secondary) }
             ForEach(entries.indices, id: \.self) { index in
@@ -219,6 +224,7 @@ private struct ChartView: View {
     let spec: ChartSpec
     let title: String?
     let height: Double
+    @Environment(\.look) private var look
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -245,6 +251,9 @@ private struct ChartView: View {
                         .foregroundStyle(by: .value(spec.x, spec.rows[index].label))
                 }
             }
+            .chartForegroundStyleScale(domain: spec.rows.map(\.label), range: palette(spec.rows.count))
+            .chartXAxis { axis }
+            .chartYAxis { axis }
         default:
             Chart {
                 ForEach(spec.y, id: \.self) { series in
@@ -253,6 +262,23 @@ private struct ChartView: View {
                     }
                 }
             }
+            .chartForegroundStyleScale(domain: spec.y, range: palette(spec.y.count))
+            .chartXAxis { axis }
+            .chartYAxis { axis }
+        }
+    }
+
+    /// The scheme's series colours (`seriesColors`, from `Chart.tsx`'s own list), in order, starting over when there are more series than colours.
+    private func palette(_ count: Int) -> [Color] {
+        let colors = look.seriesColors
+        return (0..<max(count, 1)).map { colors[$0 % colors.count] }
+    }
+
+    /// Faint grid lines and grey labels, as the desktop's chart has them (`--border`, `--muted-foreground`).
+    private var axis: some AxisContent {
+        AxisMarks { _ in
+            AxisGridLine().foregroundStyle(look.border)
+            AxisValueLabel().foregroundStyle(look.mutedText)
         }
     }
 
@@ -274,13 +300,14 @@ private struct ChartView: View {
 private struct RepoCard: View {
     let ref: RepoRef
     let description: String?
+    @Environment(\.look) private var look
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         if let url = URL(string: ref.href) {
             Button { openURL(url) } label: {
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "shippingbox").font(.title2).foregroundStyle(Color.accentColor)
+                    Image(systemName: "shippingbox").font(.title2).foregroundStyle(look.link)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(ref.label).font(.headline).foregroundStyle(.primary)
                         Text(ref.service ?? ref.host).font(.caption).foregroundStyle(.secondary)
@@ -290,7 +317,7 @@ private struct RepoCard: View {
                     Image(systemName: "arrow.up.right").foregroundStyle(.secondary)
                 }
                 .padding(12)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                .background(look.surface, in: RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Repository \(ref.label)")
@@ -301,6 +328,7 @@ private struct RepoCard: View {
 private struct YouTubeCard: View {
     let ref: YouTubeRef
     let title: String
+    @Environment(\.look) private var look
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -316,7 +344,7 @@ private struct YouTubeCard: View {
                     Image(systemName: "arrow.up.right").foregroundStyle(.secondary)
                 }
                 .padding(12)
-                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10))
+                .background(look.surface, in: RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Video: \(title)")

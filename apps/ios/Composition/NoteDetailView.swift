@@ -11,6 +11,7 @@ struct NoteDetailView: View {
 
     let model: AppModel
     let noteID: Int64
+    @Environment(\.look) private var look
     // What the system brings back after the app was ended: the tab, and where the caret was.
     @SceneStorage("noteMode") private var mode = Mode.preview
     @SceneStorage("caretOffset") private var caret = 0
@@ -43,6 +44,9 @@ struct NoteDetailView: View {
             }
         }
         .navigationBarTitleDisplayMode(.inline)
+        .background(look.background)
+        // The note's own text colour; the lists beside it keep the system's, so that a selected row still turns its text to white.
+        .foregroundStyle(look.foreground)
         .task(id: noteID) { await open() }
         .onDisappear { close() }
         .toolbar {
@@ -177,6 +181,7 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
 /// after the last change.
 struct NoteReader: View {
     let model: AppModel
+    @Environment(\.look) private var look
     @State private var live: LivePreview
 
     init(model: AppModel, session: NoteSession) {
@@ -203,6 +208,9 @@ struct NoteReader: View {
                 .frame(maxWidth: NoteTextView.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            // The preview's type family, and its links in the scheme's link colour.
+            .fontDesign(look.previewFont.design)
+            .tint(look.link)
             // A link to another note (`[title](note:12)`) opens that note.
             .environment(\.openURL, OpenURLAction { url in
                 guard url.scheme == "note", let id = NoteLinks.id(fromRef: url.absoluteString) else { return .systemAction }

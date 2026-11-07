@@ -5,9 +5,11 @@ struct RootView: View {
     @Bindable var model: AppModel
     @State private var choosingBackup = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.look) private var look
 
     var body: some View {
         content
+            .background(look.background.ignoresSafeArea())
             // Any file: a backup is a `.tar.gz`, which the system may not name as a type this app could list.
             .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.data]) { result in
                 switch result {

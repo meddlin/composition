@@ -6,6 +6,7 @@ struct MoveSheet: View {
     let model: AppModel
     let item: DraggedItem
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.look) private var look
 
     private struct Entry: Identifiable {
         let group: NoteGroup
@@ -78,6 +79,8 @@ struct MoveSheet: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(look.background)
             .navigationTitle("Move “\(title)”")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }

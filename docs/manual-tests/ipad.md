@@ -194,12 +194,26 @@ A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for
 
 **Not built, so do not expect it:** highlighting in the *Preview* tab (do it in the editor; the preview follows), and buttons for Tab and Shift+Tab on the on-screen keyboard.
 
+## Colour schemes and fonts (build plan Step 10)
+
+65. **The schemes.** Open More (…), *Appearance…*: **System, Dark, Light, Forest, Wine and Cream**, each with a swatch. Choose each in turn: the whole app (the sidebar, the list, the note, the sheet itself, the status bar and the keyboard) changes at once, and the choice is ticked.
+66. **System.** Choose System, then switch the iPad between Light and Dark (Control Centre): the app follows. System is the choice on a fresh install.
+67. **Your own notes in each scheme.** Open a long note with a few components (an Info, a chart, a `<Mark>` of each colour) on the Preview and Split tabs in every scheme: everything reads easily, the five highlight colours too. Put the desktop beside it in the same scheme: the desktop's is the reference; say what looks different.
+68. **The editor.** On the Markdown tab, headings, bold, italics, code, links, `<Info>` tags, list markers and the frontmatter are each coloured, and legible, in every scheme; they are the desktop's editor colours.
+69. **The selected row.** The selected note in the list has light text on the scheme's accent colour in all five (Cream's is terracotta, Forest's green).
+70. **Fonts.** In *Appearance…* set the Editor to Serif, Sans serif and Monospaced, and the Preview likewise: the text changes at once. Code in the editor stays monospaced; typing and the caret are not disturbed.
+71. **Kept.** Close the app (swipe it away) and open it again: the same scheme and fonts. Make a backup and restore it in the desktop app: it wears the same scheme (not for System, which the desktop does not have: it keeps its own).
+72. **From the desktop.** Choose a scheme on the desktop, make a backup, restore it on the iPad: the iPad wears that scheme. If the desktop's was "Follow the sun", the iPad shows System.
+73. **Your eyes.** In daylight and at night, at your usual brightness: say which schemes are too faint or too bright on this screen, and where.
+
+**Not built, so do not expect it:** "Follow the sun", and the desktop's own font families (Geist, Lora …): the iPad has the system's three. The footer under the list, and the system's own pickers, are not in the scheme.
+
 What to tell me for each: what you did, what you expected, what happened.
 
 ## What it leaves out
 
-Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
-the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; the colour schemes and settings; the Pencil; sync. Selecting text
+Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; settings other than the colour scheme and fonts; the Pencil; sync. Selecting text
 across blocks of the preview, and the video player of `<YouTube>`, are not there either.
 
 ## What is not yet verified

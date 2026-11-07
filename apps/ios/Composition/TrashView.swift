@@ -4,6 +4,7 @@ import SwiftUI
 struct TrashView: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.look) private var look
 
     var body: some View {
         NavigationStack {
@@ -33,6 +34,8 @@ struct TrashView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(look.background)
             .navigationTitle("Trash Can")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

@@ -42,6 +42,7 @@ enum Prompt: Identifiable, Equatable {
 /// button on each row that has groups beneath it, so that the rows can be opened from code (a group picked in the list opens the ones above it).
 struct SidebarView: View {
     @Bindable var model: AppModel
+    @Environment(\.look) private var look
     @Binding var prompt: Prompt?
     @Binding var moving: DraggedItem?
 
@@ -54,6 +55,8 @@ struct SidebarView: View {
             }
         }
         .listStyle(.sidebar)
+        .scrollContentBackground(.hidden)
+        .background(look.panel)
         .dropList()
     }
 }

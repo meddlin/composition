@@ -104,7 +104,7 @@ public final class SettingsStore: @unchecked Sendable {
         return object
     }
 
-    private func locked<T>(_ body: ([String: Any]) -> T) -> T {
+    func locked<T>(_ body: ([String: Any]) -> T) -> T {
         lock.lock()
         defer { lock.unlock() }
         return body(readObject())
@@ -112,7 +112,7 @@ public final class SettingsStore: @unchecked Sendable {
 
     /// Changes the keys `body` touches and writes the object back, every other key as it was. Written to a temporary name and
     /// renamed, so the file is never half written.
-    private func edit(_ body: (inout [String: Any]) -> Void) throws {
+    func edit(_ body: (inout [String: Any]) -> Void) throws {
         lock.lock()
         defer { lock.unlock() }
         var object = readObject()

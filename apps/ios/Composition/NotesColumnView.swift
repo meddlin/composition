@@ -5,6 +5,7 @@ import SwiftUI
 /// its groups and then its notes, All Notes lists everything by the latest edit, and Favorites lists what is pinned (build plan Step 7).
 struct NotesColumnView: View {
     @Bindable var model: AppModel
+    @Environment(\.look) private var look
     @Binding var prompt: Prompt?
     @Binding var moving: DraggedItem?
     var footer: AnyView
@@ -39,6 +40,8 @@ struct NotesColumnView: View {
             }
         }
         .overlay { empty }
+        .scrollContentBackground(.hidden)
+        .background(look.surface)
         .dropList()
         .textDrop(into: item, model: model)
         .navigationTitle(searching ? "Search" : model.title(of: item))

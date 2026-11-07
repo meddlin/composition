@@ -22,7 +22,8 @@ final class MarkdownStyler {
     private(set) var measurements = Measurements()
 
     private weak var textView: UITextView?
-    private var palette = Palette()
+    private var look: Look
+    private var palette: Palette
     /// What the colours on the text were made from; nil when that is not known (just loaded, or something changed the text unseen), and the
     /// next full pass then colours all of it.
     private var model: HighlightModel?
@@ -37,8 +38,10 @@ final class MarkdownStyler {
     private static let pause: TimeInterval = 0.3
     private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle]
 
-    init(textView: UITextView) {
+    init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
+        self.look = look
+        palette = Palette(look: look)
         // Every change to the characters, from anywhere: typing, a paste, an undo, a change made in code. (The delegate's `shouldChangeTextIn`
         // is not called for `insertText` or for changes made in code.) A change to attributes only, which is all the colouring does, is not an edit.
         observer = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
@@ -63,8 +66,15 @@ final class MarkdownStyler {
 
     /// The text size changed: the fonts in the colours are stale.
     func restyleAll() {
-        palette = Palette()
+        palette = Palette(look: look)
         reload()
+    }
+
+    /// The colour scheme or the editor's font changed: every colour is made again.
+    func apply(_ new: Look) {
+        guard new != look else { return }
+        look = new
+        restyleAll()
     }
 
     /// The text view reported a change.
@@ -195,24 +205,28 @@ final class MarkdownStyler {
         let base: [NSAttributedString.Key: Any]
         private let heading, strong, emphasis, strikethrough, inlineCode, codeBlock, linkText, quote, listMarker, rule, tag, mark, frontmatter: [NSAttributedString.Key: Any]
 
-        init() {
-            let metrics = UIFontMetrics(forTextStyle: .body)
-            let regular = metrics.scaledFont(for: .monospacedSystemFont(ofSize: 16, weight: .regular))
-            let bold = metrics.scaledFont(for: .monospacedSystemFont(ofSize: 16, weight: .bold))
-            base = [.font: regular, .foregroundColor: UIColor.label]
-            frontmatter = [.foregroundColor: UIColor.secondaryLabel]
-            heading = [.foregroundColor: UIColor.systemBlue, .font: bold]
-            strong = [.font: bold]
-            emphasis = [.foregroundColor: UIColor.systemIndigo]
-            strikethrough = [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: UIColor.secondaryLabel]
-            inlineCode = [.foregroundColor: UIColor.systemOrange, .backgroundColor: UIColor.secondarySystemFill]
-            codeBlock = [.foregroundColor: UIColor.systemOrange]
-            linkText = [.foregroundColor: UIColor.systemTeal]
-            quote = [.foregroundColor: UIColor.secondaryLabel]
-            listMarker = [.foregroundColor: UIColor.systemPink, .font: bold]
-            rule = [.foregroundColor: UIColor.tertiaryLabel]
-            tag = [.foregroundColor: UIColor.systemPurple]
-            mark = [.foregroundColor: UIColor.tertiaryLabel]
+        /// The editor's colours are the desktop's (`.md-heading` is `--syntax-function`, `.md-code` is `--syntax-string`, `.md-marker` is `--syntax-number`, and so on in
+        /// `globals.css`), in the scheme in force; the fonts are the family chosen, with code kept monospaced.
+        init(look: Look) {
+            let family = look.editorFont
+            let regular = family.uiFont(size: 16)
+            let bold = family.uiFont(size: 16, weight: .bold)
+            let code = FontFamily.mono.uiFont(size: 16)
+            let syntax = look.theme.syntax
+            base = [.font: regular, .foregroundColor: look.uiForeground]
+            frontmatter = [.foregroundColor: syntax.comment.uiColor]
+            heading = [.foregroundColor: syntax.function.uiColor, .font: bold]
+            strong = [.font: bold, .foregroundColor: syntax.type.uiColor]
+            emphasis = [.foregroundColor: syntax.attr.uiColor]
+            strikethrough = [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: syntax.comment.uiColor]
+            inlineCode = [.foregroundColor: syntax.string.uiColor, .backgroundColor: look.uiMutedFill, .font: code]
+            codeBlock = [.foregroundColor: syntax.string.uiColor, .font: code]
+            linkText = [.foregroundColor: look.theme.link.uiColor]
+            quote = [.foregroundColor: syntax.comment.uiColor]
+            listMarker = [.foregroundColor: syntax.number.uiColor, .font: bold]
+            rule = [.foregroundColor: syntax.comment.uiColor]
+            tag = [.foregroundColor: syntax.keyword.uiColor]
+            mark = [.foregroundColor: syntax.comment.uiColor]
         }
 
         func attributes(for kind: HighlightKind) -> [NSAttributedString.Key: Any] {

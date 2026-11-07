@@ -15,11 +15,12 @@ struct MarkdownView: View {
 
 private struct MdBlockView: View {
     let block: MdBlock
+    @Environment(\.look) private var look
 
     var body: some View {
         switch block {
         case .heading(let level, let ordinal, let inlines):
-            Text(inlines.attributed)
+            Text(inlines.attributed(look))
                 .font(Self.headingFont(level))
                 .padding(.top, level <= 2 ? 6 : 2)
                 .id(PreviewScroll.headingID(ordinal))
@@ -28,16 +29,16 @@ private struct MdBlockView: View {
             if let images = Self.onlyImages(inlines) {
                 VStack(alignment: .leading, spacing: 8) { ForEach(images.indices, id: \.self) { InlineImageView(image: images[$0]) } }
             } else {
-                Text(inlines.attributed).textSelection(.enabled)
+                Text(inlines.attributed(look)).textSelection(.enabled)
             }
         case .code(_, let text):
             ScrollView(.horizontal) {
                 Text(text).font(.system(.callout, design: .monospaced)).textSelection(.enabled).padding(12)
             }
-            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
+            .background(look.surface, in: RoundedRectangle(cornerRadius: 8))
         case .quote(let blocks):
             HStack(alignment: .top, spacing: 10) {
-                Rectangle().fill(Color.secondary.opacity(0.5)).frame(width: 3)
+                Rectangle().fill(look.mutedText).frame(width: 3)
                 MarkdownView(blocks: blocks).foregroundStyle(.secondary)
             }
         case .list(let ordered, let start, let items):
@@ -50,12 +51,12 @@ private struct MdBlockView: View {
                 }
             }
         case .rule:
-            Divider()
+            Rectangle().fill(look.border).frame(height: 1)
         case .table(let alignments, let header, let rows):
             ScrollView(.horizontal) {
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
                     GridRow { ForEach(header.indices, id: \.self) { cell(header[$0], alignments, $0).bold() } }
-                    Divider()
+                    Rectangle().fill(look.border).frame(height: 1)
                     ForEach(rows.indices, id: \.self) { row in
                         GridRow { ForEach(rows[row].indices, id: \.self) { cell(rows[row][$0], alignments, $0) } }
                     }
@@ -74,13 +75,13 @@ private struct MdBlockView: View {
             case .trailing: .trailing
             }
         }()
-        return Text(inlines.attributed).frame(minWidth: 40, alignment: alignment)
+        return Text(inlines.attributed(look)).frame(minWidth: 40, alignment: alignment)
     }
 
     @ViewBuilder
     private func marker(ordered: Bool, number: Int, checked: Bool?) -> some View {
         if let checked {
-            Image(systemName: checked ? "checkmark.square.fill" : "square").foregroundStyle(checked ? Color.accentColor : .secondary)
+            Image(systemName: checked ? "checkmark.square.fill" : "square").foregroundStyle(checked ? look.brand : look.mutedText)
         } else if ordered {
             Text("\(number).").monospacedDigit().foregroundStyle(.secondary)
         } else {
@@ -132,28 +133,28 @@ private struct InlineImageView: View {
 // MARK: Text
 
 extension Array where Element == MdInline {
-    /// The inline content as one styled run of text.
-    var attributed: AttributedString {
+    /// The inline content as one styled run of text, in the scheme in force (code gets the faint fill, a `<Mark>` its tint).
+    func attributed(_ look: Look) -> AttributedString {
         var out = AttributedString()
-        for inline in self { out += inline.attributed }
+        for inline in self { out += inline.attributed(look) }
         return out
     }
 }
 
 private extension MdInline {
-    var attributed: AttributedString {
+    func attributed(_ look: Look) -> AttributedString {
         switch self {
         case .text(let text): return AttributedString(text)
         case .code(let text):
             var run = AttributedString(text)
             run.inlinePresentationIntent = .code
-            run.backgroundColor = Color(.secondarySystemFill)
+            run.backgroundColor = look.mutedFill
             return run
-        case .emphasis(let inner): return inner.attributed.adding(.emphasized)
-        case .strong(let inner): return inner.attributed.adding(.stronglyEmphasized)
-        case .strikethrough(let inner): return inner.attributed.adding(.strikethrough)
+        case .emphasis(let inner): return inner.attributed(look).adding(.emphasized)
+        case .strong(let inner): return inner.attributed(look).adding(.stronglyEmphasized)
+        case .strikethrough(let inner): return inner.attributed(look).adding(.strikethrough)
         case .link(let destination, let inner):
-            var run = inner.attributed
+            var run = inner.attributed(look)
             if let destination, let url = URL(string: destination) { run.link = url }
             return run
         case .image(_, let alt, _, _):
@@ -162,8 +163,8 @@ private extension MdInline {
             run.inlinePresentationIntent = .emphasized
             return run
         case .mark(let color, let inner):
-            var run = inner.attributed
-            run.backgroundColor = MarkColor.color(named: color)
+            var run = inner.attributed(look)
+            run.backgroundColor = look.markTint(color)
             return run
         case .softBreak: return AttributedString(" ")
         case .lineBreak: return AttributedString("\n")
@@ -176,19 +177,5 @@ private extension AttributedString {
         var copy = self
         for run in copy.runs { copy[run.range].inlinePresentationIntent = (run.inlinePresentationIntent ?? []).union(intent) }
         return copy
-    }
-}
-
-/// The five highlight colours by name; an unknown or missing one is yellow, as on the desktop. (The desktop also tints each
-/// to its colour scheme and keeps the text legible, `markContrast`; this is a single set for now.)
-enum MarkColor {
-    static func color(named name: String?) -> Color {
-        switch name?.lowercased() {
-        case "green": Color.green.opacity(0.35)
-        case "blue": Color.blue.opacity(0.30)
-        case "pink": Color.pink.opacity(0.32)
-        case "orange": Color.orange.opacity(0.38)
-        default: Color.yellow.opacity(0.45)
-        }
     }
 }

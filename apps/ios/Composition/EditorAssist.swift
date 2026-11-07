@@ -132,7 +132,7 @@ final class EditorAssist {
         selected = max(0, min(selected, rows.count - 1))
         if selected < first { first = selected } else if selected >= first + AssistListView.maxRows { first = selected - AssistListView.maxRows + 1 }
         first = max(0, min(first, rows.count - AssistListView.maxRows))
-        list.show(rows: rows, selected: selected, first: first, label: label, near: view.caretRect(for: position), in: view)
+        list.show(rows: rows, selected: selected, first: first, label: label, near: view.caretRect(for: position), in: view, look: view.look)
     }
 
     private func hide() {
@@ -334,11 +334,13 @@ final class AssistListView: UIView {
 
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(rows: [EditorAssist.Row], selected: Int, first: Int, label: String, near caret: CGRect, in textView: UITextView) {
+    func show(rows: [EditorAssist.Row], selected: Int, first: Int, label: String, near caret: CGRect, in textView: UITextView, look: Look) {
+        backgroundColor = look.theme.surface.uiColor
+        layer.borderColor = look.theme.foreground.uiColor(alpha: Theme.Share.border * 2).cgColor
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         let visible = rows.indices.dropFirst(first).prefix(Self.maxRows)
         for index in visible {
-            let line = AssistRowView(rows[index], selected: index == selected)
+            let line = AssistRowView(rows[index], selected: index == selected, look: look)
             line.accessibilityIdentifier = "assist-row-\(index)"
             line.addAction(UIAction { [weak self] _ in self?.onPick?(index) }, for: .touchUpInside)
             stack.addArrangedSubview(line)
@@ -364,8 +366,11 @@ final class AssistListView: UIView {
 private final class AssistRowView: UIControl {
     private let resting: UIColor
 
-    init(_ row: EditorAssist.Row, selected: Bool) {
-        resting = selected ? UIColor.tintColor.withAlphaComponent(0.2) : .clear
+    private let pressed: UIColor
+
+    init(_ row: EditorAssist.Row, selected: Bool, look: Look) {
+        resting = selected ? look.uiBrand.withAlphaComponent(0.25) : .clear
+        pressed = look.uiBrand.withAlphaComponent(0.4)
         super.init(frame: .zero)
         layer.cornerRadius = 7
         backgroundColor = resting
@@ -374,7 +379,7 @@ private final class AssistRowView: UIControl {
         title.text = row.title
         title.font = row.monospaced ? UIFontMetrics(forTextStyle: .callout).scaledFont(for: .monospacedSystemFont(ofSize: 15, weight: .medium)) : .preferredFont(forTextStyle: .body)
         title.adjustsFontForContentSizeCategory = true
-        title.textColor = .label
+        title.textColor = look.uiForeground
         let text = UIStackView(arrangedSubviews: [title])
         text.axis = .vertical
         text.spacing = 1
@@ -383,7 +388,7 @@ private final class AssistRowView: UIControl {
             label.text = detail
             label.font = .preferredFont(forTextStyle: .caption1)
             label.adjustsFontForContentSizeCategory = true
-            label.textColor = .secondaryLabel
+            label.textColor = look.theme.foreground.uiColor(alpha: Theme.Share.mutedForeground)
             label.numberOfLines = 2
             text.addArrangedSubview(label)
         }
@@ -406,7 +411,7 @@ private final class AssistRowView: UIControl {
             let hint = UILabel()
             hint.text = key
             hint.font = .monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-            hint.textColor = .tertiaryLabel
+            hint.textColor = look.theme.foreground.uiColor(alpha: Theme.Share.mutedForeground * 0.7)
             hint.setContentHuggingPriority(.required, for: .horizontal)
             line.addArrangedSubview(hint)
         }
@@ -424,6 +429,6 @@ private final class AssistRowView: UIControl {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isHighlighted: Bool {
-        didSet { backgroundColor = isHighlighted ? UIColor.tintColor.withAlphaComponent(0.3) : resting }
+        didSet { backgroundColor = isHighlighted ? pressed : resting }
     }
 }

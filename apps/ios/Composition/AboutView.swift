@@ -4,15 +4,16 @@ import SwiftUI
 struct AboutView: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.look) private var look
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("This build") {
                     LabeledContent("Version", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?") (prototype)")
-                    LabeledContent("Does", value: "Browse, search, write, preview, organize, pictures, typing aids, Trash Can, backups")
+                    LabeledContent("Does", value: "Browse, search, write, preview, organize, pictures, typing aids, colour schemes, Trash Can, backups")
                     LabeledContent("Search forgives", value: "Typos, also in first letters and short words")
-                    LabeledContent("Does not yet", value: "Themes, ink")
+                    LabeledContent("Does not yet", value: "Follow the sun, ink")
                 }
                 Section("Your notes") {
                     LabeledContent("Notes", value: "\(model.noteCount)")
@@ -32,6 +33,8 @@ struct AboutView: View {
                     #endif
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(look.background)
             .navigationTitle("About this build")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }

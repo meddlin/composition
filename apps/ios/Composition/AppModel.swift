@@ -55,6 +55,8 @@ final class AppModel {
     private var database: CompositionDatabase?
     private var searchIndex: SearchIndex?
     private(set) var settings: SettingsStore?
+    /// How the app looks (the colour scheme and the two type families), read from `settings.json` when the data opens (build plan Step 10).
+    private(set) var appearance = Appearance()
     private var searchTask: Task<Void, Never>?
 
     /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
@@ -145,6 +147,7 @@ final class AppModel {
             searchIndex = stores.index
             sessions = stores.sessions
             settings = SettingsStore(location: location)
+            loadAppearance()
             indexRebuiltAtOpen = stores.rebuilt
             if stores.recovered > 0 {
                 notice = "The app was closed while you were typing. What you had typed in \(stores.recovered == 1 ? "1 note" : "\(stores.recovered) notes") is back."
@@ -171,6 +174,33 @@ final class AppModel {
             errorMessage = "Couldn't open your notes: \(error.localizedDescription)"
             phase = FileManager.default.fileExists(atPath: location.databaseURL.path) ? .ready : .empty
         }
+    }
+
+    // MARK: Appearance
+
+    /// Reads the appearance from `settings.json`. In a Debug build `-theme forest` (or `system`, `dark` …), `-editorFont serif` and `-previewFont mono`
+    /// set it for that run without writing anything, for screenshots and the UI tests.
+    func loadAppearance() {
+        var current = settings?.appearance() ?? Appearance()
+        #if DEBUG || EDITOR_TEST_HOOKS
+        let defaults = UserDefaults.standard
+        if let name = defaults.string(forKey: "theme") { current.scheme = name == "system" ? .system : .theme(name) }
+        if let name = defaults.string(forKey: "editorFont"), let family = FontFamily(rawValue: name) { current.editorFont = family }
+        if let name = defaults.string(forKey: "previewFont"), let family = FontFamily(rawValue: name) { current.previewFont = family }
+        #endif
+        appearance = current
+    }
+
+    func chooseScheme(_ choice: SchemeChoice) { change { try $0.setScheme(choice) } }
+    func chooseEditorFont(_ family: FontFamily) { change { try $0.setEditorFont(family) } }
+    func choosePreviewFont(_ family: FontFamily) { change { try $0.setPreviewFont(family) } }
+
+    /// Writes one change to `settings.json` and shows it. The file keeps every key the desktop wrote; if it cannot be written, the problem is said
+    /// and nothing changes.
+    private func change(_ edit: (SettingsStore) throws -> Void) {
+        guard let settings else { return }
+        do { try edit(settings) } catch { errorMessage = "Couldn't save that choice: \(error.localizedDescription)" }
+        loadAppearance()
     }
 
     /// Reads the list, the Trash Can and the counts again, and re-runs the search if one is typed.
