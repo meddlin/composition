@@ -30,6 +30,8 @@ export type BackupCounts = {
   todos: number;
   /** To-do items in the archive (done, removed or dropped). */
   archivedTodos: number;
+  /** People in the Contacts rolodex. */
+  contacts: number;
 };
 
 /**
@@ -84,6 +86,7 @@ export function describeCounts(counts: BackupCounts): string {
     const archived = counts.archivedTodos > 0 ? ` (${counts.archivedTodos} archived)` : "";
     parts.push(`${plural(counts.todos, "to-do")}${archived}`);
   }
+  if (counts.contacts > 0) parts.push(plural(counts.contacts, "contact"));
   const text = `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   const trashed = counts.trashedNotes + counts.trashedGroups;
   return trashed > 0 ? `${text}, plus ${plural(trashed, "item")} in the Trash Can` : text;

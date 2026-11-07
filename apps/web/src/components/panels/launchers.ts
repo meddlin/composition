@@ -1,4 +1,4 @@
-import { BookmarkIcon, LibraryBigIcon, ListChecksIcon, RssIcon, SparklesIcon, type LucideIcon } from "lucide-react";
+import { BookmarkIcon, BookUserIcon, LibraryBigIcon, ListChecksIcon, RssIcon, SparklesIcon, type LucideIcon } from "lucide-react";
 import type { PluginSettings } from "@/lib/composition/plugins";
 import { KINDS } from "./kinds";
 import type { KindId } from "./panelsState";
@@ -31,6 +31,7 @@ export const LAUNCHERS: readonly Launcher[] = [
   { kind: "todo", label: "To-do", icon: ListChecksIcon, keywords: ["todo", "tasks", "checklist"], reuse: "focus" },
   { kind: "reading-list", label: "Reading List", icon: BookmarkIcon, keywords: ["links", "articles", "read later", "bookmarks"], reuse: "focus" },
   { kind: "rss", label: "RSS Reader", icon: RssIcon, keywords: ["feeds", "news", "atom", "subscribe"], reuse: "focus" },
+  { kind: "contacts", label: "Contacts", icon: BookUserIcon, keywords: ["rolodex", "address book", "people", "crm", "birthday"], reuse: "focus" },
 ];
 
 export function launcherFor(kind: LauncherKind): Launcher {

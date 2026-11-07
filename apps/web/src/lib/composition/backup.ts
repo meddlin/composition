@@ -102,6 +102,7 @@ function countRows(databaseFile: string): Omit<BackupCounts, "images"> {
       attachments: count(COUNTED_TABLES.attachments),
       todos: count("todos") - archivedTodos,
       archivedTodos,
+      contacts: count("contacts"),
     };
   } finally {
     db.close();

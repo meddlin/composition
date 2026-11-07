@@ -21,7 +21,7 @@ const button = () => screen.queryByRole("button", { name: "Clear browsing data" 
 describe("the Reading List's Clear browsing data", () => {
   it("is not shown while the plugin is off, and appears when it is turned on", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
         <ReadingListSettings />
       </PluginsProvider>,
@@ -35,7 +35,7 @@ describe("the Reading List's Clear browsing data", () => {
 
   it("asks first, and clears nothing on Cancel", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false, contacts: true }}>
         <ReadingListSettings />
       </PluginsProvider>,
     );
@@ -49,7 +49,7 @@ describe("the Reading List's Clear browsing data", () => {
 
   it("clears the browsing data once confirmed, and says so", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false, contacts: true }}>
         <ReadingListSettings />
       </PluginsProvider>,
     );
@@ -64,7 +64,7 @@ describe("the Reading List's Clear browsing data", () => {
   it("says why when it could not clear", async () => {
     vi.mocked(clearReadingData).mockRejectedValueOnce(new Error("The session is busy."));
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": true, rss: false, contacts: true }}>
         <ReadingListSettings />
       </PluginsProvider>,
     );

@@ -10,6 +10,7 @@ const counts = (overrides: Partial<BackupCounts> = {}): BackupCounts => ({
   attachments: 1,
   todos: 0,
   archivedTodos: 0,
+  contacts: 0,
   ...overrides,
 });
 
@@ -36,6 +37,11 @@ describe("describeCounts", () => {
     expect(describeCounts(counts({ archivedTodos: 31 }))).toBe(
       "12 notes, 3 groups, 4 images, 1 attached file and 0 to-dos (31 archived)",
     );
+  });
+
+  it("adds the contacts, in the singular for one", () => {
+    expect(describeCounts(counts({ contacts: 40 }))).toBe("12 notes, 3 groups, 4 images, 1 attached file and 40 contacts");
+    expect(describeCounts(counts({ todos: 8, contacts: 1 }))).toBe("12 notes, 3 groups, 4 images, 1 attached file, 8 to-dos and 1 contact");
   });
 
   it("puts what the Trash Can holds last", () => {

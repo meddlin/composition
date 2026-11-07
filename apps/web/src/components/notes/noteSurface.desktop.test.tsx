@@ -88,7 +88,7 @@ describe("the panel commands in the notes surface of the desktop app", () => {
     act(() => void press("KeyP"));
 
     expect(screen.getByRole("dialog", { name: "Command palette" })).toBeTruthy();
-    expect(screen.getAllByRole("option")).toHaveLength(11);
+    expect(screen.getAllByRole("option")).toHaveLength(12);
   });
 
   it("tell the workspace to show its panels when the palette opens one, so Home does not hide it", () => {

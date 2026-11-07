@@ -30,7 +30,7 @@ const toDo = () => screen.getByRole("checkbox", { name: "To-do" });
 describe("the Plugins tab", () => {
   it("lists the To-do plugin, on as the settings say", () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
       </PluginsProvider>,
     );
@@ -40,7 +40,7 @@ describe("the Plugins tab", () => {
 
   it("lists the Reading List plugin, off until it is turned on, and saves turning it on", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
       </PluginsProvider>,
     );
@@ -49,26 +49,26 @@ describe("the Plugins tab", () => {
 
     fireEvent.click(readingList);
 
-    await waitFor(() => expect(savePluginSettings).toHaveBeenCalledWith({ todo: true, "reading-list": true, rss: false }));
+    await waitFor(() => expect(savePluginSettings).toHaveBeenCalledWith({ todo: true, "reading-list": true, rss: false, contacts: true }));
   });
 
   it("turns a plugin off and saves it", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
       </PluginsProvider>,
     );
 
     fireEvent.click(toDo());
 
-    await waitFor(() => expect(savePluginSettings).toHaveBeenCalledWith({ todo: false, "reading-list": false, rss: false }));
+    await waitFor(() => expect(savePluginSettings).toHaveBeenCalledWith({ todo: false, "reading-list": false, rss: false, contacts: true }));
     expect(toDo().getAttribute("aria-checked")).toBe("false");
   });
 
   it("puts the box back and says why when the save is refused", async () => {
     vi.mocked(savePluginSettings).mockResolvedValue({ error: "Settings could not be written." });
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
       </PluginsProvider>,
     );
@@ -81,7 +81,7 @@ describe("the Plugins tab", () => {
 
   it("hides the to-do background under Styling while the plugin is off, and shows it again when it is on", async () => {
     render(
-      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false }}>
+      <PluginsProvider initial={{ todo: true, "reading-list": false, rss: false, contacts: true }}>
         <PluginsSettings />
         <TodoLookSettings />
       </PluginsProvider>,

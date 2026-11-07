@@ -44,14 +44,14 @@ describe("the plugin rail", () => {
   it("has an icon for each kind of panel that can be opened, in the empty panel's order", async () => {
     await setup();
 
-    expect(icons()).toEqual(["Notes browser", "AI helper", "To-do", "Reading List", "RSS Reader"]);
+    expect(icons()).toEqual(["Notes browser", "AI helper", "To-do", "Reading List", "RSS Reader", "Contacts"]);
   });
 
   it("leaves out the icon of a plugin that is off, as a fresh install has it", async () => {
     const store = createWorkspaceStore({ notes: [], groups: [] }, {} as never, undefined, { panels: {} });
     render(<PluginRail store={store} />);
 
-    expect(icons()).toEqual(["Notes browser", "AI helper", "To-do"]);
+    expect(icons()).toEqual(["Notes browser", "AI helper", "To-do", "Contacts"]);
   });
 
   it("drops an icon when its plugin is turned off and brings it back when it is turned on", async () => {
@@ -135,7 +135,7 @@ describe("the plugin rail", () => {
 
       act(() => setRailKindHidden("rss", true));
 
-      expect(icons()).toEqual(["Notes browser", "AI helper", "To-do", "Reading List"]);
+      expect(icons()).toEqual(["Notes browser", "AI helper", "To-do", "Reading List", "Contacts"]);
       expect(store.plugins.getSnapshot().enabled.rss).toBe(true);
       // Its panel is still there for the palette and the empty panel.
       expect(store.openKind("rss")).not.toBeNull();
@@ -173,6 +173,7 @@ describe("the plugin rail", () => {
       setRailKindHidden("notes-browser", true);
       setRailKindHidden("ai", true);
       setRailKindHidden("todo", true);
+      setRailKindHidden("contacts", true);
     });
 
     expect(rail()).toBeNull();
