@@ -1,4 +1,4 @@
-import { Component, useId, useMemo, type ReactNode } from "react";
+import { Component, memo, useId, useMemo, type ReactNode } from "react";
 import Markdown, { type Options } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMdx from "remark-mdx";
@@ -45,8 +45,11 @@ const mdxRehypeOptions = (idPrefix: string): NonNullable<Options["remarkRehypeOp
  * the MDX components in `mdxComponents` for notes that use any of them. The
  * headings of such a note get ids, which is what `<Toc />` links to. Footnotes
  * (`[^1]`) are listed at the end of the note, or where it puts `<Footnotes />`.
+ *
+ * Memoized: parsing the note is the costly part, and the editor around it re-renders for reasons that leave the text
+ * alone (a note switch does it twice). Whatever the preview reads from context still updates it.
  */
-export function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props) {
+export const NoteMarkdown = memo(function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props) {
   // Every piece of text is wrapped to say where in the note it came from; that has to see the tree first.
   const rehypePlugins = useMemo(() => [rehypeSourceSpans, ...extraRehypePlugins], [extraRehypePlugins]);
   const mdxRehypePlugins = useMemo(() => [rehypeSourceSpans, rehypeFootnotes, ...extraRehypePlugins], [extraRehypePlugins]);
@@ -81,7 +84,7 @@ export function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props)
       </Markdown>
     </MdxBoundary>
   );
-}
+});
 
 type BoundaryProps = { body: string; fallback: ReactNode; children: ReactNode };
 type BoundaryState = { body: string; error: Error | null };
