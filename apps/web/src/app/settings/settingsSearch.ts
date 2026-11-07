@@ -25,7 +25,18 @@ const GROUP = '[data-slot="card"], [data-slot="field-set"]';
 const HEADING = '[data-slot="card-title"], legend, label';
 
 const squash = (text: string) => text.replace(/\s+/g, " ").trim();
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const isWordCharacter = (character: string) => /[\p{L}\p{N}]/u.test(character);
+
+/** Whether `word` appears in `text` starting a word, not in the middle of one ("sun" in "sunset" but not "unsung"). */
+function startsAWord(text: string, word: string): boolean {
+  for (let at = text.indexOf(word); at !== -1; at = text.indexOf(word, at + 1)) {
+    // The character before, which may be a surrogate pair.
+    const before = [...text.slice(Math.max(0, at - 2), at)].pop();
+    if (before === undefined || !isWordCharacter(before)) return true;
+  }
+  return false;
+}
 
 /**
  * What the element says, as words. Not `textContent`, which runs neighbouring elements together
@@ -54,8 +65,7 @@ function groupsIn(root: HTMLElement): HTMLElement[] {
 export function searchSettings(pages: SettingsSearchPage[], query: string): SettingsHit[] {
   const words = squash(query).toLowerCase().split(" ").filter(Boolean);
   if (words.length === 0) return [];
-  const patterns = words.map((word) => new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(word)}`, "u"));
-  const matches = (text: string) => patterns.every((pattern) => pattern.test(text));
+  const matches = (text: string) => words.every((word) => startsAWord(text, word));
 
   const byHeading: SettingsHit[] = [];
   const byBody: SettingsHit[] = [];

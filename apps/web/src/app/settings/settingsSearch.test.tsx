@@ -71,6 +71,26 @@ describe("searchSettings", () => {
     expect(searchSettings(pages, "puter")).toHaveLength(0);
   });
 
+  it("tells a word's start from its middle by letters and digits of any script, not just ASCII ones", () => {
+    const pages = pagesOf({
+      general: titled("Notes", "café au lait, 2fa codes, 😀sun, 𝒜sunrise"),
+    });
+
+    expect(searchSettings(pages, "lait")).toHaveLength(1);
+    expect(searchSettings(pages, "afé")).toHaveLength(0);
+    expect(searchSettings(pages, "fa")).toHaveLength(0);
+    expect(searchSettings(pages, "codes")).toHaveLength(1);
+    // After an emoji, which is not a letter, a word starts; after a letter outside the basic plane, it does not.
+    expect(searchSettings(pages, "sun")).toHaveLength(1);
+    expect(searchSettings(pages, "sunrise")).toHaveLength(0);
+  });
+
+  it("finds a word at a later place in the text when it sits in the middle of a word at the first", () => {
+    const pages = pagesOf({ general: titled("Notes", "unsung, then sung loudly") });
+
+    expect(searchSettings(pages, "sung")).toHaveLength(1);
+  });
+
   it("needs every word of the query, in any order, and ignores case", () => {
     const pages = pagesOf({ general: titled("Backup", "Saves your notes in one file") });
 
