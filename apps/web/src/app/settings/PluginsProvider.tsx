@@ -10,7 +10,7 @@ import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/com
 const PluginsContext = createContext<PluginsStore>(createPluginsStore(unsavedPlugins, DEFAULT_PLUGIN_SETTINGS));
 
 /**
- * Gives the Settings screen one answer to "which plugins are on", so the Plugins tab and the sections a plugin adds
+ * Gives the Settings screen one answer to "which plugins are on", so the Plugins page and the sections a plugin adds
  * to other tabs (the to-do background under Styling) change together. When the desktop app's workspace exists the answer
  * is the workspace's, so the open panels, in every window, follow a change at once; otherwise it is the saved
  * settings, kept here.

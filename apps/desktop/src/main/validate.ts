@@ -162,6 +162,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   savePreviewFont: ([font]) => [text("savePreviewFont", font, "font")],
   saveEditorFont: ([font]) => [text("saveEditorFont", font, "font")],
   saveNoteBackground: ([background]) => [text("saveNoteBackground", background, "background")],
+  saveSunPair: ([pair]) => [text("saveSunPair", pair, "pair")],
   saveWritingSettings: ([input]) => {
     const value = record("saveWritingSettings", input, "settings");
     // Only the settings sent are changed (the Styling page sends just its own), but something has to be sent.

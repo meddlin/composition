@@ -30,13 +30,14 @@ afterEach(() => {
   root.removeAttribute("data-theme");
   root.removeAttribute("data-tone");
   root.removeAttribute("data-note-background");
+  root.removeAttribute("data-sun-pair");
   root.removeAttribute("data-translucent");
   root.removeAttribute("style");
 });
 
-/** Tells the window how the app looks; the note background and see-through look are the plain, opaque ones unless said. */
-const tell = (appearance: Omit<AppearanceMessage, "noteBackground" | "translucent" | "opacity"> & Partial<Pick<AppearanceMessage, "noteBackground" | "translucent" | "opacity">>) =>
-  listeners.forEach((listener) => listener({ noteBackground: "plain", translucent: false, opacity: 0.8, ...appearance }));
+/** Tells the window how the app looks; the note background, sun colors and see-through look are the plain, opaque, classic ones unless said. */
+const tell = (appearance: Omit<AppearanceMessage, "noteBackground" | "sunPair" | "translucent" | "opacity"> & Partial<Pick<AppearanceMessage, "noteBackground" | "sunPair" | "translucent" | "opacity">>) =>
+  listeners.forEach((listener) => listener({ noteBackground: "plain", sunPair: "classic", translucent: false, opacity: 0.8, ...appearance }));
 const root = () => document.documentElement;
 
 describe("AppearanceSync", () => {
@@ -85,6 +86,16 @@ describe("AppearanceSync", () => {
     expect(root().dataset.theme).toBe("auto");
     expect(root().dataset.tone).toBe("light");
     expect(root().style.getPropertyValue("--auto-light")).toBe("0.65");
+  });
+
+  it("gives the window the pair of colors it follows the sun between", () => {
+    render(<AppearanceSync />);
+
+    tell({ theme: "auto", previewFont: "default", editorFont: "default", sunPair: "cream-amber" });
+    expect(root().dataset.sunPair).toBe("cream-amber");
+
+    tell({ theme: "auto", previewFont: "default", editorFont: "default" });
+    expect(root().dataset.sunPair).toBe("classic");
   });
 
   it("tells the window's own sun sync to read the schedule again, since the scheme or the city may have changed it", () => {

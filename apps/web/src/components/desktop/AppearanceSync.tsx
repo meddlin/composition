@@ -11,6 +11,7 @@ import { previewFontStack } from "@/lib/composition/previewFonts";
 function applyAppearance(root: HTMLElement, appearance: AppearanceMessage): void {
   root.dataset.theme = appearance.theme;
   root.dataset.noteBackground = appearance.noteBackground;
+  root.dataset.sunPair = appearance.sunPair;
   // A flag, as the layout's first-paint script sets it: present means see-through.
   if (appearance.translucent) root.dataset.translucent = "";
   else delete root.dataset.translucent;
