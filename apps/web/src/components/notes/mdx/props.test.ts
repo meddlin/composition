@@ -46,6 +46,7 @@ describe("findPropTarget: prop names", () => {
     expect(names("<Toc |/>")).toEqual(["maxDepth"]);
     expect(names('<YouTube url="x" |/>')).toEqual(["start", "title"]);
     expect(names('<Repo url="x" |/>')).toEqual(["description"]);
+    expect(names("<Sheet |")).toEqual(["title", "height"]);
   });
 
   it("finds the tag in the middle of a sentence", () => {
@@ -141,6 +142,7 @@ describe("findPropTarget: values", () => {
     expect(names('<Mark color="|')).toEqual(["yellow", "green", "blue", "pink", "orange"]);
     expect(names('<Mark color="p|')).toEqual(["pink"]);
     expect(names('<Toc maxDepth="|')).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(names('<Sheet height="|')).toEqual(["240", "360", "500", "700"]);
   });
 
   it("has no suggestions for a prop that has none", () => {

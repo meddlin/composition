@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`, `<Sheet>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -286,6 +286,59 @@ which reads the CSV and the props (and is shared with the terminal app, whose dr
 [`chartText.ts`](../../apps/cli/src/chartText.ts)). A note never reaches Recharts' own API: swapping
 the library means rewriting `Chart.tsx` only.
 
+## `<Sheet>`
+
+A grid of a table, drawn like a spreadsheet, with the table written inside the tag as a CSV block, as for
+[`<Chart>`](#chart):
+
+````mdx
+<Sheet title="Q3 budget">
+
+```csv
+Region,Units,Price,Revenue
+West,120,9.5,1140
+East,80,9.5,760
+```
+
+</Sheet>
+````
+
+This is the first, read-only step of [spreadsheets in notes](../sheet-component-plan.md): the data is a CSV block in
+the note, which is Markdown text like the rest of it. Editing it in a grid, formulas and importing from Excel are the
+steps after, and are not built yet.
+
+- **Blank lines around the fence**, as for `<Chart>`, which is what makes it a code block and keeps Markdown from
+  rewrapping it.
+- **Drawn like a spreadsheet.** Excel's column letters (A, B, … AA) sit over the header row, row numbers run down the
+  side, numbers are flush right, and the header and the row numbers stay in view as it scrolls. The header is
+  **row 1** and the first row below it is row 2, as in Excel, because formulas will be written against those addresses.
+- **The table.** The first row names the columns. Cells can be quoted (`"Smith, J"`, with `""` for a quote, and a quoted
+  cell can hold a line break) and are trimmed. A row shorter than the widest is padded with empty cells. **A blank row
+  (`,,`) is a row**, so a row's number is its place in the text; blank lines before the header and after the last row are
+  dropped. A header with nothing below it is a sheet, an empty one to start typing in.
+- **Errors.** A cell holding one of Excel's errors (`#DIV/0!`, `#N/A`, `#NAME?`, `#NULL!`, `#NUM!`, `#REF!`,
+  `#VALUE!`) is shown in the error colour.
+- `title` captions it. `height` is how tall it may grow, in pixels (360 by default, kept between 120 and 800), after
+  which it scrolls. A column is as wide as its longest cell, between 4 and 40 characters; a longer cell is cut, and
+  hovering shows all of it.
+- **A long sheet** of up to 100 rows below the header is drawn whole, so the preview's find-in-note can search it.
+  A longer one draws only the rows in view, so its size is not what it costs (drawing 5,000 rows of 20 columns whole
+  took about 400 ms; the window about 4 ms), and find-in-note sees only the rows drawn.
+- **A big sheet is said so.** Past 100,000 characters the editor stops colouring the whole note, and a sheet that
+  size says so under itself.
+- The block tagged `csv` is read. With none, the first block is, since a fence the author forgot to tag is still
+  meant. Any other fenced block beside the `csv` one is ignored (a `formulas` block will hold formulas, in a later step).
+- A table that can't be drawn (no data) shows a short notice in place of the grid, saying so, so the rest of the note
+  stays put.
+- Colours are the active theme's own, so a sheet reads in every scheme. It is a table with a label saying how big it is,
+  and its scrolling area can be reached with the keyboard.
+- The terminal draws the cells as aligned text, with the letters and row numbers (see [In the CLI](#in-the-cli)).
+
+Source: [`mdx/Sheet.tsx`](../../apps/web/src/components/notes/mdx/Sheet.tsx) and
+[`mdx/sheetData.ts`](../../apps/web/src/components/notes/mdx/sheetData.ts), which reads the CSV (and is shared with the
+terminal app, whose drawing is [`sheetText.ts`](../../apps/cli/src/sheetText.ts)). The CSV reader is `parseCsv` in
+[`chartData.ts`](../../apps/web/src/components/notes/mdx/chartData.ts), with an option that keeps blank rows.
+
 ## How it renders
 
 - **Only notes that use a component are parsed as MDX.** Every other note is plain
@@ -323,6 +376,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
 | `<Repo>` | A link to the repository, `⎇ owner/name`, with the description after it. A `url` that isn't a repository is said so in words. |
 | `<Chart>` | A code block of bars made of block characters, one per value, under the title in bold. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
+| `<Sheet>` | A code block of the cells, with Excel's column letters and the row numbers, under the title in bold; a column that holds only numbers is flush right, and a cell is cut at 24 characters. A sheet over 50 rows below the header shows the first 50 and says how many it left out. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 | `<Drawio>` | The same as `<Image>`: the diagram's picture, which is a PNG. The terminal has no editor, so it cannot change one. |
 
@@ -364,6 +418,8 @@ worth trying for that prop.
 | `<Chart>` | `type` | `bar` `line` `area` `pie` |
 | `<Chart>` | `height` | `200` `280` `400` `600` |
 | `<Chart>` | `x`, `y`, `title` | none (free text) |
+| `<Sheet>` | `title` | none (free text) |
+| `<Sheet>` | `height` | `240` `360` `500` `700` |
 
 A value menu closes when nothing matches what's typed, since `width="320"` is as good as any
 preset. Picking a value replaces what was typed, closing quote included, and puts the caret past

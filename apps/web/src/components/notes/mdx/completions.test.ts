@@ -21,6 +21,13 @@ describe("mdxCompletions", () => {
     expect(text.slice(caret)).toBe("\n\n</Info>");
   });
 
+  it("leaves the caret on the header row of a sheet's csv block", () => {
+    const { text, caret } = expandCompletion(mdxCompletions.find((c) => c.name === "Sheet")!);
+    expect(text).toBe("<Sheet>\n\n```csv\n\n```\n\n</Sheet>");
+    expect(text.slice(0, caret)).toBe("<Sheet>\n\n```csv\n");
+    expect(text.slice(caret)).toBe("\n```\n\n</Sheet>");
+  });
+
   it("leaves the caret inside the src of an image", () => {
     const { text, caret } = expandCompletion(mdxCompletions.find((c) => c.name === "Image")!);
     expect(text.slice(0, caret)).toBe('<Image src="');

@@ -26,6 +26,7 @@ describeParity("MarkdownEditor component completion", (scenario) => {
       expect.stringContaining("<YouTube>"),
       expect.stringContaining("<Repo>"),
       expect.stringContaining("<Chart>"),
+      expect.stringContaining("<Sheet>"),
     ]);
   });
 
@@ -122,9 +123,9 @@ describeParity("MarkdownEditor component completion", (scenario) => {
     editor.press("ArrowUp");
     editor.press("Enter");
 
-    expect(editor.text()).toBe('<Chart type="bar">\n\n```csv\n\n```\n\n</Chart>');
+    expect(editor.text()).toBe("<Sheet>\n\n```csv\n\n```\n\n</Sheet>");
     // Inside the fence, where the table goes.
-    expect(editor.caret()).toBe('<Chart type="bar">\n\n```csv\n'.length);
+    expect(editor.caret()).toBe("<Sheet>\n\n```csv\n".length);
   });
 
   scenario("inserts a component picked with the mouse", ({ render }) => {

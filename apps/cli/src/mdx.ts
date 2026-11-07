@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`, `<Sheet>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -18,13 +18,14 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { chartMarkdown } from "./chartText";
-import { HEADINGS_PROP, imageNameFromRef, parseChart, parseRepo, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
+import { sheetMarkdown } from "./sheetText";
+import { HEADINGS_PROP, imageNameFromRef, parseChart, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart", "Sheet"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -67,6 +68,8 @@ type Node = {
   url?: string;
   title?: string | null;
   alt?: string | null;
+  /** On a fenced `code` node: the language after the opening fence. */
+  lang?: string | null;
   /** On a `footnoteDefinition` or `footnoteReference`: what the note called the footnote. */
   identifier?: string;
   /** Set by `numberFootnotes`: on a citation, its footnote's number; on a `<Footnotes>` tag, the list it draws. */
@@ -222,6 +225,8 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "markdown", source: repoMarkdown(element) }];
     case "Chart":
       return [{ kind: "markdown", source: chartText(element) }];
+    case "Sheet":
+      return [{ kind: "markdown", source: sheetText(element) }];
     default:
       return [];
   }
@@ -268,8 +273,9 @@ function replacement(element: Node, source: string): string {
       return youtubeMarkdown(element);
     case "Repo":
       return repoMarkdown(element);
-    // A block of bars can't sit in a sentence or a list item, any more than a table of contents can.
+    // A block of bars, or of cells, can't sit in a sentence or a list item, any more than a table of contents can.
     case "Chart":
+    case "Sheet":
       return "";
     case "Info":
     case "Warning":
@@ -334,6 +340,30 @@ function csvOf(node: Node): string {
 function chartText(element: Node): string {
   const parsed = parseChart({ type: attribute(element, "type"), x: attribute(element, "x"), y: attribute(element, "y"), csv: csvOf(element) });
   return parsed.spec ? chartMarkdown(parsed.spec, attribute(element, "title")) : parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
+}
+
+/**
+ * The text of the fenced block tagged `lang` under a tag, else its first block, else all its text: a
+ * `<Sheet>`'s CSV, with a `formulas` block beside it that must not run into it. As on the web (Sheet.tsx).
+ */
+function blockOf(node: Node, lang: string): string {
+  const blocks: Node[] = [];
+  const collect = (n: Node) => {
+    if (n.type === "code") blocks.push(n);
+    else n.children?.forEach(collect);
+  };
+  collect(node);
+  const wanted = blocks.find((block) => block.lang === lang) ?? blocks[0];
+  return wanted ? (wanted.value ?? "") : csvOf(node);
+}
+
+/**
+ * `<Sheet>` as its cells in a code block (see sheetText.ts), since a terminal can't draw a grid. A table
+ * that can't be drawn is said so in words, as on the web.
+ */
+function sheetText(element: Node): string {
+  const parsed = parseSheet(blockOf(element, "csv"));
+  return parsed.sheet ? sheetMarkdown(parsed.sheet, attribute(element, "title")) : parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {

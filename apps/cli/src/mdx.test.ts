@@ -231,6 +231,29 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Sheet>", () => {
+    const sheet = (props: string, ...fences: string[]) => `<Sheet${props}>\n\n${fences.join("\n\n")}\n\n</Sheet>`;
+    const csv = (text: string) => `\`\`\`csv\n${text}\n\`\`\``;
+
+    it("is a code block of the grid under its title", () => {
+      const [block] = parsePreview(sheet(' title="Q3"', csv("Region,Units\nWest,120"))).blocks;
+      expect(block).toEqual({ kind: "markdown", source: `**Q3**\n\n\`\`\`\n  A${" ".repeat(11)}B\n1 Region  Units\n2 West${" ".repeat(6)}120\n\`\`\`` });
+    });
+
+    it("reads the csv block and not a formulas block beside it", () => {
+      const [block] = parsePreview(sheet("", csv("a,b\n1,2"), "```formulas\nB2 =A2+1\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A  B\n1 a  b\n2 1  2\n```" });
+    });
+
+    it("says so when the table can't be drawn", () => {
+      expect(parsePreview("<Sheet />").blocks).toEqual([{ kind: "markdown", source: "Sheet: add a \\`\\`\\`csv block with a header row and the data." }]);
+    });
+
+    it("is dropped from inside a sentence", () => {
+      expect(parsePreview("See <Sheet /> now.").blocks).toEqual([{ kind: "markdown", source: "See  now." }]);
+    });
+  });
+
   describe("indented code", () => {
     it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
       const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
@@ -485,7 +508,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>, <Sheet>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {

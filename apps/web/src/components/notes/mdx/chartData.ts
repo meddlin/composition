@@ -40,9 +40,11 @@ export const isChartType = (value: unknown): value is ChartType => typeof value 
 
 /**
  * CSV as rows of cells. Cells may be quoted (`"a, b"`, with `""` for a quote), a quoted cell may
- * hold a newline, and `\r\n` is a line break. Blank lines are skipped.
+ * hold a newline, and `\r\n` is a line break. Blank lines are skipped, unless `keepBlankRows` is set:
+ * a sheet counts them (a row's number is where it sits in the text), so there a row of empty cells is a
+ * row, and the text ending in a line break ends with one more, empty, for the caller to trim.
  */
-export function parseCsv(text: string): string[][] {
+export function parseCsv(text: string, { keepBlankRows = false }: { keepBlankRows?: boolean } = {}): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -54,7 +56,7 @@ export function parseCsv(text: string): string[][] {
   };
   const endRow = () => {
     endCell();
-    if (row.some((value) => value.trim() !== "")) rows.push(row.map((value) => value.trim()));
+    if (keepBlankRows || row.some((value) => value.trim() !== "")) rows.push(row.map((value) => value.trim()));
     row = [];
   };
 
