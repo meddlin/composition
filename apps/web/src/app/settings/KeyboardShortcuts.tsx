@@ -7,7 +7,7 @@ import { ShortcutList } from "@/components/shortcuts/ShortcutList";
 import { useShortcutsHelper } from "@/components/shortcuts/ShortcutsHelper";
 
 /**
- * The Keyboard shortcuts tab of the Settings screen: the full list, plus a button for the
+ * The Keyboard shortcuts page of the Settings screen: the full list, plus a button for the
  * floating window that the same list opens in from anywhere in the app.
  */
 export function KeyboardShortcuts() {

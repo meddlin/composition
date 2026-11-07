@@ -147,6 +147,10 @@ async function waitFor(fn, { timeout = 20_000, interval = 250 } = {}) {
   throw last ?? new Error("timed out");
 }
 
+/** Opens a page of the Settings screen from the list down its side (the app's window opens wide enough to show it). */
+const openSettingsPage = (page, name) =>
+  page.getByRole("navigation", { name: "Settings sections" }).getByRole("button", { name, exact: true }).click();
+
 function meiliProcessesFor(dir) {
   try {
     return execFileSync("pgrep", ["-f", dir], { encoding: "utf-8" }).trim().split("\n").filter(Boolean);
@@ -450,7 +454,7 @@ try {
   // ---- AI helper (Settings). The server is a stand-in on a free local port; nothing leaves this machine.
   const ollama = await startFakeOllama();
   const decoy = await startFakeOllama();
-  await page.getByRole("tab", { name: "AI Configuration" }).click();
+  await openSettingsPage(page, "AI Configuration");
   const helper = page.locator('[data-slot="card"]').filter({ has: page.getByRole("heading", { name: "AI helper" }) });
   await helper.waitFor();
   await helper.getByLabel("Server address").fill(ollama.url);
@@ -915,7 +919,7 @@ try {
     console.log("SKIP  the update toggles  (development build or a .deb install: they are not shown)");
   }
 
-  await page.getByRole("tab", { name: "Styling" }).click();
+  await openSettingsPage(page, "Styling");
   await page.getByLabel("Light", { exact: true }).check();
   await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).theme === "light");
   check("changing the theme applies it immediately", (await page.evaluate(() => document.documentElement.dataset.theme)) === "light");
@@ -924,7 +928,7 @@ try {
   check("the theme is stored in the app's own settings file", fs.existsSync(path.join(userData, "settings.json")) && JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).theme === "light");
   check("the web app's settings file was not touched", !fs.existsSync(path.join(home, ".composition-web", "settings.json")));
   await page.screenshot({ path: path.join(out, "4-settings-light.png") });
-  await page.getByRole("tab", { name: "General" }).click();
+  await openSettingsPage(page, "General");
 
   // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real
   // main-process code and the real files are exercised; only the OS picker is not.
