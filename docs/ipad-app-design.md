@@ -565,7 +565,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Markdown tab | ⭐ | M1 | 🔬 | TextKit 2 with attribute runs; no overlay. S3: the colours work in the lab on a 5,000-line note, but a full re-colour per keystroke is too slow there, so it needs an incremental one ([S3 status](#s3-status)); nothing is saved yet |
+| Markdown tab | ⭐ | M1 | 🔬 | TextKit 2 with attribute runs; no overlay. S3: a full re-colour per keystroke was too slow on a 5,000-line note (87 ms); **the incremental one is built (build plan Step 5): 0.6 ms per keystroke there in a Release Simulator build** ([Step 5 status](#step-5-incremental-colouring)); the real editor is Step 6 |
 | Preview tab | 🔁 | M1 | 🔨 | Prototype: SwiftUI blocks from `CompositionCore`'s model, in the Simulator ([S4 status](#s4-status)). The design's read-only text view with view-based attachments (selection across blocks) is not built |
 | Split tab | 🔁 | M1 | ⬜ | One column at narrow widths |
 | Live tab | ⚠️ | Later | 🔬 | Hidden marks away from the caret ([C12](#compromise-register)). S3, Simulator only: a tiny clear font on the syntax, except in the caret's paragraph, works; swapping the displayed paragraph does not (the text comes out garbled). Not tried with the Pencil, arrow keys, selection handles or VoiceOver ([S3 status](#s3-status)) |
@@ -720,7 +720,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R10 | Tar and gzip written in Swift mis-restore a desktop backup or produce one the desktop rejects. | Medium, high | Round-trip both ways in S1, including a large archive. **Done 2026-11-05 on the Mac and the Simulator** ([S1 status](#s1-status)); not yet on the device. |
 | R11 | Vision reads handwriting poorly, so handwritten notes stay unsearchable. | Medium, medium | C11; S5 with your handwriting. |
 | R12 | PencilKit's dark-mode colour inversion fights the six schemes. | Medium, low | Semantic colours; `convertColor`; S5. |
-| R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. **S3 (Simulator, Release build): it does, with a full re-colour on every keystroke.** An edit in a 5,030-line note took 87 ms (22 ms to read the Markdown, 45 ms to apply the colours); the apply is UIKit's and not helped by a Release build. The editor therefore has to re-colour only what changed, and read the Markdown off the main thread or after a pause ([S3 status](#s3-status)). The iPad's own speed is not measured. |
+| R13 | Typing lags in a very long note with attachments. | Medium, high | S3 with a 5,000-line note; N7. **S3 (Simulator, Release build): it does, with a full re-colour on every keystroke.** An edit in a 5,030-line note took 87 ms (22 ms to read the Markdown, 45 ms to apply the colours); the apply is UIKit's and not helped by a Release build. The editor therefore has to re-colour only what changed, and read the Markdown off the main thread or after a pause ([S3 status](#s3-status)). The iPad's own speed is not measured. **Step 5 (Simulator, Release build): fixed in the lab.** Re-colouring only the blocks around an edit costs 0.58 ms median and 0.9 ms worst per keystroke in the same note, against 91 ms for the whole-note way ([Step 5 status](#step-5-incremental-colouring)); still to measure on the iPad. |
 | R14 | Only one test device: no mini or Air, no Pencil Pro; the Simulator is believed not to emulate Pencil pressure, tilt or hover (unverified). | Certain, low | Recorded in D14; the Simulator covers sizes. |
 | R15 | CI on a macOS runner is slow or costly, and Xcode versions drift. | Medium, low | Pin the Xcode version; keep the core on `swift test`. **Done in `.github/workflows/ios-core.yml`:** the `xcode-27` image with Xcode 27.2 pinned and Node 24, the toolchain used locally, only on the paths that can break the agreement (the repo is public, so macOS minutes are free). That image is still a GitHub *preview* (it can be unstable or queue), so the stable fallback is `macos-26` with Xcode 26.6. Not yet run on GitHub. |
 
@@ -982,6 +982,42 @@ exists to show is needed. A note of 37 lines costs 0.5 ms.
 **What it means for Gate B** (a proposal, for you): D5 (a `UITextView` on TextKit 2) is supported for the Markdown and Split tabs; R2 holds in the Simulator; R13
 needs an incremental re-colour in the editor's design before M1; the Live tab (C12) is *not ruled out* but stays after v1 until the on-device items above pass.
 Gate B also waits for the same on-device checks, listed in [manual-tests/ipad.md](manual-tests/ipad.md).
+
+### Step 5: incremental colouring
+
+**Built and measured 2026-11-06 in the iPad Pro 11-inch (M5) Simulator, Release build; not tried on an iPad.** It answers the finding of [S3](#s3-status): a full re-colour of a 5,030-line note after every
+keystroke took 87 ms.
+
+**What was built.** In `CompositionCore/Markdown/`: `MarkdownHighlighter.blocks(in:)` groups the spans by the note's top-level blocks (a paragraph, a list, a fenced block, the frontmatter), and
+`HighlightModel` holds them. After an edit `edited(replacing:withLength:in:)` reads again only the blocks the edit touches and one neighbour on each side (what was typed may have joined or split them), moves
+everything after it, and says which range to colour again; `EditAccumulator` turns a run of edits (a composition, an undo) into one. In the lab: character edits are taken from the text storage's own
+notification (the delegate's `shouldChangeTextIn` is *not* called for `insertText` or for changes made in code), the blocks around the edit are coloured at once, and a pause of 0.3 s starts a full read **off the
+main thread** whose `differences(from:)` the quick reads are compared with. Only the blocks that differ are coloured again, in steps of at most 3,000 characters that typing interrupts. The Live-style
+reveal now re-colours only the paragraph the caret left and the one it entered.
+
+**Measured** (Release, 5,034 lines, 101,015 characters, 20 views in the text, 400 keystrokes typed with `insertText` and 8 ms between them; the lab's *Typing speed test*):
+
+| | Whole note after every keystroke (before) | Blocks around the edit (now) |
+|---|---|---|
+| Our own work per keystroke, median | 91 ms | **0.58 ms** |
+| Our own work per keystroke, 95th percentile / worst | 94 / 104 ms | **0.74 / 0.9 ms** |
+| The whole keystroke, with UIKit taking the character in, median | 98 ms | 3.4 ms (worst 17 ms, once) |
+| A full read of the note | on the main thread, every keystroke | 27 to 30 ms, off the main thread, after a pause |
+
+The proposed budget was about one frame (16 ms) of our own work: it is used up by 4%. A fence typed on its own line in the middle of the note, which the blocks around it cannot read correctly because the
+text it swallows is not among them, was found and put right by the pause: 50,311 characters, in steps totalling 11 ms of main-thread time, the worst under 1 ms.
+
+**How right the quick read is, and why that is enough.** On the 115 notes of the MDX corpus, with a typed character, a typed line break or a deleted character at six places in each, the quick read gave exactly
+the full read's colours for **97.7%** of 1,692 edits; for random typing of the characters that make Markdown (fences, `#`, `>`, list markers, tables, tags, emoji) it was 92% to 96%. A test that puts the quick
+colours and then only the ranges `differences` names on a simulated text view ends with exactly the colours of a full read, for 1,410 corpus edits (127 of them needed the correction) and for 4,000 random
+ones with a pause every five edits. Taking the neighbours out of the read drops the agreement to 93% and 83%, so they stay.
+
+**A bug this found.** 120,000 random edits crashed the existing highlighter: for odd Markdown (a quote that swallows a fence) a child node's range lies outside its parent's, and building a `Range` the wrong way round
+traps. Fixed (`between`), with a soak test; the editor would have crashed on such text while typing. The parser can also give overlapping blocks for such text; blocks that overlap are joined.
+
+**Not done, or not known:** the iPad's own speed (a Mac-built Simulator is faster than an M2 iPad Pro, so expect larger numbers; the 16 ms budget leaves a factor of 25); Scribble, dictation and other compositions (they are
+skipped and read as one edit afterwards, by design and by test of the merging, not by trying them); a very large *single* block, which is read whole on each edit inside it (a 2,000-line fenced block would cost its size);
+and the `substitute` way of hiding marks, which still colours the whole note each time (it was found not to work in S3).
 
 ### S4 status
 
@@ -1282,6 +1318,11 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   (17 unit tests, and `autosave-kill-test.sh` in the Simulator). A kill during the pause before a save lost everything typed in it until every edit was also written to a draft file; with the
   drafts, three ways of ending the app lose nothing. The lifecycle flush and state restoration (note, tab, caret) are in. Several windows are not enabled, so the second-window item is only covered in the
   core. Nothing is verified on the iPad. Tracker rows for autosave and the app shell updated; S6 marked done in the Simulator.
+
+- 2026-11-06: **Build plan Step 5, incremental colouring (R13), done in the Simulator.** `HighlightModel` and `EditAccumulator` in the core; the lab colours the blocks around an edit at once and corrects
+  the rest after a pause, off the main thread. Release build, 5,034 lines: 0.58 ms median per keystroke (0.9 ms worst) against 91 ms before. The quick read matches the full one for 97.7% of typed characters
+  on the MDX corpus and a property test shows the correction always ends with the full read's colours. Fuzzing found a crash in the highlighter on odd Markdown, now fixed. Tracker row Markdown tab and R13
+  updated. The iPad's own number and Scribble are still to be checked.
 
 ## Sources
 

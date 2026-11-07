@@ -15,6 +15,7 @@ struct EditorLabView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var lab = EditorLab()
     @State private var scenario = Scenario.sample
+    @State private var benchmark: String?
 
     var body: some View {
         NavigationStack {
@@ -25,7 +26,16 @@ struct EditorLabView: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbar }
         }
-        .task { await load(.sample) }
+        .task {
+            // Developer shortcut: `-labBenchmark 1` opens the 5,000-line note with views, types into it, and writes lab-benchmark.json.
+            if UserDefaults.standard.bool(forKey: "labBenchmark") {
+                await load(.bigViews)
+                try? await Task.sleep(for: .seconds(2))
+                benchmark = await lab.runTypingBenchmark()
+            } else {
+                await load(.sample)
+            }
+        }
     }
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
@@ -48,6 +58,7 @@ struct EditorLabView: View {
                 Button("SwiftUI panel", systemImage: "rectangle.on.rectangle") { lab.insertAttachment(.panel) }
             } label: { Label("Insert a view", systemImage: "plus.rectangle.on.rectangle") }
 
+            Button { Task { benchmark = await lab.runTypingBenchmark() } } label: { Label("Typing speed test", systemImage: "speedometer") }
             Button { lab.presentFind() } label: { Label("Find", systemImage: "magnifyingglass") }
             Button { lab.measureFullLayout() } label: { Label("Lay out everything", systemImage: "ruler") }
         }
@@ -56,9 +67,11 @@ struct EditorLabView: View {
     private var hud: some View {
         let s = lab.stats
         return VStack(alignment: .leading, spacing: 2) {
-            Text("\(s.textKit2 ? "TextKit 2" : "TextKit 1 (fell back!)") · \(s.lines) lines · \(s.characters) characters · \(s.attachments) views · \(s.spans) spans")
-            Text(String(format: "colour: parse %.1f ms + apply %.1f ms · last edit %.1f ms · worst %.1f ms", s.parseMilliseconds, s.applyMilliseconds, s.lastEditMilliseconds, s.worstEditMilliseconds)
+            Text("\(s.textKit2 ? "TextKit 2" : "TextKit 1 (fell back!)") · \(s.lines) lines · \(s.characters) characters · \(s.attachments) views · \(s.spans) blocks")
+            Text(String(format: "colour per edit: last %.2f ms · worst %.2f ms · re-read %d characters · %d quick, %d not", s.lastEditMilliseconds, s.worstEditMilliseconds, s.rereadCharacters, s.incrementalEdits, s.fallbackEdits))
+            Text(String(format: "full read: %.0f ms off the main thread · put on in steps: worst %.1f ms, all %.0f ms · corrections %d (%d characters last)", s.fullReadMilliseconds, s.worstSliceMilliseconds, s.sliceTotalMilliseconds, s.corrections, s.lastCorrectionCharacters)
                 + (s.fullLayoutMilliseconds.map { String(format: " · whole layout %.0f ms", $0) } ?? ""))
+            if let benchmark { Text(benchmark) }
         }
         .font(.caption.monospacedDigit())
         .foregroundStyle(.secondary)

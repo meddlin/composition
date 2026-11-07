@@ -30,6 +30,20 @@ struct EditorStats: Equatable {
     var fullLayoutMilliseconds: Double?
     var lastEditMilliseconds = 0.0
     var worstEditMilliseconds = 0.0
+    // Colouring only what was typed (build plan Step 5)
+    /// Characters the last quick read covered.
+    var rereadCharacters = 0
+    /// How long the last full read took, off the main thread.
+    var fullReadMilliseconds = 0.0
+    /// The most time any one step of putting the colours on took on the main thread, and what all the steps of the last full pass took.
+    var worstSliceMilliseconds = 0.0
+    var sliceTotalMilliseconds = 0.0
+    /// How many pauses found something the quick reads had wrong, and how many characters the last one put right.
+    var corrections = 0
+    var lastCorrectionCharacters = 0
+    /// Edits coloured by reading the blocks around them, and edits that could not be (the pause that follows reads the whole note).
+    var incrementalEdits = 0
+    var fallbackEdits = 0
 }
 
 @MainActor
@@ -56,12 +70,26 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     private var restylePending = false
     private var lastCaretParagraph = NSRange(location: 0, length: 0)
+    // Colouring only what was typed. `model` is what the colours on the text were made from; nil means that is not known (the note was
+    // just loaded, or something changed the text unseen), and the next full pass puts them all on.
+    private var model: HighlightModel?
+    private var pendingEdits = EditAccumulator()
+    private var version = 0
+    private var idlePass: DispatchWorkItem?
+    private var sliceGeneration = 0
+    /// What the speed test (and anything else that wants numbers) can read: how long each keystroke's own work took, in milliseconds.
+    private(set) var editSamples: [Double] = []
+    /// Developer switch for comparing: `-labLegacyColouring 1` colours the whole note after every edit, as the lab did before Step 5.
+    private let legacyColouring = UserDefaults.standard.bool(forKey: "labLegacyColouring")
     private var completionList: CompletionList?
     private let clock = ContinuousClock()
 
     override init() {
         super.init()
         textView.delegate = self
+        NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
+            MainActor.assumeIsolated { self?.storageProcessedEditing() }
+        }
         textView.font = Self.baseFont
         textView.textColor = .label
         textView.backgroundColor = .systemBackground
@@ -94,11 +122,12 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle]
 
-    /// Colours the whole text. Only attributes change (never the characters, and never `attributedText` itself, which would drop the
-    /// selection and the undo stack), and not while a composition (Scribble, dictation, an input method) is under way.
+    /// Colours the whole text, at once, on the main thread: what every edit used to do, and what the experimental `substitute` way of hiding
+    /// still does. The editor proper colours what was typed (`recolourAfterEdit`) and the rest in a pause (`runFullPass`).
     func restyle(force: Bool = false) {
         guard textView.markedTextRange == nil else { restylePending = true; return }
         restylePending = false
+        model = nil
         let start = clock.now
         let text = textView.text ?? ""
         let spans = MarkdownHighlighter.spans(in: text)
@@ -159,7 +188,16 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         textView.setContentOffset(.zero, animated: false)
         stats.fullLayoutMilliseconds = nil
         stats.worstEditMilliseconds = 0
-        restyle(force: true)
+        stats.worstSliceMilliseconds = 0
+        stats.corrections = 0
+        stats.incrementalEdits = 0
+        stats.fallbackEdits = 0
+        editSamples = []
+        model = nil
+        pendingEdits = EditAccumulator()
+        version += 1
+        refreshCounts()
+        if hideMode == .substitute { restyle(force: true) } else { scheduleFullPass(after: 0) }
     }
 
     /// Lays out the whole text, which TextKit 2 otherwise does only for what is on screen: the worst case for a long note.
@@ -174,19 +212,230 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     // MARK: UITextViewDelegate
 
+    /// Every change to the characters, from anywhere: typing, a paste, an undo, the completion list, a view put in. (The delegate's
+    /// `shouldChangeTextIn` is not called for `insertText` or for changes made in code, so the text storage is asked instead.) A change that
+    /// is only to attributes, which is all the colouring does, is not an edit.
+    private func storageProcessedEditing() {
+        let storage = textView.textStorage
+        guard storage.editedMask.contains(.editedCharacters) else { return }
+        let edited = storage.editedRange
+        pendingEdits.record(range: NSRange(location: edited.location, length: edited.length - storage.changeInLength), newLength: edited.length)
+    }
+
     func textViewDidChange(_ textView: UITextView) {
         let start = clock.now
-        restyle()
+        version += 1
+        sliceGeneration += 1  // a full pass that is putting colours on stops: the text moved under it
+        if hideMode == .substitute || legacyColouring {
+            restyle()
+        } else {
+            recolourAfterEdit()
+            scheduleFullPass(after: 0.3)
+        }
         updateCompletion()
         let elapsed = ms(clock.now - start)
         stats.lastEditMilliseconds = elapsed
         stats.worstEditMilliseconds = max(stats.worstEditMilliseconds, elapsed)
+        editSamples.append(elapsed)
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
         if restylePending, textView.markedTextRange == nil { restyle() }
-        // Hiding follows the caret: only when it moves to another paragraph does anything need to change.
-        if hideMode == .attributes, paragraphRange(around: textView.selectedRange) != lastCaretParagraph { restyle() }
+        // Hiding follows the caret: only the paragraph it left and the one it entered change.
+        guard hideMode == .attributes else { return }
+        let paragraph = paragraphRange(around: textView.selectedRange)
+        guard paragraph != lastCaretParagraph else { return }
+        let left = lastCaretParagraph
+        lastCaretParagraph = paragraph
+        guard let model, textView.markedTextRange == nil else { return }
+        applyColours(to: left, using: model)
+        applyColours(to: paragraph, using: model)
+    }
+
+    // MARK: Speed test
+
+    /// Types `count` characters one at a time into the middle of the note (`insertText`, the path the keyboard takes), then waits for the
+    /// pause's full read to finish, and reports how long each keystroke's own colouring took. The same numbers go to `lab-benchmark.json` in
+    /// the app's tmp folder, for a script to read. "Ours" is what the editor does in `textViewDidChange`; "whole" adds what UIKit does to
+    /// take the character in.
+    func runTypingBenchmark(characters count: Int = 400, gap: Duration = .milliseconds(8)) async -> String {
+        let ns = (textView.text ?? "") as NSString
+        textView.becomeFirstResponder()
+        textView.selectedRange = NSRange(location: ns.paragraphRange(for: NSRange(location: ns.length / 2, length: 0)).location, length: 0)
+        editSamples = []
+        stats.worstSliceMilliseconds = 0
+        var whole: [Double] = []
+        let phrase = Array("Typing in the middle of a long note, with **bold** and `code` and a [link](https://x.test).\n")
+        for index in 0..<count {
+            let started = clock.now
+            textView.insertText(String(phrase[index % phrase.count]))
+            whole.append(ms(clock.now - started))
+            try? await Task.sleep(for: gap)
+        }
+        try? await Task.sleep(for: .seconds(1.5))  // the pause, and the full read after it
+        // Then a fence typed on a line of its own: read alone, the blocks around it cannot tell where it ends, so the pause that follows
+        // must find what it swallowed and colour that.
+        let correctionsBefore = stats.corrections
+        for character in "\n```\n" {
+            textView.insertText(String(character))
+            try? await Task.sleep(for: gap)
+        }
+        try? await Task.sleep(for: .seconds(1.5))
+        let fence: [String: Any] = [
+            "corrections": stats.corrections - correctionsBefore, "charactersPutRight": stats.lastCorrectionCharacters,
+            "worstSliceMilliseconds": stats.worstSliceMilliseconds, "sliceTotalMilliseconds": stats.sliceTotalMilliseconds,
+        ]
+        func summary(_ values: [Double]) -> [String: Double] {
+            let sorted = values.sorted()
+            guard !sorted.isEmpty else { return [:] }
+            return ["median": sorted[sorted.count / 2], "p95": sorted[min(sorted.count - 1, sorted.count * 95 / 100)], "max": sorted[sorted.count - 1]]
+        }
+        let result: [String: Any] = [
+            "build": _isDebugAssertConfiguration() ? "Debug" : "Release",
+            "lines": stats.lines, "characters": stats.characters, "views": stats.attachments, "keystrokes": count,
+            "ours": summary(editSamples), "whole": summary(whole),
+            "fullReadMilliseconds": stats.fullReadMilliseconds, "worstSliceMilliseconds": stats.worstSliceMilliseconds,
+            "sliceTotalMilliseconds": stats.sliceTotalMilliseconds, "corrections": stats.corrections,
+            "lastCorrectionCharacters": stats.lastCorrectionCharacters,
+            "incrementalEdits": stats.incrementalEdits, "fallbackEdits": stats.fallbackEdits, "rereadCharacters": stats.rereadCharacters,
+            "fence": fence,
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lab-benchmark.json"))
+        let ours = summary(editSamples)
+        return String(format: "%d keystrokes: ours median %.2f ms, 95%% %.2f, worst %.2f · whole median %.2f, worst %.2f", count, ours["median"] ?? 0, ours["p95"] ?? 0, ours["max"] ?? 0, summary(whole)["median"] ?? 0, summary(whole)["max"] ?? 0)
+    }
+
+    // MARK: Colouring only what was typed
+
+    /// For a change nobody described (views put in by the lab): forget what is known and read it all in the background.
+    func recolourEverything() {
+        model = nil
+        pendingEdits = EditAccumulator()
+        version += 1
+        sliceGeneration += 1
+        refreshCounts()
+        scheduleFullPass(after: 0)
+    }
+
+    /// After an edit: the blocks around it are read again and coloured, which costs what they hold and not what the note does.
+    private func recolourAfterEdit() {
+        // Not while a composition (Scribble, dictation, an input method) is under way: the edits wait in `pendingEdits`, and are read as one
+        // when it ends.
+        guard textView.markedTextRange == nil else { return }
+        let storage = textView.textStorage
+        guard let merged = pendingEdits.merged, let known = model, known.length - merged.range.length + merged.newLength == storage.length else {
+            // An edit nobody told us about (the completion list, a pasted view): the pause that follows reads it all.
+            let why = pendingEdits.merged == nil ? "no edit seen" : model == nil ? "no model" : "length \(model!.length) vs \(storage.length) after \(pendingEdits.merged!)"
+            if stats.fallbackEdits == 0 { NSLog("[colour] first fallback: \(why)") }
+            pendingEdits = EditAccumulator()
+            model = nil
+            stats.fallbackEdits += 1
+            return
+        }
+        pendingEdits = EditAccumulator()
+        stats.incrementalEdits += 1
+        let window = model!.edited(replacing: merged.range, withLength: merged.newLength, in: storage.mutableString)
+        applyColours(to: window, using: model!)
+        stats.rereadCharacters = window.length
+        lastCaretParagraph = paragraphRange(around: textView.selectedRange)
+    }
+
+    /// Puts the colours of `model` on `range` of the text, and nothing else: it clears what a colour put there before, and sets what the
+    /// spans there say. Only attributes change (never the characters, and never `attributedText`, which would drop the selection and the
+    /// undo stack).
+    private func applyColours(to range: NSRange, using model: HighlightModel) {
+        let storage = textView.textStorage
+        let range = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
+        guard range.length > 0 else { return }
+        let caret = lastCaretParagraph
+        storage.beginEditing()
+        for key in Self.managedKeys { storage.removeAttribute(key, range: range) }
+        storage.addAttributes([.font: Self.baseFont, .foregroundColor: UIColor.label], range: range)
+        for span in model.spans(in: range) {
+            let clipped = NSIntersectionRange(span.range, range)
+            guard clipped.length > 0 else { continue }
+            var attrs = attributes(for: span.kind)
+            if hideMode == .attributes, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0 {
+                attrs = [.font: Self.hiddenFont, .foregroundColor: UIColor.clear]
+            }
+            storage.addAttributes(attrs, range: clipped)
+        }
+        storage.endEditing()
+    }
+
+    /// A pause after typing: read the whole note, off the main thread, compare it with what the quick reads made, and put right only what
+    /// differs (all of it, when the note has just been loaded).
+    private func scheduleFullPass(after delay: TimeInterval) {
+        idlePass?.cancel()
+        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.runFullPass() } }
+        idlePass = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
+    }
+
+    private func runFullPass() {
+        guard textView.markedTextRange == nil else { return scheduleFullPass(after: 0.3) }  // a composition is under way
+        pendingEdits = EditAccumulator()
+        let snapshot = textView.text ?? ""
+        let seen = version
+        let known = model
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let started = ContinuousClock.now
+            let fresh = HighlightModel(text: snapshot)
+            let dirty = known.map { fresh.differences(from: $0) } ?? [NSRange(location: 0, length: fresh.length)]
+            let spent = ContinuousClock.now - started
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.version == seen else { return }  // typed again meanwhile: the next pause reads it again
+                    self.stats.fullReadMilliseconds = self.ms(spent)
+                    self.beginPuttingOn(fresh, dirty: dirty, hadModel: known != nil)
+                }
+            }
+        }
+    }
+
+    /// Puts the colours on in small steps, so that the main thread is never held for more than a fraction of a frame; typing stops it.
+    private func beginPuttingOn(_ fresh: HighlightModel, dirty: [NSRange], hadModel: Bool) {
+        let storage = textView.textStorage
+        guard fresh.length == storage.length else { return scheduleFullPass(after: 0.3) }
+        let ns = storage.mutableString
+        var pieces: [NSRange] = []
+        for range in dirty {
+            var position = range.location
+            while position < range.upperBound {
+                let end = min(range.upperBound, position + Self.sliceLength)
+                // End on a line break where there is one, so that a step never cuts a line in two.
+                let line = ns.lineRange(for: NSRange(location: max(end - 1, position), length: 0))
+                let stop = min(max(line.upperBound, end), range.upperBound)
+                pieces.append(NSRange(location: position, length: stop - position))
+                position = stop
+            }
+        }
+        if hadModel { stats.corrections += dirty.isEmpty ? 0 : 1 }
+        stats.lastCorrectionCharacters = hadModel ? dirty.reduce(0) { $0 + $1.length } : 0
+        stats.spans = fresh.blockCount
+        model = fresh
+        sliceGeneration += 1
+        stats.sliceTotalMilliseconds = 0
+        refreshCounts()
+        putOn(pieces, from: 0, using: fresh, generation: sliceGeneration)
+    }
+
+    private static let sliceLength = 3_000
+
+    private func putOn(_ pieces: [NSRange], from index: Int, using fresh: HighlightModel, generation: Int) {
+        guard index < pieces.count else { return }
+        guard generation == sliceGeneration, textView.markedTextRange == nil else {
+            // Interrupted: what is on the text is now partly the old colours, so the next full pass starts from nothing.
+            model = nil
+            return scheduleFullPass(after: 0.3)
+        }
+        let started = clock.now
+        applyColours(to: pieces[index], using: fresh)
+        let spent = ms(clock.now - started)
+        stats.sliceTotalMilliseconds += spent
+        stats.worstSliceMilliseconds = max(stats.worstSliceMilliseconds, spent)
+        DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.putOn(pieces, from: index + 1, using: fresh, generation: generation) } }
     }
 
     // MARK: Hiding the syntax, second way
@@ -410,7 +659,7 @@ extension EditorLab {
             piece.append(NSAttributedString(attachment: LabAttachment(kind: kinds[index % kinds.count])))
             textView.textStorage.insert(piece, at: offset)
         }
-        restyle(force: true)
+        recolourEverything()
     }
 }
 

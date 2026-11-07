@@ -350,8 +350,8 @@ struct AutosaveTests {
             defer { try? database.close() }
             let store = NoteStore(database: database)
             let note = try store.createNote(title: "Burst")
-            let location = DataLocation(directory: scratch.directory)
-            let autosaver = NoteAutosaver(store: store, note: note, drafts: NoteDrafts(location: location), timing: NoteAutosaver.Timing(quiet: 0.02, longest: 0.1, retry: 0.1))
+            let drafts = NoteDrafts(location: DataLocation(directory: scratch.directory))
+            let autosaver = NoteAutosaver(store: store, note: note, drafts: drafts, timing: NoteAutosaver.Timing(quiet: 0.02, longest: 0.1, retry: 0.1))
             var text = "---\ntitle: Burst\n---\n"
             for index in 0..<1000 {
                 text += "line \(index) of a long paragraph typed quickly\n"
@@ -360,7 +360,7 @@ struct AutosaveTests {
             }
             #expect(autosaver.flush())
             #expect(try #require(try database.note(id: note.id)).content.hasSuffix("line 999 of a long paragraph typed quickly\n"))
-            #expect(NoteDrafts(location: location).all().isEmpty)
+            #expect(drafts.all().isEmpty, "the same instance, which waits for its own pending removals")
         }
     }
 }

@@ -114,6 +114,15 @@ the core is developed with `swift test` and the app is built only to look at it.
    read gets wrong, like a fenced block or a loose list, is corrected a moment later), and read the Markdown off the main thread; the Live-style reveal
    re-colours only the two paragraphs involved. Skip while a composition is under way. Check: the lab's line for *5,000 lines with views* in a
    **Release** build, against a proposed budget of about one frame (16 ms) of our own work per edit ([N7](ipad-app-design.md#the-native-bar)), then the iPad's number from you.
+   **Done 2026-11-06 in the Simulator (the iPad's own number is still yours to give):** `HighlightModel` and `EditAccumulator` in the core keep the colours as the note's top-level blocks;
+   after an edit only the blocks around it (and one neighbour each side) are read again, and the lab puts those colours on. A pause of 0.3 s starts a full read **off the main thread**, whose
+   differences from the quick reads are put right in steps of at most 3,000 characters, and typing stops it. Release build, 5,034 lines with 20 views, 400 keystrokes through `insertText`:
+   **our own work per keystroke 0.58 ms median, 0.9 ms worst, against 91 ms median for the whole-note colouring the lab used before** (the whole keystroke, with UIKit taking the character in, is
+   3.4 ms median); a typed fence that swallows half the note was corrected by the pause in 11 ms of main-thread steps, the worst one under 1 ms. The quick read agrees with the full one in 97.7% of
+   typed characters on the 115 notes of the MDX corpus, and a property test shows that quick reads plus repainting only what `differences` names always end with exactly the full read's colours
+   (1,410 corpus edits and 4,000 random ones). **A bug found on the way:** 120,000 random edits made the old highlighter crash on odd Markdown (a quote that swallows a fence gives a child range outside its
+   parent's, and a `Range` built backwards traps); fixed. The Live-style reveal re-colours only the paragraph the caret left and the one it entered. A composition (Scribble, dictation) is skipped and its edits
+   are read as one when it ends (not tried: Scribble needs the Pencil). The lab's *Typing speed test* button, or `-openLab 1 -labBenchmark 1` on the launch arguments, repeats the measurement and writes `lab-benchmark.json`.
 6. **The editor.** The Markdown tab for real notes, replacing the lab: bound to the store (2), frontmatter (3), autosave (4) and the incremental
    colouring (5); the Preview and Split tabs; find; the Trash Can from the note. Check: create, edit, relaunch, search for what you typed, trash and restore,
    on a copy of your notes; the rows written match the desktop's for the same operations (Step 2's script, driven from the UI layer).

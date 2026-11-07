@@ -76,7 +76,11 @@ Use a **Release** build (install step 6) for the numbers.
 14. **Scribble.** With the Pencil, write a few words into the text on the *Sample* note, between lines and at the end. They should turn into text, and the colours
    should carry on (a stray half-word of colouring while you write is fine; text lost or doubled is not). Try it inside a bold word too.
 15. **Typing in a long note.** Choose *5,000 lines*, tap into the middle, and type for a few seconds on the on-screen keyboard and on a hardware one. Does it keep up?
-   Read *last edit* and *worst* in the line under the text. Then *5,000 lines with views*, and scroll all the way down and up.
+   Since build plan Step 5 only the paragraphs around what you type are coloured at once (the rest is checked a third of a second after you stop), so it should keep up easily: in the Simulator it
+   cost 0.6 ms a keystroke where the whole-note way cost 91 ms. Read *colour per edit* (last and worst) in the line under the text. Then *5,000 lines with views*, and scroll all the way down and up.
+   **Then tap *Typing speed test* (the speedometer button, in a Release build):** it types 400 characters into the middle of *5,000 lines with views* and shows a line with the median, 95th percentile and
+   worst of our own work per keystroke. Please send me that line: it is the iPad's number for the 16 ms budget.
+   Also try typing a line of three backticks (a code fence) in the middle of the note: the colours below it should change to code within about half a second, in a blink and not a freeze.
 16. **Views in the text.** In *5,000 lines with views* (or with *Insert a view*), draw in the grey canvas with the **Pencil**. The text must not scroll under the stroke, and
    the stroke must be there after you scroll away and back.
 17. **Hide syntax.** Choose *Hide: tiny and clear* on the *Sample* note. Tap into a paragraph (its marks should come back), then use the arrow keys to cross from one

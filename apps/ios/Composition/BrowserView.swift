@@ -61,6 +61,8 @@ struct BrowserView: View {
             }
         }
         .onAppear {
+            // Developer shortcut: `-openLab 1` opens the editor lab at launch.
+            if UserDefaults.standard.bool(forKey: "openLab") { showingLab = true }
             if model.selection == nil, storedSelection != 0, model.notes.contains(where: { $0.id == Int64(storedSelection) }) {
                 model.selection = Int64(storedSelection)
             }

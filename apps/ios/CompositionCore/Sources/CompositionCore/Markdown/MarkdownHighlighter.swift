@@ -31,11 +31,25 @@ public struct HighlightSpan: Equatable, Sendable {
     public var kind: HighlightKind
 }
 
+/// The spans that belong to one top-level block of the note (a paragraph, a heading, a list, a fenced block, the frontmatter, ...),
+/// with the range of text they cover. Blocks are what the editor re-reads, and re-colours, when something inside them is typed.
+public struct HighlightedBlock: Equatable, Sendable {
+    public var range: NSRange
+    /// Outermost first, as `MarkdownHighlighter.spans` has them; positions are in the whole text.
+    public var spans: [HighlightSpan]
+}
+
 public enum MarkdownHighlighter {
     /// The spans of `text`, outermost first.
     public static func spans(in text: String) -> [HighlightSpan] {
+        blocks(in: text).flatMap(\.spans)
+    }
+
+    /// The same spans, grouped by the top-level block each belongs to, in the order of the text. `frontmatter` says whether a `---` block at
+    /// the very start is frontmatter: it is not when `text` is only a piece taken from the middle of a note.
+    public static func blocks(in text: String, frontmatter: Bool = true) -> [HighlightedBlock] {
         var builder = Builder(text: text)
-        return builder.run()
+        return builder.run(frontmatter: frontmatter)
     }
 
     private struct Builder: MarkupWalker {
@@ -69,17 +83,33 @@ public enum MarkdownHighlighter {
             }
         }
 
-        mutating func run() -> [HighlightSpan] {
+        mutating func run(frontmatter allowed: Bool) -> [HighlightedBlock] {
+            var blocks: [HighlightedBlock] = []
             // The frontmatter is dimmed, and hidden from the parse by blanking it (keeping its line breaks), so offsets stay put.
             var source = text
-            if let end = Self.frontmatterEnd(in: text) {
+            if allowed, let end = Self.frontmatterEnd(in: text) {
                 let head = String(text.unicodeScalars.prefix(end))
-                spans.append(HighlightSpan(range: NSRange(location: 0, length: head.utf16.count), kind: .frontmatter))
+                let whole = NSRange(location: 0, length: head.utf16.count)
+                blocks.append(HighlightedBlock(range: whole, spans: [HighlightSpan(range: whole, kind: .frontmatter)]))
                 let blank = String(head.map { $0 == "\n" ? "\n" : " " })
                 source = blank + String(text.dropFirst(head.count))
             }
-            visit(Document(parsing: source))
-            return spans
+            for child in Document(parsing: source).children {
+                spans.removeAll(keepingCapacity: true)
+                visit(child)
+                guard !spans.isEmpty else { continue }
+                // The block covers what its node says it does and, to be safe, every span found inside it.
+                var covered = range(of: child).map { NSRange(location: $0.lowerBound, length: $0.count) }
+                for span in spans { covered = covered.map { NSUnionRange($0, span.range) } ?? span.range }
+                let block = HighlightedBlock(range: covered ?? NSRange(location: 0, length: 0), spans: spans)
+                // The parser's ranges can overlap for odd input (a quote that swallows a fence); a block that starts inside the one before joins it.
+                if let last = blocks.last, block.range.location < last.range.upperBound {
+                    blocks[blocks.count - 1] = HighlightedBlock(range: NSUnionRange(last.range, block.range), spans: last.spans + block.spans)
+                } else {
+                    blocks.append(block)
+                }
+            }
+            return blocks
         }
 
         /// The end (in scalars) of a leading `---` block, as `NoteFrontmatter` finds it.
@@ -104,6 +134,10 @@ public enum MarkdownHighlighter {
             return start <= end ? start..<end : nil
         }
 
+        /// The range from `start` to `end`, or nil when they are the wrong way round. A child's range can lie outside its parent's for odd
+        /// input (a quote that swallows a fence), and `Range` refuses to be made backwards.
+        private func between(_ start: Int, _ end: Int) -> Range<Int>? { start <= end ? start..<end : nil }
+
         private mutating func add(_ range: Range<Int>?, _ kind: HighlightKind) {
             guard let range, !range.isEmpty else { return }
             spans.append(HighlightSpan(range: NSRange(location: range.lowerBound, length: range.count), kind: kind))
@@ -116,8 +150,8 @@ public enum MarkdownHighlighter {
             descendInto(markup)
             let kids = markup.children.compactMap { range(of: $0) }
             if let first = kids.first, let last = kids.last {
-                add(whole.lowerBound..<first.lowerBound, .mark)
-                add(last.upperBound..<whole.upperBound, .mark)
+                add(between(whole.lowerBound, first.lowerBound), .mark)
+                add(between(last.upperBound, whole.upperBound), .mark)
             }
         }
 
@@ -164,10 +198,10 @@ public enum MarkdownHighlighter {
             guard let whole = range(of: link) else { return descendInto(link) }
             let kids = link.children.compactMap { range(of: $0) }
             if let first = kids.first, let last = kids.last {
-                add(first.lowerBound..<last.upperBound, .linkText)
+                add(between(first.lowerBound, last.upperBound), .linkText)
                 descendInto(link)
-                add(whole.lowerBound..<first.lowerBound, .mark)
-                add(last.upperBound..<whole.upperBound, .mark)
+                add(between(whole.lowerBound, first.lowerBound), .mark)
+                add(between(last.upperBound, whole.upperBound), .mark)
             } else {
                 add(whole, .linkText)
             }
