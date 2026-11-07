@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronRightIcon, StarIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,17 @@ import { noteTitle, type Group, type Note, type Notebook } from "./types";
 // hovered or focused.
 const ROW_ACTIONS_CLASS =
   "pointer-events-none absolute inset-y-0 right-0 flex items-center rounded-md bg-surface opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100 has-data-[state=open]:pointer-events-auto has-data-[state=open]:opacity-100";
+
+/**
+ * A group's name makes room for the row actions while they show: it stops short of them by the
+ * actions' width and fades out over its last stretch, so the name never sits under the buttons.
+ */
+const GROUP_ROW_ACTIONS_WIDTH = "5rem";
+const GROUP_NAME_FADE_CLASS =
+  "group-hover/row:pr-[var(--row-actions-width)] group-focus-within/row:pr-[var(--row-actions-width)] group-has-data-[state=open]/row:pr-[var(--row-actions-width)] " +
+  "group-hover/row:[mask-image:linear-gradient(to_right,black_calc(100%-var(--row-actions-width)-1.25rem),transparent_calc(100%-var(--row-actions-width)))] " +
+  "group-focus-within/row:[mask-image:linear-gradient(to_right,black_calc(100%-var(--row-actions-width)-1.25rem),transparent_calc(100%-var(--row-actions-width)))] " +
+  "group-has-data-[state=open]/row:[mask-image:linear-gradient(to_right,black_calc(100%-var(--row-actions-width)-1.25rem),transparent_calc(100%-var(--row-actions-width)))]";
 
 /** A request to bring a note's row into view; a new `nonce` is a new request, even for the same note. */
 export type RevealRequest = { noteId: number; nonce: number };
@@ -467,7 +478,12 @@ function GroupNode({
               "group/row relative flex items-center gap-1.5 rounded-md py-0.5 text-sm",
               draggingGroupId === group.id && "opacity-50",
             )}
-            style={{ paddingLeft: `${depth * 16 + 8}px` }}
+            style={
+              {
+                paddingLeft: `${depth * 16 + 8}px`,
+                "--row-actions-width": GROUP_ROW_ACTIONS_WIDTH,
+              } as CSSProperties
+            }
             onDoubleClick={() => setRenaming(true)}
           >
             <CollapsibleTrigger asChild>
@@ -494,6 +510,7 @@ function GroupNode({
               title={`View all notes in ${group.name}`}
               className={cn(
                 "h-auto min-w-0 flex-1 justify-start border-0 px-1 py-1 hover:bg-transparent dark:hover:bg-transparent",
+                GROUP_NAME_FADE_CLASS,
                 isTopLevel ? "font-bold text-foreground" : "font-medium text-foreground/80",
               )}
             >
