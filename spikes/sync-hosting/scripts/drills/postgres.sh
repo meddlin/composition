@@ -17,7 +17,7 @@ if [[ "$mode" == local ]]; then
   dbc=sync-spike-pg-db-1
 else
   APP=$(fly_app pg); URL="https://$APP.fly.dev"
-  machine_id() { fly machines list -a "$APP" --json | jq -r '.[0].id'; }
+  machine_id() { fly machines list -a "$APP" --json | jq -r '.[0] | (.id // .ID)'; }
   PROJECT=$(need NEON_PROJECT_ID)
 fi
 
@@ -31,7 +31,7 @@ case "$mode/$action" in
 
   fly/down) fly machine kill "$(machine_id)" -a "$APP" ;;
   fly/up)
-    state=$(fly machines list -a "$APP" --json | jq -r '.[0].state')
+    state=$(fly machines list -a "$APP" --json | jq -r '.[0] | (.state // .State)')
     [[ "$state" == started ]] || fly machine start "$(machine_id)" -a "$APP"
     wait_ready "$URL" ;;
   fly/db-down)

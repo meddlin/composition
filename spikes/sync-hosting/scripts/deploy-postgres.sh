@@ -6,7 +6,7 @@ source scripts/drills/lib.sh
 
 APP=$(fly_app pg); REGION=$(need FLY_REGION); ORG=$(need FLY_ORG)
 
-if ! fly apps list --json | jq -e --arg a "$APP" '.[] | select(.Name==$a)' >/dev/null; then
+if ! fly apps list --json | jq -e --arg a "$APP" 'map(select((.Name // .name) == $a)) | length > 0' >/dev/null; then
   fly apps create "$APP" --org "$ORG"
 fi
 {

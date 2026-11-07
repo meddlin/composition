@@ -13,7 +13,7 @@ if [[ "$mode" == local ]]; then
   compose="docker compose -f lean/compose.yaml"
 else
   APP=$(fly_app lean); URL="https://$APP.fly.dev"
-  machine_id() { fly machines list -a "$APP" --json | jq -r '.[0].id'; }
+  machine_id() { fly machines list -a "$APP" --json | jq -r '.[0] | (.id // .ID)'; }
 fi
 
 case "$mode/$action" in
@@ -24,13 +24,13 @@ case "$mode/$action" in
 
   fly/down)      fly machine kill "$(machine_id)" -a "$APP" ;;
   fly/up)
-    state=$(fly machines list -a "$APP" --json | jq -r '.[0].state')
+    state=$(fly machines list -a "$APP" --json | jq -r '.[0] | (.state // .State)')
     [[ "$state" == started ]] || fly machine start "$(machine_id)" -a "$APP"
     wait_ready "$URL" ;;
   fly/restore)
-    image=$(fly machines list -a "$APP" --json | jq -r '.[0].config.image')
+    image=$(fly machines list -a "$APP" --json | jq -r '.[0] | (.config.image // .Config.image)')
     fly machine destroy "$(machine_id)" --force -a "$APP"
-    fly volumes destroy "$(fly volumes list -a "$APP" --json | jq -r '.[0].id')" -y -a "$APP"
+    fly volumes destroy "$(fly volumes list -a "$APP" --json | jq -r '.[0] | (.id // .ID)')" -y -a "$APP"
     fly volumes create data --region "$(need FLY_REGION)" --size 1 -y -a "$APP"
     fly deploy -a "$APP" -c lean/fly.toml --image "$image" --ha=false -y
     wait_ready "$URL" ;;

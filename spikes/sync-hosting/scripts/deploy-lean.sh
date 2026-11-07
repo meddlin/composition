@@ -7,7 +7,7 @@ source scripts/drills/lib.sh
 APP=$(fly_app lean); REGION=$(need FLY_REGION); ORG=$(need FLY_ORG)
 ACCOUNT=$(need R2_ACCOUNT_ID)
 
-if ! fly apps list --json | jq -e --arg a "$APP" '.[] | select(.Name==$a)' >/dev/null; then
+if ! fly apps list --json | jq -e --arg a "$APP" 'map(select((.Name // .name) == $a)) | length > 0' >/dev/null; then
   fly apps create "$APP" --org "$ORG"
 fi
 if ! fly volumes list -a "$APP" --json | jq -e 'length > 0' >/dev/null; then
@@ -27,7 +27,6 @@ fi
 
 fly deploy -a "$APP" -c lean/fly.toml --dockerfile lean/Dockerfile --primary-region "$REGION" --ha=false -y .
 URL="https://$APP.fly.dev"
-echo "SYNC_URL_LEAN=$URL" > /dev/null
 # Record where it lives for the scenario runner.
 touch .env.candidates.local; grep -v '^SYNC_URL_LEAN=' .env.candidates.local > .env.candidates.local.tmp || true
 echo "SYNC_URL_LEAN=$URL" >> .env.candidates.local.tmp; mv .env.candidates.local.tmp .env.candidates.local

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Two-device harness</title>
+<style>
+  :root { --bg:#f6f5f2; --card:#fff; --ink:#1d1d1b; --muted:#6b6a65; --line:#dedcd5; --accent:#2f5d50; --warn:#a85d00; --bad:#a3342b; --ok:#2f7d4f; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#171716; --card:#222221; --ink:#ecebe6; --muted:#9a988f; --line:#3a3936; --accent:#7fc0ad; --warn:#e0a24f; --bad:#e07a70; --ok:#6cc58c; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 16px; max-width:70ch; }
+  .bar { display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px; }
+  .bar label { color:var(--muted); font-size:13px; margin-right:6px; }
+  .cands { display:flex; gap:8px; flex-wrap:wrap; }
+  .cand { border:1px solid var(--line); background:transparent; color:var(--ink); border-radius:8px; padding:6px 12px; cursor:pointer; font:inherit; }
+  .cand[aria-pressed="true"] { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 14%, transparent); font-weight:600; }
+  .cand[disabled] { opacity:.45; cursor:not-allowed; }
+  .cand small { display:block; color:var(--muted); font-weight:400; font-size:11px; }
+  select, button.act { font:inherit; color:var(--ink); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:5px 8px; }
+  button.act { cursor:pointer; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px; }
+  .card h2 { font-size:15px; margin:0 0 8px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  textarea { width:100%; min-height:150px; resize:vertical; font:inherit; color:var(--ink); background:transparent; border:1px solid var(--line); border-radius:8px; padding:10px; }
+  .pill { font-size:12px; border-radius:99px; padding:2px 9px; border:1px solid var(--line); color:var(--muted); white-space:nowrap; }
+  .pill.synced { color:var(--ok); border-color:var(--ok); } .pill.pending { color:var(--warn); border-color:var(--warn); } .pill.offline { color:var(--bad); border-color:var(--bad); }
+  .meta { color:var(--muted); font-size:12px; margin-top:6px; display:flex; flex-wrap:wrap; gap:4px 14px; }
+  .copies { margin-top:8px; font-size:13px; } .copies b { color:var(--warn); }
+  .copies pre { margin:4px 0 0; white-space:pre-wrap; background:color-mix(in srgb, var(--warn) 10%, transparent); border-radius:6px; padding:6px 8px; }
+  .readout { margin-top:16px; display:grid; grid-template-columns:minmax(0,260px) 1fr; gap:16px; }
+  @media (max-width:760px) { .readout { grid-template-columns:1fr; } }
+  .big { font-size:34px; font-weight:650; letter-spacing:-.02em; } .big small { font-size:14px; font-weight:400; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th,td { text-align:left; padding:4px 6px; border-bottom:1px solid var(--line); } th { color:var(--muted); font-weight:500; }
+  .note { color:var(--muted); font-size:12.5px; margin-top:14px; max-width:80ch; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Two-device harness</h1>
+  <p class="sub">Type on device A and watch device B. Both are simulated clients (not the desktop app, which has no server-address setting or sync engine yet), talking to the candidate you pick below. Text is sent as plain bytes: no encryption, no real sign-in.</p>
+
+  <div class="bar">
+    <div><label>Candidate</label><span class="cands" id="cands"></span></div>
+    <div><label for="deb">Push debounce</label>
+      <select id="deb"><option value="0">0 ms (infrastructure only)</option><option value="500">500 ms</option><option value="2000" selected>2000 ms (the design)</option></select></div>
+    <div><label for="hint">Hints</label>
+      <select id="hint"><option value="native" selected>live (SSE / Convex query)</option><option value="poll">poll every 5 s</option></select></div>
+    <button class="act" id="reconnect">Reconnect</button>
+  </div>
+
+  <div class="grid">
+    <section class="card" id="card-a"><h2><span>Device A</span><span><span class="pill" id="pill-a">…</span> <button class="act" data-off="a">Go offline</button></span></h2>
+      <textarea id="text-a" placeholder="Type here…" aria-label="Device A note"></textarea><div class="meta" id="meta-a"></div><div class="copies" id="copies-a"></div></section>
+    <section class="card" id="card-b"><h2><span>Device B</span><span><span class="pill" id="pill-b">…</span> <button class="act" data-off="b">Go offline</button></span></h2>
+      <textarea id="text-b" placeholder="…or here" aria-label="Device B note"></textarea><div class="meta" id="meta-b"></div><div class="copies" id="copies-b"></div></section>
+  </div>
+
+  <div class="card readout">
+    <div><div class="big" id="last">–<small> ms</small></div><div class="meta" id="lastmeta">edit → other device has it</div>
+      <div class="meta" id="stats"></div></div>
+    <div><table><thead><tr><th>When</th><th>From → to</th><th>Total</th><th>Push ack</th><th>Minus debounce</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </div>
+  <p class="note">“Total” runs from the keystroke to the other device holding the text, so it includes the push debounce. “Minus debounce” is what the server, network and hint add. Go offline on one device, edit both, then bring it back to see the conflict rule: the first writer to reach the server wins and the other text is kept as a conflict copy.</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+let cfg = null;
+const timers = {};
+const percentile = (xs, p) => { const s = [...xs].sort((a,b)=>a-b); return s.length ? s[Math.min(s.length-1, Math.ceil(p/100*s.length)-1)] : NaN; };
+
+async function post(path, body) { const r = await fetch(path, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) }); return r.json(); }
+
+function renderConfig() {
+  const box = $('cands'); box.textContent = '';
+  for (const c of cfg.candidates) {
+    const b = document.createElement('button'); b.className = 'cand'; b.disabled = !c.ok; b.setAttribute('aria-pressed', String(c.name === cfg.candidate));
+    b.innerHTML = '<span></span><small></small>'; b.firstChild.textContent = c.name; b.lastChild.textContent = c.ok ? c.where + ' · ' + c.hint : 'not reachable';
+    b.onclick = () => post('/api/connect', { candidate: c.name, debounceMs: Number($('deb').value), hintMode: $('hint').value });
+    box.appendChild(b);
+  }
+  $('deb').value = String(cfg.debounceMs); $('hint').value = cfg.hintMode;
+}
+function renderState(s) {
+  const pill = $('pill-' + s.device);
+  pill.textContent = s.offline ? 'offline' : s.dirty ? 'sending…' : 'synced';
+  pill.className = 'pill ' + (s.offline ? 'offline' : s.dirty ? 'pending' : 'synced');
+  const ta = $('text-' + s.device);
+  if (!s.dirty && document.activeElement !== ta && ta.value !== s.text) ta.value = s.text;
+  if (!s.dirty && document.activeElement === ta && ta.value !== s.text && !timers[s.device]) ta.value = s.text;
+  $('meta-' + s.device).textContent = `version ${s.version} · cursor ${s.cursor} · conflicts ${s.conflicts} · retries ${s.retries}`;
+  const box = $('copies-' + s.device); box.textContent = '';
+  if (s.copies.length) { const h = document.createElement('b'); h.textContent = `Conflict copies (${s.copies.length})`; box.appendChild(h); for (const c of s.copies) { const p = document.createElement('pre'); p.textContent = c.text; box.appendChild(p); } }
+  document.querySelector(`[data-off="${s.device}"]`).textContent = s.offline ? 'Go online' : 'Go offline';
+}
+function renderTimings(t) {
+  const rows = $('rows'); rows.textContent = '';
+  for (const x of t.all.slice(0, 12)) {
+    const tr = document.createElement('tr');
+    for (const v of [x.at, `${x.from} → ${x.to}`, `${x.totalMs} ms`, x.ackMs == null ? '–' : `${x.ackMs} ms`, `${Math.max(0, x.totalMs - x.debounceMs)} ms`]) { const td = document.createElement('td'); td.textContent = v; tr.appendChild(td); }
+    rows.appendChild(tr);
+  }
+  if (t.latest) $('last').innerHTML = `${t.latest.totalMs}<small> ms</small>`;
+  const server = t.all.map((x) => Math.max(0, x.totalMs - x.debounceMs));
+  $('stats').textContent = server.length ? `minus debounce: p50 ${Math.round(percentile(server,50))} ms · p95 ${Math.round(percentile(server,95))} ms · n=${server.length}` : '';
+}
+const es = new EventSource('/api/events');
+es.addEventListener('config', (e) => { cfg = JSON.parse(e.data); renderConfig(); });
+es.addEventListener('state', (e) => renderState(JSON.parse(e.data)));
+es.addEventListener('timing', (e) => renderTimings(JSON.parse(e.data)));
+for (const d of ['a', 'b']) {
+  $('text-' + d).addEventListener('input', (e) => { post('/api/edit', { device: d, text: e.target.value }); clearTimeout(timers[d]); timers[d] = setTimeout(() => { timers[d] = null; }, 1500); });
+  document.querySelector(`[data-off="${d}"]`).onclick = () => post('/api/offline', { device: d, offline: document.querySelector(`[data-off="${d}"]`).textContent === 'Go offline' });
+}
+$('reconnect').onclick = () => post('/api/connect', { candidate: cfg && cfg.candidate, debounceMs: Number($('deb').value), hintMode: $('hint').value });
+</script>
+</body>
+</html>
