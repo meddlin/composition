@@ -31,6 +31,8 @@ See [feature-matrix.md](feature-matrix.md) for which features the CLI, web and d
 
 See [architecture/attachments.md](architecture/attachments.md) for files attached to a note.
 
+See [architecture/sync-server.md](architecture/sync-server.md) for the self-hosted sync server (`apps/sync-server`): what it is, how to run it, and where its guides are.
+
 See [ui/cli-keybindings.md](ui/cli-keybindings.md) for every CLI key, which keys belong to the editor, and which keys can't be used and why.
 
 See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the three apps share into one package.

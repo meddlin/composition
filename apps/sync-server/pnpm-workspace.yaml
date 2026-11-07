@@ -1,0 +1,5 @@
+# pnpm 11 keeps install settings here. This is NOT a workspace: the sync server is one package with its own lockfile,
+# and nothing under apps/ imports from it (or it from them).
+#
+# The server itself has no runtime dependencies (node:sqlite and node:http ship with Node 24); the two dev
+# dependencies are only for `pnpm typecheck`.

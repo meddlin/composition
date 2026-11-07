@@ -1,0 +1,10 @@
+node_modules
+.env*
+.local
+backup
+**/*.db*
+# Not needed to build the image (the Dockerfile copies core, lean and three protocol files).
+selfhost
+scripts
+protocol/client
+protocol/contract
