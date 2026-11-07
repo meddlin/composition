@@ -928,6 +928,18 @@ try {
   check("the theme is stored in the app's own settings file", fs.existsSync(path.join(userData, "settings.json")) && JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).theme === "light");
   check("the web app's settings file was not touched", !fs.existsSync(path.join(home, ".composition-web", "settings.json")));
   await page.screenshot({ path: path.join(out, "4-settings-light.png") });
+
+  // ---- Follow the sun (Settings > Styling > Follow the sun): the pair of colors it moves between.
+  await openSettingsPage(page, "Follow the sun");
+  await page.getByRole("radio", { name: "Cream to dark amber" }).check();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunPair === "cream-amber");
+  check("choosing a pair of Follow the sun colors puts it on the page at once", (await page.evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber");
+  await waitFor(async () => (await popoutPage().evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber").catch(() => {});
+  check("a pop-out follows it", (await popoutPage().evaluate(() => document.documentElement.dataset.sunPair)) === "cream-amber");
+  check("the pair is stored in the app's own settings file", JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).sunPair === "cream-amber");
+  check("a pair that doesn't exist is refused with a reason", typeof (await page.evaluate(() => window.composition.saveSunPair("neon-pink"))).error === "string");
+  await page.getByRole("radio", { name: "Light and dark", exact: true }).check();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunPair === "classic");
   await openSettingsPage(page, "General");
 
   // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real

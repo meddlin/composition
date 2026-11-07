@@ -168,6 +168,7 @@ describe("VALIDATORS", () => {
     ["savePreviewFont", [{}]],
     ["saveEditorFont", [{}]],
     ["saveNoteBackground", [{}]],
+    ["saveSunPair", [{}]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],

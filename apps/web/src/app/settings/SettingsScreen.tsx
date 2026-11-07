@@ -8,6 +8,7 @@ import {
   PuzzleIcon,
   SlidersHorizontalIcon,
   SparklesIcon,
+  SunMoonIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { RouteBackNav } from "@/components/RouteBackNav";
@@ -17,6 +18,8 @@ import type { SettingsSnapshot } from "@/lib/composition/api";
 import { AssistantSettings } from "./AssistantSettings";
 import { ChatGptSettings } from "./ChatGptSettings";
 import { BackupRestore } from "./BackupRestore";
+import { ColorSchemeProvider } from "./ColorSchemeProvider";
+import { FollowTheSunSettings } from "./FollowTheSunSettings";
 import { FunMetrics } from "./FunMetrics";
 import { HomeSettings } from "./HomeSettings";
 import { KeyboardShortcuts } from "./KeyboardShortcuts";
@@ -25,7 +28,7 @@ import { PluginsProvider } from "./PluginsProvider";
 import { PluginsSettings } from "./PluginsSettings";
 import { SettingsForm } from "./SettingsForm";
 import { SettingsShell, type SettingsPage } from "./SettingsShell";
-import { StylingSettings } from "./StylingSettings";
+import { FOLLOW_THE_SUN_PAGE, StylingSettings } from "./StylingSettings";
 import { TodoSettings } from "./TodoSettings";
 import { TrashCan } from "./TrashCan";
 import { Updates } from "./Updates";
@@ -107,16 +110,21 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
       icon: <PaletteIcon />,
       content: (
         <StylingSettings
-          currentTheme={snapshot.theme}
           currentPreviewFont={snapshot.previewFont}
           currentEditorFont={snapshot.editorFont}
           currentNoteBackground={snapshot.noteBackground}
           currentHeadingRail={snapshot.writing.headingRailEnabled}
           currentHeadingRailSide={snapshot.writing.headingRailSide}
-          currentCity={snapshot.city}
-          currentSunTimes={snapshot.sunTimes}
         />
       ),
+      subpages: [
+        {
+          id: FOLLOW_THE_SUN_PAGE,
+          label: "Follow the sun",
+          icon: <SunMoonIcon />,
+          content: <FollowTheSunSettings currentCity={snapshot.city} currentSunTimes={snapshot.sunTimes} />,
+        },
+      ],
     },
     {
       id: "writing",
@@ -174,7 +182,9 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
       </div>
 
       <PluginsProvider initial={snapshot.plugins}>
-        <SettingsShell pages={pages} />
+        <ColorSchemeProvider initialTheme={snapshot.theme} initialSunPair={snapshot.sunPair}>
+          <SettingsShell pages={pages} />
+        </ColorSchemeProvider>
       </PluginsProvider>
     </div>
   );

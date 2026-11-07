@@ -266,6 +266,15 @@ export async function saveNoteBackground(background: string): Promise<{ error?: 
   return result;
 }
 
+export async function saveSunPair(pair: string): Promise<{ error?: string }> {
+  const result = await service.saveSunPair(pair);
+  if (!result.error) {
+    revalidatePath("/settings");
+    revalidatePath("/");
+  }
+  return result;
+}
+
 export async function saveWritingSettings(writing: Partial<WritingSettings>): Promise<{ error?: string }> {
   const result = await service.saveWritingSettings(writing);
   if (!result.error) {

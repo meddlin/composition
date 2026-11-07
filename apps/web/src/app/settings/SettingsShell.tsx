@@ -1,7 +1,7 @@
 "use client";
 
-import { MenuIcon, SearchIcon, XIcon } from "lucide-react";
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ChevronLeftIcon, MenuIcon, SearchIcon, XIcon } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -13,7 +13,25 @@ export type SettingsPage = {
   label: string;
   icon: ReactNode;
   content: ReactNode;
+  /** Pages under this one in the list, for a topic that needs a page of its own (one level only). */
+  subpages?: SettingsPage[];
 };
+
+/** A page as the screen handles it: the parent it sits under, if any, and the name that says where it is. */
+type Entry = { page: SettingsPage; parent?: SettingsPage; path: string };
+
+const entriesOf = (pages: SettingsPage[]): Entry[] =>
+  pages.flatMap((page) => [
+    { page, path: page.label },
+    ...(page.subpages ?? []).map((subpage) => ({ page: subpage, parent: page, path: `${page.label} › ${subpage.label}` })),
+  ]);
+
+const OpenPageContext = createContext<((id: string) => void) | null>(null);
+
+/** Opens another Settings page by its id, for a link inside a page; null where the page is shown outside the screen. */
+export function useOpenSettingsPage(): ((id: string) => void) | null {
+  return useContext(OpenPageContext);
+}
 
 type Search = { query: string; hits: SettingsHit[] };
 const NO_SEARCH: Search = { query: "", hits: [] };
@@ -29,6 +47,20 @@ type NavProps = {
   onOpenPage: (id: string) => void;
   onOpenHit: (hit: SettingsHit) => void;
 };
+
+function PageButton({ page, pageId, onOpenPage }: Pick<NavProps, "pageId" | "onOpenPage"> & { page: SettingsPage }) {
+  return (
+    <button
+      type="button"
+      aria-current={page.id === pageId ? "page" : undefined}
+      onClick={() => onOpenPage(page.id)}
+      className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground [&_svg]:size-4 [&_svg]:shrink-0"
+    >
+      {page.icon}
+      {page.label}
+    </button>
+  );
+}
 
 /** The search box and, under it, the pages, or what the search found in place of them. */
 function SettingsNav({ pages, pageId, search, onSearch, onOpenPage, onOpenHit }: NavProps) {
@@ -105,15 +137,16 @@ function SettingsNav({ pages, pageId, search, onSearch, onOpenPage, onOpenHit }:
           <ul className="flex flex-col gap-0.5">
             {pages.map((page) => (
               <li key={page.id}>
-                <button
-                  type="button"
-                  aria-current={page.id === pageId ? "page" : undefined}
-                  onClick={() => onOpenPage(page.id)}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-sm text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground [&_svg]:size-4 [&_svg]:shrink-0"
-                >
-                  {page.icon}
-                  {page.label}
-                </button>
+                <PageButton page={page} pageId={pageId} onOpenPage={onOpenPage} />
+                {page.subpages && (
+                  <ul className="mt-0.5 ml-5 flex flex-col gap-0.5 border-l pl-2">
+                    {page.subpages.map((subpage) => (
+                      <li key={subpage.id}>
+                        <PageButton page={subpage} pageId={pageId} onOpenPage={onOpenPage} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>
@@ -131,6 +164,7 @@ function SettingsNav({ pages, pageId, search, onSearch, onOpenPage, onOpenHit }:
  * the search can read all of them.
  */
 export function SettingsShell({ pages }: { pages: SettingsPage[] }) {
+  const entries = entriesOf(pages);
   const [pageId, setPageId] = useState(pages[0].id);
   const [search, setSearch] = useState(NO_SEARCH);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -153,9 +187,9 @@ export function SettingsShell({ pages }: { pages: SettingsPage[] }) {
   }, [reveal]);
 
   function find(query: string) {
-    const searchable = pages.flatMap(({ id, label }) => {
-      const root = panels.current.get(id);
-      return root ? [{ id, label, root }] : [];
+    const searchable = entries.flatMap(({ page, path }) => {
+      const root = panels.current.get(page.id);
+      return root ? [{ id: page.id, label: path, root }] : [];
     });
     setSearch({ query, hits: searchSettings(searchable, query) });
   }
@@ -211,24 +245,39 @@ export function SettingsShell({ pages }: { pages: SettingsPage[] }) {
           </Sheet>
         </div>
 
-        {pages.map((page) => (
-          <section
-            key={page.id}
-            ref={(element) => {
-              if (element) panels.current.set(page.id, element);
-              else panels.current.delete(page.id);
-            }}
-            hidden={page.id !== pageId}
-            aria-labelledby={`settings-${page.id}`}
-          >
-            <div className="flex flex-col gap-6">
-              <h2 id={`settings-${page.id}`} className="text-base font-semibold">
-                {page.label}
-              </h2>
-              {page.content}
-            </div>
-          </section>
-        ))}
+        <OpenPageContext.Provider value={openPage}>
+          {entries.map(({ page, parent }) => (
+            <section
+              key={page.id}
+              ref={(element) => {
+                if (element) panels.current.set(page.id, element);
+                else panels.current.delete(page.id);
+              }}
+              hidden={page.id !== pageId}
+              aria-labelledby={`settings-${page.id}`}
+            >
+              <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-1">
+                  {parent && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => openPage(parent.id)}
+                      className="-ml-2 w-fit text-muted-foreground hover:text-foreground"
+                    >
+                      <ChevronLeftIcon /> {parent.label}
+                    </Button>
+                  )}
+                  <h2 id={`settings-${page.id}`} className="text-base font-semibold">
+                    {page.label}
+                  </h2>
+                </div>
+                {page.content}
+              </div>
+            </section>
+          ))}
+        </OpenPageContext.Provider>
       </div>
     </div>
   );

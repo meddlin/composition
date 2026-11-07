@@ -5,14 +5,16 @@ import { saveEditorFont, saveNoteBackground, savePreviewFont, saveWritingSetting
 import { EDITOR_FONT_CHOICES, editorFontStack } from "@/lib/composition/editorFonts";
 import { NOTE_BACKGROUND_CHOICES } from "@/lib/composition/noteBackgrounds";
 import { PREVIEW_FONT_CHOICES, previewFontStack } from "@/lib/composition/previewFonts";
+import { THEME_CHOICES } from "@/lib/composition/themes";
+import { ColorSchemeProvider } from "./ColorSchemeProvider";
 import { StylingSettings } from "./StylingSettings";
 
 vi.mock("@/lib/composition/client", () => ({
-  saveLocation: vi.fn(async () => ({})),
   savePreviewFont: vi.fn(async () => ({})),
   saveEditorFont: vi.fn(async () => ({})),
   saveNoteBackground: vi.fn(async () => ({})),
   saveSettings: vi.fn(async () => ({})),
+  saveSunPair: vi.fn(async () => ({})),
   saveTheme: vi.fn(async () => ({})),
   saveWritingSettings: vi.fn(async () => ({})),
 }));
@@ -33,17 +35,36 @@ function renderForm(
   currentHeadingRailSide: "left" | "right" = "left",
 ) {
   render(
-    <StylingSettings
-      currentTheme="dark"
-      currentPreviewFont={currentPreviewFont}
-      currentEditorFont={currentEditorFont}
-      currentNoteBackground={currentNoteBackground}
-      currentHeadingRail={currentHeadingRail}
-      currentHeadingRailSide={currentHeadingRailSide}
-      currentCity=""
-    />,
+    <ColorSchemeProvider initialTheme="dark" initialSunPair="classic">
+      <StylingSettings
+        currentPreviewFont={currentPreviewFont}
+        currentEditorFont={currentEditorFont}
+        currentNoteBackground={currentNoteBackground}
+        currentHeadingRail={currentHeadingRail}
+        currentHeadingRailSide={currentHeadingRailSide}
+      />
+    </ColorSchemeProvider>,
   );
 }
+
+describe("color scheme setting", () => {
+  it("offers every scheme, with the saved one selected", () => {
+    renderForm();
+
+    const group = screen.getByRole("radiogroup", { name: "Color scheme" });
+    expect(group.querySelectorAll('[role="radio"]')).toHaveLength(THEME_CHOICES.length);
+    expect(within(group).getByRole("radio", { name: "Dark" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("says what Follow the sun is, and leaves its settings to its own page", () => {
+    renderForm();
+
+    expect(screen.getByText(/Follow the sun fades between a light and a dark set of colors/)).toBeTruthy();
+    // Outside the Settings screen there is no page to go to, so no link to it.
+    expect(screen.queryByRole("button", { name: "Choose its colors and city" })).toBeNull();
+    expect(screen.queryByLabelText("City")).toBeNull();
+  });
+});
 
 const rootFont = () => document.documentElement.style.getPropertyValue("--preview-font");
 

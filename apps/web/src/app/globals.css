@@ -14,6 +14,11 @@
  * colors come from whichever one `data-tone` names, while the three surface
  * colors cross-fade with `--auto-light` (see the block after cream). Both
  * attributes are kept current by components/SunThemeSync.tsx.
+ *
+ * Which two palettes it moves between is the pair named by `data-sun-pair` (see
+ * lib/composition/sunPairs.ts): the classic light and dark when it is absent, or one of
+ * the others, whose palettes are the selectors that also list `data-sun-pair` below. Those
+ * selectors are more specific than the classic ones, so a pair's palette wins over them.
  */
 :root,
 [data-theme="dark"],
@@ -68,7 +73,8 @@
   --syntax-attr: #116329;
 }
 
-[data-theme="forest"] {
+[data-theme="forest"],
+[data-theme="auto"][data-sun-pair="mint-forest"][data-tone="dark"] {
   color-scheme: dark;
   --background: #0c1510;
   --foreground: #d5e5da;
@@ -92,7 +98,8 @@
 }
 
 /* Dark red wine: burgundy backgrounds, rose accents, champagne highlights. */
-[data-theme="wine"] {
+[data-theme="wine"],
+[data-theme="auto"][data-sun-pair="blush-wine"][data-tone="dark"] {
   color-scheme: dark;
   --background: #160a0e;
   --foreground: #ecdde0;
@@ -116,7 +123,8 @@
 }
 
 /* Warm paper look: cream backgrounds, brown ink, terracotta accents. Web only. */
-[data-theme="cream"] {
+[data-theme="cream"],
+[data-theme="auto"][data-sun-pair="cream-amber"][data-tone="light"] {
   color-scheme: light;
   --background: #f6f0e1;
   --foreground: #3b3226;
@@ -140,6 +148,131 @@
   --syntax-attr: #22627a;
 }
 
+/* The new palettes below exist only as the halves of a "Follow the sun" pair (see sunPairs.ts); web only. */
+
+/* Cream to dark amber, at night: brown-black, amber accents and a warm ink. */
+[data-theme="auto"][data-sun-pair="cream-amber"][data-tone="dark"] {
+  color-scheme: dark;
+  --background: #17110a;
+  --foreground: #f0e2cc;
+  --surface: #21170d;
+  --panel: #2d1f10;
+  --brand: #e8a13a;
+  --brand-dim: #a8701e;
+  --highlight: #f2c14e;
+  --warning: #e8a13a;
+  --error: #e0604f;
+  --success: #8fc46a;
+  --link: #f0b04a;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #a8977c;
+  --syntax-keyword: #f0866f;
+  --syntax-string: #b5d48a;
+  --syntax-number: #f0c05a;
+  --syntax-function: #cfa6f0;
+  --syntax-type: #f0a65a;
+  --syntax-attr: #8fd49b;
+}
+
+/* Light green to dark forest, by day: sage backgrounds, deep green ink. */
+[data-theme="auto"][data-sun-pair="mint-forest"][data-tone="light"] {
+  color-scheme: light;
+  --background: #eef5ea;
+  --foreground: #1f2d22;
+  --surface: #e3edde;
+  --panel: #d6e4d0;
+  --brand: #2f7a4a;
+  --brand-dim: #5f7a66;
+  --highlight: #b5651d;
+  --warning: #9a6a10;
+  --error: #b8323f;
+  --success: #1f7a45;
+  --link: #1f6b3f;
+  --mark-alpha: 55%;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #55695a;
+  --syntax-keyword: #a82b3a;
+  --syntax-string: #0f5f4d;
+  --syntax-number: #8a5a00;
+  --syntax-function: #6b3fa0;
+  --syntax-type: #8a4a12;
+  --syntax-attr: #1b5f7a;
+}
+
+/* Blush to wine, by day: pale rose backgrounds, plum-brown ink. */
+[data-theme="auto"][data-sun-pair="blush-wine"][data-tone="light"] {
+  color-scheme: light;
+  --background: #faf0f0;
+  --foreground: #3a2226;
+  --surface: #f3e3e4;
+  --panel: #ead3d6;
+  --brand: #b02e4f;
+  --brand-dim: #86616a;
+  --highlight: #b4571a;
+  --warning: #96600c;
+  --error: #b3261e;
+  --success: #2f7a45;
+  --link: #a3243f;
+  --mark-alpha: 55%;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #7a5b62;
+  --syntax-keyword: #a3243f;
+  --syntax-string: #2f6b3a;
+  --syntax-number: #8a5608;
+  --syntax-function: #7a3e9d;
+  --syntax-type: #9a4a1f;
+  --syntax-attr: #22627a;
+}
+
+/* Sky to midnight, by day: pale blue backgrounds, navy ink. */
+[data-theme="auto"][data-sun-pair="sky-midnight"][data-tone="light"] {
+  color-scheme: light;
+  --background: #eef5fb;
+  --foreground: #1c2b3a;
+  --surface: #e1ecf6;
+  --panel: #d1e2f0;
+  --brand: #1b64b8;
+  --brand-dim: #5a6f85;
+  --highlight: #b4570c;
+  --warning: #9a640c;
+  --error: #c4314b;
+  --success: #1a7f4b;
+  --link: #0b5cb8;
+  --mark-alpha: 55%;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #52657a;
+  --syntax-keyword: #b5273a;
+  --syntax-string: #0a3069;
+  --syntax-number: #0550ae;
+  --syntax-function: #6b3fb5;
+  --syntax-type: #953800;
+  --syntax-attr: #116329;
+}
+
+/* Sky to midnight, at night: navy backgrounds, blue accents. */
+[data-theme="auto"][data-sun-pair="sky-midnight"][data-tone="dark"] {
+  color-scheme: dark;
+  --background: #0b1220;
+  --foreground: #dde6f3;
+  --surface: #111a2c;
+  --panel: #182339;
+  --brand: #4f8ff0;
+  --brand-dim: #2c5aa8;
+  --highlight: #f0b64a;
+  --warning: #f0b64a;
+  --error: #e8607a;
+  --success: #5bd08a;
+  --link: #7db4ff;
+  /* Code block tokens, checked at >= 4.5:1 against --surface. Web only. */
+  --syntax-comment: #8a9ab4;
+  --syntax-keyword: #ff8b9a;
+  --syntax-string: #a5d6ff;
+  --syntax-number: #79c0ff;
+  --syntax-function: #d2a8ff;
+  --syntax-type: #ffb86b;
+  --syntax-attr: #7ee787;
+}
+
 /*
  * Follow the sun: only the surfaces blend smoothly. Text snaps to the tone's
  * palette instead, since a blend of dark and light text vanishes against the
@@ -150,6 +283,31 @@
   --background: color-mix(in srgb, #f7f7f4 var(--auto-light, 0%), #121212);
   --surface: color-mix(in srgb, #edede8 var(--auto-light, 0%), #1e1e1e);
   --panel: color-mix(in srgb, #e2e2db var(--auto-light, 0%), #1b2730);
+}
+
+/* The other pairs blend between their own palettes (the same endpoints; themes.test.ts checks them). */
+[data-theme="auto"][data-sun-pair="cream-amber"][data-tone] {
+  --background: color-mix(in srgb, #f6f0e1 var(--auto-light, 0%), #17110a);
+  --surface: color-mix(in srgb, #eee5d0 var(--auto-light, 0%), #21170d);
+  --panel: color-mix(in srgb, #e4d9be var(--auto-light, 0%), #2d1f10);
+}
+
+[data-theme="auto"][data-sun-pair="mint-forest"][data-tone] {
+  --background: color-mix(in srgb, #eef5ea var(--auto-light, 0%), #0c1510);
+  --surface: color-mix(in srgb, #e3edde var(--auto-light, 0%), #132019);
+  --panel: color-mix(in srgb, #d6e4d0 var(--auto-light, 0%), #1a2c22);
+}
+
+[data-theme="auto"][data-sun-pair="blush-wine"][data-tone] {
+  --background: color-mix(in srgb, #faf0f0 var(--auto-light, 0%), #160a0e);
+  --surface: color-mix(in srgb, #f3e3e4 var(--auto-light, 0%), #22111a);
+  --panel: color-mix(in srgb, #ead3d6 var(--auto-light, 0%), #2d1620);
+}
+
+[data-theme="auto"][data-sun-pair="sky-midnight"][data-tone] {
+  --background: color-mix(in srgb, #eef5fb var(--auto-light, 0%), #0b1220);
+  --surface: color-mix(in srgb, #e1ecf6 var(--auto-light, 0%), #111a2c);
+  --panel: color-mix(in srgb, #d1e2f0 var(--auto-light, 0%), #182339);
 }
 
 /* `dark:` utilities follow the selected scheme, not the OS setting. */

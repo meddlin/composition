@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { DEFAULT_ASSISTANT_SETTINGS } from "@/lib/composition/assistant/settings";
@@ -27,6 +27,7 @@ vi.mock("@/lib/composition/client", () => {
     savePluginSettings: stub(),
     savePreviewFont: stub(),
     saveSettings: stub(),
+    saveSunPair: stub(),
     saveTheme: stub(),
     saveWritingSettings: stub(),
     signOutChatGpt: stub(),
@@ -47,13 +48,18 @@ vi.stubGlobal(
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  delete document.documentElement.dataset.sunPair;
+  delete document.documentElement.dataset.theme;
+});
 
 const snapshot: SettingsSnapshot = {
   theme: "dark",
   previewFont: "default",
   editorFont: "default",
   noteBackground: "plain",
+  sunPair: "classic",
   writing: DEFAULT_WRITING_SETTINGS,
   home: DEFAULT_HOME_SETTINGS,
   plugins: DEFAULT_PLUGIN_SETTINGS,
@@ -87,6 +93,7 @@ describe("the Settings screen", () => {
     expect(pages.map((page) => page.textContent)).toEqual([
       "General",
       "Styling",
+      "Follow the sun",
       "Writing",
       "Home page",
       "Plugins",
@@ -118,6 +125,98 @@ describe("the Settings screen", () => {
     const heading = screen.getByRole("heading", { level: 2, name: "Keyboard shortcuts" });
     expect(heading.closest("section")!.hidden).toBe(false);
     expect(screen.getByRole("heading", { level: 2, name: "General", hidden: true }).closest("section")!.hidden).toBe(true);
+  });
+});
+
+describe("the Follow the sun page", () => {
+  const section = (name: string) => screen.getByRole("heading", { level: 2, name, hidden: true }).closest("section")!;
+  const openIt = () => fireEvent.click(sidebar().getByRole("button", { name: "Follow the sun" }));
+
+  it("sits under Styling in the list, one level in", () => {
+    render(<SettingsScreen snapshot={snapshot} />);
+
+    const nav = sidebar().getByRole("navigation", { name: "Settings sections" });
+    const styling = within(nav).getByRole("button", { name: "Styling" }).closest("li")!;
+
+    expect(within(styling).getByRole("button", { name: "Follow the sun" })).toBeTruthy();
+    expect(within(nav).getAllByRole("list")).toHaveLength(2);
+  });
+
+  it("is reached from the Color scheme choices, which say what it is", () => {
+    render(<SettingsScreen snapshot={snapshot} />);
+    fireEvent.click(sidebar().getByRole("button", { name: "Styling" }));
+
+    fireEvent.click(within(section("Styling")).getByRole("button", { name: "Choose its colors and city" }));
+
+    expect(section("Follow the sun").hidden).toBe(false);
+    expect(section("Styling").hidden).toBe(true);
+    expect(sidebar().getByRole("button", { name: "Follow the sun" }).getAttribute("aria-current")).toBe("page");
+  });
+
+  it("takes you back to Styling from its own heading", () => {
+    render(<SettingsScreen snapshot={snapshot} />);
+    fireEvent.click(sidebar().getByRole("button", { name: "Follow the sun" }));
+
+    fireEvent.click(within(section("Follow the sun")).getByRole("button", { name: "Styling" }));
+
+    expect(section("Styling").hidden).toBe(false);
+  });
+
+  it("explains the scheme, takes the city, and offers every pair of colors", () => {
+    render(<SettingsScreen snapshot={{ ...snapshot, city: "Austin, Texas, United States", sunPair: "mint-forest" }} />);
+    openIt();
+    const page = within(section("Follow the sun"));
+
+    expect(page.getByText(/changes between its light-scheme and dark-scheme color halfway through the fade/)).toBeTruthy();
+    expect((page.getByLabelText("City") as HTMLInputElement).value).toBe("Austin, Texas, United States");
+    const pairs = page.getByRole("radiogroup", { name: "Light and dark colors" });
+    expect(within(pairs).getAllByRole("radio").map((radio) => radio.getAttribute("aria-checked"))).toEqual([
+      "false",
+      "false",
+      "true",
+      "false",
+      "false",
+    ]);
+    expect(within(pairs).getByRole("radio", { name: "Cream to dark amber" })).toBeTruthy();
+    expect(within(pairs).getByRole("radio", { name: "Light green to dark forest" })).toBeTruthy();
+  });
+
+  it("saves a chosen pair of colors and puts it on the page", async () => {
+    const { saveSunPair } = await import("@/lib/composition/client");
+    render(<SettingsScreen snapshot={snapshot} />);
+    openIt();
+
+    await act(async () => {
+      fireEvent.click(within(section("Follow the sun")).getByRole("radio", { name: "Cream to dark amber" }));
+    });
+
+    expect(saveSunPair).toHaveBeenCalledWith("cream-amber");
+    expect(document.documentElement.dataset.sunPair).toBe("cream-amber");
+  });
+
+  it("offers to switch to Follow the sun, and then says it is on, while the Color scheme choice follows", async () => {
+    const { saveTheme } = await import("@/lib/composition/client");
+    render(<SettingsScreen snapshot={snapshot} />);
+    openIt();
+    const page = within(section("Follow the sun"));
+
+    await act(async () => {
+      fireEvent.click(page.getByRole("button", { name: "Use Follow the sun" }));
+    });
+
+    expect(saveTheme).toHaveBeenCalledWith("auto");
+    expect(page.getByRole("status").textContent).toBe("Follow the sun is your color scheme now.");
+    expect(page.queryByRole("button", { name: "Use Follow the sun" })).toBeNull();
+    const scheme = within(section("Styling")).getByRole("radiogroup", { name: "Color scheme", hidden: true });
+    expect(within(scheme).getByRole("radio", { name: /Follow the sun/, hidden: true }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("is found by searching for what it does", () => {
+    render(<SettingsScreen snapshot={snapshot} />);
+
+    search("sunrise");
+
+    expect(found().some((hit) => hit.endsWith("Styling › Follow the sun"))).toBe(true);
   });
 });
 
@@ -165,12 +264,12 @@ describe("searching the Settings screen", () => {
     expect(found().some((hit) => hit.endsWith("AI Configuration"))).toBe(true);
   });
 
-  it("finds the city setting by its own heading, first", () => {
+  it("finds the city setting, on the Follow the sun page under Styling, first", () => {
     render(<SettingsScreen snapshot={snapshot} />);
 
     search("city");
 
-    expect(found()[0]).toBe("CityStyling");
+    expect(found()[0]).toBe("Your cityStyling › Follow the sun");
   });
 
   it("opens the page a result is on", () => {

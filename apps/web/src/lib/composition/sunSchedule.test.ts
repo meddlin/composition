@@ -4,6 +4,7 @@ import {
   INK_FLIP_LEVEL,
   RAMP_HALF_WIDTH_MS,
   sunLevel,
+  sunThemeAttributes,
   toneForLevel,
   type SunEvent,
 } from "./sunSchedule";
@@ -58,6 +59,16 @@ describe("sunLevel", () => {
 
   it("is dark when there are no events", () => {
     expect(sunLevel([], MIDNIGHT)).toBe(0);
+  });
+});
+
+describe("a pair's own flip level", () => {
+  it("moves where the tone changes, for toneForLevel and sunThemeAttributes alike", () => {
+    expect(toneForLevel(0.47)).toBe("light");
+    expect(toneForLevel(0.47, 0.5)).toBe("dark");
+    expect(toneForLevel(0.5, 0.5)).toBe("light");
+    expect(sunThemeAttributes(0.47, 0.5)).toEqual({ tone: "dark", autoLight: "47.0%" });
+    expect(sunThemeAttributes(0.47)).toEqual({ tone: "light", autoLight: "47.0%" });
   });
 });
 

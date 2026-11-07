@@ -52,6 +52,7 @@ describe("saveSettings", () => {
       previewFont: "default",
       editorFont: "default",
       noteBackground: "plain",
+      sunPair: "classic",
       todoLook: { background: "notes", color: null },
       todos: DEFAULT_TODO_SETTINGS,
       plugins: DEFAULT_PLUGIN_SETTINGS,
@@ -202,6 +203,34 @@ describe("saveNoteBackground", () => {
   });
 });
 
+describe("saveSunPair", () => {
+  it("stores a known pair of colors and leaves the rest of the settings alone", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveSunPair, savePreviewFont } = await import("./service");
+    await savePreviewFont("lora");
+
+    expect(await saveSunPair("cream-amber")).toEqual({});
+
+    expect(loadWebSettings()).toMatchObject({ sunPair: "cream-amber", previewFont: "lora", ...DEFAULT_LAYOUT });
+  });
+
+  it("rejects an unknown pair without writing it", async () => {
+    const { loadWebSettings } = await import("./webSettings");
+    const { saveSunPair } = await import("./service");
+
+    expect(await saveSunPair("neon-pink")).toEqual({ error: "Unknown pair of colors." });
+
+    expect(loadWebSettings().sunPair).toBe("classic");
+  });
+
+  it("is what Settings reports afterwards", async () => {
+    const { loadSettings, saveSunPair } = await import("./service");
+    await saveSunPair("sky-midnight");
+
+    expect((await loadSettings()).sunPair).toBe("sky-midnight");
+  });
+});
+
 describe("saveHomeSettings", () => {
   const home: HomeSettings = {
     layout: "strip",
@@ -314,6 +343,7 @@ describe("loadSettings", () => {
       previewFont: "default",
       editorFont: "default",
       noteBackground: "plain",
+      sunPair: "classic",
       writing: DEFAULT_WRITING_SETTINGS,
       home: DEFAULT_HOME_SETTINGS,
       plugins: DEFAULT_PLUGIN_SETTINGS,

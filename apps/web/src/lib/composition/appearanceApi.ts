@@ -1,6 +1,7 @@
 import type { EditorFontName } from "./editorFonts";
 import type { NoteBackgroundName } from "./noteBackgrounds";
 import type { PreviewFontName } from "./previewFonts";
+import type { SunPairName } from "./sunPairs";
 import type { ThemeName } from "./themes";
 
 /**
@@ -14,6 +15,8 @@ export type AppearanceMessage = {
   previewFont: PreviewFontName;
   editorFont: EditorFontName;
   noteBackground: NoteBackgroundName;
+  /** The light and dark colors the "auto" scheme moves between. */
+  sunPair: SunPairName;
   /** Whether the window lets what is behind it show through, so the first frame already does. */
   translucent: boolean;
   /** How solid the page's fills are while translucent (see `WindowTranslucency.opacity`). */

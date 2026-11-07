@@ -20,7 +20,7 @@ type Change = (value: string) => Promise<{ error?: string }>;
  * refused or failed). Settings is one page in one window; this is what lets the others, pop-outs among them, follow it.
  */
 export function notifyAppearanceChanges<
-  T extends Record<"saveTheme" | "savePreviewFont" | "saveEditorFont" | "saveLocation" | "saveNoteBackground", Change>,
+  T extends Record<"saveTheme" | "savePreviewFont" | "saveEditorFont" | "saveLocation" | "saveNoteBackground" | "saveSunPair", Change>,
 >(
   api: T,
   announce: () => void,
@@ -39,6 +39,7 @@ export function notifyAppearanceChanges<
     saveEditorFont: announcing(api.saveEditorFont),
     saveLocation: announcing(api.saveLocation),
     saveNoteBackground: announcing(api.saveNoteBackground),
+    saveSunPair: announcing(api.saveSunPair),
   } as T;
 }
 
