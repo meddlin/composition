@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import yaml from "js-yaml";
+import { load } from "js-yaml";
 import { expandHome, themes } from "./backend";
 
 /**
@@ -29,7 +29,7 @@ function mapTheme(value: unknown): string {
 
 function readLegacy(file: string): Record<string, unknown> | null {
   try {
-    const data = yaml.load(fs.readFileSync(file, "utf-8"));
+    const data = load(fs.readFileSync(file, "utf-8"));
     return data && typeof data === "object" && !Array.isArray(data)
       ? (data as Record<string, unknown>)
       : null;
