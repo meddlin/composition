@@ -4,13 +4,15 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/drills/lib.sh
 
+hide_local_convex
 export CONVEX_DEPLOY_KEY; CONVEX_DEPLOY_KEY=$(need CONVEX_DEPLOY_KEY)
 SITE=$(need CONVEX_SITE_URL)
 
 # Tokens first, so the functions never run without them.
-tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
+tmp=$(mktemp)
 { printf 'SYNC_DEV_TOKENS=%s\n' "$(need SYNC_DEV_TOKENS)"; printf 'SYNC_ADMIN_TOKEN=%s\n' "$(need SYNC_ADMIN_TOKEN)"; } > "$tmp"
 pnpm -s exec convex env set --force --from-file "$tmp"
+rm -f "$tmp"
 pnpm -s exec convex deploy -y
 pnpm -s exec convex run sync:init '{}' >/dev/null
 

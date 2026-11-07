@@ -1,0 +1,46 @@
+{
+  "scenario": "outage-database",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:57:28.705Z",
+  "finishedAt": "2026-11-07T04:57:53.781Z",
+  "params": {
+    "what": "database",
+    "downSeconds": 10,
+    "editEveryMs": 1000,
+    "downCmd": "(script)"
+  },
+  "metrics": {
+    "downCommandMs": 702,
+    "upCommandMs": 484,
+    "longestSilentGapMs": 11495,
+    "firstAckAfterServerReturnedMs": 1027,
+    "deviceSawAnErrorAfterMs": 1007,
+    "retriesDuringOutage": 7,
+    "editsMade": 25,
+    "editsLost": 0,
+    "whatTheDeviceSaw": [
+      "HTTP 503: {\"error\":{\"code\":\"storage_unavailable\",\"message\":\"the server could not"
+    ],
+    "upCommandSecondsFromDown": 10
+  },
+  "checks": [
+    {
+      "name": "down command succeeded",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "no edit was lost: the server holds the last text of every note",
+      "ok": true,
+      "detail": "0 lost"
+    },
+    {
+      "name": "the device resumed syncing after the server came back",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

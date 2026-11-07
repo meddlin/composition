@@ -32,7 +32,8 @@ case "$mode/$action" in
     fly machine destroy "$(machine_id)" --force -a "$APP"
     fly volumes destroy "$(fly volumes list -a "$APP" --json | jq -r '.[0] | (.id // .ID)')" -y -a "$APP"
     fly volumes create data --region "$(need FLY_REGION)" --size 1 -y -a "$APP"
-    fly deploy -a "$APP" -c lean/fly.toml --image "$image" --ha=false -y
+    [[ -f .local/lean.fly.toml ]] || { echo "run scripts/deploy-lean.sh first (it writes .local/lean.fly.toml)" >&2; exit 1; }
+    fly deploy -a "$APP" -c .local/lean.fly.toml --image "$image" --ha=false -y
     wait_ready "$URL" ;;
   *) echo "usage: lean.sh <local|fly> <down|up|restore>" >&2; exit 2 ;;
 esac

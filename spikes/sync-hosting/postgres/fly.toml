@@ -2,9 +2,6 @@
 app = "comp-sync-pg-REPLACED-BY-DEPLOY-SCRIPT"
 primary_region = "iad"
 
-[build]
-  dockerfile = "Dockerfile"
-
 [env]
   PORT = "8080"
   LOG = "1"

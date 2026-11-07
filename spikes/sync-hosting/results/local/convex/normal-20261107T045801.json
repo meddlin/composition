@@ -1,0 +1,56 @@
+{
+  "scenario": "normal",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
+  "where": "local",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T04:58:01.555Z",
+  "finishedAt": "2026-11-07T04:58:52.134Z",
+  "params": {
+    "edits": 30,
+    "gapMs": 1500,
+    "hints": "native",
+    "notes": 20,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "ackMs": {
+      "n": 30,
+      "min": 13,
+      "p50": 17.2,
+      "p95": 47.3,
+      "p99": 55.5,
+      "max": 55.5,
+      "mean": 22.8
+    },
+    "propagationMs": {
+      "n": 30,
+      "min": 16.2,
+      "p50": 20.9,
+      "p95": 50.6,
+      "p99": 55.2,
+      "max": 55.2,
+      "mean": 26.8
+    },
+    "missedEdits": 0,
+    "requestsFromA": 67,
+    "deviceAErrors": 0
+  },
+  "checks": [
+    {
+      "name": "every edit reached device B",
+      "ok": true,
+      "detail": "0 missed"
+    },
+    {
+      "name": "no conflicts with one writer",
+      "ok": true
+    },
+    {
+      "name": "propagation p95 within the design's 10 s target",
+      "ok": true,
+      "detail": "p95 50.6 ms (excludes the app's 2 s push debounce)"
+    }
+  ],
+  "notes": []
+}

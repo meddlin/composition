@@ -1,0 +1,56 @@
+{
+  "scenario": "normal",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:54:01.349Z",
+  "finishedAt": "2026-11-07T04:54:51.462Z",
+  "params": {
+    "edits": 30,
+    "gapMs": 1500,
+    "hints": "native",
+    "notes": 20,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "ackMs": {
+      "n": 30,
+      "min": 4.6,
+      "p50": 10,
+      "p95": 21,
+      "p99": 23.3,
+      "max": 23.3,
+      "mean": 11.3
+    },
+    "propagationMs": {
+      "n": 30,
+      "min": 8.6,
+      "p50": 15.9,
+      "p95": 27.8,
+      "p99": 28.3,
+      "max": 28.3,
+      "mean": 16.6
+    },
+    "missedEdits": 0,
+    "requestsFromA": 42,
+    "deviceAErrors": 0
+  },
+  "checks": [
+    {
+      "name": "every edit reached device B",
+      "ok": true,
+      "detail": "0 missed"
+    },
+    {
+      "name": "no conflicts with one writer",
+      "ok": true
+    },
+    {
+      "name": "propagation p95 within the design's 10 s target",
+      "ok": true,
+      "detail": "p95 27.8 ms (excludes the app's 2 s push debounce)"
+    }
+  ],
+  "notes": []
+}

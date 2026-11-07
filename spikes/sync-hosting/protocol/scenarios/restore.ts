@@ -18,7 +18,8 @@ export async function restore(ctx: Context): Promise<Result> {
   const settleMs = ctx.num("settle-ms", 3000);
   const devicesMode = ctx.str("devices") ?? "offline";
   const rotate = ctx.str("rotate") ?? "if-needed";
-  const result = newResult(ctx, "restore", { before: 100, after: 70, settleMs, rotate, devices: devicesMode, backupCmd: backupCmd ? "(script)" : null });
+  const result = newResult(ctx, ctx.str("name") ?? "restore", { before: 100, after: 70, settleMs, rotate, devices: devicesMode,
+    restoresTo: backupCmd ? "a backup point taken before the last 70 writes (loss is by construction: this tests the healing, not durability)" : "the latest state the backup system holds (loss is whatever it had not caught up on)", backupCmd: backupCmd ? "(script)" : null });
   if (!restoreCmd) {
     result.notes.push("no --restore-cmd given");
     result.metrics = { skipped: true };

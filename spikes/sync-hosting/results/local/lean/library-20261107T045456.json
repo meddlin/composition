@@ -1,0 +1,48 @@
+{
+  "scenario": "library",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:54:56.779Z",
+  "finishedAt": "2026-11-07T04:54:57.552Z",
+  "params": {
+    "targetBytes": 10485760,
+    "noteBytes": "2-8 KiB, uniform",
+    "placementBytes": 120
+  },
+  "metrics": {
+    "notes": 2013,
+    "records": 4026,
+    "payloadMB": 10,
+    "upload": {
+      "ms": 437,
+      "requests": 41,
+      "wireMBUp": 14.5,
+      "MBps": 22.9
+    },
+    "initialPull": {
+      "ms": 233,
+      "requests": 21,
+      "wireMBDown": 14.5,
+      "MBps": 42.9
+    },
+    "retries": 0
+  },
+  "checks": [
+    {
+      "name": "uploader pushed everything without conflicts",
+      "ok": true
+    },
+    {
+      "name": "the new device holds every record",
+      "ok": true,
+      "detail": "4026 vs 4026"
+    },
+    {
+      "name": "payloads are byte-identical on both devices",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

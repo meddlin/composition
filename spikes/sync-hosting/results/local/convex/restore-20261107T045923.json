@@ -1,0 +1,66 @@
+{
+  "scenario": "restore",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
+  "where": "local",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T04:59:23.535Z",
+  "finishedAt": "2026-11-07T04:59:34.972Z",
+  "params": {
+    "before": 100,
+    "after": 70,
+    "settleMs": 3000,
+    "rotate": "if-needed",
+    "devices": "offline",
+    "restoresTo": "a backup point taken before the last 70 writes (loss is by construction: this tests the healing, not durability)",
+    "backupCmd": "(script)"
+  },
+  "metrics": {
+    "restorePoint": "2026-11-07T04:59:25Z",
+    "restoreCommandMs": 4240,
+    "serverServingAgainAfterMs": 4246,
+    "epochChangedByRestore": false,
+    "epochRotatedByHandStep": true,
+    "recordsExpected": 150,
+    "recordsOnServerRightAfterRestore": 80,
+    "recordsLostByServerInRestore": 70,
+    "devicesNoticedNewEpochAfterMs": 100,
+    "healedAfterMs": 378,
+    "resyncs": {
+      "a": 1,
+      "b": 1
+    },
+    "repushed": {
+      "a": 70,
+      "b": 70
+    },
+    "recordsLostPermanently": 0,
+    "freshDeviceHolds": "150/150"
+  },
+  "checks": [
+    {
+      "name": "restore command succeeded",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "the epoch changed (by the restore or by the hand step)",
+      "ok": true
+    },
+    {
+      "name": "both devices noticed the new epoch on their own and resynced",
+      "ok": true,
+      "detail": "resyncs a=1 b=1"
+    },
+    {
+      "name": "devices healed the server: it holds every record again",
+      "ok": true
+    },
+    {
+      "name": "a brand-new device sees everything",
+      "ok": true,
+      "detail": "150/150"
+    }
+  ],
+  "notes": []
+}

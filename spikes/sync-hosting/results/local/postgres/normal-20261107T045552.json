@@ -1,0 +1,56 @@
+{
+  "scenario": "normal",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:55:52.595Z",
+  "finishedAt": "2026-11-07T04:56:42.918Z",
+  "params": {
+    "edits": 30,
+    "gapMs": 1500,
+    "hints": "native",
+    "notes": 20,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "ackMs": {
+      "n": 30,
+      "min": 8.1,
+      "p50": 15.9,
+      "p95": 31.9,
+      "p99": 46.3,
+      "max": 46.3,
+      "mean": 17.8
+    },
+    "propagationMs": {
+      "n": 30,
+      "min": 10.5,
+      "p50": 19,
+      "p95": 32.6,
+      "p99": 53.9,
+      "max": 53.9,
+      "mean": 20.2
+    },
+    "missedEdits": 0,
+    "requestsFromA": 68,
+    "deviceAErrors": 0
+  },
+  "checks": [
+    {
+      "name": "every edit reached device B",
+      "ok": true,
+      "detail": "0 missed"
+    },
+    {
+      "name": "no conflicts with one writer",
+      "ok": true
+    },
+    {
+      "name": "propagation p95 within the design's 10 s target",
+      "ok": true,
+      "detail": "p95 32.6 ms (excludes the app's 2 s push debounce)"
+    }
+  ],
+  "notes": []
+}

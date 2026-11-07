@@ -1,0 +1,49 @@
+{
+  "scenario": "concurrent",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:56:49.510Z",
+  "finishedAt": "2026-11-07T04:56:50.574Z",
+  "params": {
+    "devices": 8,
+    "rounds": 40,
+    "freshPerPush": 5,
+    "sharedRecords": 4,
+    "payloadBytes": 1024
+  },
+  "metrics": {
+    "pushes": 320,
+    "appliedRecords": 1693,
+    "head": 1693,
+    "duplicateVersions": 0,
+    "versionsOutOfPlace": 0,
+    "conflictsOnSharedRecords": 227,
+    "retriesOn5xxOrNetwork": 0,
+    "pushesGivenUp": 0,
+    "latencyMs": {
+      "n": 320,
+      "min": 2.9,
+      "p50": 21.1,
+      "p95": 52.6,
+      "p99": 72.6,
+      "max": 105,
+      "mean": 24.9
+    },
+    "errorSamples": []
+  },
+  "checks": [
+    {
+      "name": "versions handed out are exactly 1..head with none repeated",
+      "ok": true,
+      "detail": "applied 1693, head 1693, dups 0, out of place 0"
+    },
+    {
+      "name": "no push was given up on",
+      "ok": true,
+      "detail": "0 given up after retries"
+    }
+  ],
+  "notes": []
+}

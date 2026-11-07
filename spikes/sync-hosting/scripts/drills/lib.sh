@@ -36,3 +36,12 @@ neon_api() { # neon_api METHOD PATH [json]
     -H "authorization: Bearer $(need NEON_API_KEY)" -H 'content-type: application/json' \
     ${body:+-d "$body"}
 }
+
+# The local anonymous `convex dev` writes .env.local with CONVEX_DEPLOYMENT, which the Convex CLI would mix up with a
+# production deploy key. Move it aside for the life of the calling script and put it back on exit.
+hide_local_convex() {
+  if [[ -f .env.local ]] && grep -q '^CONVEX_DEPLOYMENT=' .env.local; then
+    mv .env.local .env.local.hidden
+    trap 'mv .env.local.hidden .env.local 2>/dev/null || true' EXIT
+  fi
+}

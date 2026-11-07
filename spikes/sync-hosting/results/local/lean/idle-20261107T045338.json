@@ -1,0 +1,50 @@
+{
+  "scenario": "idle",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:53:38.238Z",
+  "finishedAt": "2026-11-07T04:54:00.866Z",
+  "params": {
+    "idleSeconds": 20,
+    "warmPushes": 5,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "warmAckMs": {
+      "n": 5,
+      "min": 6,
+      "p50": 7.6,
+      "p95": 8.8,
+      "p99": 8.8,
+      "max": 8.8,
+      "mean": 7.3
+    },
+    "warmPropagationMs": {
+      "n": 5,
+      "min": 11.8,
+      "p50": 12.1,
+      "p95": 14.1,
+      "p99": 14.1,
+      "max": 14.1,
+      "mean": 12.7
+    },
+    "afterIdle": {
+      "ackMs": 15,
+      "propagationMs": 18
+    },
+    "secondAfterIdle": {
+      "ackMs": 4,
+      "propagationMs": 6
+    },
+    "afterIdleVsWarmMedian": 1.9
+  },
+  "checks": [
+    {
+      "name": "the push after idle arrived on B",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

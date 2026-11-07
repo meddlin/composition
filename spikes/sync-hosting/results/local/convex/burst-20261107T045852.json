@@ -1,0 +1,46 @@
+{
+  "scenario": "burst",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
+  "where": "local",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T04:58:52.143Z",
+  "finishedAt": "2026-11-07T04:58:57.586Z",
+  "params": {
+    "edits": 500,
+    "notes": 100,
+    "spacingMs": 10,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "editPhaseMs": 5301,
+    "lastEditToConvergedMs": 20,
+    "pushes": 343,
+    "editsPerPush": 1.5,
+    "requestsFromA": 352,
+    "pushAckMs": {
+      "n": 343,
+      "min": 8.4,
+      "p50": 11.6,
+      "p95": 34.8,
+      "p99": 73.1,
+      "max": 123.9,
+      "mean": 15.3
+    },
+    "conflicts": 0,
+    "retries": 0,
+    "failures": 0
+  },
+  "checks": [
+    {
+      "name": "B holds the last edit of every note",
+      "ok": true,
+      "detail": "0 of 98 differ"
+    },
+    {
+      "name": "no conflicts and no retries",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

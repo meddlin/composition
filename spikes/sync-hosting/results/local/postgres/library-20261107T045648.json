@@ -1,0 +1,48 @@
+{
+  "scenario": "library",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:56:48.157Z",
+  "finishedAt": "2026-11-07T04:56:49.508Z",
+  "params": {
+    "targetBytes": 10485760,
+    "noteBytes": "2-8 KiB, uniform",
+    "placementBytes": 120
+  },
+  "metrics": {
+    "notes": 2013,
+    "records": 4026,
+    "payloadMB": 10,
+    "upload": {
+      "ms": 580,
+      "requests": 41,
+      "wireMBUp": 14.5,
+      "MBps": 17.2
+    },
+    "initialPull": {
+      "ms": 544,
+      "requests": 21,
+      "wireMBDown": 14.5,
+      "MBps": 18.4
+    },
+    "retries": 0
+  },
+  "checks": [
+    {
+      "name": "uploader pushed everything without conflicts",
+      "ok": true
+    },
+    {
+      "name": "the new device holds every record",
+      "ok": true,
+      "detail": "4026 vs 4026"
+    },
+    {
+      "name": "payloads are byte-identical on both devices",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

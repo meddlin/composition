@@ -1,6 +1,8 @@
 // Checks every credential the wizard saved and prints pass/fail only, never a value.
 
 import { execFile } from "node:child_process";
+import { existsSync, readFileSync, renameSync } from "node:fs";
+import { join } from "node:path";
 import { promisify } from "node:util";
 import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import pg from "pg";
@@ -64,11 +66,24 @@ await check("neon api", async () => {
 });
 
 await check("convex", async () => {
+  // A local anonymous `convex dev` leaves .env.local behind; the CLI would mix it up with the deploy key.
+  const local = join(ROOT, ".env.local");
+  const hidden = join(ROOT, ".env.local.hidden");
+  const hide = existsSync(local) && readFileSync(local, "utf8").includes("CONVEX_DEPLOYMENT=");
+  if (hide) renameSync(local, hidden);
+  try {
+    return await checkConvex();
+  } finally {
+    if (hide) renameSync(hidden, local);
+  }
+});
+
+async function checkConvex(): Promise<string> {
   if (!has("CONVEX_URL", "CONVEX_SITE_URL", "CONVEX_DEPLOY_KEY")) throw new Error("missing CONVEX_* values");
   if (!process.env.CONVEX_DEPLOY_KEY!.startsWith("prod:")) throw new Error("deploy key does not start with prod:");
   const { stdout } = await run("pnpm", ["exec", "convex", "env", "list", "--names-only"], { cwd: ROOT, env: process.env });
   return `deploy key accepted (${stdout.trim().split("\n").filter(Boolean).length} env vars set)`;
-});
+}
 
 console.log(failed === 0 ? "\nAll credentials check out." : `\n${failed} check(s) failed.`);
 process.exit(failed === 0 ? 0 : 1);

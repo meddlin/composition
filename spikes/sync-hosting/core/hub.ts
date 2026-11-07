@@ -14,9 +14,13 @@ export class HintHub {
     let set = this.listeners.get(userId);
     if (!set) this.listeners.set(userId, (set = new Set()));
     set.add(listener);
+    let active = true;
     return () => {
+      // Called from both the request's and the response's 'close'; the second call must not touch a newer set.
+      if (!active) return;
+      active = false;
       set.delete(listener);
-      if (set.size === 0) this.listeners.delete(userId);
+      if (set.size === 0 && this.listeners.get(userId) === set) this.listeners.delete(userId);
     };
   }
 

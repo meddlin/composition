@@ -1,0 +1,49 @@
+{
+  "scenario": "concurrent",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:54:57.553Z",
+  "finishedAt": "2026-11-07T04:54:57.769Z",
+  "params": {
+    "devices": 8,
+    "rounds": 40,
+    "freshPerPush": 5,
+    "sharedRecords": 4,
+    "payloadBytes": 1024
+  },
+  "metrics": {
+    "pushes": 320,
+    "appliedRecords": 1688,
+    "head": 1688,
+    "duplicateVersions": 0,
+    "versionsOutOfPlace": 0,
+    "conflictsOnSharedRecords": 232,
+    "retriesOn5xxOrNetwork": 0,
+    "pushesGivenUp": 0,
+    "latencyMs": {
+      "n": 320,
+      "min": 0.9,
+      "p50": 3.9,
+      "p95": 10.3,
+      "p99": 13.8,
+      "max": 14.5,
+      "mean": 4.7
+    },
+    "errorSamples": []
+  },
+  "checks": [
+    {
+      "name": "versions handed out are exactly 1..head with none repeated",
+      "ok": true,
+      "detail": "applied 1688, head 1688, dups 0, out of place 0"
+    },
+    {
+      "name": "no push was given up on",
+      "ok": true,
+      "detail": "0 given up after retries"
+    }
+  ],
+  "notes": []
+}

@@ -1,10 +1,7 @@
 # Lean candidate on Fly: one always-on machine, one volume for the SQLite file, Litestream to R2.
-# The app name is passed on the command line by scripts/deploy-lean.sh (names must be globally unique).
+# scripts/deploy-lean.sh writes a copy of this file with the real app name and region; the Dockerfile is passed on its command line.
 app = "comp-sync-lean-REPLACED-BY-DEPLOY-SCRIPT"
 primary_region = "iad"
-
-[build]
-  dockerfile = "Dockerfile"
 
 [env]
   PORT = "8080"

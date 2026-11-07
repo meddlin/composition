@@ -1,0 +1,50 @@
+{
+  "scenario": "idle",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:53:38.236Z",
+  "finishedAt": "2026-11-07T04:54:00.900Z",
+  "params": {
+    "idleSeconds": 20,
+    "warmPushes": 5,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "warmAckMs": {
+      "n": 5,
+      "min": 7.9,
+      "p50": 12.2,
+      "p95": 18.4,
+      "p99": 18.4,
+      "max": 18.4,
+      "mean": 12.5
+    },
+    "warmPropagationMs": {
+      "n": 5,
+      "min": 9.8,
+      "p50": 14.6,
+      "p95": 20.3,
+      "p99": 20.3,
+      "max": 20.3,
+      "mean": 14.7
+    },
+    "afterIdle": {
+      "ackMs": 18,
+      "propagationMs": 20
+    },
+    "secondAfterIdle": {
+      "ackMs": 6,
+      "propagationMs": 8
+    },
+    "afterIdleVsWarmMedian": 1.5
+  },
+  "checks": [
+    {
+      "name": "the push after idle arrived on B",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

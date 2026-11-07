@@ -1,0 +1,66 @@
+{
+  "scenario": "restore-immediate",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:55:48.190Z",
+  "finishedAt": "2026-11-07T04:55:52.210Z",
+  "params": {
+    "before": 100,
+    "after": 70,
+    "settleMs": 0,
+    "rotate": "if-needed",
+    "devices": "offline",
+    "restoresTo": "the latest state the backup system holds (loss is whatever it had not caught up on)",
+    "backupCmd": null
+  },
+  "metrics": {
+    "restorePoint": "2026-11-07T04:55:48.248Z",
+    "restoreCommandMs": 1767,
+    "serverServingAgainAfterMs": 1771,
+    "epochChangedByRestore": true,
+    "epochRotatedByHandStep": false,
+    "recordsExpected": 150,
+    "recordsOnServerRightAfterRestore": 80,
+    "recordsLostByServerInRestore": 70,
+    "devicesNoticedNewEpochAfterMs": 101,
+    "healedAfterMs": 115,
+    "resyncs": {
+      "a": 1,
+      "b": 1
+    },
+    "repushed": {
+      "a": 70,
+      "b": 70
+    },
+    "recordsLostPermanently": 0,
+    "freshDeviceHolds": "150/150"
+  },
+  "checks": [
+    {
+      "name": "restore command succeeded",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "the epoch changed (by the restore or by the hand step)",
+      "ok": true
+    },
+    {
+      "name": "both devices noticed the new epoch on their own and resynced",
+      "ok": true,
+      "detail": "resyncs a=1 b=1"
+    },
+    {
+      "name": "devices healed the server: it holds every record again",
+      "ok": true
+    },
+    {
+      "name": "a brand-new device sees everything",
+      "ok": true,
+      "detail": "150/150"
+    }
+  ],
+  "notes": []
+}

@@ -15,7 +15,9 @@ fi
   printf 'DATABASE_URL=%s\n'     "$(need NEON_DATABASE_URL)"
 } | fly secrets import -a "$APP" --stage
 
-fly deploy -a "$APP" -c postgres/fly.toml --dockerfile postgres/Dockerfile --primary-region "$REGION" --ha=false -y .
+mkdir -p .local
+sed -e "s|^app = .*|app = \"$APP\"|" -e "s|^primary_region = .*|primary_region = \"$REGION\"|" postgres/fly.toml > .local/postgres.fly.toml
+fly deploy -a "$APP" -c .local/postgres.fly.toml --dockerfile postgres/Dockerfile --ha=false -y .
 URL="https://$APP.fly.dev"
 touch .env.candidates.local; grep -v '^SYNC_URL_POSTGRES=' .env.candidates.local > .env.candidates.local.tmp || true
 echo "SYNC_URL_POSTGRES=$URL" >> .env.candidates.local.tmp; mv .env.candidates.local.tmp .env.candidates.local

@@ -1,0 +1,59 @@
+{
+  "scenario": "faults",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:54:57.770Z",
+  "finishedAt": "2026-11-07T04:55:08.520Z",
+  "params": {
+    "rounds": 25,
+    "devices": 3,
+    "notes": 30,
+    "plan": {
+      "dropRequest": 0.1,
+      "dropResponse": 0.15,
+      "duplicate": 0.1,
+      "http503": 0.05,
+      "delayMs": [
+        0,
+        150
+      ]
+    },
+    "seed": 1
+  },
+  "metrics": {
+    "editsMade": 133,
+    "serverHead": 145,
+    "faultsInjected": {
+      "dropRequest": 30,
+      "dropResponse": 22,
+      "duplicate": 22,
+      "http503": 6,
+      "delayed": 215
+    },
+    "retries": 58,
+    "conflicts": 7,
+    "conflictCopies": 4,
+    "lostEdits": 0,
+    "divergences": 0
+  },
+  "checks": [
+    {
+      "name": "solo device under duplicate and lost-response faults saw zero conflicts (idempotent retry)",
+      "ok": true,
+      "detail": "0 conflicts, 15 retries"
+    },
+    {
+      "name": "no device's last text for a note was lost: each survives as the winner or a conflict copy",
+      "ok": true,
+      "detail": "0 lost"
+    },
+    {
+      "name": "after every round all devices and the server agree",
+      "ok": true,
+      "detail": "0 differences"
+    }
+  ],
+  "notes": []
+}

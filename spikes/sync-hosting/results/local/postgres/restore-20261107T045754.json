@@ -1,0 +1,66 @@
+{
+  "scenario": "restore",
+  "candidate": "postgres",
+  "baseUrl": "http://127.0.0.1:8788",
+  "where": "local",
+  "serverKind": "postgres",
+  "startedAt": "2026-11-07T04:57:54.149Z",
+  "finishedAt": "2026-11-07T04:58:01.088Z",
+  "params": {
+    "before": 100,
+    "after": 70,
+    "settleMs": 3000,
+    "rotate": "if-needed",
+    "devices": "offline",
+    "restoresTo": "a backup point taken before the last 70 writes (loss is by construction: this tests the healing, not durability)",
+    "backupCmd": "(script)"
+  },
+  "metrics": {
+    "restorePoint": "2026-11-07T04:57:55Z",
+    "restoreCommandMs": 495,
+    "serverServingAgainAfterMs": 496,
+    "epochChangedByRestore": false,
+    "epochRotatedByHandStep": true,
+    "recordsExpected": 150,
+    "recordsOnServerRightAfterRestore": 80,
+    "recordsLostByServerInRestore": 70,
+    "devicesNoticedNewEpochAfterMs": 101,
+    "healedAfterMs": 112,
+    "resyncs": {
+      "a": 1,
+      "b": 1
+    },
+    "repushed": {
+      "a": 70,
+      "b": 70
+    },
+    "recordsLostPermanently": 0,
+    "freshDeviceHolds": "150/150"
+  },
+  "checks": [
+    {
+      "name": "restore command succeeded",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "the epoch changed (by the restore or by the hand step)",
+      "ok": true
+    },
+    {
+      "name": "both devices noticed the new epoch on their own and resynced",
+      "ok": true,
+      "detail": "resyncs a=1 b=1"
+    },
+    {
+      "name": "devices healed the server: it holds every record again",
+      "ok": true
+    },
+    {
+      "name": "a brand-new device sees everything",
+      "ok": true,
+      "detail": "150/150"
+    }
+  ],
+  "notes": []
+}

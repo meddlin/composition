@@ -1,0 +1,22 @@
+{
+  "scenario": "outage-api",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
+  "where": "local",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T04:59:23.160Z",
+  "finishedAt": "2026-11-07T04:59:23.161Z",
+  "params": {
+    "what": "api",
+    "downSeconds": 10,
+    "editEveryMs": 1000,
+    "downCmd": null
+  },
+  "metrics": {
+    "skipped": true
+  },
+  "checks": [],
+  "notes": [
+    "Convex runs the API and the database; there is no process or disk to kill from outside"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "scenario": "outage-api",
+  "candidate": "lean",
+  "baseUrl": "http://127.0.0.1:8787",
+  "where": "local",
+  "serverKind": "lean",
+  "startedAt": "2026-11-07T04:55:08.978Z",
+  "finishedAt": "2026-11-07T04:55:38.054Z",
+  "params": {
+    "what": "api",
+    "downSeconds": 10,
+    "editEveryMs": 1000,
+    "downCmd": "(script)"
+  },
+  "metrics": {
+    "downCommandMs": 610,
+    "upCommandMs": 1071,
+    "longestSilentGapMs": 15726,
+    "firstAckAfterServerReturnedMs": 4665,
+    "deviceSawAnErrorAfterMs": 15568,
+    "retriesDuringOutage": 1,
+    "editsMade": 29,
+    "editsLost": 0,
+    "whatTheDeviceSaw": [
+      "network: read ECONNRESET"
+    ],
+    "upCommandSecondsFromDown": 10
+  },
+  "checks": [
+    {
+      "name": "down command succeeded",
+      "ok": true,
+      "detail": "exit 0"
+    },
+    {
+      "name": "no edit was lost: the server holds the last text of every note",
+      "ok": true,
+      "detail": "0 lost"
+    },
+    {
+      "name": "the device resumed syncing after the server came back",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

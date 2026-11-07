@@ -1,0 +1,50 @@
+{
+  "scenario": "idle",
+  "candidate": "convex",
+  "baseUrl": "http://127.0.0.1:3211",
+  "where": "local",
+  "serverKind": "convex",
+  "startedAt": "2026-11-07T04:53:38.238Z",
+  "finishedAt": "2026-11-07T04:54:00.986Z",
+  "params": {
+    "idleSeconds": 20,
+    "warmPushes": 5,
+    "payloadBytes": 4096
+  },
+  "metrics": {
+    "warmAckMs": {
+      "n": 5,
+      "min": 14.8,
+      "p50": 15.4,
+      "p95": 23.1,
+      "p99": 23.1,
+      "max": 23.1,
+      "mean": 17
+    },
+    "warmPropagationMs": {
+      "n": 5,
+      "min": 17.7,
+      "p50": 18.4,
+      "p95": 25.9,
+      "p99": 25.9,
+      "max": 25.9,
+      "mean": 20
+    },
+    "afterIdle": {
+      "ackMs": 23,
+      "propagationMs": 25
+    },
+    "secondAfterIdle": {
+      "ackMs": 15,
+      "propagationMs": 16
+    },
+    "afterIdleVsWarmMedian": 1.5
+  },
+  "checks": [
+    {
+      "name": "the push after idle arrived on B",
+      "ok": true
+    }
+  ],
+  "notes": []
+}

@@ -9,6 +9,7 @@ source scripts/drills/lib.sh
 
 mode="${1:?local|prod}"; action="${2:?backup|restore}"
 mkdir -p .local
+[[ "$mode" == prod ]] && hide_local_convex
 convex() {
   if [[ "$mode" == prod ]]; then CONVEX_DEPLOY_KEY=$(need CONVEX_DEPLOY_KEY) pnpm -s exec convex "$@"; else pnpm -s exec convex "$@"; fi
 }

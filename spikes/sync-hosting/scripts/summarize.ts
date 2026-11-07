@@ -43,14 +43,16 @@ const rows: [string, (c: string) => string][] = [
   ["Faults: texts lost / replica divergences", (c) => `${fmt(g(c, "faults", "lostEdits"))} / ${fmt(g(c, "faults", "divergences"))}`],
   ["Kill the API: longest sync pause (ms); edits lost", (c) => `${fmt(g(c, "outage-api", "longestSilentGapMs"))}; ${fmt(g(c, "outage-api", "editsLost"))}`],
   ["Kill the database: longest sync pause (ms); edits lost", (c) => `${fmt(g(c, "outage-database", "longestSilentGapMs"))}; ${fmt(g(c, "outage-database", "editsLost"))}`],
-  ["Restore: command (ms); records the server lost; lost for good", (c) => `${fmt(g(c, "restore", "restoreCommandMs"))}; ${fmt(g(c, "restore", "recordsLostByServerInRestore"))}; ${fmt(g(c, "restore", "recordsLostPermanently"))}`],
+  ["Restore: command (ms); records the restored server lacked; lost for good", (c) => `${fmt(g(c, "restore", "restoreCommandMs"))}; ${fmt(g(c, "restore", "recordsLostByServerInRestore"))}; ${fmt(g(c, "restore", "recordsLostPermanently"))}`],
   ["Restore: devices noticed the new epoch / healed (ms)", (c) => `${fmt(g(c, "restore", "devicesNoticedNewEpochAfterMs"))} / ${fmt(g(c, "restore", "healedAfterMs"))}`],
+  ["Restore right after a write (lean's replication lag): records lacked / lost for good", (c) => `${fmt(g(c, "restore-immediate", "recordsLostByServerInRestore"))} / ${fmt(g(c, "restore-immediate", "recordsLostPermanently"))}`],
   ["Restore: epoch rotated by hand?", (c) => fmt(g(c, "restore", "epochRotatedByHandStep") === undefined ? undefined : g(c, "restore", "epochRotatedByHandStep") ? "yes (extra step)" : "no (automatic)")],
 ];
 
 const out = [`# Scenario results (${where})`, "", `| Measure | ${CANDIDATES.join(" | ")} |`, `|---|${CANDIDATES.map(() => "---").join("|")}|`];
 for (const [label, f] of rows) out.push(`| ${label} | ${CANDIDATES.map(f).join(" | ")} |`);
-out.push("", "Checks: " + ["normal", "burst", "library", "concurrent", "faults", "idle", "outage-api", "outage-database", "restore"].map((s) => `${s} ${CANDIDATES.map((c) => `${c}=${passed(c, s)}`).join(" ")}`).join("; "));
+out.push("", "Restore rows: lean restores the latest replica, so what it lacks is replication lag; Postgres and Convex are restored to a backup point taken before the last 70 writes, on purpose, so \"lacked\" is 70 by construction there and the row tests the healing, not durability.");
+out.push("", "Checks: " + ["normal", "burst", "library", "concurrent", "faults", "idle", "outage-api", "outage-database", "restore", "restore-immediate"].map((s) => `${s} ${CANDIDATES.map((c) => `${c}=${passed(c, s)}`).join(" ")}`).join("; "));
 const when = [...latest.values()].map((r) => r.startedAt as string).sort();
 if (when.length) out.push("", `Runs from ${when[0]} to ${when.at(-1)}. Raw files sit beside this one.`);
 writeFileSync(join(dir, "SUMMARY.md"), out.join("\n") + "\n");

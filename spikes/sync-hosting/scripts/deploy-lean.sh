@@ -25,7 +25,10 @@ fi
   printf 'LITESTREAM_SECRET_ACCESS_KEY=%s\n' "$(need R2_SECRET_ACCESS_KEY)"
 } | fly secrets import -a "$APP" --stage
 
-fly deploy -a "$APP" -c lean/fly.toml --dockerfile lean/Dockerfile --primary-region "$REGION" --ha=false -y .
+# A per-run copy of the config with this account's app name and region (also used by the restore drill).
+mkdir -p .local
+sed -e "s|^app = .*|app = \"$APP\"|" -e "s|^primary_region = .*|primary_region = \"$REGION\"|" lean/fly.toml > .local/lean.fly.toml
+fly deploy -a "$APP" -c .local/lean.fly.toml --dockerfile lean/Dockerfile --ha=false -y .
 URL="https://$APP.fly.dev"
 # Record where it lives for the scenario runner.
 touch .env.candidates.local; grep -v '^SYNC_URL_LEAN=' .env.candidates.local > .env.candidates.local.tmp || true
