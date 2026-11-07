@@ -40,6 +40,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *                                  build plan Step 1: favorites, themes and saved cities, and what parseWebSettings makes
  *                                  of each; and desktop-backup*.settings.json, the (non-default) settings the desktop
  *                                  backups carry
+ *   organization-cases.json, organization-expected.json
+ *                                  build plan Step 7: the pure rules behind the sidebar, run through the real navHistory.ts
+ *                                  (record, back, forward), dropEdge.ts and groupListing.ts (buildGroupListing, groupPath)
  *
  * "reads what the Swift core wrote" restores swift-backup.tar.gz and swift-backup-large.tar.gz (which carry the settings
  * the iPad was handed, with its favorites changed) with the real
@@ -718,6 +721,61 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     fs.copyFileSync(file, path.join(outDir!, "frontmatter-cases.json"));
     fs.writeFileSync(path.join(outDir!, "frontmatter-expected.json"), JSON.stringify(expected, null, 2));
     expect(expected.parse.length).toBe(cases.parse.length);
+  }, 60_000);
+
+  it("writes the organization cases and what the real navHistory, dropEdge and groupListing make of each", async () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../ios/conformance/organization-cases.json");
+    type Loc = { kind: "note" | "group"; id: number } | { kind: "home" };
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
+      navHistory: { steps: ({ op: "record"; location: Loc } | { op: "back" } | { op: "forward" } | { op: "gone"; locations: Loc[] })[] }[];
+      dropEdge: { offsetY: number; height: number; allowed: ("before" | "into" | "after")[] }[];
+      groupListing: { groupId: number; groups: { id: number; parentId: number | null }[]; notes: { id: number; groupId: number | null }[]; order: "none" | "reverse" }[];
+      groupPath: { groupId: number; groups: { id: number; parentId: number | null }[] }[];
+    };
+    const notes = path.resolve(__dirname, "../src/components/notes");
+    const nav = await import(path.join(notes, "navHistory"));
+    const { dropEdge } = await import(path.join(notes, "dropEdge"));
+    const { buildGroupListing, groupPath } = await import(path.join(notes, "groupListing"));
+
+    const navHistory = cases.navHistory.map(({ steps }) => {
+      let history = nav.EMPTY_NAV_HISTORY;
+      let gone: Loc[] = [];
+      const isValid = (location: Loc) => !gone.some((g) => nav.sameLocation(g, location));
+      return steps.map((step) => {
+        let result: Loc | null = null;
+        if (step.op === "record") history = nav.record(history, step.location);
+        else if (step.op === "gone") gone = step.locations;
+        else {
+          const moved = step.op === "back" ? nav.back(history, isValid) : nav.forward(history, isValid);
+          if (moved) {
+            history = moved.history;
+            result = moved.location;
+          }
+        }
+        return { entries: history.entries, cursor: history.cursor, result };
+      });
+    });
+    type Shown = { id: number; subgroups: Shown[]; notes: number[]; totalNotes: number };
+    const show = (listing: { group: { id: number }; subgroups: unknown[]; notes: { id: number }[]; totalNotes: number }): Shown => ({
+      id: listing.group.id,
+      subgroups: (listing.subgroups as (typeof listing)[]).map(show),
+      notes: listing.notes.map((n) => n.id),
+      totalNotes: listing.totalNotes,
+    });
+    const expected = {
+      navHistory,
+      dropEdge: cases.dropEdge.map(({ offsetY, height, allowed }) => dropEdge(offsetY, height, allowed)),
+      groupListing: cases.groupListing.map(({ groupId, groups, notes, order }) => {
+        const listing = buildGroupListing(groupId, groups, notes, order === "reverse" ? (own: unknown[]) => [...own].reverse() : undefined);
+        return listing ? show(listing) : null;
+      }),
+      groupPath: cases.groupPath.map(({ groupId, groups }) => groupPath(groupId, groups).map((g: { id: number }) => g.id)),
+    };
+    fs.copyFileSync(file, path.join(outDir!, "organization-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "organization-expected.json"), JSON.stringify(expected));
+    expect(expected.navHistory.length).toBe(cases.navHistory.length);
+    expect(expected.groupListing.filter((l) => l !== null).length).toBeGreaterThan(50);
   }, 60_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:

@@ -56,6 +56,25 @@ struct StoreTests {
         }
     }
 
+    @Test("an imported text goes under frontmatter made from its name, or keeps its own, and is found by search")
+    func importing() throws {
+        try withScratch { scratch in
+            let (store, database, index) = try open(scratch, indexed: true)
+            defer { try? database.close() }
+            let group = try store.createGroup(name: "Inbox")
+            let plain = try store.importNote(named: "Trip plan", text: "# Packing\n\nSocks and a zebracorn.\n", groupId: group.id)
+            #expect(plain.title == "Trip plan" && plain.groupId == group.id)
+            #expect(plain.content.hasPrefix("---\ntitle: Trip plan\n") && plain.content.hasSuffix("---\n# Packing\n\nSocks and a zebracorn.\n"))
+            #expect(try index!.search("zebracorn") == [plain.id], "the index follows")
+
+            let own = "---\ntitle: Own title\ndescription: d\ntags:\n- one\ncreatedAt: 2026-01-02\nupdatedAt: 2026-01-02\n---\nBody\n"
+            let kept = try store.importNote(named: "file-name", text: own)
+            #expect(kept.title == "Own title" && kept.tags == "one" && kept.description == "d" && kept.groupId == nil)
+            #expect(kept.content.contains("Body\n") && kept.content.hasPrefix("---\ntitle: Own title\n"))
+            #expect(kept.content.contains("createdAt: 2026-01-02"), "the file's own creation date stays in its frontmatter (the column keeps the time the note was made here)")
+        }
+    }
+
     @Test("saving rewrites the frontmatter and keeps the columns in step; a bad block leaves them alone")
     func saving() throws {
         try withScratch { scratch in

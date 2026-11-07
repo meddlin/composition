@@ -22,8 +22,24 @@ final class AppModel {
 
     var query = ""
     var selection: Int64?
+    /// The notes the search found, or every note (the latest first) while nothing is typed.
     private(set) var notes: [NoteSummary] = []
     private(set) var resultLine = ""
+    /// Notebooks, groups and every note in the order the sidebar shows them (hand-placed first), and the pinned items (build plan Step 7).
+    private(set) var notebooks: [Notebook] = []
+    private(set) var groups: [NoteGroup] = []
+    private(set) var orderedNotes: [NoteSummary] = []
+    private(set) var favorites: [Favorite] = []
+    /// How many times the notes, groups and notebooks have been read: the screen restores where it was after the first.
+    private(set) var loads = 0
+    /// How many notes each group (with everything beneath it) and each notebook holds, for the sidebar's counts.
+    private(set) var totals = SidebarCounts()
+    /// Where the sidebar is, which groups are open in it, and where the user has been.
+    var sidebar: SidebarItem? = .all
+    var expanded: Set<SidebarItem> = []
+    var history = NavigationHistory<Place>()
+    /// What the person is dragging right now (set when the drag lifts, so that rows can say what they would accept while it hovers over them).
+    var dragging: DraggedItem?
     private(set) var trashedNotes: [TrashedNote] = []
     private(set) var trashedGroups: [TrashedGroup] = []
     private(set) var noteCount = 0
@@ -36,6 +52,7 @@ final class AppModel {
     let location = DataLocation(directory: URL.applicationSupportDirectory.appending(path: "Composition", directoryHint: .isDirectory))
     private var database: CompositionDatabase?
     private var searchIndex: SearchIndex?
+    private(set) var settings: SettingsStore?
     private var searchTask: Task<Void, Never>?
 
     /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
@@ -54,13 +71,17 @@ final class AppModel {
 
     private struct Snapshot: Sendable {
         let all: [NoteSummary]
+        let ordered: [NoteSummary]
+        let notebooks: [Notebook]
+        let groups: [NoteGroup]
+        let favorites: [Favorite]
         let trashedNotes: [TrashedNote]
         let trashedGroups: [TrashedGroup]
         let sqliteVersion: String
     }
 
     /// Runs slow, blocking work off the main thread.
-    nonisolated private static func perform<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+    nonisolated static func perform<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
         try await Task.detached(priority: .userInitiated, operation: work).value
     }
 
@@ -73,6 +94,9 @@ final class AppModel {
             }
         }
     }
+
+    /// What the organization operations (AppModel+Organization.swift) change notes, groups and notebooks through.
+    var store: NoteStore? { sessions?.store }
 
     // MARK: Opening
 
@@ -118,6 +142,7 @@ final class AppModel {
             database = stores.database
             searchIndex = stores.index
             sessions = stores.sessions
+            settings = SettingsStore(location: location)
             indexRebuiltAtOpen = stores.rebuilt
             if stores.recovered > 0 {
                 notice = "The app was closed while you were typing. What you had typed in \(stores.recovered == 1 ? "1 note" : "\(stores.recovered) notes") is back."
@@ -134,6 +159,10 @@ final class AppModel {
             if trash != 0 { await moveToTrash(Int64(trash)) }
             let restore = UserDefaults.standard.integer(forKey: "restoreNote")
             if restore != 0 { await restoreNote(Int64(restore)) }
+            // `-importText /path/file.md` does what dropping that file on the list does.
+            if let path = UserDefaults.standard.string(forKey: "importText"), let data = FileManager.default.contents(atPath: path), let text = String(data: data, encoding: .utf8) {
+                await importTexts([DroppedText(name: URL(fileURLWithPath: path).lastPathComponent, text: text)], into: sidebar)
+            }
             #endif
             await reload()
         } catch {
@@ -143,13 +172,23 @@ final class AppModel {
     }
 
     /// Reads the list, the Trash Can and the counts again, and re-runs the search if one is typed.
-    private func reload() async {
+    func reload() async {
         guard let database else { return }
+        let settings = settings
         do {
             let snapshot = try await Self.perform {
                 let trash = try database.listTrash()
-                return Snapshot(all: try database.listNotes(), trashedNotes: trash.notes, trashedGroups: trash.groups, sqliteVersion: try database.sqliteVersion())
+                return Snapshot(
+                    all: try database.listNotes(), ordered: try database.notesInDisplayOrder(), notebooks: try database.listNotebooks(), groups: try database.listGroups(),
+                    favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups, sqliteVersion: try database.sqliteVersion())
             }
+            orderedNotes = snapshot.ordered
+            notebooks = snapshot.notebooks
+            groups = snapshot.groups
+            favorites = snapshot.favorites
+            totals = SidebarCounts.make(groups: snapshot.groups, notes: snapshot.ordered)
+            pruneNavigation()
+            loads += 1
             trashedNotes = snapshot.trashedNotes
             trashedGroups = snapshot.trashedGroups
             noteCount = snapshot.all.count
@@ -217,12 +256,14 @@ final class AppModel {
     /// The id of a note that was just made, so that the screen opens it in the editor with the keyboard up (once).
     private var freshNote: Int64?
 
-    /// Makes an empty note ("Untitled", as the desktop does), selects it, and opens it for typing.
+    /// Makes an empty note ("Untitled", as the desktop does) where the sidebar is (in its group, or at the top of its notebook), selects it, and
+    /// opens it for typing.
     func createNote() async {
         guard let store = sessions?.store else { return }
         flushEditing()
+        let target = newNoteTarget
         do {
-            let note = try await Self.perform { try store.createNote(title: "Untitled") }
+            let note = try await Self.perform { try store.createNote(title: "Untitled", groupId: target.group, notebookId: target.notebook) }
             freshNote = note.id
             query = ""
             selection = note.id

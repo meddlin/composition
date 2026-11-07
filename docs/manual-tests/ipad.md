@@ -134,10 +134,37 @@ The note screen has **Markdown** (the editor), **Preview** and **Split**. **Use 
 
 What to tell me for each: what you did, what you expected, what happened, and Debug or Release. For item 28, the *Typing speed test* in the editor lab (item 15) still gives the number for the 16 ms budget; the editor adds about a millisecond to it.
 
+## Notebooks, groups and favorites (build plan Step 7)
+
+The first column lists **All Notes**, **Favorites** and each **notebook**; the small arrow beside a notebook or a group opens the groups beneath it. The second column lists what is selected: a notebook's
+or group's sub-groups (tap one to go into it) and then its notes. For something to organize, make the backup with `apps/ios/scripts/make-organization-backup.sh` (the 1,000 test notes, a second notebook
+*Work* and six groups) and restore it, or use a copy of your own notes. **This changes the notes' groups and the favorites.**
+
+37. **The tree.** Open each notebook and group in the first column. The number beside a row is how many notes it holds, with everything beneath it. Tap a group in the second column: the first column
+    opens the way to it and selects it. In the notes list, a new note made with the compose button lands in the group you are in.
+38. **Make, rename, delete.** The folder button makes a group in the notebook or group you are on; the **+** at the top of the first column makes a notebook. Press and hold a group or notebook for its
+    menu: *Rename…*, *Move to…* (a list of everywhere it may go), *Move Up* and *Move Down*, *Delete*. A group or notebook that still holds something refuses to be deleted and says why; an empty one goes to the
+    Trash Can (groups) or is gone (notebooks, as on the desktop). The last notebook cannot be deleted.
+39. **Favorites.** Swipe a note or a group to the right, or use *Add to Favorites* in its menu. A star shows on it, the **Favorites** row counts it, and the list shows pinned groups and notes in the order they
+    were pinned. Make a backup and restore it in the desktop app: they are favorites there too (and the reverse).
+40. **Move things by dragging.** Hold a note in the list and drag it onto a group in the first column: it moves there. Onto its own notebook's row: out of its group. Drag a group (from the second column) onto
+    a notebook row: it moves to that notebook with its notes and sub-groups. The place you are aiming at is tinted (onto it) or has a line above or below it (beside it). Dropping a group onto itself or
+    beneath itself must do nothing. (The drag may show a **+** badge: that is the system's way of showing it will be accepted.)
+41. **Put things in order.** In a group's list, hold a note and drag it up or down: it stays where you put it, also after quitting and reopening. The same for the groups in a list. All Notes and Favorites
+    cannot be reordered (All Notes is by the last edit).
+42. **Back and forward.** The two arrows at the top of the second column, or ⌘[ and ⌘] on a hardware keyboard, retrace what you looked at: notebooks, groups and notes. A note, group or notebook that has since been
+    deleted is passed over.
+43. **Text dropped in.** With the Files app beside this one (Split View or Slide Over), drag a Markdown or text file onto a group in the first column or onto the list: a note appears, named after the file, with
+    the file's text. A file that has frontmatter of its own keeps it. Dragging a selection of text from Safari or Notes does the same, named after its first line. **This has not been tried in the Simulator, which cannot drag
+    between apps:** please tell me what happens.
+44. **Where it was.** Quit the app from the app switcher after opening a group and a note, then reopen: the same group and note, with the groups above it open.
+
+What to tell me for each: what you did, what you expected, what happened.
+
 ## What it leaves out
 
 Completion, links, indenting and shortcuts in the editor, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
-the preview); groups and notebooks (notes are one flat list); the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
+the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
 are plain text, selecting text across blocks of the preview, and the video player of `<YouTube>`.
 
 ## What is not yet verified

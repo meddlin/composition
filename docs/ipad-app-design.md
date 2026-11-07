@@ -341,9 +341,10 @@ The query parser ports as it is. **SQLite FTS5 replaces Meilisearch.**
 
 ### App structure, windows and themes
 
-- **Navigation:** `NavigationSplitView` (notebooks and groups, notes, the note). Swipe actions and context menus
-  for delete (to the Trash Can), favorite, move. Home page as the landing detail. Back and forward as navigation
-  history, plus Cmd+[ and Cmd+].
+- **Navigation:** `NavigationSplitView` with three columns: the **sidebar** (All Notes, Favorites, and each notebook with the groups beneath it, each row
+  with its count), the **list** (what the sidebar points at: a notebook's or group's sub-groups and then its notes; Favorites lists what is pinned; All Notes is every note by
+  latest edit; typing in the search field searches every note), and the **note**. Swipe actions and context menus for delete (to the Trash Can), favorite and move. Home page as the landing detail.
+  Back and forward as navigation history, plus Cmd+[ and Cmd+] ([Step 7 status](#step-7-status)).
 - **Windows:** iPadOS scenes replace the panel grid and pop-outs: "Open in New Window", Split View, Slide Over and
   Stage Manager come from size classes and scenes. The same note in two windows shares one database pool.
 - **Orientation:** all four orientations are on, and none is a mode the app has to be put in. The three tabs of a note are one set of views that lay themselves out from the width they are given, so turning the iPad
@@ -544,15 +545,15 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 |---|:-:|:-:|:-:|---|
 | Create, edit, delete notes, autosave | 🔁 | M1 | ⬜ | GRDB; debounce plus flush. The core's create, save and delete (with the title, tags and description columns kept in step, and `search.db` following) match the desktop's `service.ts` over a 98-step script ([build plan](ipad-build-plan.md), Step 2). **Autosave is built and tested by killing the app in the Simulator ([S6 status](#s6-status))**, behind a plain-text *Edit* tab in the prototype; the real editor is Steps 5 and 6 |
 | Frontmatter (title, description, tags, dates) | 🔁 | M1 | 🔨 | A port of `js-yaml`'s loader and dumper (Step 3, no dependency): 111 of 111 blocks read, and 123 of 123 written byte for byte, as the desktop does; the header-image edits and tag helpers agree. No screen of its own: the editor and the note header use it |
-| Groups: create, rename, delete, move, reorder | 🔁 | M1 | ⬜ | The core's operations (create, rename, move, move to a notebook, place, trash and restore) match `groupsRepo.ts` and the Trash Can step for step; no screen yet (Step 7) |
-| Notebooks: switch, colours | 🔁 | M1 | ⬜ | Create, rename, order and delete match `notebooksRepo.ts` in the core; the sidebar is Step 7 |
-| Favorites | 🔁 | M1 | ⬜ | The core now stores them in `settings.json`, as the desktop does, and carries them through backups both ways ([build plan](ipad-build-plan.md), Step 1); no screen yet |
+| Groups: create, rename, delete, move, reorder | 🔁 | M1 | 🔨 | The core's operations (create, rename, move, move to a notebook, place, trash and restore) match `groupsRepo.ts` and the Trash Can step for step; the screens are Step 7: the sidebar tree, a new-group button, rename, delete (an empty group only), "Move to…", move up and down, and drag and drop. Checked in the Simulator, not on the iPad |
+| Notebooks: switch, colours | 🔁 | M1 | 🔨 | Create, rename, order and delete match `notebooksRepo.ts` in the core; Step 7 draws them as the top level of the sidebar (a + button, a menu for rename, move up and down and delete, and drag to reorder from the list). **Colours are not built** (the desktop has none either) |
+| Favorites | 🔁 | M1 | 🔨 | The core stores them in `settings.json`, as the desktop does, and carries them through backups both ways ([build plan](ipad-build-plan.md), Step 1); Step 7 adds the screens: a Favorites entry in the sidebar, a star in the menu and on a swipe, pinned groups and notes listed in pin order |
 | Trash Can (60 days) | 🔁 | M1 | 🔨 | The core is checked step by step against the desktop's `trashRepo.ts` ([S1 status](#s1-status)), and the prototype has its screen (swipe to trash, restore, delete for good), in the Simulator; attached files of purged notes are not removed |
-| Drag and drop of notes and groups | ⭐ | M1 | ⬜ | Native drag and drop, reorder, and drops from Files and Photos |
+| Drag and drop of notes and groups | ⭐ | M1 | 🔨 | Native drag and drop (Step 7): a note onto a group or notebook, a group onto another group or notebook or between its siblings, in-list reordering by the system's own drag, and Markdown or text files and text selections dropped on a group or the list become notes. **Images and Photos come with Step 8.** Not tried with a finger or the Pencil, or with Files, which needs the iPad |
 | Home page (recent, pinned) | 🔁 | M3† | ⬜ | |
 | Heading rail | 🔁 | M3† | ⬜ | An outline popover or trailing rail |
-| Back and forward | 🔁 | M1 | ⬜ | Navigation history plus Cmd+[ and Cmd+] |
-| Resizable columns | ⭐ | M1 | ⬜ | `NavigationSplitView` manages column widths; the Split tab keeps a draggable divider |
+| Back and forward | 🔁 | M1 | 🔨 | The desktop's `navHistory.ts`, ported and checked against it (Step 7), behind two buttons and Cmd+[ and Cmd+]; not saved across launches, as on the desktop |
+| Resizable columns | ⭐ | M1 | 🔨 | `NavigationSplitView` manages the three columns and their widths; the system decides which are shown in portrait. (The Split tab's halves are still equal; a draggable divider is not built) |
 | Open a note in another window | ⭐ | Later | ⬜ | Scenes ([C5](#compromise-register)) |
 | Panels grid, pop-outs, command palette | ❌ | Never | ⛔ | Windows replace them; the iPadOS menu bar may replace the palette ([C5](#compromise-register)) |
 | Notebook backgrounds (architect grid) | 🔁 | Later | ⬜ | Custom drawing behind the text |
@@ -1160,6 +1161,38 @@ Not checked: Split View, Slide Over and Stage Manager (Step 11), the iPad itself
 shortcuts (Step 9), the colour schemes (Step 10), VoiceOver and Dynamic Type beyond the fonts being scaled (Step 11), synchronised scrolling between the two halves of Split, choosing a group or notebook for a new note (Step 7), and
 two windows on one note (not enabled in the target). The Live tab and the experimental hiding stay in the lab.
 
+### Step 7 status
+
+**Built and checked 2026-11-06 in the iPad Pro 11-inch (M5) Simulator; not on an iPad.** Build plan Step 7: organization. The screens for what the core already did (Steps 1 to 3).
+
+**What it is.** The note browser is now three columns. The **sidebar** lists All Notes, Favorites and each notebook, with its groups beneath it as a tree (the disclosure arrows are ours, so that choosing a group elsewhere opens the way to it), each row with its count;
+the **list** shows what is selected: a notebook's or group's sub-groups and then its notes in the order the person placed them (All Notes by latest edit, Favorites in pin order), and search, when something is typed, is over every note. Rows have context menus and swipes: new note, new
+sub-group, rename, favorite, *Move to…*, move up and down, delete. A compose button makes a note in the group you are on, a folder button makes a group, a **+** makes a notebook. Two arrows (and ⌘[ and ⌘]) step back and forward through where you have been. What the sidebar
+pointed at, the open groups and the note are brought back after the app was ended. Every change goes through `NoteStore` (so the search index follows) or `SettingsStore` (favorites, in `settings.json`, as on the desktop).
+
+**Decisions made while building (say if you disagree).** (1) The desktop keeps notebooks in a narrow panel beside the tree of groups, with notes nested in the tree. The design says three columns, so the notebooks and groups share the first column and the second lists one group at a time:
+a nested tree would leave the middle column nothing to do, and a long note list under every group is slow to scroll on a touch screen. (2) Favorites is a row of the sidebar that lists the pinned items, not a section at the top of the tree. (3) A group can only be deleted when it is empty (as on the desktop), and a notebook only when it is empty
+and not the last. (4) A new note, group or text dropped in goes where the sidebar is; from All Notes or Favorites, into the default notebook with no group.
+
+**Drag and drop, and what the system will not let a list do.** A drag lifts a note, a group or a notebook, and the rows it passes over say where it would land: tinted when onto the row, a line above or below when beside it, using the desktop's `dropEdge` rule. A note can go onto a group
+(into it) or onto its own notebook (out of its group); a group onto a group (inside it, or between its siblings), or onto a notebook (a top-level group there, with everything in it; into another notebook that moves its notes too); a notebook beside another notebook. A group cannot go into itself or
+beneath itself, and beside a top-level group of another notebook only *inside* works, because the store keeps a placed group in its own notebook. Four things were learned the hard way. **A drag that starts and ends in the same list belongs to the list**: SwiftUI hands it to UIKit's own reordering, so rows of one list never see
+each other as drop targets. In-list order is therefore the list's own `onMove` (hold a row and drag it), and moves between lists (a note from the second column onto a group in the first) are drops; moves *within* the sidebar (nesting one group in another there) are *Move to…* and the menu. **A drop that proposes a *move* is refused for
+these drags; proposing a *copy* is accepted** (the system may show a **+** badge). **A drop reports where the finger is in the list's coordinate space, not the row's**, so each row measures its own frame in the list's space. And **a restore from a backup without `settings.json` keeps the iPad's own
+settings, as the desktop does**, which meant a favorite from an earlier run leaked into the next test; the test backup now carries an empty one.
+
+**Text dropped in.** A Markdown or text file dragged onto a group or the list, or a selection of text from another app, becomes a note in that group or notebook (named after the file, or after the first line), with the file's own frontmatter kept when it has one. This is `NoteStore.importNote` (create, then save: two of the desktop's operations, tested with the
+search index following). It is checked in the Simulator only through a launch argument (`-importText path`), because the Simulator cannot drag between apps; dropping from Files is a manual-test item.
+
+**Checks.** Three pure rules were ported with an oracle, as every port is: the desktop's `navHistory.ts`, `dropEdge.ts` and `groupListing.ts` are run over `apps/ios/conformance/organization-cases.json` (72 histories of up to 45 steps with places going missing, 552 drags over three row heights and every set of edges, 183 listings and 182 paths over random trees,
+loops and missing groups) and Swift gives the same answer for every one; breaking each port in turn makes the check fail. By hand in the Simulator: the tree, opening a group from the list, rename (the row written has the new name and time), a note dragged onto a group, a group dragged to another notebook with its notes following, a group reordered in its list, a favorite (`settings.json` has it), and the three columns
+in portrait. **UI tests (XCUITest), the first of the project:** `apps/ios/CompositionUITests` is driven by `apps/ios/scripts/ui-test.sh`, which makes a backup of two notebooks and six groups (`make-organization-backup.sh`) and runs **nine tests, all passing**: the sidebar and its counts, a group's list, a new group, renaming one, deleting an empty one (by a swipe) and being refused for one that holds notes, favorites, back and forward, and a note dragged onto a group (a real drag, with `press(forDuration:thenDragTo:)`). Two things to know about them: the first test of each run takes about two minutes (the Simulator is cloned), and a context menu opened by the test on a group that was *just created* left the system waiting for the app to be idle until the test timed out, though the same sequence by hand works and the app is not stuck, so those tests use an existing group's menu or a swipe. The whole conformance check (desktop to Swift to desktop) also passes with the new rules: 180 Swift tests.
+
+**Columns and turning the iPad.** In portrait the system shows the list and the note and hides the sidebar (the button at the top left shows it over them); on an iPad mini in portrait it shows the note alone, and the same button brings up the lists. The system also keeps the sidebar hidden after the iPad is turned back to landscape and, at a fresh launch, restores what it last had, so the app asks for all three columns a moment after the width becomes landscape (asking at once is undone by the system); a column hidden by hand in landscape stays hidden.
+
+**Not done, or not known:** the iPad (touch and the Pencil, Files, VoiceOver and Dynamic Type for the new rows, the third-width window), the notes' sort order and date display (the desktop has both, in a per-viewer setting), notebook colours (the desktop has none), "Open in New Window", dragging notes and groups *out* to other apps (as Markdown or a link), moving a note up
+or down by menu (groups and notebooks have it; a note is moved by dragging), selecting several notes, and a landing page ("Home") for when nothing is selected. The tree is re-read from the database after every change, which is instant for the test notes and has not been timed for tens of thousands.
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1202,7 +1235,8 @@ final pass on the device is yours.
   `swift test`: migrations from each earlier schema (the intent of `db.test.ts`), the operation scripts, FTS5
   queries, the C1 corpus, backup round trips.
 - **The conformance corpus** runs on both sides ([Keeping two implementations honest](#keeping-two-implementations-honest)).
-- **UI:** XCUITest for the main flows, snapshot tests for the ten components in the six schemes, Instruments for
+- **UI:** XCUITest for the main flows (the first nine are in `apps/ios/CompositionUITests`, run by `apps/ios/scripts/ui-test.sh`: the sidebar, a group's list, new group, rename, delete (by a swipe, and refused when it holds notes),
+  favorites, back and forward, and a drag of a note onto a group), snapshot tests for the ten components in the six schemes, Instruments for
   typing and ink latency.
 - **A manual test page,** `docs/manual-tests/ipad.md`, written when something is built: install, create and
   search a note, every MDX component, Scribble, ink, backup and restore to and from the desktop, background
@@ -1369,6 +1403,8 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
 - 2026-11-06: **Orientation made explicit, at your request (you use the iPad mostly in landscape, sometimes portrait).** Recorded as a decided item, an App structure paragraph, a tracker row and N3. Checked in the Simulator: both orientations,
   rotating while typing, the three tabs, the keyboard and the sheets, on an iPad Pro 11-inch and an iPad mini. Changes: Preview and the Markdown tab keep to a readable width of 820 points in a wide view; Split goes side by side from 800 points, not 700; the
   About screen's lists of what the build does were out of date and are corrected. Nothing is verified on the iPad.
+- 2026-11-06: **Build plan Step 7, organization, done in the Simulator.** Three columns: a sidebar of All Notes, Favorites and notebooks with their group trees, a list of the sub-groups and notes of what is selected, and the note. Create, rename, delete, move and reorder for groups and notebooks, favorites in `settings.json`, drag and drop
+  between the columns and in a list, text files dropped in become notes, back and forward (⌘[ and ⌘]), and the place restored after a relaunch. The desktop's `navHistory.ts`, `dropEdge.ts` and `groupListing.ts` ported and checked against it. The project's first XCUITests. Tracker rows for groups, notebooks, favorites, drag and drop, back and forward and columns updated. Not tried on the iPad.
 
 ## Sources
 

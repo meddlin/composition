@@ -3,7 +3,7 @@
 #
 #   1. the desktop writes databases, real backups, the result of running apps/ios/conformance/trash-script.json
 #      through its real trashRepo and store-script.json through its real service, the notes and parser answers for the
-#      search queries, and what its settings and frontmatter code make of the committed cases   (apps/web/scripts/ios-conformance-fixtures.test.ts)
+#      search queries, and what its settings, frontmatter, navigation-history, drop-edge and group-listing code make of the committed cases   (apps/web/scripts/ios-conformance-fixtures.test.ts)
 #   2. Swift reads them, restores the backups, runs the same two scripts and compares every step, reads the same settings
 #      and frontmatter cases, and writes backups of its own (after about a hundred store operations), and compares its
 #      search with the committed Meilisearch answers   (apps/ios/CompositionCore tests)

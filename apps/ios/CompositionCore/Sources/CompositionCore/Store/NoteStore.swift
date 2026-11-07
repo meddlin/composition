@@ -25,6 +25,15 @@ public final class NoteStore: Sendable {
         }
     }
 
+    /// A note made from a text file (or a piece of text) dropped on the app (build plan Step 7): the text as it is, under frontmatter made from
+    /// `name`, or under its own when it brings a block of its own (whose title, tags and description then fill the note's columns). The desktop
+    /// has no import; this is two of its operations in a row (create, save), so each row written is one the desktop writes.
+    public func importNote(named name: String, text: String, groupId: Int64? = nil, notebookId: Int64? = nil, now: Date = Date()) throws -> NoteDetail {
+        let created = try createNote(title: name, groupId: groupId, notebookId: notebookId, now: now)
+        let content = NoteFrontmatter.parse(text).frontmatter == nil ? created.content + text : text
+        return try saveNoteContent(id: created.id, content: content, now: now)
+    }
+
     /// Saves what the editor holds (see `CompositionDatabase.saveNoteContent`) and re-indexes the note.
     public func saveNoteContent(id: Int64, content: String, now: Date = Date()) throws -> NoteDetail {
         try write({ try database.saveNoteContent(id: id, content: content, now: now) }) { index, note in

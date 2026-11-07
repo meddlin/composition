@@ -12,12 +12,18 @@
 
 /* Begin PBXFileReference section */
 		7F0000000000000000000004 /* Composition.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Composition.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7F0000000000000000000020 /* CompositionUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CompositionUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7F0000000000000000000005 /* Composition */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Composition;
+			sourceTree = "<group>";
+		};
+		7F0000000000000000000021 /* CompositionUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = CompositionUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -31,6 +37,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7F0000000000000000000024 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -38,6 +51,7 @@
 			isa = PBXGroup;
 			children = (
 				7F0000000000000000000005 /* Composition */,
+				7F0000000000000000000021 /* CompositionUITests */,
 				7F0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -46,11 +60,22 @@
 			isa = PBXGroup;
 			children = (
 				7F0000000000000000000004 /* Composition.app */,
+				7F0000000000000000000020 /* CompositionUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+
+/* Begin PBXContainerItemProxy section */
+		7F0000000000000000000026 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7F0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7F0000000000000000000006;
+			remoteInfo = Composition;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXNativeTarget section */
 		7F0000000000000000000006 /* Composition */ = {
@@ -76,6 +101,29 @@
 			productReference = 7F0000000000000000000004 /* Composition.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7F0000000000000000000022 /* CompositionUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7F000000000000000000002A /* Build configuration list for PBXNativeTarget "CompositionUITests" */;
+			buildPhases = (
+				7F0000000000000000000023 /* Sources */,
+				7F0000000000000000000024 /* Frameworks */,
+				7F0000000000000000000025 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7F0000000000000000000027 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7F0000000000000000000021 /* CompositionUITests */,
+			);
+			name = CompositionUITests;
+			packageProductDependencies = (
+			);
+			productName = CompositionUITests;
+			productReference = 7F0000000000000000000020 /* CompositionUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -88,6 +136,10 @@
 				TargetAttributes = {
 					7F0000000000000000000006 = {
 						CreatedOnToolsVersion = 26.2;
+					};
+					7F0000000000000000000022 = {
+						CreatedOnToolsVersion = 26.2;
+						TestTargetID = 7F0000000000000000000006;
 					};
 				};
 			};
@@ -110,12 +162,20 @@
 			projectRoot = "";
 			targets = (
 				7F0000000000000000000006 /* Composition */,
+				7F0000000000000000000022 /* CompositionUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		7F0000000000000000000009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7F0000000000000000000025 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -132,7 +192,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7F0000000000000000000023 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7F0000000000000000000027 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7F0000000000000000000006 /* Composition */;
+			targetProxy = 7F0000000000000000000026 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7F000000000000000000000F /* Debug */ = {
@@ -227,6 +302,42 @@
 			};
 			name = Release;
 		};
+		7F0000000000000000000028 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rushinglabs.composition.ipad.dev.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = Composition;
+			};
+			name = Debug;
+		};
+		7F0000000000000000000029 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.rushinglabs.composition.ipad.dev.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_TARGET_NAME = Composition;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -244,6 +355,15 @@
 			buildConfigurations = (
 				7F0000000000000000000011 /* Debug */,
 				7F0000000000000000000012 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7F000000000000000000002A /* Build configuration list for PBXNativeTarget "CompositionUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7F0000000000000000000028 /* Debug */,
+				7F0000000000000000000029 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

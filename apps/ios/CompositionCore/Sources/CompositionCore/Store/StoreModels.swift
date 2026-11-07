@@ -31,6 +31,10 @@ public struct NoteGroup: Equatable, Sendable, FetchableRecord {
     public var createdAt: String
     public var updatedAt: String
 
+    public init(id: Int64, uuid: String = "", name: String, parentId: Int64? = nil, notebookId: Int64? = nil, createdAt: String = "", updatedAt: String = "") {
+        (self.id, self.uuid, self.name, self.parentId, self.notebookId, self.createdAt, self.updatedAt) = (id, uuid, name, parentId, notebookId, createdAt, updatedAt)
+    }
+
     public init(row: Row) {
         id = row["id"]
         uuid = row["uuid"]

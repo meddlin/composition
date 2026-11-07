@@ -14,6 +14,10 @@ public struct NoteSummary: Equatable, Sendable, FetchableRecord {
     public var createdAt: String
     public var updatedAt: String
 
+    public init(id: Int64, uuid: String = "", title: String, tags: String = "", notebookId: Int64? = nil, groupId: Int64? = nil, createdAt: String = "", updatedAt: String = "") {
+        (self.id, self.uuid, self.title, self.tags, self.notebookId, self.groupId, self.createdAt, self.updatedAt) = (id, uuid, title, tags, notebookId, groupId, createdAt, updatedAt)
+    }
+
     public init(row: Row) {
         id = row["id"]
         uuid = row["uuid"]
