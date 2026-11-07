@@ -1,0 +1,11 @@
+{
+  "name": "pdf-reader-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "dependencies": {
+    "electron": "45.2.1",
+    "pdfjs-dist": "6.5.438"
+  },
+  "main": "main.js"
+}

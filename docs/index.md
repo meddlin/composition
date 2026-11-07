@@ -57,6 +57,8 @@ See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for h
 
 See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.
 
+See [pdf-markup-plan.md](pdf-markup-plan.md) for the design (not built yet) of reading a PDF with your notes beside it: a PDF as a note that owns it, markup stored beside the file (highlights, underlines, text notes, and Apple Pencil ink on the iPad), `pdf:` links from notes, and an **Export annotated PDF** button.
+
 ## Features
 
 - [x] Create note
