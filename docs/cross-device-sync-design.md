@@ -39,7 +39,7 @@ account-based, record-level sync service**, and it changes the schema the iPad's
   [Fast follow](#fast-follow-attachments-and-plugin-data).
 - **Revised (2026-11-07): self-hosted first.** Sync will be user-run until the product has a user base, so the order in D6 is
   reversed, **D20 (the lean SQLite server) is decided**, and **D3 (the hosted service's database) is deferred**, not open and
-  not blocking. The lean server exists as a container for a personal server (`spikes/sync-hosting/selfhost/`).
+  not blocking. The lean server exists as a container for a personal server (`apps/sync-server/`).
 
 ## The assumption
 
@@ -474,9 +474,9 @@ deletes by file, but every file must be migrated and replicated.
 leaves the backups stale, R19), and an occasional restore drill. Litestream is pre-1.0: its 0.5.0 release had bugs fixed in
 patch releases, and the latest release I saw was 0.5.18 (2026-11-03).
 
-**Status (2026-11-07).** Lean is now the chosen shape of the self-hosted server (D20) and has a prototype container
-(`spikes/sync-hosting/selfhost/`). It was kept as a spike ([S6](#spikes-and-gates)) and is the likely shape of the self-hosted server
-([D20](#decisions)): one container, one volume, nothing else to run.
+**Status (2026-11-07).** Lean is now the chosen shape of the self-hosted server ([D20](#decisions)) and is built as an app,
+`apps/sync-server/`, with a container for a personal server: one container, one volume, nothing else to run. It started as a spike
+([S6](#spikes-and-gates)).
 
 ### Moving from lean to hosted Postgres
 
@@ -546,7 +546,7 @@ the smallest size listed).
 
 **Open concerns**
 
-- **Backups (read from the docs, 2026-11-06; details in `spikes/sync-hosting/convex/FINDINGS.md`).** Manual backups are kept 7
+- **Backups (read from the docs, 2026-11-06; details in `spikes/sync-hosting/convex/FINDINGS.md` on the spike branch).** Manual backups are kept 7
   days and Free or Starter hold at most two per deployment. **Daily and weekly backups need the Professional plan** ($25 per
   developer a month). `npx convex export` and `npx convex import --replace-all` work with a deploy key, so a restore can be
   scripted, but on Starter there is no scheduled backup, so Starter cannot be the only copy of the server's data unless the
@@ -1020,7 +1020,7 @@ v1. Padding sizes is also left out of v1.
 > **Revised 2026-11-07, by you: the order is reversed.** Sync is **self-hosted first** (you, and any customer, run the server);
 > a hosted service waits until there is a user base. The 2026-11-05 text below says "hosted now, self-hosted later" and is kept
 > for the record; read "self-hostable" as "the first thing built" and treat the hosted-only parts as later. A prototype container
-> exists (`spikes/sync-hosting/selfhost/`: compose file, device tokens, backup to a folder or a bucket, optional HTTPS proxy).
+> exists (`apps/sync-server/selfhost/`: compose file, device tokens, backup to a folder or a bucket, optional HTTPS proxy).
 
 **Decided (D6, 2026-11-05):** the first sync server is hosted by us. A self-hosted server comes later, and users will
 choose which to use. Nothing about self-hosting is built now, but a few cheap choices keep it open:
@@ -1173,8 +1173,10 @@ candidate is a thin implementation of the same few operations, so one test clien
 them. That needs a *draft* of the protocol and the storage interface, not the frozen one: S8 starts before Gate B on a draft
 subset and its findings feed S3 and Gate B.
 
-**Status (2026-11-06): built as a throwaway prototype, not merged.** It lives in `spikes/sync-hosting/` on the draft PR
-branch `claude/quirky-khayyam-837226` (it is deleted once D3 is decided, and does not touch `apps/`). It holds the draft
+**Status (2026-11-06): built as a throwaway prototype, not merged.** It lives in `spikes/sync-hosting/` on the
+branch `claude/quirky-khayyam-837226` (PR #264, which is not meant to merge; it was to be deleted once D3 is decided, and D3 is
+deferred, so it stays for now because the numbers below come from it). Only the lean server was moved out, into `apps/sync-server/`
+(2026-11-07, see D20); the rest stays on that branch. It holds the draft
 protocol, the shared Node core, the three candidates, a 30-test HTTP contract suite, a simulated two-device client with fault
 injection, the scenarios below, a two-device harness page, and the wizard, deploy, drill and teardown scripts. All three pass the
 contract suite and every scenario **on a laptop**. The real-host column below is empty, and **parked since 2026-11-07**: it needs
@@ -1197,9 +1199,9 @@ a month on Fly at the prices in [Hosting it cheaply](#hosting-it-cheaply)).
 
 **How to read the cells.** *local* means measured on one laptop with everything on it (the real image and entrypoint for lean,
 a Postgres container, Convex's local backend), so it shows what the software adds and none of the network, the host or the
-provider. *Pending* means it needs the deployed hosts and has not been run: it needs your accounts (`spikes/sync-hosting/scripts/wizard.sh`),
+provider. *Pending* means it needs the deployed hosts and has not been run: it needs your accounts (`spikes/sync-hosting/scripts/wizard.sh`, on the spike branch),
 then `scripts/deploy-all.sh` and `scripts/run-all.sh real`. *Yours* is a judgement left for you. Raw numbers are in
-`spikes/sync-hosting/results/`.
+`spikes/sync-hosting/results/` on the spike branch.
 
 | Question | How to measure | Lean | Managed Postgres | Convex |
 |---|---|---|---|---|
@@ -1296,7 +1298,7 @@ Recommendations are proposals until the status says *Decided*. **Nothing is wait
 | D17 | Self-hosting preparation. | Server address as a setting; the protocol as a public, versioned contract with a contract suite; `GET /v1/info`; few server dependencies. | Proposed |
 | D18 | Encryption design. | Random vault key wrapped by an Argon2id passphrase key and a recovery key; AEAD per record (AES-256-GCM proposed); keyed-hash blob ids; sign-in separate from the passphrase. | Proposed; settled in S5 |
 | D19 | Weekly cycle across devices. | Runs after the first pull; deferred if offline; decisions derived from the synced log; one report per period (keep both on a clash); first to the server wins `todo_places`. | Proposed |
-| D20 | **Self-hosted server's storage.** | The lean setup: SQLite with continuous replication, one container and a volume ([how it works](#how-the-lean-setup-works)). Prototype container built (`spikes/sync-hosting/selfhost/`). | **Decided** (you, 2026-11-07) |
+| D20 | **Self-hosted server's storage.** | The lean setup: SQLite with continuous replication, one container and a volume ([how it works](#how-the-lean-setup-works)). Built as an app, with a container for a personal server (`apps/sync-server/`). | **Decided** (you, 2026-11-07) |
 
 ## Risks
 
@@ -1403,7 +1405,8 @@ its docs (above); its **production terms** and the Terms of Service text are sti
   suite, and the local baseline was re-run. See "What building them taught".
 - 2026-11-07: **self-hosted first (your decision).** Sync will be user-run until the product has a user base: D6 is reversed (self-hosted
   first, hosted later), D20 (the lean SQLite server) is decided, and D3 (the hosted service's database) is deferred; the S8 real-host run is
-  parked. The lean server is now a container for a personal server (`spikes/sync-hosting/selfhost/`): device tokens kept hashed in its own
+  parked. The lean server is now a container for a personal server (then in `spikes/sync-hosting/selfhost/`, now `apps/sync-server/`): device tokens kept hashed in its own
   SQLite file, backup to a folder or an S3-compatible bucket with restore on an empty disk, an optional HTTPS proxy, a healthcheck and a
   guide. Its smoke test (token, restart, lose the disk and restore, revoke) and the 27 non-admin contract tests pass against the container;
   the arm64 image builds and starts under emulation. Not built: real sign-in, blobs, quotas, a published image.
+- 2026-11-07: **the lean server is an app.** It moved out of the spike into `apps/sync-server/` (its own PR, cut from `main`): Node 24, `node:sqlite`, no runtime dependencies, with the contract suite and the container smoke test as its checks. The Postgres and Convex candidates, the scenarios, the two-device harness and the wizard stay on the spike branch.
