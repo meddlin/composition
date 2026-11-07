@@ -76,7 +76,7 @@ describe("createBackup", () => {
     expect(path.dirname(result.file!)).toBe(backups);
     expect(path.basename(result.file!)).toMatch(/^composition-backup-\d{4}-\d{2}-\d{2}-\d{6}\.tar\.gz$/);
     expect(fs.statSync(result.file!).size).toBe(result.bytes);
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0, contacts: 0 });
     // Only the backup is left in the folder, none of the working files.
     expect(fs.readdirSync(backups)).toEqual([path.basename(result.file!)]);
   });
@@ -147,7 +147,7 @@ describe("createBackup", () => {
 
     const result = await service.createBackup(backups);
 
-    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0, todos: 0, archivedTodos: 0 });
+    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0, todos: 0, archivedTodos: 0, contacts: 0 });
   });
 
   it("does not let two run at once", async () => {
@@ -174,7 +174,7 @@ describe("restoreBackup", () => {
     const result = await service.restoreBackup(file!);
 
     expect(result.error).toBeUndefined();
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0, contacts: 0 });
     const workspace = await service.loadWorkspace();
     expect(workspace.notes.map((n) => n.title).sort()).toEqual(["First note", "Second note"]);
     expect(workspace.notes.find((n) => n.id === first.id)).toMatchObject({ groupId: group.id });
@@ -237,6 +237,53 @@ describe("restoreBackup", () => {
     expect(settings.loadWebSettings().todos).toEqual(cycle);
     // The report link still points at a note that came back with it.
     expect((await service.loadWorkspace()).notes.map((n) => n.id)).toContain(first.id);
+  });
+
+  it("counts the contacts, and brings them back in full after everything is lost", async () => {
+    const { service } = await populate();
+    const contacts = await import("./contactsService");
+    const { closeDb } = await import("./db");
+    await contacts.addContact({ kind: "personal", firstName: "Ada", lastName: "Lovelace", email: "ada@example.com", phone: "555 0100", notes: "Met at a conference.\nLikes maths.", birthDate: "1985-12-10", title: "", manager: "" });
+    await contacts.addContact({ kind: "work", firstName: "Grace", lastName: "Hopper", email: "", phone: "", notes: "", birthDate: "", title: "Rear Admiral", manager: "Chester Nimitz" });
+    const before = await contacts.listContacts();
+    const { file, counts } = await service.createBackup(backups);
+    expect(counts).toMatchObject({ contacts: 2 });
+
+    closeDb();
+    fs.rmSync(dataDir(), { recursive: true });
+    expect(await contacts.listContacts()).toEqual([]);
+
+    const result = await service.restoreBackup(file!);
+
+    expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ contacts: 2 });
+    expect(await contacts.listContacts()).toEqual(before);
+  });
+
+  it("restores a backup made before contacts existed, leaving an empty rolodex that can be added to", async () => {
+    const { service } = await populate();
+    const contacts = await import("./contactsService");
+    const { file } = await service.createBackup(backups);
+    const { getDb } = await import("./db");
+    // The backup above has the table; make one that does not, as a backup from before this plugin does.
+    const Database = (await import("better-sqlite3")).default;
+    const old = path.join(home, "no-contacts.db");
+    getDb().prepare("VACUUM INTO ?").run(old);
+    const raw = new Database(old);
+    raw.exec("DROP TABLE contacts");
+    raw.close();
+    const { writeArchive } = await import("./tarArchive");
+    const legacy = path.join(home, "no-contacts.tar.gz");
+    const manifest = { format: "composition-backup", version: 1, createdAt: "2026-09-01T00:00:00.000Z", counts: {} };
+    await writeArchive(legacy, new Map([["composition-backup.json", Buffer.from(JSON.stringify(manifest))]]), [{ name: "composition.db", file: old }]);
+    expect(file).toBeTruthy();
+
+    const result = await service.restoreBackup(legacy);
+
+    expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ contacts: 0 });
+    expect(await contacts.listContacts()).toEqual([]);
+    expect((await contacts.addContact({ kind: "personal", firstName: "Ada", lastName: "", email: "", phone: "", notes: "", birthDate: "", title: "", manager: "" })).firstName).toBe("Ada");
   });
 
   it("replaces what is there now rather than merging with it", async () => {
@@ -327,7 +374,7 @@ describe("restoreBackup", () => {
     const result = await service.restoreBackup(file);
 
     expect(result.error).toBeUndefined();
-    expect(result.counts).toMatchObject({ todos: 0, archivedTodos: 0 });
+    expect(result.counts).toMatchObject({ todos: 0, archivedTodos: 0, contacts: 0 });
     expect((await service.loadWorkspace()).notes.map((n) => n.title)).toEqual(["Ancient"]);
   });
 

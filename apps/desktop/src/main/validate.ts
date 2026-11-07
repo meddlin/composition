@@ -5,6 +5,8 @@ import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import { PLUGINS } from "../../../web/src/lib/composition/plugins";
 import { normalizeFeedUrl } from "../../../web/src/lib/composition/feeds";
+import { checkContactInput } from "../../../web/src/lib/composition/contacts";
+import type { ContactsMethod } from "../../../web/src/lib/composition/contactsApi";
 import type { FeedMethod } from "../../../web/src/lib/composition/feedsApi";
 import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingList";
 import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
@@ -334,6 +336,22 @@ export const READING_LIST_VALIDATORS: Record<ReadingListMethod, Validator> = {
   deleteReadingItem: ([itemId]) => [id("deleteReadingItem", itemId, "id")],
   clearReadingData: none,
 };
+
+/**
+ * The contact methods take ids and a contact's details. The details are checked with the same rule the panel and the service
+ * use and passed on as that rule writes them (trimmed, with nothing in a personal contact's work fields), so what reaches the
+ * database is always well formed.
+ */
+export const CONTACTS_VALIDATORS: Record<ContactsMethod, Validator> = {
+  listContacts: none,
+  addContact: ([input]) => [contactDetails("addContact", input)],
+  updateContact: ([contactId, input]) => [id("updateContact", contactId, "id"), contactDetails("updateContact", input)],
+  deleteContact: ([contactId]) => [id("deleteContact", contactId, "id")],
+};
+
+function contactDetails(method: string, value: unknown) {
+  return checkContactInput(value).input ?? fail(method, "contact");
+}
 
 /**
  * The feed methods take ids, booleans and one address. The address is checked with the same rule the panel and the service

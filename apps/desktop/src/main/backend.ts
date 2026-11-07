@@ -18,6 +18,7 @@ export * as todosService from "../../../web/src/lib/composition/todosService";
 export { runCycle as runTodoCycle } from "../../../web/src/lib/composition/todoCycle";
 export { indexReportNotes } from "../../../web/src/lib/composition/todoReportIndex";
 export * as feedsService from "../../../web/src/lib/composition/feedsService";
+export * as contactsService from "../../../web/src/lib/composition/contactsService";
 export * as readingListService from "../../../web/src/lib/composition/readingListService";
 export { defaultSharedLocationPath, loadWebSettings } from "../../../web/src/lib/composition/webSettings";
 export type { ThemeName } from "../../../web/src/lib/composition/themes";

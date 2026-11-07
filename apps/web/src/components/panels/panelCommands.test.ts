@@ -66,9 +66,10 @@ describe("searching the panel commands", () => {
       "open:todo",
       "open:reading-list",
       "open:rss",
+      "open:contacts",
       "toggle-rail",
     ]);
-    expect(ids("   ")).toHaveLength(13);
+    expect(ids("   ")).toHaveLength(14);
   });
 
   it("finds a command by the start of a word in its name, whatever the case", () => {
@@ -164,8 +165,9 @@ describe("the commands that open a panel", () => {
       "Open To-do",
       "Open Reading List",
       "Open RSS Reader",
+      "Open Contacts",
     ]);
-    expect(LAUNCH_COMMANDS.map((command) => command.opens)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
+    expect(LAUNCH_COMMANDS.map((command) => command.opens)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss", "contacts"]);
     expect(LAUNCH_COMMANDS.every((command) => command.shortcut === undefined)).toBe(true);
   });
 
@@ -201,11 +203,11 @@ describe("the commands that open a panel", () => {
   it("leave out a command whose plugin is off, given which plugins are on", () => {
     const some = (enabled: PluginSettings) => searchPanelCommands("", enabled).flatMap((command) => (command.opens ? [command.opens] : []));
 
-    expect(some(allOn)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss"]);
-    expect(some(DEFAULT_PLUGIN_SETTINGS)).toEqual(["notes-browser", "ai", "todo"]);
-    expect(some({ ...allOn, todo: false })).toEqual(["notes-browser", "ai", "reading-list", "rss"]);
+    expect(some(allOn)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss", "contacts"]);
+    expect(some(DEFAULT_PLUGIN_SETTINGS)).toEqual(["notes-browser", "ai", "todo", "contacts"]);
+    expect(some({ ...allOn, todo: false })).toEqual(["notes-browser", "ai", "reading-list", "rss", "contacts"]);
     expect(searchPanelCommands("rss", DEFAULT_PLUGIN_SETTINGS).map((command) => command.id)).toEqual([]);
-    expect(searchPanelCommands("split", { ...allOn, todo: false, rss: false, "reading-list": false })).toHaveLength(2);
+    expect(searchPanelCommands("split", { ...allOn, todo: false, rss: false, "reading-list": false, contacts: false })).toHaveLength(2);
   });
 });
 

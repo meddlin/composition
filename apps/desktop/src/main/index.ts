@@ -8,7 +8,7 @@ import { createBackupApi } from "./backup";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
-import { closeDb, defaultSharedLocationPath, feedsService, indexReportNotes, listNotes, loadWebSettings, panelsService, readingListService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
+import { closeDb, contactsService, defaultSharedLocationPath, feedsService, indexReportNotes, listNotes, loadWebSettings, panelsService, readingListService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
 import { createAssistantHost } from "./assistant";
 import { fetchFeedText } from "./feedFetcher";
 import { startFeedRefresh } from "./feedRefresh";
@@ -277,6 +277,7 @@ async function main(): Promise<void> {
     todos: notifyTodoReports(todosService, announceTodos),
     // Clearing is the one call that needs a browser session, which only this process has.
     readingList: { ...readingListService, clearReadingData: () => clearReadingData(readingSession()) },
+    contacts: contactsService,
     feeds,
     updates: updates.manager,
     window: notifyTranslucencyChange(translucency, announceAppearance),

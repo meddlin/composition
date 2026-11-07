@@ -10,6 +10,7 @@ export function panelTitle(panel: PanelRecord | undefined, notes: readonly Note[
   if (panel.kind === "todo") return "To-do";
   if (panel.kind === "reading-list") return "Reading List";
   if (panel.kind === "rss") return "RSS Reader";
+  if (panel.kind === "contacts") return "Contacts";
   const noteId = noteIdOf(panel);
   const note = noteId === null ? undefined : [...notes, ...deleted].find((n) => n.id === noteId);
   return note ? noteTitle(note) : panel.kind === "note" ? "Note" : "Composition";

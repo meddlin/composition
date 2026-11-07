@@ -4,6 +4,7 @@ import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachments
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
 import { FEED_METHODS } from "../../../web/src/lib/composition/feedsApi";
 import { PANELS_METHODS } from "../../../web/src/lib/composition/panelsApi";
+import { CONTACTS_METHODS } from "../../../web/src/lib/composition/contactsApi";
 import { READING_LIST_METHODS } from "../../../web/src/lib/composition/readingListApi";
 import { TODO_METHODS } from "../../../web/src/lib/composition/todosApi";
 import { ASSISTANT_METHODS, type AssistantEventMessage } from "../../../web/src/lib/composition/assistantApi";
@@ -13,13 +14,13 @@ import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { APPEARANCE_CHANNEL, ASSISTANT_EVENT_CHANNEL, channelFor, INITIAL_CHANNEL, POPOUT_CLOSED_CHANNEL, TODOS_CHANGED_CHANNEL, UPDATE_STATE_CHANNEL } from "../shared/channels";
 
 /**
- * Exposes `window.composition`: every CompositionApi, AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, FeedsApi, UpdatesApi, WindowApi and AI helper
+ * Exposes `window.composition`: every CompositionApi, AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AI helper
  * method, each forwarded to the main process, plus `onUpdateState` for the update state the main
  * process pushes, and a synchronous snapshot of the settings the first
  * paint needs. Nothing else from Electron or Node reaches the page.
  */
 const api = Object.fromEntries(
-  [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map((method) => [
+  [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...CONTACTS_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map((method) => [
     method,
     (...args: unknown[]) => ipcRenderer.invoke(channelFor(method), ...args),
   ]),

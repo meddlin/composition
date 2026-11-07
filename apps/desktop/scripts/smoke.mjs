@@ -43,6 +43,7 @@ const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../w
 const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { TODO_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/todosApi.ts"));
 const { READING_LIST_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/readingListApi.ts"));
+const { CONTACTS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/contactsApi.ts"));
 const { FEED_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/feedsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
@@ -54,6 +55,7 @@ const expectedBridge = [
   ...PANELS_METHODS,
   ...TODO_METHODS,
   ...READING_LIST_METHODS,
+  ...CONTACTS_METHODS,
   ...FEED_METHODS,
   ...UPDATE_METHODS,
   ...WINDOW_METHODS,
@@ -647,7 +649,7 @@ try {
     (await palette(page).count()) === 1 &&
       (await page.getByRole("combobox", { name: "Search commands" }).evaluate((el) => el === document.activeElement)) &&
       // The seven panel commands, the Open commands for the plugins that are on (Reading List and RSS Reader start off), and the rail's.
-      (await palette(page).getByRole("option").count()) === 11,
+      (await palette(page).getByRole("option").count()) === 12,
   );
   await page.keyboard.type("next");
   await page.keyboard.press("Enter");
@@ -707,7 +709,7 @@ try {
   const railIconsFresh = await railIcons();
   check(
     "the plugin rail has an icon for each panel that can be opened and whose plugin is on, in the empty panel's order",
-    JSON.stringify(railIconsFresh) === JSON.stringify(["Notes browser", "AI helper", "To-do"]),
+    JSON.stringify(railIconsFresh) === JSON.stringify(["Notes browser", "AI helper", "To-do", "Contacts"]),
     railIconsFresh.join(", "),
   );
 
@@ -768,7 +770,7 @@ try {
   await closePalette();
   check(
     "Hide from Rail takes one icon off the rail, and that kind is still in the palette",
-    hidden && stillInPalette && (await railIcons()).length === 2,
+    hidden && stillInPalette && (await railIcons()).length === 3,
     (await railIcons()).join(", "),
   );
   // Put the icon back, as Settings does, so the relaunch below starts from the defaults.

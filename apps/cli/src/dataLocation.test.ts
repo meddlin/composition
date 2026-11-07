@@ -23,7 +23,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     noteBackground: "plain",
     todoLook: { background: "notes", color: null },
     todos: { weekStartsOn: 0, retentionMonths: 60, fiscalYearStartMonth: 1 },
-    plugins: { todo: true, "reading-list": false, rss: false },
+    plugins: { todo: true, "reading-list": false, rss: false, contacts: true },
     editorFont: "default",
     writing: {
       rulerEnabled: false,

@@ -3,6 +3,7 @@ import type { AssistantEventListener, AssistantStreamApi } from "./assistantApi"
 import type { AppearanceListener, AppearanceMessage } from "./appearanceApi";
 import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
+import type { ContactsApi } from "./contactsApi";
 import type { FeedsApi } from "./feedsApi";
 import type { PanelsApi } from "./panelsApi";
 import type { ReadingListApi } from "./readingListApi";
@@ -13,7 +14,7 @@ import type { WindowApi } from "./windowApi";
 
 /**
  * What Electron's preload script exposes on `window.composition` (apps/desktop).
- * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, FeedsApi, UpdatesApi, WindowApi and AssistantStreamApi, plus a
+ * Everything in CompositionApi, plus the desktop-only AttachmentsApi, DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AssistantStreamApi, plus a
  * synchronous snapshot taken before the page paints so the first frame already
  * has the right color scheme.
  */
@@ -23,6 +24,7 @@ export type DesktopBridge = CompositionApi &
   PanelsApi &
   TodosApi &
   ReadingListApi &
+  ContactsApi &
   FeedsApi &
   UpdatesApi &
   WindowApi &

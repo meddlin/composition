@@ -178,6 +178,28 @@ CREATE TABLE IF NOT EXISTS reading_list (
 `;
 
 /**
+ * The Contacts plugin's rolodex. `kind` is `personal` or `work`; `title` and `manager` are only ever filled for a work
+ * contact (contacts.ts empties them otherwise), and `birth_date` is `YYYY-MM-DD` or empty. Being in this file is what puts
+ * contacts in a backup. The CLI shares this file and ignores the table.
+ */
+const CONTACTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind TEXT NOT NULL DEFAULT 'personal',
+    first_name TEXT NOT NULL DEFAULT '',
+    last_name TEXT NOT NULL DEFAULT '',
+    email TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
+    notes TEXT NOT NULL DEFAULT '',
+    birth_date TEXT NOT NULL DEFAULT '',
+    title TEXT NOT NULL DEFAULT '',
+    manager TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+`;
+
+/**
  * The RSS Reader's feeds and their entries. Deleting a feed deletes its entries too (feedsRepo.ts does that in one
  * transaction, so no foreign key is declared). The CLI shares this file and ignores the tables.
  */
@@ -296,6 +318,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(TODOS_SCHEMA);
   db.exec(READING_LIST_SCHEMA);
   db.exec(FEEDS_SCHEMA);
+  db.exec(CONTACTS_SCHEMA);
   // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
   const todoColumns = db.prepare("PRAGMA table_info(todos)").all() as { name: string }[];
   if (!todoColumns.some((c) => c.name === "status")) {

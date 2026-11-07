@@ -48,11 +48,11 @@ panel, else in the note panel used last, else in a new panel to the right. So or
 ## Opening a plugin's panel
 
 An empty panel lists the kinds a panel can become, but you do not have to make one first. A panel of **Notes browser, AI helper, To-do,
-Reading List or RSS Reader** can be opened directly, three ways:
+Reading List, RSS Reader or Contacts** can be opened directly, three ways:
 
 | How | Result |
 |---|---|
-| **Command palette** (`Mod+Shift+P`), then **Open AI Helper**, **Open To-do**, **Open Reading List**, **Open RSS Reader** or **Open Notes Browser** | Opens it in the window you are in. Found by name or by what it is about (*todo*, *tasks*, *feeds*, *read later*, *notebook*). |
+| **Command palette** (`Mod+Shift+P`), then **Open AI Helper**, **Open To-do**, **Open Reading List**, **Open RSS Reader**, **Open Contacts** or **Open Notes Browser** | Opens it in the window you are in. Found by name or by what it is about (*todo*, *tasks*, *feeds*, *read later*, *rolodex*, *birthday*, *notebook*). |
 | The **plugin rail**: a narrow column of icons left of the Notebooks column | Click an icon. The main window only. |
 | **An empty panel** | Its buttons, as before. |
 
@@ -284,6 +284,32 @@ and [`feedRefresh.ts`](../../apps/desktop/src/main/feedRefresh.ts) (the timer).
 - **One set of feeds.** They belong to the workspace, not the panel: any number of RSS panels, in any window, show and change the same ones. A panel saves only which feed and entry it has open.
 - **Narrow panels.** From a panel width of 640 px the feeds and entries sit side by side; below that the panel shows the feeds, then the entries, then one entry, each with a way back.
 - **Not in the web app or the CLI.** Fetching needs the desktop app's main process. OPML import and export, folders, search, notifications and reading the article inside the panel are future work.
+
+## The Contacts panel
+
+A rolodex: people on the left, filed by last name under a letter, and on the right the one you picked, as a card or as a form (choose **Contacts**
+in an empty panel, or **Open Contacts** in the palette; it is on from the start, like the to-do list, because it only adds a panel). It is a
+**built-in plugin** in **Settings > Plugins**. Source: [`ContactsPanel.tsx`](../../apps/web/src/components/panels/ContactsPanel.tsx),
+[`contacts.ts`](../../apps/web/src/lib/composition/contacts.ts) (the one rule that checks and tidies a contact; the panel, the bridge validator and the service all use it),
+[`contactsStore.ts`](../../apps/web/src/lib/composition/contactsStore.ts) (the contacts, shared by every window) and
+[`contactsService.ts`](../../apps/web/src/lib/composition/contactsService.ts) (the `contacts` table in the notes database).
+
+- **What a contact has.** First and last name (at least one), email, phone, notes and birth date, for everyone. A **work** contact also has a **title** and a **manager**;
+  a **personal** contact stops at the basics. The manager is a name, not a link to another contact, so it can be someone who is not in the rolodex.
+  Changing a contact from work to personal drops its title and manager when it is saved.
+- **Checks.** Email only has to look like one (`something@something`); the birth date must be a real date from 1900 and not in the future; a name is trimmed and kept
+  on one line. A refusal is shown in the form and nothing is saved. The birth date is a calendar date, so no time zone moves it; the card shows it in words with the age.
+- **The list.** Sorted by last name (first name when there is no last), then first name. **Search** matches every word you type against the name, email, phone, title, manager and notes.
+  **All / Personal / Work** narrows it, and the panel remembers that choice.
+- **Adding and changing.** The **New contact** button at the top of the list opens a form (a new contact starts as work while only Work is listed); **Edit** on a card opens the same form with its details. **Save** keeps it and
+  opens its card; **Cancel** leaves it as it was. Picking another contact while a form is open drops what was typed.
+- **Deleting asks first**, naming the contact, and says it is removed for good and not sent to the Trash Can. A backup made earlier still has it.
+- **Backups.** Contacts live in the notes database, so they are in every backup and come back with a restore; see [backup-restore.md](../architecture/backup-restore.md).
+- **One set of contacts.** They belong to the workspace, not the panel: any number of Contacts panels, in any window or pop-out, show and change the same ones. A panel saves only which contact it has
+  open, which kinds it lists and how wide its list is.
+- **Off.** An open Contacts panel says the plugin is off, with **Turn on Contacts**. The contacts are kept, and stay in backups.
+- **Narrow panels.** From a panel width of 640 px the list and the contact sit side by side; below that the panel shows one at a time, with **Back to list**.
+- **Not in the web app or the CLI.** Panels are desktop only. Importing vCards or CSV, groups, and birthday reminders are future work.
 
 ## Panel commands and the command palette
 

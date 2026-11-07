@@ -139,7 +139,7 @@ export function BackupRestore({ defaultBackupDir }: { defaultBackupDir: string }
             Backup
           </CardTitle>
           <CardDescription>
-            Saves your notes, groups, Trash Can, images, attached files and these settings (color scheme, city, column
+            Saves your notes, groups, Trash Can, images, attached files, contacts and these settings (color scheme, city, column
             sizes, favorites) in one file. Where your data lives on this computer isn&apos;t included.
           </CardDescription>
         </CardHeader>
