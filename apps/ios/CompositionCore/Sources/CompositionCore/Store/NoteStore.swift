@@ -40,7 +40,13 @@ public final class NoteStore: Sendable {
 
     public func restoreNote(id: Int64) throws -> RestoreResult? {
         try write({ try database.restoreNote(id: id) }) { index, restored in
-            if restored != nil, let note = try database.note(id: id) { try index.upsert([Self.indexed(note)]) }
+            guard restored != nil else { return }
+            if let note = try database.note(id: id) {
+                try index.upsert([Self.indexed(note)])
+            } else {
+                // The note came back under a new id (its own was taken), so there is nothing to add by the old one: start the index over.
+                try index.rebuild(from: database)
+            }
         }
     }
 

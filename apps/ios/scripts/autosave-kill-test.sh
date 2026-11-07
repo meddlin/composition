@@ -63,7 +63,7 @@ fresh() {  # a restored copy of the backup, with no draft left over
 
 type_into_note() {  # type_into_note <text> <seconds between characters>
   # A pause of 30 seconds before a save: within each case only leaving the foreground, or the draft file, can save the typing.
-  launch -openNote "$note" -openMode Edit -autotype "$1" -autotypeInterval "$2" -autosaveQuiet 30
+  launch -openNote "$note" -openMode Markdown -autotype "$1" -autotypeInterval "$2" -autosaveQuiet 30
 }
 
 echo "== A: killed right after typing, inside the pause before the save"

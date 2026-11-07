@@ -313,6 +313,26 @@ struct AutosaveTests {
         }
     }
 
+    @Test("an editor is not handed back what it just typed, and the other windows still hear it")
+    func noEcho() throws {
+        try withScratch { scratch in
+            let s = try setup(scratch)
+            defer { try? s.database.close() }
+            let sessions = NoteSessions(store: s.store, drafts: s.drafts, scheduler: s.scheduler)
+            let session = try sessions.open(noteId: s.note.id)
+            let mine = HeardText(), theirs = HeardText()
+            let myObservation = session.observe { mine.set($0) }
+            let theirObservation = session.observe { theirs.set($0) }
+            session.edit("---\ntitle: Typed\n---\nfrom my window", from: myObservation)
+            #expect(mine.text == nil, "the window that typed it is not told")
+            #expect(theirs.text == "---\ntitle: Typed\n---\nfrom my window")
+            session.edit("---\ntitle: Typed\n---\nfrom elsewhere")
+            #expect(mine.text == "---\ntitle: Typed\n---\nfrom elsewhere", "and it hears everyone else")
+            withExtendedLifetime((myObservation, theirObservation)) {}
+            sessions.close(session)
+        }
+    }
+
     @Test("flushAll saves every open note")
     func flushAll() throws {
         try withScratch { scratch in

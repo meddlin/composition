@@ -77,7 +77,7 @@ final class AppModel {
     // MARK: Opening
 
     func start() async {
-        #if DEBUG
+        #if DEBUG || EDITOR_TEST_HOOKS
         // Developer shortcut: `-importBackup /path/to/backup.tar.gz` on the launch arguments restores that file at startup.
         if let path = UserDefaults.standard.string(forKey: "importBackup") {
             await importBackup(from: URL(fileURLWithPath: path), securityScoped: false)
@@ -96,7 +96,7 @@ final class AppModel {
         defer { busyMessage = nil }
         let location = location
         var timing = NoteAutosaver.Timing()
-        #if DEBUG
+        #if DEBUG || EDITOR_TEST_HOOKS
         // Developer shortcut for scripts: `-autosaveQuiet 30` makes the pause before a save 30 seconds, so that only leaving the
         // foreground (or the draft file) can save what was typed within a test.
         let quiet = UserDefaults.standard.double(forKey: "autosaveQuiet")
@@ -123,10 +123,17 @@ final class AppModel {
                 notice = "The app was closed while you were typing. What you had typed in \(stores.recovered == 1 ? "1 note" : "\(stores.recovered) notes") is back."
             }
             phase = .ready
-            #if DEBUG
+            #if DEBUG || EDITOR_TEST_HOOKS
             // Developer shortcut: `-openNote 12` selects that note at launch.
             let forced = UserDefaults.standard.integer(forKey: "openNote")  // launch arguments arrive as text; 0 when absent
             if forced != 0 { selection = Int64(forced) }
+            // `-trashNote 3` and `-restoreNote 3` do what the buttons do, for the script that checks the rows (apps/ios/scripts/editor-flow-test.sh);
+            // `-newNote 1` makes a note as the + button does.
+            if UserDefaults.standard.bool(forKey: "newNote") { await createNote() }
+            let trash = UserDefaults.standard.integer(forKey: "trashNote")
+            if trash != 0 { await moveToTrash(Int64(trash)) }
+            let restore = UserDefaults.standard.integer(forKey: "restoreNote")
+            if restore != 0 { await restoreNote(Int64(restore)) }
             #endif
             await reload()
         } catch {
@@ -207,6 +214,31 @@ final class AppModel {
 
     // MARK: Editing
 
+    /// The id of a note that was just made, so that the screen opens it in the editor with the keyboard up (once).
+    private var freshNote: Int64?
+
+    /// Makes an empty note ("Untitled", as the desktop does), selects it, and opens it for typing.
+    func createNote() async {
+        guard let store = sessions?.store else { return }
+        flushEditing()
+        do {
+            let note = try await Self.perform { try store.createNote(title: "Untitled") }
+            freshNote = note.id
+            query = ""
+            selection = note.id
+            await reload()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Whether `id` is the note that was just made; asking once uses it up.
+    func takeFreshNote(_ id: Int64) -> Bool {
+        guard freshNote == id else { return false }
+        freshNote = nil
+        return true
+    }
+
     /// Opens a note for editing, or joins the session another window already has for it.
     func openSession(_ id: Int64) async -> NoteSession? {
         guard let sessions else { return nil }
@@ -258,14 +290,10 @@ final class AppModel {
     // MARK: Trash Can
 
     func moveToTrash(_ id: Int64) async {
-        guard let database, let index = searchIndex else { return }
+        guard let store = sessions?.store else { return }
         flushEditing()  // what was typed goes into the note before the note goes to the Trash Can
         do {
-            try await Self.perform {
-                try database.trashNote(id: id)
-                try index.remove(ids: [id])
-                try index.markCurrent(with: database)
-            }
+            try await Self.perform { try store.deleteNote(id: id) }
             if selection == id { selection = nil }
             await reload()
         } catch {
@@ -274,9 +302,12 @@ final class AppModel {
     }
 
     func restoreNote(_ id: Int64) async {
-        await changeTrash { database, index in
-            _ = try database.restoreNote(id: id)
-            try index.rebuild(from: database)  // a restored note may come back under a new id, so start over
+        guard let store = sessions?.store else { return }
+        do {
+            _ = try await Self.perform { try store.restoreNote(id: id) }
+            await reload()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

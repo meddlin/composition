@@ -22,10 +22,11 @@ public final class NoteSession: Sendable {
     /// The newest text.
     public var text: String { autosaver.text }
 
-    /// An editor changed the text. Every observer hears it, the sender included, which ignores a text it already shows.
-    public func edit(_ text: String) {
+    /// An editor changed the text. Every observer hears it except the one named as `origin`, so that an editor is not handed back what it just
+    /// typed (which, for a long note, costs a comparison of all of it on every keystroke).
+    public func edit(_ text: String, from origin: Observation? = nil) {
         autosaver.edit(text)
-        let handlers = observers.withLock { Array($0.values) }
+        let handlers = observers.withLock { $0.filter { $0.key != origin?.id }.map(\.value) }
         for handler in handlers { handler(text) }
     }
 
@@ -33,12 +34,16 @@ public final class NoteSession: Sendable {
     public func observe(_ handler: @escaping @Sendable (String) -> Void) -> Observation {
         let id = UUID()
         observers.withLock { $0[id] = handler }
-        return Observation { [weak self] in self?.observers.withLock { $0[id] = nil } }
+        return Observation(id: id) { [weak self] in self?.observers.withLock { $0[id] = nil } }
     }
 
     public final class Observation: Sendable {
+        fileprivate let id: UUID
         private let stop: @Sendable () -> Void
-        fileprivate init(_ stop: @escaping @Sendable () -> Void) { self.stop = stop }
+        fileprivate init(id: UUID, _ stop: @escaping @Sendable () -> Void) {
+            self.id = id
+            self.stop = stop
+        }
         deinit { stop() }
     }
 }
@@ -49,7 +54,9 @@ public final class NoteSessions: Sendable {
         var holders: Int
     }
 
-    private let store: NoteStore
+    /// The store every session saves through; what the rest of the app should use for creating, trashing and restoring, so that the search index
+    /// is kept in step in one place.
+    public let store: NoteStore
     private let drafts: NoteDrafts
     private let timing: NoteAutosaver.Timing
     private let scheduler: any AutosaveScheduler

@@ -38,6 +38,9 @@ struct BrowserView: View {
             .safeAreaInset(edge: .bottom) { footer }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
+                    Button { Task { await model.createNote() } } label: { Label("New note", systemImage: "square.and.pencil") }
+                }
+                ToolbarItem(placement: .primaryAction) {
                     Button { showingTrash = true } label: {
                         Label("Trash Can", systemImage: model.trashedNotes.isEmpty && model.trashedGroups.isEmpty ? "trash" : "trash.fill")
                     }

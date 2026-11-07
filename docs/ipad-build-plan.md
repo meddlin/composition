@@ -71,6 +71,10 @@ sessions at the same time**; give each its own `ios-conformance-<name>.test.ts` 
 conflict. Steps 4 and 5 are app-side and independent of 1 to 3. Step 6 needs 2 to 5. A cold `xcodebuild` took over ten minutes here, so
 the core is developed with `swift test` and the app is built only to look at it.
 
+**Orientation is a rule for every step, not a step** (you, 2026-11-06: mostly landscape, sometimes portrait). Each screen an app step builds is looked at in **landscape first, then portrait**, and turned while
+it is in use (typing, a sheet open); a screen is not done until both work. Layout follows the width the view is given, not the orientation ([App structure](ipad-app-design.md#app-structure-windows-and-themes), N3), so Step 11 only
+has to add the system's other window sizes. Steps 1 to 6 have been checked that way in the Simulator (an iPad Pro 11-inch, and an iPad mini for portrait).
+
 0. **Gate A** (you). **Passed 2026-11-06**: D2, D3, D7 and D16 decided, D6 closed. Nothing below needs more; G3 can wait.
 1. **Settings.** A `Settings` type in the core for the keys the iPad uses (favorites, colour scheme, saved city), read from and written to a
    `settings.json` in the data folder, keeping every key it does not use as it came ([G5](#decisions-to-make)); `Backup` carries it both ways.
@@ -126,6 +130,18 @@ the core is developed with `swift test` and the app is built only to look at it.
 6. **The editor.** The Markdown tab for real notes, replacing the lab: bound to the store (2), frontmatter (3), autosave (4) and the incremental
    colouring (5); the Preview and Split tabs; find; the Trash Can from the note. Check: create, edit, relaunch, search for what you typed, trash and restore,
    on a copy of your notes; the rows written match the desktop's for the same operations (Step 2's script, driven from the UI layer).
+   **Done 2026-11-06 in the Simulator (not on your iPad, and not on a copy of your own notes):** the app now has the three tabs of the design, **Markdown** (a TextKit 2 text view on the note's session, coloured by
+   Step 5's quick reads, with the system find bar), **Preview** and **Split** (the preview follows what is typed, a quarter of a second after it; side by side from 800 points of width, or one above the other in a narrow window); the
+   prototype's read-only *Source* tab is gone, since Markdown is the source. A **+** button makes a note ("Untitled", as the desktop does), opens it in Markdown with the keyboard up and the caret after its
+   frontmatter; the Trash Can button on a note flushes it first and goes through `NoteStore`, as do restore and create, so the search index follows each. Every tab shares one `NoteSession`, so what is
+   typed is what Preview shows and what autosave writes. **Checks:** `apps/ios/scripts/editor-flow-test.sh` makes a note through the app, types into it, backgrounds the app, trashes the note and restores it,
+   then has the desktop's real `service.ts` do the same on a copy of the starting database with the clock set to the moments the app's rows record, and every row of `notes`, `groups`, `notebooks`, `trashed_notes`,
+   `trashed_groups` and `sqlite_sequence` is equal (the check fails when the typed text differs); the Step 4 kill test still passes on the new editor. **A finding:** in the first version of the editor each
+   keystroke cost **23 ms** in a 5,000-line note, none of it the colouring: `UITextView.text` returns a lazily bridged `NSString`, and comparing it with a native string went one character at a time through Objective-C.
+   One native copy of the UTF-8 (0.25 ms) and not handing an editor its own edit back brought the whole `textViewDidChange` to **1.05 ms median, 1.5 ms worst** (Release, Simulator, 100,190 characters, typing in the
+   middle); the colouring is 0.7 ms of that. **Orientation** (added the same day, see the rule under Build order): landscape and portrait were looked at on an iPad Pro 11-inch and an iPad mini in the Simulator, turning the iPad while typing in Split kept the text, the caret and the save;
+   in a wide view Preview and the Markdown tab now keep to 820 points, centred, and Split stacks below 800 points ([Step 6 status](ipad-app-design.md#step-6-orientation)). Not done: the hundred-operations check on a copy of your own notes (item 27 to 33 of the manual test are for the iPad; items 34 to 36 are the turning checks), and everything of Steps 7 to 11 (groups, notebooks,
+   images, completion, schemes, accessibility).
 7. **Organization.** The sidebar of notebooks and groups, create, rename, delete, move and reorder, favorites (from Step 1), drag and drop within
    the app and from Files, back and forward, columns. Check: the first **UI tests** (XCUITest) on the main flows, and a pass in the Simulator.
 8. **Images.** Port `sniffImage`, `imageFileName` and `storeImage` (no size limit, as on the desktop); insert from the picker, paste with
@@ -136,8 +152,8 @@ the core is developed with `swift test` and the app is built only to look at it.
    the catalogues as JSON through the desktop's code; the rest in the Simulator.
 10. **Appearance.** A `Theme` of tokens for the six schemes (from `globals.css`) plus **System**, fonts, the `<Mark>` colours per scheme
     (`markContrast`) and the chart colours from tokens. Check: snapshot tests of the ten components in every scheme, in light and dark.
-11. **Accessibility and size classes.** Dynamic Type, VoiceOver labels, Reduce Motion, rotation, Split View, Slide Over and Stage Manager,
-    a third-width window; the licence notices for GRDB and swift-markdown. Check: Accessibility Inspector, then you ([N3, N5, N6, N7](ipad-app-design.md#the-native-bar)).
+11. **Accessibility and size classes.** Dynamic Type, VoiceOver labels, Reduce Motion, Split View, Slide Over and Stage Manager,
+    a third-width window (landscape and portrait are already checked in every step, see the rule under Build order; this step repeats the turn through each of those sizes); the licence notices for GRDB and swift-markdown. Check: Accessibility Inspector, then you ([N3, N5, N6, N7](ipad-app-design.md#the-native-bar)).
 12. **Install and Gate B.** A Release build on your iPad; the manual test page; every M1 row at least built. **Gate B:** the on-device
     answers from the editor lab (Scribble, the Pencil in a text view, arrow keys over hidden marks, VoiceOver, the iPad's speed) decide whether the editor stands
     as designed ([D4, D5](ipad-app-design.md#decisions)) and whether the Live tab stays out of v1 ([G7](#decisions-to-make)). Then the exit criteria below.
@@ -147,7 +163,7 @@ the core is developed with `swift test` and the app is built only to look at it.
 ## M1 is done when
 
 From the design: it installs and runs on your iPad; you can create, edit, search, delete and restore from the Trash Can; a backup made on the
-desktop restores on the iPad and the reverse, **favorites included**; every M1 row is at least built; Gates A and B are passed; S6 is done.
+desktop restores on the iPad and the reverse, **favorites included**; every M1 row is at least built; Gates A and B are passed; S6 is done; **every screen works in landscape and in portrait** (you: mostly landscape).
 
 ## Risks
 

@@ -2,8 +2,8 @@
 
 A viewer on the Swift core, to try your own notes on the iPad before the real app exists. It can import a
 desktop backup, list and search the notes (typos included), draw a note's Markdown and the ten components (or show its source),
-use the Trash Can, and export a backup the desktop can restore. Since build plan Step 4 it has a **plain-text editor** (the *Edit*
-tab) that saves what you type, which is there to test saving, not to be the editor. It cannot show attachments, or draw ink: see
+use the Trash Can, and export a backup the desktop can restore. Since build plan Steps 4 to 6 it also **edits**: a *Markdown* tab with colours and find, a *Split* tab, a + button, and autosave. It has no
+completion, links, images or groups yet. It cannot show attachments, or draw ink: see
 [What it leaves out](#what-it-leaves-out). Design and status: [ipad-app-design.md](../ipad-app-design.md).
 
 **You have run it on your iPad with a backup of your real notes** (reported 2026-11-06). **The preview is newer than that run and has
@@ -50,15 +50,15 @@ Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unk
 5. **Filters:** `tag: yourtag`, `created: >2026-01-01`, `updated: <2026-01-01`, `title: something`. Text must come before a
    filter (`roadmap tag: infra`), as on the desktop.
 6. **Speed.** The line under the list gives how long each search took. Note the typical figure and the first search after launch.
-7. **Open a note.** It opens as a **Preview** (Markdown and components; **Source** is the switch beside it, with the frontmatter, as
-   stored). Open one of your own notes that uses components (`<Info>`, `<Chart>`, footnotes) and compare it with the desktop: see 13.
+7. **Open a note.** It opens as a **Preview** (Markdown and components; **Markdown** is the switch beside it, with the frontmatter, as
+   stored, and **Split** shows both). Open one of your own notes that uses components (`<Info>`, `<Chart>`, footnotes) and compare it with the desktop: see 13.
 8. **Trash Can:** swipe a note, or use the trash button on an open one. Open the Trash Can (top left): swipe a row right
    to restore, left to delete for good. A trashed note must stop appearing in search, and appear again once restored.
 9. **Export a backup** (the ⋯ menu, then **Save or share…**) and restore it in the desktop app (Settings, Restore).
    Everything, including the Trash Can, should be there.
 10. **Replace with a backup,** and choose a file that is not a backup (any other file). It must say so and change nothing.
 11. **Quit and reopen.** The notes are still there, and *About this build* says the search index was **not** rebuilt at launch.
-12. **Turn the iPad, then use Split View and Slide Over.** Does the list and note still make sense?
+12. **Turn the iPad, then use Split View and Slide Over.** Does the list and note still make sense? (Items 34 to 36 go through the turning in detail; this one is for the window sizes.)
 13. **The preview, against the desktop's.** The generated backup (`make-test-backup.sh`) ends with a note, **Preview showcase**, that
    uses every component; open it, and open the same note in the desktop app (restore that backup there). Tap an entry in the
    contents box (it scrolls). Known differences, so you need not report them: no video player (a link card), no code colouring, charts are
@@ -94,25 +94,49 @@ What to tell me for each: what you did, what you expected, what happened, and De
 
 ## Saving what you type (build plan Step 4, spike S6)
 
-The *Edit* tab beside *Preview* and *Source* is a plain text view on the note's text: no colours, no completion, nothing else (the real
-editor is Step 6). What you type is written to a small file at once, and into the notes after a pause of about a second (at the latest five seconds
+The *Markdown* tab beside *Preview* and *Split* is the editor (build plan Step 6). What you type is written to a small file at once, and into the notes after a pause of about a second (at the latest five seconds
 into non-stop typing), and every time the app is about to leave the front. In the Simulator, ending the app in the middle of typing lost nothing; these
 check it on the iPad. **Use a copy of your notes: this does edit them.**
 
-20. **Type, then leave.** In *Edit*, type a sentence and at once swipe up to the Home screen. Open the app again: the sentence is there, and so in *Preview*.
+20. **Type, then leave.** In *Markdown*, type a sentence and at once swipe up to the Home screen. Open the app again: the sentence is there, and so in *Preview*.
 21. **Type, then end the app at once.** Type a sentence and immediately swipe the app away in the app switcher (or hold the side button and restart the iPad, if you dare). Open the app:
     an alert says the app was closed while you were typing, and the sentence is back. Tell me if any of it is missing, and how fast you were.
 22. **Type without stopping** for half a minute. Watch the list on the left: the note should move to the top, and its date change, *while* you are still typing (within about five seconds).
 23. **Edit, then look.** After a pause, *Preview* shows what you typed, and a search for a word you typed finds the note.
 24. **The frontmatter at the top of the note.** Change the `title:` line: after a pause the list shows the new title. Make it wrong (`title: [oops`): the title in the list stays as it was, and the text stays exactly as you typed it.
 25. **Back up right after typing.** Type a sentence, open the ⋯ menu at once and export a backup, and restore it in the desktop app: the sentence is in the note.
-26. **Come back to where you were.** Open a note, choose *Edit*, put the caret mid-note, press Home, then swipe the app away. Open it again from the Home screen: it should be on the same note, in *Edit*, with the caret about where it was.
+26. **Come back to where you were.** Open a note, choose *Markdown*, put the caret mid-note, press Home, then swipe the app away. Open it again from the Home screen: it should be on the same note, in *Markdown*, with the caret about where it was.
 
 What to tell me for each: what you did, what you expected, what happened, and Debug or Release.
 
+## The editor (build plan Step 6)
+
+The note screen has **Markdown** (the editor), **Preview** and **Split**. **Use a copy of your notes: this edits them.**
+
+27. **Make a note.** Tap the + button (top of the list). A note called *Untitled* opens in *Markdown* with the keyboard up and the caret after the frontmatter. Type a heading (`# Hello`), a line with **bold**,
+    a link and a list. The colours should follow as you type, and the frontmatter at the top is dimmed. Change the `title:` line: a moment later the list shows the new title.
+28. **Colours while typing fast,** on a hardware keyboard and on the on-screen one, in a long note of yours. Nothing should lag, and no text should flicker to a wrong colour for more than a moment. Type three backticks on a line of their
+    own in the middle of a note: the text below should turn into code within about half a second, without a freeze.
+29. **Preview and Split.** Type in *Split*: the preview follows about a quarter of a second after you stop. Turn the iPad: the halves should stack when the note's pane is narrower than 800 points and sit side by side when it is wider, without losing the keyboard or your place.
+30. **Find** (the magnifying glass, or ⌘F with a hardware keyboard). It marks every match in the colours' place, and the next and previous buttons move between them.
+31. **Search for what you typed.** Type an unusual word into a note, wait a second, then search for it in the list: the note is found, with no relaunch. Then trash the note from its own screen (the trash button, top right) and
+    restore it from the Trash Can: it is back, and still found.
+32. **Undo and redo** (⌘Z, ⇧⌘Z, or the shake and the three-finger swipe) after typing and after a paste. The colours should be right afterwards.
+33. **Scribble and dictation in the editor.** With the Pencil, write a few words between lines (item 14 did this in the lab). The colours should carry on once you stop writing; text lost or doubled is a bug.
+34. **Landscape, the way you hold it.** Go through everything with the iPad on its side: the list, each of the three tabs, the + button, Find, the Trash Can, the ⋯ menu and *About this build*. With the list open, *Split* puts the editor
+    and the preview side by side. **Hide the list** (the button at the top left): the *Preview* and the *Markdown* text should now keep to a comfortable width in the middle of the screen, not run from edge to edge, and *Split* gives each half
+    half the screen. In the empty sides of the *Markdown* tab, drag to scroll and tap to put the caret in the line: both should work as they do over the text. Anything cut off, overlapping, or too small to tap is a bug.
+35. **Portrait.** The same walk with the iPad upright. *Split* sits the halves one above the other when the note's pane is narrower than 800 points (the list open, on most iPads) and side by side when it is wider (the list hidden, on an 11-inch or
+    larger). The tab picker, Find and the trash button should all stay in the bar. (On an iPad mini the list's title shows as "N…": known.)
+36. **Turn the iPad while you use it.** In *Split*, with the keyboard up and the caret in the middle of a long note, type a few words, then turn the iPad to the other side, and again to each of the four ways up (landscape both ways, portrait both ways).
+    The text you typed, the caret, the keyboard and the preview should all still be there, with no jump to the top and nothing lost; wait two seconds and check the note in the list's search. Also turn it with a sheet open (the Trash Can, *About this build*) and with
+    the + button's new note open. Rotation lock (Control Centre) should hold the layout as it is.
+
+What to tell me for each: what you did, what you expected, what happened, and Debug or Release. For item 28, the *Typing speed test* in the editor lab (item 15) still gives the number for the 16 ms budget; the editor adds about a millisecond to it.
+
 ## What it leaves out
 
-Colour and completion in the editor, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+Completion, links, indenting and shortcuts in the editor, the colour schemes, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
 the preview); groups and notebooks (notes are one flat list); the colour schemes and settings; the Pencil; sync. A note's `[[links]]`
 are plain text, selecting text across blocks of the preview, and the video player of `<YouTube>`.
 

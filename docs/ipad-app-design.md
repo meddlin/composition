@@ -96,6 +96,7 @@ Legend for the tracker:
 | Design before code | Nothing is built until this page is agreed. |
 | **Native, in Swift and Objective-C, with C and C++ where necessary** | Stated 2026-11-05. Reflected in [Languages](#languages-and-dependencies). |
 | Test hardware | iPad Pro with the M2 chip and a wireless-charging Apple Pencil. Assumed to be the **2nd generation**, since Apple lists the Pencil Pro only for M4/M5 iPad Pro and M2-and-later iPad Air ([Apple](https://support.apple.com/guide/ipad/aside/ipad47ee2e98/ipados)). It has hover and double-tap and no squeeze or barrel roll. The iPad is on **iPadOS 27.0.1** (you, 2026-11-06); the screen size is not recorded. |
+| **Orientation: both, mostly landscape** | You hold the iPad **mostly in landscape** and sometimes in portrait (you, 2026-11-06). Both work in every screen from the first build; landscape is the one to get right first, portrait must not break. See [App structure](#app-structure-windows-and-themes) and N3. |
 | A handwritten note may depart from "Markdown only" on the iPad | Stated as acceptable. The design below keeps it Markdown anyway. |
 
 ## What the app is today
@@ -345,6 +346,11 @@ The query parser ports as it is. **SQLite FTS5 replaces Meilisearch.**
   history, plus Cmd+[ and Cmd+].
 - **Windows:** iPadOS scenes replace the panel grid and pop-outs: "Open in New Window", Split View, Slide Over and
   Stage Manager come from size classes and scenes. The same note in two windows shares one database pool.
+- **Orientation:** all four orientations are on, and none is a mode the app has to be put in. The three tabs of a note are one set of views that lay themselves out from the width they are given, so turning the iPad
+  does not rebuild the text view or lose the caret, the text or a pending save. *Landscape* (the main use): the list and the note side by side; **Split** puts the editor and the preview side by side; with the
+  list hidden, the preview and the editor's text keep to a readable width of about 820 points and sit in the middle instead of running across the whole screen. *Portrait*: the list beside the note or over it, as the system chooses, and a button hides it;
+  Split stacks the editor above the preview when the note's pane is under 800 points wide (an iPad mini, Slide Over, a third of Split View), and sits them side by side when it is wider. Sheets are the system's. Layout decisions use the
+  width of the view, not the device or the orientation, so a narrow window in Stage Manager behaves like a narrow iPad.
 - **Drag and drop:** SwiftUI `draggable` and `dropDestination` (or UIKit's interactions) for notes and groups,
   and for dropping images and files in from Photos and Files, which the web app could not do.
 - **Themes:** the six schemes become a `Theme` of semantic tokens ported from `themes.ts`, injected through the
@@ -443,7 +449,7 @@ design (keep both versions as a conflicted copy); the iPad does not need one in 
 |---|---|---|:-:|
 | N1 | Text editing uses the system text engine: loupe, spelling, autocorrect, dictation, Scribble, system find, system edit menus | Hands-on with the Pencil and a hardware keyboard | ⬜ |
 | N2 | Navigation and controls are SwiftUI or UIKit: split view, lists, swipe actions, context menus, sheets, popovers | Review of the view hierarchy; no web view outside the exceptions | ⬜ |
-| N3 | Adapts: rotation, Split View, Slide Over, Stage Manager, a third of the screen, multiple windows | Resize through every size class | ⬜ |
+| N3 | Adapts: **landscape (the main way you hold it) and portrait**, rotating while typing, Split View, Slide Over, Stage Manager, a third of the screen, multiple windows | Resize through every size class; turn the iPad in every tab. **Simulator: landscape and portrait of the iPad Pro 11-inch and an iPad mini checked 2026-11-06 ([Step 6 status](#step-6-status)); Split View, Slide Over, Stage Manager and the iPad itself are not.** | 🔨 |
 | N4 | Input: Pencil (draw, Scribble, double-tap, hover), pointer hover effects, keyboard shortcuts with the Cmd-hold list, drag and drop within and across apps | Hands-on | ⬜ |
 | N5 | System integration: Files and Photos pickers, share sheet, state restoration, saves that survive being backgrounded | Kill and relaunch mid-typing | ⬜ |
 | N6 | Accessibility: VoiceOver labels, Dynamic Type, Reduce Motion, contrast in all seven schemes | Accessibility Inspector, then a person | ⬜ |
@@ -525,6 +531,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Dynamic Type, VoiceOver, Reduce Motion | ⭐ | M1 | ⬜ | The native bar, N6 |
 | Hardware-keyboard shortcuts | ⭐ | M1 | ⬜ | `UIKeyCommand`; audit iPadOS-reserved combinations |
 | Shortcuts helper (Cmd+/) | ⭐ | M1 | ⬜ | Replaced by the system's Cmd-hold list |
+| Portrait and landscape | ⭐ | M1 | 🔨 | Both orientations everywhere; landscape is the main one ([App structure](#app-structure-windows-and-themes), N3). Checked in the Simulator, not on the iPad |
 | Split View, Slide Over, Stage Manager | ⭐ | M1 | ⬜ | Size classes (N3) |
 | Window translucency | ❌ | Never | ⛔ | macOS setting; system materials may be used in the UI, not as a setting |
 | Auto-update, Updates settings | ❌ | Never | ⛔ | TestFlight or the App Store ([C13](#compromise-register)) |
@@ -558,16 +565,16 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Typo-tolerant search | 🔁 | M1 | 🔨 | Built: Meilisearch's typo rules over the index's vocabulary; the same results as Meilisearch on the acceptance corpus. The prototype app uses a more forgiving mode (first letters, short words) on top ([C1](#compromise-register), [S2 status](#s2-status)) |
 | Field filters: `tag:`, `title:`, `description:`, `created:`, `updated:` | 🔁 | M1 | 🔨 | `searchQuery.ts` ported; the same result as the desktop's parser on 274 queries, and the filters answer in the search index ([S2 status](#s2-status)) |
 | Search bar | ⭐ | M1 | 🔨 | `.searchable` in the prototype (no tokens yet), with a readout of how long each search took |
-| Find in a note | ⭐ | M1 | 🔬 | `UIFindInteraction`. S3: the system find bar works on the editor's text, with the colours intact |
+| Find in a note | ⭐ | M1 | 🔨 | `UIFindInteraction`. S3: the system find bar works on the editor's text, with the colours intact; Step 6: a Find button on the Markdown and Split tabs opens it on a real note (Simulator) |
 | Spotlight indexing | 🆕 | Later | ⬜ | Core Spotlight |
 
 ### Writing
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Markdown tab | ⭐ | M1 | 🔬 | TextKit 2 with attribute runs; no overlay. S3: a full re-colour per keystroke was too slow on a 5,000-line note (87 ms); **the incremental one is built (build plan Step 5): 0.6 ms per keystroke there in a Release Simulator build** ([Step 5 status](#step-5-incremental-colouring)); the real editor is Step 6 |
+| Markdown tab | ⭐ | M1 | 🔨 | TextKit 2 with attribute runs; no overlay. S3: a full re-colour per keystroke was too slow on a 5,000-line note (87 ms); **the incremental one is built (build plan Step 5): 0.6 ms per keystroke there in a Release Simulator build** ([Step 5 status](#step-5-incremental-colouring)); **Step 6 (Simulator): the editor is built on it,** bound to the store, frontmatter, autosave and the colouring, with find; no completion, `[[` links, indenting or schemes yet (Steps 9 and 10) |
 | Preview tab | 🔁 | M1 | 🔨 | Prototype: SwiftUI blocks from `CompositionCore`'s model, in the Simulator ([S4 status](#s4-status)). The design's read-only text view with view-based attachments (selection across blocks) is not built |
-| Split tab | 🔁 | M1 | ⬜ | One column at narrow widths |
+| Split tab | 🔁 | M1 | 🔨 | Editor and preview side by side, or one above the other in a narrow window (Step 6, Simulator); the preview follows the typing. No synchronised scrolling yet |
 | Live tab | ⚠️ | Later | 🔬 | Hidden marks away from the caret ([C12](#compromise-register)). S3, Simulator only: a tiny clear font on the syntax, except in the caret's paragraph, works; swapping the displayed paragraph does not (the text comes out garbled). Not tried with the Pencil, arrow keys, selection handles or VoiceOver ([S3 status](#s3-status)) |
 | Scribble, autocorrect, dictation, Writing Tools | ⭐ | M1 | ⬜ | System text engine. Scribble cannot be tried in the Simulator: the Editor lab on your iPad is the test ([manual-tests/ipad.md](manual-tests/ipad.md)) |
 | Tab and Shift+Tab indent | 🔁 | M1 | ⬜ | `UIKeyCommand` plus accessory-bar buttons |
@@ -1121,6 +1128,38 @@ tried. What is in place for it: one database pool for the whole app, and one sha
 **Not done, or not known:** the iPad's own behaviour (jetsam, a real home-button press mid-word, the Pencil); a very large note's save time, which the draft write does not wait for but
 the database write does; and a draft for a note that is changed some other way before the next launch would overwrite it (nothing else changes notes yet).
 
+### Step 6 status
+
+**Built and checked 2026-11-06 in the iPad Pro 11-inch (M5) Simulator; not tried on an iPad.** Build plan Step 6: the editor, replacing the plain *Edit* tab of Step 4.
+
+**What it is.** The note screen has three tabs: **Markdown**, **Preview**, **Split** (the prototype's read-only *Source* is gone; Markdown is the source). Markdown is a `UITextView` on TextKit 2
+(`NoteEditorView`), coloured by `MarkdownStyler` (Step 5's blocks, now used by the real editor, with fonts made once and the text size change handled), with the system find bar from a Find button. All three tabs
+share the note's `NoteSession`, so the preview shows what is being typed (a quarter of a second after the last change, rendered off the main thread) and autosave writes the same text. A **+** button makes a note, "Untitled", as the
+desktop does, and opens it in Markdown with the keyboard up and the caret after the frontmatter (the first version put the caret at the very start, and typing there broke the frontmatter, which the colouring showed
+correctly as a heading). Create, trash and restore go through `NoteStore`, so the search index follows each. Split lays the two side by side from 800 points of width and one above the other below that, the same views either way ([Orientation](#step-6-orientation)).
+
+**What it cost, and a finding.** The first version of the editor spent **23 ms on every keystroke** in a 5,000-line note, though the colouring took 0.7 ms. `UITextView.text` returns the text storage's `NSString` bridged lazily, and
+comparing it with a native string (which the session does, and the editor did again for its own echo) goes one character at a time through Objective-C. Reading the characters out of `textStorage.string`
+instead was no better (4.4 ms, a proxy string); copying the UTF-8 of `UITextView.text` is **0.25 ms** for 100,000 characters. With that, and with an edit no longer handed back to the editor that made it, the whole change callback is
+**1.05 ms median, 1.17 ms at the 95th percentile, 1.5 ms worst** in a Release build typing into the middle of a 100,190-character note (the colouring is 0.74 ms of it, the session 0.06), about 6% of the 16 ms budget.
+
+**Checks.** `apps/ios/scripts/editor-flow-test.sh` makes a note through the app (the + button's code), types into it with `insertText`, backgrounds the app, moves the note to the Trash Can and restores it, then has the desktop's real
+`service.ts` do the same operations on a copy of the starting database with the clock set to the moments the app's rows record. Every row of `notes`, `groups`, `notebooks`, `trashed_notes`, `trashed_groups` and `sqlite_sequence`
+is equal, and the check fails when the typed text is changed. The Step 4 kill test passes on the new editor. Typing with the Simulator's keyboard, find, and the three tabs were tried by hand. The speed numbers need a Release build with the
+`EDITOR_TEST_HOOKS` compilation condition (`xcodebuild ... SWIFT_ACTIVE_COMPILATION_CONDITIONS='$(inherited) EDITOR_TEST_HOOKS'`), which turns on the launch-argument hooks (`-autotype`, `-autotypeMiddle 1`, `-newNote 1`) that Debug builds have; a Release build
+without it has none of them.
+
+<a id="step-6-orientation"></a>**Orientation (added 2026-11-06, at your request: you use the iPad mostly in landscape).** Checked in the iPad Pro 11-inch (M5) Simulator in both orientations and on an iPad mini (A17 Pro) in portrait, by hand:
+the browser, the note in each of the three tabs, the software keyboard, and the Trash Can, About and More menus. Turning the iPad while typing in Split kept the text, the caret and the save (the text view is not rebuilt: the same views are re-laid-out by width).
+Two things changed because of it. First, in landscape with the list hidden the Preview ran the whole 1,210 points, lines of well over a hundred characters; the preview and the Markdown tab now keep to 820 points, centred
+(`NoteTextView` insets the text, so a tap or a scroll in the empty sides still goes to the text view). Second, Split went side by side from 700 points, which made two 372-point halves on an iPad mini in portrait with the list hidden; it is now 800.
+Known and left: with the list open on an iPad mini in portrait the *Notes* title in the list's bar is cut to "N…" by the four buttons beside it (the system holds the list to about 290 points there and ignored a wider setting); the other iPads show it whole.
+Not checked: Split View, Slide Over and Stage Manager (Step 11), the iPad itself, and the lab screen in portrait.
+
+**Not done, or not known:** the iPad (its speed, the keyboard, the Pencil, Scribble in this text view, the on-screen keyboard's behaviour with the frontmatter), a copy of your own notes, the `<` list, `[[` links, indenting and the
+shortcuts (Step 9), the colour schemes (Step 10), VoiceOver and Dynamic Type beyond the fonts being scaled (Step 11), synchronised scrolling between the two halves of Split, choosing a group or notebook for a new note (Step 7), and
+two windows on one note (not enabled in the target). The Live tab and the experimental hiding stay in the lab.
+
 ### The first app
 
 **A read-only prototype, built 2026-11-05 and run in the iPad Simulator; never run on an iPad.** It is there so you can try
@@ -1323,6 +1362,13 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
   the rest after a pause, off the main thread. Release build, 5,034 lines: 0.58 ms median per keystroke (0.9 ms worst) against 91 ms before. The quick read matches the full one for 97.7% of typed characters
   on the MDX corpus and a property test shows the correction always ends with the full read's colours. Fuzzing found a crash in the highlighter on odd Markdown, now fixed. Tracker row Markdown tab and R13
   updated. The iPad's own number and Scribble are still to be checked.
+
+- 2026-11-06: **Build plan Step 6, the editor, done in the Simulator.** Markdown, Preview and Split tabs on one `NoteSession`; the Markdown tab is a TextKit 2 text view coloured by `MarkdownStyler` (Step 5) with the
+  system find bar; a + button makes a note. A first version cost 23 ms a keystroke in a 5,000-line note because of a lazily bridged `NSString`; now the whole change callback is 1.05 ms median (Release). `editor-flow-test.sh`
+  makes a note in the app, types, trashes and restores it and the desktop's real service gives equal rows. Tracker rows for Markdown tab, Split tab and Find updated. Not tried on the iPad or on a copy of your notes.
+- 2026-11-06: **Orientation made explicit, at your request (you use the iPad mostly in landscape, sometimes portrait).** Recorded as a decided item, an App structure paragraph, a tracker row and N3. Checked in the Simulator: both orientations,
+  rotating while typing, the three tabs, the keyboard and the sheets, on an iPad Pro 11-inch and an iPad mini. Changes: Preview and the Markdown tab keep to a readable width of 820 points in a wide view; Split goes side by side from 800 points, not 700; the
+  About screen's lists of what the build does were out of date and are corrected. Nothing is verified on the iPad.
 
 ## Sources
 

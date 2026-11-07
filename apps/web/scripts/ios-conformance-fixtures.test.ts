@@ -803,3 +803,75 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     300_000,
   );
 });
+
+// --- The iPad's editor flow (build plan, Step 6) ------------------------------------------------------------------------------
+
+const uiRunDir = process.env.IOS_UI_RUN_DIR;
+
+/** Every row of the tables the editor flow touches, with the uuid of anything the starting database did not have replaced by "new". */
+function flowRows(db: import("better-sqlite3").Database, startUuids: Set<string>): Record<string, unknown[]> {
+  const rows: Record<string, unknown[]> = {};
+  for (const table of ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups"]) {
+    rows[table] = (db.prepare(`SELECT * FROM ${table} ORDER BY id`).all() as Record<string, unknown>[]).map((row) =>
+      typeof row.uuid === "string" && !startUuids.has(row.uuid) ? { ...row, uuid: "new" } : row,
+    );
+  }
+  rows.sqlite_sequence = db.prepare("SELECT name, seq FROM sqlite_sequence ORDER BY name").all();
+  return rows;
+}
+
+describe.skipIf(!uiRunDir)("iPad editor flow", () => {
+  // apps/ios/scripts/editor-flow-test.sh runs the iPad app in the Simulator, makes a note, types into it, trashes it and restores it, and leaves
+  // start.db, end.db and ui-run.json (the moments its rows record) in IOS_UI_RUN_DIR. This gives the real service the same operations.
+  it("replays the operations the iPad's editor made, and every row is the same", async () => {
+    const run = JSON.parse(fs.readFileSync(path.join(uiRunDir!, "ui-run.json"), "utf8")) as {
+      noteId: number;
+      createdAt: string;
+      updatedAt: string;
+      deletedAt: string;
+      typed: string;
+    };
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-ios-flow-"));
+    fs.mkdirSync(path.join(home, ".composition"), { recursive: true });
+    fs.copyFileSync(path.join(uiRunDir!, "start.db"), path.join(home, ".composition", "composition.db"));
+    vi.stubEnv("HOME", home);
+    vi.stubEnv("USERPROFILE", home);
+    vi.resetModules();
+    // Meilisearch isn't running; the service indexes best-effort (as in service.test.ts).
+    vi.doMock(path.join(lib, "searchIndex"), () => ({
+      indexNote: async () => {},
+      deleteNoteFromIndex: async () => {},
+      searchNoteIds: async () => [],
+      unavailableMessage: () => "unavailable",
+    }));
+    const { default: Database } = await import("better-sqlite3");
+    const startUuids = new Set<string>();
+    const start = new Database(path.join(uiRunDir!, "start.db"), { readonly: true });
+    for (const table of ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups"]) {
+      for (const row of start.prepare(`SELECT uuid FROM ${table}`).all() as { uuid: string }[]) startUuids.add(row.uuid);
+    }
+    start.close();
+
+    const service = await import(path.join(lib, "service"));
+    const { getDb, closeDb } = await import(path.join(lib, "db"));
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(run.createdAt));
+    const created = await service.createNote("Untitled", null, null);
+    expect(created.id).toBe(run.noteId);
+    vi.setSystemTime(new Date(run.updatedAt));
+    await service.saveNoteContent(created.id, created.content + run.typed);
+    vi.setSystemTime(new Date(run.deletedAt));
+    await service.deleteNote(created.id);
+    await service.restoreNote(created.id);
+    vi.useRealTimers();
+    const desktop = flowRows(getDb(), startUuids);
+    closeDb();
+
+    const end = new Database(path.join(uiRunDir!, "end.db"), { readonly: true });
+    const app = flowRows(end, startUuids);
+    end.close();
+    expect(app).toEqual(desktop);
+    // And the note is really there, with what was typed.
+    expect((app.notes as { id: number; content: string }[]).find((note) => note.id === run.noteId)?.content).toContain(run.typed.trim());
+  }, 60_000);
+});
