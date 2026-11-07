@@ -3,8 +3,9 @@
 # (not the dev-token environment variable), on a throwaway compose project. Needs `pnpm install` in the spike folder.
 set -uo pipefail
 cd "$(dirname "$0")"
+COMPOSE="$PWD/compose.yaml"   # absolute: the script changes directory before the cleanup trap runs
 PROJECT=composition-sync-contract; PORT=18081; BACKUP=$(mktemp -d); export SYNC_PORT=$PORT BACKUP_DIR=$BACKUP
-dc() { docker compose -p $PROJECT -f compose.yaml "$@"; }
+dc() { docker compose -p $PROJECT -f "$COMPOSE" "$@"; }
 trap 'dc down -v >/dev/null 2>&1; rm -rf "$BACKUP"' EXIT
 dc up -d --build >/dev/null 2>&1 || { echo "build or start failed"; exit 1; }
 for _ in $(seq 1 90); do [[ "$(docker inspect --format '{{.State.Health.Status}}' "$(dc ps -q sync)" 2>/dev/null)" == healthy ]] && break; sleep 1; done
