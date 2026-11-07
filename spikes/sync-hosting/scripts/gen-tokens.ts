@@ -45,7 +45,7 @@ for (const [user, devices] of Object.entries(USERS)) {
 const admin = (rotate ? undefined : read("SYNC_ADMIN_TOKEN")) ?? `adm_${randomBytes(24).toString("hex")}`;
 writeFileSync(file, `SYNC_DEV_TOKENS=${JSON.stringify(tokens)}\nSYNC_ADMIN_TOKEN=${admin}\n`, { mode: 0o600 });
 // Env files the npm scripts load with --env-file-if-exists; creating them keeps Node from printing a notice.
-for (const name of [".env.candidates.local", ".env.postgres.local"]) {
+for (const name of [".env.candidates.local"]) {
   const f = join(root, name);
   if (!existsSync(f)) writeFileSync(f, "", { mode: 0o600 });
 }

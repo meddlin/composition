@@ -5,7 +5,14 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789
 const LOOKUP = new Int16Array(256).fill(-1);
 for (let i = 0; i < ALPHABET.length; i++) LOOKUP[ALPHABET.charCodeAt(i)] = i;
 
-const nodeBuffer = (globalThis as { Buffer?: typeof Buffer }).Buffer;
+// Typed structurally so this file compiles where Node's types are absent (the Convex functions project).
+interface BufferInstance {
+  buffer: ArrayBufferLike;
+  byteOffset: number;
+  byteLength: number;
+  toString(encoding: string): string;
+}
+const nodeBuffer = (globalThis as { Buffer?: { from(...args: unknown[]): BufferInstance } }).Buffer;
 
 export function encodeBase64(bytes: Uint8Array): string {
   if (nodeBuffer) return nodeBuffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");

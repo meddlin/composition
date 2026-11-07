@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "gen-tokens": "node scripts/gen-tokens.ts",
     "lean": "node --env-file-if-exists=.env.tokens.local lean/main.ts",
-    "postgres": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.postgres.local postgres/main.ts",
+    "postgres": "node --env-file-if-exists=.env.tokens.local postgres/main.ts",
     "contract": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local --test protocol/contract/suite.test.ts",
     "scenario": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local protocol/scenarios/run.ts",
     "harness": "node --env-file-if-exists=.env.tokens.local --env-file-if-exists=.env.candidates.local harness/server.ts"

@@ -1,0 +1,21 @@
+# Local Postgres for the Postgres candidate: `docker compose -f postgres/compose.yaml up -d`
+# then `pnpm postgres` (port 8788). Throwaway; Neon is the real target.
+name: sync-spike-pg
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: sync
+      POSTGRES_PASSWORD: sync
+      POSTGRES_DB: sync
+    ports:
+      - "55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sync -d sync"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+volumes:
+  pgdata:
