@@ -121,10 +121,13 @@ CREATE TABLE pdf_bookmarks (
   digits, then the name made safe). The original is left alone.
 - **One owner note per PDF**, enforced by a unique index on `note_id`. Citing the same PDF from other notes is a link, not a
   second row. Importing the same bytes again offers the existing one (P16).
-- **Coordinates are in the PDF's own page space**, unrotated, in points, origin at the lower left of the page's crop box, and
-  each viewer applies the page's rotation. This is what lets pdf.js and PDFKit draw a mark in the same place, and it is the
-  first thing spike C checks, on rotated and cropped pages. A coordinate outside the page is legal, which is what keeps a
-  later margin gutter from needing a migration (P6).
+- **Coordinates are raw PDF user space:** the numbers a PDF's own annotation `/Rect` and `/QuadPoints` use, in points,
+  unrotated, whatever the page's crop box, media box, rotation or `UserUnit`. Each viewer maps them to its screen with its own
+  call. Spike C measured this on rotated, cropped and offset pages: pdf.js and PDFKit draw a stored rectangle in the same
+  place on every one ([Spike C findings](#spike-c-findings-2026-11-07)). (This plan first said "relative to the crop box's
+  lower-left corner"; that fails on every page whose crop or media box does not start at 0,0, and needs the origin added
+  back everywhere.) A coordinate outside the page is legal, which is what keeps a later margin gutter from needing a migration
+  (P6), and **Export annotated PDF** writes the same numbers back out.
 - **One ink record per page** (my pick): all of a page's strokes in one `ink` row, since PencilKit draws one drawing per page
   overlay. Decided with the stroke format at Gate C. A finer grain (a row per stroke) would merge two devices' edits better
   and cost thousands of rows per book.
@@ -319,8 +322,10 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      with the worker served by the app scheme, on a 405 MB, 600-page file. It changed the plan: ranges need a transport, a
      small chunk size and a streaming handler. Scrolling in a visible window with pdf.js's viewer components, and a cold disk,
      are still untested.
-   - **C, coordinates.** One convention (above), fixtures with rotated and cropped pages, a mark made in pdf.js drawn in the same
-     place by PDFKit. PDFKit also runs on macOS, so its half can be a command-line Swift script on this Mac with no simulator.
+   - **C, coordinates. Done 2026-11-07;** see [Spike C findings](#spike-c-findings-2026-11-07). One convention (raw user space),
+     a fixture with rotated, cropped and offset pages, pdf.js and PDFKit compared. PDFKit runs on macOS, so its half was a
+     command-line Swift program on this Mac with no simulator. Still untested: PDFKit on the iPad itself, and real
+     multi-line selections.
    - **D, the export writer.** Which library writes native annotations and flattens, with a licence and a size check.
    - **B, PencilKit over PDFKit,** needs the iPad: finger scroll, selection and Pencil drawing together; ink latency; memory on
      500 pages. It runs at the start of M2 and gates the iPad's ink, not the desktop's work.
@@ -373,12 +378,38 @@ PDFs; a balanced page tree (the open may be cheaper than here); and Windows and 
 and interleaved layout are not typical, and a handwritten generator is not a real book: **run the same phases on two or three
 real PDFs of yours** (the README says how) before treating any number as a promise.
 
+## Spike C findings (2026-11-07)
+
+The check is in [`spikes/pdf-reader/coords`](../spikes/pdf-reader/README.md#spike-c-do-pdfjs-and-pdfkit-agree-on-where-a-mark-goes).
+The fixture has nine pages with the same two landmarks in raw user space (a red square at (100,100) to (150,150), and the text
+ANCHOR TEXT with its baseline at (100,300)); the pages differ only in geometry: plain, `/Rotate` 90, 180 and 270, a crop box, a
+media box with a negative origin, crop and rotate 90, media offset with crop and rotate 270, and `UserUnit 2`. Both sides ran
+headless on this Mac: pdf.js 6.5.438 in Node (with `@napi-rs/canvas`) and PDFKit (macOS 27.0.1, Swift 6.4.2) in a command-line
+program. `node coords/compare.mjs` gives the pass or fail.
+
+| Question | Answer |
+|---|---|
+| Does a rectangle stored in raw user space land on the same spot in both viewers? | **Yes, on all nine pages.** In pdf.js (each corner through `convertToViewportPoint`) the converted area was 100% red with no red outside it; in PDFKit an annotation whose `bounds` are the raw rectangle covered the red square exactly (0 red pixels left, 0 changed pixels outside it). Both draw the landmark at the same viewport position, within 0.5 pt. A rectangle also survives pdf.js's round trip to the viewport and back with no error. |
+| Does the convention this plan first wrote (relative to the crop box's lower-left corner) work? | **No.** A negative control that uses it as if it were raw fails on exactly the four pages whose crop or media box does not start at 0,0. Raw user space needs no origin added back, and is what an exported annotation's `/Rect` holds. |
+| Is the text in the same place? | **x and width agree** (100 pt and 172.0 pt) on every page, whatever its rotation. Vertically, pdf.js gives the baseline (300) and PDFKit its line box (294.5 to 318.5): they differ by the font's descent, 5.5 pt at 24 pt. A stored text rectangle keeps what the viewer that made it captured, and the other draws it as stored. |
+| What did PDFKit do that needs care? | (1) `PDFPage.bounds(for:)` returns the **unrotated** box: width and height are not swapped on a 90° or 270° page. (2) A highlight's `quadrilateralPoints` are **relative to its `bounds` origin**: the same quad written in page coordinates landed exactly 100 pt off, the offset of its origin. (3) A highlight is drawn inset vertically by about a tenth of its height on each side (5 pt of 50), which is appearance only: nothing changed outside the rectangle. |
+| What did pdf.js do that needs care? | This version has no `convertToViewportRectangle`: convert the four corners with `convertToViewportPoint` and take their extent (a 90° turn swaps the axes). A text item's `transform[4]` and `[5]` are raw and identical on every page. |
+| `UserUnit`? | pdf.js scales its viewport by it (a `UserUnit 2` page shows twice as large); PDFKit ignores it. The stored rectangles are right either way and only the display scale differs. **My pick:** not handled; pages with a `UserUnit` other than 1 are rare. |
+
+**What it changed in the plan:** the coordinate convention (above), and risk X2 is answered for stored rectangles.
+
+**What it did not test:** a real multi-line selection (pdf.js's DOM range rectangles to raw space, and PDFKit's
+`selectionsByLine`); rotated text; `/Rotate` or boxes inherited from the page tree; a crop box larger than the media box;
+PDFKit on iPadOS (the same framework, but the UIKit conversions such as `PDFView.convert` were not run); pdf.js's pixels in
+Chromium's canvas (the spike used a Node canvas, though the conversions are pure arithmetic); and the export itself (writing
+`/QuadPoints` into a file, which is spike D).
+
 ## Risks and unknowns
 
 | # | Risk | Mitigation |
 |---|---|---|
 | X1 | pdf.js is slow or heavy on a 300 MB, 600-page file. **Mostly answered by spike A:** it works under the CSP and opens in about 0.1 s reading about 10 MB, but memory trends toward the file's size over a long session (it keeps what it has read until the document closes). | Range transport, 16 KB chunks, render only visible pages; closing the panel frees it. Still untested: scrolling in a real window, a cold disk. |
-| X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). | One coordinate convention and spike C, before any markup is saved. |
+| X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). **Answered by spike C** for stored rectangles: raw user space agrees on all nine test geometries. Open: real multi-line selections, and PDFKit on the iPad. | Raw user-space convention; the spike C checks in `spikes/pdf-reader/coords` as a regression test when the code exists. |
 | X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. | Spike B; Pencil-only input; overlays only on visible pages. |
 | X4 | Quoted text comes out jumbled on multi-column or odd PDFs (selection order), or a highlight's rectangles merge badly. | Keep the rectangles per line; test on a two-column paper and a scanned-then-OCR file; the user can correct the quote in the note. |
 | X5 | A hostile PDF attacks the reader. | Pinned recent pdf.js, eval off, no scripting, file served only to our own pages. |
@@ -415,3 +446,7 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
 - 2026-11-07: **spike A done** ([findings](#spike-a-findings-2026-11-07)). pdf.js works under the real CSP but does not use
   `Range` on `app://`: the reader needs a range transport, 16 KB chunks and a streaming handler. WebAssembly is blocked and
   pdf.js falls back to JavaScript; the CSP is left alone (my pick). Prototype in `spikes/pdf-reader`.
+- 2026-11-07: **spike C done** ([findings](#spike-c-findings-2026-11-07)). pdf.js and PDFKit agree on where a stored rectangle
+  goes on all nine test geometries when it is stored in **raw PDF user space**; the plan's first convention (relative to the
+  crop box) fails on pages whose boxes do not start at 0,0 and is replaced. PDFKit's highlight quad points are relative to
+  the annotation's bounds, and its `bounds(for:)` is unrotated.

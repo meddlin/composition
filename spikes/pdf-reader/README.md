@@ -36,3 +36,25 @@ node trace.mjs /tmp/textbook.pdf 16384
 Leave `SPIKE_QUERY` out to let pdf.js open the URL itself, which is the case that does **not** use `Range` on `app://`.
 Pinned: Electron 45.2.1 (the desktop app's locked version) and `pdfjs-dist` 6.5.438. `unset ELECTRON_RUN_AS_NODE` matters
 if your shell sets it.
+
+## Spike C: do pdf.js and PDFKit agree on where a mark goes
+
+Question: if a highlight is stored as a rectangle, does it land on the same spot in both viewers, including on pages that are
+rotated, cropped or have a media box that does not start at 0,0? The findings are in the plan's
+[Spike C findings](../../docs/pdf-markup-plan.md#spike-c-findings-2026-11-07).
+
+`gen/geometry.py` writes a nine-page PDF with the same two landmarks in raw user space on every page (a red square and the text
+ANCHOR TEXT) and only the page geometry changed. `coords/pdfjs.mjs` (Node, no Electron) and `coords/pdfkit.swift` (macOS, a
+command-line program on the same PDFKit the iPad uses) each report where they draw the landmarks and what a raw-space
+rectangle covers; `coords/compare.mjs` checks that they agree and exits 1 if not. It needs macOS with Xcode for the Swift half.
+
+```bash
+.venv/bin/python gen/geometry.py /tmp/geometry.pdf
+node coords/pdfjs.mjs /tmp/geometry.pdf > /tmp/pdfjs.json
+swiftc -O coords/pdfkit.swift -o /tmp/pdfkit-check && /tmp/pdfkit-check /tmp/geometry.pdf > /tmp/pdfkit.json
+node coords/compare.mjs /tmp/pdfjs.json /tmp/pdfkit.json        # all checks pass
+
+# a control that should fail on the pages whose boxes do not start at 0,0: the rectangle relative to the crop box, used as raw
+SPIKE_NEGATIVE=1 node coords/pdfjs.mjs /tmp/geometry.pdf > /tmp/pdfjs-negative.json
+node coords/compare.mjs /tmp/pdfjs-negative.json /tmp/pdfkit.json
+```
