@@ -281,3 +281,19 @@ export async function importedHash(source: SheetSource): Promise<string> {
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 }
+
+const count = (n: number, noun: string, plural = `${noun}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? noun : plural}`;
+const because = (reasons: Reason[]) => reasons.map(({ reason, count: n }) => `${reason} (${n})`).join("; ");
+
+/** What an import did, in sentences, one for each thing worth knowing; the first says how big the sheet is. */
+export function describeImport({ rows, columns, formulas, calculated, carried, values, unchecked, carriedWhy, valuesWhy }: ImportSummary): string[] {
+  const lines = [`${count(rows, "row")} (the first is the header) by ${count(columns, "column")}.`];
+  if (formulas === 0) return [...lines, "No formulas: every cell is the value Excel showed."];
+  lines.push(`${count(formulas, "formula")}:`);
+  if (calculated > 0) lines.push(`${count(calculated, "is", "are")} kept as ${calculated === 1 ? "a formula" : "formulas"}, calculated here, where they gave the number Excel saved.`);
+  if (carried > 0) lines.push(`${count(carried, "is", "are")} carried: the formula is kept, and the cell shows Excel's value without calculating it again. Why: ${because(carriedWhy)}.`);
+  if (values > 0) lines.push(`${count(values, "is", "are")} kept as ${values === 1 ? "a value" : "values"}, because ${values === 1 ? "it reads" : "they read"} outside the range: ${because(valuesWhy)}.`);
+  if (unchecked > 0) lines.push(`${count(unchecked, "formula")} had no value saved by Excel, so could not be checked against one.`);
+  return lines;
+}
+

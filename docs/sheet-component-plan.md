@@ -3,8 +3,8 @@
 A note can hold data that is best read as a spreadsheet: a budget, a comparison, a range copied from an Excel
 workbook. A Markdown table is not enough for it (no formulas, no sorting, awkward to edit, no way to bring a
 range in from Excel). This page is the design for a **`<Sheet>` MDX component**: a grid you can edit, with
-formulas, whose data stays in the note's text. Built so far: the read-only grid and the formula engine (Steps 1 and 2 of
-the [build order](#build-order)); not yet: editing, Excel import and export. Dates are 2026-11-07 and 2026-11-08.
+formulas, whose data stays in the note's text. Built so far: every step of the [build order](#build-order) (the grid, the
+engine, the editor, Excel in, Excel out and back, and the by-hand test), waiting on the owner's looks at Gates B to G. Dates are 2026-11-07 and 2026-11-08.
 
 **In scope:** author a sheet in a note; bring a range in from an Excel workbook and refresh it later; formulas
 (including `SUMIFS` and column-name references); export; the terminal app drawing it.
@@ -567,8 +567,27 @@ and CSV. **Gate F.**
 - **Not checked:** a workbook saved by Excel itself with tables (the file route used here writes the table XML by hand, as Excel does; a real file has more attributes, which are ignored);
   tables with filters or slicers; a table with a header row of numbers.
 
-**Step 6: the owner's by-hand test**, with real workbooks, written up as `manual-tests/sheet.md` like the other
+**Step 6: the owner's by-hand test**, with real workbooks, written up as [`manual-tests/sheet.md`](manual-tests/sheet.md) like the other
 features. **Gate G.**
+
+*Built 2026-11-08, waiting for the owner's run (Gate G). What it is:*
+
+- **`pnpm manual:sheet`** ([`sheet-manual.mjs`](../apps/desktop/scripts/sheet-manual.mjs), with [`sheetManualRun.ts`](../apps/desktop/src/tools/sheetManualRun.ts) and
+  [`sheetManualFixture.ts`](../apps/desktop/src/tools/sheetManualFixture.ts) bundled by esbuild, as for the to-do test): `setup` makes a scratch home with three notes (a tour of sheets, a note to promote and paste
+  in, an imported sheet to re-import) and the sample workbooks in `<home>/workbooks`; `check BOOK.xlsx` runs a workbook of **the owner's** through the import and prints counts and function names,
+  never a cell (sheet names only with `--names`); `launch` prints the commands that start the desktop, web and terminal apps on the home.
+- **The sample workbooks** ([`sheetManualWorkbooks.ts`](../apps/web/src/components/notes/mdx/sheetManualWorkbooks.ts), in the web tree because `xlsx` is its dependency): `orders.xlsx` (a real Excel table with a totals row,
+  hand-written parts as Excel writes them, dates, a percent, and beside it `SUMIFS`, `XLOOKUP`, `FILTER`, `TEXT`, `IFERROR(VLOOKUP)` and a read of another sheet), `carried.xlsx` (`STDEV`, `NETWORKDAYS`, `TODAY`,
+  `LET`, another sheet, a stale saved value), `old-1904.xlsx`, `big.xlsx` (5,001 rows and a sheet of 5,200), and two files that are not workbooks.
+- **The test** has ten parts: look, edit in the grid, column names and the totals row, promote/paste/start, import, re-import (including a workbook the owner saves in Excel), export (including opening in Excel and the
+  desktop save dialog), limits, **the owner's own workbooks**, and the terminal app.
+- **What was checked here:** each sample workbook through the real import gives the counts the document states, and the notes the real sheet code reads as the document says
+  ([`sheetManualFixture.test.ts`](../apps/desktop/src/tools/sheetManualFixture.test.ts), 10 tests); `setup`, `check` and `launch` through the real launcher; the three notes drawn in the web app on a scratch home;
+  the counts for narrower ranges and for an export imported again were computed with the real code and are in the document.
+- **A finding:** in `LET(x,B4,x*2)` the import reads `x` as a defined name, so the cell is kept as a **value**, not carried; the cell shows Excel's number either way, but an export would not have the formula. It is in the document
+  as a known limit. **Not built.**
+- **Not checked:** the desktop app and the terminal app on the scratch home (their commands are printed, not started here), every step that needs Excel (they are the owner's), a password-protected workbook (no sample can be made
+  without Excel), and the first time the fixture test runs in CI (`apps/desktop` was not installed in this worktree, so it was run with the web app's `vitest`).
 
 ## Non-goals and future work
 
