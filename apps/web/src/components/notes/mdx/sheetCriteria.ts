@@ -13,17 +13,65 @@ export type Criterion = (cell: Scalar) => boolean;
 
 const WILDCARD = /[*?~]/;
 
-/** A pattern with Excel's wildcards (`*` any run, `?` any one character, `~` to mean the next one literally) as a regular expression. */
-export function wildcardRegExp(pattern: string, anchored = true): RegExp {
-  let source = "";
+/** A wildcard pattern as tokens: `*` (any run), `?` (any one character), or a character to match as it is, in lower case. */
+type Token = { any: true } | { one: true } | { literal: string };
+
+function tokenize(pattern: string): Token[] {
+  const tokens: Token[] = [];
   for (let i = 0; i < pattern.length; i++) {
     const char = pattern[i];
-    if (char === "~" && i + 1 < pattern.length && WILDCARD.test(pattern[i + 1])) source += `\\${pattern[++i]}`;
-    else if (char === "*") source += "[\\s\\S]*";
-    else if (char === "?") source += "[\\s\\S]";
-    else source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
+    // `~` takes the next `*`, `?` or `~` literally; before anything else it is just a tilde.
+    if (char === "~" && i + 1 < pattern.length && WILDCARD.test(pattern[i + 1])) tokens.push({ literal: pattern[++i] });
+    else if (char === "*") tokens.push({ any: true });
+    else if (char === "?") tokens.push({ one: true });
+    else tokens.push({ literal: char.toLowerCase() });
   }
-  return new RegExp(anchored ? `^${source}$` : source, "i");
+  return tokens;
+}
+
+/**
+ * Whether the tokens match `text` from `start`: all of it, or (with `prefix`) the start of what is left. Done by walking the text
+ * once and going back only to the last `*`, so it takes no more than the length of the text times the length of the pattern, however
+ * many stars there are: a regular expression built from `*a*a*a*b` can take longer than the age of the sheet.
+ */
+function matchFrom(tokens: Token[], text: string, start: number, prefix: boolean): boolean {
+  let t = start;
+  let p = 0;
+  let star = -1;
+  let mark = start;
+  for (;;) {
+    if (prefix && p === tokens.length) return true;
+    if (t >= text.length) break;
+    const token = p < tokens.length ? tokens[p] : undefined;
+    if (token && "one" in token) {
+      t++;
+      p++;
+    } else if (token && "literal" in token && text[t].toLowerCase() === token.literal) {
+      t++;
+      p++;
+    } else if (token && "any" in token) {
+      star = p++;
+      mark = t;
+    } else if (star >= 0) {
+      p = star + 1;
+      t = ++mark;
+    } else return false;
+  }
+  while (p < tokens.length && "any" in tokens[p]) p++;
+  return p === tokens.length;
+}
+
+/** A test of a whole text against a pattern with Excel's wildcards (`*` any run, `?` any one character, `~` to mean the next one literally), ignoring case. */
+export function wildcardMatcher(pattern: string): (text: string) => boolean {
+  const tokens = tokenize(pattern);
+  return (text) => matchFrom(tokens, text, 0, false);
+}
+
+/** The place, from 0, where a pattern first matches inside a text (as `SEARCH` finds one), or -1. */
+export function wildcardFind(pattern: string, text: string, from = 0): number {
+  const tokens = tokenize(pattern);
+  for (let start = from; start <= text.length; start++) if (matchFrom(tokens, text, start, true)) return start;
+  return -1;
 }
 
 /** Whether a text has a wildcard in it, so a plain comparison will not do. */
@@ -31,7 +79,7 @@ export const hasWildcard = (text: string) => WILDCARD.test(text);
 
 /** Whether `text` is `pattern`, ignoring case, with wildcards where the pattern has them. */
 export function matchesPattern(pattern: string, text: string): boolean {
-  return hasWildcard(pattern) ? wildcardRegExp(pattern).test(text) : compareText(pattern, text) === 0;
+  return hasWildcard(pattern) ? wildcardMatcher(pattern)(text) : compareText(pattern, text) === 0;
 }
 
 const OPERATORS = [">=", "<=", "<>", ">", "<", "="] as const;
@@ -78,12 +126,7 @@ function textual(operator: Operator, text: string): Criterion {
     if (operator === "=") return (cell) => cell === null;
     if (operator === "<>") return (cell) => cell !== null;
   }
-  const matches: (cell: string) => boolean = hasWildcard(text)
-    ? (
-        (re) => (cell: string) =>
-          re.test(cell)
-      )(wildcardRegExp(text))
-    : (cell) => compareText(cell, text) === 0;
+  const matches: (cell: string) => boolean = hasWildcard(text) ? wildcardMatcher(text) : (cell) => compareText(cell, text) === 0;
   switch (operator) {
     case "":
     case "=":

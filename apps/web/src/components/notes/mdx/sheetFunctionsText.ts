@@ -4,7 +4,7 @@
  * All take one value per argument, so an array passed to one is lifted: `LEFT(A1:A5,1)` is five letters.
  */
 import { type Ymd, addMonths, dayOfWeek, endOfMonth, serialToYmd, ymdToSerial } from "./sheetDate";
-import { wildcardRegExp } from "./sheetCriteria";
+import { wildcardFind } from "./sheetCriteria";
 import { formatNumber } from "./sheetFormat";
 import { type FunctionSpec, flatten } from "./sheetMatrix";
 import { ERR, type Scalar, Unsupported, isMatrix, parseNumberText, toBool, toNumber, toText } from "./sheetValue";
@@ -111,8 +111,8 @@ export const TEXT_FUNCTIONS: Record<string, FunctionSpec> = {
     const inside = toText(within);
     const from = count(start, 1);
     if (from < 1 || from > inside.length) return ERR.VALUE;
-    const match = wildcardRegExp(toText(find), false).exec(inside.slice(from - 1));
-    return match ? match.index + from : ERR.VALUE;
+    const at = wildcardFind(toText(find), inside, from - 1);
+    return at < 0 ? ERR.VALUE : at + 1;
   }),
   EXACT: scalar(2, 2, ([a, b]) => toText(a) === toText(b)),
   REPT: scalar(2, 2, ([value, times]) => {

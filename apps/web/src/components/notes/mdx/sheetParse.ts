@@ -369,8 +369,8 @@ class Parser {
       const next = this.tokens[this.at + 1];
       if (next?.kind === "ident" && /^\$?[A-Za-z]{1,3}$/.test(next.text)) {
         this.at += 2;
-        const a = columnIndex(name.replace("$", ""));
-        const b = columnIndex(next.text.replace("$", ""));
+        const a = columnIndex(name.replace(/\$/g, ""));
+        const b = columnIndex(next.text.replace(/\$/g, ""));
         if (a < 0 || b < 0) throw new SyntaxProblem("a column past XFD");
         return {
           t: "ref",
