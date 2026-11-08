@@ -83,3 +83,19 @@ struct MarkdownHighlighterTests {
         #expect(elapsed < .seconds(5))
     }
 }
+
+@Suite("The highlighter and a note with Windows line breaks")
+struct HighlighterCRLFTests {
+    @Test("frontmatter with \\r\\n line breaks does not move the spans that follow it")
+    func frontmatterWithCRLF() {
+        let body = "# Title\r\n\r\nSome **bold** text.\r\n"
+        let unix = "---\ntitle: A\ntags:\n- x\n---\n" + "# Title\n\nSome **bold** text.\n"
+        let windows = "---\r\ntitle: A\r\ntags:\r\n- x\r\n---\r\n" + body
+        func texts(_ text: String) -> [String] {
+            let ns = text as NSString
+            return MarkdownHighlighter.spans(in: text).filter { $0.kind != .frontmatter }.map { ns.substring(with: $0.range) }
+        }
+        // The same spans over the same words, whichever line breaks the note has.
+        #expect(texts(windows).map { $0.replacingOccurrences(of: "\r\n", with: "\n") } == texts(unix))
+    }
+}
