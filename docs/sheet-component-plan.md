@@ -181,7 +181,7 @@ Recommendations are mine. S5, S7, S8 and S11 are decided (owner, 2026-11-07); th
 | S6 | **One format.** A sheet is a `<Sheet>` tag holding a ` ```csv ` block of values, as `<Chart>` does, and optionally a ` ```formulas ` block (S7). | **Yes.** | Reuses `parseCsv`, survives every other app, is searchable, and diffs. |
 | S7 | **Where formulas live.** *Revised 2026-11-07, after the Excel-compatibility question; the first draft stored `=` text in the CSV and nothing cached.* | **Decided (owner, 2026-11-07).** **The CSV block holds values (what Excel showed, or what we calculated). An optional ` ```formulas ` block holds the formula of each cell that has one, in Excel's own syntax (`E2 =C2*D2`).** A formula we can evaluate is recalculated when drawn. One we cannot is **carried**: its text is kept and its value is the one Excel computed, marked "calculated by Excel". A formula that points outside the sheet is not carried; it becomes a value. | An `.xlsx` stores a formula and its cached value side by side, so this maps 1:1 on import and export, and it is the only shape that can keep a formula we cannot yet calculate. It also removes the first draft's cost: search, the assistant, `<Chart>`, the terminal app and the iPad all read numbers from the CSV block. **Costs:** two blocks to keep in step (the editor writes both); a carried formula's value is "as of import" and goes stale if you change a cell it depends on; and it must be settled before the first release, since it is what ends up in users' notes. |
 | S8 | **The engine.** *Revised at Gate A, 2026-11-07.* | **Decided (owner, 2026-11-07).** **Our own parser and evaluator, behind one function (`evaluate(grid)` returning values and errors). It owns criteria matching (the `SUMIFS` family), range and text coercion, lookups, dates as serial numbers and error values. formulajs may supply a function body only where it matches the Excel fixtures.** | We own the semantics, so the terminal app and, later, Swift agree by shared vectors; and no parser toolkit with `eval`. The evaluator is the small part; the long tail is `SUMIFS`-family criteria (`">=5"`, `"<>"`, wildcards), lookups, coercion and error values. A function we lack shows `#NAME?`, never a guess. **Gate A:** formulajs matched Excel on 15 of 34 cases and `xlsx-calc` on 6 to 12, so there is no fallback: the long tail is the work, and [`excel-verified-cases.json`](../spikes/sheet/excel-verified-cases.json) is its first test suite. |
-| S9 | **Excel tables.** The header row of a sheet is its table, so formulas may use column names: `=SUM([Revenue])`, `=SUMIFS([Revenue],[Region],"West")`, `=[@Units]*[@Price]`. | **Yes, after the core engine** (Step 4). A formula that names a table we do not have stays a value on import. | It is the part of Excel's tables that makes formulas readable, and it fits a one-table sheet exactly. Structured references in the Excel dialect are a subset; the rest stay values. |
+| S9 | **Excel tables.** *Built 2026-11-08.* The header row of a sheet is its table, so formulas may use column names: `=SUM([Revenue])`, `=SUMIFS([Revenue],[Region],"West")`, `=[@Units]*[@Price]`. | **Yes, after the core engine** (Step 4). A formula that names a table we do not have stays a value on import. **Done, with one addition: `<Sheet totals>`** says the last row is the table's totals row, as Excel's Total Row is, which is what lets a total in the sheet's own last row say `=SUM([Revenue])` without reading itself. | It is the part of Excel's tables that makes formulas readable, and it fits a one-table sheet exactly. Structured references in the Excel dialect are a subset; the rest stay values. |
 | S10 | **Pivot tables.** | **A pivot imports as its cells; Re-import after refreshing it in Excel.** A native `<Pivot from="…">` over note data is a later component if you want to pivot data you author here. | Nothing in the library reads pivot definitions, and values are what you see anyway. A native pivot is the first step toward reinventing Excel; wait for a reason. |
 | S11 | **Size.** *Revised at Gate A, 2026-11-07.* | **Decided (owner, 2026-11-07).** **Warn when the note passes 100,000 characters (about 800 to 1,600 rows, depending on columns; past that the editor stops colouring the note), refuse an import over 5,000 rows with a suggestion to narrow the range, and always draw the grid with virtual scrolling.** | A note is one `TEXT` value that is saved, searched, synced and parsed whole. Past the cap the honest answer is a linked file, which is S2's deferred feature, so the cap is what makes deferring it safe. |
 | S12 | **Numbers, dates and formats.** | **Numbers are stored raw, dates as `YYYY-MM-DD`, everything else as the text Excel showed. No cell styles in v1.** Currency and percent display is a later per-column hint. | CSV carries no types. Storing the formatted text would break arithmetic; storing Excel's date serials would be unreadable. Step 0 tries both on real workbooks. |
@@ -491,8 +491,8 @@ references (S9). **Gate E.**
 - **Not checked:** a workbook saved by Excel itself or by another program (the formula, value and format reading is SheetJS's, tested here on files
   built by SheetJS and by hand, not on yours; a workbook-vs-engine run on your own files is the way to learn what your formulas do: `inventory.mjs`
   first); a password-protected one (the message is written, not seen); a file near the 50 MB limit; Safari and Windows; the desktop app's window.
-- **Not built, by plan:** column-name references (S9, `=SUM([Revenue])`), which want the table parts of the file; until then a formula that names a
-  table becomes a value on import. The picker offers `.xlsx` and `.xlsm`; SheetJS would also read an `.xls`, which is not promised.
+- **Column names (S9) were built after this** and are in their own entry below, with Excel's tables read on import. The picker offers `.xlsx` and `.xlsm`; SheetJS would
+  also read an `.xls`, which is not promised.
 - **Picks to confirm:** `carried` as the word and its place before the formula; a formula whose result Excel shows as a date is carried
   (a sheet has no cell formats, so a recalculated date would show as a number of days); text-formatted numbers (`"123"` that Excel keeps
   as text) become numbers when read back from the CSV, which the formula check catches where a formula depends on one; cells
@@ -533,12 +533,40 @@ and CSV. **Gate F.**
   export do, and there is no such bridge for a file the page made. So there **Download is disabled, with the reason, and Copy cells works**. A small
   `saveFile` bridge (a method in the shared API list, a handler that opens the save dialog and writes the bytes, the preload list and its tests) is a task of its own in
   `apps/desktop`; the dialog needs only to call it when `window.composition` has it.
-- **Not built, by plan:** column-name references as ranges on export (S9 is not built), a formula that gave a date shown as a date (a sheet has no cell formats),
-  a merge instead of a replace on re-import.
+- **Not built, by plan:** a formula that gave a date shown as a date (a sheet has no cell formats), a merge instead of a replace on re-import. (Column names
+  are written as ranges on export, since S9.)
 - **Not checked:** an `.xlsx` opened in Excel for Windows or other versions, in LibreOffice or Numbers; a very large export (5,000 rows by 20 columns: its size and
   time were not measured); the desktop app's window.
 - **Picks to confirm:** re-import **replaces whole** and warns, with no merge; a sheet with no fingerprint counts as changed; the exported workbook has one sheet named
   for the caption (or `Sheet1`); a CSV has a byte order mark (Excel needs it; some other programs show it as a stray character).
+
+**S9, column names in formulas** (after Step 5, 2026-11-08). *Built; waiting for the owner's look.*
+
+- **Built:** `=SUM([Revenue])`, `=SUMIFS([Revenue],[Region],"West")`, `=[@Units]*[@[Unit Price]]` and the rest of Excel's grammar for a table's columns
+  ([`sheetStructured.ts`](../apps/web/src/components/notes/mdx/sheetStructured.ts)): `[Col]`, `[@Col]`, `[@]`, `[[#This Row],[Col]]`, `[[Col1]:[Col2]]`, `[#Headers]`, `[#Data]`,
+  `[#Totals]`, `[#All]`, the combinations Excel allows (`[[#Headers],[Revenue]]`, `[[#Headers],[#Data]]`, `[[#Data],[#Totals]]`), `Table1[…]` by name where the name is known,
+  and Excel's escapes in a column name (`'[`, `']`, `'#`, `''`). Each reference is **resolved to an ordinary range as text** before anything reads the formula, so the engine,
+  the export and the import share one piece of code and nothing else knows about tables. A column the table has not is `#REF!` in its place (so an `IFERROR` round it
+  still answers); `@` in a row that is not one of the data is `#VALUE!`; a form Excel does not have is `#NAME?` with the reason.
+- **In a sheet, the table is the sheet:** its header row (names are matched ignoring case and spaces at the ends) and the rows of the CSV below it. A formula under the last
+  CSV row (a totals row of nothing but formulas, which the grid grows to hold) is not data. **A totals row inside the CSV needs `<Sheet totals>`**, which says the last row is the
+  table's Total Row: without it `=SUM([Revenue])` in that row reads its own cell, and says so (circular). The grid editor has a **Last row is a totals row** box, saved on the tag as
+  `totals="true"`; a tag written `<Sheet totals>` reads the same.
+- **A column named in a formula survives rows and columns coming and going**, since it says which column and not where (the editor does not rewrite it), and is written as the range
+  it stands for on **export** (`$E$2:$E$5`), since Excel does not know the sheet's table.
+- **On import, a table is read from the file** ([`sheetTables.ts`](../apps/web/src/components/notes/mdx/sheetTables.ts)): its name, its sheet, its range, whether it has a header and a
+  totals row and what its columns are called, from only the small parts of the zip that hold them (never past 4 MB of any part). `Table1[Revenue]`, `Table1[[#This Row],[Units]]`,
+  `[@Units]` and the rest become ranges of that table, are moved to where the imported range began, and are then **kept as formulas if the range holds what they read**, **carried** if
+  the engine cannot calculate them (`SUBTOTAL` over a column, say) and **values** if they read a column outside the range or a table on another sheet.
+- **Checked in real Excel, as a table.** 38 cells (the forms above, in a table and a table with a totals row, outside the table, in its calculated column, and `@` outside its rows) were run
+  in Excel, opened from a file whose tables are defined in its own XML, and this engine gives the same for all of them
+  ([`excel-verified-tables.json`](../spikes/sheet/excel-verified-tables.json), [`sheetStructured.excel.test.ts`](../apps/web/src/components/notes/mdx/sheetStructured.excel.test.ts)).
+  **Excel corrected one thing I had assumed:** `@` outside a table's rows is `#VALUE!`, not `#REF!`. (Excel's AppleScript cannot make a table reliably: `make new list object` shifted a column. The file route is the way.)
+- **Not built:** renaming a header does not rewrite the formulas that name it (Excel does); a table's name for a sheet's own table (a sheet has none: `Table1[Revenue]` typed in a sheet says so); a table
+  that Excel keeps on another sheet being read by a formula here; `TableName` alone for the whole data range; a totals row's own functions (a `SUBTOTAL` over a column is carried, as the engine
+  lacks it).
+- **Not checked:** a workbook saved by Excel itself with tables (the file route used here writes the table XML by hand, as Excel does; a real file has more attributes, which are ignored);
+  tables with filters or slicers; a table with a header row of numbers.
 
 **Step 6: the owner's by-hand test**, with real workbooks, written up as `manual-tests/sheet.md` like the other
 features. **Gate G.**

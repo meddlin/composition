@@ -142,7 +142,7 @@ describe("what it does not calculate", () => {
     expect(calc("=Rate*2").unsupported).toEqual(["the name Rate"]);
     expect(calc("=Sheet2!A1+1").unsupported).toEqual(["a reference to another sheet"]);
     expect(calc("='Q3 budget'!A1:B2").unsupported).toEqual(["a reference to another sheet"]);
-    expect(calc("=SUM(Table1[Revenue])").unsupported).toEqual(["a table's column reference"]);
+    expect(calc("=SUM(Table1[Revenue])").unsupported).toEqual(["a table called Table1 (write its column as [Column], without the table's name)"]);
     expect(calc('="1/2/2026"+1').unsupported).toEqual(["the text “1/2/2026” read as a date or a currency"]);
     expect(calc("=ROUND(1)").unsupported).toEqual(["ROUND with 1 arguments"]);
   });
@@ -201,7 +201,8 @@ describe("what is safe", () => {
 
     // 0 + 7 + 14 + ... up to 4998: 715 terms of 7 * (0..714).
     expect(results.get("C5000")?.value).toBe((7 * 714 * 715) / 2);
-  });
+    // About a second alone; the whole suite runs beside it, so it is given room rather than flake.
+  }, 30_000);
 
   it("stops a formula nested past Excel's 64 levels, or with 64 signs in a row, or longer than 8,192 characters, before it can overflow the stack", () => {
     expect(value(`=${"(".repeat(60)}1${")".repeat(60)}`)).toBe(1);
@@ -443,5 +444,86 @@ describe("calculate with carried formulas", () => {
   it("grows the grid to hold a carried formula under the last row, as for any other", () => {
     const { sheet: shown } = calculate(sheet, new Map([["D5", "=XLOOKUP(A2,F:F,G:G)"]]), new Set(["D5"]));
     expect(shown.rows).toHaveLength(5);
+  });
+});
+
+
+describe("column names in a sheet's formulas (S9)", () => {
+  const sheet = {
+    rows: [
+      ["Region", "Units", "Unit Price", "Revenue"],
+      ["West", "120", "9.5", ""],
+      ["East", "80", "9.5", ""],
+      ["West", "45", "20", ""],
+    ],
+    columns: 4,
+  };
+  const run = (formulas: Record<string, string>) => calculate(sheet, new Map(Object.entries(formulas)));
+
+  it("reads a column by its name, and this row's cell by @", () => {
+    const { sheet: shown } = run({ D2: "=[@Units]*[@[Unit Price]]", D3: "=[@Units]*[@[Unit Price]]", D4: "=[[#This Row],[Units]]*[[#This Row],[Unit Price]]" });
+    expect(shown.rows.map((row) => row[3])).toEqual(["Revenue", "1140", "760", "900"]);
+  });
+
+  it("sums a column, and sums one by a condition on another, in a totals row under the data that does not read itself", () => {
+    const { sheet: shown, results } = run({
+      D2: "=[@Units]*[@[Unit Price]]",
+      D3: "=[@Units]*[@[Unit Price]]",
+      D4: "=[@Units]*[@[Unit Price]]",
+      B5: "=SUM([Units])",
+      D5: "=SUM([Revenue])",
+      D6: '=SUMIFS([Revenue],[Region],"West")',
+    });
+    expect(shown.rows[4].filter((cell) => cell !== "")).toEqual(["245", "2800"]);
+    expect(shown.rows[5][3]).toBe("2040");
+    expect(results.get("D5")?.unsupported).toEqual([]);
+  });
+
+  it("is #REF! for a column the sheet has not, so an IFERROR round it answers", () => {
+    const { results } = run({ D2: "=SUM([Nope])", D3: "=IFERROR([Nope],-1)" });
+    expect(results.get("D2")?.value).toMatchObject({ code: "#REF!" });
+    expect(results.get("D3")?.value).toBe(-1);
+  });
+
+  it("is #VALUE! for @ in a row that is not one of the data's, as in Excel", () => {
+    expect(run({ D6: "=[@Units]" }).results.get("D6")?.value).toMatchObject({ code: "#VALUE!" });
+  });
+
+  it("says what it does not read: a table on another sheet, or a form Excel does not have", () => {
+    const { results } = run({ D2: "=SUM(Table1[Units])", D3: "=[[#Headers],[#Totals]]" });
+    // A sheet is one table and has no name for it: a column is written without one.
+    expect(results.get("D2")?.unsupported[0]).toContain("a table called Table1");
+    expect(results.get("D3")?.unsupported[0]).toContain("a table reference this reads no further");
+  });
+
+  it("does not need to be told again when a column is added: it names the column, not where it is", () => {
+    const wider = { rows: sheet.rows.map((row) => ["Notes", ...row]), columns: 5 };
+    const { sheet: shown } = calculate(wider, new Map([["F2", "=[@Units]*[@[Unit Price]]"]]));
+    expect(shown.rows[1][5]).toBe("1140");
+  });
+
+  it("reads the headers as the names, whatever they hold: a number or a logical too", () => {
+    const odd = { rows: [["2026", "TRUE"], ["5", "7"]], columns: 2 };
+    const { results } = calculate(odd, new Map([["C2", "=[2026]+[TRUE]"]]));
+    expect(results.get("C2")?.value).toBe(12);
+  });
+});
+
+describe("a totals row (the tag says totals)", () => {
+  const sheet = { rows: [["Region", "Units"], ["West", "120"], ["East", "80"], ["Total", ""]], columns: 2 };
+  const run = (formulas: Record<string, string>, totals: boolean) => calculate(sheet, new Map(Object.entries(formulas)), undefined, { totals });
+
+  it("is not data to a column named in a formula, so a total in it does not read itself", () => {
+    expect(run({ B4: "=SUM([Units])" }, true).sheet.rows[3][1]).toBe("200");
+    expect(run({ B4: "=SUM([Units])" }, false).results.get("B4")?.unsupported.length).toBeGreaterThan(0);
+  });
+
+  it("is [#Totals], and [@Units] in it is #VALUE!, as in Excel", () => {
+    expect(run({ A5: "=ROWS([#Data])", B5: "=ROWS([#All])", C5: "=COLUMNS([#Totals])" }, true).sheet.rows[4]).toEqual(["2", "4", "2"]);
+    expect(run({ B4: "=[@Units]" }, true).results.get("B4")?.value).toMatchObject({ code: "#VALUE!" });
+  });
+
+  it("makes [#Totals] an error for a sheet that has no totals row", () => {
+    expect(run({ B5: "=SUM([#Totals])" }, false).results.get("B5")?.value).toMatchObject({ code: "#REF!" });
   });
 });

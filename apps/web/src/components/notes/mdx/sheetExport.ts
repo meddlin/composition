@@ -19,7 +19,8 @@ import { columnLabel, parseFormulas, parseSheet } from "./sheetData";
 import { isoDateSerial } from "./sheetDate";
 import { type SheetSource, formatCsv } from "./sheetDraft";
 import { calculate, typeCell } from "./sheetFormula";
-import { tokenize } from "./sheetParse";
+import { parseAddress, tokenize } from "./sheetParse";
+import { findInSheet, resolveStructuredReferences, sheetTableOf } from "./sheetStructured";
 import { type Scalar, isError } from "./sheetValue";
 
 /** What a cell holds in the file: a number, a text, a logical, an error as its text (`#N/A`), or nothing. */
@@ -105,7 +106,14 @@ export function exportSheet(source: SheetSource): ExportResult {
   const parsed = parseSheet(source.csv);
   if (!parsed.sheet) return { ok: false, error: parsed.error };
   const { formulas, carried } = parseFormulas(source.formulas);
-  const { sheet, results } = calculate(parsed.sheet, formulas, carried);
+  const { sheet, results } = calculate(parsed.sheet, formulas, carried, { totals: source.totals });
+  // Excel does not know the sheet's table, so a column named in a formula is written as the range it stands for.
+  const find = findInSheet(sheetTableOf(parsed.sheet.rows[0], parsed.sheet.rows.length, source.totals));
+  const fileFormula = (formula: string, address: string) => {
+    const at = parseAddress(address);
+    const resolved = at ? resolveStructuredReferences(formula, find, at) : { formula };
+    return toFileFormula(resolved.unsupported === undefined ? resolved.formula : formula);
+  };
 
   let formulaCount = 0;
   let carriedCount = 0;
@@ -119,13 +127,13 @@ export function exportSheet(source: SheetSource): ExportResult {
       let cell: ExportCell;
       if (formula !== undefined && result) {
         // Calculated here, or not calculable here: Excel will calculate it either way when it opens the file.
-        cell = { value: exportValue(result.value), formula: toFileFormula(formula) };
+        cell = { value: exportValue(result.value), formula: fileFormula(formula, address) };
         if (result.unsupported.length > 0) notCalculated++;
       } else {
         const date = isoDateSerial(text);
         cell = date !== null ? { value: date, date: true } : { value: exportValue(typeCell(text)) };
         if (formula !== undefined) {
-          cell.formula = toFileFormula(formula); // carried: Excel's value, as it was
+          cell.formula = fileFormula(formula, address); // carried: Excel's value, as it was
           carriedCount++;
         }
         if (cell.date) dates++;

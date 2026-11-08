@@ -83,6 +83,9 @@ type SheetTarget =
   | { kind: "edit"; start: number; text: string }
   | { kind: "range"; start: number; text: string };
 
+/** What a saved sheet says on its tag about its totals row: `totals="true"`, or nothing (an empty value takes the attribute off a tag that had it). */
+const totalsAttribute = (source: SheetSource): Record<string, string> => ({ totals: source.totals ? "true" : "" });
+
 /** A paste that looks like a range copied from a spreadsheet: where it went and what it was, until the note changes. */
 type PasteOffer = { value: string; start: number; text: string; rows: string[][] };
 
@@ -415,23 +418,23 @@ export function MarkdownEditor({
       const { target } = saved;
       if (target.kind === "new") {
         const start = Math.min(target.start, text.length);
-        const edit = insertSheet(text, start, Math.min(Math.max(target.end, start), text.length), source);
+        const edit = insertSheet(text, start, Math.min(Math.max(target.end, start), text.length), source, totalsAttribute(source));
         return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
       }
       if (target.kind === "range") {
         if (text.slice(target.start, target.start + target.text.length) !== target.text) return changedUnderneath(text);
-        const edit = insertSheet(text, target.start, target.start + target.text.length, source);
+        const edit = insertSheet(text, target.start, target.start + target.text.length, source, totalsAttribute(source));
         return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
       }
       if (target.kind === "promote") {
         const table = tableAt(text, target.start);
         if (!table || text.slice(table.start, table.end) !== target.text) return changedUnderneath(text);
-        const edit = insertSheet(text, table.start, table.end, source);
+        const edit = insertSheet(text, table.start, table.end, source, totalsAttribute(source));
         return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
       }
       const span = findOpenedSheet(text, { start: target.start, text: target.text });
       if (!span) return changedUnderneath(text);
-      const next = writeSheet(text, span, source);
+      const next = writeSheet(text, span, source, totalsAttribute(source));
       const end = span.end + (next.length - text.length);
       applyAsTyping({ start: span.start, end: span.end, text: next.slice(span.start, end), caret: end - span.start });
     }, 0);

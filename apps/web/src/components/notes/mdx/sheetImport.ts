@@ -25,6 +25,7 @@ import { type SheetSource, formatCsv } from "./sheetDraft";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, evaluate, formatValue, typeCell } from "./sheetFormula";
 import { parseAddress } from "./sheetParse";
 import { rebaseReferences } from "./sheetRefs";
+import { type FindTable, type TableDef, resolveStructuredReferences } from "./sheetStructured";
 import { type Scalar, errorByCode, isError, round15 } from "./sheetValue";
 
 /** What Excel holds in a cell, as the workbook reader hands it over: its value, or an error as `{ error: "#N/A" }`. */
@@ -41,6 +42,9 @@ export type SourceCell = {
   text?: string;
 };
 
+/** A table of the workbook: its name and sheet, and where it is and what its columns are called (see sheetTables.ts). */
+export type ImportTable = TableDef & { name: string; sheet: string };
+
 /** A range of cells as the workbook reader reads it. */
 export type SourceRange = {
   /** The rows of the range, each cell or `null` where there is none. */
@@ -49,6 +53,9 @@ export type SourceRange = {
   origin: { row: number; col: number };
   /** The workbook counts days from 1904. */
   date1904?: boolean;
+  /** The sheet the range is in, and every table of the workbook, for a formula that names one (`Table1[Revenue]`). */
+  sheet?: string;
+  tables?: readonly ImportTable[];
 };
 
 export type Reason = { reason: string; count: number };
@@ -128,10 +135,20 @@ const tally = (reasons: string[]): Reason[] => {
   return [...counts].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);
 };
 
+/** Which table a reference means: by its name, or the one on `sheet` that holds the formula's cell. With no tables known (a reader that does not give them) it is not read. */
+function findTable(tables: readonly ImportTable[], sheet: string, cell: { row: number; col: number }): FindTable {
+  if (tables.length === 0) return () => ({ unsupported: "a table's column" });
+  return (name) => {
+    if (name === null) return tables.find((table) => table.sheet === sheet && cell.row >= table.row1 && cell.row <= table.row2 && cell.col >= table.col1 && cell.col <= table.col2);
+    const found = tables.find((table) => table.name.toLowerCase() === name.toLowerCase());
+    return found && found.sheet !== sheet ? { unsupported: "a table on another sheet" } : found;
+  };
+}
+
 type Pending = { address: string; row: number; col: number; formula: string; cell: SourceCell };
 
 /** The range as a sheet: its CSV and `formulas` blocks, and a summary of what was kept as a formula, carried and made a value. */
-export function importRange({ cells, origin, date1904 = false }: SourceRange): ImportResult {
+export function importRange({ cells, origin, date1904 = false, sheet = "", tables = [] }: SourceRange): ImportResult {
   const rows = cells.length;
   const columns = cells.reduce((widest, row) => Math.max(widest, row.length), 0);
   if (rows === 0 || columns === 0) return { ok: false, error: "There is nothing in that range." };
@@ -152,7 +169,14 @@ export function importRange({ cells, origin, date1904 = false }: SourceRange): I
     row.forEach((cell, c) => {
       if (!cell?.formula) return;
       formulaCells++;
-      const rebased = rebaseReferences(cell.formula, origin, { rows, cols: columns });
+      // A column named in the formula (`Table1[Revenue]`) is the range it is in the workbook, which is then moved with the rest.
+      const at = { row: origin.row + r, col: origin.col + c };
+      const resolved = cell.formula.includes("[") ? resolveStructuredReferences(cell.formula, findTable(tables, sheet, at), at) : { formula: cell.formula };
+      if (resolved.unsupported !== undefined) {
+        valuesWhy.push(resolved.unsupported);
+        return;
+      }
+      const rebased = rebaseReferences(resolved.formula, origin, { rows, cols: columns });
       if (rebased.outside !== undefined) {
         valuesWhy.push(rebased.outside);
         return;

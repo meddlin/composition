@@ -175,7 +175,7 @@ export function SheetGrid({ draft, selection, onSelect, onChange, onUndo, onRedo
     const startedAt = tabStart.current;
     if (move) {
       // Enter on the last row, after typing something, starts the next row, as filling in a table does.
-      if (move.rows === 1 && editing.row === next.rows.length - 1 && next !== draft && canInsertRow(next)) next = insertRow(next, next.rows.length);
+      if (move.rows === 1 && editing.row === next.rows.length - 1 && next !== draft && canInsertRow(next) && !next.totals) next = insertRow(next, next.rows.length);
       const col = move.rows === 1 && move.cols === 0 && startedAt !== null ? startedAt : target.col + move.cols;
       target = { row: clamp(target.row + move.rows, 0, next.rows.length - 1), col: clamp(col, 0, next.columns - 1) };
     }

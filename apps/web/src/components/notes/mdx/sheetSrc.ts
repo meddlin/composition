@@ -7,6 +7,7 @@
  * does not end it, and a tag shown inside a fenced code block is an example of one, not a sheet.
  */
 import { insideFence } from "./completions";
+import { isTotalsRow } from "./sheetData";
 import { type SheetSource } from "./sheetDraft";
 
 /** Cmd+Shift+G on macOS, Ctrl+Shift+G elsewhere; `aria-keyshortcuts` says the same. */
@@ -38,6 +39,8 @@ export type SheetSpan = {
   end: number;
   /** Where the opening tag ends. */
   openEnd: number;
+  /** The opening tag, as written. */
+  tag: string;
   /** The CSV block (the first one tagged `csv`, else the first block, as the preview reads it), and the `formulas` one. */
   csv: Fence | null;
   formulas: Fence | null;
@@ -96,6 +99,7 @@ function readSheet(text: string, start: number, openEnd: number): SheetSpan | nu
           start,
           end,
           openEnd,
+          tag: text.slice(start, openEnd),
           csv: fences.find((fence) => fence.language === "csv") ?? fences.find((fence) => fence.language !== "formulas") ?? null,
           formulas: fences.find((fence) => fence.language === "formulas") ?? null,
         };
@@ -107,9 +111,10 @@ function readSheet(text: string, start: number, openEnd: number): SheetSpan | nu
   return null;
 }
 
-/** What the sheet editor opens on: the text of the sheet's two blocks. */
+/** What the sheet editor opens on: the text of the sheet's two blocks, and whether its tag says the last row is a totals row. */
 export function sheetSource(span: SheetSpan): SheetSource {
-  return { csv: span.csv?.content ?? "", formulas: span.formulas?.content ?? "" };
+  const totals = isTotalsRow(sheetAttributes(span.tag).totals);
+  return { csv: span.csv?.content ?? "", formulas: span.formulas?.content ?? "", ...(totals ? { totals: true } : {}) };
 }
 
 /** A fence long enough that nothing inside `content` can close it. */
@@ -127,17 +132,17 @@ function fenceBlock(language: string, content: string, keep?: Fence | null): str
 
 type Replacement = { from: number; to: number; text: string };
 
-/** The attributes of a `<Sheet …>` tag, as written: `name="value"` or `name='value'`. */
+/** The attributes of a `<Sheet …>` tag, as written: `name="value"`, `name='value'`, or a bare `name` (its value is empty). */
 export function sheetAttributes(tag: string): Record<string, string> {
   const attributes: Record<string, string> = {};
-  for (const match of tag.matchAll(/\s([A-Za-z_][\w.-]*)=(?:"([^"]*)"|'([^']*)')/g)) attributes[match[1]] = match[2] ?? match[3] ?? "";
+  for (const match of tag.matchAll(/\s([A-Za-z_][\w.-]*)(?:=(?:"([^"]*)"|'([^']*)'))?(?=[\s/>])/g)) attributes[match[1]] = match[2] ?? match[3] ?? "";
   return attributes;
 }
 
 /** The tag with these attributes set: one it already has changes in place, a new one goes at the end, an empty one is taken off; the rest are left as they were. */
 function withAttributes(tag: string, attributes: Record<string, string>): string {
   const seen = new Set<string>();
-  const changed = tag.replace(/(\s)([A-Za-z_][\w.-]*)=("[^"]*"|'[^']*')/g, (whole, space: string, name: string) => {
+  const changed = tag.replace(/(\s)([A-Za-z_][\w.-]*)(?:=(?:"[^"]*"|'[^']*'))?(?=[\s/>])/g, (whole, space: string, name: string) => {
     if (!(name in attributes)) return whole;
     seen.add(name);
     const value = attributeValue(attributes[name]);

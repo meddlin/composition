@@ -21,6 +21,7 @@ import { isoDateSerial } from "./sheetDate";
 import { FUNCTIONS } from "./sheetFunctions";
 import { type EvalContext, type Lazy, attempt, broadcast, finite, power, scalarOf } from "./sheetMatrix";
 import { type Node, SyntaxProblem, parseAddress, parseFormula } from "./sheetParse";
+import { findInSheet, resolveStructuredReferences, sheetTableOf } from "./sheetStructured";
 import {
   ERR,
   type Matrix,
@@ -82,16 +83,34 @@ function arithmetic(op: string, x: Scalar, y: Scalar, root: boolean): Scalar {
   }
 }
 
+/** A header cell as the name a column goes by in a formula (`[Revenue]`). */
+const headerName = (value: Scalar): string => (value === null ? "" : typeof value === "string" ? value : isError(value) ? value.code : formatValue(value));
+
+/** The sheet as the table a formula's column names mean (S9): the rows are the ones the CSV holds (see `sheetTableOf`). */
+function sheetTable(cells: readonly (readonly Scalar[])[], totals: boolean) {
+  const width = cells.reduce((widest, row) => Math.max(widest, row.length), 0);
+  return findInSheet(sheetTableOf(Array.from({ length: width }, (_, c) => headerName(cells[0]?.[c] ?? null)), cells.length, totals));
+}
+
+/** What a sheet's tag says about how to read its formulas. */
+export type SheetOptions = {
+  /** The last row is the table's totals row (see `sheetTableOf`). */
+  totals?: boolean;
+};
+
 /** A formula whose address is the key, the grid's values, and the results by address. */
-export function evaluate(cells: readonly (readonly Scalar[])[], formulas: ReadonlyMap<string, string>): Evaluation {
+export function evaluate(cells: readonly (readonly Scalar[])[], formulas: ReadonlyMap<string, string>, options: SheetOptions = {}): Evaluation {
   const parsed = new Map<number, { node?: Node; problem?: string }>();
   let lastRow = cells.length - 1;
   let lastCol = cells.reduce((widest, row) => Math.max(widest, row.length), 0) - 1;
+  const find = sheetTable(cells, options.totals === true);
   for (const [address, text] of formulas) {
     const at = parseAddress(address);
     if (!at) continue;
     try {
-      parsed.set(at.row * STRIDE + at.col, { node: parseFormula(text) });
+      // A column named in the formula (`[Revenue]`) is the range it stands for before anything reads the formula.
+      const resolved = resolveStructuredReferences(text, find, at);
+      parsed.set(at.row * STRIDE + at.col, { node: resolved.unsupported === undefined ? parseFormula(resolved.formula) : { t: "unsupported", reason: resolved.unsupported } });
     } catch (error) {
       if (!(error instanceof SyntaxProblem)) throw error;
       parsed.set(at.row * STRIDE + at.col, { problem: error.message });
@@ -314,10 +333,11 @@ export function typeCell(text: string): Scalar {
 }
 
 /** The formulas of a sheet, given the sheet's CSV values: its first row is row 1, as in Excel. */
-export function evaluateSheet(sheet: Sheet, formulas: ReadonlyMap<string, string>): Evaluation {
+export function evaluateSheet(sheet: Sheet, formulas: ReadonlyMap<string, string>, options: SheetOptions = {}): Evaluation {
   return evaluate(
     sheet.rows.map((row) => row.map(typeCell)),
     formulas,
+    options,
   );
 }
 
@@ -334,9 +354,9 @@ export const MAX_SHEET_COLUMNS = 100;
  * `carried` are formulas of `formulas` that are not calculated: the CSV holds their value (see `parseFormulas`), and the
  * cells that read them read that. They have no result, and the grid still grows to hold them.
  */
-export function calculate(sheet: Sheet, formulas: ReadonlyMap<string, string>, carried: ReadonlySet<string> = NONE): Calculated {
+export function calculate(sheet: Sheet, formulas: ReadonlyMap<string, string>, carried: ReadonlySet<string> = NONE, options: SheetOptions = {}): Calculated {
   const live = carried.size === 0 ? formulas : new Map([...formulas].filter(([address]) => !carried.has(address)));
-  const results = evaluateSheet(sheet, live);
+  const results = evaluateSheet(sheet, live, options);
   const places = [...formulas.keys()].flatMap((address) => {
     const at = parseAddress(address);
     return at && at.row < MAX_SHEET_ROWS && at.col < MAX_SHEET_COLUMNS ? [{ address, ...at }] : [];

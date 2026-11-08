@@ -28,6 +28,7 @@ import {
   insertColumn,
   insertRow,
   isDraftEmpty,
+  setTotals,
 } from "./mdx/sheetDraft";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./mdx/sheetFormula";
 import { SheetGrid, addressOf, cellSelection, selectionBounds, type Selection } from "./SheetGrid";
@@ -52,7 +53,7 @@ type History = { past: Draft[]; present: Draft; future: Draft[] };
 function startingDraft(source: SheetEditSource): Draft {
   if (source.kind === "new") return emptyDraft();
   if (source.kind === "promote") return draftFromSource(formatCsv(source.rows), "");
-  return draftFromSource(source.csv, source.formulas);
+  return draftFromSource(source.csv, source.formulas, source.totals);
 }
 
 /**
@@ -203,6 +204,11 @@ function SheetSession({ source, onClose, onSaved }: Omit<Props, "open">) {
             )}
           </div>
         </div>
+
+        <label className="flex items-center gap-1.5 text-xs" title="Excel's Total Row: the last row is not data, so a column named in a formula, such as [Revenue], leaves it out and a total there does not read itself.">
+          <input type="checkbox" checked={draft.totals === true} disabled={draft.rows.length < 2} onChange={(event) => commit(setTotals(draft, event.target.checked))} />
+          Last row is a totals row
+        </label>
 
         <div className="flex min-w-0 items-center gap-2 rounded-md border px-2 py-1 font-mono text-xs" data-testid="sheet-formula-line">
           <span className="shrink-0 font-semibold">{active}</span>

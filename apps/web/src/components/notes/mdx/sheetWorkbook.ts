@@ -15,7 +15,8 @@
  */
 import type { CellObject, WorkBook, WorkSheet } from "xlsx";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS } from "./sheetFormula";
-import { type SourceCell, type SourceRange, type SourceValue, type Workbook, parseRange, rangeText } from "./sheetImport";
+import { type ImportTable, type SourceCell, type SourceRange, type SourceValue, type Workbook, parseRange, rangeText } from "./sheetImport";
+import { readTables } from "./sheetTables";
 
 /** A sheet is read down to this row and no further: a range past it is refused, with the reason. */
 export const MAX_ROWS_READ = 100_000;
@@ -98,7 +99,7 @@ const days1904 = (book: WorkBook) => {
 };
 
 /** Reads the cells of `range` of `sheet`: at most the size of a sheet, and no further down than `MAX_ROWS_READ`. */
-function readRange(book: WorkBook, sheet: WorkSheet, range: string): SourceRange | { error: string } {
+function readRange(book: WorkBook, sheet: WorkSheet, range: string, sheetName: string, tables: readonly ImportTable[]): SourceRange | { error: string } {
   const parsed = parseRange(range);
   if (!parsed) return { error: `${range} is not a range.` };
   const rows = parsed.row2 - parsed.row1 + 1;
@@ -112,7 +113,7 @@ function readRange(book: WorkBook, sheet: WorkSheet, range: string): SourceRange
     for (let c = parsed.col1; c <= parsed.col2; c++) row.push(sourceCell(sheet[`${columnName(c)}${r + 1}`] as CellObject | undefined));
     cells.push(row);
   }
-  return { cells, origin: { row: parsed.row1, col: parsed.col1 }, date1904: days1904(book) };
+  return { cells, origin: { row: parsed.row1, col: parsed.col1 }, date1904: days1904(book), sheet: sheetName, tables };
 }
 
 /** A column's letters, `A` to `XFD` (SheetJS names its cells so). */
@@ -148,12 +149,14 @@ export async function readWorkbook(bytes: Uint8Array): Promise<Workbook> {
     const message = reason instanceof Error ? reason.message : "";
     throw new Error(/password|encrypt/i.test(message) ? "It is protected by a password." : "It is not an Excel workbook.");
   }
+  // The workbook's tables are read from the file's own parts, which SheetJS does not give; a file whose parts cannot be read has none.
+  const tables = await readTables(bytes).catch((): ImportTable[] => []);
   const visible = book.SheetNames.filter((_, index) => book.Workbook?.Sheets?.[index]?.Hidden !== 2);
   return {
     sheets: visible.map((name) => ({ name, used: usedRange(book.Sheets[name] ?? {}) })),
     read(sheet, range) {
       const found = book.Sheets[sheet];
-      return found ? readRange(book, found, range) : { error: `There is no sheet called ${sheet}.` };
+      return found ? readRange(book, found, range, sheet, tables) : { error: `There is no sheet called ${sheet}.` };
     },
   };
 }

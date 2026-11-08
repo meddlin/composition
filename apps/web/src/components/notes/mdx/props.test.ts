@@ -46,7 +46,7 @@ describe("findPropTarget: prop names", () => {
     expect(names("<Toc |/>")).toEqual(["maxDepth"]);
     expect(names('<YouTube url="x" |/>')).toEqual(["start", "title"]);
     expect(names('<Repo url="x" |/>')).toEqual(["description"]);
-    expect(names("<Sheet |")).toEqual(["title", "height"]);
+    expect(names("<Sheet |")).toEqual(["title", "totals", "height"]);
   });
 
   it("finds the tag in the middle of a sentence", () => {

@@ -118,6 +118,23 @@ describe("sheet attributes", () => {
     expect(writeSheet(IMPORTED, findSheets(IMPORTED)[0], { csv: "A\n1", formulas: "" }, { imported: "" }).split("\n")[0]).toBe('<Sheet title="Q3" source="budget.xlsx" sheet="Q3 budget" range="A1:F40" height="300">');
   });
 
+  it("reads a bare attribute, as <Sheet totals> writes one, and says a sheet's source has a totals row", () => {
+    expect(sheetAttributes("<Sheet totals title='x'>")).toEqual({ totals: "", title: "x" });
+    const bare = "<Sheet totals>\n\n```csv\nA\n1\n```\n\n</Sheet>";
+    expect(sheetSource(findSheets(bare)[0])).toEqual({ csv: "A\n1", formulas: "", totals: true });
+    const quoted = '<Sheet totals="true">\n\n```csv\nA\n1\n```\n\n</Sheet>';
+    expect(sheetSource(findSheets(quoted)[0]).totals).toBe(true);
+    expect(sheetSource(findSheets('<Sheet totals="false">\n\n```csv\nA\n```\n\n</Sheet>')[0])).toEqual({ csv: "A", formulas: "" });
+  });
+
+  it("turns totals on and off in a tag, whether it was written bare or with a value", () => {
+    const bare = "<Sheet totals title=\"Q3\">\n\n```csv\nA\n1\n```\n\n</Sheet>";
+    expect(writeSheet(bare, findSheets(bare)[0], { csv: "A\n1", formulas: "" }, { totals: "true" }).split("\n")[0]).toBe('<Sheet totals="true" title="Q3">');
+    expect(writeSheet(bare, findSheets(bare)[0], { csv: "A\n1", formulas: "" }, { totals: "" }).split("\n")[0]).toBe('<Sheet title="Q3">');
+    const plain = '<Sheet title="Q3">\n\n```csv\nA\n1\n```\n\n</Sheet>';
+    expect(writeSheet(plain, findSheets(plain)[0], { csv: "A\n1", formulas: "" }, { totals: "true" }).split("\n")[0]).toBe('<Sheet title="Q3" totals="true">');
+  });
+
   it("leaves the tag as it was when no attributes are given", () => {
     expect(writeSheet(IMPORTED, findSheets(IMPORTED)[0], { csv: "A\n1", formulas: "" })).toBe(IMPORTED);
   });

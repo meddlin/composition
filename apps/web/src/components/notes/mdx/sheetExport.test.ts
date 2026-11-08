@@ -83,6 +83,24 @@ describe("exportSheet", () => {
     expect(rows[3][0]).toEqual({ value: 30, formula: "SUM(A2:A3)" });
   });
 
+  it("writes a column named in a formula as the range it stands for, which Excel can read, with the value it came to", () => {
+    const { rows, summary } = exported(
+      "Region,Units,Unit Price,Revenue\nWest,120,9.5,\nEast,80,9.5,",
+      "D2 =[@Units]*[@[Unit Price]]\nD3 =[@Units]*[@[Unit Price]]\nD4 =SUM([Revenue])\nB4 =SUMIFS([Units],[Region],\"West\")",
+    );
+    expect(rows[1][3]).toEqual({ value: 1140, formula: "B2*C2" });
+    expect(rows[2][3]).toEqual({ value: 760, formula: "B3*C3" });
+    expect(rows[3][3]).toEqual({ value: 1900, formula: "SUM($D$2:$D$3)" });
+    expect(rows[3][1]).toEqual({ value: 120, formula: 'SUMIFS($B$2:$B$3,$A$2:$A$3,"West")' });
+    expect(summary).toMatchObject({ formulas: 4, notCalculated: 0 });
+  });
+
+  it("writes a formula with a table reference it cannot read as it was written", () => {
+    const { rows } = exported("A,B\n1,", "B2 =SUM(Table1[A])");
+    expect(rows[1][1].formula).toBe("SUM(Table1[A])");
+    expect(rows[1][1].value).toMatchObject({ error: "#NAME?" });
+  });
+
   it("is the CSV of what the sheet shows, formulas calculated", () => {
     expect(exported("Qty,Price,Total\n12,1.5,0\n2,3,0", "C2 =A2*B2\nC3 =A3*B3").csv).toBe("Qty,Price,Total\n12,1.5,18\n2,3,6");
   });
@@ -127,5 +145,13 @@ describe("names", () => {
     expect(exportFileName(undefined, undefined, "xlsx")).toBe("Sheet.xlsx");
     expect(exportFileName('a/b\\c:"d"', undefined, "xlsx")).toBe("a_b_c_d_.xlsx");
     expect(exportFileName("Résumé 2026", undefined, "csv")).toBe("Résumé 2026.csv");
+  });
+});
+
+describe("exportSheet with a totals row", () => {
+  it("writes a column named in a formula without the totals row, and the total's formula over the rows above", () => {
+    const result = exportSheet({ csv: "Region,Units\nWest,120\nEast,80\nTotal,", formulas: "B4 =SUM([Units])", totals: true });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.rows[3][1]).toEqual({ value: 200, formula: "SUM($B$2:$B$3)" });
   });
 });

@@ -1,0 +1,280 @@
+{
+  "about": "Formulas that name a table's columns, each run in real Microsoft Excel (opened from a workbook whose tables are defined in its own XML, so they are real Tables) with the string value Excel showed. They are the cases of sheetStructured.excel.test.ts, which resolves each against the same table and calculates it. Cells H1 and down are outside the table; F2 to F5 are its calculated column.",
+  "excelVersion": "16.114.4 (Microsoft Excel for Mac, run 2026-11-08)",
+  "header": [
+    "Region",
+    "Product",
+    "Units",
+    "Unit Price",
+    "Revenue",
+    "Calc"
+  ],
+  "rows": [
+    [
+      "West",
+      "Widget",
+      120,
+      9.5,
+      1140
+    ],
+    [
+      "East",
+      "Widget",
+      80,
+      9.5,
+      760
+    ],
+    [
+      "West",
+      "Gadget",
+      45,
+      20,
+      900
+    ],
+    [
+      "North",
+      "Gadget",
+      10,
+      21.5,
+      215
+    ]
+  ],
+  "tables": {
+    "Table1": {
+      "totals": false
+    },
+    "Table2": {
+      "totals": true
+    }
+  },
+  "cases": [
+    {
+      "table": "Table1",
+      "address": "F2",
+      "formula": "Table1[[#This Row],[Units]]*Table1[[#This Row],[Unit Price]]",
+      "excel": "1140"
+    },
+    {
+      "table": "Table1",
+      "address": "F3",
+      "formula": "Table1[[#This Row],[Units]]*Table1[[#This Row],[Unit Price]]",
+      "excel": "760"
+    },
+    {
+      "table": "Table1",
+      "address": "F4",
+      "formula": "Table1[[#This Row],[Units]]*Table1[[#This Row],[Unit Price]]",
+      "excel": "900"
+    },
+    {
+      "table": "Table1",
+      "address": "F5",
+      "formula": "Table1[[#This Row],[Units]]*Table1[[#This Row],[Unit Price]]",
+      "excel": "215"
+    },
+    {
+      "table": "Table1",
+      "address": "H1",
+      "formula": "SUM(Table1[Revenue])",
+      "excel": "3015"
+    },
+    {
+      "table": "Table1",
+      "address": "H2",
+      "formula": "Table1[[#This Row],[Units]]",
+      "excel": "120"
+    },
+    {
+      "table": "Table1",
+      "address": "H3",
+      "formula": "Table1[[#This Row],[Unit Price]]",
+      "excel": "9.5"
+    },
+    {
+      "table": "Table1",
+      "address": "H4",
+      "formula": "Table1[[#Headers],[Revenue]]",
+      "excel": "Revenue"
+    },
+    {
+      "table": "Table1",
+      "address": "H5",
+      "formula": "ROWS(Table1[#Data])",
+      "excel": "4"
+    },
+    {
+      "table": "Table1",
+      "address": "H6",
+      "formula": "ROWS(Table1[#All])",
+      "excel": "5"
+    },
+    {
+      "table": "Table1",
+      "address": "H7",
+      "formula": "COLUMNS(Table1[[Region]:[Units]])",
+      "excel": "3"
+    },
+    {
+      "table": "Table1",
+      "address": "H8",
+      "formula": "SUMIFS(Table1[Revenue],Table1[Region],\"West\")",
+      "excel": "2040"
+    },
+    {
+      "table": "Table1",
+      "address": "H9",
+      "formula": "COUNTA(Table1[#Headers])",
+      "excel": "6"
+    },
+    {
+      "table": "Table1",
+      "address": "H10",
+      "formula": "INDEX(Table1[Region],MATCH(MAX(Table1[Revenue]),Table1[Revenue],0))",
+      "excel": "West"
+    },
+    {
+      "table": "Table1",
+      "address": "H11",
+      "formula": "SUM(Table1[[#Data],[Units]])",
+      "excel": "255"
+    },
+    {
+      "table": "Table1",
+      "address": "H12",
+      "formula": "SUM(Table1[Calc])",
+      "excel": "3015"
+    },
+    {
+      "table": "Table1",
+      "address": "H13",
+      "formula": "Table1[[#This Row],[Units]]",
+      "excel": "#VALUE!"
+    },
+    {
+      "table": "Table1",
+      "address": "H14",
+      "formula": "COUNTA(Table1[[#Headers],[#Data]])",
+      "excel": "30"
+    },
+    {
+      "table": "Table1",
+      "address": "H15",
+      "formula": "SUM(Table1[[Units]:[Revenue]])",
+      "excel": "3330.5"
+    },
+    {
+      "table": "Table1",
+      "address": "H16",
+      "formula": "SUM(Table1[[#Data],[Units]:[Revenue]])",
+      "excel": "3330.5"
+    },
+    {
+      "table": "Table1",
+      "address": "H17",
+      "formula": "Table1[[#Headers],[Region]]",
+      "excel": "Region"
+    },
+    {
+      "table": "Table1",
+      "address": "H18",
+      "formula": "SUM(Table1[[#This Row],[Units]:[Revenue]])",
+      "excel": "#VALUE!"
+    },
+    {
+      "table": "Table1",
+      "address": "H19",
+      "formula": "COUNTA(Table1[#All])",
+      "excel": "30"
+    },
+    {
+      "table": "Table2",
+      "address": "F2",
+      "formula": "Table2[[#This Row],[Units]]*Table2[[#This Row],[Unit Price]]",
+      "excel": "1140"
+    },
+    {
+      "table": "Table2",
+      "address": "F3",
+      "formula": "Table2[[#This Row],[Units]]*Table2[[#This Row],[Unit Price]]",
+      "excel": "760"
+    },
+    {
+      "table": "Table2",
+      "address": "F4",
+      "formula": "Table2[[#This Row],[Units]]*Table2[[#This Row],[Unit Price]]",
+      "excel": "900"
+    },
+    {
+      "table": "Table2",
+      "address": "F5",
+      "formula": "Table2[[#This Row],[Units]]*Table2[[#This Row],[Unit Price]]",
+      "excel": "215"
+    },
+    {
+      "table": "Table2",
+      "address": "H1",
+      "formula": "ROWS(Table2[#All])",
+      "excel": "6"
+    },
+    {
+      "table": "Table2",
+      "address": "H2",
+      "formula": "ROWS(Table2[#Data])",
+      "excel": "4"
+    },
+    {
+      "table": "Table2",
+      "address": "H3",
+      "formula": "Table2[[#Totals],[Units]]",
+      "excel": "255"
+    },
+    {
+      "table": "Table2",
+      "address": "H4",
+      "formula": "SUM(Table2[Revenue])",
+      "excel": "3015"
+    },
+    {
+      "table": "Table2",
+      "address": "H5",
+      "formula": "COUNTA(Table2[#Totals])",
+      "excel": "2"
+    },
+    {
+      "table": "Table2",
+      "address": "H6",
+      "formula": "SUM(Table2[[#Data],[Units]])",
+      "excel": "255"
+    },
+    {
+      "table": "Table2",
+      "address": "H7",
+      "formula": "COUNTA(Table2[[#Headers],[#Data]])",
+      "excel": "30"
+    },
+    {
+      "table": "Table2",
+      "address": "H8",
+      "formula": "SUM(Table2[Units])",
+      "excel": "255"
+    },
+    {
+      "table": "Table2",
+      "address": "H9",
+      "formula": "COLUMNS(Table2[#Totals])",
+      "excel": "6"
+    },
+    {
+      "table": "Table2",
+      "address": "H10",
+      "formula": "Table2[[#Totals],[Region]]",
+      "excel": "Total"
+    },
+    {
+      "table": "Table2",
+      "address": "H11",
+      "formula": "ROWS(Table2[[#Data],[#Totals]])",
+      "excel": "5"
+    }
+  ]
+}

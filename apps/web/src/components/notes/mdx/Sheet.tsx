@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { SheetEditContext } from "../SheetEdit";
 import { SheetExportDialog } from "../SheetExportDialog";
 import { textOf } from "./Chart";
-import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, parseFormulas, parseSheet, viewportHeight } from "./sheetData";
+import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, isTotalsRow, parseFormulas, parseSheet, viewportHeight } from "./sheetData";
 import { calculate } from "./sheetFormula";
 
 /** Every row is this tall, in pixels, which is what lets a long sheet draw only the rows in view. */
@@ -104,6 +104,7 @@ export function Sheet({
   source,
   sheet: sheetName,
   range,
+  totals,
   children,
   node,
 }: {
@@ -112,17 +113,20 @@ export function Sheet({
   source?: string;
   sheet?: string;
   range?: string;
+  /** The last row is the table's totals row, which a column named in a formula (`[Revenue]`) does not include. */
+  totals?: string | boolean;
   /** Fingerprints what an import wrote (see importedHash); not drawn. */
   imported?: string;
   children?: ReactNode;
   node?: SourceNode;
 }) {
   const editing = useContext(SheetEditContext);
+  const totalsRow = isTotalsRow(totals);
   const csv = blockText(children, "csv");
   const formulaSource = formulasText(children);
   const parsed = useMemo(() => parseSheet(csv), [csv]);
   const formulas = useMemo(() => parseFormulas(formulaSource), [formulaSource]);
-  const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas, formulas.carried) : undefined), [parsed, formulas]);
+  const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas, formulas.carried, { totals: totalsRow }) : undefined), [parsed, formulas, totalsRow]);
   const widths = useMemo(() => (calculated ? columnWidths(calculated.sheet) : []), [calculated]);
   const [scrollTop, setScrollTop] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -193,7 +197,7 @@ export function Sheet({
         )}
         <SheetTool label="Export…" icon={<DownloadIcon className="size-3" />} onClick={() => setExporting(true)} />
       </div>
-      {exporting && <SheetExportDialog open source={{ csv, formulas: formulaSource }} title={title} from={source} onClose={() => setExporting(false)} />}
+      {exporting && <SheetExportDialog open source={{ csv, formulas: formulaSource, ...(totalsRow ? { totals: true } : {}) }} title={title} from={source} onClose={() => setExporting(false)} />}
       <div
         role="region"
         aria-label={`${caption || "Sheet"}: ${count(bodyRows, "row")} by ${count(columns, "column")}`}

@@ -19,7 +19,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { chartMarkdown } from "./chartText";
 import { sheetMarkdown } from "./sheetText";
-import { HEADINGS_PROP, calculate, imageNameFromRef, parseChart, parseFormulas, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
+import { HEADINGS_PROP, calculate, imageNameFromRef, isTotalsRow, parseChart, parseFormulas, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
@@ -377,7 +377,10 @@ function sheetText(element: Node): string {
   const parsed = parseSheet(blockOf(element, "csv"));
   if (!parsed.sheet) return parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
   const { formulas, carried } = parseFormulas(formulasOf(element));
-  const { sheet, results } = calculate(parsed.sheet, formulas, carried);
+  // `<Sheet totals>`, bare, has no string value: its being there is the answer.
+  const totalsAttribute = element.attributes?.find((a) => a.name === "totals");
+  const totals = totalsAttribute !== undefined && isTotalsRow(typeof totalsAttribute.value === "string" ? totalsAttribute.value : true);
+  const { sheet, results } = calculate(parsed.sheet, formulas, carried, { totals });
   const notCalculated = [...results].filter(([, result]) => result.unsupported.length > 0).map(([address, result]) => `${address} (${result.unsupported[0]})`);
   const shown = notCalculated.slice(0, 5).join("; ");
   const note = notCalculated.length > 0 ? `\n\nNot calculated: ${shown.replace(/[\\[\]<>`*_]/g, "\\$&")}${notCalculated.length > 5 ? `; and ${notCalculated.length - 5} more` : ""}.` : "";

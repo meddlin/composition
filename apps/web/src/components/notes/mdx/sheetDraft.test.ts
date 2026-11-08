@@ -16,6 +16,7 @@ import {
   pasteBlock,
   rangeFromClipboard,
   setCell,
+  setTotals,
   trimDraft,
   type Draft,
 } from "./sheetDraft";
@@ -201,6 +202,38 @@ describe("inserting and deleting columns", () => {
   });
 });
 
+describe("column names in formulas, when rows and columns come and go", () => {
+  const NAMED: Draft = {
+    ...draft([
+      ["Region", "Units", "Price", "Revenue"],
+      ["West", "120", "9.5", "=[@Units]*[@Price]"],
+      ["East", "80", "9.5", "=[@Units]*[@Price]"],
+      ["Total", "=SUM([Units])", "", "=SUM([Revenue])"],
+    ]),
+    totals: true,
+  };
+
+  it("keeps a formula that names a column as it was when a row or a column goes in, since it says which column and not where", () => {
+    const wider = insertColumn(insertRow(NAMED, 2), 1);
+    expect(wider.rows[1][4]).toBe("=[@Units]*[@Price]");
+    expect(wider.rows[4][2]).toBe("=SUM([Units])");
+  });
+
+  it("calculates the same after a row is put in, though the data are one longer", () => {
+    const inserted = insertRow(NAMED, 1);
+    expect(inserted.totals).toBe(true);
+    const withData = setCell(setCell(setCell(setCell(inserted, 1, 0, "North"), 1, 1, "10"), 1, 2, "2"), 1, 3, "=[@Units]*[@Price]");
+    const { sheet } = calculateDraft(withData);
+    expect(sheet.rows[1][3]).toBe("20");
+    expect(sheet.rows[4][3]).toBe("1920");
+  });
+
+  it("makes a formula that names a column that is deleted #REF!", () => {
+    const { sheet } = calculateDraft(deleteColumn(NAMED, 1));
+    expect(sheet.rows[3][2]).toBe("#REF!");
+  });
+});
+
 describe("pasteBlock", () => {
   it("fills cells from the corner, and grows the grid to hold them", () => {
     const { draft: next, cut } = pasteBlock(draft([["a", "b"], ["c", "d"]]), 1, 1, [["1", "2"], ["3", "4"]]);
@@ -379,5 +412,46 @@ describe("rangeFromClipboard", () => {
   it("is not a range too big for a sheet", () => {
     expect(rangeFromClipboard(Array.from({ length: 5002 }, (_, i) => `${i}\tx`).join("\n"))).toBeNull();
     expect(rangeFromClipboard(Array.from({ length: 101 }, (_, i) => String(i)).join("\t") + "\n1\t2")).toBeNull();
+  });
+});
+
+
+describe("the totals row", () => {
+  const rows = [
+    ["Region", "Units"],
+    ["West", "120"],
+    ["Total", "=SUM([Units])"],
+  ];
+
+  it("is data when the sheet does not say its last row is a totals row, so a total there reads itself", () => {
+    expect(calculateDraft(draft(rows)).sheet.rows[2][1]).toBe("#NAME?");
+  });
+
+  it("is left out of a column named in a formula when it does, so the total reads the rows above it", () => {
+    expect(calculateDraft({ ...draft(rows), totals: true }).sheet.rows[2][1]).toBe("120");
+  });
+
+  it("is set and cleared with setTotals, which leaves an equal draft alone", () => {
+    const plain = draft(rows);
+    const on = setTotals(plain, true);
+    expect(on.totals).toBe(true);
+    expect(setTotals(on, true)).toBe(on);
+    expect(setTotals(plain, false)).toBe(plain);
+    expect("totals" in setTotals(on, false)).toBe(false);
+  });
+
+  it("is kept through every change to the rows and columns, and written with the blocks", () => {
+    const on = { ...draft(rows), totals: true };
+    for (const changed of [setCell(on, 1, 0, "East"), insertRow(on, 1), deleteRow(on, 1), insertColumn(on, 1), deleteColumn(on, 1), pasteBlock(on, 0, 0, [["x"]]).draft, trimDraft(on), clearCells(on, { row: 1, col: 0 }, { row: 1, col: 0 })]) {
+      expect(changed.totals).toBe(true);
+    }
+    expect(draftToSource(on)).toMatchObject({ ok: true, source: { totals: true } });
+    expect(draftToSource(draft(rows))).toEqual(expect.not.objectContaining({ source: expect.objectContaining({ totals: true }) }));
+  });
+
+  it("is read back by draftFromSource", () => {
+    expect(draftFromSource("Region,Units\nWest,120\nTotal,", "B3 =SUM([Units])", true).totals).toBe(true);
+    expect(draftFromSource("Region,Units\nWest,120", "").totals).toBeUndefined();
+    expect(draftFromSource("", "", true).totals).toBe(true);
   });
 });

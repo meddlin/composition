@@ -97,7 +97,8 @@ export function tokenize(text: string): Token[] {
       let depth = 0;
       let j = 0;
       for (; j < rest.length; j++) {
-        if (rest[j] === "[") depth++;
+        if (rest[j] === "'") j++; // an escaped bracket in a column name: '[ or ']
+        else if (rest[j] === "[") depth++;
         else if (rest[j] === "]" && --depth === 0) break;
       }
       if (j >= rest.length) throw new SyntaxProblem("a [ without its ]");

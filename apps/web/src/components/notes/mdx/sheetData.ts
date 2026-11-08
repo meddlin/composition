@@ -109,6 +109,9 @@ export function parseFormulas(text: string): FormulasParse {
   return { formulas, carried, problems };
 }
 
+/** What a tag's `totals` says: written bare (`<Sheet totals>`) it is `true`, and `totals="true"` says the same; `totals="false"` and a tag without it say no. */
+export const isTotalsRow = (value: string | boolean | undefined) => value === true || (typeof value === "string" && /^(?:true|yes|1)?$/i.test(value.trim()));
+
 /** A column's name as Excel writes it: A to Z, then AA, AB… (0 is A). */
 export function columnLabel(index: number): string {
   let label = "";

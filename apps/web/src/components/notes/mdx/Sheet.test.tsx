@@ -346,3 +346,25 @@ describe("Sheet: Export and Re-import", () => {
     expect(screen.queryByRole("button", { name: "Re-import" })).toBeNull();
   });
 });
+
+describe("Sheet: a totals row", () => {
+  const body = (
+    <>
+      {fence("csv", "Region,Units\nWest,120\nEast,80\nTotal,")}
+      {fence("formulas", "B4 =SUM([Units])")}
+    </>
+  );
+
+  it("is left out of a column named in a formula when the tag says totals, bare or with a value", () => {
+    const { unmount } = render(<Sheet totals>{body}</Sheet>);
+    expect(screen.getByRole("cell", { name: "200" })).toBeTruthy();
+    unmount();
+    render(<Sheet totals="true">{body}</Sheet>);
+    expect(screen.getByRole("cell", { name: "200" })).toBeTruthy();
+  });
+
+  it("is data when the tag does not say so, and a total there reads itself, which is said", () => {
+    render(<Sheet>{body}</Sheet>);
+    expect(screen.getByRole("cell", { name: "#NAME?" })).toBeTruthy();
+  });
+});

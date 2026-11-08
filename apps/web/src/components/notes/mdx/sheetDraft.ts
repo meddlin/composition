@@ -21,7 +21,20 @@ export type Draft = {
    * Changing a cell, in any way, makes its formula an ordinary one.
    */
   carried?: readonly (readonly (string | null)[])[];
+  /** The last row is the table's totals row, which a column named in a formula does not include (the tag says `totals`). Left out when it is not. */
+  totals?: boolean;
 };
+
+/** `totals` as a draft holds it: present only when true, so a draft without one is equal to one that never had it. */
+const withTotals = (totals: boolean | undefined) => (totals ? { totals: true } : {});
+
+/** The draft with its last row made a totals row, or not. */
+export function setTotals(draft: Draft, totals: boolean): Draft {
+  if ((draft.totals ?? false) === totals) return draft;
+  const changed: Draft = { ...draft, ...withTotals(totals) };
+  if (!totals) delete changed.totals;
+  return changed;
+}
 
 /** What a new sheet starts as: a header row and five empty ones, in four columns. */
 export const NEW_SHEET_ROWS = 6;
@@ -58,12 +71,12 @@ const inputOfText = (text: string) => (text.startsWith("=") ? `'${text}` : text)
 export const commitInput = (text: string) => text.replace(/\s*[\r\n]+\s*/g, " ").trim();
 
 /** The sheet in the note's two blocks, as a draft. A sheet with no CSV is an empty one, to start typing in. */
-export function draftFromSource(csv: string, formulasText: string): Draft {
+export function draftFromSource(csv: string, formulasText: string, totals = false): Draft {
   const parsed = parseSheet(csv);
-  if (!parsed.sheet) return emptyDraft();
+  if (!parsed.sheet) return { ...emptyDraft(), ...withTotals(totals) };
   const { formulas, carried } = parseFormulas(formulasText);
   // The grid grows to hold a formula below the last CSV row, as it does when the sheet is drawn.
-  const { sheet } = calculate(parsed.sheet, formulas, carried);
+  const { sheet } = calculate(parsed.sheet, formulas, carried, { totals });
   const rows = sheet.rows.map((row) => row.map(inputOfText));
   const kept = sheet.rows.map((row) => row.map((): string | null => null));
   for (const [address, formula] of formulas) {
@@ -76,7 +89,7 @@ export function draftFromSource(csv: string, formulasText: string): Draft {
     // A carried formula keeps what the CSV holds in its cell, which is its value.
     if (carried.has(address)) kept[row][column] = sheet.rows[row][column];
   }
-  return { rows, columns: sheet.columns, ...(carried.size > 0 && kept.some((cells) => cells.some((cell) => cell !== null)) ? { carried: kept } : {}) };
+  return { rows, columns: sheet.columns, ...(carried.size > 0 && kept.some((cells) => cells.some((cell) => cell !== null)) ? { carried: kept } : {}), ...withTotals(totals) };
 }
 
 /** The draft with one cell changed to `input`, as it is kept (see `commitInput`). */
@@ -123,7 +136,7 @@ export function insertRow(draft: Draft, at: number): Draft {
 /** Row `at` taken out, with the formulas that point at it showing `#REF!`. The last row left is emptied, not removed. */
 export function deleteRow(draft: Draft, at: number): Draft {
   if (at < 0 || at >= draft.rows.length) return draft;
-  if (draft.rows.length === 1) return { columns: draft.columns, rows: [blankRow(draft.columns)] };
+  if (draft.rows.length === 1) return { columns: draft.columns, rows: [blankRow(draft.columns)], ...withTotals(draft.totals) };
   const shift: Shift = { axis: "row", at, delta: -1 };
   const rows = draft.rows.map((cells) => shiftFormulas(cells, shift));
   rows.splice(at, 1);
@@ -135,6 +148,7 @@ export function insertColumn(draft: Draft, at: number): Draft {
   if (!canInsertColumn(draft) || at < 0 || at > draft.columns) return draft;
   const shift: Shift = { axis: "col", at, delta: 1 };
   return {
+    ...withTotals(draft.totals),
     columns: draft.columns + 1,
     rows: draft.rows.map((cells) => {
       const next = shiftFormulas(cells, shift);
@@ -148,9 +162,10 @@ export function insertColumn(draft: Draft, at: number): Draft {
 /** Column `at` taken out. The last column left is emptied, not removed. */
 export function deleteColumn(draft: Draft, at: number): Draft {
   if (at < 0 || at >= draft.columns) return draft;
-  if (draft.columns === 1) return { columns: 1, rows: draft.rows.map(() => [""]) };
+  if (draft.columns === 1) return { columns: 1, rows: draft.rows.map(() => [""]), ...withTotals(draft.totals) };
   const shift: Shift = { axis: "col", at, delta: -1 };
   return {
+    ...withTotals(draft.totals),
     columns: draft.columns - 1,
     rows: draft.rows.map((cells) => {
       const next = shiftFormulas(cells, shift);
@@ -183,7 +198,7 @@ export function pasteBlock(draft: Draft, row: number, col: number, block: readon
         Array.from({ length: columns }, (_, c) => (r >= row && r < row + block.length && c >= col && c < col + (block[r - row]?.length ?? 0) ? null : (draft.carried?.[r]?.[c] ?? null))),
       )
     : undefined;
-  return { draft: { rows, columns, ...(carried?.some((cells) => cells.some((cell) => cell !== null)) ? { carried } : {}) }, cut };
+  return { draft: { rows, columns, ...(carried?.some((cells) => cells.some((cell) => cell !== null)) ? { carried } : {}), ...withTotals(draft.totals) }, cut };
 }
 
 /**
@@ -275,6 +290,7 @@ export function trimDraft(draft: Draft): Draft {
   while (columns > 1 && draft.rows.slice(0, rowCount).every((cells) => cells[columns - 1] === "")) columns--;
   if (rowCount === draft.rows.length && columns === draft.columns) return draft;
   return {
+    ...withTotals(draft.totals),
     rows: draft.rows.slice(0, rowCount).map((cells) => cells.slice(0, columns)),
     columns,
     carried: draft.carried?.slice(0, rowCount).map((cells) => cells.slice(0, columns)),
@@ -286,6 +302,8 @@ export type SheetSource = {
   csv: string;
   /** The text of the `formulas` block, empty when no cell has a formula. */
   formulas: string;
+  /** The tag says `totals`: the last row is the table's totals row (see `sheetTableOf`). */
+  totals?: boolean;
 };
 
 export type DraftToSource = { ok: true; source: SheetSource } | { ok: false; error: string };
@@ -305,7 +323,7 @@ export function calculateDraft(draft: Draft): Calculated & { formulas: Map<strin
       return kept;
     }),
   );
-  return { formulas, carried, ...calculate({ rows: values, columns: draft.columns }, formulas, carried) };
+  return { formulas, carried, ...calculate({ rows: values, columns: draft.columns }, formulas, carried, { totals: draft.totals }) };
 }
 
 /**
@@ -323,5 +341,5 @@ export function draftToSource(draft: Draft): DraftToSource {
 
   const { formulas, carried, sheet } = calculateDraft(trimmed);
   const lines = [...formulas].map(([address, formula]) => `${address} ${carried.has(address) ? "carried " : ""}${formula}`);
-  return { ok: true, source: { csv: formatCsv(sheet.rows), formulas: lines.join("\n") } };
+  return { ok: true, source: { csv: formatCsv(sheet.rows), formulas: lines.join("\n"), ...withTotals(trimmed.totals) } };
 }

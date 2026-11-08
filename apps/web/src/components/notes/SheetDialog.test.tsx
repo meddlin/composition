@@ -291,3 +291,49 @@ describe("SheetDialog: rows and columns", () => {
     expect(cell(1, 0).textContent).toBe("Pencils");
   });
 });
+
+describe("SheetDialog: the totals row", () => {
+  const WITH_TOTAL: SheetEditSource = { kind: "edit", csv: "Region,Units\nWest,120\nEast,80\nTotal,", formulas: "B4 =SUM([Units])" };
+  const checkbox = () => screen.getByRole("checkbox", { name: "Last row is a totals row" }) as HTMLInputElement;
+
+  it("is off for a sheet whose tag does not say so, where a total that names its own column reads itself", () => {
+    open(WITH_TOTAL);
+    expect(checkbox().checked).toBe(false);
+    expect(cell(4, 1).textContent).toBe("#NAME?");
+  });
+
+  it("is turned on by the checkbox, which calculates the total from the rows above, and is saved with the blocks", () => {
+    const { onSaved } = open(WITH_TOTAL);
+
+    fireEvent.click(checkbox());
+
+    expect(checkbox().checked).toBe(true);
+    expect(cell(4, 1).textContent).toBe("200");
+    fireEvent.click(button("Save sheet"));
+    expect(onSaved).toHaveBeenCalledWith({ csv: "Region,Units\nWest,120\nEast,80\nTotal,200", formulas: "B4 =SUM([Units])", totals: true });
+  });
+
+  it("is on when the sheet's tag said so, and a change of it is one step for undo", () => {
+    open({ ...WITH_TOTAL, totals: true });
+    expect(checkbox().checked).toBe(true);
+    expect(cell(4, 1).textContent).toBe("200");
+
+    fireEvent.click(checkbox());
+    expect(cell(4, 1).textContent).toBe("#NAME?");
+    fireEvent.click(button("Undo"));
+    expect(checkbox().checked).toBe(true);
+  });
+
+  it("cannot be set on a sheet of a single row, which has no row to be one", () => {
+    open({ kind: "edit", csv: "A", formulas: "" });
+    expect(checkbox().disabled).toBe(true);
+  });
+
+  it("does not start a row after the totals row when Enter is pressed after typing in it", () => {
+    open({ ...WITH_TOTAL, totals: true });
+    press("ArrowDown", { metaKey: true });
+    typeInto("Sum");
+
+    expect(screen.getAllByRole("row")).toHaveLength(5); // the letters, the header, and three rows: no fourth
+  });
+});

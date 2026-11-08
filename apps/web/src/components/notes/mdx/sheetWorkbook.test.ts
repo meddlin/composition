@@ -2,6 +2,7 @@ import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
 import { importRange } from "./sheetImport";
 import { MAX_ROWS_READ, numberFormatKind, readWorkbook, sourceCell } from "./sheetWorkbook";
+import { unzipToFiles, zip } from "./zipForTests";
 
 /** A sheet as SheetJS holds it: its cells by address, and the range they are in as `!ref`. */
 type Cells = Record<string, unknown>;
@@ -116,34 +117,6 @@ describe("readWorkbook", () => {
   });
 });
 
-/** A zip file of these entries, stored with no compression: enough to hand SheetJS a workbook whose XML is written by hand. */
-function zip(files: Record<string, string>): Uint8Array {
-  const crcTable = Array.from({ length: 256 }, (_, n) => {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    return c >>> 0;
-  });
-  const crc32 = (bytes: Uint8Array) => (bytes.reduce((c, byte) => crcTable[(c ^ byte) & 0xff] ^ (c >>> 8), 0xffffffff) ^ 0xffffffff) >>> 0;
-  const encoder = new TextEncoder();
-  const parts: Uint8Array[] = [];
-  const central: Uint8Array[] = [];
-  let offset = 0;
-  const u16 = (n: number) => [n & 255, (n >> 8) & 255];
-  const u32 = (n: number) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
-  for (const [name, content] of Object.entries(files)) {
-    const nameBytes = encoder.encode(name);
-    const data = encoder.encode(content);
-    const crc = crc32(data);
-    const local = Uint8Array.from([...u32(0x04034b50), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...nameBytes, ...data]);
-    central.push(Uint8Array.from([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(offset), ...nameBytes]));
-    parts.push(local);
-    offset += local.length;
-  }
-  const centralSize = central.reduce((total, part) => total + part.length, 0);
-  const end = Uint8Array.from([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(central.length), ...u16(central.length), ...u32(centralSize), ...u32(offset), ...u16(0)]);
-  return Uint8Array.from([...parts.flatMap((part) => [...part]), ...central.flatMap((part) => [...part]), ...end]);
-}
-
 const MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const RELS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const workbookWith = (sheetXml: string, extraWorkbookXml = "") =>
@@ -191,22 +164,6 @@ describe("readWorkbook: a file as Excel writes it", () => {
     expect(range.date1904).toBe(true);
   });
 });
-
-/** The entries of a stored zip made by `zip` above, to build on. */
-function unzipToFiles(archive: Uint8Array): Record<string, string> {
-  const view = new DataView(archive.buffer, archive.byteOffset, archive.byteLength);
-  const decoder = new TextDecoder();
-  const files: Record<string, string> = {};
-  let at = 0;
-  while (view.getUint32(at, true) === 0x04034b50) {
-    const size = view.getUint32(at + 18, true);
-    const nameLength = view.getUint16(at + 26, true);
-    const name = decoder.decode(archive.subarray(at + 30, at + 30 + nameLength));
-    files[name] = decoder.decode(archive.subarray(at + 30 + nameLength, at + 30 + nameLength + size));
-    at += 30 + nameLength + size;
-  }
-  return files;
-}
 
 describe("sourceCell", () => {
   it("is null for a cell with no value and no formula, or an empty text, and keeps a formula that has no value saved", () => {

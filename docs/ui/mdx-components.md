@@ -392,7 +392,7 @@ formulas will work in Excel: the syntax is Excel's, and each rule below was read
     `$0.00`, `;` sections) and the date letters (`yyyy-mm-dd`, `mmm d, yyyy`, `dddd`)
   - *Dates* (as numbers: Excel's days from 1900, with its 29 February 1900): `DATE` `YEAR` `MONTH` `DAY` `EOMONTH` `EDATE` `WEEKDAY`
 - **What it does not calculate says so, and is not guessed.** A function not in the list (`FILTER`, `LET`, `TODAY`,
-  `NETWORKDAYS`…), another sheet (`Sheet2!A1`), a table's `[Column]`, a name, a text Excel would read as a date
+  `NETWORKDAYS`…), another sheet (`Sheet2!A1`), a name, a text Excel would read as a date
   (`"1/2/2026"+1`), a `TEXT` format with a time, a fraction or E notation, `XLOOKUP` by binary search, a formula that
   refers to itself, or one that fills several cells makes the cell **`#NAME?`**, and pointing at it says why. So does
   every cell that depends on it. A formula that came from Excel and does this is [carried](#carried-formulas) instead.
@@ -403,6 +403,42 @@ calculates, [`sheetParse.ts`](../../apps/web/src/components/notes/mdx/sheetParse
 [`sheetCriteria.ts`](../../apps/web/src/components/notes/mdx/sheetCriteria.ts) matches criteria, and so on. It is tested against
 real Excel: [`excel-verified-cases.json`](../../spikes/sheet/excel-verified-cases.json) holds more than 1,200 formulas with the
 result Excel gave each, and `node spikes/sheet/run-in-excel.mjs` runs new ones in Excel on a Mac and records them.
+
+### Column names in formulas
+
+The header row of a sheet is its table, as in Excel, so a formula can say a column by its name:
+
+````mdx
+<Sheet totals>
+
+```csv
+Region,Units,Unit Price,Revenue
+West,120,9.5,
+East,80,9.5,
+Total,,,
+```
+
+```formulas
+D2 =[@Units]*[@[Unit Price]]
+D3 =[@Units]*[@[Unit Price]]
+B4 =SUM([Units])
+D4 =SUM([Revenue])
+```
+
+</Sheet>
+````
+
+- **What is read** (Excel's own grammar for a table): `[Revenue]` (the data of a column), `[@Units]` and `[@[Unit Price]]` (this row's cell), `[@]` (this row), `[[#This Row],[Units]]` (the same),
+  `[[Region]:[Revenue]]` (columns from one to another), `[#Headers]`, `[#Data]`, `[#Totals]`, `[#All]`, and `[[#Headers],[Revenue]]`, `[[#Data],[Revenue]]`, `[[#Headers],[#Data]]`, `[[#Data],[#Totals]]`. A column
+  name with `[`, `]`, `#` or `'` in it is written with a `'` before the character, as in Excel. Names are matched without regard to case.
+- **The table is the sheet**: the header row, and the rows of the CSV below it. A formula in a row under the last CSV row (the grid grows to hold it) is not one of the data, so `=SUM([Revenue])` there is safe.
+- **A total inside the CSV needs `totals`.** Say `<Sheet totals>` (or tick **Last row is a totals row** in the grid editor, which writes `totals="true"`) and the last row is the table's Total Row: not data, so `=SUM([Units])`
+  in it reads the rows above it. Without it that formula would read its own cell, and the sheet says so. `[#Totals]` is that row, and `[@Units]` in it is `#VALUE!`, as in Excel.
+- **A column the sheet has not** is `#REF!` where it is written (so `IFERROR([Nope],0)` is 0); **`@` in a row that is not one of the data** is `#VALUE!`; what Excel's grammar has no such form for (`[[#Headers],[#Totals]]`, two columns that are not a range) is `#NAME?`,
+  and pointing at the cell says why. **A table's name** (`Table1[Revenue]`) is not read in a sheet, which is one table with no name: write `[Revenue]`.
+- **They keep working when rows and columns come and go**, since they say which column and not where it is. Renaming a header does not change the formulas that use it (Excel changes them; this does not), so they say `#REF!` until they are changed.
+- **On export** each is written as the range it stands for (`$D$2:$D$3`), since Excel would not know the table. **On import** the tables of the file are read, so `Table1[Revenue]` and `[@Units]` come across as formulas (see below).
+- Checked in Excel itself: 38 cases over a table and a table with a totals row (`excel-verified-tables.json`) give the same here.
 
 ### Carried formulas
 
@@ -452,8 +488,9 @@ range is read when its box is left or Enter is pressed), says what would come ac
     gives is Excel's to 15 digits;
   - **[carried](#carried-formulas)** when its function is not one this engine has (`FILTER`, `LET`…), or the result differs, or Excel shows the
     result as a date (a sheet has no cell formats, so a recalculated date would show as a number of days);
-  - **kept as a value** when it reads anything outside the range: another sheet or workbook, a cell above or left of it or beyond it, a table's column
-    (`Table1[Revenue]`), or a defined name. Whole columns and rows inside the range's columns and rows are inside.
+  - **kept as a value** when it reads anything outside the range: another sheet or workbook, a cell above or left of it or beyond it, a column of a table that the range does not
+    hold, a table on another sheet, or a defined name. Whole columns and rows inside the range's columns and rows are inside. **A table's columns are read from the file**
+    (`Table1[Revenue]`, `[@Units]`, `Table1[[#This Row],[Units]]` become ranges of that table, with its totals row left out of the data), so they stay formulas when the range holds the table.
 - **The dialog says all of it first**: the size, how many formulas there are, and how many of each kind, with the reasons ("1 is carried … Why: the
   function FILTER (1)").
 - **Limits.** A range of more than 5,001 rows (the header included) or 100 columns, or one whose first row is empty, is refused with the reason; a file over

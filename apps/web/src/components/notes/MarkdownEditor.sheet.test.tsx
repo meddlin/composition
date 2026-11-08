@@ -128,6 +128,25 @@ describeParity("MarkdownEditor: the sheet editor", (scenario) => {
     await waitFor(() => expect(editor.reported.at(-1)).toBe(`${FRONTMATTER}Before\n\n<Sheet title="Q3">\n\n\`\`\`csv\nItem,Qty\nPens,12\n\`\`\`\n\n</Sheet>\n\nAfter`));
   });
 
+  scenario("says on the tag that the last row is a totals row when the sheet was saved so, and takes it off again", async ({ render }) => {
+    saving = { ...SAVED, totals: true };
+    const editor = render({ initial: "Intro" });
+    sheetShortcut(editor);
+    save();
+    await waitFor(() => expect(editor.reported.at(-1)).toContain('<Sheet totals="true">'));
+
+    const note = editor.text();
+    const inSheet = note.indexOf("Item,Qty");
+    editor.select(inSheet, inSheet);
+    saving = SAVED;
+    sheetShortcut(editor);
+    expect(sourceOf()).toEqual({ kind: "edit", csv: "Item,Qty\nPens,12", formulas: "", totals: true });
+    save();
+
+    await waitFor(() => expect(editor.reported.at(-1)).toContain("<Sheet>\n"));
+    expect(editor.reported.at(-1)).not.toContain("totals");
+  });
+
   scenario("is opened from outside too, by the pane's Sheet button", ({ render }) => {
     const controls = createRef<MarkdownEditorControls>();
     render({ initial: "Intro", controls });

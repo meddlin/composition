@@ -260,6 +260,15 @@ describe("parsePreview", () => {
       expect(block).toEqual({ kind: "markdown", source: "```\n  A   B\n1 a   b\n2 1  99\n```" });
     });
 
+    it("calculates a column named in a formula, and leaves the last row out of it when the tag says totals, bare or with a value", () => {
+      const body = ["```csv\nRegion,Units\nWest,120\nEast,80\nTotal,\n```", "```formulas\nB4 =SUM([Units])\n```"];
+      const text = (props: string) => (parsePreview(sheet(props, ...body)).blocks[0] as { source: string }).source;
+      expect(text(" totals")).toMatch(/4 Total\s+200/);
+      expect(text(' totals="true"')).toMatch(/4 Total\s+200/);
+      expect(text("")).toContain("#NAME?");
+      expect(text(' totals="false"')).toContain("#NAME?");
+    });
+
     it("says where an imported sheet came from, under it", () => {
       const [block] = parsePreview(sheet(' source="budget.xlsx" sheet="Q3" range="A1:F40" imported="0123456789ab"', csv("a\n1"))).blocks;
       expect(block).toEqual({ kind: "markdown", source: "```\n  A\n1 a\n2 1\n```\n\nImported from budget.xlsx, sheet Q3, A1:F40." });
