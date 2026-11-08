@@ -59,6 +59,8 @@ See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note'
 
 See [pdf-markup-plan.md](pdf-markup-plan.md) for the design (not built yet) of reading a PDF with your notes beside it: a PDF as a note that owns it, markup stored beside the file (highlights, underlines, text notes, and Apple Pencil ink on the iPad), `pdf:` links from notes, and an **Export annotated PDF** button.
 
+See [manual-tests/stress-databases.md](manual-tests/stress-databases.md) for the generated 1,000-, 10,000- and 50,000-note databases (and the harness that measures the web app on them), and [stress-test-findings.md](stress-test-findings.md) for what they showed: a note over 1,000,000 characters that cannot be saved, a sidebar that re-renders on every keystroke, and a first page and an autosave that carry every note's text.
+
 ## Features
 
 - [x] Create note

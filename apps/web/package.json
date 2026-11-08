@@ -9,6 +9,7 @@
     "start": "next start",
     "fetch:drawio": "node scripts/fetch-drawio.mjs",
     "copy:pdfjs": "node scripts/copy-pdfjs.mjs",
+    "stress:db": "node scripts/sample-db/generate.mjs",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
