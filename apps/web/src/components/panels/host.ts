@@ -6,6 +6,8 @@ export type SidebarActions = {
   onToggleFavorite: (type: "group" | "note", id: number) => void;
   onSelectGroup: (id: number) => void;
   onCreate: (groupId: number | null, notebookId: number) => void;
+  /** Imports a PDF into a new note there; absent where there are no PDFs (the web app). */
+  onImportPdf?: (groupId: number | null, notebookId: number) => void;
   onDelete: (noteId: number) => void;
   onCreateGroup: (name: string, parentId: number | null, notebookId: number) => void;
   onRenameGroup: (id: number, name: string) => void;

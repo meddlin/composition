@@ -4,6 +4,7 @@ import { IMAGE_DIR_NAME, imageNameFromRef } from "../../../web/src/lib/compositi
 import { IMAGE_RESPONSE_HEADERS, type StoredImage } from "../../../web/src/lib/composition/images";
 import { APP_HOST, APP_ORIGIN, APP_SCHEME } from "./appScheme";
 import { DRAWIO_HOST, DRAWIO_ORIGIN, drawioContentSecurityPolicy } from "./drawioHost";
+import { documentIdFromPath, servePdf } from "./rangeResponse";
 import { mimeTypeFor, resolveRendererFile } from "./rendererFiles";
 
 export { APP_HOST, APP_ORIGIN, APP_SCHEME };
@@ -37,7 +38,8 @@ export function registerSchemePrivileges(): void {
       scheme: APP_SCHEME,
       // `standard` makes relative URLs resolve; `secure` and `supportFetchAPI`
       // let Next's client router fetch its route payloads.
-      privileges: { standard: true, secure: true, supportFetchAPI: true },
+      // `corsEnabled` lets a page served by `next dev` (another origin) fetch a PDF's bytes; see `registerAppProtocol`.
+      privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
     },
   ]);
 }
@@ -45,12 +47,15 @@ export function registerSchemePrivileges(): void {
 /**
  * Serves the exported renderer from `rendererRoot` at app://composition/, and
  * images pasted into notes at app://composition/app_data/<name> (what a note's
- * `![](app_data/<name>)` resolves to; see imageUrl.desktop.ts). `readImage`
- * looks in whichever application data directory is configured at the time.
+ * `![](app_data/<name>)` resolves to; see imageUrl.desktop.ts), and a PDF's bytes at app://composition/documents/<id>,
+ * which the reader fetches a few kilobytes at a time (see rangeResponse.ts). `readImage` and `findDocument` look in
+ * whichever application data directory is configured at the time.
  */
 export function registerAppProtocol(
   rendererRoot: string,
   readImage: (name: string) => Promise<StoredImage | null>,
+  /** Where the bytes of the PDF with this id are, or null when there is none (or its file is gone). */
+  findDocument: (id: number) => string | null,
   drawio: {
     /** The folder the draw.io editor's files are in (`pnpm fetch:drawio`), served at app://drawio/. */
     root: string;
@@ -59,6 +64,7 @@ export function registerAppProtocol(
   },
 ): void {
   const drawioCsp = drawioContentSecurityPolicy(drawio.parentOrigins);
+  const findDocumentFile = findDocument;
   const isFile = (file: string) => {
     try {
       return fs.statSync(file).isFile();
@@ -85,6 +91,20 @@ export function registerAppProtocol(
       return new Response(new Uint8Array(image.data), {
         headers: { "content-type": image.contentType, ...IMAGE_RESPONSE_HEADERS },
       });
+    }
+
+    const documentId = url.host === APP_HOST ? documentIdFromPath(url.pathname) : null;
+    if (documentId !== null) {
+      const file = findDocumentFile(documentId);
+      if (!file) return new Response("Not found", { status: 404 });
+      const response = servePdf(file, request.headers.get("range"), request.method);
+      // Under `next dev` the page is another origin, which may read these bytes only if it is one of the allowed parents.
+      const origin = request.headers.get("origin");
+      if (origin && drawio.parentOrigins.includes(origin)) {
+        response.headers.set("access-control-allow-origin", origin);
+        response.headers.set("access-control-expose-headers", "content-range, content-length, accept-ranges");
+      }
+      return response;
     }
 
     if (url.host === DRAWIO_HOST) {

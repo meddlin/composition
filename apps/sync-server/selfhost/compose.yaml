@@ -1,0 +1,49 @@
+# Self-hosted Composition sync server: one container, one SQLite file, backed up continuously. See README.md.
+#   docker compose up -d --build
+#   docker compose exec sync node lean/tokens.ts add me ipad      # one token per device
+name: composition-sync
+services:
+  sync:
+    build:
+      context: ..
+      dockerfile: lean/Dockerfile
+    image: composition-sync:local
+    restart: unless-stopped
+    environment:
+      # Backup. A folder by default (set BACKUP_DIR to a second disk or a NAS mount). Or an S3-compatible bucket (Cloudflare
+      # R2, Backblaze B2, MinIO): set LITESTREAM_BUCKET and the values below. If both are set the bucket wins. To run with NO
+      # backup, set LITESTREAM_FILE_PATH to an empty string (the server logs a warning at every start).
+      LITESTREAM_FILE_PATH: ${LITESTREAM_FILE_PATH-/backup}
+      LITESTREAM_BUCKET: ${LITESTREAM_BUCKET:-}
+      LITESTREAM_ENDPOINT: ${LITESTREAM_ENDPOINT:-}
+      LITESTREAM_REGION: ${LITESTREAM_REGION:-}
+      LITESTREAM_ACCESS_KEY_ID: ${LITESTREAM_ACCESS_KEY_ID:-}
+      LITESTREAM_SECRET_ACCESS_KEY: ${LITESTREAM_SECRET_ACCESS_KEY:-}
+    volumes:
+      - data:/data
+      - ${BACKUP_DIR:-./backup}:/backup
+    ports:
+      # Loopback only: the server speaks plain HTTP. Put HTTPS in front (README) and only then widen SYNC_BIND.
+      - "${SYNC_BIND:-127.0.0.1}:${SYNC_PORT:-8787}:8080"
+
+  # Optional HTTPS with an automatic certificate: docker compose --profile https up -d   (needs SYNC_DOMAIN in .env)
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    restart: unless-stopped
+    depends_on: [sync]
+    environment:
+      # Compose reads every service even when its profile is off, so this must not be a required variable.
+      SYNC_DOMAIN: ${SYNC_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  data:
+  caddy_data:
+  caddy_config:

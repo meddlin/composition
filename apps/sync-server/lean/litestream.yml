@@ -1,0 +1,13 @@
+# Replicates the SQLite file to S3-compatible storage (Cloudflare R2, Backblaze B2, MinIO).
+# Values come from the environment; the entrypoint skips replication when LITESTREAM_BUCKET is unset.
+dbs:
+  - path: ${DB_PATH}
+    replica:
+      type: s3
+      bucket: ${LITESTREAM_BUCKET}
+      path: ${LITESTREAM_PATH}
+      endpoint: ${LITESTREAM_ENDPOINT}
+      region: ${LITESTREAM_REGION}
+      access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+      secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+      sync-interval: 1s

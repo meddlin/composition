@@ -20,6 +20,10 @@ if (!fs.existsSync(path.join(webDir, "node_modules"))) {
 const fetchDrawio = spawnSync("pnpm", ["run", "fetch:drawio"], { cwd: webDir, stdio: "inherit" });
 if (fetchDrawio.status !== 0) process.exit(fetchDrawio.status ?? 1);
 
+// pdf.js's worker and assets are served from public/ too (app://composition/pdfjs/), copied from the pinned package.
+const copyPdfjs = spawnSync("pnpm", ["run", "copy:pdfjs"], { cwd: webDir, stdio: "inherit" });
+if (copyPdfjs.status !== 0) process.exit(copyPdfjs.status ?? 1);
+
 fs.rmSync(exportDir, { recursive: true, force: true });
 const build = spawnSync("pnpm", ["exec", "next", "build"], {
   cwd: webDir,
@@ -34,6 +38,10 @@ if (!fs.existsSync(path.join(exportDir, "index.html"))) {
 }
 if (!fs.existsSync(path.join(exportDir, "drawio", "index.html"))) {
   console.error(`Expected the draw.io editor at ${path.join(exportDir, "drawio")}: run \`pnpm fetch:drawio\` in apps/web.`);
+  process.exit(1);
+}
+if (!fs.existsSync(path.join(exportDir, "pdfjs", "pdf.worker.mjs"))) {
+  console.error(`Expected pdf.js's worker at ${path.join(exportDir, "pdfjs")}: run \`pnpm copy:pdfjs\` in apps/web.`);
   process.exit(1);
 }
 fs.rmSync(target, { recursive: true, force: true });

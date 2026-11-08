@@ -6,6 +6,13 @@ import * as attachments from "./attachments";
 import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
+import * as documents from "./documents";
+import type { ExistingPdf, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import * as documentsRepo from "./documentsRepo";
+import type { StoredDocument } from "./documentsRepo";
+import { pdfTitleFromFileName } from "./documentNames";
+import * as pdfMarkupRepo from "./pdfMarkupRepo";
+import type { AnnotationChanges, PdfAnnotationInput, PdfViewState } from "./pdfMarkup";
 import { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
@@ -77,6 +84,32 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
   } catch (error) {
     console.error("[search] indexing failed:", error);
   }
+}
+
+/**
+ * A PDF's marks are part of what its owner note is found by, so the note goes back into the index when they change. Marks change
+ * in bursts (a highlight, then its comment, then a recolor), so a change while the note is being indexed only asks for one
+ * more pass afterwards, and the caller does not wait for any of it.
+ */
+const reindexing = new Map<number, "running" | "again">();
+function reindexOwnerSoon(documentId: number): void {
+  if (reindexing.has(documentId)) {
+    reindexing.set(documentId, "again");
+    return;
+  }
+  reindexing.set(documentId, "running");
+  void (async () => {
+    try {
+      do {
+        reindexing.set(documentId, "running");
+        const document = documentsRepo.getDocument(documentId);
+        const note = document ? notesRepo.getNote(document.noteId) : null;
+        if (note) await bestEffortIndex(() => searchIndex.indexNote(note));
+      } while (reindexing.get(documentId) === "again");
+    } finally {
+      reindexing.delete(documentId);
+    }
+  })();
 }
 
 export async function loadWorkspace(): Promise<Workspace> {
@@ -290,19 +323,24 @@ export async function deleteNote(id: number): Promise<void> {
 }
 
 /**
- * Deletes the attachments of notes that are gone for good. The note is already
+ * Deletes the attachments, and the PDFs with their marks, of notes that are gone for good. The note is already
  * gone, so a failure here leaves a stray file, not a half-deleted note: log it
- * and carry on.
+ * and carry on. Each is swept on its own, so one failing does not skip the other.
  */
 async function removeOrphanedAttachments(): Promise<void> {
-  try {
-    await attachments.removeOrphans(loadWebSettings().appDataDir);
-  } catch (error) {
-    console.error("[attachments] cleanup failed:", error);
+  for (const [label, sweep] of [
+    ["attachments", attachments.removeOrphans],
+    ["documents", documents.removeOrphans],
+  ] as const) {
+    try {
+      await sweep(loadWebSettings().appDataDir);
+    } catch (error) {
+      console.error("[orphans] cleanup failed:", label, error);
+    }
   }
 }
 
-/** Clears Trash Can items past their retention window, and the attachments of any notes among them. */
+/** Clears Trash Can items past their retention window, and the attachments and PDFs of any notes among them. */
 async function purgeExpiredTrash(): Promise<void> {
   trashRepo.purgeExpired();
   await removeOrphanedAttachments();
@@ -377,6 +415,139 @@ export async function findAttachmentFile(id: number): Promise<{ path: string; fi
 export async function removeAttachment(id: number): Promise<AttachmentActionResult> {
   const removed = await attachments.removeAttachment(loadWebSettings().appDataDir, id);
   return removed ? {} : { error: "That attachment no longer exists." };
+}
+
+/*
+ * PDFs a note owns are desktop only too (documentsApi.ts). The main process calls these after it has run the native file
+ * picker; the reader's bytes are served by the app scheme from `findDocumentFile`.
+ */
+
+/** What the UI gets: without the stored name and the hash, so the file's place on disk never leaves the main process. */
+const publicDocument = ({ storedName: _storedName, sha256: _sha256, ...document }: StoredDocument): PdfDocument => {
+  void _storedName;
+  void _sha256;
+  return document;
+};
+
+export async function listDocuments(): Promise<PdfDocument[]> {
+  return documentsRepo.listDocuments().map(publicDocument);
+}
+
+/** What `importPdf` came to: the note and PDF made, or the PDFs that already hold these bytes, or a reason to show. */
+export type ImportPdfOutcome =
+  | { status: "added"; note: Note; document: PdfDocument }
+  | { status: "duplicate"; existing: ExistingPdf[] }
+  | { status: "refused"; error: string };
+
+/** A note that was made for an import that did not come to anything: it was never shown, so it goes for good, not to the Trash Can. */
+function discardNote(id: number): void {
+  trashRepo.trashNote(id);
+  trashRepo.purgeNote(id);
+}
+
+/** The title of a note that owns a PDF, whether the note is live or in the Trash Can. */
+function ownerTitle(noteId: number): string {
+  return notesRepo.getNote(noteId)?.title ?? trashRepo.getTrashedNotes([noteId])[0]?.title ?? "Untitled";
+}
+
+/**
+ * Makes a note for the PDF at `sourcePath` (chosen by the user in a native dialog) in the target group and imports the
+ * file into it. Nothing is left behind when the file is refused, or is one the library already has and the caller did not
+ * ask for a separate copy.
+ */
+export async function importPdf(sourcePath: string, target: ImportTarget, options: { allowDuplicate?: boolean } = {}): Promise<ImportPdfOutcome> {
+  const note = notesRepo.createNote(pdfTitleFromFileName(sourcePath), "", target.groupId, target.notebookId);
+  let result;
+  try {
+    result = await documents.importDocument(loadWebSettings().appDataDir, note.id, sourcePath, options);
+  } catch (error) {
+    discardNote(note.id);
+    throw error;
+  }
+  if (result.status === "added") {
+    await bestEffortIndex(() => searchIndex.indexNote(note));
+    return { status: "added", note, document: publicDocument(result.document) };
+  }
+  discardNote(note.id);
+  if (result.status === "refused") return { status: "refused", error: result.error };
+  return {
+    status: "duplicate",
+    existing: result.existing.map((document) => ({ document: publicDocument(document), noteTitle: ownerTitle(document.noteId) })),
+  };
+}
+
+/** Where a PDF's bytes are, for the app scheme to serve; null when the row is gone or the file was deleted behind the app's back. */
+export function findDocumentFile(id: number): { path: string; fileName: string } | null {
+  const found = documents.documentPath(loadWebSettings().appDataDir, id);
+  return found ? { path: found.path, fileName: found.document.fileName } : null;
+}
+
+/** What an export needs: where the PDF's bytes are, and every mark on it. Null when the row is gone or the file is. */
+export function documentForExport(documentId: number): { path: string; fileName: string; marks: PdfAnnotation[] } | null {
+  const file = findDocumentFile(documentId);
+  return file ? { ...file, marks: pdfMarkupRepo.listAnnotations(documentId) } : null;
+}
+
+export async function setDocumentPageCount(documentId: number, pageCount: number): Promise<void> {
+  documentsRepo.setPageCount(documentId, pageCount);
+}
+
+export async function saveDocumentViewState(documentId: number, state: PdfViewState): Promise<void> {
+  documentsRepo.setViewState(documentId, state);
+}
+
+export async function listBookmarks(documentId: number): Promise<PdfBookmark[]> {
+  return pdfMarkupRepo.listBookmarks(documentId);
+}
+
+export async function addBookmark(documentId: number, page: number, label: string): Promise<PdfBookmark> {
+  const bookmark = pdfMarkupRepo.addBookmark(documentId, page, label);
+  reindexOwnerSoon(documentId);
+  return bookmark;
+}
+
+export async function renameBookmark(bookmarkId: number, label: string): Promise<PdfBookmark | null> {
+  const bookmark = pdfMarkupRepo.renameBookmark(bookmarkId, label);
+  if (bookmark) reindexOwnerSoon(bookmark.documentId);
+  return bookmark;
+}
+
+export async function removeBookmark(bookmarkId: number): Promise<void> {
+  const bookmark = pdfMarkupRepo.getBookmark(bookmarkId);
+  pdfMarkupRepo.deleteBookmark(bookmarkId);
+  if (bookmark) reindexOwnerSoon(bookmark.documentId);
+}
+
+export async function describeDocument(noteId: number): Promise<PdfContents | null> {
+  return documentsRepo.documentContents(noteId);
+}
+
+export async function listAnnotations(documentId: number): Promise<PdfAnnotation[]> {
+  return pdfMarkupRepo.listAnnotations(documentId);
+}
+
+export async function addAnnotations(documentId: number, inputs: readonly PdfAnnotationInput[]): Promise<PdfAnnotation[]> {
+  const added = pdfMarkupRepo.addAnnotationGroup(documentId, inputs);
+  if (added.length > 0) reindexOwnerSoon(documentId);
+  return added;
+}
+
+export async function updateAnnotation(annotationId: number, changes: AnnotationChanges): Promise<PdfAnnotation | null> {
+  const updated = pdfMarkupRepo.updateAnnotation(annotationId, changes);
+  if (updated) reindexOwnerSoon(updated.documentId);
+  return updated;
+}
+
+export async function deleteAnnotation(annotationId: number): Promise<PdfAnnotation[]> {
+  const removed = pdfMarkupRepo.deleteAnnotation(annotationId);
+  if (removed.length > 0) reindexOwnerSoon(removed[0].documentId);
+  return removed;
+}
+
+export async function restoreAnnotations(documentId: number, annotations: readonly PdfAnnotation[]): Promise<PdfAnnotation[]> {
+  const restored = pdfMarkupRepo.restoreAnnotations(documentId, annotations);
+  if (restored.length > 0) reindexOwnerSoon(documentId);
+  return restored;
 }
 
 /*
@@ -455,9 +626,12 @@ export async function restoreBackup(file: string): Promise<BackupResult> {
 
     let safetyBackup: string | undefined;
     try {
-      const hasCurrentData = [dbPath, images.imageDir(appDataDir), attachments.attachmentDir(appDataDir)].some((p) =>
-        fs.existsSync(p),
-      );
+      const hasCurrentData = [
+        dbPath,
+        images.imageDir(appDataDir),
+        attachments.attachmentDir(appDataDir),
+        documents.documentDir(appDataDir),
+      ].some((p) => fs.existsSync(p));
       if (hasCurrentData) {
         safetyBackup = path.join(/*turbopackIgnore: true*/ backup.defaultBackupDir(), backup.backupFileName(new Date(), "pre-restore"));
         await backup.createBackup({ file: safetyBackup, db: getDb(), appDataDir, settings });

@@ -42,6 +42,8 @@ type Props = {
   onOpenBeside: (id: number) => void;
   onSelectGroup: (id: number) => void;
   onCreate: (groupId: number | null) => void;
+  /** Imports a PDF into a new note at the top level (or in the group); absent where there are no PDFs (the web app). */
+  onImportPdf?: (groupId: number | null) => void;
   onDelete: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
@@ -72,6 +74,7 @@ export function NoteSidebar({
   onOpenBeside,
   onSelectGroup,
   onCreate,
+  onImportPdf,
   onDelete,
   onCreateGroup,
   onRenameGroup,
@@ -208,6 +211,11 @@ export function NoteSidebar({
           <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => onCreate(null)}>
             + New note
           </Button>
+          {onImportPdf && (
+            <Button variant="ghost" size="sm" className="justify-start text-muted-foreground hover:text-foreground" onClick={() => onImportPdf(null)}>
+              + Import PDF…
+            </Button>
+          )}
           {addingGroup ? (
             <InlineTextInput
               depth={0}

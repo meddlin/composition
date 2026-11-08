@@ -1,0 +1,6 @@
+# HTTPS in front of the sync server. flush_interval -1 stops Caddy buffering the event stream devices listen on.
+{$SYNC_DOMAIN} {
+	reverse_proxy sync:8080 {
+		flush_interval -1
+	}
+}

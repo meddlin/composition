@@ -1,0 +1,405 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describeCitingNotes, describeContents } from "./pdfContents";
+import { pdfTitleFromFileName } from "./documentNames";
+
+vi.mock("./searchIndex", () => ({
+  indexNote: vi.fn(async () => {}),
+  deleteNoteFromIndex: vi.fn(async () => {}),
+  searchNoteIds: vi.fn(async () => []),
+  unavailableMessage: () => "unavailable",
+}));
+
+let home: string;
+let source: string;
+
+beforeEach(() => {
+  home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-docservice-"));
+  source = path.join(home, "inbox");
+  fs.mkdirSync(source);
+  vi.stubEnv("HOME", home);
+  vi.resetModules();
+});
+
+afterEach(async () => {
+  const { closeDb } = await import("./db");
+  closeDb();
+  vi.unstubAllEnvs();
+  fs.rmSync(home, { recursive: true, force: true });
+});
+
+const appData = () => path.join(home, ".composition");
+const pdf = (name: string, extra = "") => {
+  const file = path.join(source, name);
+  fs.writeFileSync(file, `%PDF-1.7\n${extra}\n%%EOF\n`);
+  return file;
+};
+const storedFiles = () => {
+  const dir = path.join(appData(), "documents");
+  return fs.existsSync(dir) ? fs.readdirSync(dir) : [];
+};
+
+async function setup() {
+  const service = await import("./service");
+  const groups = await import("./groupsRepo");
+  const notes = await import("./notesRepo");
+  const notebooks = await import("./notebooksRepo");
+  const notebook = notebooks.listNotebooks()[0] ?? notebooks.createNotebook("Notebook");
+  return { service, groups, notes, notebook };
+}
+
+describe("importPdf", () => {
+  it("makes a note titled from the file, in the group and notebook asked for, that owns the PDF", async () => {
+    const { service, groups, notebook } = await setup();
+    const group = groups.createGroup("Textbooks", null, notebook.id);
+
+    const result = await service.importPdf(pdf("Designing_Data-Intensive_Applications.pdf"), { groupId: group.id, notebookId: notebook.id });
+
+    expect(result.status).toBe("added");
+    if (result.status !== "added") return;
+    expect(result.note).toEqual(expect.objectContaining({ title: "Designing Data-Intensive Applications", groupId: group.id }));
+    expect(result.document).toEqual(expect.objectContaining({ noteId: result.note.id, fileName: "Designing_Data-Intensive_Applications.pdf", pageCount: 0 }));
+    expect(result.document).not.toHaveProperty("storedName");
+    expect(result.document).not.toHaveProperty("sha256");
+    expect(await service.listDocuments()).toEqual([result.document]);
+    expect((await service.loadWorkspace()).notes.map((n) => n.id)).toContain(result.note.id);
+    expect(storedFiles()).toHaveLength(1);
+  });
+
+  it("leaves no note behind when the file is refused", async () => {
+    const { service, notes, notebook } = await setup();
+    const before = notes.listNotes().length;
+    const text = path.join(source, "notes.txt");
+    fs.writeFileSync(text, "just text");
+
+    const result = await service.importPdf(text, { groupId: null, notebookId: notebook.id });
+
+    expect(result).toEqual({ status: "refused", error: "notes.txt: this doesn't look like a PDF." });
+    expect(notes.listNotes()).toHaveLength(before);
+    expect((await service.loadTrash()).notes).toEqual([]);
+    expect(storedFiles()).toEqual([]);
+  });
+
+  it("offers the PDF you already have, naming its note, and leaves no note or file behind", async () => {
+    const { service, notes, notebook } = await setup();
+    const first = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (first.status !== "added") throw new Error("expected the first import to be added");
+    const before = notes.listNotes().length;
+
+    const again = await service.importPdf(pdf("book copy.pdf"), { groupId: null, notebookId: notebook.id });
+
+    expect(again).toEqual({ status: "duplicate", existing: [{ document: first.document, noteTitle: "book" }] });
+    expect(notes.listNotes()).toHaveLength(before);
+    expect(storedFiles()).toHaveLength(1);
+    expect((await service.loadTrash()).notes).toEqual([]);
+  });
+
+  it("names the owner of a duplicate that is in the Trash Can, and imports a separate copy when asked", async () => {
+    const { service, notebook } = await setup();
+    const first = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (first.status !== "added") throw new Error("expected the first import to be added");
+    await service.deleteNote(first.note.id);
+
+    const again = await service.importPdf(pdf("book copy.pdf"), { groupId: null, notebookId: notebook.id });
+    expect(again).toEqual({ status: "duplicate", existing: [{ document: first.document, noteTitle: "book" }] });
+
+    const copy = await service.importPdf(pdf("book copy.pdf"), { groupId: null, notebookId: notebook.id }, { allowDuplicate: true });
+    expect(copy.status).toBe("added");
+    expect(storedFiles()).toHaveLength(2);
+  });
+
+  it("finds a PDF's file for the app scheme to serve, and says nothing for one that is gone", async () => {
+    const { service, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+
+    const found = service.findDocumentFile(result.document.id);
+    expect(found).toEqual({ path: expect.stringContaining(path.join(".composition", "documents")), fileName: "book.pdf" });
+    expect(fs.existsSync(found!.path)).toBe(true);
+    expect(service.findDocumentFile(9999)).toBeNull();
+    fs.rmSync(found!.path);
+    expect(service.findDocumentFile(result.document.id)).toBeNull();
+  });
+});
+
+describe("the reader's own calls", () => {
+  it("records the page count and the reading position, and keeps bookmarks", async () => {
+    const { service, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    const id = result.document.id;
+
+    await service.setDocumentPageCount(id, 412);
+    await service.saveDocumentViewState(id, { page: 40, zoom: 1.5, darkPages: true });
+    const bookmark = await service.addBookmark(id, 12, "Chapter 2");
+    await service.renameBookmark(bookmark.id, "Ch. 2");
+
+    expect((await service.listDocuments())[0]).toEqual(expect.objectContaining({ pageCount: 412, viewState: { page: 40, zoom: 1.5, darkPages: true } }));
+    expect(await service.listBookmarks(id)).toEqual([expect.objectContaining({ page: 12, label: "Ch. 2" })]);
+    await service.removeBookmark(bookmark.id);
+    expect(await service.listBookmarks(id)).toEqual([]);
+  });
+
+  it("lists a trashed PDF note in the Trash Can with what its PDF holds, and a plain one without", async () => {
+    const { service, notebook } = await setup();
+    const plain = await service.createNote("A plain note", null, notebook.id);
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    await service.addBookmark(result.document.id, 0, "start");
+    await service.deleteNote(plain.id);
+    await service.deleteNote(result.note.id);
+
+    const { notes } = await service.loadTrash();
+
+    expect(notes.find((n) => n.id === plain.id)).not.toHaveProperty("pdf");
+    expect(notes.find((n) => n.id === result.note.id)?.pdf).toEqual(expect.objectContaining({ fileName: "book.pdf", bookmarks: 1 }));
+  });
+
+  it("says what deleting a PDF's note would take with it", async () => {
+    const { service, notebook } = await setup();
+    const marks = await import("./pdfMarkupRepo");
+    const result = await service.importPdf(pdf("book.pdf", "x".repeat(2000)), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    await service.setDocumentPageCount(result.document.id, 20);
+    for (const page of [1, 2, 3]) marks.addAnnotation(result.document.id, { page, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] });
+    marks.addAnnotation(result.document.id, { page: 4, kind: "underline", color: "green", rects: [[0, 0, 1, 1]] });
+    marks.addAnnotation(result.document.id, { page: 5, kind: "ink", color: "black", body: { strokes: [] } });
+    marks.addAnnotation(result.document.id, { page: 5, kind: "ink", color: "black", body: { strokes: [1] } });
+    await service.addBookmark(result.document.id, 7, "a");
+
+    const contents = await service.describeDocument(result.note.id);
+
+    expect(contents).toEqual({
+      fileName: "book.pdf",
+      size: expect.any(Number),
+      marks: { highlight: 3, underline: 1, strikethrough: 0, text: 0, ink: 2 },
+      inkPages: 1,
+      bookmarks: 1,
+      citingNotes: 0,
+    });
+    expect(describeContents(contents!)).toBe("its PDF (2 KB), 3 highlights, 1 underline, 1 ink page and 1 bookmark");
+    expect(await service.describeDocument(9999)).toBeNull();
+  });
+});
+
+describe("the notes that cite a PDF", () => {
+  async function importBook() {
+    const { service, notes, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    return { service, notes, notebook, note: result.note, document: result.document };
+  }
+  const mark = "7b1d0000000000000000000000000001";
+
+  it("lists the owner first, even with no link in it, then each live note whose text links to the PDF", async () => {
+    const { notes, note, document } = await importBook();
+    const first = notes.createNote("Chapter 1");
+    const second = notes.createNote("Chapter 2");
+    notes.createNote("Unrelated");
+    notes.updateNoteContent(first.id, `> quote\n> — [*Book*, p. 44](pdf:${document.uuid}#p=44&a=${mark})\nand [page 9](pdf:${document.uuid}#p=9)`);
+    notes.updateNoteContent(second.id, `see [the book](pdf:${document.uuid})`);
+
+    const citations = (await import("./documentsRepo")).listCitations(document.id);
+
+    expect(citations.map((c) => [c.noteId, c.owner])).toEqual([[note.id, true], [second.id, false], [first.id, false]]);
+    expect(citations.find((c) => c.noteId === first.id)).toEqual({ noteId: first.id, title: "Chapter 1", owner: false, pages: [44, 9], marks: [mark] });
+    expect(citations[0]).toEqual({ noteId: note.id, title: "book", owner: true, pages: [], marks: [] });
+  });
+
+  it("leaves out a note that cites another PDF, and a note in the Trash Can", async () => {
+    const { service, notes, document } = await importBook();
+    const other = notes.createNote("Other");
+    const trashed = notes.createNote("Trashed");
+    notes.updateNoteContent(other.id, `[x](pdf:${"a".repeat(32)}#p=2)`);
+    notes.updateNoteContent(trashed.id, `[x](pdf:${document.uuid}#p=2)`);
+    await service.deleteNote(trashed.id);
+
+    const citations = (await import("./documentsRepo")).listCitations(document.id);
+
+    expect(citations.map((c) => c.title)).toEqual(["book"]);
+  });
+
+  it("is empty for a PDF that is gone", async () => {
+    await importBook();
+
+    expect((await import("./documentsRepo")).listCitations(9999)).toEqual([]);
+  });
+
+  it("counts the notes other than the owner in what deleting the PDF's note takes with it, and says so", async () => {
+    const { service, notes, note, document } = await importBook();
+    for (const title of ["a", "b"]) notes.updateNoteContent(notes.createNote(title).id, `[x](pdf:${document.uuid})`);
+    notes.updateNoteContent(note.id, `my own link [x](pdf:${document.uuid}#p=1)`);
+
+    const contents = await service.describeDocument(note.id);
+
+    expect(contents?.citingNotes).toBe(2);
+    expect(describeCitingNotes(contents!)).toBe("2 notes cite it; their quotes stay and their links stop working.");
+  });
+});
+
+describe("describeCitingNotes", () => {
+  const contents = { fileName: "a.pdf", size: 1, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0 };
+
+  it("is nothing when no note cites the PDF, and singular for one", () => {
+    expect(describeCitingNotes({ ...contents, citingNotes: 0 })).toBeNull();
+    expect(describeCitingNotes({ ...contents, citingNotes: 1 })).toBe("1 note cites it; its quote stays and its links stop working.");
+  });
+});
+
+describe("what a PDF's owner note is found by", () => {
+  async function importBook() {
+    const { service, notes, notebook } = await setup();
+    const marks = await import("./pdfMarkupRepo");
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    return { service, notes, marks, note: result.note, document: result.document };
+  }
+  const rect = [[0, 0, 5, 5]];
+
+  it("is the words of its marks and bookmarks, one per line by page, with a text note's words and each comment", async () => {
+    const { marks, note, document } = await importBook();
+    marks.addAnnotation(document.id, { page: 4, kind: "underline", color: "green", rects: rect, quote: "B-tree nodes split", comment: "key idea" });
+    marks.addAnnotation(document.id, { page: 1, kind: "highlight", color: "yellow", rects: rect, quote: "an early line" });
+    marks.addAnnotation(document.id, { page: 2, kind: "text", color: "yellow", body: { rect: [0, 0, 50, 20], text: "my own words" } });
+    marks.addBookmark(document.id, 3, "Chapter on indexes");
+    marks.addAnnotation(document.id, { page: 5, kind: "ink", color: "black", body: { strokes: [] } });
+
+    const found = marks.marksSearchText(note.id);
+
+    expect(found.get(note.id)).toBe("an early line\nmy own words\nB-tree nodes split\nkey idea\nChapter on indexes");
+    expect([...found.keys()]).toEqual([note.id]);
+  });
+
+  it("is nothing for a note that owns no PDF, or a PDF nobody has marked", async () => {
+    const { marks, notes, note } = await importBook();
+    const other = notes.createNote("Plain");
+
+    expect(marks.marksSearchText(other.id).size).toBe(0);
+    expect(marks.marksSearchText(note.id).size).toBe(0);
+    expect(marks.marksSearchText().size).toBe(0);
+  });
+
+  it("is listed for every owner note when the whole index is rebuilt", async () => {
+    const { service, marks, note, document } = await importBook();
+    const notebookId = (await import("./notebooksRepo")).listNotebooks()[0].id;
+    const result = await service.importPdf(pdf("other.pdf", "different bytes"), { groupId: null, notebookId });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    marks.addAnnotation(document.id, { page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "first book" });
+    marks.addAnnotation(result.document.id, { page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "second book" });
+
+    const everything = marks.marksSearchText();
+
+    expect(everything.get(note.id)).toBe("first book");
+    expect(everything.get(result.note.id)).toBe("second book");
+  });
+
+  it("puts the owner note back into the search index when its marks or bookmarks change", async () => {
+    const { service, note, document } = await importBook();
+    const indexNote = vi.mocked((await import("./searchIndex")).indexNote);
+    indexNote.mockClear();
+
+    const [first] = await service.addAnnotations(document.id, [{ page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "words" }]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(1));
+    await service.updateAnnotation(first.id, { comment: "check" });
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(2));
+    await service.addBookmark(document.id, 1, "here");
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(3));
+    await service.deleteAnnotation(first.id);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(4));
+    await service.restoreAnnotations(document.id, [first]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(5));
+
+    expect(indexNote.mock.calls.every(([indexed]) => indexed.id === note.id)).toBe(true);
+  });
+
+  it("asks for only one more pass when marks change while the note is being indexed", async () => {
+    const { service, document } = await importBook();
+    const indexNote = vi.mocked((await import("./searchIndex")).indexNote);
+    indexNote.mockClear();
+    let release: () => void = () => {};
+    indexNote.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
+
+    const [first] = await service.addAnnotations(document.id, [{ page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "words" }]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(1));
+    await service.updateAnnotation(first.id, { comment: "one" });
+    await service.updateAnnotation(first.id, { comment: "two" });
+    await service.addBookmark(document.id, 1, "here");
+    expect(indexNote).toHaveBeenCalledTimes(1);
+
+    release();
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(indexNote).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not index anything for a change that changed nothing", async () => {
+    const { service, document } = await importBook();
+    const searchIndex = await import("./searchIndex");
+    const indexNote = vi.mocked(searchIndex.indexNote);
+    indexNote.mockClear();
+
+    await service.addAnnotations(document.id, []);
+    await service.deleteAnnotation(9999);
+    await service.updateAnnotation(9999, { comment: "x" });
+    await service.removeBookmark(9999);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(indexNote).not.toHaveBeenCalled();
+  });
+});
+
+describe("marks through the service", () => {
+  it("makes, lists, changes, deletes and restores marks, a selection across pages as one", async () => {
+    const { service, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    const id = result.document.id;
+
+    const [one, two] = await service.addAnnotations(id, [
+      { page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 5, 5]], quote: "end" },
+      { page: 1, kind: "highlight", color: "yellow", rects: [[0, 0, 5, 5]], quote: "start" },
+    ]);
+    expect(one.groupUuid).toBe(two.groupUuid);
+    expect(await service.listAnnotations(id)).toEqual([one, two]);
+
+    expect((await service.updateAnnotation(one.id, { color: "pink", comment: "see" }))?.color).toBe("pink");
+    expect(await service.updateAnnotation(9999, { color: "pink" })).toBeNull();
+
+    const removed = await service.deleteAnnotation(one.id);
+    expect(removed.map((m) => m.id)).toEqual([one.id, two.id]);
+    expect(await service.listAnnotations(id)).toEqual([]);
+
+    expect((await service.restoreAnnotations(id, removed)).map((m) => m.uuid)).toEqual([one.uuid, two.uuid]);
+    // what was deleted comes back as it was then: the first, changed to pink before it went, is still pink
+    expect((await service.listAnnotations(id)).map((m) => m.color)).toEqual(["pink", "yellow"]);
+  });
+});
+
+describe("describeContents", () => {
+  const empty = { fileName: "a.pdf", size: 212_000_000, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0, citingNotes: 0 };
+
+  it("is just the PDF when nobody has marked it", () => {
+    expect(describeContents(empty)).toBe("its PDF (212 MB)");
+  });
+
+  it("lists what is there, leaving out what is not, in the singular for one", () => {
+    expect(describeContents({ ...empty, marks: { ...empty.marks, highlight: 41 }, inkPages: 2, bookmarks: 6 })).toBe("its PDF (212 MB), 41 highlights, 2 ink pages and 6 bookmarks");
+    expect(describeContents({ ...empty, marks: { ...empty.marks, strikethrough: 1, text: 1 } })).toBe("its PDF (212 MB), 1 strikethrough and 1 text note");
+    expect(describeContents({ ...empty, bookmarks: 1 })).toBe("its PDF (212 MB) and 1 bookmark");
+  });
+});
+
+describe("pdfTitleFromFileName", () => {
+  it.each([
+    ["Designing_Data-Intensive_Applications.pdf", "Designing Data-Intensive Applications"],
+    ["/Users/me/Downloads/Linear Algebra.PDF", "Linear Algebra"],
+    ["C:\\docs\\manual__v2.pdf", "manual v2"],
+    ["  spaced   out .pdf", "spaced out"],
+    [".pdf", "PDF"],
+    ["noextension", "noextension"],
+  ])("makes %s into %s", (input, title) => {
+    expect(pdfTitleFromFileName(input)).toBe(title);
+  });
+});

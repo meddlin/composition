@@ -10,7 +10,7 @@
 // <dir>/.composition, everything else in <dir>/userData), so experiments never
 // touch real notes. Overriding HOME alone isn't enough: Electron keeps its own
 // data folder wherever the OS says, regardless of $HOME.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,6 +20,9 @@ const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".
 const webDir = path.resolve(desktopDir, "..", "web");
 const port = process.env.COMPOSITION_DEV_PORT ?? "3100";
 const url = `http://localhost:${port}`;
+
+// pdf.js's worker and assets are served from the web app's public/ folder; a no-op once they are there.
+spawnSync("pnpm", ["run", "copy:pdfjs"], { cwd: webDir, stdio: "inherit" });
 
 const next = spawn("pnpm", ["exec", "next", "dev", "--port", port], {
   cwd: webDir,

@@ -97,6 +97,7 @@ describe("ShortcutsHelper", () => {
     fireEvent.keyDown(document.body, { key: "?" });
 
     expect(screen.queryByRole("region", { name: "Panels" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Reading a PDF" })).toBeNull();
     expect(screen.getByRole("dialog").textContent).not.toContain("Command palette");
   });
 
@@ -124,6 +125,15 @@ describe("ShortcutsHelper", () => {
       expect(keysOf("Close Panel")).toEqual(["Ctrl", "Shift", "W"]);
       expect(keysOf("Next Panel")).toEqual(["Ctrl", "Shift", "]"]);
       expect(keysOf("Previous Panel")).toEqual(["Ctrl", "Shift", "["]);
+    });
+
+    it("adds the keys of the PDF reader, which the web app does not have", () => {
+      render(<ShortcutsHelper />);
+      fireEvent.keyDown(document.body, { key: "?" });
+      const pdf = within(screen.getByRole("region", { name: "Reading a PDF" }));
+
+      expect([...pdf.getByText("Underline the selected text").closest("div")!.querySelectorAll("kbd")].map((k) => k.textContent)).toEqual(["Ctrl", "Shift", "U"]);
+      expect(pdf.getByText("Find in the PDF")).toBeTruthy();
     });
 
     it("lists no command that has no key of its own", () => {

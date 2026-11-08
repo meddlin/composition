@@ -1,0 +1,11 @@
+node_modules/
+# Secrets and per-machine state, never committed.
+.env
+.env.*
+!.env.example
+.local/
+data/
+backup/
+*.db
+*.db-shm
+*.db-wal

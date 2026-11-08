@@ -2,6 +2,7 @@ import { isRequestId, type AssistantMethod } from "../../../web/src/lib/composit
 import { checkChatRequest } from "../../../web/src/lib/composition/assistant/chatRequest";
 import type { AttachmentMethod } from "../../../web/src/lib/composition/attachmentsApi";
 import type { BackupMethod } from "../../../web/src/lib/composition/backupApi";
+import type { DocumentMethod } from "../../../web/src/lib/composition/documentsApi";
 import type { PanelsMethod } from "../../../web/src/lib/composition/panelsApi";
 import { PLUGINS } from "../../../web/src/lib/composition/plugins";
 import { normalizeFeedUrl } from "../../../web/src/lib/composition/feeds";
@@ -242,6 +243,50 @@ export const ATTACHMENT_VALIDATORS: Record<AttachmentMethod, Validator> = {
   revealAttachment: ([attachmentId]) => [id("revealAttachment", attachmentId, "id")],
   saveAttachmentCopy: ([attachmentId]) => [id("saveAttachmentCopy", attachmentId, "id")],
   removeAttachment: ([attachmentId]) => [id("removeAttachment", attachmentId, "id")],
+};
+
+const importTarget = (method: string, value: unknown) => {
+  const target = record(method, value, "target");
+  return { groupId: nullableId(method, target.groupId, "groupId"), notebookId: id(method, target.notebookId, "notebookId") };
+};
+
+/** The page of a bookmark, or the count of a PDF's pages: a whole number from `min`. */
+const wholeNumber = (method: string, value: unknown, name: string, min: number): number =>
+  Number.isSafeInteger(value) && (value as number) >= min ? (value as number) : fail(method, name);
+
+/** The most marks one call may carry: a selection over a few pages, or one delete's worth being put back. A real one is a handful. */
+const MAX_MARKS_AT_ONCE = 500;
+
+/** A list of records, each of which the service checks as it would a mark made by hand. */
+function records(method: string, value: unknown, name: string, limit: number): Record<string, unknown>[] {
+  if (!Array.isArray(value) || value.length > limit) return fail(method, name);
+  return value.map((item) => record(method, item, name));
+}
+
+/** How to export: only whether to flatten, as a real boolean. */
+function exportOptions(method: string, value: unknown): { flatten: boolean } {
+  const given = record(method, value, "options");
+  return typeof given.flatten === "boolean" ? { flatten: given.flatten } : fail(method, "options");
+}
+
+/** Arguments of the desktop-only PDF methods (see documents.ts). Ids and a target only: no path ever comes from the renderer. */
+export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
+  listDocuments: none,
+  importPdf: ([target]) => [importTarget("importPdf", target)],
+  importPdfCopy: ([token, target]) => [text("importPdfCopy", token, "token"), importTarget("importPdfCopy", target)],
+  setDocumentPageCount: ([documentId, pageCount]) => [id("setDocumentPageCount", documentId, "documentId"), wholeNumber("setDocumentPageCount", pageCount, "pageCount", 1)],
+  saveDocumentViewState: ([documentId, state]) => [id("saveDocumentViewState", documentId, "documentId"), record("saveDocumentViewState", state, "state")],
+  listBookmarks: ([documentId]) => [id("listBookmarks", documentId, "documentId")],
+  addBookmark: ([documentId, page, label]) => [id("addBookmark", documentId, "documentId"), wholeNumber("addBookmark", page, "page", 0), text("addBookmark", label, "label")],
+  renameBookmark: ([bookmarkId, label]) => [id("renameBookmark", bookmarkId, "bookmarkId"), text("renameBookmark", label, "label")],
+  removeBookmark: ([bookmarkId]) => [id("removeBookmark", bookmarkId, "bookmarkId")],
+  describeDocument: ([noteId]) => [id("describeDocument", noteId, "noteId")],
+  exportDocument: ([documentId, options]) => [id("exportDocument", documentId, "documentId"), exportOptions("exportDocument", options)],
+  listAnnotations: ([documentId]) => [id("listAnnotations", documentId, "documentId")],
+  addAnnotations: ([documentId, inputs]) => [id("addAnnotations", documentId, "documentId"), records("addAnnotations", inputs, "inputs", MAX_MARKS_AT_ONCE)],
+  updateAnnotation: ([annotationId, changes]) => [id("updateAnnotation", annotationId, "annotationId"), record("updateAnnotation", changes, "changes")],
+  deleteAnnotation: ([annotationId]) => [id("deleteAnnotation", annotationId, "annotationId")],
+  restoreAnnotations: ([documentId, annotations]) => [id("restoreAnnotations", documentId, "documentId"), records("restoreAnnotations", annotations, "annotations", MAX_MARKS_AT_ONCE)],
 };
 
 /** The desktop-only backup methods take nothing: the main process asks with a dialog, so no path ever comes from the renderer. */

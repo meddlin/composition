@@ -465,7 +465,7 @@ into the first release.
 | Milestone | What | Installed as |
 |---|---|---|
 | **M1: usable notebook** | The sync-ready store; notebooks, groups, notes, Trash Can and favorites; the Markdown, Preview and Split tabs; Scribble and the system text engine; search (FTS5 plus the typo layer); images (paste, picker, Photos); the MDX components other than `<Ink>` and `<YouTube>`; the six colour schemes plus a System scheme; backup and restore | A test install on your dev iPad, from Xcode. **Pre-v1.** |
-| **M2: Pencil** | `<Ink>`, the PencilKit canvas, handwritten pages, stroke JSON in the PNG, theme-aware ink, and drawing ink on the desktop app and in the CLI | A fast-follow install on your dev iPad, from Xcode. **Pre-v1.** |
+| **M2: Pencil and PDFs** | `<Ink>`, the PencilKit canvas, handwritten pages, stroke JSON in the PNG, theme-aware ink, and drawing ink on the desktop app and in the CLI; **and PDFs** ([pdf-markup-plan.md](pdf-markup-plan.md), P19), in this order: the Swift core's three PDF tables against the shared fixtures, the PDFKit reader beside its note, typed markup, bookmarks, the Notes tab and import from Files, Pencil ink on PDFs, handwritten notes beside the PDF, export on the iPad, and last the standalone `<Ink>` pages (the first thing cut if the schedule bites) | A fast-follow install on your dev iPad, from Xcode. **Pre-v1.** |
 | **M3: first release (v1)** | M1 and M2 combined and hardened as a release: the release-polish rows (marked †), the native-bar audit ([S7](#spikes-and-gates)), the manual test page, and distribution ([D12](#decisions)) | **The first release**, through TestFlight |
 
 The tracker's **Plan** column says which milestone builds each row. A **†** marks release polish: the first rows
@@ -488,7 +488,7 @@ the plugins ([C6](#compromise-register)) and the Live tab ([C12](#compromise-reg
 **Exit criteria** (proposed):
 
 - **M1:** installs and runs on the dev iPad; create, edit, search, delete and restore from the Trash Can; a backup made on the desktop restores on the iPad and the reverse; every M1 row is at least 🔨. Gates A and B ([S1 to S4](#spikes-and-gates)) are passed along the way, and S6 is done.
-- **M2:** draw, save and reopen ink; a backup restored on the desktop shows the ink in every colour scheme, and the CLI shows its PNG. Gate C ([S5](#spikes-and-gates)) is passed first.
+- **M2:** draw, save and reopen ink; a backup restored on the desktop shows the ink in every colour scheme, and the CLI shows its PNG. Gate C ([S5](#spikes-and-gates)) is passed first. **PDFs:** import a PDF from Files, read it beside its note, mark it up (typed marks, then Pencil ink after the PDF spike B and Gate C), cite it from a note and follow the citation; a backup made on the desktop with PDFs restores on the iPad (marks drawn where they were) and the reverse; an annotated export opens in another app. `docs/manual-tests/pdf.md` is extended for the iPad (Gate P2).
 - **M3:** the † rows are done or moved to *Later*; the native-bar audit passes the bar you accept; `docs/manual-tests/ipad.md` has been run by hand; the distribution checklist below is done.
 
 **Distribution** ([D12](#decisions), decided). Unlike the desktop app's GitHub Releases download, an iPad app reaches
@@ -638,6 +638,23 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 | Pencil Pro squeeze and barrel roll | ❌ | Never | ⛔ | The test iPad does not support that Pencil |
 | Ink over rendered Markdown | ❌ | Never | ⛔ | Anchors break when text reflows |
 
+### PDFs (new)
+
+The desktop side is built ([ui/pdf.md](ui/pdf.md), [architecture/pdf.md](architecture/pdf.md)); these rows are the iPad's, from [pdf-markup-plan.md](pdf-markup-plan.md#the-ipad-milestone-m2). The three tables, the files and the stored coordinates are the shared schema.
+
+| Feature | Kind | Plan | Status | Native approach and notes |
+|---|:-:|:-:|:-:|---|
+| The three PDF tables, `documents/` and the uuid pass, in the Swift core | 🔁 | M2 | ⬜ | Replays [`fixtures/conformance/pdf`](../fixtures/conformance/README.md); marks stored in raw PDF user space |
+| Import a PDF from Files, a note that owns it | 🆕 | M2 | ⬜ | Copied in, hashed; the same duplicate question as the desktop |
+| PDF reader beside its note | 🆕 | M2 | ⬜ | PDFKit; a draggable split in landscape, a switch in portrait. Outline, bookmarks, find, resume |
+| Highlight, underline, strikethrough and typed notes | 🆕 | M2 | ⬜ | PDFKit annotations; rectangles map through PDFKit's own calls (spike C) |
+| Highlights and Notes tabs, Quote, Cite this page, `pdf:` links | 🆕 | M2 | ⬜ | `pdf:` in the Markdown preview; the typed strip of a handwritten note |
+| Pencil ink on a PDF | 🆕 | M2 | ⬜ | PencilKit over PDFKit, one ink record per page, the D9 stroke format. **Spike B first** (finger scroll, selection and Pencil together; latency; memory on 500 pages) |
+| Handwritten notes beside the PDF | 🆕 | M2 | ⬜ | A canvas under a typed strip of citations |
+| Export annotated PDF | 🆕 | M2 | ⬜ | PDFKit writes native annotations; textured ink is simplified to paths ([C21](#compromise-register)) |
+| Search finds a PDF's note by its marks | 🔁 | M2 | ⬜ | The marks' words go into the FTS5 entry of the owner note |
+| Standalone `<Ink>` pages | 🆕 | M2 | ⬜ | Built last; the first row cut if M2 slips |
+
 ### Sync and portability
 
 | Feature | Kind | Plan | Status | Native approach and notes |
@@ -676,6 +693,8 @@ next one. **Status:** *Proposed* (not agreed) · *Accepted* · *Deferred* (a fut
 | **C17** | **Swift packages enter the supply chain:** GRDB, swift-markdown, perhaps Yams. | Low | Writing a SQLite wrapper and a Markdown parser ourselves is worse. | Exact versions, `Package.resolved` checked in, a row in [Languages](#languages-and-dependencies) before each addition. | Proposed |
 | **C18** | **Photos from the Photos app are converted from HEIC to JPEG** on import. | Low | `images.ts` accepts only PNG, JPEG, GIF and WebP, and the desktop cannot show HEIC. | Allow HEIC only if conversion proves too lossy. | Proposed |
 | **C19** | **The AI helper needs more than a `localhost` address,** and ChatGPT sign-in may not work. Ollama on a LAN host needs plain-`http://` exceptions in Info.plist and the Local Network permission, or Tailscale and HTTPS. ChatGPT sign-in redirects to a loopback address that an iOS app cannot count on. | Med | App Transport Security and sandbox rules. | Nothing to handle unless [D19](#decisions) is reopened; then this is the list of what the AI helper needs. | Parked ([D19](#decisions)) |
+| **C20** | **Your marks on a PDF are invisible to other apps until you export.** They are stored beside the file, never written into it. | Med | The file stays exactly as imported, backups and sync move small records, and the desktop and iPad can both read them ([pdf-markup-plan.md](pdf-markup-plan.md), P3). | **Export annotated PDF** writes a copy for other apps, native or flattened. | Accepted (you, 2026-11-07) |
+| **C21** | **An annotated export simplifies textured ink.** PencilKit's pencil and crayon strokes become plain ink paths in a native export. | Low | PDF's ink annotation holds paths, not textures. | The dialog says so; **Flatten markup** burns the ink in exactly as drawn. | Proposed |
 
 **Web-route compromises this design avoids** (kept so the trade is visible): hover-only controls becoming always
 visible; drag and drop falling back to a "Move to…" menu; right-click highlighting replaced by long-press;
@@ -702,7 +721,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D10 | Which Pencil layers ship. | Scribble and PencilKit in v1; Pencil events after. No web ink canvas on the iPad. | Proposed |
 | D11 | **Does Windows ever edit ink, or only view it?** | **View only first** on every non-Apple client (the Windows and Linux desktop apps and the web app): ink shows from the stroke JSON in theme colours, with the PNG as fallback. The stroke format keeps the door open for editing later (see D9). Revisit when sync ships, or when a pen-capable non-Apple device is in daily use. | **Decided** (you, 2026-11-05) |
 | D12 | **Distribution.** | **M1 and M2:** installed from Xcode onto the dev iPad; the paid Apple membership that already signs the desktop app avoids the 7-day limit of a free Apple ID ([Apple](https://developer.apple.com/support/compare-memberships)). **M3:** TestFlight first, internal and then an external link if others are invited. **The App Store waits** (you, 2026-11-05): it is not part of M3 and is revisited once M3 is in daily use. The checklist under [v1 scope and milestones](#v1-scope-and-milestones) is settled before M1's first install. | **Decided** (you, 2026-11-05) |
-| D13 | **v1 scope.** | **The full notes editor without plugins**, built in three milestones: M1 and M2 as test installs on the dev iPad, M3 as the first release combining them ([v1 scope and milestones](#v1-scope-and-milestones)). A capture-and-read companion was rejected: with no sync in v1 it would be a data silo, and it saves only UI polish. | **Decided** (you, 2026-11-05) |
+| D13 | **v1 scope.** | **The full notes editor without plugins**, built in three milestones: M1 and M2 as test installs on the dev iPad, M3 as the first release combining them ([v1 scope and milestones](#v1-scope-and-milestones)). A capture-and-read companion was rejected: with no sync in v1 it would be a data silo, and it saves only UI polish. **Widened 2026-11-07 (you): M2 also carries PDFs** ([pdf-markup-plan.md](pdf-markup-plan.md), P19). | **Decided** (you, 2026-11-05) |
 | D14 | Test hardware. | iPad Pro (M2) and a 2nd-generation Pencil. | **Decided** (you) |
 | D15 | A handwritten note may leave "Markdown only" on the iPad. | Acceptable; the design keeps it Markdown anyway. | **Decided** (you) |
 | D16 | Deployment floor. | iPadOS 17 (C15), confirmed against the iPad's actual version. | **Decided** (you, 2026-11-06): the floor is 17; the iPad is on iPadOS 27.0.1 |
@@ -1506,6 +1525,8 @@ Where the earlier chats are out of date or differ from `main` as of 2026-11-05, 
 - 2026-11-07: **Insert a stored image built (the last unbuilt M1 row).** *Image ▸ Stored Image…* and ⌘⇧M list the images in `app_data/` newest first with thumbnails, how many notes use each and its size; typing filters by words of the name; the chosen one is written in as a paragraph of its own, selected words becoming its description. Swift ports with an oracle: `listImages` (over real folders), `imageUsage` (new, extracted from the desktop's `service.listImages` into `imageRefs.ts`, same behaviour), `matchImages`, `usageLabel`, `formatSize` over 60 queries, 7 folders, 5 note sets and 41 sizes; breaking eight details fails the check (the ninth, ICU's lower-case-first tie, cannot occur on a file system that ignores case, so it was removed). Three UI tests (the Image menu path with filtering and insertion, Cancel, and Xcode's accessibility audit of the list, with each row labelled for VoiceOver and at least 44 points high). ⌘⇧M is a key command on the editor like ⌘⇧K and ⌘⇧H, and was seen to open the list in the UI tests, but those tests cannot send it steadily (when the on-screen keyboard is up the chord is also typed as an "m"), so it is a manual-test item. **Now:** conformance passes with 235 Swift tests (227 before) and the UI suite has 38 tests, all passing (the full run had one 150-second timeout in the Simulator's query on the Cancel test, which passed in three runs of its class). Not tried on a real iPad.
 
 - 2026-11-08: **App icon added.** The desktop's notebook (a PNG on a transparent background) on an opaque terracotta tile (the Cream scheme's accent), as an `AppIcon` single-size asset (`Assets.xcassets`, `ASSETCATALOG_COMPILER_APPICON_NAME`); the build puts the 60 and 76-point icons and `Assets.car` in the app, and it shows on the Simulator's home screen. `apps/ios/scripts/flatten-app-icon.swift` regenerates it. Not yet seen on a real iPad.
+
+- 2026-11-07: **PDFs join M2 (you, in the PDF design session, [pdf-markup-plan.md](pdf-markup-plan.md) P19).** D13 widened: M2 also builds the PDF reader, marks, the Notes tab, Pencil ink on PDFs, handwritten notes beside the PDF and export, with standalone `<Ink>` pages last and first to be cut. New tracker section "PDFs (new)", M2's exit criteria, and compromises C20 (marks are invisible to other apps until exported, accepted) and C21 (an annotated export simplifies textured ink). The desktop side is built; the iPad's rows are all ⬜, and spike B (PencilKit over PDFKit) needs the iPad.
 
 ## Sources
 
