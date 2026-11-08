@@ -24,3 +24,14 @@ export function looksLikePdf(head: Uint8Array): boolean {
 
 /** A stored name is one path segment of the shape the app generates; the same test the backup applies to a restored file. */
 export const STORED_DOCUMENT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * The title a note made for an imported PDF starts with: the file's name without `.pdf`, underscores read as spaces
+ * ("Designing_Data.pdf" is "Designing Data"). The user can rename it; reading the PDF's own title from its metadata
+ * is for the reader to do when it first opens the file.
+ */
+export function pdfTitleFromFileName(filePath: string): string {
+  const name = filePath.split(/[\\/]/).pop() ?? "";
+  const stem = name.replace(/\.pdf$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+  return stem || "PDF";
+}

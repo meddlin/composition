@@ -118,6 +118,8 @@ const packages = new Map([
     "next",
     "meilisearch",
     "js-yaml",
+    // The PDF reader (Apache-2.0); its worker and assets also travel inside the renderer, with their own LICENSE (pnpm copy:pdfjs).
+    "pdfjs-dist",
   ]),
   // better-sqlite3 is a native module loaded at runtime from node_modules.
   // The RSS Reader's feed parser, bundled into the main process (esbuild) with its own dependencies.

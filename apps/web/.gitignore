@@ -21,6 +21,9 @@
 # the draw.io editor, vendored by `pnpm fetch:drawio` (see drawio.lock.json)
 /public/drawio/
 
+# pdf.js's worker and assets, copied from node_modules by `pnpm copy:pdfjs`
+/public/pdfjs/
+
 # production
 /build
 

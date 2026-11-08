@@ -1,0 +1,270 @@
+"use client";
+
+import "pdfjs-dist/web/pdf_viewer.css";
+import {
+  BookmarkPlusIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+  MoonIcon,
+  PanelLeftIcon,
+  SearchIcon,
+  ZoomInIcon,
+  ZoomOutIcon,
+  MoveHorizontalIcon,
+  XIcon,
+} from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useElementWidth } from "../notes/useElementWidth";
+import type { PdfDocument } from "@/lib/composition/documentsApi";
+import type { DocumentsStore } from "@/lib/composition/documentsStore";
+import { cn } from "@/lib/utils";
+import { BookmarkList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
+import { usePdfViewer, type PdfViewer } from "./usePdfViewer";
+
+/** How wide the panel must be for the outline and bookmarks to sit beside the pages rather than over them. */
+const SIDEBAR_BESIDE_MIN_WIDTH = 600;
+
+/**
+ * A PDF being read: the pages (drawn by pdf.js as they scroll into view), and above them a bar with the page, the zoom,
+ * find, the dark-pages toggle and a bookmark button, with the outline and bookmarks in a sidebar. Where the reader was,
+ * its zoom and the dark-pages choice are remembered for the PDF.
+ */
+export function PdfReader({ document, documents }: { document: PdfDocument; documents: DocumentsStore }) {
+  const root = useRef<HTMLDivElement>(null);
+  const container = useRef<HTMLDivElement>(null);
+  const pages = useRef<HTMLDivElement>(null);
+  // A narrow panel has no room for the sidebar beside the pages, so there it covers them until it is put away.
+  const narrow = useElementWidth(root) < SIDEBAR_BESIDE_MIN_WIDTH;
+  const [dark, setDark] = useState(document.viewState.darkPages === true);
+  const [sidebar, setSidebar] = useState<SidebarTab | null>(null);
+  const [findOpen, setFindOpen] = useState(false);
+  const [bookmarksRead, setBookmarksRead] = useState(0);
+
+  const viewer = usePdfViewer(container, pages, {
+    documentId: document.id,
+    viewState: { ...document.viewState, darkPages: dark },
+    onPageCount: useCallback((count: number) => documents.setPageCount(document.id, count), [documents, document.id]),
+    onViewState: useCallback((state) => documents.saveViewState(document.id, state), [documents, document.id]),
+  });
+
+  function toggleDark() {
+    const next = !dark;
+    setDark(next);
+    const known = documents.byId(document.id)?.viewState ?? document.viewState;
+    documents.saveViewState(document.id, { ...known, darkPages: next });
+  }
+
+  function onKeyDown(event: KeyboardEvent) {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+      event.preventDefault();
+      setFindOpen(true);
+    }
+  }
+
+  const ready = viewer.phase === "ready" ? viewer : null;
+
+  return (
+    <div ref={root} className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
+      <Toolbar
+        viewer={viewer}
+        dark={dark}
+        onToggleDark={toggleDark}
+        sidebar={sidebar}
+        onToggleSidebar={() => setSidebar(sidebar === null ? "outline" : null)}
+        findOpen={findOpen}
+        onToggleFind={() => setFindOpen(!findOpen)}
+        onAddBookmark={() => {
+          if (!ready) return;
+          void documents.addBookmark(document.id, ready.page - 1, "").then(() => {
+            setBookmarksRead((n) => n + 1);
+            setSidebar("bookmarks");
+          });
+        }}
+      />
+      {ready && findOpen && <FindBar viewer={ready} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
+      <div className="relative flex min-h-0 flex-1">
+        {sidebar !== null && (
+          <aside
+            aria-label="PDF sidebar"
+            className={cn("flex w-60 shrink-0 flex-col border-r bg-background", narrow && "absolute inset-y-0 left-0 z-10 max-w-[85%] shadow-md")}
+          >
+            <div role="tablist" aria-label="Sidebar" className="flex shrink-0 border-b text-sm">
+              {(["outline", "bookmarks"] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  role="tab"
+                  aria-selected={sidebar === tab}
+                  onClick={() => setSidebar(tab)}
+                  className={cn("flex-1 px-3 py-1.5 capitalize", sidebar === tab ? "border-b-2 border-foreground font-medium" : "text-muted-foreground hover:text-foreground")}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
+              {!ready ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
+              ) : sidebar === "outline" ? (
+                <OutlineTree items={ready.outline} controls={ready.controls} />
+              ) : (
+                <BookmarkList documentId={document.id} documents={documents} controls={ready.controls} labels={ready.labels} refreshKey={bookmarksRead} />
+              )}
+            </div>
+          </aside>
+        )}
+        <div className="relative min-h-0 min-w-0 flex-1 bg-muted/40">
+          {/* pdf.js requires its scroll container to be positioned absolutely */}
+          <div
+            ref={container}
+            tabIndex={0}
+            role="document"
+            aria-label={`${document.fileName}, pages`}
+            className={cn(
+              "absolute inset-0 overflow-auto outline-none",
+              // Dark pages inverts the page images only: the text layer and marks drawn over them keep their colors.
+              dark && "[&_.canvasWrapper]:[filter:invert(1)_hue-rotate(180deg)]",
+            )}
+          >
+            <div ref={pages} className="pdfViewer" />
+          </div>
+          {viewer.phase === "loading" && <p className="pointer-events-none absolute inset-x-0 top-6 text-center text-sm text-muted-foreground">Opening the PDF…</p>}
+          {viewer.phase === "error" && (
+            <p role="alert" className="absolute inset-x-0 top-6 px-6 text-center text-sm text-destructive">
+              {viewer.message}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Toolbar({
+  viewer,
+  dark,
+  onToggleDark,
+  sidebar,
+  onToggleSidebar,
+  findOpen,
+  onToggleFind,
+  onAddBookmark,
+}: {
+  viewer: PdfViewer;
+  dark: boolean;
+  onToggleDark: () => void;
+  sidebar: SidebarTab | null;
+  onToggleSidebar: () => void;
+  findOpen: boolean;
+  onToggleFind: () => void;
+  onAddBookmark: () => void;
+}) {
+  const ready = viewer.phase === "ready" ? viewer : null;
+  return (
+    <div role="toolbar" aria-label="PDF tools" className="flex shrink-0 flex-wrap items-center gap-x-1 gap-y-0.5 border-b px-2 py-1">
+      <Button variant="ghost" size="icon-sm" aria-label="Outline and bookmarks" aria-pressed={sidebar !== null} onClick={onToggleSidebar} title="Outline and bookmarks">
+        <PanelLeftIcon />
+      </Button>
+      <PageBox viewer={ready} />
+      <div className="mx-1 hidden h-4 w-px bg-border sm:block" />
+      <Button variant="ghost" size="icon-sm" aria-label="Zoom out" disabled={!ready} onClick={() => ready?.controls.zoomOut()} title="Zoom out">
+        <ZoomOutIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Zoom in" disabled={!ready} onClick={() => ready?.controls.zoomIn()} title="Zoom in">
+        <ZoomInIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Fit to width" disabled={!ready} onClick={() => ready?.controls.fitWidth()} title="Fit to width">
+        <MoveHorizontalIcon />
+      </Button>
+      <div className="ml-auto" />
+      <Button variant="ghost" size="icon-sm" aria-label="Find in this PDF" aria-pressed={findOpen} disabled={!ready} onClick={onToggleFind} title="Find in this PDF (Ctrl/Cmd+F)">
+        <SearchIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Bookmark this page" disabled={!ready} onClick={onAddBookmark} title="Bookmark this page">
+        <BookmarkPlusIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Dark pages" aria-pressed={dark} onClick={onToggleDark} title="Dark pages: invert the pages' colors">
+        <MoonIcon />
+      </Button>
+    </div>
+  );
+}
+
+/** The page the reader is on, which can be typed over to go to another; the printed label is shown when it differs from the number. */
+function PageBox({ viewer }: { viewer: Extract<PdfViewer, { phase: "ready" }> | null }) {
+  // What is typed over the number belongs to the page it was typed on: once the reader is somewhere else, the page shows.
+  const [typed, setTyped] = useState<{ page: number; text: string } | null>(null);
+  const page = viewer?.page ?? 0;
+  const draft = typed !== null && typed.page === page ? typed.text : null;
+  const setDraft = (text: string | null) => setTyped(text === null ? null : { page, text });
+
+  function go() {
+    const target = Number(draft);
+    if (viewer && Number.isFinite(target) && draft !== "") viewer.controls.goToPage(target);
+    setDraft(null);
+  }
+
+  const label = viewer ? pageName(page, viewer.labels) : "";
+  return (
+    <div className="flex items-center gap-1.5 whitespace-nowrap text-sm text-muted-foreground">
+      <Input
+        aria-label="Page number"
+        inputMode="numeric"
+        disabled={!viewer}
+        value={draft ?? (viewer ? String(page) : "")}
+        onChange={(event) => setDraft(event.target.value.replace(/\D/g, ""))}
+        onFocus={(event) => event.target.select()}
+        onBlur={() => setDraft(null)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") go();
+          if (event.key === "Escape") setDraft(null);
+        }}
+        className="h-7 w-14 px-1.5 text-center"
+      />
+      <span>of {viewer?.pageCount ?? "…"}</span>
+      {viewer && label !== String(page) && <span title="The page number printed on the page">(page {label})</span>}
+    </div>
+  );
+}
+
+function FindBar({ viewer, onClose }: { viewer: Extract<PdfViewer, { phase: "ready" }>; onClose: () => void }) {
+  const [query, setQuery] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => input.current?.focus(), []);
+
+  const count = viewer.find;
+  return (
+    <div role="search" aria-label="Find in this PDF" className="flex shrink-0 items-center gap-1 border-b px-2 py-1">
+      <Input
+        ref={input}
+        aria-label="Find in this PDF"
+        placeholder="Find in this PDF"
+        value={query}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          viewer.controls.find(event.target.value);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") viewer.controls.find(query, { findPrevious: event.shiftKey });
+          if (event.key === "Escape") onClose();
+        }}
+        className="h-7 max-w-64"
+      />
+      <span aria-live="polite" className="min-w-16 text-xs text-muted-foreground">
+        {query === "" || !count ? "" : count.notFound ? "Not found" : `${count.current} of ${count.total}`}
+      </span>
+      <Button variant="ghost" size="icon-xs" aria-label="Previous match" onClick={() => viewer.controls.find(query, { findPrevious: true })}>
+        <ChevronUpIcon />
+      </Button>
+      <Button variant="ghost" size="icon-xs" aria-label="Next match" onClick={() => viewer.controls.find(query)}>
+        <ChevronDownIcon />
+      </Button>
+      <div className="flex-1" />
+      <Button variant="ghost" size="icon-xs" aria-label="Close find" onClick={onClose}>
+        <XIcon />
+      </Button>
+    </div>
+  );
+}

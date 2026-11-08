@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRightIcon, StarIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, FileTextIcon, StarIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -14,6 +14,7 @@ import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
 import { relativeTime } from "./homeListing";
 import { noteDateLine, useNoteDatePrefs } from "./noteDatePrefs";
+import { usePdfNoteIds } from "./pdfNotes";
 import { NoteMenu } from "./NoteMenu";
 import { sortNotes, useNoteSort } from "./noteSort";
 import { noteTitle, type Group, type Note, type Notebook } from "./types";
@@ -672,6 +673,7 @@ function NoteRow({
   onToggleFavorite: () => void;
 }) {
   const dateLine = noteDateLine(note, useNoteDatePrefs(), relativeTime);
+  const ownsPdf = usePdfNoteIds().has(note.id);
   const rowRef = useRef<HTMLDivElement>(null);
   const revealNonce = reveal?.nonce;
   useEffect(() => {
@@ -698,7 +700,10 @@ function NoteRow({
         )}
       >
         <span className="flex min-w-0 flex-col items-start">
-          <span className="max-w-full truncate">{noteTitle(note)}</span>
+          <span className="flex max-w-full items-center gap-1.5">
+            {ownsPdf && <FileTextIcon aria-label="PDF" role="img" className="size-3.5 shrink-0 text-muted-foreground" />}
+            <span className="truncate">{noteTitle(note)}</span>
+          </span>
           {dateLine && (
             <span className="max-w-full truncate text-xs font-normal text-muted-foreground">{dateLine}</span>
           )}

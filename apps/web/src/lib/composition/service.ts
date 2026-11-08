@@ -7,6 +7,12 @@ import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from ".
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
 import * as documents from "./documents";
+import type { ExistingPdf, ImportTarget, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import * as documentsRepo from "./documentsRepo";
+import type { StoredDocument } from "./documentsRepo";
+import { pdfTitleFromFileName } from "./documentNames";
+import * as pdfMarkupRepo from "./pdfMarkupRepo";
+import type { PdfViewState } from "./pdfMarkup";
 import { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
@@ -386,6 +392,99 @@ export async function findAttachmentFile(id: number): Promise<{ path: string; fi
 export async function removeAttachment(id: number): Promise<AttachmentActionResult> {
   const removed = await attachments.removeAttachment(loadWebSettings().appDataDir, id);
   return removed ? {} : { error: "That attachment no longer exists." };
+}
+
+/*
+ * PDFs a note owns are desktop only too (documentsApi.ts). The main process calls these after it has run the native file
+ * picker; the reader's bytes are served by the app scheme from `findDocumentFile`.
+ */
+
+/** What the UI gets: without the stored name and the hash, so the file's place on disk never leaves the main process. */
+const publicDocument = ({ storedName: _storedName, sha256: _sha256, ...document }: StoredDocument): PdfDocument => {
+  void _storedName;
+  void _sha256;
+  return document;
+};
+
+export async function listDocuments(): Promise<PdfDocument[]> {
+  return documentsRepo.listDocuments().map(publicDocument);
+}
+
+/** What `importPdf` came to: the note and PDF made, or the PDFs that already hold these bytes, or a reason to show. */
+export type ImportPdfOutcome =
+  | { status: "added"; note: Note; document: PdfDocument }
+  | { status: "duplicate"; existing: ExistingPdf[] }
+  | { status: "refused"; error: string };
+
+/** A note that was made for an import that did not come to anything: it was never shown, so it goes for good, not to the Trash Can. */
+function discardNote(id: number): void {
+  trashRepo.trashNote(id);
+  trashRepo.purgeNote(id);
+}
+
+/** The title of a note that owns a PDF, whether the note is live or in the Trash Can. */
+function ownerTitle(noteId: number): string {
+  return notesRepo.getNote(noteId)?.title ?? trashRepo.getTrashedNotes([noteId])[0]?.title ?? "Untitled";
+}
+
+/**
+ * Makes a note for the PDF at `sourcePath` (chosen by the user in a native dialog) in the target group and imports the
+ * file into it. Nothing is left behind when the file is refused, or is one the library already has and the caller did not
+ * ask for a separate copy.
+ */
+export async function importPdf(sourcePath: string, target: ImportTarget, options: { allowDuplicate?: boolean } = {}): Promise<ImportPdfOutcome> {
+  const note = notesRepo.createNote(pdfTitleFromFileName(sourcePath), "", target.groupId, target.notebookId);
+  let result;
+  try {
+    result = await documents.importDocument(loadWebSettings().appDataDir, note.id, sourcePath, options);
+  } catch (error) {
+    discardNote(note.id);
+    throw error;
+  }
+  if (result.status === "added") {
+    await bestEffortIndex(() => searchIndex.indexNote(note));
+    return { status: "added", note, document: publicDocument(result.document) };
+  }
+  discardNote(note.id);
+  if (result.status === "refused") return { status: "refused", error: result.error };
+  return {
+    status: "duplicate",
+    existing: result.existing.map((document) => ({ document: publicDocument(document), noteTitle: ownerTitle(document.noteId) })),
+  };
+}
+
+/** Where a PDF's bytes are, for the app scheme to serve; null when the row is gone or the file was deleted behind the app's back. */
+export function findDocumentFile(id: number): { path: string; fileName: string } | null {
+  const found = documents.documentPath(loadWebSettings().appDataDir, id);
+  return found ? { path: found.path, fileName: found.document.fileName } : null;
+}
+
+export async function setDocumentPageCount(documentId: number, pageCount: number): Promise<void> {
+  documentsRepo.setPageCount(documentId, pageCount);
+}
+
+export async function saveDocumentViewState(documentId: number, state: PdfViewState): Promise<void> {
+  documentsRepo.setViewState(documentId, state);
+}
+
+export async function listBookmarks(documentId: number): Promise<PdfBookmark[]> {
+  return pdfMarkupRepo.listBookmarks(documentId);
+}
+
+export async function addBookmark(documentId: number, page: number, label: string): Promise<PdfBookmark> {
+  return pdfMarkupRepo.addBookmark(documentId, page, label);
+}
+
+export async function renameBookmark(bookmarkId: number, label: string): Promise<PdfBookmark | null> {
+  return pdfMarkupRepo.renameBookmark(bookmarkId, label);
+}
+
+export async function removeBookmark(bookmarkId: number): Promise<void> {
+  pdfMarkupRepo.deleteBookmark(bookmarkId);
+}
+
+export async function describeDocument(noteId: number): Promise<PdfContents | null> {
+  return documentsRepo.documentContents(noteId);
 }
 
 /*

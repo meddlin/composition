@@ -7,6 +7,8 @@ import { applyOrder, placeBefore } from "@/lib/composition/ordering";
 import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/composition/pluginsStore";
 import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
 import { createContactsStore, unavailableContacts, type ContactsStore } from "@/lib/composition/contactsStore";
+import type { ImportPdfResult, ImportTarget } from "@/lib/composition/documentsApi";
+import { createDocumentsStore, unavailableDocuments, type DocumentsStore, type DuplicateImport } from "@/lib/composition/documentsStore";
 import { createFeedsStore, unavailableFeeds, type FeedsStore } from "@/lib/composition/feedsStore";
 import { createReadingListStore, unavailableReadingList, type ReadingListStore } from "@/lib/composition/readingListStore";
 import { createTodosStore, unavailableTodos, type TodosStore } from "@/lib/composition/todosStore";
@@ -31,6 +33,7 @@ import {
   openAssistantFor as openAssistantForIn,
   openKind as openKindIn,
   openNote as openNoteIn,
+  openPdfPair as openPdfPairIn,
   openNoteBeside as openNoteBesideIn,
   openNoteBesideNote as openNoteBesideNoteIn,
   setAssistantFollow as setAssistantFollowIn,
@@ -120,6 +123,8 @@ export type WorkspaceOptions = {
   feeds?: FeedsStore;
   /** The contacts, one set for every window. Without it, loading them reports that they are unavailable. */
   contacts?: ContactsStore;
+  /** The PDFs notes own, one list for every window. Without it, loading them reports that they are unavailable. */
+  documents?: DocumentsStore;
   /** Which plugins are on, one answer for every window. Without it, all are on and a change is only remembered while the page is open. */
   plugins?: PluginsStore;
   panels?: {
@@ -143,6 +148,8 @@ export type WorkspaceStore = {
   readonly feeds: FeedsStore;
   /** The contacts, which live with the workspace so every Contacts panel, in any window, shows the same ones. */
   readonly contacts: ContactsStore;
+  /** The PDFs notes own, which live with the workspace so the sidebar's PDF rows and every PDF panel, in any window, agree. */
+  readonly documents: DocumentsStore;
   /** Which built-in plugins are on, which live with the workspace so every panel, in any window, agrees. */
   readonly plugins: PluginsStore;
   subscribe(listener: () => void): () => void;
@@ -180,7 +187,10 @@ export type WorkspaceStore = {
    * in `panelsState.ts`). Null, and nothing changes, for a kind whose plugin is off or a window that is gone.
    */
   openKind(kind: LauncherKind, windowId?: WindowId): PanelId | null;
-  /** Shows a note the way picking it in the sidebar does (see `openNote` in `panelsState.ts`). */
+  /**
+   * Shows a note the way picking it in the sidebar does (see `openNote` in `panelsState.ts`); a note that owns a PDF opens
+   * with its PDF beside it (see `openPdfPair`).
+   */
   openNote(noteId: number, windowId?: WindowId): void;
   /** The sidebar's "Open to the side": a new note panel beside the focused one, even if the note is open already. */
   openNoteBeside(noteId: number, windowId?: WindowId): void;
@@ -215,6 +225,14 @@ export type WorkspaceStore = {
   moveNoteToGroup(noteId: number, groupId: number | null): void;
   /** Files the note in the group just before a sibling note (last when `beforeNoteId` is null). */
   placeNote(noteId: number, groupId: number | null, beforeNoteId: number | null): void;
+
+  /**
+   * Imports a PDF the user picks in the native dialog, into a new note in the target group, and opens the note with its PDF
+   * beside it. A refused file comes back as `error` and one the library already has as `duplicate`; nothing is added then.
+   */
+  importPdf(target: ImportTarget, windowId?: WindowId): Promise<ImportPdfResult>;
+  /** Imports the PDF of a `duplicate` result as a separate copy, and opens it the same way. */
+  importPdfCopy(duplicate: DuplicateImport, windowId?: WindowId): Promise<ImportPdfResult>;
 
   /** Makes a separate note from an AI answer, in the group and notebook of the note it was asked about, opened to that note's right. */
   newNoteFromText(fromNoteId: number, text: string, fallbackNotebookId: number): Promise<Note>;
@@ -258,6 +276,7 @@ export function createWorkspaceStore(
 ): WorkspaceStore {
   const grid = options.panels !== undefined;
   const plugins = options.plugins ?? createPluginsStore(unsavedPlugins, initial.plugins ?? DEFAULT_PLUGIN_SETTINGS);
+  const documents = options.documents ?? createDocumentsStore(unavailableDocuments, false);
   let panelCount = 0;
   const newPanelId = () => `p${++panelCount}`;
   let windowCount = 0;
@@ -395,6 +414,28 @@ export function createWorkspaceStore(
     if (grid && isAssistantPinnedTo(noteId)) keptChats.add(noteId);
     else assistant.forgetNote(noteId);
     void deps.deleteNote(noteId);
+  }
+
+  /** Shows the note an import made, and its PDF beside it. */
+  function acceptImport(result: ImportPdfResult, windowId: WindowId): ImportPdfResult {
+    const { note, document } = result;
+    if (note && document) {
+      set({
+        notes: [note, ...state.notes],
+        ...(grid ? { panels: openPdfPairIn(state.panels, windowId, note.id, document.id, newPanelId) } : {}),
+      });
+    }
+    return result;
+  }
+
+  async function importPdf(target: ImportTarget, windowId: WindowId = MAIN_WINDOW) {
+    flushSaves();
+    return acceptImport(await documents.importPdf(target), windowId);
+  }
+
+  async function importPdfCopy(duplicate: DuplicateImport, windowId: WindowId = MAIN_WINDOW) {
+    flushSaves();
+    return acceptImport(await documents.importCopy(duplicate), windowId);
   }
 
   async function newNoteFromText(fromNoteId: number, text: string, fallbackNotebookId: number) {
@@ -602,6 +643,7 @@ export function createWorkspaceStore(
     readingList: options.readingList ?? createReadingListStore(unavailableReadingList),
     feeds: options.feeds ?? createFeedsStore(unavailableFeeds),
     contacts: options.contacts ?? createContactsStore(unavailableContacts),
+    documents,
     plugins,
     subscribe(listener) {
       listeners.add(listener);
@@ -612,6 +654,8 @@ export function createWorkspaceStore(
     flushSaves,
     reconcile,
     newNoteFromText,
+    importPdf,
+    importPdfCopy,
     toggleFavorite,
     toggleNotebookPin,
     updatePanes: (update) => set({ panes: update(state.panes) }),
@@ -629,7 +673,10 @@ export function createWorkspaceStore(
       if (opened.panels !== state.panels) set({ panels: opened.panels });
       return opened.panelId;
     },
-    openNote: (noteId, windowId = MAIN_WINDOW) => updatePanels((panels) => openNoteIn(panels, windowId, noteId, newPanelId)),
+    openNote: (noteId, windowId = MAIN_WINDOW) => {
+      const pdf = grid ? documents.forNote(noteId) : undefined;
+      updatePanels((panels) => (pdf ? openPdfPairIn(panels, windowId, noteId, pdf.id, newPanelId) : openNoteIn(panels, windowId, noteId, newPanelId)));
+    },
     openNoteBeside: (noteId, windowId = MAIN_WINDOW) =>
       updatePanels((panels) => openNoteBesideIn(panels, windowId, noteId, newPanelId)),
     movePanelToNewWindow: (panelId) => {

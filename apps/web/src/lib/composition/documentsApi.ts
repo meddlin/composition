@@ -1,3 +1,4 @@
+import type { Note } from "./notesRepo";
 import type { PdfMarkKind, PdfRect, PdfViewState } from "./pdfMarkup";
 
 /**
@@ -53,3 +54,78 @@ export type PdfBookmark = {
   label: string;
   createdAt: string;
 };
+
+/** What deleting a PDF's note takes with it: counted for the delete dialog and the Trash Can row. */
+export type PdfContents = {
+  fileName: string;
+  /** Size in bytes. */
+  size: number;
+  /** Marks by kind (a text note is `text`). */
+  marks: Record<PdfMarkKind, number>;
+  /** How many pages have ink on them (ink is one record per page). */
+  inkPages: number;
+  bookmarks: number;
+};
+
+/** Where an imported PDF's note goes: the group and notebook the sidebar is on. */
+export type ImportTarget = { groupId: number | null; notebookId: number };
+
+/** A PDF the same bytes of which are already imported, with the note that owns it. */
+export type ExistingPdf = { document: PdfDocument; noteTitle: string };
+
+/**
+ * What an import came to. Cancelling the picker is not an error: `canceled` is set. When the file is one you already have,
+ * nothing is imported and `duplicate` says which PDFs hold the same bytes; `token` stands for the file the user picked, so
+ * that "Import a separate copy" (`importPdfCopy`) needs no path from the page.
+ */
+export type ImportPdfResult = {
+  note?: Note;
+  document?: PdfDocument;
+  duplicate?: { token: string; fileName: string; existing: ExistingPdf[] };
+  error?: string;
+  canceled?: boolean;
+};
+
+/**
+ * The contract for PDFs a note owns. Desktop only, like the reader that shows them: the web app and the CLI keep the file
+ * and the note (docs/pdf-markup-plan.md). The renderer never supplies a path: a PDF is chosen in the operating system's own
+ * dialog, which only the main process can open, and its bytes are served to the reader by the app scheme.
+ */
+export interface DocumentsApi {
+  /** Every PDF, one per owner note. */
+  listDocuments(): Promise<PdfDocument[]>;
+  /** Opens the file picker, makes a note for the PDF in the target group, and imports the file into it. */
+  importPdf(target: ImportTarget): Promise<ImportPdfResult>;
+  /** Imports the file a refused `importPdf` found a duplicate of (`token`), as a separate copy, into a new note. */
+  importPdfCopy(token: string, target: ImportTarget): Promise<ImportPdfResult>;
+  /** Records how many pages the reader counted. */
+  setDocumentPageCount(documentId: number, pageCount: number): Promise<void>;
+  /** Remembers where the reader was in a PDF. */
+  saveDocumentViewState(documentId: number, state: PdfViewState): Promise<void>;
+  listBookmarks(documentId: number): Promise<PdfBookmark[]>;
+  addBookmark(documentId: number, page: number, label: string): Promise<PdfBookmark>;
+  renameBookmark(bookmarkId: number, label: string): Promise<PdfBookmark | null>;
+  removeBookmark(bookmarkId: number): Promise<void>;
+  /** What deleting the note would take with it; null when the note owns no PDF. */
+  describeDocument(noteId: number): Promise<PdfContents | null>;
+}
+
+/** Every method of DocumentsApi, as data; the check below fails to compile if one is missing (see API_METHODS in api.ts). */
+export const DOCUMENT_METHODS = [
+  "listDocuments",
+  "importPdf",
+  "importPdfCopy",
+  "setDocumentPageCount",
+  "saveDocumentViewState",
+  "listBookmarks",
+  "addBookmark",
+  "renameBookmark",
+  "removeBookmark",
+  "describeDocument",
+] as const satisfies readonly (keyof DocumentsApi)[];
+
+export type DocumentMethod = (typeof DOCUMENT_METHODS)[number];
+
+type MissingFromDocumentMethods = Exclude<keyof DocumentsApi, DocumentMethod>;
+const _everyMethodListed: [MissingFromDocumentMethods] extends [never] ? true : never = true;
+void _everyMethodListed;

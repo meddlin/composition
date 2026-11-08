@@ -1,17 +1,18 @@
 "use client";
 
-import { FolderTreeIcon, BookOpenIcon, BookUserIcon, LayoutDashboardIcon, ListTodoIcon, LinkIcon, MessageSquareIcon, RssIcon, StickyNoteIcon } from "lucide-react";
-import { Fragment, useRef, useSyncExternalStore } from "react";
+import { FileTextIcon, FolderTreeIcon, BookOpenIcon, BookUserIcon, LayoutDashboardIcon, ListTodoIcon, LinkIcon, MessageSquareIcon, RssIcon, StickyNoteIcon } from "lucide-react";
+import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { NotePane } from "../notes/NotePane";
+import { PdfReader } from "../pdf/PdfReader";
 import { ResizeHandle } from "../notes/ResizeHandle";
 import type { WorkspaceSnapshot, WorkspaceStore } from "../notes/workspaceStore";
 import { AiPanel } from "./AiPanel";
 import { EmptyPanel } from "./EmptyPanel";
 import type { PanelHost } from "./host";
-import { KINDS, type AssistantPanelState, type ContactsPanelState, type NotePanelState, type NotesBrowserState, type ReadingListPanelState, type RssPanelState, type TodoPanelState } from "./kinds";
+import { KINDS, type AssistantPanelState, type ContactsPanelState, type NotePanelState, type NotesBrowserState, type PdfPanelState, type ReadingListPanelState, type RssPanelState, type TodoPanelState } from "./kinds";
 import { NotesBrowserPanel } from "./NotesBrowserPanel";
 import { dragSizes, minExtent, panelIds, type Direction, type LayoutNode, type PanelId, type SplitPath } from "./layoutTree";
 import { ContactsPanel } from "./ContactsPanel";
@@ -35,12 +36,13 @@ type Props = {
 /** The least height, in px, a panel can be dragged down to: its header and a few lines. */
 const MIN_PANEL_HEIGHT = 120;
 
-const KIND_LABEL: Record<KindId, string> = { empty: "Empty panel", note: "Note", "notes-browser": "Notes browser", ai: "AI helper", todo: "To-do", "reading-list": "Reading List", rss: "RSS Reader", contacts: "Contacts" };
+const KIND_LABEL: Record<KindId, string> = { empty: "Empty panel", note: "Note", "notes-browser": "Notes browser", ai: "AI helper", pdf: "PDF", todo: "To-do", "reading-list": "Reading List", rss: "RSS Reader", contacts: "Contacts" };
 const KIND_ICON: Record<KindId, typeof StickyNoteIcon> = {
   empty: LayoutDashboardIcon,
   note: StickyNoteIcon,
   "notes-browser": FolderTreeIcon,
   ai: MessageSquareIcon,
+  pdf: FileTextIcon,
   todo: ListTodoIcon,
   "reading-list": BookOpenIcon,
   rss: RssIcon,
@@ -106,6 +108,8 @@ function PanelView({ panelId, shared }: { panelId: PanelId; shared: Shared }) {
     if (state.noteId !== null) return <NoteView panelId={panelId} state={state} shared={shared} />;
   }
 
+  if (record.kind === "pdf") return <PdfView panelId={panelId} state={record.state as PdfPanelState} shared={shared} />;
+
   const Icon = KIND_ICON[record.kind];
   const plugin = KINDS[record.kind].plugin;
   const off = plugin !== undefined && !enabled[plugin];
@@ -140,6 +144,45 @@ function PanelView({ panelId, shared }: { panelId: PanelId; shared: Shared }) {
           snapshot={shared.snapshot}
           host={shared.host}
         />
+      )}
+    </PanelFrame>
+  );
+}
+
+/** A PDF panel: the reader for the PDF it shows, named by the file, or a note that the PDF is gone. */
+function PdfView({ panelId, state, shared }: { panelId: PanelId; state: PdfPanelState; shared: Shared }) {
+  const { store, focusedId, canCloseLast } = shared;
+  const snapshot = useSyncExternalStore(store.documents.subscribe, store.documents.getSnapshot, store.documents.getSnapshot);
+  useEffect(() => {
+    void store.documents.load();
+  }, [store]);
+  const document = state.documentId === null ? undefined : snapshot.documents.find((d) => d.id === state.documentId);
+  const loaded = snapshot.status === "ready" || snapshot.status === "error";
+
+  return (
+    <PanelFrame
+      store={store}
+      panelId={panelId}
+      label={document ? `PDF: ${document.fileName}` : "PDF"}
+      focused={panelId === focusedId}
+      canClose={canCloseLast}
+      windowId={shared.windowId}
+      windows={shared.windows}
+      alone={shared.alone}
+      onDropNote={(noteId, zone) => shared.host.onDropNote(noteId, panelId, zone)}
+      icon={<FileTextIcon className="size-4 shrink-0" />}
+      title={document?.fileName ?? "PDF"}
+    >
+      {document ? (
+        <PdfReader key={document.id} document={document} documents={store.documents} />
+      ) : (
+        <Empty>
+          <EmptyHeader>
+            <EmptyDescription>
+              {!loaded ? "Loading…" : snapshot.status === "error" ? (snapshot.error ?? "The PDFs could not be read.") : "This PDF is no longer in the library."}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       )}
     </PanelFrame>
   );

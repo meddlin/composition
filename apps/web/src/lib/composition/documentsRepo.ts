@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import type { PdfDocument } from "./documentsApi";
+import type { PdfContents, PdfDocument } from "./documentsApi";
 import { normalizeViewState, parseViewState, type PdfViewState } from "./pdfMarkup";
 
 /** A PDF plus where its bytes are and their hash: the name of the file in `<application data>/documents/`. */
@@ -137,4 +137,28 @@ export function deleteOrphanedDocuments(): StoredDocument[] {
     db.prepare("DELETE FROM pdf_bookmarks WHERE document_id NOT IN (SELECT id FROM documents)").run();
     return rows.map(fromRow);
   })();
+}
+
+/** Every PDF, oldest first: the sidebar marks the notes that own one, and opening a note finds its PDF here. */
+export function listDocuments(): StoredDocument[] {
+  const rows = getDb().prepare("SELECT * FROM documents ORDER BY id").all() as DocumentRow[];
+  return rows.map(fromRow);
+}
+
+/** What a note's PDF holds (marks by kind, pages with ink, bookmarks), for the delete dialog; null when the note owns none. */
+export function documentContents(noteId: number): PdfContents | null {
+  const document = getDocumentForNote(noteId);
+  if (!document) return null;
+  const db = getDb();
+  const marks: PdfContents["marks"] = { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 };
+  const counts = db.prepare("SELECT kind, COUNT(*) AS n FROM pdf_annotations WHERE document_id = ? GROUP BY kind").all(document.id) as {
+    kind: keyof PdfContents["marks"];
+    n: number;
+  }[];
+  for (const { kind, n } of counts) if (kind in marks) marks[kind] = n;
+  const inkPages = (
+    db.prepare("SELECT COUNT(DISTINCT page) AS n FROM pdf_annotations WHERE document_id = ? AND kind = 'ink'").get(document.id) as { n: number }
+  ).n;
+  const bookmarks = (db.prepare("SELECT COUNT(*) AS n FROM pdf_bookmarks WHERE document_id = ?").get(document.id) as { n: number }).n;
+  return { fileName: document.fileName, size: document.size, marks, inkPages, bookmarks };
 }

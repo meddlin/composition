@@ -1,4 +1,4 @@
-import { BESIDE_VIEW, KINDS, noteIdOf, type AssistantPanelState, type NotePanelState } from "./kinds";
+import { BESIDE_VIEW, KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfPanelState } from "./kinds";
 import { launcherFor, type LauncherKind } from "./launchers";
 import {
   closePanel as closeLayout,
@@ -14,7 +14,7 @@ import {
 } from "./layoutTree";
 
 /** What a panel can show. A kind is added here and in `kinds.ts`, which says how its state is made and read back. */
-export type KindId = "empty" | "note" | "notes-browser" | "ai" | "todo" | "reading-list" | "rss" | "contacts";
+export type KindId = "empty" | "note" | "notes-browser" | "ai" | "pdf" | "todo" | "reading-list" | "rss" | "contacts";
 
 export type WindowId = string;
 export const MAIN_WINDOW: WindowId = "main";
@@ -191,6 +191,24 @@ export function openNote(panels: PanelsState, windowId: WindowId, noteId: number
 
   const state: NotePanelState = { noteId, view: BESIDE_VIEW };
   return splitPanel(panels, focused.id, "right", { id: newId(), kind: "note", state });
+}
+
+/**
+ * Opens a note that owns a PDF the way picking its row in the sidebar does: the note as `openNote` would show it, and the
+ * PDF to the left of it, which is focused (reading comes first). A PDF the window already shows is only focused.
+ */
+export function openPdfPair(panels: PanelsState, windowId: WindowId, noteId: number, documentId: number, newId: () => PanelId): PanelsState {
+  const withNote = openNote(panels, windowId, noteId, newId);
+  const window = withNote.windows[windowId];
+  if (!window) return panels;
+
+  const showing = window.focusOrder.find((id) => pdfDocumentIdOf(withNote.byId[id]) === documentId);
+  if (showing !== undefined) return focusPanel(withNote, showing);
+
+  const notePanel = window.focusOrder.find((id) => noteIdOf(withNote.byId[id]) === noteId);
+  if (notePanel === undefined) return withNote;
+  const state: PdfPanelState = { documentId };
+  return splitPanel(withNote, notePanel, "left", { id: newId(), kind: "pdf", state });
 }
 
 /** A new note panel beside `panelId` showing the note, on the editor tab, focused. */

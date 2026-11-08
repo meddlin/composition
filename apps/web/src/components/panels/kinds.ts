@@ -15,6 +15,12 @@ export type NotesBrowserState = { notebookId: number | null };
  */
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
+/**
+ * What a PDF panel saves: the PDF it shows (none when it was saved before the PDF existed or its note is gone). Where the
+ * reader was in it, its zoom and the dark-pages choice are the PDF's own (`documents.view_state`), not the panel's.
+ */
+export type PdfPanelState = { documentId: number | null };
+
 /** How a to-do panel shows the items: as the nested list, as a board with a column per status, as the reports, or the archive. */
 export type TodoView = "list" | "board" | "reports" | "archive";
 
@@ -116,6 +122,15 @@ export const KINDS: Record<
       return { noteId, follow: false } satisfies AssistantPanelState;
     },
   },
+  pdf: {
+    minWidth: 360,
+    initialState: (): PdfPanelState => ({ documentId: null }),
+    restore(saved) {
+      if (!isRecord(saved)) return null;
+      // The PDF may be gone since (its note deleted for good); the panel then says so, so it is not checked here.
+      return { documentId: Number.isSafeInteger(saved.documentId) ? (saved.documentId as number) : null } satisfies PdfPanelState;
+    },
+  },
   todo: {
     minWidth: MIN_PANEL_WIDTH,
     plugin: "todo",
@@ -185,6 +200,11 @@ export const KINDS: Record<
  * tab away. (The same choice `panes.ts` makes for the web app's row.)
  */
 export const BESIDE_VIEW: PaneView = "markdown";
+
+/** The PDF a panel shows; null for a panel of another kind, or a PDF panel not showing one. */
+export function pdfDocumentIdOf(panel: PanelRecord): number | null {
+  return panel.kind === "pdf" ? (panel.state as PdfPanelState).documentId : null;
+}
 
 /** The note a panel shows; null for a panel of another kind, or a note panel not showing one yet. */
 export function noteIdOf(panel: PanelRecord): number | null {

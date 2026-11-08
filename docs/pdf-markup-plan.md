@@ -354,8 +354,33 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
 
    Not in this step, on purpose: the delete dialog's and the Trash Can row's summary of what is inside (Step 2), its count of
    citing notes (Step 4), the service and IPC wrappers the reader calls (Step 2), and the Swift side (M2).
-2. **Import and the reader.** Importing, serving bytes, the `pdf` panel kind, the PDF row in the tree, the pair opening, outline,
-   bookmarks, resume, find, dark pages, the new delete dialog and Trash Can row.
+2. **Import and the reader. Built 2026-11-07,** checked in the real app by `pnpm --dir apps/desktop smoke:pdf` (24 checks,
+   against a small hand-made PDF, with the screenshots it takes). Importing through the native picker, serving the bytes with
+   ranges, the `pdf` panel kind, the PDF row in the tree, the pair opening, outline, bookmarks, resume, find, dark pages, the
+   new delete dialog and Trash Can row. What was built, and what it found:
+   - **Main process:** `DocumentsApi` over IPC (ids and a target only: no path from the page), `main/documents.ts` (the picker,
+     and a random token that stands for a file found to be a duplicate so that "Import a separate copy" needs no path), and
+     `main/rangeResponse.ts` (a streaming `Range` handler for `app://composition/documents/<id>`; a 3 GB sparse file is sliced
+     in a test without reading it). The scheme gains `corsEnabled`, and a response is given `Access-Control-Allow-Origin` only
+     for the dev server's own origin, so `next dev` can fetch the bytes too (written, but only the built app was exercised).
+   - **Renderer:** `PdfReader` drives pdf.js's own viewer components through `usePdfViewer`, with the range transport and
+     16 KB chunks of spike A. Toolbar (page box with the printed label, zoom, fit width, find, bookmark, dark pages), an
+     outline and bookmarks sidebar (it covers the pages in a panel narrower than 600 px instead of squeezing them), find across
+     the whole PDF. The reading position, zoom and dark pages are saved a moment after the reader stops and come back after a
+     restart. The workspace store has a `documents` store like the contacts one, and opening a PDF's note opens the pair.
+   - **Findings:** (1) `pdf_viewer.mjs` reads the core library from `globalThis.pdfjsLib` when it loads, so the loader puts it
+     there first. (2) pdf.js 6.5.438 has **no `isEvalSupported` option and no eval at all**, so the spike's `isEvalSupported:
+     false` did nothing and risk X5's "eval off" is moot. (3) `useWasm: false` keeps pdf.js from trying WebAssembly under the
+     CSP. (4) pdf.js bundles under Next 16's Turbopack as a dynamic import, with its worker, CMaps, fonts and ICC profiles copied
+     into `public/pdfjs/` from the pinned package by `pnpm copy:pdfjs` (the desktop build and dev loop run it; nothing to
+     download, unlike draw.io), and the worker is served by the app scheme under the unchanged CSP.
+   - **My picks, made while building:** the note is titled from the file name (underscores read as spaces), not from the PDF's
+     own metadata, which is left for a later pass; **the reader counts the pages** on first open, not the main process; the
+     PDF panel's saved state is only its document (the paired-note state of Step 4 is added then); opening a PDF note focuses
+     the PDF panel; a PDF in a narrow panel puts the sidebar over the pages; a password-protected PDF says it is protected.
+   - **Not done in this step:** dragging a `.pdf` onto the window or a group, and **Import PDF…** in the File menu (the sidebar
+     button is the one way in so far); the Highlights and Notes tabs (Steps 3 and 4); web's "This note has a PDF" line; a
+     password prompt; the panel's title in a pop-out's window (it says "PDF").
 3. **Text markup.** Highlight, underline, strikethrough, typed text notes, the Highlights tab, undo and redo.
 4. **Notes and links.** `pdf:` links (preview, editor, Live tab), Quote, Cite this page, link following, the Notes tab, New note
    for this PDF, pin and follow.
@@ -474,7 +499,7 @@ itself in Electron.
 | X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). **Answered by spike C** for stored rectangles: raw user space agrees on all nine test geometries. Open: real multi-line selections, and PDFKit on the iPad. | Raw user-space convention; the spike C checks in `spikes/pdf-reader/coords` as a regression test when the code exists. |
 | X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. | Spike B; Pencil-only input; overlays only on visible pages. |
 | X4 | Quoted text comes out jumbled on multi-column or odd PDFs (selection order), or a highlight's rectangles merge badly. | Keep the rectangles per line; test on a two-column paper and a scanned-then-OCR file; the user can correct the quote in the note. |
-| X5 | A hostile PDF attacks the reader. | Pinned recent pdf.js, eval off, no scripting, file served only to our own pages. |
+| X5 | A hostile PDF attacks the reader. | Pinned recent pdf.js (this version has no eval to turn off), no scripting, no form widgets, no WebAssembly, the file served only to our own pages. |
 | X6 | A backup grows large and slow with textbooks; a Trash Can holds a large file for 60 days. | Counts in the Backup card and the Trash Can row; no cap beyond 1 GB per file. |
 | X7 | The TypeScript and Swift implementations drift on the three tables. | The shared fixtures (the iPad design's [conformance corpus](ipad-app-design.md#keeping-two-implementations-honest)). |
 | X8 | PDF in M2 widens v1 and the rewrite is already larger than v1 can afford (R3). | The order in P19; `<Ink>` pages are cut first. |
@@ -524,3 +549,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   110 new tests; the web suite (3,814 tests) and the desktop suite (706) pass, and so does everything in the CLI suite that
   passed before (it has 144 failures on a clean checkout too: it wants Node 26 for OpenTUI and this machine has 24). Picks made while building are listed under Step 1 in
   the [build order](#build-order). Nothing is user-visible yet.
+- 2026-11-07: **Step 2 built** (import and the reader). The `DocumentsApi`, a streaming byte-range handler, the `pdf` panel kind
+  with pdf.js's viewer components, the sidebar's Import PDF… button and PDF rows, the pair opening, the delete dialog and Trash
+  Can row naming what is inside, and `pnpm smoke:pdf` (24 checks in the real app). New findings: pdf.js 6.5 has no eval option
+  at all (X5's mitigation is moot), and its viewer needs `globalThis.pdfjsLib`. Dragging a PDF in and the File menu are not
+  built.

@@ -37,6 +37,18 @@ function renderTrash(initial: Trash = trash) {
   render(<TrashCan initialTrash={initial} />);
 }
 
+describe("TrashCan with a PDF note", () => {
+  const pdf = { fileName: "book.pdf", size: 212_000_000, marks: { highlight: 41, underline: 0, strikethrough: 0, text: 0, ink: 2 }, inkPages: 2, bookmarks: 6 };
+
+  it("says what the note's PDF holds, which is deleted for good with the note", () => {
+    renderTrash({ notes: [entry({ id: 5, title: "Designing Data", pdf }, daysAgo(12)), entry({ id: 6, title: "A plain note" }, daysAgo(3))], groups: [] });
+
+    expect(screen.getByText("With its PDF (212 MB), 41 highlights, 2 ink pages and 6 bookmarks")).toBeTruthy();
+    expect(screen.getAllByText(/^With /)).toHaveLength(1);
+    expect(screen.getByText("Deleted permanently in 48 days")).toBeTruthy();
+  });
+});
+
 describe("TrashCan", () => {
   it("always says that items are permanently deleted after 60 days", () => {
     renderTrash({ notes: [], groups: [] });

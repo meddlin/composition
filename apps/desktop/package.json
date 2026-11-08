@@ -15,6 +15,7 @@
     "test": "vitest run",
     "smoke": "node scripts/smoke.mjs",
     "smoke:reading-list": "node scripts/smoke-reading-list.mjs",
+    "smoke:pdf": "node scripts/smoke-pdf.mjs",
     "smoke:rss": "node scripts/smoke-rss.mjs",
     "package": "pnpm build && electron-builder --dir -c.mac.identity=null",
     "dist": "pnpm build && electron-builder",

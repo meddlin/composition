@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { DOCUMENT_METHODS } from "../../../web/src/lib/composition/documentsApi";
 import { CONTACTS_METHODS } from "../../../web/src/lib/composition/contactsApi";
 import { FEED_METHODS } from "../../../web/src/lib/composition/feedsApi";
 import { READING_LIST_METHODS } from "../../../web/src/lib/composition/readingListApi";
@@ -10,7 +11,7 @@ import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -230,6 +231,46 @@ describe("ATTACHMENT_VALIDATORS", () => {
     ["removeAttachment", [Number.NaN]],
   ] as const)("rejects a bad id for %s", (method, args) => {
     expect(() => ATTACHMENT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
+  });
+});
+
+describe("DOCUMENT_VALIDATORS", () => {
+  it("has a validator for every PDF method, and no extras", () => {
+    expect(Object.keys(DOCUMENT_VALIDATORS).sort()).toEqual([...DOCUMENT_METHODS].sort());
+  });
+
+  it("takes a target for an import, keeping only its two ids, so no path can ride along", () => {
+    expect(DOCUMENT_VALIDATORS.importPdf([{ groupId: 4, notebookId: 1, path: "/Users/me/.ssh/id_rsa" }, "/etc/passwd"])).toEqual([{ groupId: 4, notebookId: 1 }]);
+    expect(DOCUMENT_VALIDATORS.importPdf([{ groupId: null, notebookId: 2 }])).toEqual([{ groupId: null, notebookId: 2 }]);
+    expect(DOCUMENT_VALIDATORS.importPdfCopy(["abc123", { groupId: null, notebookId: 2, path: "/x" }])).toEqual(["abc123", { groupId: null, notebookId: 2 }]);
+  });
+
+  it("takes whole numbers for pages: a count from 1, a bookmark's page from 0", () => {
+    expect(DOCUMENT_VALIDATORS.setDocumentPageCount([3, 600])).toEqual([3, 600]);
+    expect(DOCUMENT_VALIDATORS.addBookmark([3, 0, "Preface"])).toEqual([3, 0, "Preface"]);
+    expect(DOCUMENT_VALIDATORS.renameBookmark([8, "x"])).toEqual([8, "x"]);
+  });
+
+  it.each([
+    ["importPdf", [{ groupId: "4", notebookId: 1 }]],
+    ["importPdf", [{ groupId: 4 }]],
+    ["importPdf", [null]],
+    ["importPdfCopy", [5, { groupId: null, notebookId: 1 }]],
+    ["importPdfCopy", ["tok", "target"]],
+    ["setDocumentPageCount", [1, 0]],
+    ["setDocumentPageCount", ["1", 5]],
+    ["setDocumentPageCount", [1, 2.5]],
+    ["saveDocumentViewState", [1, "state"]],
+    ["saveDocumentViewState", [1, [1, 2]]],
+    ["listBookmarks", [undefined]],
+    ["addBookmark", [1, -1, "x"]],
+    ["addBookmark", [1, 1.5, "x"]],
+    ["addBookmark", [1, 1, 5]],
+    ["renameBookmark", [1, null]],
+    ["removeBookmark", [Number.NaN]],
+    ["describeDocument", ["7"]],
+  ] as const)("rejects bad arguments for %s", (method, args) => {
+    expect(() => DOCUMENT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });
 });
 
