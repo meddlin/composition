@@ -3,7 +3,10 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SheetExportDialog } from "./SheetExportDialog";
 
-const exportFile = vi.hoisted(() => ({ canSaveFile: vi.fn(() => true), saveFile: vi.fn() }));
+const exportFile = vi.hoisted(() => {
+  class SaveFileError extends Error {}
+  return { canSaveFile: vi.fn(() => true), saveFile: vi.fn<(name: string, data: Uint8Array | string, kind: string) => Promise<string>>(async () => "offered"), SaveFileError };
+});
 vi.mock("./exportFile", () => exportFile);
 
 const SOURCE = { csv: "Item,Qty,Total,Due\nPens,12,0,2026-03-04\nPaper,3,7,2026-03-09", formulas: "C2 =B2*1.5\nC3 carried =XLOOKUP(A3,F:F,G:G)" };
@@ -16,6 +19,7 @@ function open(props: Partial<React.ComponentProps<typeof SheetExportDialog>> = {
 
 beforeEach(() => {
   exportFile.canSaveFile.mockReturnValue(true);
+  exportFile.saveFile.mockResolvedValue("offered");
 });
 afterEach(() => {
   cleanup();
@@ -40,11 +44,11 @@ describe("SheetExportDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
 
     await waitFor(() => expect(exportFile.saveFile).toHaveBeenCalledTimes(1));
-    const [name, data, type] = exportFile.saveFile.mock.calls[0];
+    const [name, data, kind] = exportFile.saveFile.mock.calls[0];
     expect(name).toBe("Q3 budget.xlsx");
-    expect(type).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(kind).toBe("xlsx");
     expect([(data as Uint8Array)[0], (data as Uint8Array)[1]]).toEqual([0x50, 0x4b]); // "PK"
-    expect(screen.getByRole("status").textContent).toContain("Q3 budget.xlsx");
+    expect(screen.getByRole("status").textContent).toContain("Q3 budget.xlsx was offered to your browser");
   });
 
   it("downloads CSV of the values the sheet shows, with a byte order mark for Excel", async () => {
@@ -55,9 +59,9 @@ describe("SheetExportDialog", () => {
     fireEvent.click(screen.getByRole("button", { name: "Download" }));
 
     await waitFor(() => expect(exportFile.saveFile).toHaveBeenCalledTimes(1));
-    const [name, data, type] = exportFile.saveFile.mock.calls[0];
+    const [name, data, kind] = exportFile.saveFile.mock.calls[0];
     expect(name).toBe("Q3 budget.csv");
-    expect(type).toBe("text/csv;charset=utf-8");
+    expect(kind).toBe("csv");
     expect(data).toBe("\uFEFFItem,Qty,Total,Due\nPens,12,18,2026-03-04\nPaper,3,7,2026-03-09\n");
   });
 
@@ -81,13 +85,44 @@ describe("SheetExportDialog", () => {
     expect(screen.getByRole("status").textContent).toContain("copied");
   });
 
-  it("cannot download in the desktop app, which blocks it, and says so; copying still works", () => {
+  it("says Saved, not that the browser was offered it, when the desktop app's save dialog wrote the file", async () => {
+    exportFile.saveFile.mockResolvedValue("saved");
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe("Saved.");
+    expect(screen.getByRole("dialog").textContent).not.toContain("browser");
+  });
+
+  it("says nothing when the save dialog is dismissed, and can be used again", async () => {
+    exportFile.saveFile.mockResolvedValue("canceled");
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+
+    await waitFor(() => expect(exportFile.saveFile).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says why the desktop app could not write the file", async () => {
+    exportFile.saveFile.mockRejectedValue(new exportFile.SaveFileError("Could not save the file: ENOSPC: no space left on device"));
+    open();
+
+    fireEvent.click(screen.getByRole("button", { name: "Download" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Could not save the file: ENOSPC: no space left on device");
+  });
+
+  it("cannot save where the window has no way to, and says so; copying still works", () => {
     exportFile.canSaveFile.mockReturnValue(false);
     open();
 
     expect((screen.getByRole("button", { name: "Download" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Copy cells" }) as HTMLButtonElement).disabled).toBe(false);
-    expect(screen.getByRole("dialog").textContent).toContain("desktop app cannot save a file from here yet");
+    expect(screen.getByRole("dialog").textContent).toContain("This window cannot save a file");
   });
 
   it("says a sheet with no data has nothing to export", () => {

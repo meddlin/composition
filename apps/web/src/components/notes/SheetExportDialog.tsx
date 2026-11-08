@@ -7,7 +7,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { type SheetSource, formatClipboard } from "./mdx/sheetDraft";
 import { describeExport, excelSheetName, exportFileName, exportSheet } from "./mdx/sheetExport";
-import { canSaveFile, saveFile } from "./exportFile";
+import { canSaveFile, saveFile, SaveFileError, type SaveOutcome } from "./exportFile";
 
 type Format = "xlsx" | "csv";
 
@@ -21,11 +21,9 @@ type Props = {
   onClose: () => void;
 };
 
-const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
 /**
- * **Export…** on a sheet: its cells as an Excel workbook (formulas as formulas, each with its value) or as CSV, saved as a download;
- * or copied as cells to paste into Excel. It says what is written and what is not first (see sheetExport.ts). The workbook is made
+ * **Export…** on a sheet: its cells as an Excel workbook (formulas as formulas, each with its value) or as CSV, saved as a download
+ * in a browser or in the desktop app's save dialog; or copied as cells to paste into Excel. It says what is written and what is not first (see sheetExport.ts). The workbook is made
  * only when it is asked for, and the library that writes it is loaded then.
  */
 export function SheetExportDialog({ open, ...props }: Props) {
@@ -46,16 +44,19 @@ function ExportSession({ source, title, from, onClose }: Omit<Props, "open">) {
     setResult(null);
     try {
       const name = exportFileName(title, from, format);
+      let outcome: SaveOutcome;
       if (format === "csv") {
         // A byte order mark first, which Excel needs to read the text as UTF-8.
-        saveFile(name, `﻿${exported.csv}\n`, "text/csv;charset=utf-8");
+        outcome = await saveFile(name, `\uFEFF${exported.csv}\n`, "csv");
       } else {
         const { writeWorkbook } = await import("./mdx/sheetWorkbookWrite");
-        saveFile(name, await writeWorkbook(exported, excelSheetName(title)), XLSX_TYPE);
+        outcome = await saveFile(name, await writeWorkbook(exported, excelSheetName(title)), "xlsx");
       }
-      setResult({ ok: true, message: `${name} was offered to your browser to save.` });
-    } catch {
-      setResult({ ok: false, message: "The file could not be made." });
+      // The desktop app's person chose the name in its save dialog, and dismissing it is not worth a message.
+      if (outcome === "saved") setResult({ ok: true, message: "Saved." });
+      if (outcome === "offered") setResult({ ok: true, message: `${name} was offered to your browser to save.` });
+    } catch (error) {
+      setResult({ ok: false, message: error instanceof SaveFileError ? error.message : "The file could not be made." });
     } finally {
       setBusy(false);
     }
@@ -104,7 +105,7 @@ function ExportSession({ source, title, from, onClose }: Omit<Props, "open">) {
 
             {!canSave && (
               <p className="text-sm text-muted-foreground">
-                The desktop app cannot save a file from here yet. Copy the cells instead and paste them into Excel, or open the note in a browser to save the file.
+                This window cannot save a file. Copy the cells instead and paste them into Excel.
               </p>
             )}
             {result && (
