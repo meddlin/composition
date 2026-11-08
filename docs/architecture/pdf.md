@@ -42,6 +42,14 @@ leaves no note behind. If the same bytes are already in the library the answer i
 picked path, which the main process holds (at most four, newest kept); **Import a separate copy** sends the token back, so the page never
 learns where the file is. The reader counts the pages on first open and tells the store, which saves the count.
 
+**A password.** `openPdf(id, password?)` hands the password to pdf.js, which raises `PasswordException` with a code (1: needed, 2: wrong); that becomes a
+`PdfPasswordError(incorrect)`, whose message says nothing of the password. `usePdfViewer` catches it, shows a `password` phase (`PdfPasswordDialog` in the reader) and
+tries again with what is typed, until the PDF opens. The password that worked goes to the **documents store** (`rememberPassword`), a `Map` that is not part of the
+snapshot, so it is not in what every panel reads, in React state, in storage, or in the database, and a panel opened again, in any window (they share the store), is
+offered it first. It is in memory only: nothing writes it, and the smoke test looks for it in every file the app wrote after quitting. It leaves the renderer in
+exactly one place: an export sends it to the main process (`ExportPdfOptions.password`, checked by `exportOptions` in `validate.ts`: a non-empty string of at most 1,024
+characters, never named in an error), which hands it to the export's utility process in the job message and nowhere else.
+
 **The PDF's own title.** The note is first titled from the file's name (`pdfTitleFromFileName`). When the reader opens the file, `usePdfViewer` asks pdf.js
 for its metadata and passes the title up (`onTitle`, through `PdfReader` to the panel, which calls `store.retitleFromPdf`). `pdfTitle.ts` holds the rules,
 as pure functions: the XMP `dc:title` is read before the Info dictionary's `Title` (as pdf.js's own viewer orders them); a title is *sensible* if it has
@@ -163,7 +171,13 @@ finds the unpacked copy. It reads the PDF, writes the copy as `<target>.part` an
   Noto Sans Math for a character the first lacks (both SIL OFL, subsetted per export, embedded only when a note needs them). On a page whose `/Rotate`
   is 90, 180 or 270 the appearance carries a matrix that turns it back, so it reads upright, as the reader shows it. A note with a character neither font has
   **refuses the export**, naming it, rather than letting the library write a `?`.
-- **Refused:** a password-protected PDF (never `ignoreEncryption`, which writes a file that still says it is encrypted), and a file that cannot be read.
+- **Protected PDFs.** `PDFDocument.load` is given the password (an empty one when none was sent, which opens a PDF that is only restricted). A PDF that needs one that was not
+  given, or a wrong one, is refused with a reason that does not repeat it. **The copy is protected the way the original was** (`originalProtection`, `protectCopy`): the library
+  decrypts a file it was given the password of and leaves its encryption dictionary behind as an unused object, which is where the permission flags (`/P`) are read, so the
+  copy has the same limits on printing, copying and so on; it is encrypted with the same password (AES-256, whatever the original used) and a made-up owner password that is
+  kept by no one, so the limits cannot be lifted. A test pins that behaviour of the library (an upgrade that changes it fails the test instead of writing an unprotected copy).
+  `ignoreEncryption` is never used, since it writes a file that still says it is encrypted. A file that is not protected is not protected by the export, even if a password was sent.
+- **Refused:** a file that cannot be read, a PDF whose password was not given or is wrong, and a note with a character no font can draw.
   **Left out and counted:** ink (its stroke format is not final, D9) and a mark on a page the PDF does not have.
 - **Lost by a full rewrite:** a digital signature, and a linearized file's linearization.
 

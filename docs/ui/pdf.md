@@ -42,6 +42,11 @@ any note.
   no place on your disk.
 - **A PDF you already have:** if the file's contents are the same as one in the library, a dialog says which note has it and offers
   **Open it** or **Import a separate copy**. Nothing is imported until you choose.
+- **A PDF that needs a password** imports like any other (only the file is copied). When the reader opens it, a small dialog asks for the password.
+  A wrong one says so and asks again; the right one opens the PDF, and everything below works as for any PDF: reading, marks, citations, find, export.
+  **Cancel** leaves the panel saying the PDF is protected, with an **Enter password…** button. The password is kept **in memory only**, for as long as
+  the app stays open: opening the PDF again (or in a pop-out) does not ask again, but after you quit it does. It is never saved to disk, put in the
+  database or settings, or written to the log. (A PDF that only limits printing or copying and needs no password to open opens without any prompt.)
 - **Your marks are not written into the file.** They are kept beside it, so the PDF stays exactly as you imported it. **Export annotated
   PDF** (below) writes a copy with the marks in it, for other apps.
 
@@ -179,7 +184,11 @@ What to know:
   common math come out right. A note with any other character (Chinese, Japanese, Korean, emoji) **stops the export**, which names the
   note's page and the characters, so nothing is lost silently. Change that note, or delete it, and export again.
 - **Ink** (from the iPad) is left out for now, and the message says how many marks were.
-- **A password-protected PDF** cannot be exported with its marks. (The reader cannot open one to mark, either.)
+- **A password-protected PDF** is exported with the password you opened it with, and **the copy is protected with the same password** and has the same
+  limits on printing and copying as the original; the export dialog says so. It opens in other apps with that password, so exporting never leaves a
+  readable copy of a private document on disk. The copy is encrypted with AES-256, whatever the original used. A PDF that only limits printing or
+  copying, with no password to open it, is exported the same way: the copy has the same limits and still needs no password. (If you opened the
+  PDF with an *owner* password, the copy opens with that password but keeps the original's limits.)
 - **A signed PDF** loses its signature in the copy, since the whole file is rewritten.
 - The copy is written next to its final name and renamed into place, so a failed export never leaves half a PDF behind.
 
@@ -202,5 +211,5 @@ good, so are the file and its marks.
 
 ## Not built yet
 
-a prompt for a password-protected PDF; ink and handwritten notes (the iPad app, milestone M2); the
+Ink and handwritten notes (the iPad app, milestone M2); the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

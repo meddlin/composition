@@ -281,8 +281,9 @@ Native marks stay editable and visible in other apps; flattened ones look identi
 writes native annotations with PDFKit. The desktop writes them with `@cantoo/pdf-lib` (MIT, a maintained fork of `pdf-lib`),
 chosen by spike D ([findings](#spike-d-findings-2026-11-07)): it writes the annotations with appearance streams, or burns
 them into the page for Flatten, and rewrites the whole file in a utility process with a progress bar. A text note goes through
-an embedded font, never a standard one. Export of a password-protected PDF writes an **unprotected** copy (the writer
-decrypts it), and asks for the password if the file needs one.
+an embedded font, never a standard one. **Export of a password-protected PDF** uses the password the reader opened it with and writes a copy **protected with the
+same password and the same limits on printing and copying** (the owner's choice, 2026-11-08; this section first said an unprotected copy, which would have left a readable
+copy of a private document on disk).
 
 ## Search
 
@@ -703,3 +704,13 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   is whether the note still has the file-derived title, which the change itself ends (a stored flag would have changed the view-state schema the iPad core
   reproduces). Checked in the real app by `smoke:pdf` (a title taken, XMP over Info, a placeholder passed over, a note renamed before its PDF first opened
   keeps its name); `pdf-fixture.mjs` can now write an Info title and an XMP title. Still to do: the password prompt.
+- 2026-11-08: **Import gaps, item 4: a prompt for a password-protected PDF.** When pdf.js raises `PasswordException`, the reader asks for the password in a small dialog,
+  tells a wrong one, and tries again; Cancel leaves the panel with an **Enter password…** button. The password is kept in memory only (the documents store, not in its
+  snapshot), so reopening the PDF in the same session does not ask again and a restart does; it is never stored or logged (the smoke test searches every file the app wrote
+  after quitting, and the console). **The owner's choice for export:** it takes the password and writes a copy **protected with the same password**, not an unprotected one:
+  same user password, the original's permission flags (read from the encryption dictionary the library leaves behind once it has decrypted the file; a test pins that), a
+  made-up owner password kept by no one, AES-256. Tested against pdf.js on AES-256, AES-128, RC4-128 and RC4-40 originals, and on a PDF that is only restricted (no password to
+  open; it now exports too, with its limits kept, where it used to be refused as "password-protected"). Checked in the real app by `smoke:pdf` (dialog, wrong then right
+  password, no second question, nothing written to disk, asked again after a restart, Cancel and Enter password…, export through the utility process read back). Picks:
+  the password box is emptied as soon as it is sent; a wrong password is asked for again with no limit; a PDF opened with an *owner* password exports with that as the copy's
+  password and keeps the original's limits. **With this, the four gaps Steps 1 to 6 left are built**; `docs/ui/pdf.md` no longer lists them as not built.

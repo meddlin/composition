@@ -60,9 +60,12 @@ const launch = () =>
   });
 
 const consoleProblems = [];
+// Everything the page said, of any kind, to check that a password never reaches the console.
+const consoleAll = [];
 async function open(app) {
   const page = await app.firstWindow();
   page.on("console", (message) => {
+    consoleAll.push(message.text());
     if (message.type() === "error" || /Refused to|Content Security Policy/i.test(message.text())) consoleProblems.push(message.text());
   });
   page.on("pageerror", (error) => consoleProblems.push(`pageerror: ${error.message}`));
@@ -537,7 +540,8 @@ try {
   check("dropping a file the library already has asks first, naming the note", /“Window Drop again.pdf” has exactly the same contents as “Window Drop”/.test(await dup.innerText()) && (await documents(page)).length === docsBefore + 2, await dup.innerText());
   await dup.getByRole("button", { name: "Import a separate copy" }).click();
   await waitFor(async () => (await documents(page)).length === docsBefore + 3);
-  const copied = (await notesNow(page)).find((n) => n.title === "Window Drop again");
+  // The document is in the database a moment before the page has the note, so the note is waited for.
+  const copied = await waitFor(async () => (await notesNow(page)).find((n) => n.title === "Window Drop again")).catch(() => undefined);
   check("Import a separate copy imports it into the group it was dropped on", copied?.groupId === groupId, JSON.stringify(copied));
 
   // Refusals: nothing is imported, and the reason shows.
@@ -671,6 +675,102 @@ try {
   const afterOpen = (await savedNotes()).find((n) => n.id === renamed);
   check("a note the user had already named keeps its name when the reader first opens its PDF", afterOpen?.title === "My own name for it" && !(await savedNotes()).some((n) => n.title === "A Title The User Never Sees"), JSON.stringify(afterOpen?.title));
   check("no CSP violations or errors after reading PDF titles", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- A PDF protected by a password: the reader asks for it, and keeps it in memory only
+  const secret = "open sesame";
+  const lockedFile = path.join(home, "Locked_Book.pdf");
+  const locked = await PDFDocument.load(makeTestPdf({ pages: 3 }));
+  locked.encrypt({ userPassword: secret, ownerPassword: "owner-only", algorithm: "AES-256" });
+  fs.writeFileSync(lockedFile, await locked.save());
+  await pick(app, lockedFile);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  const lockedReader = page.getByRole("region", { name: "PDF: Locked_Book.pdf" });
+  await lockedReader.waitFor({ timeout: 20_000 });
+  const askDialog = page.getByRole("dialog", { name: "This PDF needs a password" });
+  await askDialog.waitFor();
+  check("a PDF protected by a password imports, and the reader asks for the password in a dialog naming the file", /“Locked_Book.pdf” is protected by a password/.test(await askDialog.innerText()), await askDialog.innerText());
+  await page.screenshot({ path: path.join(out, "pdf-password-dialog.png") });
+  await askDialog.getByLabel("Password").fill("not the one");
+  await askDialog.getByRole("button", { name: "Open" }).click();
+  await askDialog.getByRole("alert").waitFor();
+  check("a wrong password says so and asks again", /That password is not right/.test(await askDialog.getByRole("alert").innerText()) && (await lockedReader.locator(".textLayer").count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-password-wrong.png") });
+  await askDialog.getByLabel("Password").fill(secret);
+  await askDialog.getByRole("button", { name: "Open" }).click();
+  await lockedReader.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("the right password opens the PDF: its first page is drawn, with its text", (await lockedReader.locator(".canvasWrapper canvas").count()) >= 1 && (await page.getByRole("dialog", { name: "This PDF needs a password" }).count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-password-opened.png") });
+
+  // Closed and opened again in the same session, it is not asked about again.
+  await lockedReader.getByRole("button", { name: "Close panel" }).click();
+  await lockedReader.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: /Locked Book/ }).first().click();
+  await lockedReader.waitFor({ timeout: 20_000 });
+  await lockedReader.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("opened again in the same session, it opens without asking again", (await page.getByRole("dialog", { name: "This PDF needs a password" }).count()) === 0);
+
+  // The password is in memory only: not in what the page holds in the open, not in its storage, not in what it said.
+  const held = await page.evaluate(() => JSON.stringify({ documents: window.__workspace.store.documents.getSnapshot(), workspace: window.__workspace.store.getSnapshot(), local: { ...localStorage }, session: { ...sessionStorage } }));
+  check("the password is not in the workspace, the documents or the page's storage", !held.includes(secret) && !held.includes("not the one"));
+  check("and the page never said it in the console", !consoleAll.some((line) => line.includes(secret) || line.includes("not the one")));
+
+  // Quit: nothing was written down, and the next launch asks again.
+  await app.close();
+  const filesWith = (needle) => {
+    const hits = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else if (entry.isFile() && fs.readFileSync(file).includes(needle)) hits.push(path.relative(home, file));
+      }
+    };
+    walk(home);
+    return hits;
+  };
+  const written = [...filesWith(secret), ...filesWith("not the one")];
+  check("after quitting, the password is in no file the app wrote (the database, settings, its browser profile)", written.length === 0, written.join(", "));
+  app = await launch();
+  page = await open(app);
+  await page.getByRole("button", { name: /Locked Book/ }).first().click();
+  const askAgain = page.getByRole("dialog", { name: "This PDF needs a password" });
+  await askAgain.waitFor({ timeout: 20_000 });
+  check("after a restart the password is asked for again", true);
+  await askAgain.getByRole("button", { name: "Cancel" }).click();
+  await askAgain.waitFor({ state: "detached" });
+  const lockedAgain = page.getByRole("region", { name: "PDF: Locked_Book.pdf" });
+  check("cancelling leaves the panel saying the PDF is protected, with a button that asks again", (await lockedAgain.getByText("This PDF is protected by a password.").count()) === 1 && (await lockedAgain.getByRole("button", { name: "Enter password…" }).count()) === 1);
+  await lockedAgain.getByRole("button", { name: "Enter password…" }).click();
+  await askAgain.waitFor();
+  await askAgain.getByLabel("Password").fill(secret);
+  await askAgain.getByRole("button", { name: "Open" }).click();
+  await lockedAgain.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("and the password then opens it", true);
+
+  // Exported with its marks, the copy is protected with the same password (the chosen policy), and the library's file is as it was.
+  const lockedDoc = (await documents(page)).find((d) => d.fileName === "Locked_Book.pdf");
+  await page.evaluate((id) => window.composition.addAnnotations(id, [{ page: 0, kind: "highlight", color: "yellow", rects: [[100, 696, 300, 720]], quote: "Page 1" }]), lockedDoc.id);
+  const lockedCopy = path.join(home, "Locked copy.pdf");
+  await app.evaluate(({ dialog }, chosen) => void (dialog.showSaveDialog = async () => ({ canceled: false, filePath: chosen })), lockedCopy);
+  await lockedAgain.getByRole("button", { name: "Export annotated PDF" }).click();
+  const lockedExport = page.getByRole("dialog", { name: "Export annotated PDF" });
+  check("the export dialog says the copy of a protected PDF is protected with the same password", /The copy is protected with the same password, and has the same limits on printing and copying/.test(await lockedExport.innerText()), await lockedExport.innerText());
+  await lockedExport.getByRole("button", { name: "Export…" }).click();
+  const lockedSaid = await waitFor(async () => (await lockedAgain.getByRole("status").innerText().catch(() => "")).match(/Saved .*/)?.[0] ?? false, { timeout: 30_000 }).catch(() => false);
+  check("exporting says it saved the copy with its mark, protected with the same password", /Saved “Locked copy.pdf” with 1 mark\. The copy is protected with the same password\./.test(lockedSaid || ""), String(lockedSaid));
+  const copyBytes = fs.readFileSync(lockedCopy);
+  let openedWithout = "opened";
+  try {
+    await PDFDocument.load(copyBytes);
+  } catch (error) {
+    openedWithout = /encrypted/i.test(error.message) ? "refused" : error.message;
+  }
+  const reread = await PDFDocument.load(copyBytes, { password: secret });
+  check("the copy cannot be opened without the password, and with it has the mark", openedWithout === "refused" && reread.getPages()[0].node.Annots()?.size() === 1, openedWithout);
+  check("the PDF in the library is still the original, protected as it was", Buffer.compare(fs.readFileSync(path.join(home, ".composition", "documents", fs.readdirSync(path.join(home, ".composition", "documents")).find((name) => name.endsWith("Locked_Book.pdf")))), fs.readFileSync(lockedFile)) === 0);
+  check("no password went into the console, and none was written into the copy's folder as a file of its own", !consoleAll.some((line) => line.includes(secret)) && fs.readdirSync(home).every((name) => !name.endsWith(".part")));
+  await page.screenshot({ path: path.join(out, "pdf-password-exported.png") });
+  check("no CSP violations or errors around the password prompt", consoleProblems.length === 0, consoleProblems.join(" | "));
 } catch (error) {
   // A step that cannot go on: say what the page showed, which is usually the whole story.
   console.error(error);

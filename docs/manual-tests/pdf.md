@@ -25,7 +25,7 @@ Use a scratch home so your own notes and settings are not touched:
 - [ ] Drag the **same file** in again: the same question as the button (Open it, Import a separate copy). Drag a `.txt`, or a PDF out of a web page, or the library's own file from `~/.composition/documents/`: nothing is imported (the last two say why).
 - [ ] **The PDF's own title:** import a PDF that has a title in its metadata (most published books and papers do; Preview's or Acrobat's Document Properties shows it). Its note is first titled from the file's name and, as the reader opens, takes the PDF's title. Rename that note, close and reopen the PDF: your name stays. Import a PDF with no title, or a title that is a file name or "Untitled": the note keeps the file's name.
 - [ ] Try a file that is not a PDF (rename a `.txt` to `.pdf`): it is refused with a reason, and no note is left behind.
-- [ ] The password-protected PDF: it imports; the panel says it is protected and does not show pages.
+- [ ] The password-protected PDF: it imports, and as its panel opens a dialog asks for the password (naming the file, and saying it is kept in memory only). A wrong password says so and asks again; the right one shows the pages. **Cancel** leaves the panel saying it is protected, with **Enter password…**. Close the PDF's panel and open the note again: no question. Quit and relaunch, and open it: the question again.
 - [ ] Close the app and look in `~/.composition/documents/`: one file per PDF, named with 12 hex digits and the file's name. Your original is untouched.
 
 ## 2. Reading
@@ -92,7 +92,7 @@ Use a scratch home so your own notes and settings are not touched:
 - [ ] Include a text note on a **rotated page** and in **Greek or Cyrillic** (`Привет`, `Ωμέγα`) and with `≤ ≠ → √`: it reads upright and the characters are right in both apps.
 - [ ] Add a text note with `日本語` or an emoji and export: the export **stops**, naming the note's page and the characters, and no file is written. Change the note and export again.
 - [ ] Try to save over **the library's own file** (`~/.composition/documents/…`): refused with a reason; the file is untouched.
-- [ ] Export the password-protected PDF (it has no marks, so also try after the panel says it is protected): refused with a reason.
+- [ ] Mark the password-protected PDF and export it: the dialog says the copy is protected with the same password. Open the copy in Preview or Acrobat: it asks for that password and shows your marks. If the original limited printing or copying, check the copy's limits are the same.
 - [ ] The manual, with a few marks on a late page: exports in seconds; the copy opens at that page's marks. Watch the memory the export uses; note it and the file sizes.
 - [ ] Compare the original and the copy: the original is byte-identical to what you imported (`shasum`), and the library's file too.
 

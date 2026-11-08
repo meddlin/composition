@@ -34,7 +34,7 @@ function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
   const nativeUi: DocumentUi = {
     pickPdf: vi.fn(async () => "/inbox/book.pdf"),
     pickExportPath: vi.fn(async () => "/out/book (annotated).pdf"),
-    exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 } })),
+    exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false })),
     dataFolder: () => dataFolder,
     ...ui,
   };
@@ -196,7 +196,23 @@ describe("exportDocument", () => {
 
     expect(ui.pickExportPath).toHaveBeenCalledWith("book (annotated).pdf");
     expect(ui.exportPdf).toHaveBeenCalledWith({ sourcePath: "/library/documents/abc-book.pdf", targetPath: "/out/book (annotated).pdf", marks, flatten: true });
-    expect(result).toEqual({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 } });
+    expect(result).toEqual({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false });
+  });
+
+  it("hands the writer the password a protected PDF was opened with, only when there is one, and says the copy is protected", async () => {
+    const protectedCopy = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 1, skipped: { ink: 0, offPage: 0 }, passwordProtected: true })) });
+    protectedCopy.service.documentForExport.mockReturnValue({ path: "/library/documents/abc-book.pdf", fileName: "book.pdf", marks: [] });
+
+    const result = await protectedCopy.api.exportDocument(1, { flatten: false, password: "s3cret" });
+
+    expect(protectedCopy.ui.exportPdf).toHaveBeenCalledWith({ sourcePath: "/library/documents/abc-book.pdf", targetPath: "/out/book (annotated).pdf", marks: [], flatten: false, password: "s3cret" });
+    expect(result).toMatchObject({ saved: true, passwordProtected: true });
+    // Not in anything handed back to the page.
+    expect(JSON.stringify(result)).not.toContain("s3cret");
+
+    const plain = setup({ status: "refused", error: "x" });
+    await plain.api.exportDocument(1, { flatten: false });
+    expect("password" in (plain.ui.exportPdf as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(false);
   });
 
   it("does nothing when the dialog is cancelled", async () => {
@@ -227,7 +243,7 @@ describe("exportDocument", () => {
     const failed = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: false as const, error: "A text note has characters that cannot be written." })) });
     expect(await failed.api.exportDocument(1, options)).toEqual({ error: "A text note has characters that cannot be written." });
 
-    const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 } })) });
+    const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 }, passwordProtected: false })) });
     expect(await partial.api.exportDocument(1, options)).toMatchObject({ saved: true, written: 2, skipped: { ink: 1, offPage: 0 } });
   });
 });

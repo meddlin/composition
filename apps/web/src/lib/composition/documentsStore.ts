@@ -37,6 +37,13 @@ export type DocumentsStore = {
   importDropped(file: File, target: ImportTarget): Promise<ImportPdfResult>;
   /** Imports the file of a `duplicate` result as a separate copy. */
   importCopy(duplicate: DuplicateImport): Promise<ImportPdfResult>;
+  /**
+   * The password a protected PDF was opened with this session, so a panel opened again (or a pop-out, which shares this store)
+   * does not ask again, and so an export can unlock the file. Kept in this object's memory only: it is not in the snapshot,
+   * never sent anywhere but to pdf.js and, for an export, to the main process, and gone when the app closes.
+   */
+  passwordFor(documentId: number): string | undefined;
+  rememberPassword(documentId: number, password: string): void;
   /** Remembers the page count the reader found (it shows at once; the backend is told). */
   setPageCount(documentId: number, pageCount: number): void;
   /** Remembers where the reader was. Not awaited: it is a convenience and must not get in the way of reading. */
@@ -83,6 +90,8 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
   }
 
   const marks = createMarksController(deps, () => set({ marks: marks.snapshot() }));
+  // Deliberately not in `state`: a snapshot is read by every panel and may be inspected or logged; a password must not be.
+  const passwords = new Map<number, string>();
 
   function load(): Promise<void> {
     if (state.status === "ready") return Promise.resolve();
@@ -147,6 +156,8 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     importPdf,
     importDropped,
     importCopy,
+    passwordFor: (documentId) => passwords.get(documentId),
+    rememberPassword: (documentId, password) => void passwords.set(documentId, password),
     setPageCount(documentId, pageCount) {
       const document = state.documents.find((d) => d.id === documentId);
       if (!document || document.pageCount === pageCount) return;

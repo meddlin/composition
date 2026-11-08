@@ -102,8 +102,10 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
       if (!targetPath) return { canceled: true };
       // The PDF in the library is never written to, even if the user points the dialog at it.
       if (path.resolve(targetPath) === path.resolve(input.path)) return { error: "Choose another file: the PDF in the library is never overwritten." };
-      const outcome = await ui.exportPdf({ sourcePath: input.path, targetPath, marks: input.marks, flatten: options.flatten });
-      return outcome.ok ? { saved: true, fileName: path.basename(targetPath), written: outcome.written, skipped: outcome.skipped } : { error: outcome.error };
+      const outcome = await ui.exportPdf({ sourcePath: input.path, targetPath, marks: input.marks, flatten: options.flatten, ...(options.password === undefined ? {} : { password: options.password }) });
+      return outcome.ok
+        ? { saved: true, fileName: path.basename(targetPath), written: outcome.written, skipped: outcome.skipped, passwordProtected: outcome.passwordProtected }
+        : { error: outcome.error };
     },
     listAnnotations: (documentId) => service.listAnnotations(documentId),
     addAnnotations: (documentId, inputs) => service.addAnnotations(documentId, inputs),

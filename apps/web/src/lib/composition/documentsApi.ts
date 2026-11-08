@@ -85,11 +85,16 @@ export type PdfCitation = {
 export type ExportPdfOptions = {
   /** Draw the marks into the pages (every app shows them the same, none can be edited) instead of adding annotations. */
   flatten: boolean;
+  /**
+   * The password the PDF was opened with, when it needs one. The one case where something the page typed goes to the main
+   * process: it unlocks the file for the export, which protects the copy with the same password. Never stored or logged.
+   */
+  password?: string;
 };
 
 /** What an export did, or why it did not: nothing is said of where, since the page never knows a path. */
 export type ExportPdfResult =
-  | { saved: true; fileName: string; written: number; skipped: { ink: number; offPage: number } }
+  | { saved: true; fileName: string; written: number; skipped: { ink: number; offPage: number }; passwordProtected: boolean }
   | { canceled: true }
   | { error: string };
 

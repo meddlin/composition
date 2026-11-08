@@ -34,6 +34,7 @@ import { MarkLayers, usePageLayers } from "./PdfMarkLayers";
 import { BookmarkList, HighlightList, NotesList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { useMarkEditing } from "./useMarkEditing";
+import { PdfPasswordDialog } from "./PdfPasswordDialog";
 import { usePdfViewer, type PdfViewer } from "./usePdfViewer";
 
 /** How wide the panel must be for the outline and bookmarks to sit beside the pages rather than over them. */
@@ -85,8 +86,14 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
     viewState: { ...document.viewState, darkPages: dark },
     onPageCount: useCallback((count: number) => documents.setPageCount(document.id, count), [documents, document.id]),
     onTitle,
+    // A PDF opened with a password earlier this session is not asked about again; the one typed is kept in memory only (the store).
+    password: documents.passwordFor(document.id),
+    onPassword: useCallback((password: string) => documents.rememberPassword(document.id, password), [documents, document.id]),
     onViewState: useCallback((state) => documents.saveViewState(document.id, state), [documents, document.id]),
   });
+
+  // Cancelling the password box leaves the panel saying the PDF is protected, with a button that asks again.
+  const [passwordDismissed, setPasswordDismissed] = useState(false);
 
   function toggleDark() {
     const next = !dark;
@@ -112,7 +119,9 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
     setExported(null);
     setNotice(null);
     setExporting(true);
-    const result = await documents.exportDocument(document.id, { flatten });
+    // A PDF that needed a password is exported with it: the main process unlocks the file with it, and protects the copy the same way.
+    const password = documents.passwordFor(document.id);
+    const result = await documents.exportDocument(document.id, { flatten, ...(password === undefined ? {} : { password }) });
     setExporting(false);
     if ("error" in result) return setNotice(result.error);
     if ("canceled" in result) return;
@@ -120,7 +129,7 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
       result.skipped.ink > 0 && `${result.skipped.ink} ink ${result.skipped.ink === 1 ? "mark was" : "marks were"} left out (ink is not exported yet).`,
       result.skipped.offPage > 0 && `${result.skipped.offPage} ${result.skipped.offPage === 1 ? "mark" : "marks"} on a page this PDF does not have ${result.skipped.offPage === 1 ? "was" : "were"} left out.`,
     ].filter(Boolean);
-    setExported([`Saved “${result.fileName}” with ${result.written} ${result.written === 1 ? "mark" : "marks"}.`, ...left].join(" "));
+    setExported([`Saved “${result.fileName}” with ${result.written} ${result.written === 1 ? "mark" : "marks"}.`, result.passwordProtected && "The copy is protected with the same password.", ...left].filter(Boolean).join(" "));
   }
   function put(markdown: string, how: Insertion) {
     if (!pairing) return;
@@ -224,7 +233,7 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
           )}
         </div>
       )}
-      <ExportPdfDialog open={exportOpen} onOpenChange={setExportOpen} onExport={(flatten) => void exportPdf(flatten)} />
+      <ExportPdfDialog open={exportOpen} onOpenChange={setExportOpen} onExport={(flatten) => void exportPdf(flatten)} protectedByPassword={documents.passwordFor(document.id) !== undefined} />
       {ready && findOpen && <FindBar viewer={ready} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
       <div className="relative flex min-h-0 flex-1">
         {sidebar !== null && (
@@ -297,6 +306,25 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
             <p role="alert" className="absolute inset-x-0 top-6 px-6 text-center text-sm text-destructive">
               {viewer.message}
             </p>
+          )}
+          {viewer.phase === "password" && (
+            <div className="absolute inset-x-0 top-6 flex flex-col items-center gap-3 px-6 text-center">
+              <p className="text-sm text-muted-foreground">This PDF is protected by a password.</p>
+              <Button size="sm" onClick={() => setPasswordDismissed(false)}>
+                Enter password…
+              </Button>
+              <PdfPasswordDialog
+                open={!passwordDismissed}
+                onOpenChange={(open) => setPasswordDismissed(!open)}
+                fileName={document.fileName}
+                incorrect={viewer.incorrect}
+                checking={viewer.checking}
+                onSubmit={(password) => {
+                  setPasswordDismissed(false);
+                  viewer.submit(password);
+                }}
+              />
+            </div>
           )}
         </div>
       </div>

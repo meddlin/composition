@@ -15,10 +15,10 @@ export async function runExport(job: ExportJob): Promise<ExportOutcome> {
   const partial = `${job.targetPath}.part`;
   try {
     const source = new Uint8Array(await fs.readFile(job.sourcePath));
-    const result = await exportAnnotatedPdf(source, job.marks, { flatten: job.flatten, fonts: { text: notoSans, math: notoSansMath } });
+    const result = await exportAnnotatedPdf(source, job.marks, { flatten: job.flatten, fonts: { text: notoSans, math: notoSansMath }, password: job.password });
     await fs.writeFile(partial, result.bytes);
     await fs.rename(partial, job.targetPath);
-    return { ok: true, written: result.written, skipped: result.skipped };
+    return { ok: true, written: result.written, skipped: result.skipped, passwordProtected: result.passwordProtected };
   } catch (error) {
     await fs.rm(partial, { force: true }).catch(() => {});
     if (error instanceof ExportRefused) return { ok: false, error: error.message };

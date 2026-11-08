@@ -129,6 +129,39 @@ describe("the documents store", () => {
     });
   });
 
+  describe("a protected PDF's password", () => {
+    it("is remembered for that PDF alone, for as long as the store lives", () => {
+      const { store } = setup([doc(1), doc(2)]);
+
+      expect(store.passwordFor(1)).toBeUndefined();
+      store.rememberPassword(1, "s3cret");
+
+      expect(store.passwordFor(1)).toBe("s3cret");
+      expect(store.passwordFor(2)).toBeUndefined();
+    });
+
+    it("is kept out of the snapshot, which every panel reads and anything may inspect, and out of what the backend is sent", async () => {
+      const { store, deps } = setup([doc(1)]);
+      await store.load();
+      store.rememberPassword(1, "s3cret");
+      store.setPageCount(1, 5);
+      store.saveViewState(1, { page: 2 });
+
+      expect(JSON.stringify(store.getSnapshot())).not.toContain("s3cret");
+      expect(JSON.stringify(Object.values(deps).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock?.calls ?? []))).not.toContain("s3cret");
+    });
+
+    it("does not tell the listeners: nothing is drawn from it", () => {
+      const { store } = setup([doc(1)]);
+      const listener = vi.fn();
+      store.subscribe(listener);
+
+      store.rememberPassword(1, "s3cret");
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
+
   describe("the reader's bookkeeping", () => {
     it("shows a page count at once, tells the backend, and does nothing when it is the same", async () => {
       const { store, deps } = setup();
@@ -221,7 +254,7 @@ describe("the documents store", () => {
 
 describe("exporting a PDF with its marks", () => {
   it("asks the backend, and passes on what came of it", async () => {
-    const result = { saved: true as const, fileName: "a (annotated).pdf", written: 2, skipped: { ink: 0, offPage: 0 } };
+    const result = { saved: true as const, fileName: "a (annotated).pdf", written: 2, skipped: { ink: 0, offPage: 0 }, passwordProtected: false };
     const api = fakeDocumentsApi({ exportDocument: vi.fn(async () => result) });
     const store = createDocumentsStore(api);
 
