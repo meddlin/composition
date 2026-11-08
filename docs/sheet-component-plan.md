@@ -528,11 +528,10 @@ and CSV. **Gate F.**
 - **Checked in the browser:** an export of an imported sheet downloaded an 18 KB workbook with the right type; a re-import of an untouched sheet showed no warning;
   after the sheet's text was edited the warning and **Replace my changes** showed; replacing restored Excel's values, set a new fingerprint, and one undo brought
   the edit back.
-- **Not built, and why:** **saving the file in the desktop app.** The desktop app blocks every download on purpose (`will-download` is cancelled in
-  `readingListGuard.ts`) and, by its own rule, the page never names a path: the way to save is a native dialog opened by the main process, as the backup and the PDF
-  export do, and there is no such bridge for a file the page made. So there **Download is disabled, with the reason, and Copy cells works**. A small
-  `saveFile` bridge (a method in the shared API list, a handler that opens the save dialog and writes the bytes, the preload list and its tests) is a task of its own in
-  `apps/desktop`; the dialog needs only to call it when `window.composition` has it.
+- **Saving in the desktop app** goes through a `saveFile` bridge: the page hands the main process the bytes and a suggested name, and the main process
+  opens the native save dialog and writes the file where it is chosen (the page never names a path), as the backup and the PDF export do.
+  Checked by unit tests of the handler (dialog and file system faked), the argument checks and the bridge's method list; **not driven in the
+  real Electron app** (the native dialog can't be clicked from a test).
 - **Not built, by plan:** column-name references as ranges on export (S9 is not built), a formula that gave a date shown as a date (a sheet has no cell formats),
   a merge instead of a replace on re-import.
 - **Not checked:** an `.xlsx` opened in Excel for Windows or other versions, in LibreOffice or Numbers; a very large export (5,000 rows by 20 columns: its size and

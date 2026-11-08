@@ -5,6 +5,7 @@ import { FEED_METHODS, type FeedsApi } from "../../../web/src/lib/composition/fe
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { READING_LIST_METHODS, type ReadingListApi } from "../../../web/src/lib/composition/readingListApi";
+import { SAVE_FILE_METHODS, type SaveFileApi } from "../../../web/src/lib/composition/saveFileApi";
 import { TODO_METHODS, type TodosApi } from "../../../web/src/lib/composition/todosApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
@@ -13,7 +14,7 @@ import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import type { AssistantHost, AssistantSender } from "./assistant";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isAllowedOrigin } from "./origin";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, SAVE_FILE_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 /** The slice of Electron's `ipcMain` this module uses, so tests don't need Electron. */
 export type IpcMainLike = {
@@ -32,7 +33,7 @@ export class UntrustedSenderError extends Error {}
 
 /**
  * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi, DocumentsApi,
- * DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AI helper chat calls, over IPC, one channel per method.
+ * DesktopBackupApi, SaveFileApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AI helper chat calls, over IPC, one channel per method.
  *
  * Every call is checked twice: the sender must be a frame of our own UI (a
  * navigated-away or injected frame must never reach the notes database), and
@@ -44,6 +45,7 @@ export function registerIpc(options: {
   attachments: AttachmentsApi;
   documents: DocumentsApi;
   backup: DesktopBackupApi;
+  saveFile: SaveFileApi;
   panels: PanelsApi;
   todos: TodosApi;
   readingList: ReadingListApi;
@@ -57,7 +59,7 @@ export function registerIpc(options: {
   /** Synchronous snapshot for the preload, taken before the page paints. */
   initial: () => unknown;
 }): void {
-  const { ipcMain, api, attachments, documents, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant, isTrustedUrl, initial } = options;
+  const { ipcMain, api, attachments, documents, backup, saveFile, panels, todos, readingList, contacts, feeds, updates, window, assistant, isTrustedUrl, initial } = options;
 
   const trusted = (event: IpcEventLike): boolean => {
     const url = event.senderFrame?.url;
@@ -81,6 +83,7 @@ export function registerIpc(options: {
   for (const method of ATTACHMENT_METHODS) expose(method, ATTACHMENT_VALIDATORS[method], attachments);
   for (const method of DOCUMENT_METHODS) expose(method, DOCUMENT_VALIDATORS[method], documents);
   for (const method of BACKUP_METHODS) expose(method, BACKUP_VALIDATORS[method], backup);
+  for (const method of SAVE_FILE_METHODS) expose(method, SAVE_FILE_VALIDATORS[method], saveFile);
   for (const method of PANELS_METHODS) expose(method, PANELS_VALIDATORS[method], panels);
   for (const method of TODO_METHODS) expose(method, TODO_VALIDATORS[method], todos);
   for (const method of READING_LIST_METHODS) expose(method, READING_LIST_VALIDATORS[method], readingList);

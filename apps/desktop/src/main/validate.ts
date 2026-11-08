@@ -11,6 +11,7 @@ import type { ContactsMethod } from "../../../web/src/lib/composition/contactsAp
 import type { FeedMethod } from "../../../web/src/lib/composition/feedsApi";
 import { normalizeReadingUrl } from "../../../web/src/lib/composition/readingList";
 import { MAX_READING_TITLE_LENGTH, type ReadingListMethod } from "../../../web/src/lib/composition/readingListApi";
+import { isSaveFileKind, MAX_SAVE_FILE_BYTES, MAX_SAVE_FILE_NAME_LENGTH, type SaveFileMethod } from "../../../web/src/lib/composition/saveFileApi";
 import { isTodoLook } from "../../../web/src/lib/composition/todoLook";
 import { isRetention, validateTodoSettings } from "../../../web/src/lib/composition/todoSettings";
 import { isReportKind, isTodoPriority, isTodoStatus, MAX_TODO_TITLE_LENGTH, type TodoMethod } from "../../../web/src/lib/composition/todosApi";
@@ -293,6 +294,23 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
 export const BACKUP_VALIDATORS: Record<BackupMethod, Validator> = {
   createBackup: none,
   restoreBackup: none,
+};
+
+/**
+ * The save-file method takes the bytes of a file the page made, a suggested name and what kind of file it is, and nothing that
+ * names a place: the person picks that in the save dialog. It is rebuilt from the three checked fields, so nothing else the
+ * page sends goes on, and the bytes must be a real, non-empty Uint8Array no larger than the cap.
+ */
+export const SAVE_FILE_VALIDATORS: Record<SaveFileMethod, Validator> = {
+  saveFile: ([input]) => {
+    const value = record("saveFile", input, "file");
+    const name = text("saveFile", value.name, "name");
+    if (name.length > MAX_SAVE_FILE_NAME_LENGTH) fail("saveFile", "name");
+    if (!isSaveFileKind(value.kind)) fail("saveFile", "kind");
+    const data = bytes("saveFile", value.bytes, "bytes");
+    if (data.byteLength === 0 || data.byteLength > MAX_SAVE_FILE_BYTES) fail("saveFile", "bytes");
+    return [{ name, bytes: data, kind: value.kind }];
+  },
 };
 
 /** The most a saved arrangement of panels can weigh. A real one is a few kilobytes; this stops a page from filling the settings file. */

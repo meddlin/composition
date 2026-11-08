@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
+import { MAX_SAVE_FILE_BYTES, MAX_SAVE_FILE_NAME_LENGTH, SAVE_FILE_METHODS } from "../../../web/src/lib/composition/saveFileApi";
 import { DOCUMENT_METHODS } from "../../../web/src/lib/composition/documentsApi";
 import { CONTACTS_METHODS } from "../../../web/src/lib/composition/contactsApi";
 import { FEED_METHODS } from "../../../web/src/lib/composition/feedsApi";
@@ -11,7 +12,7 @@ import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi
 import { UPDATE_METHODS } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
 import { API_METHODS } from "./backend";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, InvalidArgumentsError, PANELS_VALIDATORS, READING_LIST_VALIDATORS, SAVE_FILE_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 describe("VALIDATORS", () => {
   it("has a validator for every method of the API, and no extras", () => {
@@ -303,6 +304,52 @@ describe("BACKUP_VALIDATORS", () => {
   it("takes no arguments at all, so a page can't name a path", () => {
     expect(BACKUP_VALIDATORS.createBackup(["/etc/cron.d/evil"])).toEqual([]);
     expect(BACKUP_VALIDATORS.restoreBackup(["/tmp/x.tar.gz", 1])).toEqual([]);
+  });
+});
+
+describe("SAVE_FILE_VALIDATORS", () => {
+  const bytes = new Uint8Array([1, 2, 3]);
+
+  it("covers exactly the save-file methods", () => {
+    expect(Object.keys(SAVE_FILE_VALIDATORS).sort()).toEqual([...SAVE_FILE_METHODS].sort());
+  });
+
+  it("passes on only the name, the kind and the bytes, so a page can't name a path", () => {
+    expect(SAVE_FILE_VALIDATORS.saveFile([{ name: "Q3.xlsx", kind: "xlsx", bytes, path: "/etc/cron.d/evil", filePath: "/tmp/x" }, "/tmp/y"])).toEqual([
+      { name: "Q3.xlsx", kind: "xlsx", bytes },
+    ]);
+    expect(SAVE_FILE_VALIDATORS.saveFile([{ name: "Q3.csv", kind: "csv", bytes }])).toEqual([{ name: "Q3.csv", kind: "csv", bytes }]);
+  });
+
+  it("allows a file of exactly the largest size and refuses one a byte over", () => {
+    const largest = new Uint8Array(MAX_SAVE_FILE_BYTES);
+    expect(SAVE_FILE_VALIDATORS.saveFile([{ name: "a", kind: "csv", bytes: largest }])).toHaveLength(1);
+    expect(() => SAVE_FILE_VALIDATORS.saveFile([{ name: "a", kind: "csv", bytes: new Uint8Array(MAX_SAVE_FILE_BYTES + 1) }])).toThrow(InvalidArgumentsError);
+  });
+
+  it("allows a name of exactly the longest length and refuses one a character over", () => {
+    expect(SAVE_FILE_VALIDATORS.saveFile([{ name: "a".repeat(MAX_SAVE_FILE_NAME_LENGTH), kind: "csv", bytes }])).toHaveLength(1);
+    expect(() => SAVE_FILE_VALIDATORS.saveFile([{ name: "a".repeat(MAX_SAVE_FILE_NAME_LENGTH + 1), kind: "csv", bytes }])).toThrow(InvalidArgumentsError);
+  });
+
+  it.each([
+    ["no argument", []],
+    ["a string", ["a.xlsx"]],
+    ["null", [null]],
+    ["an array", [[1, 2]]],
+    ["no name", [{ kind: "xlsx", bytes }]],
+    ["a name that is not text", [{ name: 7, kind: "xlsx", bytes }]],
+    ["a kind that is not allowed", [{ name: "a.sh", kind: "sh", bytes }]],
+    ["a kind that is not text", [{ name: "a", kind: 1, bytes }]],
+    ["no kind", [{ name: "a", bytes }]],
+    ["bytes that are text", [{ name: "a.csv", kind: "csv", bytes: "a,b" }]],
+    ["bytes that are a plain array", [{ name: "a.csv", kind: "csv", bytes: [1, 2, 3] }]],
+    ["bytes that are an ArrayBuffer", [{ name: "a.csv", kind: "csv", bytes: new ArrayBuffer(3) }]],
+    ["bytes that only look like an array", [{ name: "a.csv", kind: "csv", bytes: { length: 3, 0: 1 } }]],
+    ["no bytes", [{ name: "a.csv", kind: "csv" }]],
+    ["no bytes at all in it", [{ name: "a.csv", kind: "csv", bytes: new Uint8Array(0) }]],
+  ] as const)("rejects %s", (_name, args) => {
+    expect(() => SAVE_FILE_VALIDATORS.saveFile([...args])).toThrow(InvalidArgumentsError);
   });
 });
 

@@ -7,6 +7,7 @@ import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
 import { FEED_METHODS, type FeedsApi } from "../../../web/src/lib/composition/feedsApi";
 import { READING_LIST_METHODS, type ReadingListApi } from "../../../web/src/lib/composition/readingListApi";
+import { SAVE_FILE_METHODS, type SaveFileApi } from "../../../web/src/lib/composition/saveFileApi";
 import { TODO_METHODS, type TodosApi } from "../../../web/src/lib/composition/todosApi";
 import { UPDATE_METHODS, type UpdatesApi } from "../../../web/src/lib/composition/updatesApi";
 import { WINDOW_METHODS, type WindowApi } from "../../../web/src/lib/composition/windowApi";
@@ -37,6 +38,9 @@ function setup() {
   const backup = Object.fromEntries(
     BACKUP_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof DesktopBackupApi]: ReturnType<typeof vi.fn> };
+  const saveFile = Object.fromEntries(
+    SAVE_FILE_METHODS.map((m) => [m, vi.fn(async () => ({ saved: true }))]),
+  ) as unknown as { [K in keyof SaveFileApi]: ReturnType<typeof vi.fn> };
   const panels = Object.fromEntries(
     PANELS_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof PanelsApi]: ReturnType<typeof vi.fn> };
@@ -66,6 +70,7 @@ function setup() {
     attachments: attachments as unknown as AttachmentsApi,
     documents: documents as unknown as DocumentsApi,
     backup: backup as unknown as DesktopBackupApi,
+    saveFile: saveFile as unknown as SaveFileApi,
     panels: panels as unknown as PanelsApi,
     todos: todos as unknown as TodosApi,
     readingList: readingList as unknown as ReadingListApi,
@@ -76,16 +81,16 @@ function setup() {
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, documents, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant };
+  return { handlers, listeners, api, attachments, documents, backup, saveFile, panels, todos, readingList, contacts, feeds, updates, window, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, PDF, backup, panels, to-do, Reading List, contacts, feed, update, window and AI helper method, and nothing else", () => {
+  it("registers one handler per API, attachment, PDF, backup, save-file, panels, to-do, Reading List, contacts, feed, update, window and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...DOCUMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...CONTACTS_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...DOCUMENT_METHODS, ...BACKUP_METHODS, ...SAVE_FILE_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...CONTACTS_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
   });
 
@@ -150,6 +155,29 @@ describe("registerIpc", () => {
     expect(backup.restoreBackup).toHaveBeenCalledWith();
   });
 
+  it("saves a file with exactly the name, kind and bytes the page sends, and no path", async () => {
+    const { handlers, saveFile } = setup();
+    const bytes = new Uint8Array([0x50, 0x4b, 3, 4]);
+
+    const result = await handlers.get(channelFor("saveFile"))!(own, { name: "Q3 budget.xlsx", kind: "xlsx", bytes, path: "/etc/cron.d/evil", filePath: "/tmp/x" }, "/tmp/y");
+
+    expect(result).toEqual({ saved: true });
+    expect(saveFile.saveFile).toHaveBeenCalledWith({ name: "Q3 budget.xlsx", kind: "xlsx", bytes });
+  });
+
+  it("refuses a file of the wrong shape, kind or size without opening a dialog", async () => {
+    const { handlers, saveFile } = setup();
+    const save = handlers.get(channelFor("saveFile"))!;
+    const bytes = new Uint8Array(4);
+
+    await expect(save(own, { name: "a.exe", kind: "exe", bytes })).rejects.toThrow(/invalid/);
+    await expect(save(own, { name: "a.xlsx", kind: "xlsx", bytes: "PK" })).rejects.toThrow(/invalid/);
+    await expect(save(own, { name: "a.xlsx", kind: "xlsx", bytes: new Uint8Array(0) })).rejects.toThrow(/invalid/);
+    await expect(save(own, { name: "a.xlsx", kind: "xlsx", bytes: { length: 4 } })).rejects.toThrow(/invalid/);
+    await expect(save(own, "a.xlsx")).rejects.toThrow(/invalid/);
+    expect(saveFile.saveFile).not.toHaveBeenCalled();
+  });
+
   it("calls the update methods with a boolean at most, never a url", async () => {
     const { handlers, updates } = setup();
 
@@ -199,7 +227,7 @@ describe("registerIpc", () => {
     ["a missing frame", { senderFrame: null }],
     ["an unparsable url", { senderFrame: { url: "not a url" } }],
   ])("refuses every method from %s", async (_name, event) => {
-    const { handlers, api, attachments, backup, panels, todos, updates } = setup();
+    const { handlers, api, attachments, backup, saveFile, panels, todos, updates } = setup();
 
     for (const method of TODO_METHODS) {
       await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(/untrusted sender/);
@@ -226,6 +254,12 @@ describe("registerIpc", () => {
         /untrusted sender/,
       );
       expect(backup[method]).not.toHaveBeenCalled();
+    }
+    for (const method of SAVE_FILE_METHODS) {
+      await expect(handlers.get(channelFor(method))!(event as IpcEventLike, { name: "a.xlsx", kind: "xlsx", bytes: new Uint8Array(1) })).rejects.toThrow(
+        /untrusted sender/,
+      );
+      expect(saveFile[method]).not.toHaveBeenCalled();
     }
     for (const method of UPDATE_METHODS) {
       await expect(handlers.get(channelFor(method))!(event as IpcEventLike)).rejects.toThrow(
