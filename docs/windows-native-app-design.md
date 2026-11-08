@@ -184,10 +184,10 @@ flowchart TB
 
 The notes rules (ordering, Trash Can, notebook invariants, frontmatter, backup, search parsing, MDX parsing) now exist once per platform: TypeScript, Swift, C#, Rust. The guard is a shared conformance corpus. **What exists** (S2, checked 2026-11-07):
 
-- `fixtures/conformance/`, which the iPad design proposed: **does not exist**, on `main` or any branch.
-- A real corpus exists on the **unmerged iPad branch** (PR #247) at `apps/ios/conformance/`: 15 input files (store and Trash Can operation scripts, frontmatter, settings, search queries, MDX notes, organization, images, editing and component cases). Expected answers are **not committed**: a test file in `apps/web` on that branch runs the inputs through the desktop's real code and writes them; a script drives both sides.
+- `fixtures/conformance/`, which the iPad design proposed: **did not exist** when I checked on 2026-11-07, on `main` or any branch. **Since then** the PDF-markup work created it on its **unmerged** branch (PR #267): a README and `pdf/` fixtures (`schema.json`, `validation.json`, `scripts.json`) for the PDF tables only. Its convention differs from the iPad's: the **expected answers are committed** in the files (regenerated with `UPDATE_FIXTURES=1`), so a harness in any language reads them with no TypeScript at all.
+- A larger corpus exists on the **unmerged iPad branch** (PR #247) at `apps/ios/conformance/`: 15 input files (store and Trash Can operation scripts, frontmatter, settings, search queries, MDX notes, organization, images, editing and component cases). There the expected answers are **not committed**: a test file in `apps/web` on that branch runs the inputs through the desktop's real code at test time and writes them; a script drives both sides.
 
-**Gaps, reported and not filled** (this branch invented no corpus): the corpus is not on `main`; it is named and placed for the iPad; its oracle is a web test on an unmerged branch, so a Windows harness cannot regenerate answers from `main`; nothing says which cases a port must pass. **Your call (D10):** merge the iPad's corpus and move it to a shared folder with a manifest, or leave it and have each platform point at it. The Windows harness is built to take a **directory**, so either way it reads the same fixtures (S2 did, from a `git archive` extract, copying nothing).
+**Gaps, reported and not filled** (this branch invented no corpus): nothing of this is on `main`; the iPad's cases sit under `apps/ios/` and need a test file from an unmerged branch to produce their answers, so a Windows harness cannot regenerate them from `main`; the two branches use **two conventions** (inputs plus a test-time oracle, or committed expectations); nothing says which cases a port must pass. **Your call (D10):** merge one shared folder, and my recommendation is `fixtures/conformance/` in the PDF branch's committed-expectation style, with the iPad's cases moved into it. The Windows harness is built to take a **directory**, so it reads either (S2 read the iPad's from a `git archive` extract, copying nothing).
 
 How the .NET side runs it: the oracle phase (TypeScript, real code) writes answers; `dotnet test` reads the same inputs and the answers and compares; a second phase makes the desktop read what .NET wrote. That is `apps/windows/spikes/run-core-spike.sh` today (S1), generalised at step 1. **No port without an oracle.**
 
@@ -447,7 +447,7 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | D7 | **Toolchain:** .NET 10 LTS, one pinned Windows App SDK 2.x, C# with nullable on; no trimming or AOT in v1 | .NET 9 ends 2026-11-10. Pin at Gate A after one clean build on Windows | Proposed |
 | D8 | **OS floor and architectures:** Windows 10 22H2 and Windows 11; `win-x64` and `win-arm64` native | The framework supports back to 1809; Arm64 gets Meilisearch under emulation (S8) | Proposed |
 | D9 | **Installer and updater** | Velopack is the lead candidate; S7 decides at Gate C. W2's per-user, no-UAC rule carries | Proposed |
-| D10 | **Where the shared corpus lives** | Merge the iPad's corpus to `main` and move it to a shared folder with a manifest; the Windows and Linux harnesses take a directory. Until then no Windows port can pass an oracle from `main` | **Needs you** |
+| D10 | **Where the shared corpus lives** | One shared `fixtures/conformance/` on `main`: it already exists on the PDF branch (PR #267) with committed expected answers; move the iPad's `apps/ios/conformance/` cases into it in that style and add a manifest. The Windows and Linux harnesses take a directory. Until then no Windows port can pass an oracle from `main`. The Linux session raised the same question (its D12) | **Needs you** |
 | D11 | **App name, identity, icon, folders** | A placeholder id until M3, a distinct display name from the Electron app | **Needs you** |
 | D12 | **Which engine syncs when two apps share a database** | The sync design's question: one engine per database, with a lease | For the sync design |
 | D13 | **No CLI inside the native app in v1** (W5 not applicable) | Electron's bundle or source | Proposed |
@@ -484,7 +484,7 @@ Each spike answers one question before anything is built for real. **Where it ra
 | # | Spike | Answers | Where it ran | Result |
 |---|---|---|---|---|
 | **S1** | **Core library vs the desktop's real data layer:** schema pass, uuid pass, backup, FTS5; the real `db.ts` and `backup.ts` as oracle in both directions | R12; D3, D7, C13 | **macOS arm64**, SDK 9.0.200. Windows DLLs of SQLite inspected, not run | **16 of 16 pass** ([note](../apps/windows/spikes/results/S1-core.md)). FTS5 present; sqlite_master byte-identical; no-op both ways; uuids and settings carried through backup both ways; two deliberate corruptions caught |
-| **S2** | **The shared corpus, and YAML** | R4, R11; D10, C8 | macOS | The corpus is **not on `main`** (iPad branch only, `apps/ios/conformance/`); YamlDotNet matches js-yaml on 93 of 111 parse and **61 of 123** generate cases ([note](../apps/windows/spikes/results/S2-corpus-and-yaml.md)) |
+| **S2** | **The shared corpus, and YAML** | R4, R11; D10, C8 | macOS | Nothing is on `main`: the iPad branch has the corpus (`apps/ios/conformance/`), and the PDF branch has since added `fixtures/conformance/` (PDF only, committed answers); YamlDotNet matches js-yaml on 93 of 111 parse and **61 of 123** generate cases ([note](../apps/windows/spikes/results/S2-corpus-and-yaml.md)) |
 | **S3** | **The preview as a standalone page** | R2, R14; O2, C1 | macOS, **Chromium in the Browser pane, not WebView2** | Builds untouched in 3 s (1.1 MB JS, 123 KB CSS); renders the components; re-themes from a message. Render time unmeasured ([note](../apps/windows/spikes/results/S3-preview-bundle.md)) |
 | **S4** | **Meilisearch from .NET, with a Job Object** | R6, R7; D1, C4 | macOS, Meilisearch 1.53.1. **The Job Object never ran** | 2 of 2 pass: healthy in 228 to 645 ms, typo tolerance, filter, hard kill and restart ([note](../apps/windows/spikes/results/S4-search-sidecar.md)) |
 | **S5** | **The WinUI 3 shell:** RichEditBox on 5,000 lines, WebView2 memory and start-up, the preview in WebView2 | R1, R2, R3; D2 | **Windows only. Written, never built, never run** (the XAML compiler does not run on macOS) | Restore of the package graph resolves on macOS; nothing else ([note](../apps/windows/spikes/results/S5-shell-windows.md)) |
@@ -530,7 +530,7 @@ Each step ends in something checkable. Steps 1 and 2 are core-only and run on a 
 ## What this page corrects
 
 1. **Electron's Windows plan excluded Arm because of Meilisearch.** A native Arm64 app is possible; only the sidecar stays x64 ([W6](#what-carries-over-from-the-electron-windows-plan)).
-2. **The brief proposed `fixtures/conformance/`.** It does not exist, and the corpus that does exist is on an unmerged branch under `apps/ios/`.
+2. **The brief proposed `fixtures/conformance/`.** When I checked it existed nowhere; the real corpus was on the unmerged iPad branch under `apps/ios/`. The PDF branch has since created `fixtures/conformance/` (PDF cases only), so there are now two conventions on two unmerged branches.
 3. **"Notes stay `.md` files"** in [mdx-components.md](ui/mdx-components.md) is loose here as on the iPad (a note is a SQLite row).
 4. **The Windows plan's installer decision (NSIS and electron-updater) does not carry** to a .NET app.
 
@@ -542,6 +542,7 @@ A new dependency gets a row in [Languages and dependencies](#languages-and-depen
 ## Change log
 
 - 2026-11-07: first version. Design and five spikes (S1 to S4 on macOS, S5 written and not run). **You decided D1 to D6:** Meilisearch as a sidecar (not my FTS5 recommendation); a native RichEditBox editor gated on a Windows measurement; the same database as Electron and the CLI; an unpackaged exe plus an installer (not my MSIX-through-the-Store recommendation); v1 = the full notes editor with no panels or plugins; a Windows 11 Arm VM on this Mac plus a real x64 PC. Found the shared corpus does not exist on `main`.
+- 2026-11-08: corrected the corpus finding: the PDF branch (PR #267) has since created `fixtures/conformance/` with committed expected answers (PDF cases only), so D10 now chooses between two existing conventions; recommendation updated.
 
 ## Sources
 

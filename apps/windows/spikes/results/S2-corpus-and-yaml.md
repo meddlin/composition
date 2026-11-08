@@ -4,7 +4,7 @@
 
 | Where | What |
 |---|---|
-| `fixtures/conformance/` (what the iPad design proposed) | **Does not exist** on this branch's base (`main` at da75aa3) or on any branch |
+| `fixtures/conformance/` (what the iPad design proposed) | **Did not exist** when checked on 2026-11-07, on this branch's base (`main` at da75aa3) or any branch. **Update 2026-11-08:** the PDF-markup branch (PR #267, unmerged) now has it: a README and `pdf/` fixtures with **committed expected answers** (`UPDATE_FIXTURES=1` regenerates), for the PDF tables only. Not read by this spike |
 | `main` | No conformance files at all. `apps/web/src/lib/composition/assistant/__fixtures__/` is unrelated (AI chat recordings) |
 | The iPad branch `claude/ipad-app-design-build-683ed8` (PR #247, **unmerged**) | A real corpus at **`apps/ios/conformance/`**: 15 inputs, about 1 MB (`store-script.json`, `trash-script.json`, `frontmatter-cases.json`, `settings-cases.json`, `search-queries.json`, `mdx-notes.json`, `organization-cases.json`, `images-cases.json`, `editing-cases.json`, `component-cases.json`, `logic-subset.json`, `search-expected.json` and a preview showcase). It is named for the iPad |
 | Where its expected answers come from | Not committed (except `search-expected.json`): `apps/web/scripts/ios-conformance-fixtures.test.ts` on that branch runs the inputs through the desktop's real TypeScript at test time and writes the answers; `apps/ios/scripts/conformance.sh` drives it |
