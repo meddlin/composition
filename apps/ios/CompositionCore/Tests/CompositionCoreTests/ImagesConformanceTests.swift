@@ -16,6 +16,11 @@ private struct Cases: Decodable {
     struct Hex: Decodable { let hex: String }
     struct Text: Decodable { let text: String }
     struct Selection: Decodable { let text: String, start: Int, end: Int }
+    struct FileSpec: Decodable { let name: String, size: Int, modified: String }
+    struct Folder: Decodable { let files: [FileSpec], dirs: [String], others: [String], noFolder: Bool }
+    struct Note: Decodable { let id: Int64, title: String, content: String }
+    struct Notes: Decodable { let notes: [Note] }
+    struct Match: Decodable { let names: [String], query: String; let limit: Int? }
     let sniff: [Hex]
     let fileName: [Name]
     let store: [Store]
@@ -24,6 +29,11 @@ private struct Cases: Decodable {
     let tag: [Named]
     let refs: [Text]
     let toMdx: [Selection]
+    let list: [Folder]
+    let usage: [Notes]
+    let match: [Match]
+    let usageLabel: [Int]
+    let sizeLabel: [Int]
 }
 
 private struct Expected: Decodable {
@@ -37,6 +47,8 @@ private struct Expected: Decodable {
 
     struct Tag: Decodable { let tag: String?; let error: String? }
     struct Edit: Decodable, Equatable { let start: Int, end: Int, text: String, caret: Int }
+    struct Listed: Decodable, Equatable { let name: String, size: Int, modifiedAt: String }
+    struct Use: Decodable, Equatable { let id: Int64, title: String }
     let sniff: [String?]
     let fileName: [String]
     let store: [Stored]
@@ -45,6 +57,11 @@ private struct Expected: Decodable {
     let tag: [Tag]
     let refs: [[String]]
     let toMdx: [Edit?]
+    let list: [[Listed]]
+    let usage: [[String: [Use]]]
+    let match: [[String]]
+    let usageLabel: [String]
+    let sizeLabel: [String]
 }
 
 private func bytes(_ hex: String) -> Data {
@@ -140,5 +157,66 @@ struct ImagesConformanceTests {
             #expect(mapped == want, "\(shown(item.text)) from \(item.start) to \(item.end)")
         }
         #expect(edits > 300)
+    }
+
+    @Test("every folder lists as the real listImages lists it: newest first, ties by name, only real image files")
+    func listing() throws {
+        let (cases, expected) = try load()
+        #expect(cases.list.count == expected.list.count)
+        for (index, item) in cases.list.enumerated() {
+            try withScratch { scratch in
+                let location = DataLocation(directory: scratch.directory)
+                if !item.noFolder {
+                    let folder = location.imagesURL
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    func touch(_ name: String, _ stamp: String) throws {
+                        let date = Timestamp.date(milliseconds: try #require(Timestamp.milliseconds(from: stamp.replacingOccurrences(of: "Z", with: ".000Z"))))
+                        try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: folder.appendingPathComponent(name).path)
+                    }
+                    for file in item.files {
+                        try Data(repeating: 0x61, count: file.size).write(to: folder.appendingPathComponent(file.name))
+                        try touch(file.name, file.modified)
+                    }
+                    for name in item.dirs { try FileManager.default.createDirectory(at: folder.appendingPathComponent(name), withIntermediateDirectories: false) }
+                    for name in item.others {
+                        try Data("abcd".utf8).write(to: folder.appendingPathComponent(name))
+                        try touch(name, "2020-01-01T00:00:00Z")
+                    }
+                }
+                let got = StoredImages.list(in: location).map { Expected.Listed(name: $0.name, size: $0.size, modifiedAt: $0.modifiedAt) }
+                #expect(got == expected.list[index], "folder \(index): \(got.map(\.name)) against \(expected.list[index].map(\.name))")
+            }
+        }
+    }
+
+    @Test("the notes that point at each image are what imageUsage finds, in the order the notes are given")
+    func usage() throws {
+        let (cases, expected) = try load()
+        #expect(cases.usage.count == expected.usage.count)
+        for (index, item) in cases.usage.enumerated() {
+            let got = StoredImages.usage(in: item.notes.map { NoteText(id: $0.id, title: $0.title, content: $0.content) }).mapValues { $0.map { Expected.Use(id: $0.id, title: $0.title) } }
+            #expect(got == expected.usage[index], "notes \(index)")
+        }
+    }
+
+    @Test("what the picker offers for each query is what matchImages offers, with the same limit")
+    func matching() throws {
+        let (cases, expected) = try load()
+        #expect(cases.match.count == expected.match.count)
+        var found = 0
+        for (index, item) in cases.match.enumerated() {
+            let images = item.names.map { StoredImageInfo(name: $0, size: 0, modifiedAt: "", usedIn: []) }
+            let got = (item.limit.map { StoredImages.match(images, query: item.query, limit: $0) } ?? StoredImages.match(images, query: item.query)).map(\.name)
+            if !got.isEmpty { found += 1 }
+            #expect(got == expected.match[index], "query \(shown(item.query)) over \(item.names.count) names, limit \(String(describing: item.limit))")
+        }
+        #expect(found > 30)
+    }
+
+    @Test("the labels under an image read as usageLabel and formatSize write them")
+    func labels() throws {
+        let (cases, expected) = try load()
+        for (index, count) in cases.usageLabel.enumerated() { #expect(StoredImages.usageLabel(count: count) == expected.usageLabel[index], "\(count) notes") }
+        for (index, bytes) in cases.sizeLabel.enumerated() { #expect(StoredImages.sizeLabel(bytes: bytes) == expected.sizeLabel[index], "\(bytes) bytes") }
     }
 }

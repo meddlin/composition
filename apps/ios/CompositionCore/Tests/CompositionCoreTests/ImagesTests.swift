@@ -90,4 +90,65 @@ struct ImagesTests {
             #expect(restored == png)
         }
     }
+
+    @Test("the stored images are listed newest first with who uses them, and the picker narrows them by words of the name")
+    func theLibrary() throws {
+        try withScratch { scratch in
+            let location = DataLocation(directory: scratch.directory)
+            #expect(StoredImages.list(in: location).isEmpty, "no folder is no images")
+            guard case .stored(let trip) = StoredImages.store(noteTitle: "Trip Plan", fileName: "route map.png", data: png, in: location),
+                case .stored(let recipe) = StoredImages.store(noteTitle: "Recipes", fileName: "pasta.jpg", data: jpeg, in: location)
+            else { Issue.record("not stored"); return }
+            let folder = location.imagesURL
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000_000)], ofItemAtPath: folder.appendingPathComponent(trip).path)
+            try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 2_000_000)], ofItemAtPath: folder.appendingPathComponent(recipe).path)
+            try Data("x".utf8).write(to: folder.appendingPathComponent("notes.txt"))
+            try Data("x".utf8).write(to: folder.appendingPathComponent(".\(trip).tmp"))
+
+            let notes = [NoteText(id: 4, title: "Plan", content: "![map](app_data/\(trip))"), NoteText(id: 3, title: "Other", content: "no pictures")]
+            let library = StoredImages.library(in: location) { notes }
+            #expect(library.map(\.name) == [recipe, trip], "newest first; the text file and the half-written one are left out")
+            #expect(library.map(\.usedIn) == [[], [ImageUse(id: 4, title: "Plan")]])
+            #expect(library.map(\.size) == [jpeg.count, png.count])
+
+            #expect(StoredImages.match(library, query: "trip map").map(\.name) == [trip], "every word, anywhere in the name")
+            #expect(StoredImages.match(library, query: "  ").map(\.name) == [recipe, trip], "nothing typed offers all of them, in the order given")
+            #expect(StoredImages.match(library, query: "RECIPES").map(\.name) == [recipe], "case does not matter")
+            #expect(StoredImages.match(library, query: "nothing").isEmpty)
+        }
+    }
+
+    @Test("the notes are read only when there is an image to say who uses")
+    func notesAreReadOnDemand() throws {
+        try withScratch { scratch in
+            let location = DataLocation(directory: scratch.directory)
+            var reads = 0
+            _ = StoredImages.library(in: location) { reads += 1; return [] }
+            #expect(reads == 0)
+        }
+    }
+
+    @Test("a note's texts come with its id and title, in the order the sidebar shows them")
+    func noteTexts() throws {
+        try withScratch { scratch in
+            let database = try CompositionDatabase.open(at: scratch.directory.appendingPathComponent("composition.db"))
+            defer { try? database.close() }
+            let first = try database.createNote(title: "First")
+            let second = try database.createNote(title: "Second", now: Date().addingTimeInterval(5))
+            _ = try database.saveNoteContent(id: first.id, content: "---\ntitle: First\n---\n![x](app_data/x-0123456789ab.png)", now: Date().addingTimeInterval(10))
+            let texts = try database.noteTexts()
+            #expect(texts.map(\.id) == [first.id, second.id], "the last edited first")
+            #expect(texts.first?.title == "First" && texts.first?.content.contains("app_data/x-0123456789ab.png") == true)
+            #expect(StoredImages.usage(in: texts)["x-0123456789ab.png"] == [ImageUse(id: first.id, title: "First")])
+        }
+    }
+
+    @Test("sizes and counts are written as the picker writes them")
+    func labels() {
+        #expect(StoredImages.sizeLabel(bytes: 0) == "0 B" && StoredImages.sizeLabel(bytes: 1023) == "1023 B")
+        #expect(StoredImages.sizeLabel(bytes: 812 * 1024) == "812 KB" && StoredImages.sizeLabel(bytes: 1536) == "2 KB")
+        #expect(StoredImages.sizeLabel(bytes: 5 * 1_048_576 + 400_000) == "5.4 MB")
+        #expect(StoredImages.sizeLabel(bytes: 1_310_720) == "1.3 MB", "1.25 MB: the larger tenth, as JavaScript's toFixed picks it")
+        #expect(StoredImages.usageLabel(count: 0) == "Not used in any note" && StoredImages.usageLabel(count: 1) == "Used in 1 note" && StoredImages.usageLabel(count: 4) == "Used in 4 notes")
+    }
 }

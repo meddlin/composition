@@ -313,6 +313,13 @@ final class AppModel {
         return true
     }
 
+    /// Every stored image, newest first, with the notes that point at each, for the picker of images already stored; nil when they cannot be listed.
+    func storedImages() async -> [StoredImageInfo]? {
+        guard let database else { return nil }
+        let location = location
+        return try? await Self.perform { try StoredImages.library(in: location) { try database.noteTexts() } }
+    }
+
     /// Opens a note for editing, or joins the session another window already has for it.
     func openSession(_ id: Int64) async -> NoteSession? {
         guard let sessions else { return nil }

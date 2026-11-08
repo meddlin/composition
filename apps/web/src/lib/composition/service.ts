@@ -30,7 +30,7 @@ import * as groupsRepo from "./groupsRepo";
 import { GroupNotEmptyError, InvalidGroupMoveError, InvalidNotebookMoveError } from "./groupsRepo";
 import type { Group } from "./groupsRepo";
 import * as images from "./images";
-import { findImageRefs, MAX_IMAGE_BYTES } from "./imageRefs";
+import { imageUsage, MAX_IMAGE_BYTES } from "./imageRefs";
 import { clampEditorRatio, clampSidebarWidth, type Layout } from "./layout";
 import * as notebooksRepo from "./notebooksRepo";
 import { LastNotebookError, NotebookNotEmptyError } from "./notebooksRepo";
@@ -256,10 +256,7 @@ export async function listImages(): Promise<ImageInfo[]> {
   const files = await images.listImages(settings.appDataDir);
   // Listing images must not be what creates a missing database file (see loadSettings).
   const notes = files.length > 0 && fs.existsSync(resolvedDbPath(settings)) ? notesRepo.listNotes() : [];
-  const usedIn = new Map<string, ImageInfo["usedIn"]>();
-  for (const { id, title, content } of notes) {
-    for (const name of findImageRefs(content)) usedIn.set(name, [...(usedIn.get(name) ?? []), { id, title }]);
-  }
+  const usedIn = imageUsage(notes);
   return files.map((file) => ({ ...file, usedIn: usedIn.get(file.name) ?? [] }));
 }
 

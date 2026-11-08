@@ -35,6 +35,20 @@ If it will not build or install, the useful things to send are the Xcode error a
 
 Importing **replaces** everything in the app with the backup: nothing is merged and nothing is kept.
 
+## A first sitting (build plan Step 12, Gate B)
+
+The page below is long. For the first time on the iPad with the Release build, this is the order I would take, most important first, about an hour. **Use a copy of your notes** (they get edited). Stop at the first thing that goes wrong and tell me; the rest can wait.
+
+1. **It runs and your notes are in** (items 1, 11): install the Release build, restore your backup, quit and reopen.
+2. **The editor, which Gate B turns on** (items 14, 15, 16, 17, 19): Scribble, typing in a long note and the *Typing speed test* line (please send me that line), the Pencil in a canvas, the arrow keys over hidden marks, turning the iPad. These are the answers that settle [D4 and D5](../ipad-app-design.md#decisions) and whether the Live tab stays out of v1 ([G7](../ipad-build-plan.md#decisions-to-make)).
+3. **Nothing typed is lost** (items 20, 21, 26): type and leave, type and swipe the app away, come back to where you were.
+4. **The round trip with the desktop** (items 9, 25, 39, 52): export a backup, restore it in the desktop app, and back.
+5. **Writing for real** (items 27, 33, 53, 57, 82): a new note, Scribble in the editor, the `<` list, the `[[` picker, a stored picture put back.
+6. **The way you hold it** (items 34, 36): landscape, and turning it with the keyboard up.
+7. **Looks and access** (items 65, 73, 74, 75, 78): the schemes in your light, VoiceOver, the largest text, a narrow window.
+
+Gate B needs from you: the speed line, whether Scribble and the Pencil behaved, whether the arrow keys over hidden marks were odd, and your call on the Live tab.
+
 ## What to try
 
 Search is the main thing to judge ([risk R7](../ipad-app-design.md#risks-and-unknowns)): is it as good as the desktop's on *your* notes?
@@ -219,6 +233,15 @@ A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for
 80. **Licences.** *More*, *About this build*, *Open-source licences*: GRDB.swift, swift-markdown and swift-cmark, each opening its licence text.
 
 What to tell me for each: what you did, what you expected, what happened.
+
+## Pictures already stored (Stored Image…)
+
+The **Image** menu has *Stored Image…* (⌘⇧M with a hardware keyboard, on the *Markdown* or *Split* tab). It lists every picture in the app's `app_data/`, newest first, so one can be put in a note again, also after the text that pointed at it is gone. **Use a copy of your notes: this edits them.**
+
+81. **The list.** Image, *Stored Image…* (or ⌘⇧M with a hardware keyboard: the same list opens, and no "m" is typed in the note): each picture has a small preview, its file name (it starts with the title of the note it was first put into), "Used in N notes" (or "Not used in any note") and its size. After a backup restored from the desktop, the desktop's pictures are all there, with the same counts as the desktop's Images list if you open it there.
+82. **Filter and choose.** Type words of a name (`trip map` finds `trip-plan-route-map-…`): only the pictures with every word remain; nothing matching says so. Tap one: the list closes and `![…](app_data/…)` is in the note as a paragraph of its own, after the frontmatter even if the caret was in it, and the *Preview* shows it. Cancel changes nothing.
+83. **Selected words.** Select a few words of a note, then Image, *Stored Image…* (the title of the list says which words), and choose: the words are replaced by the picture, and are its description (`![the words](app_data/…)`).
+84. **Many pictures.** With a few hundred pictures (your own notes) the list opens without a long wait, shows at most 50 at once, and scrolling stays smooth while the previews load.
 
 ## What it leaves out
 

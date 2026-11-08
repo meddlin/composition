@@ -23,6 +23,16 @@ extension CompositionDatabase {
         }
     }
 
+    /// Every note's id, title and text, in the order the sidebar shows them (`listNotes` of `notesRepo.ts`, which the desktop reads whole to see which
+    /// notes point at each stored image).
+    public func noteTexts() throws -> [NoteText] {
+        try pool.read { db in
+            try Row.fetchAll(db, sql: "SELECT id, title, content FROM notes ORDER BY \(Self.noteDisplayOrder)").map {
+                NoteText(id: $0["id"], title: $0["title"], content: $0["content"])
+            }
+        }
+    }
+
     /// A new note with frontmatter made from the title and tags. A note in a group is in the group's notebook, whatever the
     /// caller thought.
     @discardableResult

@@ -50,7 +50,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *   images-cases.json, images-expected.json
  *                                  build plan Step 8: images, through the real sniffImage, imageFileName and storeImage
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
- *                                  imagesToMdx (imageToMdx.ts)
+ *                                  imagesToMdx (imageToMdx.ts), and for the picker of stored images listImages (images.ts, over real
+ *                                  folders), imageUsage (imageRefs.ts) and matchImages, usageLabel and formatSize (imagePicker.ts)
  *   organization-cases.json, organization-expected.json
  *                                  build plan Step 7: the pure rules behind the sidebar, run through the real navHistory.ts
  *                                  (record, back, forward), dropEdge.ts and groupListing.ts (buildGroupListing, groupPath)
@@ -801,11 +802,42 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
       tag: { name: string }[];
       refs: { text: string }[];
       toMdx: { text: string; start: number; end: number }[];
+      list: { files: { name: string; size: number; modified: string }[]; dirs: string[]; others: string[]; noFolder: boolean }[];
+      usage: { notes: { id: number; title: string; content: string }[] }[];
+      match: { names: string[]; query: string; limit: number | null }[];
+      usageLabel: number[];
+      sizeLabel: number[];
     };
     const bytes = (hex: string) => Uint8Array.from(Buffer.from(hex, "hex"));
     const images = await import(path.join(lib, "images"));
     const refs = await import(path.join(lib, "imageRefs"));
     const { imagesToMdx } = await import(path.resolve(__dirname, "../src/components/notes/mdx/imageToMdx"));
+    const picker = await import(path.resolve(__dirname, "../src/components/notes/imagePicker"));
+
+    // The picker's listing, over real folders: the files are written, given the times the case says, and read back by the real listImages.
+    const listed = [];
+    for (const { files, dirs, others, noFolder } of cases.list) {
+      const folder = fs.mkdtempSync(path.join(os.tmpdir(), "composition-ios-list-"));
+      try {
+        if (!noFolder) {
+          const dir = path.join(folder, "app_data");
+          fs.mkdirSync(dir);
+          const touch = (file: string, when: string) => fs.utimesSync(file, new Date(when), new Date(when));
+          for (const { name, size, modified } of files) {
+            fs.writeFileSync(path.join(dir, name), Buffer.alloc(size, 0x61));
+            touch(path.join(dir, name), modified);
+          }
+          for (const name of dirs) fs.mkdirSync(path.join(dir, name));
+          for (const name of others) {
+            fs.writeFileSync(path.join(dir, name), "abcd");
+            touch(path.join(dir, name), "2020-01-01T00:00:00Z");
+          }
+        }
+        listed.push(await images.listImages(folder));
+      } finally {
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+    }
 
     const stored = cases.store.map(({ title, file: fileName, hex, maxBytes }) => {
       const folder = fs.mkdtempSync(path.join(os.tmpdir(), "composition-ios-images-"));
@@ -835,10 +867,19 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
       }),
       refs: cases.refs.map(({ text }) => [...refs.findImageRefs(text)].sort()),
       toMdx: cases.toMdx.map(({ text, start, end }) => imagesToMdx(text, start, end)),
+      list: listed,
+      usage: cases.usage.map(({ notes }) => Object.fromEntries(refs.imageUsage(notes))),
+      match: cases.match.map(({ names, query, limit }) =>
+        picker.matchImages(names.map((name) => ({ name, size: 0, modifiedAt: "", usedIn: [] })), query, limit ?? undefined).map((image: { name: string }) => image.name),
+      ),
+      usageLabel: cases.usageLabel.map((count) => picker.usageLabel({ usedIn: Array.from({ length: count }) })),
+      sizeLabel: cases.sizeLabel.map((size) => picker.formatSize(size)),
     };
     fs.copyFileSync(file, path.join(outDir!, "images-cases.json"));
     fs.writeFileSync(path.join(outDir!, "images-expected.json"), JSON.stringify(expected));
     expect(expected.toMdx.filter((edit: unknown) => edit !== null).length).toBeGreaterThan(300);
+    expect(listed.map((l) => l.length)).toEqual([0, 0, 4, 25, 4, 3, 2]);
+    expect(expected.match.filter((hits: string[]) => hits.length > 0).length).toBeGreaterThan(30);
     expect(stored.filter((item) => item.name !== undefined).length).toBeGreaterThan(10);
   }, 120_000);
 

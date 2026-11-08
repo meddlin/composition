@@ -14,6 +14,8 @@ final class EditorHandle {
     /// The notes the picker after `[[` offers (the latest first), and this note, which it leaves out.
     var noteCandidates: () -> [NoteLinks.Candidate] = { [] }
     var noteID: Int64?
+    /// Opens the list of images already stored (⌘⇧M, and the Image menu's *Stored Image…*): the screen owns the sheet.
+    var openStoredImages: () -> Void = {}
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -45,32 +47,52 @@ final class EditorHandle {
                 case .failure(let failure): problems.append(failure.message)
                 }
             }
-            if let view = textView, !markdown.isEmpty {
-                view.becomeFirstResponder()
-                // A picture is never put into the note's frontmatter (a note opens with the caret at the start, which is inside it): it goes just after it.
-                let whole = view.nativeText as NSString
-                let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
-                if view.selectedRange.location < frontmatterEnd { view.selectedRange = NSRange(location: frontmatterEnd, length: 0) }
-                let selection = view.selectedRange
-                // Each picture is a paragraph of its own: the preview draws a picture that stands alone, and shows only the alt text of one inside a line.
-                func newlines(endingAt end: Int) -> Int {
-                    var count = 0
-                    while count < 2, end - count > 0, whole.character(at: end - count - 1) == 0x0A { count += 1 }
-                    return count
-                }
-                func newlines(startingAt start: Int) -> Int {
-                    var count = 0
-                    while count < 2, start + count < whole.length, whole.character(at: start + count) == 0x0A { count += 1 }
-                    return count
-                }
-                let atStart = selection.location == 0 || selection.location == frontmatterEnd
-                let atEnd = selection.location + selection.length >= whole.length
-                let before = atStart ? 2 : newlines(endingAt: selection.location)
-                let after = atEnd ? 2 : newlines(startingAt: selection.location + selection.length)
-                view.insertText(String(repeating: "\n", count: 2 - before) + markdown.joined(separator: "\n\n") + String(repeating: "\n", count: 2 - after))
-            }
+            write(paragraphs: markdown)
             if !problems.isEmpty { problem(problems.joined(separator: "\n")) }
         }
+    }
+
+    /// Writes each Markdown line at the caret (in place of the selection) as a paragraph of its own.
+    private func write(paragraphs markdown: [String]) {
+        guard let view = textView, !markdown.isEmpty else { return }
+        view.becomeFirstResponder()
+        // A picture is never put into the note's frontmatter (a note opens with the caret at the start, which is inside it): it goes just after it.
+        let whole = view.nativeText as NSString
+        let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
+        if view.selectedRange.location < frontmatterEnd { view.selectedRange = NSRange(location: frontmatterEnd, length: 0) }
+        let selection = view.selectedRange
+        // Each picture is a paragraph of its own: the preview draws a picture that stands alone, and shows only the alt text of one inside a line.
+        func newlines(endingAt end: Int) -> Int {
+            var count = 0
+            while count < 2, end - count > 0, whole.character(at: end - count - 1) == 0x0A { count += 1 }
+            return count
+        }
+        func newlines(startingAt start: Int) -> Int {
+            var count = 0
+            while count < 2, start + count < whole.length, whole.character(at: start + count) == 0x0A { count += 1 }
+            return count
+        }
+        let atStart = selection.location == 0 || selection.location == frontmatterEnd
+        let atEnd = selection.location + selection.length >= whole.length
+        let before = atStart ? 2 : newlines(endingAt: selection.location)
+        let after = atEnd ? 2 : newlines(startingAt: selection.location + selection.length)
+        view.insertText(String(repeating: "\n", count: 2 - before) + markdown.joined(separator: "\n\n") + String(repeating: "\n", count: 2 - after))
+    }
+
+    /// The words selected in the note, which describe a picture put in their place (as on the desktop); none when the selection is in the frontmatter.
+    var selectedWords: String {
+        guard let view = textView else { return "" }
+        let whole = view.nativeText as NSString
+        let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
+        let selection = view.selectedRange
+        guard selection.length > 0, selection.location >= frontmatterEnd, NSMaxRange(selection) <= whole.length else { return "" }
+        return whole.substring(with: selection)
+    }
+
+    /// Writes the Markdown that shows an image that is already stored, at the caret (in place of the selected words, which become its description).
+    func insertStoredImage(named name: String, description: String) {
+        guard textView != nil, StoredImages.isImageName(name) else { return }
+        write(paragraphs: [StoredImages.markdown(forName: name, alt: description)])
     }
 
     /// Turns the Markdown images at the caret (or every one the selection touches) into `<Image />` tags, which can say how wide to be: the caret is left
@@ -100,6 +122,8 @@ final class NoteTextView: UITextView {
 
     /// Pictures pasted from the clipboard go here (set by the editor) instead of the text view's own paste, which has no use for them.
     var pastePictures: (([ImageInput]) -> Void)?
+    /// ⌘⇧M: the list of images already stored.
+    var showStoredImages: (() -> Void)?
     /// The list at the caret (`<`, `[[`, the highlight colours), which takes some keys while it is open.
     weak var assist: EditorAssist?
     /// The colour scheme and font in force, which the list at the caret is drawn in too.
@@ -144,6 +168,7 @@ final class NoteTextView: UITextView {
             key("i", .command, #selector(makeItalic), "Italic"),
             key("k", [.command, .shift], #selector(linkToNote), "Link to a Note"),
             key("h", [.command, .shift], #selector(highlightSelection), "Highlight"),
+            key("m", [.command, .shift], #selector(insertStoredImage), "Insert a Stored Image"),
         ]
     }()
 
@@ -161,6 +186,7 @@ final class NoteTextView: UITextView {
     @objc private func makeItalic() { emphasize(.italic) }
     @objc private func linkToNote() { assist?.openNoteLink() }
     @objc private func highlightSelection() { assist?.openColors() }
+    @objc private func insertStoredImage() { showStoredImages?() }
 
     private func indent(_ command: IndentLines.Command) {
         let range = selectedRange
@@ -241,6 +267,7 @@ struct NoteEditorView: UIViewRepresentable {
         view.delegate = context.coordinator
         handle.textView = view
         view.pastePictures = { [weak handle] pictures in handle?.insertImages(pictures) }
+        view.showStoredImages = { [weak handle] in handle?.openStoredImages() }
         view.addInteraction(UIDropInteraction(delegate: context.coordinator))
         context.coordinator.handle = handle
         let assist = EditorAssist(textView: view)

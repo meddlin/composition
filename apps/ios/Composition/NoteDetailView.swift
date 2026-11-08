@@ -26,6 +26,10 @@ struct NoteDetailView: View {
     @State private var pickedPhotos: [PhotosPickerItem] = []
     @State private var showingFiles = false
     @State private var showingCamera = false
+    /// The picker of images already stored: the words that were selected when it opened, and the image chosen (put in once the sheet has gone).
+    @State private var showingStored = false
+    @State private var storedWords = ""
+    @State private var pickedStored: StoredImageInfo?
 
     var body: some View {
         Group {
@@ -90,6 +94,12 @@ struct NoteDetailView: View {
             case .failure(let error): model.errorMessage = error.localizedDescription
             }
         }
+        .sheet(isPresented: $showingStored, onDismiss: insertPickedStored) {
+            StoredImagePicker(model: model, label: storedWords) { image in
+                pickedStored = image
+                showingStored = false
+            }
+        }
         .fullScreenCover(isPresented: $showingCamera) {
             CameraView { image in
                 showingCamera = false
@@ -109,6 +119,7 @@ struct NoteDetailView: View {
         Button("Photo Library…", systemImage: "photo.on.rectangle") { showingPhotos = true }
         if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
         Button("Choose File…", systemImage: "folder") { showingFiles = true }
+        Button("Stored Image…", systemImage: "photo.stack") { handle.openStoredImages() }
         Divider()
         Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
             .keyboardShortcut("x", modifiers: [.command, .shift])
@@ -140,6 +151,18 @@ struct NoteDetailView: View {
         handle.problem = { [weak model] message in model?.errorMessage = message }
         handle.noteCandidates = { [weak model] in model?.linkCandidates ?? [] }
         handle.noteID = noteID
+        let words = $storedWords, showing = $showingStored
+        handle.openStoredImages = { [weak handle] in
+            words.wrappedValue = handle?.selectedWords ?? ""
+            showing.wrappedValue = true
+        }
+    }
+
+    /// The image chosen in the picker of stored ones goes in when its sheet is gone, so that the text takes the keyboard back first.
+    private func insertPickedStored() {
+        guard let image = pickedStored else { return }
+        pickedStored = nil
+        handle.insertStoredImage(named: image.name, description: storedWords)
     }
 
     /// The pictures chosen in the Photos picker, as the bytes the library has (often HEIC, which becomes JPEG on the way in).

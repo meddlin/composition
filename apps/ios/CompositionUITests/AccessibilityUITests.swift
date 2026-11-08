@@ -9,13 +9,13 @@ final class AccessibilityUITests: XCTestCase {
     private let app = XCUIApplication()
 
     /// `size` is a content size category name, or nil for the system's (`UICTContentSizeCategoryAccessibilityXXXL` and so on).
-    private func launch(mode: String, scheme: String, size: String? = nil, note: String = "25") throws {
+    private func launch(mode: String, scheme: String, size: String? = nil, note: String = "25", extra: [String] = []) throws {
         continueAfterFailure = true
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "Run apps/ios/scripts/ui-test.sh: it makes the backup and passes its path.")
         XCUIDevice.shared.orientation = .landscapeLeft
         var arguments = ["-importBackup", backup, "-openNote", note, "-openMode", mode, "-theme", scheme]
         if let size { arguments += ["-UIPreferredContentSizeCategoryName", size] }
-        app.launchArguments = arguments
+        app.launchArguments = arguments + extra
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
@@ -51,7 +51,7 @@ final class AccessibilityUITests: XCTestCase {
             if issue.auditType == .textClipped, issue.detailedDescription.contains("UILabel") || issue.detailedDescription.contains("UISegmentLabel") { return true }
             // The audit takes UIKit's own labels in a form (a picker's value, the “Done” button) for text that will not grow; they do (looked at at the largest size),
             // and which of them it names changes from run to run.
-            if issue.auditType == .dynamicType, issue.detailedDescription.contains("UILabel") || (issue.element.map { $0.label == "Done" } ?? false) { return true }
+            if issue.auditType == .dynamicType, issue.detailedDescription.contains("UILabel") || (issue.element.map { $0.label == "Done" || $0.label == "Cancel" } ?? false) { return true }
             let element = issue.element.map { "\($0.elementType.rawValue) “\($0.label)” \($0.identifier)" } ?? "no element"
             found.append("[\(issue.auditType.rawValue)] \(issue.compactDescription) — \(element) — \(issue.detailedDescription)")
             return true  // counted here, not thrown
@@ -63,6 +63,25 @@ final class AccessibilityUITests: XCTestCase {
     func testThePreviewInCream() throws { try launch(mode: "Preview", scheme: "cream"); try audit("preview, cream") }
     func testThePreviewInForest() throws { try launch(mode: "Preview", scheme: "forest"); try audit("preview, forest") }
     func testTheEditorInForest() throws { try launch(mode: "Markdown", scheme: "forest"); try audit("editor, forest") }
+
+    /// The list of images already stored (Image ▸ Stored Image…), audited, with each row at least a finger high; the picture the launch shortcut stores is in it.
+    func testTheListOfStoredImages() throws {
+        let picture = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_IMAGE"], "Run apps/ios/scripts/ui-test.sh: it passes a picture.")
+        try launch(mode: "Markdown", scheme: "forest", extra: ["-pasteImage", picture])
+        app.buttons["Image"].firstMatch.tap()
+        let item = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Stored Image'")).firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 10))
+        item.tap()
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'stored-image-'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20), "the list shows the stored pictures")
+        XCTAssertGreaterThanOrEqual(row.frame.height, 44, "a row is at least a finger high")
+        XCTAssertFalse(row.label.isEmpty, "a row reads as its name, its use and its size")
+        // As for the appearance sheet: the audit names no element for text it thinks should be one (here the note behind the sheet, which the sheet hides from
+        // the accessibility tree), and is not steady about what will not grow.
+        try audit("stored images, forest") { issue in
+            issue.auditType == .dynamicType || (issue.auditType == .elementDetection && issue.element == nil)
+        }
+    }
 
     /// Which elements are smaller than the 44 points a finger needs (the system's own toolbar buttons are 36 high, and are left out).
     func testOurControlsAreBigEnoughToTouch() throws {
