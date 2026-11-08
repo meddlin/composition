@@ -620,6 +620,57 @@ try {
   check("the same file chosen through the menu asks the same duplicate question", /“From the Menu.pdf” has exactly the same contents as “From the Menu”/.test(await menuDup.innerText()) && (await count()) === menuBefore + 2, await menuDup.innerText());
   await menuDup.getByRole("button", { name: "Cancel" }).click();
   check("no CSP violations or errors after the File menu import", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- The PDF's own title (plan P16): the note takes it when the reader first opens the file, unless the user named the note
+  const savedNotes = () => page.evaluate(async () => (await window.composition.loadWorkspace()).notes.map((n) => ({ id: n.id, title: n.title, content: n.content })));
+  const titled = path.join(home, "Metadata_Title.pdf");
+  fs.writeFileSync(titled, makeTestPdf({ pages: 3, title: "Designing Data-Intensive Applications" }));
+  await pick(app, titled);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  await page.getByRole("region", { name: "PDF: Metadata_Title.pdf" }).waitFor({ timeout: 20_000 });
+  const retitled = await waitFor(async () => (await savedNotes()).find((n) => n.title === "Designing Data-Intensive Applications")).catch(() => null);
+  check("a note made from a file with a title in its metadata takes that title, saved in its frontmatter", Boolean(retitled) && /^title: Designing Data-Intensive Applications$/m.test(retitled.content), JSON.stringify((await savedNotes()).map((n) => n.title)));
+  check("and the row in the sidebar shows it, not the file's name", (await sidebar.getByText("Designing Data-Intensive Applications", { exact: true }).count()) >= 1 && (await sidebar.getByText("Metadata Title", { exact: true }).count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-own-title.png") });
+
+  const both = path.join(home, "Both_Titles.pdf");
+  fs.writeFileSync(both, makeTestPdf({ pages: 2, title: "Info Title", xmpTitle: "XMP Title Wins" }));
+  await pick(app, both);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  await page.getByRole("region", { name: "PDF: Both_Titles.pdf" }).waitFor({ timeout: 20_000 });
+  check("when the PDF has both, the XMP title is the one taken", Boolean(await waitFor(async () => (await savedNotes()).some((n) => n.title === "XMP Title Wins")).catch(() => false)), JSON.stringify((await savedNotes()).map((n) => n.title)));
+
+  const junk = path.join(home, "Junk_Title.pdf");
+  fs.writeFileSync(junk, makeTestPdf({ pages: 2, title: "Untitled" }));
+  await pick(app, junk);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  const junkReader = page.getByRole("region", { name: "PDF: Junk_Title.pdf" });
+  await junkReader.waitFor({ timeout: 20_000 });
+  await junkReader.locator(".textLayer").first().waitFor({ timeout: 20_000 });
+  await sleep(1500);
+  check("a placeholder title (\"Untitled\") is not taken: the note keeps the title made from the file's name", (await savedNotes()).some((n) => n.title === "Junk Title") && !(await savedNotes()).some((n) => n.title === "Untitled"), JSON.stringify((await savedNotes()).map((n) => n.title)));
+
+  // A note the user had already named before the reader first opened its PDF (imported without opening it, then renamed) keeps its name.
+  const renamedFile = path.join(home, "Renamed_Before.pdf");
+  fs.writeFileSync(renamedFile, makeTestPdf({ pages: 2, title: "A Title The User Never Sees" }));
+  await pick(app, renamedFile);
+  const renamed = await page.evaluate(async () => {
+    const notebookId = window.__workspace.store.getSnapshot().notebooks[0].id;
+    const result = await window.composition.importPdf({ groupId: null, notebookId });
+    if (!result.note) return result.error ?? "no note";
+    await window.composition.saveNoteContent(result.note.id, result.note.content.replace(/^title: .*$/m, "title: My own name for it"));
+    return result.note.id;
+  });
+  await page.reload();
+  await page.waitForSelector('nav[aria-label="Notes"]', { timeout: 30_000 });
+  await page.getByRole("button", { name: /My own name for it/ }).first().click();
+  const renamedReader = page.getByRole("region", { name: "PDF: Renamed_Before.pdf" });
+  await renamedReader.waitFor({ timeout: 20_000 });
+  await renamedReader.locator(".textLayer").first().waitFor({ timeout: 20_000 });
+  await sleep(1500);
+  const afterOpen = (await savedNotes()).find((n) => n.id === renamed);
+  check("a note the user had already named keeps its name when the reader first opens its PDF", afterOpen?.title === "My own name for it" && !(await savedNotes()).some((n) => n.title === "A Title The User Never Sees"), JSON.stringify(afterOpen?.title));
+  check("no CSP violations or errors after reading PDF titles", consoleProblems.length === 0, consoleProblems.join(" | "));
 } catch (error) {
   // A step that cannot go on: say what the page showed, which is usually the whole story.
   console.error(error);

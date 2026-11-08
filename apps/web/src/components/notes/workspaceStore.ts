@@ -8,7 +8,9 @@ import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/com
 import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
 import { createContactsStore, unavailableContacts, type ContactsStore } from "@/lib/composition/contactsStore";
 import type { ImportPdfResult, ImportTarget } from "@/lib/composition/documentsApi";
+import * as frontmatter from "@/lib/composition/frontmatter";
 import { pdfLink, type PdfRef } from "@/lib/composition/pdfRefs";
+import { retitleFromPdf } from "@/lib/composition/pdfTitle";
 import { createDocumentsStore, unavailableDocuments, type DocumentsStore, type DuplicateImport } from "@/lib/composition/documentsStore";
 import { createFeedsStore, unavailableFeeds, type FeedsStore } from "@/lib/composition/feedsStore";
 import { createReadingListStore, unavailableReadingList, type ReadingListStore } from "@/lib/composition/readingListStore";
@@ -220,6 +222,12 @@ export type WorkspaceStore = {
    * panel and pins the PDF to it. Null when the PDF or its note is not there.
    */
   newNoteForPdf(documentId: number, panelId: PanelId): Promise<Note | null>;
+  /**
+   * Gives the PDF's own note the title the PDF gives itself (`pdfTitle`, read from its metadata when the reader opened it),
+   * if the note still has the title made from the file's name; a title the user changed is left alone. The title is changed
+   * in the note's frontmatter and saved like any edit. True when the note was retitled.
+   */
+  retitleFromPdf(documentId: number, pdfTitle: string | null): boolean;
   /**
    * Puts Markdown into a note at its caret when it is open in an editor, and at the end of it when it is not (a quote sent to a
    * note that is pinned but not showing). False when the note is not there to be written to.
@@ -758,6 +766,18 @@ export function createWorkspaceStore(
       set({ notes: [created, ...state.notes] });
       updatePanels((panels) => openNoteForPdfIn(panels, panelId, created.id, newPanelId));
       return created;
+    },
+    retitleFromPdf: (documentId, pdfTitle) => {
+      const document = documents.byId(documentId);
+      const owner = document && state.notes.find((n) => n.id === document.noteId);
+      if (!document || !owner) return false;
+      // The title the user sees and can change is the one in the frontmatter; a note with none is not made one here.
+      const [fm, body] = frontmatter.parse(owner.content);
+      if (!fm) return false;
+      const title = retitleFromPdf({ currentTitle: fm.title, fileName: document.fileName, pdfTitle });
+      if (title === null) return false;
+      editNote(owner.id, frontmatter.render({ ...fm, title }, body));
+      return true;
     },
     insertIntoNote: (noteId, markdown, how) => {
       const note = state.notes.find((n) => n.id === noteId);

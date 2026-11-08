@@ -66,9 +66,10 @@ export type PdfPairing = {
 /**
  * A PDF being read: the pages (drawn by pdf.js as they scroll into view), and above them a bar with the page, the zoom,
  * find, the dark-pages toggle and a bookmark button, with the outline and bookmarks in a sidebar. Where the reader was,
- * its zoom and the dark-pages choice are remembered for the PDF.
+ * its zoom and the dark-pages choice are remembered for the PDF. `onTitle` hears the title the PDF gives itself, if it has one
+ * worth showing, for the note that owns it to take (the workspace decides whether the note still wants one).
  */
-export function PdfReader({ document, documents, pairing }: { document: PdfDocument; documents: DocumentsStore; pairing?: PdfPairing }) {
+export function PdfReader({ document, documents, pairing, onTitle }: { document: PdfDocument; documents: DocumentsStore; pairing?: PdfPairing; onTitle?: (title: string) => void }) {
   const root = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const pages = useRef<HTMLDivElement>(null);
@@ -83,6 +84,7 @@ export function PdfReader({ document, documents, pairing }: { document: PdfDocum
     documentId: document.id,
     viewState: { ...document.viewState, darkPages: dark },
     onPageCount: useCallback((count: number) => documents.setPageCount(document.id, count), [documents, document.id]),
+    onTitle,
     onViewState: useCallback((state) => documents.saveViewState(document.id, state), [documents, document.id]),
   });
 

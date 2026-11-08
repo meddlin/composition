@@ -19,9 +19,13 @@ The web app and the terminal app have no reader. They keep the PDF's note and it
 
 ## A PDF is a note that owns a PDF
 
-Importing a PDF makes a note, titled from the file's name (underscores read as spaces, `Designing_Data.pdf` is "Designing Data"; you can
-rename it), and attaches the file to it. The note sits in the notebook tree like any other: it has a PDF icon, it can be put in a group,
-favorited, found by title, and deleted to the Trash Can. Its text starts empty; write in it as in any note.
+Importing a PDF makes a note, titled from the file's name (underscores read as spaces, `Designing_Data.pdf` is "Designing Data"), and attaches
+the file to it. **When the PDF opens and has a title of its own in its metadata, the note takes that title** ("Designing Data-Intensive
+Applications" instead of "Designing Data"), once: only a note that still has the title made from the file's name is retitled, so a title you
+typed is never replaced, and renaming it later sticks. A title that is not a real one is passed over: a placeholder such as "Untitled" or
+"Document1", a file name such as "report.docx", garbled text, or more than 200 characters. The note sits in the notebook tree like any other:
+it has a PDF icon, it can be put in a group, favorited, found by title, and deleted to the Trash Can. Its text starts empty; write in it as in
+any note.
 
 - **Import:** **+ Import PDF…** under the note list opens the system's file picker. The file must look like a PDF and be at most 1 GB.
   The file is **copied** into the app's data folder; the original is left alone and never changed. A new row appears at the top level of
@@ -198,5 +202,5 @@ good, so are the file and its marks.
 
 ## Not built yet
 
-the PDF's own title from its metadata; a prompt for a password-protected PDF; ink and handwritten notes (the iPad app, milestone M2); the
+a prompt for a password-protected PDF; ink and handwritten notes (the iPad app, milestone M2); the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

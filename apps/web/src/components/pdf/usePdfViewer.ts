@@ -3,6 +3,7 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { PdfRect, PdfViewState } from "@/lib/composition/pdfMarkup";
+import { pdfOwnTitle } from "@/lib/composition/pdfTitle";
 import { loadPdfjs, openPdf, PdfFileError } from "./pdfjs";
 import type { PageOnScreen } from "./selectionMarks";
 
@@ -39,6 +40,8 @@ type Options = {
   viewState: PdfViewState;
   /** Told how many pages the file has, once known. */
   onPageCount: (pageCount: number) => void;
+  /** Told the title the PDF gives itself, when it opens and it has one worth showing (pdfTitle.ts); never told otherwise. */
+  onTitle?: (title: string) => void;
   /** Told where the reader is, after it has settled (not at every step of a scroll). */
   onViewState: (state: PdfViewState) => void;
 };
@@ -182,6 +185,15 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
         },
       };
       controlsRef.current = controls;
+
+      // The PDF's own title is for the note to take, if the user has not named it; a file with no usable metadata says nothing.
+      void doc
+        .getMetadata()
+        .then(({ info, metadata }) => {
+          const title = pdfOwnTitle({ xmpTitle: metadata?.get("dc:title"), infoTitle: (info as { Title?: unknown } | null)?.Title });
+          if (title !== null && !cancelled) latest.current.onTitle?.(title);
+        })
+        .catch(() => {});
 
       eventBus.on("pagesinit", () => {
         const { viewState, onPageCount } = latest.current;

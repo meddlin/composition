@@ -10,7 +10,7 @@ import type { PdfViewer, PdfViewerControls } from "./usePdfViewer";
 // pdf.js needs a real browser and real layout, so the hook that drives it is replaced by a fake whose state a test sets: what
 // is under test is the reader's own bar, find box, sidebar and the bookkeeping it asks the documents store to do.
 let viewer: PdfViewer = { phase: "loading" };
-let lastOptions: { documentId: number; viewState: object; onPageCount: (n: number) => void; onViewState: (s: object) => void } | null = null;
+let lastOptions: { documentId: number; viewState: object; onPageCount: (n: number) => void; onViewState: (s: object) => void; onTitle?: (title: string) => void } | null = null;
 vi.mock("./usePdfViewer", () => ({
   usePdfViewer: (_container: unknown, _pages: unknown, options: typeof lastOptions) => {
     lastOptions = options;
@@ -114,6 +114,18 @@ describe("the reader", () => {
 
     expect(store.setPageCount).toHaveBeenCalledWith(7, 412);
     expect(store.saveViewState).toHaveBeenCalledWith(7, { page: 5 });
+  });
+
+  it("passes on the title the PDF gives itself, for the note that owns it to take, and asks for nothing when there is no one to tell", () => {
+    const onTitle = vi.fn();
+    render(<PdfReader document={document_} documents={documents()} onTitle={onTitle} />);
+
+    lastOptions?.onTitle?.("Designing Data-Intensive Applications");
+
+    expect(onTitle).toHaveBeenCalledWith("Designing Data-Intensive Applications");
+    cleanup();
+    render(<PdfReader document={document_} documents={documents()} />);
+    expect(lastOptions?.onTitle).toBeUndefined();
   });
 
   describe("once open", () => {

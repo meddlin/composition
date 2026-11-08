@@ -697,3 +697,9 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   `importPdfRequest.test.ts` (the click), with `useImportPdfRequest.test.tsx` on the page side, and to `smoke:pdf` (menu content, top level, into an open group, cancel,
   duplicate) and the bridge list in `smoke.mjs`. Picks: no keyboard shortcut (none is free that the editor does not use); the item does nothing while the Settings page
   is showing; with no main window open it opens one and imports nothing. Still to do: the PDF's own title, the password prompt.
+- 2026-11-08: **Import gaps, item 3: the PDF's own title** (P16). When the reader opens a PDF whose note still has the title made from the file's name, and the PDF's
+  metadata has a sensible title (XMP `dc:title` first, then Info `Title`; not a placeholder, a file name, garbled, empty or over 200 characters), the note takes it,
+  through the workspace store, in its frontmatter, saved like any edit. A title the user changed is never replaced. Pick: **no stored "done" marker**; the test
+  is whether the note still has the file-derived title, which the change itself ends (a stored flag would have changed the view-state schema the iPad core
+  reproduces). Checked in the real app by `smoke:pdf` (a title taken, XMP over Info, a placeholder passed over, a note renamed before its PDF first opened
+  keeps its name); `pdf-fixture.mjs` can now write an Info title and an XMP title. Still to do: the password prompt.

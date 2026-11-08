@@ -42,6 +42,15 @@ leaves no note behind. If the same bytes are already in the library the answer i
 picked path, which the main process holds (at most four, newest kept); **Import a separate copy** sends the token back, so the page never
 learns where the file is. The reader counts the pages on first open and tells the store, which saves the count.
 
+**The PDF's own title.** The note is first titled from the file's name (`pdfTitleFromFileName`). When the reader opens the file, `usePdfViewer` asks pdf.js
+for its metadata and passes the title up (`onTitle`, through `PdfReader` to the panel, which calls `store.retitleFromPdf`). `pdfTitle.ts` holds the rules,
+as pure functions: the XMP `dc:title` is read before the Info dictionary's `Title` (as pdf.js's own viewer orders them); a title is *sensible* if it has
+a letter or digit, is one line of at most 200 characters, and is not a placeholder, a file name or garbled; and `retitleFromPdf` says whether to change
+the note, which it does only when the note's current title is exactly the one the file's name gives (so a title the user typed is never replaced) and
+differs from the PDF's. The store changes the title in the owner note's frontmatter and saves it through `editNote`, like any edit; the server reads the
+title column back from it. There is **no stored marker** of having done it: after the change the note no longer has the file's title, so the next open
+finds nothing to do. (The one case that would repeat it: the user types the file-derived title back by hand.)
+
 **File > Import PDF…** carries no path either. `importPdfMenu.ts` puts the item (id `import-pdf`) at the top of Electron's default File menu, found by role
 (`fileMenuIndex` in `appMenu.ts`), and its click runs `requestImportPdf` (`importPdfRequest.ts`): it brings the main window forward and pushes
 `IMPORT_PDF_CHANNEL` to that one window's page, with no payload (with no main window it opens one, as the Dock icon does, and starts no import). The
