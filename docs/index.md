@@ -157,4 +157,6 @@ and [panel-system-research.md](panel-system-research.md) for the pop-out spike a
 
 See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
 
+See [windows-native-app-design.md](windows-native-app-design.md) for the design of a native Windows app (C#/.NET, WinUI 3, the note preview in a WebView2): what carries over from the Electron Windows plan, a tracker of which features port, the compromises, the decisions made and open, the spikes (run on a Mac, and the one that needs Windows) and the gates. Design and spikes only; the Electron app stays the shipping Windows plan.
+
 See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Design only; nothing is built.
