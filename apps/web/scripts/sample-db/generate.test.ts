@@ -12,6 +12,10 @@ import { generate } from "./generate.mjs";
  * (a one-off cost that would skew every measurement taken on it), and the first test here says so.
  */
 
+// Every database carries about 15 MB of fixed edge-case text, so one takes a second or two to write on a slow machine, and
+// some tests write three. The 5 s default is too close to that.
+vi.setConfig({ testTimeout: 30_000 });
+
 let dir: string;
 
 beforeEach(() => {
@@ -120,7 +124,8 @@ describe("sample database generator", () => {
 
   it("gives the same database for the same seed, and a different one for another", () => {
     const digest = (out: string, seed: number) => {
-      const { dbPath } = generate({ notes: 150, out, seed });
+      // Without the multi-megabyte documents: determinism is a property of the random stream, and this writes three databases.
+      const { dbPath } = generate({ notes: 150, out, seed, huge: false });
       const db = new Database(dbPath, { readonly: true });
       const hash = crypto.createHash("sha256");
       for (const row of db.prepare("SELECT id, title, content, created_at, group_id, uuid FROM notes ORDER BY id").iterate()) hash.update(JSON.stringify(row));

@@ -2,6 +2,11 @@
  * Sample note content for the stress-test databases (see generate.mjs): lorem ipsum, generated stories, generated
  * test code, MDX component notes, and a fixed set of edge cases. Everything draws from one seeded random source, so the
  * same seed always produces the same notes.
+ *
+ * Everything here is *note text*: Markdown, MDX tags, code samples and a CSV row, built as strings and written into SQLite.
+ * Nothing is ever parsed as HTML or put in a page by this file, so Opengrep's `html-in-template-string` and `raw-html-join`
+ * rules, which match tag-like text in a template literal, do not apply. Each match is marked `nosemgrep` where it occurs,
+ * as elsewhere in the repo (see `diagramTag` in the web app's mdx/drawioSrc.ts).
  */
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -268,6 +273,7 @@ const CODE = {
   tsx: [
     (r) => {
       const comp = pascal(r, 2), prop = camel(r);
+      // nosemgrep: html-in-template-string
       return `export function ${comp}({ ${prop}, onSelect }: { ${prop}: string[]; onSelect: (i: number) => void }) {\n  const [active, setActive] = useState(0);\n  return (\n    <ul role="listbox" className="flex flex-col gap-${r.int(1, 4)}">\n      {${prop}.map((label, i) => (\n        <li key={label} aria-selected={i === active} onClick={() => { setActive(i); onSelect(i); }}>\n          {label}\n        </li>\n      ))}\n    </ul>\n  );\n}`;
     },
   ],
@@ -363,8 +369,10 @@ export function chartBlock(r, rows = r.int(4, 24)) {
   const header = ["label", ...names].join(",");
   const lines = [];
   for (let i = 0; i < rows; i++) {
+    // nosemgrep: raw-html-join
     lines.push([i < 12 ? MONTHS[i] : `${MONTHS[i % 12]} ${Math.floor(i / 12) + 1}`, ...names.map(() => r.int(0, 500))].join(","));
   }
+  // nosemgrep: html-in-template-string
   return `<Chart type="${type}" x="label" y="${names.join(",")}" title="${cap(r.pick(ID_WORDS))} by month">\n\n\`\`\`csv\n${header}\n${lines.join("\n")}\n\`\`\`\n\n</Chart>`;
 }
 
@@ -377,6 +385,7 @@ function markedParagraph(r) {
   const out = [];
   for (let i = 0; i < words.length; i++) {
     if (r.chance(0.05) && i + 2 < words.length) {
+      // nosemgrep: html-in-template-string
       out.push(`<Mark color="${r.pick(MARK_COLORS)}">${words[i]} ${words[i + 1]}</Mark>`);
       i++;
     } else out.push(words[i]);
@@ -387,6 +396,7 @@ function markedParagraph(r) {
 /** An MDX note, `target` characters long, using a random selection of the components. */
 export function mdxDocument(r, target, { youtube = false, links = [] } = {}) {
   const parts = [`# ${loremTitle(r)}`];
+  // nosemgrep: html-in-template-string
   if (target > 2500 && r.chance(0.7)) parts.push(r.chance(0.5) ? "<Toc />" : `<Toc maxDepth="${r.int(1, 3)}" />`);
   let size = 0;
   const footnotes = [];
@@ -396,7 +406,9 @@ export function mdxDocument(r, target, { youtube = false, links = [] } = {}) {
       [() => markedParagraph(r), 6],
       [() => infoBlock(r), 2],
       [() => chartBlock(r), 1],
+      // nosemgrep: html-in-template-string
       [() => `<Repo url="${r.pick(REPOS)}" />`, 0.6],
+      // nosemgrep: html-in-template-string
       [() => (youtube ? `<YouTube url="${r.pick(YOUTUBE_IDS)}" start="${r.int(0, 3)}:${String(r.int(0, 59)).padStart(2, "0")}" />` : loremParagraph(r)), 0.6],
       [() => {
         const label = String(footnotes.length + 1);
@@ -471,6 +483,7 @@ export function edgeCases(r) {
   add("one unbroken token (100,000 chars)", "a".repeat(100_000), ["huge-line"]);
   add("very long URL in prose", `Visit https://example.com/${"segment/".repeat(2000)}end?q=${"x".repeat(5000)} for details.\n\n${loremParagraph(r)}`);
   add("20,000 short lines", long(20_000, (i) => `line ${i + 1}: ${r.pick(LOREM_WORDS)}`), ["many-lines"]);
+  // nosemgrep: html-in-template-string
   add("5,000 headings (Toc stress)", `<Toc />\n\n${long(5_000, (i) => `## Heading ${i + 1} ${r.pick(LOREM_WORDS)}\n\n${loremSentence(r)}\n`)}`, ["many-headings", "mdx"]);
   add("2,000-row table", `| id | name | value | note |\n| --- | --- | --- | --- |\n${long(2_000, (i) => `| ${i} | ${camel(r)} | ${r.int(0, 99999)} | ${r.pick(LOREM_WORDS)} |`)}`, ["table"]);
   add("table with 40 columns", `| ${Array.from({ length: 40 }, (_, i) => `c${i}`).join(" | ")} |\n| ${Array.from({ length: 40 }, () => "---").join(" | ")} |\n${long(30, () => `| ${Array.from({ length: 40 }, () => r.int(0, 999)).join(" | ")} |`)}`, ["table"]);
@@ -479,14 +492,18 @@ export function edgeCases(r) {
   add("3,000 task items", long(3_000, (i) => `- [${i % 3 === 0 ? "x" : " "}] task ${i + 1} ${r.pick(LOREM_WORDS)}`), ["many-lines"]);
   add("one 5 MB-class code block", `\`\`\`ts\n${long(40_000, () => `export const ${camel(r)}${r.int(0, 99999)} = ${r.int(0, 99999)};`)}\n\`\`\``, ["huge", "code"]);
   add("300 small code blocks", long(300, () => `${codeFence(r)}\n`), ["code", "many-blocks"]);
+  // nosemgrep: html-in-template-string
   add("200 inline Mark highlights", `${long(200, () => `<Mark color="${r.pick(MARK_COLORS)}">${r.pick(LOREM_WORDS)} ${r.pick(LOREM_WORDS)}</Mark> ${loremSentence(r, 8)}`)}`, ["mdx", "marks"]);
   add("60 charts on one note", long(60, () => `${chartBlock(r, 12)}\n`), ["mdx", "charts"]);
   add("one chart with 500 rows (the limit)", chartBlock(r, 500), ["mdx", "charts"]);
   add("one chart with 700 rows (over the limit)", chartBlock(r, 700), ["mdx", "charts"]);
+  // nosemgrep: html-in-template-string
   add("300 footnotes", `${long(300, (i) => `Claim ${i + 1}[^${i + 1}] ${loremSentence(r, 6)}`)}\n\n${long(300, (i) => `[^${i + 1}]: ${loremSentence(r, 8)}`)}\n\n<Footnotes />`, ["mdx", "footnotes"]);
   add("unknown MDX component", `# Rejected\n\n<Banner>\n\nThis tag is not allowed.\n\n</Banner>\n\n<Info>\n\nbut this one is.\n\n</Info>`, ["mdx", "invalid"]);
   add("MDX expressions and import", `import x from "y"\n\n# Rejected\n\n<Info title={1 + 1}>\n\n{props.value}\n\n</Info>`, ["mdx", "invalid"]);
+  // nosemgrep: html-in-template-string
   add("stray < and { in plain prose", `a < b && c > d, and {braces} and <html> tags and <3 hearts.\n\n${loremParagraph(r)}`, ["invalid"]);
+  // nosemgrep: html-in-template-string
   add("unclosed MDX tags", `<Info>\n\nnever closed\n\n<Warning>\n\n${loremParagraph(r)}`, ["mdx", "invalid"]);
   add("unterminated code fence", `# Fence\n\n\`\`\`ts\nconst x = 1;\n\n${loremParagraph(r)}\n\n${loremParagraph(r)}`, ["code", "invalid"]);
   add("unicode: emoji, CJK, RTL, combining marks", `# Unicode 🌍🚀\n\n日本語のテキストです。中文文本。한국어 텍스트.\n\nمرحبا بالعالم — שלום עולם\n\né ä ñ Z͑ͫ̓ͪ̂ͫ̽͏̴̙̤̞͉͚̯̞̠͍A̴̵̜̰͔ͫ͗͢L̠ͨͧͩ͘G̴̻͈͍͔̹̑͗̎̅͛́Ǫ̵̹̻̝̳͂̌̌͘!\n\n👨‍👩‍👧‍👦 🏳️‍🌈 🇯🇵 zero​width​spaces and nbsp and   line separator   paragraph separator.\n\n${loremParagraph(r)}`, ["unicode"]);

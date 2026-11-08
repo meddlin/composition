@@ -41,7 +41,8 @@ const STEP_TIMEOUT = Number(process.env.STEP_TIMEOUT_MS || 240000);
 const TYPE_BUDGET = Number(process.env.TYPE_BUDGET_MS || 60000);
 const results = { label, startedAt: new Date().toISOString(), steps: [], notes: [] };
 
-const log = (...a) => console.log(`[${label}]`, ...a);
+// The label comes from the command line: it is an argument, not part of the format string.
+const log = (...a) => console.log("[%s]", label, ...a);
 const save = () => fs.writeFileSync(outFile, JSON.stringify(results, null, 2));
 
 const INIT = () => {
