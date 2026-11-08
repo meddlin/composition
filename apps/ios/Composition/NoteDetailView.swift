@@ -4,7 +4,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// One note, with the three tabs of the design: **Markdown** (the editor), **Preview** (Markdown and the components, drawn from what is typed, not
-/// only from what is saved) and **Split** (both, side by side, or one above the other in a narrow window). The Live tab stays after v1 (C12).
+/// only from what is saved) and **Split** (both, side by side, or one above the other in a narrow window, with a divider that can be dragged). The Live tab is the next tab to come (C12, in v1).
 /// The note's `NoteSession` is open for as long as the note is on screen, so that every tab shows the same text and saving is one thing.
 struct NoteDetailView: View {
     enum Mode: String, CaseIterable { case markdown = "Markdown", preview = "Preview", split = "Split" }
@@ -13,6 +13,7 @@ struct NoteDetailView: View {
     let noteID: Int64
     @Environment(\.look) private var look
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.listsControl) private var lists
     // What the system brings back after the app was ended: the tab, and where the caret was.
     @SceneStorage("noteMode") private var mode = Mode.preview
     @SceneStorage("caretOffset") private var caret = 0
@@ -57,6 +58,15 @@ struct NoteDetailView: View {
         .toolbar {
             // Three words side by side where there is room. In a narrow window (a third of the screen, Slide Over) there is no room for them, and a
             // toolbar drops what does not fit: the three become one menu, and Find, Link and Image another, so that every one stays reachable.
+            // Hide both lists, the notebooks and the notes, to give the writing all the room, and bring them back (where there are columns to hide).
+            if sizeClass != .compact, let lists {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { lists.toggle() } label: {
+                        Label(lists.hidden ? "Show the lists" : "Hide the lists", systemImage: lists.hidden ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right")
+                    }
+                    .accessibilityIdentifier("focus-toggle")
+                }
+            }
             if sizeClass != .compact {
                 ToolbarItem(placement: .principal) {
                     Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented).frame(minWidth: 210, maxWidth: 300)
@@ -201,23 +211,69 @@ struct NoteDetailView: View {
 }
 
 /// The editor and the preview together: side by side when there is room, one above the other when there is not. The same views either way,
-/// so turning the iPad does not rebuild the text view.
+/// so turning the iPad does not rebuild the text view. The divider between them can be dragged (or moved with VoiceOver's adjust gesture) to give
+/// either one more room, and a double tap puts it back in the middle; where it was left is kept, one place for side by side and one for stacked.
 struct SplitLayout<Leading: View, Trailing: View>: View {
     @ViewBuilder let leading: Leading
     @ViewBuilder let trailing: Trailing
+    @AppStorage("splitFractionSideBySide") private var sideBySide = 0.5
+    @AppStorage("splitFractionStacked") private var stacked = 0.5
+    @Environment(\.look) private var look
+
+    /// How thick the strip with the divider is: wide enough to take hold of with a finger.
+    private static var grip: CGFloat { 20 }
 
     var body: some View {
         GeometryReader { geometry in
             // 800 points puts every iPad but the mini in portrait side by side (two halves of at least 400, about 45 characters each), and the mini, and any
             // narrow window (Slide Over, a third of Split View), one above the other, where a half would be under 380 points.
             let wide = geometry.size.width >= 800
+            let total = max(wide ? geometry.size.width : geometry.size.height, 1)
+            // Neither half is ever made smaller than this: a text view narrower than about 300 points, or a preview shorter than about 160, is of no use.
+            let smallest = min(wide ? 300 : 160, total / 3)
             let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            let fraction = clamp(wide ? sideBySide : stacked, smallest / total, 1 - smallest / total)
             layout {
-                leading.frame(width: wide ? geometry.size.width / 2 : nil, height: wide ? nil : geometry.size.height / 2)
-                Divider()
+                leading.frame(width: wide ? total * fraction : nil, height: wide ? nil : total * fraction)
+                handle(wide: wide, fraction: fraction, total: total, smallest: smallest)
                 trailing
             }
+            .coordinateSpace(name: "split")
         }
+    }
+
+    private func clamp(_ value: Double, _ low: Double, _ high: Double) -> Double { min(max(value, low), max(low, high)) }
+
+    private func set(_ fraction: Double, wide: Bool) {
+        if wide { sideBySide = fraction } else { stacked = fraction }
+    }
+
+    private func handle(wide: Bool, fraction: Double, total: Double, smallest: Double) -> some View {
+        let low = smallest / total
+        return ZStack {
+            look.background
+            Rectangle().fill(look.border).frame(width: wide ? 1 : nil, height: wide ? nil : 1)
+            // A grip to take hold of: a short bar across the line.
+            Capsule().fill(look.mutedText.opacity(0.7)).frame(width: wide ? 4 : 36, height: wide ? 36 : 4)
+        }
+        .frame(width: wide ? Self.grip : nil, height: wide ? nil : Self.grip)
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .named("split")).onChanged { drag in
+                // The strip follows the finger: its middle is where the finger is.
+                set(clamp((wide ? drag.location.x : drag.location.y) / total, low, 1 - low), wide: wide)
+            }
+        )
+        .onTapGesture(count: 2) { set(0.5, wide: wide) }
+        .accessibilityElement()
+        .accessibilityLabel("Divider between the editor and the preview")
+        .accessibilityValue("\(Int((fraction * 100).rounded())) percent editor")
+        .accessibilityHint("Swipe up or down to move it. Double tap to put it in the middle.")
+        .accessibilityAdjustableAction { direction in
+            let step = 0.1
+            set(clamp(fraction + (direction == .increment ? step : -step), low, 1 - low), wide: wide)
+        }
+        .accessibilityIdentifier("split-divider")
     }
 }
 

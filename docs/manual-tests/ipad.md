@@ -243,6 +243,12 @@ The **Image** menu has *Stored Image…* (⌘⇧M with a hardware keyboard, on t
 83. **Selected words.** Select a few words of a note, then Image, *Stored Image…* (the title of the list says which words), and choose: the words are replaced by the picture, and are its description (`![the words](app_data/…)`).
 84. **Many pictures.** With a few hundred pictures (your own notes) the list opens without a long wait, shows at most 50 at once, and scrolling stays smooth while the previews load.
 
+## Room for writing (the Split divider, hiding the lists)
+
+85. **Drag the divider.** In *Split*, take hold of the strip between the editor and the preview (it has a short grip) and drag it: the editor and the preview grow and shrink as the finger moves, and neither goes very small. A double tap puts it back in the middle. Quit and reopen the app: it is where you left it (one place for side by side, one for stacked).
+86. **Hide both lists.** In a note, tap the button at the left of the toolbar (arrows pointing outwards): the notebooks and the notes list both go, and the note has the whole screen; in *Split* the halves are now side by side. Tap it again (arrows pointing inwards): both come back. The system's button beside it still shows or hides the notebooks alone.
+87. **VoiceOver on the divider.** With VoiceOver on, find "Divider between the editor and the preview" and swipe up or down: it moves a tenth at a time, and says how many percent the editor has.
+
 ## What it leaves out
 
 Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in

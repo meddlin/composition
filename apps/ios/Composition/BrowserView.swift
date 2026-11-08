@@ -62,6 +62,8 @@ struct BrowserView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        // The note's toolbar can hide both lists, to give the writing all the room (see `NoteDetailView`).
+        .environment(\.listsControl, ListsControl(hidden: columns == .detailOnly) { toggleLists() })
         // Turning the iPad to landscape brings the sidebar back, which the system hid in portrait and does not bring back by itself; a column hidden by hand
         // in landscape stays hidden, because only crossing this width changes anything.
         .background(GeometryReader { proxy in Color.clear.onAppear { width = proxy.size.width }.onChange(of: proxy.size.width) { _, new in width = new } })
@@ -120,6 +122,17 @@ struct BrowserView: View {
             case .newNotebook: await model.createNotebook(named: name)
             case .rename(let item): await model.rename(item, to: name)
             }
+        }
+    }
+
+    /// Hides the notebooks and the notes list together, or brings them back. Showing them again asks twice, a moment apart: the system settles on its own
+    /// choice first (two columns, with the notebooks left out) and would otherwise keep it, as with the sidebar coming back when the iPad is turned.
+    private func toggleLists() {
+        if columns == .detailOnly {
+            columns = .all
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { if columns != .detailOnly { columns = .all } }
+        } else {
+            columns = .detailOnly
         }
     }
 
@@ -202,4 +215,15 @@ struct NoteRow: View {
         if let date = Stamp.date(note.updatedAt) { Text(date, format: .dateTime.year().month().day()) }
         if !note.tags.tagLine.isEmpty { Text(note.tags.tagLine).lineLimit(tagLines) }
     }
+}
+
+/// What the note's toolbar needs to hide the notebooks and the notes list together, to give the writing all the room, and to bring them back.
+struct ListsControl {
+    /// Both lists are hidden now.
+    let hidden: Bool
+    let toggle: () -> Void
+}
+
+extension EnvironmentValues {
+    @Entry var listsControl: ListsControl?
 }
