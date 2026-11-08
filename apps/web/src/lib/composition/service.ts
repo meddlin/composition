@@ -306,7 +306,7 @@ async function removeOrphanedAttachments(): Promise<void> {
     try {
       await sweep(loadWebSettings().appDataDir);
     } catch (error) {
-      console.error(`[${label}] cleanup failed:`, error);
+      console.error("[orphans] cleanup failed:", label, error);
     }
   }
 }
