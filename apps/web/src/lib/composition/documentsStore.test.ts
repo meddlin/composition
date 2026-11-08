@@ -89,6 +89,33 @@ describe("the documents store", () => {
       expect(await store.importPdf({ groupId: null, notebookId: 1 })).toEqual({ error: "bridge down" });
     });
 
+    it("imports a dropped file into the target group, and adds the PDF that came of it", async () => {
+      const added = { note: { id: 32 } as never, document: doc(5, 32) };
+      const { store, deps } = setup([doc(1)], { importDroppedPdf: vi.fn(async () => added) });
+      await store.load();
+      const file = new File(["%PDF-1.7"], "Dropped.pdf", { type: "application/pdf" });
+
+      const result = await store.importDropped(file, { groupId: 7, notebookId: 1 });
+
+      expect(deps.importDroppedPdf).toHaveBeenCalledWith(file, { groupId: 7, notebookId: 1 });
+      expect(result).toBe(added);
+      expect(store.getSnapshot().documents.map((d) => d.id)).toEqual([1, 5]);
+    });
+
+    it("changes nothing for a dropped file that is refused or already in the library, and answers a bridge failure as an error", async () => {
+      const file = new File([""], "x.pdf");
+      for (const result of [{ error: "x.pdf: only PDF files can be dropped here." }, { duplicate: { token: "t", fileName: "x.pdf", existing: [] } }]) {
+        const { store } = setup([doc(1)], { importDroppedPdf: vi.fn(async () => result) });
+        await store.load();
+
+        expect(await store.importDropped(file, { groupId: null, notebookId: 1 })).toBe(result);
+        expect(store.getSnapshot().documents).toEqual([doc(1)]);
+      }
+      const { store } = setup([], { importDroppedPdf: vi.fn(async () => Promise.reject(new Error("bridge down"))) });
+
+      expect(await store.importDropped(file, { groupId: null, notebookId: 1 })).toEqual({ error: "bridge down" });
+    });
+
     it("imports a duplicate as a separate copy with the token and target it was given", async () => {
       const added = { note: { id: 31 } as never, document: doc(4, 31) };
       const { store, deps } = setup([doc(1)], { importPdfCopy: vi.fn(async () => added) });

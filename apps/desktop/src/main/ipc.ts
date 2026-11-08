@@ -1,6 +1,6 @@
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
-import { DOCUMENT_METHODS, type DocumentsApi } from "../../../web/src/lib/composition/documentsApi";
+import { DOCUMENT_METHODS, type DocumentsHost } from "../../../web/src/lib/composition/documentsApi";
 import { FEED_METHODS, type FeedsApi } from "../../../web/src/lib/composition/feedsApi";
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
@@ -42,7 +42,7 @@ export function registerIpc(options: {
   ipcMain: IpcMainLike;
   api: CompositionApi;
   attachments: AttachmentsApi;
-  documents: DocumentsApi;
+  documents: DocumentsHost;
   backup: DesktopBackupApi;
   panels: PanelsApi;
   todos: TodosApi;

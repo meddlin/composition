@@ -258,6 +258,8 @@ export type WorkspaceStore = {
    * beside it. A refused file comes back as `error` and one the library already has as `duplicate`; nothing is added then.
    */
   importPdf(target: ImportTarget, windowId?: WindowId): Promise<ImportPdfResult>;
+  /** Imports a PDF dropped on the window (its File), into a new note in the target group, and opens it the same way. */
+  importDroppedPdf(file: File, target: ImportTarget, windowId?: WindowId): Promise<ImportPdfResult>;
   /** Imports the PDF of a `duplicate` result as a separate copy, and opens it the same way. */
   importPdfCopy(duplicate: DuplicateImport, windowId?: WindowId): Promise<ImportPdfResult>;
 
@@ -460,6 +462,11 @@ export function createWorkspaceStore(
   async function importPdf(target: ImportTarget, windowId: WindowId = MAIN_WINDOW) {
     flushSaves();
     return acceptImport(await documents.importPdf(target), windowId);
+  }
+
+  async function importDroppedPdf(file: File, target: ImportTarget, windowId: WindowId = MAIN_WINDOW) {
+    flushSaves();
+    return acceptImport(await documents.importDropped(file, target), windowId);
   }
 
   async function importPdfCopy(duplicate: DuplicateImport, windowId: WindowId = MAIN_WINDOW) {
@@ -684,6 +691,7 @@ export function createWorkspaceStore(
     reconcile,
     newNoteFromText,
     importPdf,
+    importDroppedPdf,
     importPdfCopy,
     toggleFavorite,
     toggleNotebookPin,

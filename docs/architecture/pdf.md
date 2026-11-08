@@ -42,6 +42,23 @@ leaves no note behind. If the same bytes are already in the library the answer i
 picked path, which the main process holds (at most four, newest kept); **Import a separate copy** sends the token back, so the page never
 learns where the file is. The reader counts the pages on first open and tells the store, which saves the count.
 
+**File > Import PDF…** carries no path either. `importPdfMenu.ts` puts the item (id `import-pdf`) at the top of Electron's default File menu, found by role
+(`fileMenuIndex` in `appMenu.ts`), and its click runs `requestImportPdf` (`importPdfRequest.ts`): it brings the main window forward and pushes
+`IMPORT_PDF_CHANNEL` to that one window's page, with no payload (with no main window it opens one, as the Dock icon does, and starts no import). The
+preload's `onImportPdfRequest(listener)` delivers it; `useImportPdfRequest` in `NotesApp` runs the same `onImportPdf` the sidebar button runs, with the target
+the page already knows (the open group page, else the notebook's top level), so the main process opens the picker as ever. The main window is tracked in
+`index.ts` (`mainWindow`), since a pop-out has no workspace of its own to answer.
+
+**A dropped file** is the other way in, and the path still never comes from the page. The page's drop handler (`usePdfDrop` for the window,
+`DropZone` in `GroupTree.tsx` for a group row) hands the drop's `File` to `importDroppedPdf(file, target)`. A `File` cannot cross the bridge, so
+that one method is written by hand in the preload script: it reads the path with Electron's `webUtils.getPathForFile` and sends only that to the
+main process (the page never sees it, and a `File` the page makes up has no path, which the preload sends as an empty string). The main process
+then checks it before `service.importPdf` looks inside the file (`droppedPdf.ts`): an absolute path, a name ending in `.pdf`, a real file (the link
+is followed, not a folder), and not inside the application data folder, which would copy the library into itself. A duplicate is answered with a
+token exactly as the picker's is. `DocumentsApi.importDroppedPdf` takes a `File` while the main process implements `DocumentsHost`, the same
+interface with a path in its place. The window's handler runs in the capture phase, so it sees the drop before a note editor (which would take
+a dropped file as text); a group row marks itself `data-pdf-drop-zone`, and the window's handler leaves drops on it to the row.
+
 `removeOrphans` (the sweep that runs when the app opens and clears the Trash Can of expired notes, and when a note is deleted for good by hand) deletes the file, marks and bookmarks
 of any PDF whose owner note is gone for good, next to the attachments' own sweep; each is swept on its own, so one failing does not skip the other.
 
@@ -152,7 +169,7 @@ checked against the stored-name pattern, and the export reads only the library's
 - Unit tests beside each module (validation, the repositories against a real database, the store and its undo, geometry, selection to marks, the layers,
   the reader with a fake viewer, the pairing and link following, the export's structure on nine geometries, the process runner).
 - [`fixtures/conformance/pdf`](../../fixtures/conformance/README.md): the schema, the validation rules and operation scripts that the Swift core must reproduce.
-- `pnpm --dir apps/desktop smoke:pdf` drives the real app (import, ranges under the CSP, the reader, marks, undo, citations and following, the Notes tab,
+- `pnpm --dir apps/desktop smoke:pdf` drives the real app (import, dragging PDFs in with Chromium's own drag events and importing through the File menu, ranges under the CSP, the reader, marks, undo, citations and following, the Notes tab,
   export native and flattened read back, delete and the Trash Can, restart). `smoke.mjs` checks the bridge's members and, for a packaged app, that the
   export worker is unpacked.
 - `spikes/pdf-reader/export/app-writer-check.mjs` renders the writer's output with pdf.js on the nine geometries (native and flattened) and compares it

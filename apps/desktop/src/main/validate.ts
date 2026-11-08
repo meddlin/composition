@@ -274,6 +274,8 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   listDocuments: none,
   importPdf: ([target]) => [importTarget("importPdf", target)],
   importPdfCopy: ([token, target]) => [text("importPdfCopy", token, "token"), importTarget("importPdfCopy", target)],
+  // The path is the preload's reading of a dropped File, not the page's word; main checks it again (droppedPdf.ts).
+  importDroppedPdf: ([path, target]) => [text("importDroppedPdf", path, "path"), importTarget("importDroppedPdf", target)],
   setDocumentPageCount: ([documentId, pageCount]) => [id("setDocumentPageCount", documentId, "documentId"), wholeNumber("setDocumentPageCount", pageCount, "pageCount", 1)],
   saveDocumentViewState: ([documentId, state]) => [id("saveDocumentViewState", documentId, "documentId"), record("saveDocumentViewState", state, "state")],
   listBookmarks: ([documentId]) => [id("listBookmarks", documentId, "documentId")],

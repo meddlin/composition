@@ -89,6 +89,7 @@ export function NotesBrowserPanel({ store, panelId, state, snapshot, host }: Pro
           onSelectGroup={sidebar.onSelectGroup}
           onCreate={(groupId) => sidebar.onCreate(groupId, notebook.id)}
           onImportPdf={sidebar.onImportPdf && ((groupId) => sidebar.onImportPdf?.(groupId, notebook.id))}
+          onDropPdf={sidebar.onDropPdf && ((files, groupId) => sidebar.onDropPdf?.(files, groupId, notebook.id))}
           onDelete={sidebar.onDelete}
           onCreateGroup={(name, parentId) => sidebar.onCreateGroup(name, parentId, notebook.id)}
           onRenameGroup={sidebar.onRenameGroup}

@@ -76,6 +76,30 @@ const documents = (page) => page.evaluate(() => window.composition.listDocuments
 /** Makes the native picker answer with this file, as the user choosing it would. */
 const pick = (app, file) => app.evaluate(({ dialog }, chosen) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosen] })), file);
 
+/**
+ * Drags real files from outside the app onto a point of the window, the way the operating system does: Chromium's own drag
+ * events, so the page gets File objects that have paths (webUtils.getPathForFile can read them). `steps` is how far to go:
+ * "over" holds the drag above the point (to look at the drop hint), "drop" lets go.
+ */
+async function dragFiles(page, files, at, steps = "drop") {
+  const cdp = await page.context().newCDPSession(page);
+  const data = { items: [], files, dragOperationsMask: 1 };
+  const send = (type) => cdp.send("Input.dispatchDragEvent", { type, x: at.x, y: at.y, data });
+  await send("dragEnter");
+  await send("dragOver");
+  if (steps === "drop") await send("drop");
+  // Letting go of a drag held over the window without dropping: the drag is called off.
+  return async () => {
+    if (steps !== "drop") await send("dragCancel").catch(() => {});
+    await cdp.detach();
+  };
+}
+const centerOf = async (locator) => {
+  const box = await locator.boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+const notesNow = (page) => page.evaluate(() => window.__workspace.store.getSnapshot().notes.map((n) => ({ id: n.id, title: n.title, groupId: n.groupId })));
+
 let app = await launch();
 let page;
 try {
@@ -466,6 +490,136 @@ try {
   check("with dark pages still on", (await again.getByRole("button", { name: "Dark pages" }).getAttribute("aria-pressed")) === "true");
   await page.screenshot({ path: path.join(out, "pdf-restored.png") });
   check("no CSP violations or errors after the restart either", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- Dragging a PDF in (plan P16): onto a group, onto the window, and the ways it is refused
+  const sidebar = page.locator('nav[aria-label="Notes"]');
+  const docsBefore = (await documents(page)).length;
+  const groupId = await page.evaluate(async () => {
+    const store = window.__workspace.store;
+    await store.createGroup("Reading", null, store.getSnapshot().notebooks[0].id);
+    return store.getSnapshot().groups.find((g) => g.name === "Reading").id;
+  });
+  const row = sidebar.getByText("Reading", { exact: true });
+  await row.waitFor();
+  const onGroup = path.join(home, "Dropped Notes.pdf");
+  fs.writeFileSync(onGroup, makeTestPdf({ pages: 3 }));
+  const release = await dragFiles(page, [onGroup], await centerOf(row), "over");
+  check("a PDF dragged over a group highlights the group", (await row.evaluate((el) => el.closest("[data-pdf-drop-zone]")?.className ?? "")).includes("bg-accent"));
+  await page.screenshot({ path: path.join(out, "pdf-drag-over-group.png") });
+  await release();
+  await dragFiles(page, [onGroup], await centerOf(row));
+  await page.getByRole("region", { name: "PDF: Dropped Notes.pdf" }).waitFor({ timeout: 20_000 });
+  const inGroup = (await notesNow(page)).find((n) => n.title === "Dropped Notes");
+  check("a PDF dropped on a group is imported into it, titled from its file name, and opens beside its note", inGroup?.groupId === groupId && (await documents(page)).length === docsBefore + 1, JSON.stringify(inGroup));
+
+  const onWindow = path.join(home, "Window Drop.pdf");
+  fs.writeFileSync(onWindow, makeTestPdf({ pages: 2 }));
+  const editor = page.locator('textarea[aria-label="Markdown editor"]').first();
+  await editor.waitFor();
+  // The note panels sit in a row that scrolls sideways; a drag can only be aimed at what is on screen.
+  await editor.scrollIntoViewIfNeeded();
+  const overEditor = await centerOf(editor);
+  const hold = await dragFiles(page, [onWindow], overEditor, "over");
+  check("a PDF dragged over the window shows what dropping it will do", /Drop the PDF to import it into “[^”]+”/.test(await page.locator("body").innerText()));
+  await page.screenshot({ path: path.join(out, "pdf-drag-over-window.png") });
+  await hold();
+  await dragFiles(page, [onWindow], overEditor);
+  await page.getByRole("region", { name: "PDF: Window Drop.pdf" }).waitFor({ timeout: 20_000 });
+  const onTop = (await notesNow(page)).find((n) => n.title === "Window Drop");
+  check("a PDF dropped on the window (here on a note's editor) is imported at the notebook's top level", onTop?.groupId === null && (await documents(page)).length === docsBefore + 2, JSON.stringify(onTop));
+  check("and no editor took it as text", (await page.locator('textarea[aria-label="Markdown editor"]').evaluateAll((all) => all.map((el) => el.value).join(""))).includes("%PDF") === false);
+
+  const sameBytes = path.join(home, "Window Drop again.pdf");
+  fs.copyFileSync(onWindow, sameBytes);
+  await dragFiles(page, [sameBytes], await centerOf(row));
+  const dup = page.getByRole("alertdialog");
+  await dup.waitFor();
+  check("dropping a file the library already has asks first, naming the note", /“Window Drop again.pdf” has exactly the same contents as “Window Drop”/.test(await dup.innerText()) && (await documents(page)).length === docsBefore + 2, await dup.innerText());
+  await dup.getByRole("button", { name: "Import a separate copy" }).click();
+  await waitFor(async () => (await documents(page)).length === docsBefore + 3);
+  const copied = (await notesNow(page)).find((n) => n.title === "Window Drop again");
+  check("Import a separate copy imports it into the group it was dropped on", copied?.groupId === groupId, JSON.stringify(copied));
+
+  // Refusals: nothing is imported, and the reason shows.
+  const count = async () => (await documents(page)).length;
+  const settled = await count();
+  const inside = path.join(home, ".composition", "documents", fs.readdirSync(path.join(home, ".composition", "documents"))[0]);
+  await dragFiles(page, [inside], await centerOf(row));
+  await sidebar.getByRole("alert").waitFor();
+  check("a file from the app's own data folder is refused, with the reason", /inside Composition's own data folder/.test(await sidebar.getByRole("alert").innerText()) && (await count()) === settled, await sidebar.getByRole("alert").innerText());
+
+  const second = path.join(home, "Second Drop.pdf");
+  fs.writeFileSync(second, makeTestPdf({ pages: 4 }));
+  const third = path.join(home, "Third Drop.pdf");
+  fs.writeFileSync(third, makeTestPdf({ pages: 5 }));
+  await dragFiles(page, [second, third], await centerOf(row));
+  await page.getByRole("region", { name: "PDF: Second Drop.pdf" }).waitFor({ timeout: 20_000 });
+  await sidebar.getByRole("alert").waitFor();
+  check("dropping two PDFs imports the first and says the other was not imported", /Only one PDF is imported at a time/.test(await sidebar.getByRole("alert").innerText()) && (await count()) === settled + 1 && !(await notesNow(page)).some((n) => n.title === "Third Drop"));
+
+  // A File the page makes up has no path, so the bridge has nothing to give the main process: it cannot import one.
+  const forged = await page.evaluate(async () => {
+    const data = new DataTransfer();
+    data.items.add(new File([new Uint8Array([37, 80, 68, 70, 45])], "Forged.pdf", { type: "application/pdf" }));
+    document.querySelector('nav[aria-label="Notes"] [data-pdf-drop-zone]').dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+    return new Promise((resolve) => setTimeout(() => resolve(document.querySelector('nav[aria-label="Notes"] [role="alert"]')?.textContent ?? null), 1500));
+  });
+  check("a File made up by the page (no path from the operating system) is refused", forged === "Drop a PDF file from your computer." && (await count()) === settled + 1, String(forged));
+  const direct = await page.evaluate(() => window.composition.importDroppedPdf({ path: "/etc/hosts", name: "x.pdf" }, { groupId: null, notebookId: 1 }));
+  check("and so is anything that is not a File, even naming a path", /Drop a PDF file from your computer/.test(direct.error ?? "") && (await count()) === settled + 1, JSON.stringify(direct));
+
+  const txt = path.join(home, "notes.txt");
+  fs.writeFileSync(txt, "not a pdf");
+  const notesBeforeTxt = (await notesNow(page)).length;
+  await dragFiles(page, [txt], await centerOf(row));
+  await sleep(800);
+  check("a text file dropped on a group is not imported", (await count()) === settled + 1 && (await notesNow(page)).length === notesBeforeTxt);
+  check("no CSP violations or errors after dragging PDFs in", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- File > Import PDF… (plan P16)
+  const fileMenu = await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu();
+    const file = menu.items.find((item) => item.role?.toLowerCase() === "filemenu" || item.label === "File");
+    return file ? file.submenu.items.map((item) => (item.type === "separator" ? "-" : item.label)) : null;
+  });
+  check("the File menu starts with Import PDF… and a separator, above what Electron puts there", fileMenu?.[0] === "Import PDF…" && fileMenu?.[1] === "-" && fileMenu.length > 2, JSON.stringify(fileMenu));
+  /** Picks File > Import PDF… the way the menu would, whichever window is in front. */
+  const chooseImportPdf = () => app.evaluate(({ Menu, BrowserWindow }) => void Menu.getApplicationMenu().getMenuItemById("import-pdf").click(undefined, BrowserWindow.getAllWindows()[0]));
+  const cancelPicker = () => app.evaluate(({ dialog }) => void (dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] })));
+
+  const fromMenu = path.join(home, "From the Menu.pdf");
+  fs.writeFileSync(fromMenu, makeTestPdf({ pages: 3, chapters: [["Menu chapter", 1, []]] }));
+  const menuBefore = await count();
+  await pick(app, fromMenu);
+  await chooseImportPdf();
+  await page.getByRole("region", { name: "PDF: From the Menu.pdf" }).waitFor({ timeout: 20_000 });
+  const menuTop = (await notesNow(page)).find((n) => n.title === "From the Menu");
+  check("File > Import PDF… opens the picker and imports into the notebook's top level, with its PDF open beside its note", menuTop?.groupId === null && (await count()) === menuBefore + 1, JSON.stringify(menuTop));
+  await page.screenshot({ path: path.join(out, "pdf-file-menu-import.png") });
+
+  await cancelPicker();
+  await chooseImportPdf();
+  await sleep(800);
+  check("cancelling the picker imports nothing", (await count()) === menuBefore + 1);
+
+  // With a group's page open, the sidebar is "on" that group: the PDF goes into it.
+  await row.click();
+  await page.getByRole("heading", { name: "Reading" }).first().waitFor();
+  const menuInGroup = path.join(home, "Menu Into Group.pdf");
+  fs.writeFileSync(menuInGroup, makeTestPdf({ pages: 2, chapters: [["Another chapter", 1, []]] }));
+  await pick(app, menuInGroup);
+  await chooseImportPdf();
+  await page.getByRole("region", { name: "PDF: Menu Into Group.pdf" }).waitFor({ timeout: 20_000 });
+  const menuGroup = (await notesNow(page)).find((n) => n.title === "Menu Into Group");
+  check("with a group's page open, File > Import PDF… imports into that group", menuGroup?.groupId === groupId && (await count()) === menuBefore + 2, JSON.stringify(menuGroup));
+
+  await pick(app, fromMenu);
+  await chooseImportPdf();
+  const menuDup = page.getByRole("alertdialog");
+  await menuDup.waitFor();
+  check("the same file chosen through the menu asks the same duplicate question", /“From the Menu.pdf” has exactly the same contents as “From the Menu”/.test(await menuDup.innerText()) && (await count()) === menuBefore + 2, await menuDup.innerText());
+  await menuDup.getByRole("button", { name: "Cancel" }).click();
+  check("no CSP violations or errors after the File menu import", consoleProblems.length === 0, consoleProblems.join(" | "));
 } catch (error) {
   // A step that cannot go on: say what the page showed, which is usually the whole story.
   console.error(error);

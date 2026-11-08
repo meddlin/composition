@@ -684,3 +684,16 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   design (M2 scope, tracker rows, C20 and C21), the sync design (documents and marks on the fast follow) and the positioning
   page. Nothing in the code changed. **Next: Gate P1, which is yours** (`docs/manual-tests/pdf.md`, on a real textbook and a real
   manual); then the iPad's M2 work, which waits for the iPad branch.
+- 2026-11-08: **Import gaps, item 1: dragging a PDF in** (P16). A `.pdf` dropped on a group (or Ungrouped) is imported into it; dropped anywhere else in
+  the window, into the open group page or the notebook's top level, with a hint while it is over the window. **The owner's choice:** the preload
+  script reads the dropped `File`'s path with `webUtils.getPathForFile` and sends it straight to the main process, so the page never names a
+  path and a `File` it makes up has none; main checks it (absolute, `.pdf`, a real file, not inside the data folder) before the import's own
+  checks and the duplicate question. One PDF at a time. The smoke test (`smoke:pdf`, now with the drag checks) drives it with Chromium's own
+  drag events. Picks: a drop is taken ahead of a note editor, which would read a file as text; a text file dragged in is left alone. Still to do:
+  the PDF's own title, the password prompt.
+- 2026-11-08: **Import gaps, item 2: File > Import PDF…** (P16). A menu item at the top of the File menu (with a separator under it) brings the main
+  window forward and tells its page to start the import its own button starts, into the group whose page is open or else the notebook's top level (the
+  same place a window drop goes); the page asks the main process to open the picker, so no path is involved. Added to `appMenu.test.ts` (placement) and
+  `importPdfRequest.test.ts` (the click), with `useImportPdfRequest.test.tsx` on the page side, and to `smoke:pdf` (menu content, top level, into an open group, cancel,
+  duplicate) and the bridge list in `smoke.mjs`. Picks: no keyboard shortcut (none is free that the editor does not use); the item does nothing while the Settings page
+  is showing; with no main window open it opens one and imports nothing. Still to do: the PDF's own title, the password prompt.

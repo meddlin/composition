@@ -93,6 +93,32 @@ describe("importing a PDF", () => {
     expect(store.documents.forNote(5)?.id).toBe(50);
   });
 
+  it("opens a dropped PDF's note and its PDF the same way, first in the list", async () => {
+    const made = note(7, { title: "Dropped Book" });
+    const result: ImportPdfResult = { note: made as never, document: pdf(70, 7) };
+    const { store, api } = setup([note(1)], [], { importDroppedPdf: vi.fn(async () => result) });
+    const file = new File(["%PDF-1.7"], "Dropped Book.pdf", { type: "application/pdf" });
+
+    const answer = await store.importDroppedPdf(file, target);
+
+    expect(api.importDroppedPdf).toHaveBeenCalledWith(file, target);
+    expect(answer).toBe(result);
+    expect(store.getSnapshot().notes.map((n) => n.id)).toEqual([7, 1]);
+    expect(kinds(store)).toEqual(["pdf", "note"]);
+    expect(store.documents.forNote(7)?.id).toBe(70);
+  });
+
+  it("leaves everything as it was when a dropped file is refused", async () => {
+    const result: ImportPdfResult = { error: "notes.txt: only PDF files can be dropped here." };
+    const { store } = setup([note(1)], [], { importDroppedPdf: vi.fn(async () => result) });
+    const before = store.getSnapshot();
+
+    expect(await store.importDroppedPdf(new File([""], "notes.txt"), target)).toBe(result);
+
+    expect(store.getSnapshot().notes).toBe(before.notes);
+    expect(store.getSnapshot().panels).toBe(before.panels);
+  });
+
   it("leaves everything as it was when the picker is cancelled, the file is refused or it is a duplicate", async () => {
     for (const result of [{ canceled: true }, { error: "x.txt: this doesn't look like a PDF." }, { duplicate: { token: "t", fileName: "a.pdf", existing: [] } }] as ImportPdfResult[]) {
       const { store } = setup([note(1)], [], { importPdf: vi.fn(async () => result) });

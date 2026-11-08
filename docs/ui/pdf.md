@@ -24,8 +24,18 @@ rename it), and attaches the file to it. The note sits in the notebook tree like
 favorited, found by title, and deleted to the Trash Can. Its text starts empty; write in it as in any note.
 
 - **Import:** **+ Import PDF…** under the note list opens the system's file picker. The file must look like a PDF and be at most 1 GB.
-  The file is **copied** into the app's data folder; the original is left alone and never changed. A new row appears in the group
-  you are looking at, and the PDF and its note open.
+  The file is **copied** into the app's data folder; the original is left alone and never changed. A new row appears at the top level of
+  the notebook you are looking at, and the PDF and its note open.
+- **File > Import PDF…:** the same picker, from the menu bar, at the top of the File menu. It goes where the sidebar is: into the group whose
+  page is open, else the top level of the notebook you are looking at (the button under the note list always uses the top level). It brings
+  the main window forward first, so it works from a pop-out too. With the Settings page showing, the menu item does nothing: go back to the notes first.
+- **Drag a PDF in:** drag a `.pdf` from Finder, Explorer or your file manager and drop it **on a group** in the sidebar (the row lights up)
+  or on **Ungrouped**, and the new row lands in that group. Drop it **anywhere else in the window**, the note editor included, and it
+  lands where the sidebar is: in the group whose page is open, else at the top level of the notebook. While a PDF is over the window, a hint
+  says where it will go. It then goes through the same checks and the same duplicate question as the button. One PDF at a time: if you
+  drop several, the first is imported and a message says to drop the others again. A file that is not a PDF is left alone, a PDF from
+  inside Composition's own data folder is refused (it is already in the library), and so is a file dragged out of a web page, which has
+  no place on your disk.
 - **A PDF you already have:** if the file's contents are the same as one in the library, a dialog says which note has it and offers
   **Open it** or **Import a separate copy**. Nothing is imported until you choose.
 - **Your marks are not written into the file.** They are kept beside it, so the PDF stays exactly as you imported it. **Export annotated
@@ -188,6 +198,5 @@ good, so are the file and its marks.
 
 ## Not built yet
 
-Dragging a `.pdf` onto a group or the window, and **Import PDF…** in the File menu (the button under the note list is the one way in);
 the PDF's own title from its metadata; a prompt for a password-protected PDF; ink and handwritten notes (the iPad app, milestone M2); the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

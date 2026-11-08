@@ -33,6 +33,8 @@ export type DocumentsStore = {
    * a PDF the library already has comes back as `duplicate`, and nothing was imported.
    */
   importPdf(target: ImportTarget): Promise<ImportPdfResult>;
+  /** Imports a PDF the user dropped on the window (the File the drop gave the page), into a new note in the target group. */
+  importDropped(file: File, target: ImportTarget): Promise<ImportPdfResult>;
   /** Imports the file of a `duplicate` result as a separate copy. */
   importCopy(duplicate: DuplicateImport): Promise<ImportPdfResult>;
   /** Remembers the page count the reader found (it shows at once; the backend is told). */
@@ -110,6 +112,16 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     }
   }
 
+  async function importDropped(file: File, target: ImportTarget): Promise<ImportPdfResult> {
+    try {
+      const result = await deps.importDroppedPdf(file, target);
+      learn(result);
+      return result;
+    } catch (error) {
+      return { error: reason(error) };
+    }
+  }
+
   async function importCopy(duplicate: DuplicateImport): Promise<ImportPdfResult> {
     try {
       const result = await deps.importPdfCopy(duplicate.token, duplicate.target);
@@ -133,6 +145,7 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     forNote: (noteId) => state.documents.find((d) => d.noteId === noteId),
     byId: (documentId) => state.documents.find((d) => d.id === documentId),
     importPdf,
+    importDropped,
     importCopy,
     setPageCount(documentId, pageCount) {
       const document = state.documents.find((d) => d.id === documentId);
@@ -173,6 +186,7 @@ export const unavailableDocuments: DocumentsDeps = {
   listDocuments: () => Promise.reject(new Error(UNAVAILABLE)),
   importPdf: () => Promise.reject(new Error(UNAVAILABLE)),
   importPdfCopy: () => Promise.reject(new Error(UNAVAILABLE)),
+  importDroppedPdf: () => Promise.reject(new Error(UNAVAILABLE)),
   setDocumentPageCount: () => Promise.reject(new Error(UNAVAILABLE)),
   saveDocumentViewState: () => Promise.reject(new Error(UNAVAILABLE)),
   listBookmarks: () => Promise.reject(new Error(UNAVAILABLE)),

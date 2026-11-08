@@ -17,9 +17,12 @@ Use a scratch home so your own notes and settings are not touched:
 
 ## 1. Import
 
-- [ ] **+ Import PDF…** (under the note list). Pick the textbook. A note titled from the file's name appears with a PDF icon, in the group you were looking at, and a PDF panel opens to the left of its note.
+- [ ] **+ Import PDF…** (under the note list). Pick the textbook. A note titled from the file's name appears with a PDF icon, at the top level of the notebook you were looking at, and a PDF panel opens to the left of its note.
 - [ ] The first page appears at once (a big file must not make you wait for all of it). Note how long it took, and the app's memory in Activity Monitor or Task Manager.
 - [ ] Import the **same file again** (rename the copy first): a dialog names the note that has it; **Import a separate copy** makes a second note, **Open it** only opens the first. Cancel does nothing.
+- [ ] **File > Import PDF…** (top of the File menu, with a line under it): the picker opens; pick a PDF and it is imported at the notebook's top level. Open a group's page (click its name) and use the menu again: the PDF goes into that group. With a pop-out in front, the main window comes forward first. Cancel the picker: nothing happens.
+- [ ] **Drag a PDF in** from Finder or Explorer. Over a group: the row lights up; drop, and the new note is in that group. Over the note editor or anywhere else in the window: a hint names where it will go; drop, and it lands in the open group page, else the notebook's top level. Drop two PDFs at once: the first is imported and a message says to drop the others again.
+- [ ] Drag the **same file** in again: the same question as the button (Open it, Import a separate copy). Drag a `.txt`, or a PDF out of a web page, or the library's own file from `~/.composition/documents/`: nothing is imported (the last two say why).
 - [ ] Try a file that is not a PDF (rename a `.txt` to `.pdf`): it is refused with a reason, and no note is left behind.
 - [ ] The password-protected PDF: it imports; the panel says it is protected and does not show pages.
 - [ ] Close the app and look in `~/.composition/documents/`: one file per PDF, named with 12 hex digits and the file's name. Your original is untouched.

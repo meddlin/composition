@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import type { DocumentsApi, ImportPdfResult, ImportTarget } from "../../../web/src/lib/composition/documentsApi";
+import type { DocumentsHost, ImportPdfResult, ImportTarget } from "../../../web/src/lib/composition/documentsApi";
 import type { ImportPdfOutcome } from "../../../web/src/lib/composition/service";
 import type { service as Service } from "./backend";
+import { checkDroppedPdf } from "./droppedPdf";
 import type { ExportJob, ExportOutcome } from "./exportJob";
 
 /**
@@ -12,6 +13,10 @@ import type { ExportJob, ExportOutcome } from "./exportJob";
  * a path, so a compromised page cannot make the app copy a file of its choosing into the library. A file that turns out
  * to be one the library already has is remembered here, under a random token, so that "Import a separate copy" can go
  * ahead without the page ever being told where the file is.
+ *
+ * A PDF dropped on the window is the one other way in. The page hands the drop's File to the preload script, which reads the
+ * path the operating system gave it and sends only that here; the page never sees it, and cannot make one up. The main
+ * process checks it anyway (droppedPdf.ts) before the import looks inside the file.
  */
 
 /** The native pieces this needs, as plain functions, so tests don't need Electron. */
@@ -22,6 +27,8 @@ export type DocumentUi = {
   pickExportPath(defaultName: string): Promise<string | null>;
   /** Writes the export, out of the main process (see exportProcess.ts). */
   exportPdf(job: ExportJob): Promise<ExportOutcome>;
+  /** The application data folder: the library's own files, which a dropped file must not come from. */
+  dataFolder(): string;
 };
 
 type DocumentService = Pick<
@@ -46,7 +53,7 @@ type DocumentService = Pick<
 /** How many files found to be duplicates are remembered: a person is choosing one at a time. */
 const MAX_PENDING = 4;
 
-export function createDocumentsApi(service: DocumentService, ui: DocumentUi): DocumentsApi {
+export function createDocumentsApi(service: DocumentService, ui: DocumentUi): DocumentsHost {
   const pending = new Map<string, string>();
 
   function answer(outcome: ImportPdfOutcome, sourcePath: string): ImportPdfResult {
@@ -65,6 +72,12 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
       const sourcePath = await ui.pickPdf();
       if (!sourcePath) return { canceled: true };
       return answer(await service.importPdf(sourcePath, target), sourcePath);
+    },
+
+    async importDroppedPdf(droppedPath: string, target: ImportTarget) {
+      const checked = await checkDroppedPdf(droppedPath, ui.dataFolder());
+      if (!checked.ok) return { error: checked.error };
+      return answer(await service.importPdf(checked.path, target), checked.path);
     },
 
     async importPdfCopy(token: string, target: ImportTarget) {
