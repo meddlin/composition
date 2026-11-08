@@ -41,6 +41,9 @@ export type PdfAnnotationInput = {
   groupUuid?: string | null;
 };
 
+/** What a caller may change of a mark already made; its page, kind and group never change. */
+export type AnnotationChanges = Partial<Pick<PdfAnnotationInput, "color" | "comment" | "quote" | "rects" | "body">>;
+
 /** A mark as it is stored: every field present and normalised. */
 export type ValidAnnotation = {
   page: number;

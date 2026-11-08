@@ -245,6 +245,14 @@ describe("DOCUMENT_VALIDATORS", () => {
     expect(DOCUMENT_VALIDATORS.importPdfCopy(["abc123", { groupId: null, notebookId: 2, path: "/x" }])).toEqual(["abc123", { groupId: null, notebookId: 2 }]);
   });
 
+  it("takes marks as lists of records for the service to check, and no more than 500 at once", () => {
+    const mark = { page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] };
+    expect(DOCUMENT_VALIDATORS.addAnnotations([3, [mark, mark]])).toEqual([3, [mark, mark]]);
+    expect(DOCUMENT_VALIDATORS.updateAnnotation([4, { color: "pink" }, "extra"])).toEqual([4, { color: "pink" }]);
+    expect(DOCUMENT_VALIDATORS.restoreAnnotations([3, []])).toEqual([3, []]);
+    expect(() => DOCUMENT_VALIDATORS.addAnnotations([3, Array.from({ length: 501 }, () => mark)])).toThrow(InvalidArgumentsError);
+  });
+
   it("takes whole numbers for pages: a count from 1, a bookmark's page from 0", () => {
     expect(DOCUMENT_VALIDATORS.setDocumentPageCount([3, 600])).toEqual([3, 600]);
     expect(DOCUMENT_VALIDATORS.addBookmark([3, 0, "Preface"])).toEqual([3, 0, "Preface"]);
@@ -269,6 +277,14 @@ describe("DOCUMENT_VALIDATORS", () => {
     ["renameBookmark", [1, null]],
     ["removeBookmark", [Number.NaN]],
     ["describeDocument", ["7"]],
+    ["listAnnotations", ["1"]],
+    ["addAnnotations", [1, "marks"]],
+    ["addAnnotations", [1, [1]]],
+    ["updateAnnotation", [1, "x"]],
+    ["updateAnnotation", ["1", {}]],
+    ["deleteAnnotation", [null]],
+    ["restoreAnnotations", [1, {}]],
+    ["restoreAnnotations", ["1", []]],
   ] as const)("rejects bad arguments for %s", (method, args) => {
     expect(() => DOCUMENT_VALIDATORS[method]([...args])).toThrow(InvalidArgumentsError);
   });

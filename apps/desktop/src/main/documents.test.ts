@@ -18,6 +18,11 @@ function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
     renameBookmark: vi.fn(async () => null),
     removeBookmark: vi.fn(async () => {}),
     describeDocument: vi.fn(async () => null),
+    listAnnotations: vi.fn(async () => []),
+    addAnnotations: vi.fn(async () => []),
+    updateAnnotation: vi.fn(async () => null),
+    deleteAnnotation: vi.fn(async () => []),
+    restoreAnnotations: vi.fn(async () => []),
   };
   const nativeUi: DocumentUi = { pickPdf: vi.fn(async () => "/inbox/book.pdf"), ...ui };
   return { api: createDocumentsApi(service, nativeUi), service, ui: nativeUi };
@@ -101,6 +106,11 @@ describe("the rest", () => {
     await api.renameBookmark(2, "y");
     await api.removeBookmark(2);
     await api.describeDocument(5);
+    await api.listAnnotations(1);
+    await api.addAnnotations(1, [{ page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] }]);
+    await api.updateAnnotation(2, { color: "pink" });
+    await api.deleteAnnotation(2);
+    await api.restoreAnnotations(1, []);
 
     expect(service.setDocumentPageCount).toHaveBeenCalledWith(1, 600);
     expect(service.saveDocumentViewState).toHaveBeenCalledWith(1, { page: 4 });
@@ -108,5 +118,10 @@ describe("the rest", () => {
     expect(service.renameBookmark).toHaveBeenCalledWith(2, "y");
     expect(service.removeBookmark).toHaveBeenCalledWith(2);
     expect(service.describeDocument).toHaveBeenCalledWith(5);
+    expect(service.listAnnotations).toHaveBeenCalledWith(1);
+    expect(service.addAnnotations).toHaveBeenCalledWith(1, [{ page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] }]);
+    expect(service.updateAnnotation).toHaveBeenCalledWith(2, { color: "pink" });
+    expect(service.deleteAnnotation).toHaveBeenCalledWith(2);
+    expect(service.restoreAnnotations).toHaveBeenCalledWith(1, []);
   });
 });

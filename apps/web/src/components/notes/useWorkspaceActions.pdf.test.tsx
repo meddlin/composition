@@ -2,6 +2,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentsApi, ImportPdfResult, PdfContents, PdfDocument } from "@/lib/composition/documentsApi";
+import { fakeDocumentsApi } from "@/lib/composition/__fixtures__/documentsApi";
 import { createDocumentsStore } from "@/lib/composition/documentsStore";
 import type { Note } from "./types";
 import { useWorkspaceActions } from "./useWorkspaceActions";
@@ -14,19 +15,11 @@ const pdf = (id: number, noteId: number): PdfDocument => ({ id, uuid: String(id)
 const contents: PdfContents = { fileName: "book10.pdf", size: 212_000_000, marks: { highlight: 41, underline: 0, strikethrough: 0, text: 0, ink: 2 }, inkPages: 2, bookmarks: 6 };
 
 function setup(over: Partial<DocumentsApi> = {}, { available = true, notes = [note(1), note(2, "Textbook")] } = {}) {
-  const api: DocumentsApi = {
+  const api = fakeDocumentsApi({
     listDocuments: vi.fn(async () => [pdf(10, 2)]),
-    importPdf: vi.fn(async () => ({ canceled: true })),
-    importPdfCopy: vi.fn(async () => ({ canceled: true })),
-    setDocumentPageCount: vi.fn(async () => {}),
-    saveDocumentViewState: vi.fn(async () => {}),
-    listBookmarks: vi.fn(async () => []),
-    addBookmark: vi.fn(async () => ({}) as never),
-    renameBookmark: vi.fn(async () => null),
-    removeBookmark: vi.fn(async () => {}),
     describeDocument: vi.fn(async (noteId: number) => (noteId === 2 ? contents : null)),
     ...over,
-  };
+  });
   const deps = { deleteNote: vi.fn(async () => {}) } as unknown as WorkspaceDeps;
   const store = createWorkspaceStore({ notes, groups: [] }, deps, undefined, { panels: {}, documents: createDocumentsStore(api, available) });
   const onCreated = vi.fn();

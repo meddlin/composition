@@ -5,6 +5,7 @@ import {
   InvalidMarkError,
   validateAnnotation,
   validateBookmarkLabel,
+  type AnnotationChanges,
   type PdfAnnotationInput,
   type PdfRect,
   type ValidAnnotation,
@@ -150,8 +151,6 @@ export function addAnnotationGroup(documentId: number, inputs: readonly PdfAnnot
   })();
 }
 
-export type AnnotationChanges = Partial<Pick<PdfAnnotationInput, "color" | "comment" | "quote" | "rects" | "body">>;
-
 /** Changes what the caller names and re-checks the whole mark; its page, kind and group never change. Null when it is gone. */
 export function updateAnnotation(id: number, changes: AnnotationChanges): PdfAnnotation | null {
   const db = getDb();
@@ -180,6 +179,60 @@ export function updateAnnotation(id: number, changes: AnnotationChanges): PdfAnn
       id,
     );
     return getAnnotation(id);
+  })();
+}
+
+const UUID = /^[0-9a-f]{32}$/;
+const TIMESTAMP_LENGTH = 40;
+
+/**
+ * Puts back marks that were deleted, exactly as they were: the same uuid (a note's citation of a mark names it by uuid), the
+ * same group, the same times, and the same id when it is free (ids are never reused, so it is). This is what undoing a delete
+ * does. Each is checked as a new mark would be. A mark whose uuid is already there is left alone, so asking twice, as a redo
+ * after an undo may, does no harm. All or none are put back.
+ */
+export function restoreAnnotations(documentId: number, rows: readonly PdfAnnotation[]): PdfAnnotation[] {
+  const checked = rows.map((row) => {
+    if (typeof row.uuid !== "string" || !UUID.test(row.uuid)) throw new InvalidMarkError("A mark's uuid is 32 lowercase hex characters.");
+    for (const time of [row.createdAt, row.updatedAt]) {
+      if (typeof time !== "string" || time === "" || time.length > TIMESTAMP_LENGTH) throw new InvalidMarkError("A mark has the times it was made and changed.");
+    }
+    return { row, mark: validateAnnotation({ page: row.page, kind: row.kind, color: row.color, rects: row.rects, quote: row.quote, comment: row.comment, body: row.body, groupUuid: row.groupUuid }) };
+  });
+  const db = getDb();
+  return db.transaction(() => {
+    const restored: PdfAnnotation[] = [];
+    for (const { row, mark } of checked) {
+      assertPage(documentId, mark.page);
+      const existing = getAnnotationByUuid(row.uuid);
+      if (existing) {
+        restored.push(existing);
+        continue;
+      }
+      const idFree = Number.isSafeInteger(row.id) && !db.prepare("SELECT 1 FROM pdf_annotations WHERE id = ?").get(row.id);
+      db.prepare(
+        `INSERT INTO pdf_annotations (id, uuid, document_id, page, kind, color, rects, quote, comment, body, group_uuid, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        idFree ? row.id : null,
+        row.uuid,
+        documentId,
+        mark.page,
+        mark.kind,
+        mark.color,
+        mark.rects === null ? null : JSON.stringify(mark.rects),
+        mark.quote,
+        mark.comment,
+        mark.body === null ? null : JSON.stringify(mark.body),
+        mark.groupUuid,
+        row.createdAt,
+        row.updatedAt,
+      );
+      const inserted = getAnnotationByUuid(row.uuid);
+      if (!inserted) throw new Error("Failed to read back the mark that was just restored");
+      restored.push(inserted);
+    }
+    return restored;
   })();
 }
 

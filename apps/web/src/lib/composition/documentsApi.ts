@@ -1,5 +1,5 @@
 import type { Note } from "./notesRepo";
-import type { PdfMarkKind, PdfRect, PdfViewState } from "./pdfMarkup";
+import type { AnnotationChanges, PdfAnnotationInput, PdfMarkKind, PdfRect, PdfViewState } from "./pdfMarkup";
 
 /**
  * What the renderer is told about a PDF and its marks (docs/pdf-markup-plan.md). Types only, so this file is safe to import
@@ -108,6 +108,16 @@ export interface DocumentsApi {
   removeBookmark(bookmarkId: number): Promise<void>;
   /** What deleting the note would take with it; null when the note owns no PDF. */
   describeDocument(noteId: number): Promise<PdfContents | null>;
+  /** Every mark of a PDF, by page. */
+  listAnnotations(documentId: number): Promise<PdfAnnotation[]>;
+  /** Makes the marks of one selection: one per page it covers, tied together when there are several. Refuses all or none. */
+  addAnnotations(documentId: number, inputs: PdfAnnotationInput[]): Promise<PdfAnnotation[]>;
+  /** Changes a mark's color, comment, quote, rectangles or body. Null when it is gone. */
+  updateAnnotation(annotationId: number, changes: AnnotationChanges): Promise<PdfAnnotation | null>;
+  /** Deletes a mark and the other parts of its selection; says which were deleted, so that the delete can be undone. */
+  deleteAnnotation(annotationId: number): Promise<PdfAnnotation[]>;
+  /** Puts back marks deleted a moment ago, as they were, with the same uuids (what undoing a delete does). */
+  restoreAnnotations(documentId: number, annotations: PdfAnnotation[]): Promise<PdfAnnotation[]>;
 }
 
 /** Every method of DocumentsApi, as data; the check below fails to compile if one is missing (see API_METHODS in api.ts). */
@@ -122,6 +132,11 @@ export const DOCUMENT_METHODS = [
   "renameBookmark",
   "removeBookmark",
   "describeDocument",
+  "listAnnotations",
+  "addAnnotations",
+  "updateAnnotation",
+  "deleteAnnotation",
+  "restoreAnnotations",
 ] as const satisfies readonly (keyof DocumentsApi)[];
 
 export type DocumentMethod = (typeof DOCUMENT_METHODS)[number];

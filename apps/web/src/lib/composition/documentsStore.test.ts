@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { DocumentsApi, PdfDocument } from "./documentsApi";
+import { fakeDocumentsApi } from "./__fixtures__/documentsApi";
 import { createDocumentsStore, unavailableDocuments } from "./documentsStore";
 
 const doc = (id: number, noteId = id + 10, over: Partial<PdfDocument> = {}): PdfDocument => ({
@@ -15,19 +16,7 @@ const doc = (id: number, noteId = id + 10, over: Partial<PdfDocument> = {}): Pdf
 });
 
 function setup(documents: PdfDocument[] = [doc(1), doc(2)], over: Partial<DocumentsApi> = {}) {
-  const deps: DocumentsApi = {
-    listDocuments: vi.fn(async () => documents),
-    importPdf: vi.fn(async () => ({ canceled: true })),
-    importPdfCopy: vi.fn(async () => ({ canceled: true })),
-    setDocumentPageCount: vi.fn(async () => {}),
-    saveDocumentViewState: vi.fn(async () => {}),
-    listBookmarks: vi.fn(async () => []),
-    addBookmark: vi.fn(async () => ({}) as never),
-    renameBookmark: vi.fn(async () => null),
-    removeBookmark: vi.fn(async () => {}),
-    describeDocument: vi.fn(async () => null),
-    ...over,
-  };
+  const deps = fakeDocumentsApi({ listDocuments: vi.fn(async () => documents), ...over });
   return { deps, store: createDocumentsStore(deps) };
 }
 
@@ -40,7 +29,7 @@ describe("the documents store", () => {
     await store.load();
 
     expect(deps.listDocuments).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot()).toEqual({ status: "ready", documents: [doc(1), doc(2)], error: null });
+    expect(store.getSnapshot()).toEqual({ status: "ready", documents: [doc(1), doc(2)], error: null, marks: {} });
     expect(store.byId(2)).toEqual(doc(2));
     expect(store.forNote(11)).toEqual(doc(1));
     expect(store.forNote(99)).toBeUndefined();
@@ -168,6 +157,28 @@ describe("the documents store", () => {
     expect(deps.renameBookmark).toHaveBeenCalledWith(2, "y");
     expect(deps.removeBookmark).toHaveBeenCalledWith(2);
     expect(deps.describeDocument).toHaveBeenCalledWith(11);
+  });
+
+  it("keeps a PDF's marks in its snapshot, tells its listeners as they change, and undoes the last change", async () => {
+    const made = { id: 1, uuid: "a".repeat(32), documentId: 1, page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]], quote: "q", comment: "", body: null, groupUuid: null, createdAt: "t", updatedAt: "t" } as never;
+    const { store, deps } = setup([doc(1)], { addAnnotations: vi.fn(async () => [made]), deleteAnnotation: vi.fn(async () => [made]), listAnnotations: vi.fn(async () => []) });
+    const listener = vi.fn();
+    store.subscribe(listener);
+
+    await store.loadMarks(1);
+    const result = await store.addMarks(1, [{ page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] }]);
+
+    expect(result.marks).toEqual([made]);
+    expect(store.getSnapshot().marks[1]).toMatchObject({ status: "ready", items: [made], undoCount: 1, redoCount: 0 });
+    expect(listener).toHaveBeenCalled();
+
+    await store.undoMark(1);
+    expect(store.getSnapshot().marks[1]).toMatchObject({ items: [], undoCount: 0, redoCount: 1 });
+    expect(deps.deleteAnnotation).toHaveBeenCalledWith(1);
+
+    await store.changeMark(made, { color: "pink" });
+    await store.removeMark(made);
+    await store.redoMark(1);
   });
 
   it("is available by default, and a store with no backend says there are no PDFs here", async () => {

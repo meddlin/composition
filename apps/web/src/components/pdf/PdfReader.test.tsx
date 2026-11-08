@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PdfDocument } from "@/lib/composition/documentsApi";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
+import { fakeControls } from "./fakeControls";
 import type { PdfViewer, PdfViewerControls } from "./usePdfViewer";
 
 // pdf.js needs a real browser and real layout, so the hook that drives it is replaced by a fake whose state a test sets: what
@@ -21,7 +22,7 @@ const { PdfReader } = await import("./PdfReader");
 
 const document_: PdfDocument = { id: 7, uuid: "a".repeat(32), noteId: 3, fileName: "book.pdf", size: 10, pageCount: 0, viewState: {}, createdAt: "x" };
 
-const controls = (): PdfViewerControls => ({ goToPage: vi.fn(), goToDestination: vi.fn(), zoomIn: vi.fn(), zoomOut: vi.fn(), fitWidth: vi.fn(), find: vi.fn(), closeFind: vi.fn() });
+const controls = (): PdfViewerControls => fakeControls();
 const ready = (over: Partial<Extract<PdfViewer, { phase: "ready" }>> = {}): PdfViewer => ({
   phase: "ready",
   pageCount: 12,
@@ -34,8 +35,25 @@ const ready = (over: Partial<Extract<PdfViewer, { phase: "ready" }>> = {}): PdfV
   ...over,
 });
 
+/** What the store says of marks, which a test sets: the reader reads them from it. */
+let marksState: Record<number, unknown> = {};
+// A store's snapshot is the same object until something changes, which useSyncExternalStore depends on.
+let cachedSnapshot: { marks: Record<number, unknown> } | null = null;
+const stableSnapshot = () => {
+  if (cachedSnapshot?.marks !== marksState) cachedSnapshot = { status: "ready", documents: [document_], error: null, marks: marksState } as never;
+  return cachedSnapshot as never;
+};
+
 function documents(over: Partial<DocumentsStore> = {}) {
   return {
+    subscribe: () => () => {},
+    getSnapshot: stableSnapshot,
+    loadMarks: vi.fn(async () => {}),
+    addMarks: vi.fn(async () => ({ marks: [] })),
+    changeMark: vi.fn(async () => ({})),
+    removeMark: vi.fn(async () => ({})),
+    undoMark: vi.fn(async () => ({})),
+    redoMark: vi.fn(async () => ({})),
     byId: vi.fn(() => ({ ...document_, viewState: { page: 3 } })),
     saveViewState: vi.fn(),
     setPageCount: vi.fn(),
@@ -48,6 +66,8 @@ function documents(over: Partial<DocumentsStore> = {}) {
 }
 
 beforeEach(() => {
+  marksState = {};
+  cachedSnapshot = null;
   viewer = { phase: "loading" };
   lastOptions = null;
   globalThis.ResizeObserver = class {
@@ -122,6 +142,20 @@ describe("the reader", () => {
       fireEvent.keyDown(box, { key: "Enter" });
 
       expect(c.goToPage).toHaveBeenCalledWith(12);
+    });
+
+    it("stays where it is when Enter is pressed with nothing typed, or with the page that is already shown", () => {
+      const c = controls();
+      viewer = ready({ controls: c, page: 6 });
+      render(<PdfReader document={document_} documents={documents()} />);
+      const box = screen.getByRole("textbox", { name: "Page number" });
+
+      fireEvent.keyDown(box, { key: "Enter" });
+      expect(c.goToPage).not.toHaveBeenCalled();
+
+      fireEvent.change(box, { target: { value: "" } });
+      fireEvent.keyDown(box, { key: "Enter" });
+      expect(c.goToPage).not.toHaveBeenCalled();
     });
 
     it("gives up what was typed on Escape or when the reader moves", () => {
@@ -239,6 +273,94 @@ describe("the reader", () => {
       fireEvent.keyDown(screen.getByRole("document"), { key: "f", ctrlKey: true });
 
       expect(screen.getByRole("search")).toBeTruthy();
+    });
+  });
+
+  describe("the marks", () => {
+    const mark = (id: number, over: Record<string, unknown> = {}) => ({ id, uuid: String(id).padStart(32, "0"), documentId: 7, page: 3, kind: "highlight", color: "yellow", rects: [[72, 690, 300, 714]], quote: "a marked line", comment: "", body: null, groupUuid: null, createdAt: "t", updatedAt: "t", ...over });
+
+    it("asks the store for the PDF's marks when it opens", () => {
+      const store = documents();
+      render(<PdfReader document={document_} documents={store} />);
+
+      expect(store.loadMarks).toHaveBeenCalledWith(7);
+    });
+
+    it("keeps Undo and Redo out of reach until there is something to undo or redo, and uses the store's", () => {
+      viewer = ready();
+      const store = documents();
+      const { rerender } = render(<PdfReader document={document_} documents={store} />);
+      expect((screen.getByRole("button", { name: "Undo" }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole("button", { name: "Redo" }) as HTMLButtonElement).disabled).toBe(true);
+
+      marksState = { 7: { status: "ready", items: [], error: null, undoCount: 2, redoCount: 1 } };
+      rerender(<PdfReader document={{ ...document_ }} documents={documents()} />);
+      const again = documents();
+      rerender(<PdfReader document={{ ...document_ }} documents={again} />);
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      fireEvent.click(screen.getByRole("button", { name: "Redo" }));
+
+      expect((screen.getByRole("button", { name: "Undo" }) as HTMLButtonElement).disabled).toBe(false);
+      expect(again.undoMark).toHaveBeenCalledWith(7);
+      expect(again.redoMark).toHaveBeenCalledWith(7);
+    });
+
+    it("undoes on Ctrl+Z and redoes on Ctrl+Shift+Z or Ctrl+Y, but not while a box is being typed in", () => {
+      viewer = ready();
+      const store = documents();
+      render(<PdfReader document={document_} documents={store} />);
+      const pages = screen.getByRole("document");
+
+      fireEvent.keyDown(pages, { key: "z", code: "KeyZ", ctrlKey: true });
+      fireEvent.keyDown(pages, { key: "z", code: "KeyZ", ctrlKey: true, shiftKey: true });
+      fireEvent.keyDown(pages, { key: "y", code: "KeyY", ctrlKey: true });
+      fireEvent.keyDown(screen.getByRole("textbox", { name: "Page number" }), { key: "z", code: "KeyZ", ctrlKey: true });
+
+      expect(store.undoMark).toHaveBeenCalledTimes(1);
+      expect(store.redoMark).toHaveBeenCalledTimes(2);
+    });
+
+    it("turns on placing a text note, and says so, and turns it off again", () => {
+      viewer = ready();
+      render(<PdfReader document={document_} documents={documents()} />);
+      const button = screen.getByRole("button", { name: "Add a text note" });
+
+      fireEvent.click(button);
+      expect(button.getAttribute("aria-pressed")).toBe("true");
+      fireEvent.keyDown(screen.getByRole("document"), { key: "Escape" });
+
+      expect(button.getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("lists the marks in the Highlights tab by page, and says when there are none", async () => {
+      viewer = ready();
+      const { rerender } = render(<PdfReader document={document_} documents={documents()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Outline and bookmarks" }));
+      fireEvent.click(screen.getByRole("tab", { name: "highlights" }));
+      expect(screen.getByText(/No highlights yet/)).toBeTruthy();
+
+      marksState = { 7: { status: "ready", items: [mark(1), mark(2, { page: 5, kind: "underline", color: "green", quote: "another line", comment: "check" })], error: null, undoCount: 0, redoCount: 0 } };
+      rerender(<PdfReader document={{ ...document_ }} documents={documents()} />);
+
+      const list = screen.getByRole("list", { name: "Highlights" });
+      expect(within(list).getByText("a marked line")).toBeTruthy();
+      expect(within(list).getByText("another line")).toBeTruthy();
+      expect(within(list).getByText("Page 1")).toBeTruthy();
+      expect(within(list).getByText("check")).toBeTruthy();
+    });
+
+    it("shows what went wrong, and lets it be dismissed", async () => {
+      viewer = ready();
+      const store = documents({ undoMark: vi.fn(async () => ({ error: "That mark is gone." })) } as never);
+      render(<PdfReader document={document_} documents={store} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      marksState = { 7: { status: "ready", items: [], error: null, undoCount: 1, redoCount: 0 } };
+      fireEvent.keyDown(screen.getByRole("document"), { key: "z", code: "KeyZ", ctrlKey: true });
+
+      expect(await screen.findByText("That mark is gone.")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+      expect(screen.queryByText("That mark is gone.")).toBeNull();
     });
   });
 });

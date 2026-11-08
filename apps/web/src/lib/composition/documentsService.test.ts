@@ -183,6 +183,33 @@ describe("the reader's own calls", () => {
   });
 });
 
+describe("marks through the service", () => {
+  it("makes, lists, changes, deletes and restores marks, a selection across pages as one", async () => {
+    const { service, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    const id = result.document.id;
+
+    const [one, two] = await service.addAnnotations(id, [
+      { page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 5, 5]], quote: "end" },
+      { page: 1, kind: "highlight", color: "yellow", rects: [[0, 0, 5, 5]], quote: "start" },
+    ]);
+    expect(one.groupUuid).toBe(two.groupUuid);
+    expect(await service.listAnnotations(id)).toEqual([one, two]);
+
+    expect((await service.updateAnnotation(one.id, { color: "pink", comment: "see" }))?.color).toBe("pink");
+    expect(await service.updateAnnotation(9999, { color: "pink" })).toBeNull();
+
+    const removed = await service.deleteAnnotation(one.id);
+    expect(removed.map((m) => m.id)).toEqual([one.id, two.id]);
+    expect(await service.listAnnotations(id)).toEqual([]);
+
+    expect((await service.restoreAnnotations(id, removed)).map((m) => m.uuid)).toEqual([one.uuid, two.uuid]);
+    // what was deleted comes back as it was then: the first, changed to pink before it went, is still pink
+    expect((await service.listAnnotations(id)).map((m) => m.color)).toEqual(["pink", "yellow"]);
+  });
+});
+
 describe("describeContents", () => {
   const empty = { fileName: "a.pdf", size: 212_000_000, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0 };
 

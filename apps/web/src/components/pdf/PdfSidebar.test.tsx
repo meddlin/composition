@@ -4,11 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { PdfBookmark } from "@/lib/composition/documentsApi";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
 import { BookmarkList, OutlineTree, pageName } from "./PdfSidebar";
+import { fakeControls } from "./fakeControls";
 import type { OutlineItem, PdfViewerControls } from "./usePdfViewer";
 
 afterEach(cleanup);
 
-const controls = (): PdfViewerControls => ({ goToPage: vi.fn(), goToDestination: vi.fn(), zoomIn: vi.fn(), zoomOut: vi.fn(), fitWidth: vi.fn(), find: vi.fn(), closeFind: vi.fn() });
+const controls = (): PdfViewerControls => fakeControls();
 const item = (title: string, dest: OutlineItem["dest"] = [1], items: OutlineItem[] = []): OutlineItem => ({ title, dest, items });
 
 describe("pageName", () => {

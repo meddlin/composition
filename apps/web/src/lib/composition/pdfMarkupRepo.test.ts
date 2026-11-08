@@ -240,6 +240,67 @@ describe("marks", () => {
   });
 });
 
+describe("putting deleted marks back", () => {
+  it("restores a mark exactly as it was: its uuid, id, times and every field", async () => {
+    const { marks, document } = await setup();
+    const original = marks.addAnnotation(document.id, highlight(2, { comment: "check this" }));
+    marks.deleteAnnotation(original.id);
+
+    const [restored] = marks.restoreAnnotations(document.id, [original]);
+
+    expect(restored).toEqual(original);
+    expect(marks.getAnnotationByUuid(original.uuid)).toEqual(original);
+    expect(marks.listAnnotations(document.id)).toEqual([original]);
+  });
+
+  it("restores a whole selection that crossed pages, still tied together", async () => {
+    const { marks, document } = await setup();
+    const parts = marks.addAnnotationGroup(document.id, [highlight(3), highlight(4)]);
+    const removed = marks.deleteAnnotation(parts[0].id);
+
+    const restored = marks.restoreAnnotations(document.id, removed);
+
+    expect(restored).toEqual(parts);
+    expect(new Set(restored.map((r) => r.groupUuid)).size).toBe(1);
+  });
+
+  it("does no harm when asked twice, as a redo after an undo may", async () => {
+    const { marks, document } = await setup();
+    const original = marks.addAnnotation(document.id, highlight(1));
+    marks.deleteAnnotation(original.id);
+
+    marks.restoreAnnotations(document.id, [original]);
+    marks.restoreAnnotations(document.id, [original]);
+
+    expect(marks.listAnnotations(document.id)).toEqual([original]);
+  });
+
+  it("takes a new id when the old one is in use, and keeps the uuid", async () => {
+    const { marks, document } = await setup();
+    const original = marks.addAnnotation(document.id, highlight(1));
+    marks.deleteAnnotation(original.id);
+    const { getDb } = await import("./db");
+    getDb().prepare("INSERT INTO pdf_annotations (id, document_id, page, kind, color, created_at, updated_at) VALUES (?, ?, 0, 'ink', 'black', 'x', 'x')").run(original.id, document.id);
+
+    const [restored] = marks.restoreAnnotations(document.id, [original]);
+
+    expect(restored.id).not.toBe(original.id);
+    expect(restored.uuid).toBe(original.uuid);
+  });
+
+  it("refuses a mark that is invalid or has no uuid, and restores none of the others", async () => {
+    const { marks, document } = await setup(3);
+    const good = marks.addAnnotation(document.id, highlight(1));
+    marks.deleteAnnotation(good.id);
+
+    expect(() => marks.restoreAnnotations(document.id, [good, { ...good, uuid: "nope" }])).toThrow(INVALID);
+    expect(() => marks.restoreAnnotations(document.id, [good, { ...good, id: 77, uuid: "b".repeat(32), color: "red" }])).toThrow(INVALID);
+    expect(() => marks.restoreAnnotations(document.id, [{ ...good, createdAt: "" }])).toThrow(INVALID);
+    expect(() => marks.restoreAnnotations(document.id, [{ ...good, page: 9 }])).toThrow("past the end");
+    expect(marks.listAnnotations(document.id)).toEqual([]);
+  });
+});
+
 describe("bookmarks", () => {
   it("have a page, a label and a uuid, and are listed in page order", async () => {
     const { marks, document } = await setup();

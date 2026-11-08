@@ -2,8 +2,9 @@
 
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState, type RefObject } from "react";
-import type { PdfViewState } from "@/lib/composition/pdfMarkup";
+import type { PdfRect, PdfViewState } from "@/lib/composition/pdfMarkup";
 import { loadPdfjs, openPdf, PdfFileError } from "./pdfjs";
+import type { PageOnScreen } from "./selectionMarks";
 
 /** What pdf.js's outline calls an entry: a title, where it goes, and the entries under it. */
 export type OutlineItem = { title: string; dest: string | unknown[] | null; items: OutlineItem[] };
@@ -21,6 +22,15 @@ export type PdfViewerControls = {
   fitWidth(): void;
   find(query: string, options?: { findPrevious?: boolean }): void;
   closeFind(): void;
+  /** Scrolls so that a rectangle of a page (in raw PDF user space) is in view, a little below the top of the panel. */
+  goToRect(page: number, rect: PdfRect): void;
+  /** The pages pdf.js has drawn into the document now (the others are empty placeholders), with their zoom. */
+  pagesOnScreen(): PageOnScreen[];
+  /**
+   * Calls `listener` whenever pages have been drawn again or zoomed, which is when anything laid over them has to be laid
+   * over them again (pdf.js rebuilds a page's contents each time it draws it). Returns the function that stops it.
+   */
+  onPagesChanged(listener: () => void): () => void;
 };
 
 type Options = {
@@ -123,6 +133,9 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
         }, SAVE_DELAY_MS);
       };
 
+      const pageListeners = new Set<() => void>();
+      const pagesChanged = () => pageListeners.forEach((listener) => listener());
+
       const controls: PdfViewerControls = {
         goToPage(target) {
           pdfViewer.currentPageNumber = Math.min(Math.max(1, Math.round(target)), pdfViewer.pagesCount);
@@ -150,6 +163,23 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
           find = null;
           publish();
         },
+        goToRect(target, rect) {
+          // The destination is a point of the page: left edge and the top of the rectangle, with a margin above it.
+          pdfViewer.scrollPageIntoView({ pageNumber: target, destArray: [null, { name: "XYZ" }, rect[0], rect[3] + 40, null] });
+        },
+        pagesOnScreen() {
+          const found: PageOnScreen[] = [];
+          host.querySelectorAll<HTMLElement>(".page[data-page-number]").forEach((element) => {
+            const pageNumber = Number(element.dataset.pageNumber);
+            const view = pdfViewer.getPageView(pageNumber - 1);
+            if (view && element.querySelector(".textLayer")) found.push({ pageNumber, element, viewport: view.viewport });
+          });
+          return found;
+        },
+        onPagesChanged(listener) {
+          pageListeners.add(listener);
+          return () => void pageListeners.delete(listener);
+        },
       };
       controlsRef.current = controls;
 
@@ -175,7 +205,10 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
         publish();
         if (ready) scheduleSave();
       });
+      eventBus.on("pagerendered", pagesChanged);
+      eventBus.on("textlayerrendered", pagesChanged);
       eventBus.on("scalechanging", () => {
+        pagesChanged();
         publish();
         if (ready && userZoomed) scheduleSave();
       });

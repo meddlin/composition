@@ -381,7 +381,36 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
    - **Not done in this step:** dragging a `.pdf` onto the window or a group, and **Import PDF…** in the File menu (the sidebar
      button is the one way in so far); the Highlights and Notes tabs (Steps 3 and 4); web's "This note has a PDF" line; a
      password prompt; the panel's title in a pop-out's window (it says "PDF").
-3. **Text markup.** Highlight, underline, strikethrough, typed text notes, the Highlights tab, undo and redo.
+3. **Text markup. Built 2026-11-07,** checked in the real app by the same `smoke:pdf` (now 44 checks, five runs in a row all
+   passing). Highlight, underline and strikethrough in the five colors, typed text notes, the Highlights tab with the optional
+   one-line comment, undo and redo. Quote, citations and `pdf:` links are Step 4; export is Step 5. What was built:
+   - **Backend:** five `DocumentsApi` methods (`listAnnotations`, `addAnnotations`, `updateAnnotation`, `deleteAnnotation`,
+     `restoreAnnotations`) through service, IPC and validators (at most 500 marks in one call), and `restoreAnnotations` in
+     `pdfMarkupRepo.ts`, which puts a deleted mark back with the same uuid, group and times.
+   - **Store:** `documentMarks.ts` is a controller with a serial queue per PDF and an undo and redo history (create, delete and
+     update steps, 200 deep); `documentsStore` exposes it, so every panel showing the PDF agrees.
+   - **Reader:** `PdfMarkLayers` draws marks in two layers on each page (an "under" layer after the canvas, where a highlight
+     multiplies into the page, and an "over" layer for text notes, the popover and the catcher that places a note), rebuilt when
+     pdf.js draws a page again or zooms. `selectionMarks.ts` turns a selection into marks: one per page, one rectangle per line,
+     in raw PDF user space (spike C), with the words as the quote. `SelectionToolbar` floats over the selection;
+     `useMarkEditing` holds the rest (selecting, recoloring, commenting, deleting, keys). Keys are in `shortcuts.ts` under
+     "Reading a PDF": `Mod+Shift+H`, `U`, `S`, `Mod+Z`, `Mod+Shift+Z` and `Ctrl+Y`, `Delete`, `Esc`.
+   - **Findings:** (1) A mark takes no mouse of its own, so the words under it stay selectable; a click selects by testing the
+     stored rectangles, and a click that ends a text selection is left to the selection. (2) pdf.js ends a line with a `<br>` and
+     no space, which `Range.toString()` reads as nothing, so the quote reads a `<br>` as a space. (3) A selection's rectangles are
+     taken relative to the page's content area, inside its border (`clientLeft`), or every mark sits a border's width off.
+     (4) The real-app test found one bug the unit tests did not: Enter in the page box with nothing typed jumped to page 1.
+     (5) A mark is in the database a few milliseconds before the reader lets go of the selection and puts the toolbar away,
+     and the toolbar sits over the line above the selection, so a click aimed there lands on a color swatch; a person cannot
+     click that fast, and the test now waits for the toolbar to go. (6) A highlight multiplies into the page, which shows on a
+     white page and vanishes on a dark one (the inverted page is black), so with dark pages on it screens instead.
+   - **My picks, made while building:** **undo and redo last only while the app is open** (the history is not stored); undoing
+     a delete brings the mark back with its uuid, so a note's citation of it (Step 4) survives; **a text note takes the color last
+     chosen** (shared with the editor's highlight menu), in a default box of 200 by 56 points at 12 points; a text note emptied
+     of words is deleted; a delete takes the whole cross-page selection with it (Step 1's pick), and one undo brings it all
+     back; Highlights lists every mark (not only highlights) by page, with its words and comment.
+   - **Not checked:** a text note on a rotated page (its box and its orientation in the export, Step 5), a selection through a
+     two-column page in a real textbook (Gate P1), and the keys on Windows and Linux.
 4. **Notes and links.** `pdf:` links (preview, editor, Live tab), Quote, Cite this page, link following, the Notes tab, New note
    for this PDF, pin and follow.
 5. **Search and export.** The owner note's search entry, and Export annotated PDF.
@@ -554,3 +583,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   Can row naming what is inside, and `pnpm smoke:pdf` (24 checks in the real app). New findings: pdf.js 6.5 has no eval option
   at all (X5's mitigation is moot), and its viewer needs `globalThis.pdfjsLib`. Dragging a PDF in and the File menu are not
   built.
+- 2026-11-07: **Step 3 built** (text markup). Highlight, underline and strikethrough in five colors from a selection, typed text
+  notes, the popover to recolor, comment on or delete a mark, the Highlights tab, undo and redo (while the app is open), and
+  the keys, all stored in raw PDF user space with one record per page for a selection that crosses pages. 44 checks in the real
+  app (`pnpm smoke:pdf`); the web suite has 4,009 tests and the desktop suite 754. The fixtures are unchanged (no schema
+  change). Picks and findings are listed under Step 3 in the [build order](#build-order).

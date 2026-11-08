@@ -1,15 +1,17 @@
 "use client";
 
-import { ChevronRightIcon, PencilIcon, Trash2Icon } from "lucide-react";
+import { ChevronRightIcon, PencilIcon, StrikethroughIcon, Trash2Icon, UnderlineIcon, HighlighterIcon, StickyNoteIcon, PenLineIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PdfBookmark } from "@/lib/composition/documentsApi";
+import type { PdfAnnotation, PdfBookmark } from "@/lib/composition/documentsApi";
+import type { PdfTextNoteBody } from "@/lib/composition/pdfMarkup";
+import { paintFor } from "./pdfGeometry";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
 import { cn } from "@/lib/utils";
 import type { OutlineItem, PdfViewerControls } from "./usePdfViewer";
 
-export type SidebarTab = "outline" | "bookmarks";
+export type SidebarTab = "outline" | "bookmarks" | "highlights";
 
 /** What a page is called to the reader: its printed label when the PDF has one ("xii", "42"), else its number. */
 export function pageName(page: number, labels: string[] | null): string {
@@ -166,5 +168,114 @@ export function BookmarkList({
         </li>
       ))}
     </ul>
+  );
+}
+
+const KIND_ICON = { highlight: HighlighterIcon, underline: UnderlineIcon, strikethrough: StrikethroughIcon, text: StickyNoteIcon, ink: PenLineIcon } as const;
+
+/** What a mark is called in the list: the words it marks, a text note's words, or what ink is. */
+function markText(mark: PdfAnnotation): string {
+  if (mark.kind === "text") return (mark.body as Partial<PdfTextNoteBody> | null)?.text?.trim() || "(empty note)";
+  if (mark.kind === "ink") return "Ink";
+  return mark.quote || "(no text)";
+}
+
+/** Every mark of the PDF by page, to jump to, to comment on, and to delete. */
+export function HighlightList({
+  marks,
+  labels,
+  controls,
+  selectedId,
+  onSelect,
+  onComment,
+  onDelete,
+}: {
+  marks: PdfAnnotation[];
+  labels: string[] | null;
+  controls: PdfViewerControls;
+  selectedId: number | null;
+  onSelect: (mark: PdfAnnotation) => void;
+  onComment: (mark: PdfAnnotation, comment: string) => void;
+  onDelete: (mark: PdfAnnotation) => void;
+}) {
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  if (marks.length === 0) {
+    return <p className="px-3 py-2 text-sm text-muted-foreground">No highlights yet. Select text on a page and choose a highlight, an underline or a strikethrough.</p>;
+  }
+
+  const pages = [...new Set(marks.map((m) => m.page))];
+  function jump(mark: PdfAnnotation) {
+    onSelect(mark);
+    const rect = mark.rects?.[0] ?? (mark.body as Partial<PdfTextNoteBody> | null)?.rect;
+    if (rect) controls.goToRect(mark.page + 1, rect);
+    else controls.goToPage(mark.page + 1);
+  }
+
+  return (
+    <div aria-label="Highlights" role="list" className="py-1 text-sm">
+      {pages.map((page) => (
+        <div key={page} role="listitem">
+          <div className="px-3 pb-0.5 pt-2 text-xs font-medium text-muted-foreground">Page {pageName(page + 1, labels)}</div>
+          <ul>
+            {marks
+              .filter((m) => m.page === page)
+              .map((mark) => {
+                const Icon = KIND_ICON[mark.kind];
+                return (
+                  <li key={mark.id} data-mark-id={mark.id} className={cn("group flex items-start gap-1.5 px-2 py-0.5", mark.id === selectedId && "bg-accent/60")}>
+                    <span style={{ background: paintFor(mark.color).fill }} className="mt-1 flex size-5 shrink-0 items-center justify-center rounded">
+                      <Icon className="size-3.5" aria-label={mark.kind} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <button type="button" onClick={() => jump(mark)} className="block w-full rounded px-1 text-left hover:bg-accent hover:text-accent-foreground">
+                        <span className="line-clamp-3">{markText(mark)}</span>
+                      </button>
+                      {editing === mark.id ? (
+                        <Input
+                          autoFocus
+                          aria-label="Comment"
+                          value={draft}
+                          maxLength={500}
+                          onChange={(event) => setDraft(event.target.value)}
+                          onBlur={() => {
+                            setEditing(null);
+                            if (draft !== mark.comment) onComment(mark, draft);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Escape") {
+                              setDraft(mark.comment);
+                              setEditing(null);
+                            }
+                          }}
+                          className="mt-0.5 h-7"
+                        />
+                      ) : (
+                        mark.kind !== "ink" &&
+                        mark.kind !== "text" && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDraft(mark.comment);
+                              setEditing(mark.id);
+                            }}
+                            className="block w-full truncate rounded px-1 text-left text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            {mark.comment || "Add a comment"}
+                          </button>
+                        )
+                      )}
+                    </div>
+                    <Button variant="ghost" size="icon-xs" aria-label={`Delete the ${mark.kind} on page ${pageName(page + 1, labels)}`} onClick={() => onDelete(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                      <Trash2Icon />
+                    </Button>
+                  </li>
+                );
+              })}
+          </ul>
+        </div>
+      ))}
+    </div>
   );
 }

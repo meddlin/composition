@@ -30,6 +30,11 @@ type DocumentService = Pick<
   | "renameBookmark"
   | "removeBookmark"
   | "describeDocument"
+  | "listAnnotations"
+  | "addAnnotations"
+  | "updateAnnotation"
+  | "deleteAnnotation"
+  | "restoreAnnotations"
 >;
 
 /** How many files found to be duplicates are remembered: a person is choosing one at a time. */
@@ -70,5 +75,10 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
     renameBookmark: (bookmarkId, label) => service.renameBookmark(bookmarkId, label),
     removeBookmark: (bookmarkId) => service.removeBookmark(bookmarkId),
     describeDocument: (noteId) => service.describeDocument(noteId),
+    listAnnotations: (documentId) => service.listAnnotations(documentId),
+    addAnnotations: (documentId, inputs) => service.addAnnotations(documentId, inputs),
+    updateAnnotation: (annotationId, changes) => service.updateAnnotation(annotationId, changes),
+    deleteAnnotation: (annotationId) => service.deleteAnnotation(annotationId),
+    restoreAnnotations: (documentId, annotations) => service.restoreAnnotations(documentId, annotations),
   };
 }

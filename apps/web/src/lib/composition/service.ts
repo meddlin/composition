@@ -7,12 +7,12 @@ import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from ".
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
 import * as documents from "./documents";
-import type { ExistingPdf, ImportTarget, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import type { ExistingPdf, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
 import * as documentsRepo from "./documentsRepo";
 import type { StoredDocument } from "./documentsRepo";
 import { pdfTitleFromFileName } from "./documentNames";
 import * as pdfMarkupRepo from "./pdfMarkupRepo";
-import type { PdfViewState } from "./pdfMarkup";
+import type { AnnotationChanges, PdfAnnotationInput, PdfViewState } from "./pdfMarkup";
 import { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
@@ -485,6 +485,26 @@ export async function removeBookmark(bookmarkId: number): Promise<void> {
 
 export async function describeDocument(noteId: number): Promise<PdfContents | null> {
   return documentsRepo.documentContents(noteId);
+}
+
+export async function listAnnotations(documentId: number): Promise<PdfAnnotation[]> {
+  return pdfMarkupRepo.listAnnotations(documentId);
+}
+
+export async function addAnnotations(documentId: number, inputs: readonly PdfAnnotationInput[]): Promise<PdfAnnotation[]> {
+  return pdfMarkupRepo.addAnnotationGroup(documentId, inputs);
+}
+
+export async function updateAnnotation(annotationId: number, changes: AnnotationChanges): Promise<PdfAnnotation | null> {
+  return pdfMarkupRepo.updateAnnotation(annotationId, changes);
+}
+
+export async function deleteAnnotation(annotationId: number): Promise<PdfAnnotation[]> {
+  return pdfMarkupRepo.deleteAnnotation(annotationId);
+}
+
+export async function restoreAnnotations(documentId: number, annotations: readonly PdfAnnotation[]): Promise<PdfAnnotation[]> {
+  return pdfMarkupRepo.restoreAnnotations(documentId, annotations);
 }
 
 /*

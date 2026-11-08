@@ -1,5 +1,6 @@
-import type { DocumentsApi, ExistingPdf, ImportPdfResult, ImportTarget, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
-import type { PdfViewState } from "./pdfMarkup";
+import type { DocumentsApi, ExistingPdf, ImportPdfResult, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import { createMarksController, type DocumentMarks } from "./documentMarks";
+import type { AnnotationChanges, PdfAnnotationInput, PdfViewState } from "./pdfMarkup";
 
 /** What the store reaches outside for: the PDFs' backend. */
 export type DocumentsDeps = DocumentsApi;
@@ -10,6 +11,8 @@ export type DocumentsSnapshot = {
   /** Every PDF, one per owner note. */
   documents: PdfDocument[];
   error: string | null;
+  /** The marks of each PDF whose marks have been asked for, with how much of each can be undone or redone. */
+  marks: Record<number, DocumentMarks>;
 };
 
 /** A file the user picked that the library already has: asked about, then opened or imported again as a separate copy. */
@@ -42,9 +45,21 @@ export type DocumentsStore = {
   removeBookmark(bookmarkId: number): Promise<void>;
   /** What deleting the PDF's note would take with it, for the delete dialog; null when the note owns no PDF. */
   describe(noteId: number): Promise<PdfContents | null>;
+  /** Reads a PDF's marks (once: the store keeps them current as they change). */
+  loadMarks(documentId: number): Promise<void>;
+  /** Marks one selection (one mark per page it covers). Resolves with the marks made, or why none were. */
+  addMarks(documentId: number, inputs: PdfAnnotationInput[]): Promise<{ marks?: PdfAnnotation[]; error?: string }>;
+  /** Changes a mark, or says why it could not be. */
+  changeMark(mark: PdfAnnotation, changes: AnnotationChanges): Promise<{ error?: string }>;
+  /** Deletes a mark and the rest of its selection. */
+  removeMark(mark: PdfAnnotation): Promise<{ error?: string }>;
+  /** Takes back the last change made to the PDF's marks. */
+  undoMark(documentId: number): Promise<{ error?: string }>;
+  /** Does it again after an undo. */
+  redoMark(documentId: number): Promise<{ error?: string }>;
 };
 
-export const NO_DOCUMENTS: DocumentsSnapshot = { status: "idle", documents: [], error: null };
+export const NO_DOCUMENTS: DocumentsSnapshot = { status: "idle", documents: [], error: null, marks: {} };
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : "Something went wrong.");
 
@@ -62,6 +77,8 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     state = { ...state, ...next };
     listeners.forEach((listener) => listener());
   }
+
+  const marks = createMarksController(deps, () => set({ marks: marks.snapshot() }));
 
   function load(): Promise<void> {
     if (state.status === "ready") return Promise.resolve();
@@ -131,6 +148,12 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     renameBookmark: (bookmarkId, label) => deps.renameBookmark(bookmarkId, label),
     removeBookmark: (bookmarkId) => deps.removeBookmark(bookmarkId),
     describe: (noteId) => deps.describeDocument(noteId),
+    loadMarks: (documentId) => marks.load(documentId),
+    addMarks: (documentId, inputs) => marks.make(documentId, inputs),
+    changeMark: (mark, changes) => marks.change(mark, changes),
+    removeMark: (mark) => marks.remove(mark),
+    undoMark: (documentId) => marks.undo(documentId),
+    redoMark: (documentId) => marks.redo(documentId),
   };
 }
 
@@ -148,4 +171,9 @@ export const unavailableDocuments: DocumentsDeps = {
   renameBookmark: () => Promise.reject(new Error(UNAVAILABLE)),
   removeBookmark: () => Promise.reject(new Error(UNAVAILABLE)),
   describeDocument: () => Promise.reject(new Error(UNAVAILABLE)),
+  listAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
+  addAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
+  updateAnnotation: () => Promise.reject(new Error(UNAVAILABLE)),
+  deleteAnnotation: () => Promise.reject(new Error(UNAVAILABLE)),
+  restoreAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
 };

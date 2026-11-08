@@ -7,7 +7,10 @@ import {
   ChevronUpIcon,
   MoonIcon,
   PanelLeftIcon,
+  Redo2Icon,
   SearchIcon,
+  StickyNoteIcon,
+  Undo2Icon,
   ZoomInIcon,
   ZoomOutIcon,
   MoveHorizontalIcon,
@@ -20,7 +23,10 @@ import { useElementWidth } from "../notes/useElementWidth";
 import type { PdfDocument } from "@/lib/composition/documentsApi";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
 import { cn } from "@/lib/utils";
-import { BookmarkList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
+import { MarkLayers, usePageLayers } from "./PdfMarkLayers";
+import { BookmarkList, HighlightList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
+import { SelectionToolbar } from "./SelectionToolbar";
+import { useMarkEditing } from "./useMarkEditing";
 import { usePdfViewer, type PdfViewer } from "./usePdfViewer";
 
 /** How wide the panel must be for the outline and bookmarks to sit beside the pages rather than over them. */
@@ -56,14 +62,17 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
     documents.saveViewState(document.id, { ...known, darkPages: next });
   }
 
+  const ready = viewer.phase === "ready" ? viewer : null;
+  const edit = useMarkEditing({ pdf: document, documents, controls: ready?.controls ?? null, container });
+  const layers = usePageLayers(ready?.controls ?? null);
+
   function onKeyDown(event: KeyboardEvent) {
+    if (edit.onKeyDown(event)) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
       event.preventDefault();
       setFindOpen(true);
     }
   }
-
-  const ready = viewer.phase === "ready" ? viewer : null;
 
   return (
     <div ref={root} className="flex min-h-0 flex-1 flex-col" onKeyDown={onKeyDown}>
@@ -75,6 +84,12 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
         onToggleSidebar={() => setSidebar(sidebar === null ? "outline" : null)}
         findOpen={findOpen}
         onToggleFind={() => setFindOpen(!findOpen)}
+        canUndo={edit.canUndo}
+        canRedo={edit.canRedo}
+        onUndo={edit.undo}
+        onRedo={edit.redo}
+        placing={edit.placing}
+        onTogglePlacing={edit.togglePlacing}
         onAddBookmark={() => {
           if (!ready) return;
           void documents.addBookmark(document.id, ready.page - 1, "").then(() => {
@@ -83,6 +98,14 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
           });
         }}
       />
+      {edit.error && (
+        <div role="alert" className="flex shrink-0 items-center gap-2 border-b bg-destructive/10 px-3 py-1 text-sm text-destructive">
+          <span className="flex-1">{edit.error}</span>
+          <Button variant="ghost" size="icon-xs" aria-label="Dismiss" onClick={edit.clearError}>
+            <XIcon />
+          </Button>
+        </div>
+      )}
       {ready && findOpen && <FindBar viewer={ready} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
       <div className="relative flex min-h-0 flex-1">
         {sidebar !== null && (
@@ -91,7 +114,7 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
             className={cn("flex w-60 shrink-0 flex-col border-r bg-background", narrow && "absolute inset-y-0 left-0 z-10 max-w-[85%] shadow-md")}
           >
             <div role="tablist" aria-label="Sidebar" className="flex shrink-0 border-b text-sm">
-              {(["outline", "bookmarks"] as const).map((tab) => (
+              {(["outline", "bookmarks", "highlights"] as const).map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -109,6 +132,8 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
                 <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
               ) : sidebar === "outline" ? (
                 <OutlineTree items={ready.outline} controls={ready.controls} />
+              ) : sidebar === "highlights" ? (
+                <HighlightList marks={edit.marks} labels={ready.labels} controls={ready.controls} selectedId={edit.selectedId} onSelect={(mark) => edit.select(mark.id)} onComment={edit.comment} onDelete={edit.remove} />
               ) : (
                 <BookmarkList documentId={document.id} documents={documents} controls={ready.controls} labels={ready.labels} refreshKey={bookmarksRead} />
               )}
@@ -121,6 +146,7 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
             ref={container}
             tabIndex={0}
             role="document"
+            onClick={edit.onContainerClick}
             aria-label={`${document.fileName}, pages`}
             className={cn(
               "absolute inset-0 overflow-auto outline-none",
@@ -130,6 +156,19 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
           >
             <div ref={pages} className="pdfViewer" />
           </div>
+          {ready && (
+            <MarkLayers
+              layers={layers}
+              dark={dark}
+              marks={edit.marks}
+              selectedId={edit.selectedId}
+              placing={edit.placing}
+              draft={edit.draft}
+              editingId={edit.editingId}
+              {...edit.layerHandlers}
+            />
+          )}
+          {edit.anchor && !edit.placing && <SelectionToolbar anchor={edit.anchor} color={edit.color} onColor={edit.chooseColor} onMark={edit.markSelection} />}
           {viewer.phase === "loading" && <p className="pointer-events-none absolute inset-x-0 top-6 text-center text-sm text-muted-foreground">Opening the PDF…</p>}
           {viewer.phase === "error" && (
             <p role="alert" className="absolute inset-x-0 top-6 px-6 text-center text-sm text-destructive">
@@ -150,6 +189,12 @@ function Toolbar({
   onToggleSidebar,
   findOpen,
   onToggleFind,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  placing,
+  onTogglePlacing,
   onAddBookmark,
 }: {
   viewer: PdfViewer;
@@ -159,6 +204,12 @@ function Toolbar({
   onToggleSidebar: () => void;
   findOpen: boolean;
   onToggleFind: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  placing: boolean;
+  onTogglePlacing: () => void;
   onAddBookmark: () => void;
 }) {
   const ready = viewer.phase === "ready" ? viewer : null;
@@ -179,6 +230,15 @@ function Toolbar({
         <MoveHorizontalIcon />
       </Button>
       <div className="ml-auto" />
+      <Button variant="ghost" size="icon-sm" aria-label="Undo" disabled={!canUndo} onClick={onUndo} title="Undo the last change to the marks (Ctrl/Cmd+Z)">
+        <Undo2Icon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Redo" disabled={!canRedo} onClick={onRedo} title="Redo (Ctrl/Cmd+Shift+Z)">
+        <Redo2Icon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Add a text note" aria-pressed={placing} disabled={!ready} onClick={onTogglePlacing} title="Add a text note: click where it goes on a page">
+        <StickyNoteIcon />
+      </Button>
       <Button variant="ghost" size="icon-sm" aria-label="Find in this PDF" aria-pressed={findOpen} disabled={!ready} onClick={onToggleFind} title="Find in this PDF (Ctrl/Cmd+F)">
         <SearchIcon />
       </Button>
@@ -201,8 +261,8 @@ function PageBox({ viewer }: { viewer: Extract<PdfViewer, { phase: "ready" }> | 
   const setDraft = (text: string | null) => setTyped(text === null ? null : { page, text });
 
   function go() {
-    const target = Number(draft);
-    if (viewer && Number.isFinite(target) && draft !== "") viewer.controls.goToPage(target);
+    // Enter with nothing typed stays where it is (an untouched box is not the page 0, which would go to page 1).
+    if (viewer && draft !== null && draft !== "" && Number.isFinite(Number(draft))) viewer.controls.goToPage(Number(draft));
     setDraft(null);
   }
 

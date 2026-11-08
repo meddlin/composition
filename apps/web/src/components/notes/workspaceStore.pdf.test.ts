@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DocumentsApi, ImportPdfResult, PdfDocument } from "@/lib/composition/documentsApi";
+import { fakeDocumentsApi } from "@/lib/composition/__fixtures__/documentsApi";
 import { createDocumentsStore } from "@/lib/composition/documentsStore";
 import { panelIds } from "../panels/layoutTree";
 import { focusedPanelId } from "../panels/panelsState";
@@ -24,19 +25,7 @@ beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
 
 function setup(notes: Note[], documents: PdfDocument[], over: Partial<DocumentsApi> = {}, grid = true) {
-  const api: DocumentsApi = {
-    listDocuments: vi.fn(async () => documents),
-    importPdf: vi.fn(async () => ({ canceled: true })),
-    importPdfCopy: vi.fn(async () => ({ canceled: true })),
-    setDocumentPageCount: vi.fn(async () => {}),
-    saveDocumentViewState: vi.fn(async () => {}),
-    listBookmarks: vi.fn(async () => []),
-    addBookmark: vi.fn(async () => ({}) as never),
-    renameBookmark: vi.fn(async () => null),
-    removeBookmark: vi.fn(async () => {}),
-    describeDocument: vi.fn(async () => null),
-    ...over,
-  };
+  const api = fakeDocumentsApi({ listDocuments: vi.fn(async () => documents), ...over });
   const store = createWorkspaceStore({ notes, groups: [] }, {} as WorkspaceDeps, undefined, {
     documents: createDocumentsStore(api),
     ...(grid ? { panels: {} } : {}),

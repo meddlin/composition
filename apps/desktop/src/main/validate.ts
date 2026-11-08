@@ -254,6 +254,15 @@ const importTarget = (method: string, value: unknown) => {
 const wholeNumber = (method: string, value: unknown, name: string, min: number): number =>
   Number.isSafeInteger(value) && (value as number) >= min ? (value as number) : fail(method, name);
 
+/** The most marks one call may carry: a selection over a few pages, or one delete's worth being put back. A real one is a handful. */
+const MAX_MARKS_AT_ONCE = 500;
+
+/** A list of records, each of which the service checks as it would a mark made by hand. */
+function records(method: string, value: unknown, name: string, limit: number): Record<string, unknown>[] {
+  if (!Array.isArray(value) || value.length > limit) return fail(method, name);
+  return value.map((item) => record(method, item, name));
+}
+
 /** Arguments of the desktop-only PDF methods (see documents.ts). Ids and a target only: no path ever comes from the renderer. */
 export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   listDocuments: none,
@@ -266,6 +275,11 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   renameBookmark: ([bookmarkId, label]) => [id("renameBookmark", bookmarkId, "bookmarkId"), text("renameBookmark", label, "label")],
   removeBookmark: ([bookmarkId]) => [id("removeBookmark", bookmarkId, "bookmarkId")],
   describeDocument: ([noteId]) => [id("describeDocument", noteId, "noteId")],
+  listAnnotations: ([documentId]) => [id("listAnnotations", documentId, "documentId")],
+  addAnnotations: ([documentId, inputs]) => [id("addAnnotations", documentId, "documentId"), records("addAnnotations", inputs, "inputs", MAX_MARKS_AT_ONCE)],
+  updateAnnotation: ([annotationId, changes]) => [id("updateAnnotation", annotationId, "annotationId"), record("updateAnnotation", changes, "changes")],
+  deleteAnnotation: ([annotationId]) => [id("deleteAnnotation", annotationId, "annotationId")],
+  restoreAnnotations: ([documentId, annotations]) => [id("restoreAnnotations", documentId, "documentId"), records("restoreAnnotations", annotations, "annotations", MAX_MARKS_AT_ONCE)],
 };
 
 /** The desktop-only backup methods take nothing: the main process asks with a dialog, so no path ever comes from the renderer. */
