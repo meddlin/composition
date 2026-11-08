@@ -6,8 +6,8 @@ Run 2026-11-07. Code: `src/search/` (`query.rs`, `typo.rs`, `index.rs`), tests i
 the Linux app could drop the sidecar?
 
 **Answer: yes, at that bar, on the first run.** **The decision went the other way** (2026-11-07, the user): the native Linux app bundles
-Meilisearch as the desktop does ([D-search in the design](../../../../docs/linux-native-app-design.md#decisions)). This note is the
-evidence for the fallback, and the parser result is needed either way.
+Meilisearch as the desktop does ([D5 in the design](../../../../docs/linux-native-app-design.md#decisions)), and [S9](../s9-meili/RESULT.md) proves that route. This note is
+evidence only, and the parser result is needed either way.
 
 ## What was compared
 

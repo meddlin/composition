@@ -45,8 +45,11 @@ decided, proposed, or needs you).
   only**; **Meilisearch bundled as on the desktop**; **GNOME first, KDE best-effort**; **`.deb` first, then Flatpak, no AppImage**.
 - **The finding that most changes the picture: the memory win is not there.** With the preview on, the whole app measured **329 to 452 MB
   PSS** in the container, against the 395 MB measured for Electron on a Mac. WebKitGTK's web process alone was about 170 MB, and Meilisearch
-  is not in that number. Different OS and method, so no verdict; but nothing here shows a saving, so the case for this app is **how it feels
+  adds about 105 to 115 MB resident on top (a different measure). Different OS and method, so no verdict; but nothing here shows a saving, so the case for this app is **how it feels
   and what it integrates with** (libadwaita, dark mode, IME, AT-SPI, GNOME conventions), not its footprint ([C1](#compromise-register)).
+- **Meilisearch is bundled exactly as the desktop does it, and the Rust twin gets the desktop's own answers.** All 274 corpus queries over
+  100 and 1,000 notes matched the committed answers with 0 differences, on Linux arm64 (no network) and macOS; a hard kill and restart passed;
+  the sidecar dies 54 ms after the app is killed. A Linux arm64 pin is needed and verified ([Search](#search), [S9](../apps/linux/spikes/s9-meili/RESULT.md)).
 - **No third MDX port.** Because the Preview reuses the web code, the ten components, footnotes, charts and themes cost nothing to keep
   identical on Linux. That is the biggest saving of the design, and it is why the Preview stays a web view ([C3](#compromise-register)).
 - **The costs that matter most:** the notes rules now exist three times in code (TypeScript, Swift, Rust) and the sync engine will be written
@@ -155,7 +158,8 @@ The policy is the iPad's: **the newest language that reaches the API, and no mor
 | `rusqlite` 0.41 with `bundled` | SQLite 3.54.1, FTS5 | System SQLite also tested: 3.45.1 on Ubuntu 24.04 |
 | `flate2` 1.1 (pure-Rust backend), `tar` 0.4 | Backup | No C zlib needed |
 | `serde`, `serde_json`, `sha2`, `thiserror`, `unicode-normalization` | Settings, backup, errors | |
-| An HTTP client, a YAML reader, a Meilisearch client | Later | Chosen when needed. The iPad hand-wrote its YAML for `js-yaml` rules |
+| `ureq` 3.5.1 (blocking HTTP), `libc` (signals, `prctl`) | The Meilisearch sidecar ([S9](../apps/linux/spikes/s9-meili/RESULT.md)) | The ten REST calls were written by hand; whether to use `meilisearch-sdk` instead is open |
+| A YAML reader | Later | The iPad hand-wrote its YAML for `js-yaml` rules |
 
 Supply chain, in line with [SECURITY.md](../SECURITY.md): exact versions, a locked tree, `cargo deny` or `cargo audit` in CI, and every new
 `uses:` in a workflow pinned to a commit SHA ([AGENTS.md](../AGENTS.md)).
@@ -312,28 +316,49 @@ schemes and a completion framework. What the container showed ([S4](../apps/linu
 
 ### Search
 
-**Decided (2026-11-07, you): Meilisearch, bundled, as the desktop does** ([D5](#decisions)). I had recommended SQLite FTS5 with the iPad's typo
-layer; that stays measured and ready as the fallback.
+**Decided (2026-11-07, you): Meilisearch, bundled, exactly as the Electron app and the Windows design do** ([D5](#decisions)). The earlier
+FTS5 recommendation is kept as evidence only ([S2](../apps/linux/spikes/s1-core/RESULT-search.md)); nothing in the plan depends on it.
 
-What it means for the build:
+**It is the same mechanism, step for step, and S9 ran it** ([S9](../apps/linux/spikes/s9-meili/RESULT.md): a Rust twin of `meili.ts` and
+`searchIndex.ts`, on Linux arm64 with no network and on macOS):
 
-- **Bundle the community Meilisearch** (MIT; an asset name must never contain `enterprise`, as `meilisearch.lock.json` already warns): 121 MB
-  for `linux-aarch64`, 126 MB for `linux-amd64` at v1.53.1. The desktop's lock pins only `linux-x64`, so the native app needs its own lock
-  with an arm64 pin (not edited here).
-- **Port `meili.ts`** (random free port, master key kept in a 0600 file and passed in the environment, production mode, a working
-  directory the app can write, a pid file so a crash leaves no orphan, health poll, terminate then kill) and `searchIndex.ts`
-  (index settings, `indexNote`, `reindexAll`, `searchNoteIds`) to Rust, with an HTTP client. **Unbuilt and unspiked** (S9).
-- **The query parser is already ported and exact:** 272 of 272 queries make the same text, filters and attributes as the desktop's.
-- **The same behaviour as the desktop** (typo tolerance, ranking), which the iPad does not have ([C1 in the iPad doc](ipad-app-design.md#compromise-register)).
-- **The same drift as the desktop:** the native app and the Electron app each own an index, so an edit in one is missing from the other's
-  search until it rebuilds ([product-builds.md](product-builds.md#search-index-drift-between-the-apps)).
-- **The memory cost stays:** a second process, with a peak of 923 MB measured on the Mac in the efficiency session and not re-measured on
-  Linux. Not in the numbers under [C1](#compromise-register).
+| | Same as the desktop |
+|---|---|
+| **The binary** | The community build pinned in `meilisearch.lock.json` (version, asset name, SHA-256, size), fetched and verified by the same rule (delete on a digest mismatch), never an `enterprise` asset. In a package it sits beside the app, as `electron-builder` puts it in `meilisearch/` |
+| **The process** | A random loopback port; the master key in a `0600` file and in the environment, never argv; `MEILI_ENV=production`; `--db-path`, `--dump-dir`, `--snapshot-dir`, `--no-analytics`; the state folder as the working directory; a pid file and a reaper that kills only a process whose command line names our data folder; a health poll (143 to 317 ms to healthy); `SIGTERM`, then `SIGKILL` |
+| **The index** | One index `notes`, primary key `id`; searchable `title, content, description`; filterable `tags, created_at_ts, updated_at_ts`; sortable `updated_at_ts`; the same document shape and the same query |
+| **The result** | **All 274 corpus queries over 100 and over 1,000 notes returned the committed Meilisearch answers with 0 differences** (same ids, same order), on both platforms; a hard kill in the middle of indexing, a restart and a rebuild passed |
 
-**The evidence for the fallback** ([S2](../apps/linux/spikes/s1-core/RESULT-search.md)): FTS5 plus the iPad's typo layer, ported to Rust, met
-the iPad's own acceptance criteria on the first run (159 of 159 exact queries with Meilisearch's set, 0 of 95 typo queries missing anything,
-median 0.1 ms and slowest 0.6 to 1.6 ms over 1,000 notes), with no sidecar. **Reconsider if** Gate B or C numbers for memory, start-up or
-arm64 packaging make Meilisearch unacceptable.
+**What S9 added or found, for the build:**
+
+- **Feed documents in `DISPLAY_ORDER`** (`position IS NOT NULL, position, updated_at DESC, id DESC`, what `listNotes()` returns). Meilisearch
+  breaks ties by the order it was given the documents; loading by id changed the order of 203 of 274 answers.
+- **Ask for `id` only** (`attributesToRetrieve`). The desktop's query returns whole notes it discards; on Linux that made a median query
+  **44 to 47 ms** in the Rust client instead of **0.6 to 0.9 ms**, with identical answers. Whether the TypeScript client pays the same on
+  Linux is unverified.
+- **`PR_SET_PDEATHSIG`**: the sidecar was gone **54 ms** after the app was `SIGKILL`ed, which the Electron app cannot do (it reaps an orphan at
+  its *next* start). It must be spawned from the main thread; the pid-file reaper stays as the second line. This is the Linux counterpart of
+  the Windows design's Job Object, which has only been compiled.
+- **Memory of the sidecar:** 61 to 70 MB right after start, **105 to 115 MB** resident after indexing 1,000 notes, and a **transient of about
+  550 MB while indexing**. The 923 MB peak measured on the Mac earlier was for a different workload and was not reproduced.
+- **A Linux arm64 pin is needed and was verified:** `meilisearch-linux-aarch64`, 127,575,104 bytes, SHA-256
+  `c156cbf7914c7af737422bcb60196366e9f9680a7ebd19ea5fd78fdaf7ac1256`, from GitHub's digest (the `linux-amd64` digest GitHub shows is the
+  desktop's existing pin, so the field can be trusted). `meilisearch.lock.json` and its validator (which accepts only `mac-arm64`,
+  `mac-x64`, `linux-x64`) need a `linux-arm64` entry; **neither was edited**. The native app reuses that one lock, as the Windows design does.
+- **In a `.deb`:** one binary per architecture, beside the app (for example `/usr/lib/composition-gtk/meilisearch/meilisearch`), found
+  relative to the executable; the amd64 package carries `linux-amd64`, the arm64 package `linux-aarch64`.
+- **Where its state lives:** a `search/` folder under the XDG data directory (`meili_data`, `dumps`, `snapshots`, the key, the pid file and the
+  log), the shape of the desktop's `Application Support/Composition/search`, and **never shared with the Electron app's** ([D23](#decisions)).
+- **Licences:** the MIT text ships as the desktop's `licenses/meilisearch-LICENSE-MIT.txt` does, and the desktop's own warning applies unchanged:
+  the Meilisearch **Rust-crate licence list is not generated yet, which its build calls a release blocker for a public release**.
+- **The same behaviour as the desktop** (typo tolerance and ranking), which the iPad does not have, and **the same drift**: the native app and
+  the Electron app each own an index, so an edit in one is missing from the other's search until it rebuilds
+  ([product-builds.md](product-builds.md#search-index-drift-between-the-apps)).
+- **Not covered:** x86-64 Linux (the amd64 binary was never run), a `.deb` or Flatpak sandbox, AppArmor, a Rust client crate (the ten REST calls
+  were written by hand over `ureq`), and starting it from the GTK app.
+
+**The fallback evidence** ([S2](../apps/linux/spikes/s1-core/RESULT-search.md)): FTS5 plus the iPad's typo layer, ported to Rust, also met the
+iPad's acceptance criteria on the first run, with no sidecar. It is not planned work; reopening [D5](#decisions) is yours.
 
 ### App structure, windows and themes
 
@@ -380,7 +405,7 @@ Gate B (VM) and Gate C (a physical machine); the last column says whether a cont
 | N9 | **GNOME conventions:** launcher entry and dock icon match the window; About; shortcuts window; preferences; the primary menu; middle-click paste; `Ctrl+Shift+U`; the context menu with spelling suggestions | VM | No | ⬜ |
 | N10 | **Adapts:** down to 360 px with the sidebar collapsing; maximised and tiled windows | VM, resizing | No | ⬜ |
 | N11 | **Performance (proposals):** a usable note list within about a second of launch; typing in a 5,000-line note with no visible lag; scrolling the preview; idle memory (a target set after the first real measurement) | VM, then the physical machine | No | ⬜ |
-| N12 | **Install and removal:** the `.deb` installs on a clean VM and starts from the launcher; Meilisearch dies with the app; removal leaves the data | Clean VM | No | ⬜ |
+| N12 | **Install and removal:** the `.deb` installs on a clean VM and starts from the launcher; Meilisearch dies with the app; removal leaves the data | Clean VM | Partly (the sidecar dies with a killed app, S9) | ⬜ |
 | N13 | **Web views only where listed** (E1 Preview, E2 draw.io editor, E3 Reading List), **with the WebKitGTK sandbox on** | Review; the sandbox checked on the VM | No | ⬜ |
 | N14 | **Data safety:** a save survives killing the app mid-typing; the Electron app and the CLI can open the database afterwards | Kill and relaunch; open in each | Partly (the core) | ⬜ |
 
@@ -392,7 +417,7 @@ Gate B (VM) and Gate C (a physical machine); the last column says whether a cont
 | Milestone | What | Installed as |
 |---|---|---|
 | **M1: usable notebook** | The sync-ready store; notebooks, groups, notes, Trash Can and favorites; the Markdown, Preview and Split tabs; Meilisearch search; images (paste, picker, files); the MDX components through the preview; the five schemes plus System; backup and restore; accessibility and IME basics | A `.deb` on the VM. **Pre-v1** |
-| **M2: writing parity** | Typing aids (`<` completions, `[[` picker, Tab indent), `<Mark>` highlighting in the editor and the preview, find in a note, spelling, attachments, the Images page, application data location, open in a new window, the draw.io editor if S9 allows | A fast-follow `.deb`. **Pre-v1** |
+| **M2: writing parity** | Typing aids (`<` completions, `[[` picker, Tab indent), `<Mark>` highlighting in the editor and the preview, find in a note, spelling, attachments, the Images page, application data location, open in a new window, the draw.io editor (E2) once a spike shows the vendored editor works in WebKitGTK | A fast-follow `.deb`. **Pre-v1** |
 | **M3: first release** | M1 and M2 hardened: the † rows, the native-bar audit on the physical machine, the manual test page, `.deb` for x64 and arm64 in GitHub Releases, then a Flatpak | The first release, as a native preview |
 
 **Never cut:** the store, the Trash Can, backup and restore, search, the Preview, images, accessibility and the input method.
@@ -460,7 +485,8 @@ same pull request that changes it.**
 
 | Feature | Kind | Plan | Status | Native approach and notes |
 |---|:-:|:-:|:-:|---|
-| Fuzzy full-text search | 🔁 | M1 | ⬜ | **Meilisearch**, bundled ([D5](#decisions)); supervisor and index ported; fallback measured ([S2](../apps/linux/spikes/s1-core/RESULT-search.md)) |
+| Fuzzy full-text search | 🔁 | M1 | 🔬 | **Meilisearch**, bundled like the desktop ([D5](#decisions)); the Rust twin of `meili.ts` and `searchIndex.ts` matched all 274 committed answers ([S9](../apps/linux/spikes/s9-meili/RESULT.md)) |
+| Search engine comes with the app | 🔁 | M1 | 🔬 | The lock-pinned community binary in the package; a Linux arm64 pin to add; the supervisor ported (S9) |
 | Field filters (`tag:`, `title:`, `created:` ...) | 🔁 | M1 | 🔬 | The parser is ported and identical on 272 queries |
 | Search bar | ⭐ | M1 | ⬜ | `GtkSearchEntry` in the sidebar (spiked) |
 | Find in a note | ⭐ | M2 | ⬜ | GtkSourceView search context; WebKit `FindController` in the preview |
@@ -532,10 +558,10 @@ What we give up. Ids are permanent once this page is agreed. **Status:** *Propos
 
 | Id | Compromise | Impact | Why | Mitigation and when to revisit | Status |
 |---|---|:-:|---|---|:-:|
-| **C1** | **No memory saving is shown.** With the preview on the app measured 329 to 452 MB PSS in a container, against 395 MB for Electron on a Mac; Meilisearch is extra. | High | WebKitGTK's web process costs about what Chromium's renderer does (about 170 MB here); the preview bundle is 2.0 MB of JS; Meilisearch is a second process. | Measure on the VM and the machine before the claim is made anywhere; trim the bundle (lazy highlight languages); revisit D5 if Meilisearch dominates. The case for this app is feel and integration. | Proposed |
+| **C1** | **No memory saving is shown.** With the preview on the app measured 329 to 452 MB PSS in a container, against 395 MB for Electron on a Mac, and Meilisearch adds about 105 to 115 MB resident (a different measure, so the sum is only indicative: roughly 430 to 570 MB). | High | WebKitGTK's web process costs about what Chromium's renderer does (about 170 MB here); the preview bundle is 2.0 MB of JS; Meilisearch is a second process. | Measure on the VM and the machine before the claim is made anywhere; trim the bundle (lazy highlight languages); revisit D5 if Meilisearch dominates. The case for this app is feel and integration. | Proposed |
 | **C2** | **The notes rules exist three times in code** (TypeScript, Swift, Rust), plus C# on Windows, and the sync engine will be written again. | High | The price of native per platform. | The shared corpus; the sync server's contract suite; revisit with [D19](#decisions). | Accepted (your 2026-11-07 direction) |
 | **C3** | **The Preview is a web view,** an exception to the native bar, with a sandbox that is unverified on a real Ubuntu 24.04. | Med | Rebuilding ten MDX components natively is the cost it avoids. | E1 to E3 are the only web views; sandbox on; the native-renderer route (O4) is the way out. | Accepted (you, 2026-11-07) |
-| **C4** | **Search stays Meilisearch:** 121 MB bundled, a second process with a measured peak of 923 MB on the Mac, a separate index per app (drift), an arm64 pin to add, and behaviour that differs from the iPad's FTS5. | Med | Your decision, for identical search to the desktop. | The FTS5 fallback is measured ([S2](../apps/linux/spikes/s1-core/RESULT-search.md)); revisit on Gate B or C numbers. | Accepted (you, 2026-11-07) |
+| **C4** | **Search stays Meilisearch:** 121 to 126 MB bundled, a second process (about 105 to 115 MB resident for 1,000 notes, a transient of about 550 MB while indexing, both measured on Linux arm64), a separate index per app (drift), an arm64 pin to add, and behaviour that differs from the iPad's FTS5. | Med | Your decision, for identical search to the desktop and Windows. | Proven to give the desktop's own answers ([S9](../apps/linux/spikes/s9-meili/RESULT.md)); `--max-indexing-memory` was not tried. | Accepted (you, 2026-11-07) |
 | **C5** | **GNOME first, KDE best-effort:** it looks like a GTK app on Plasma. | Low | Your decision. | A Qt front end on the same core if KDE users matter. | Accepted (you, 2026-11-07) |
 | **C6** | **No AppImage;** `.deb` first, Flatpak second. | Low | About 250 MB of libraries, helper and sandbox paths, the user-namespace question. | Revisit only if users ask. | Accepted (you, 2026-11-07) |
 | **C7** | **A floor of libadwaita 1.5 and GTK 4.14** (Ubuntu 24.04): no system accent colour, none of the 1.6+ widgets; Ubuntu 22.04 and older are out. | Low | Checked in the headers. | Raise the floor when 24.04 ages out; newer widgets behind feature checks. | Proposed |
@@ -561,7 +587,7 @@ Recommendations are proposals until the status says *Decided*. **Needs you:** [D
 | D2 | The Electron Linux build stays the shipping plan. | Until you say otherwise. | **Decided** (you) |
 | D3 | **Which desktops count.** | **GNOME first (Ubuntu 24.04, then 26.04 and Fedora 45), KDE best-effort.** | **Decided** (you, 2026-11-07) |
 | D4 | **The Preview.** | **WebKitGTK running the desktop's own renderer**, over a native editor. | **Decided** (you, 2026-11-07) |
-| D5 | **Search.** | **Meilisearch, bundled, as the desktop does.** (I had recommended FTS5 plus the iPad's typo layer, now the measured fallback.) | **Decided** (you, 2026-11-07) |
+| D5 | **Search.** | **Meilisearch, bundled, exactly as the desktop and the Windows design do:** the same lock, process, flags, key handling and index, proven to give the desktop's own answers (S9). I had recommended FTS5 plus the iPad's typo layer; that is evidence only. | **Decided** (you, 2026-11-07); S9 done |
 | D6 | **Packaging.** | **`.deb` first, Flatpak second, no AppImage.** | **Decided** (you, 2026-11-07) |
 | D7 | **Test hardware.** | **An Ubuntu 24.04 VM on this Mac for Gate B; a physical x86-64 machine before release.** | **Decided** (you, 2026-11-07) |
 | D8 | One run with WebKitGTK's sandbox off, in a throwaway container. | Done: no network, no real notes, our bundle only. | **Decided** (you, 2026-11-07) |
@@ -579,6 +605,7 @@ Recommendations are proposals until the status says *Decided*. **Needs you:** [D
 | D20 | The CLI is not bundled. | A separate download. | Proposed |
 | D21 | Coexistence with Electron. | Ships beside it as a native preview with its own app id until you say otherwise. | Proposed |
 | D22 | No in-app updater in v1. | The package manager or Flatpak. | Proposed |
+| D23 | **Where Meilisearch's state lives, and its lock.** | A `search/` folder under the XDG data directory, never the Electron app's; one binary per architecture in the package; the native app reuses `meilisearch.lock.json` with a `linux-arm64` entry (values in S9), added by whoever owns `apps/desktop`. | Proposed |
 
 ## Risks and unknowns
 
@@ -588,7 +615,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 |---|---|---|---|
 | R1 | WebKitGTK's bubblewrap sandbox is blocked, or has to be weakened, on a real Ubuntu 24.04, where unprivileged user namespaces are restricted by AppArmor by default (unverified for a `.deb` app). The preview would not start. | Medium, high | Gate B runs with the sandbox on; an AppArmor profile in the `.deb`; the Flatpak sandbox; the native-renderer route (O4) as the way out. |
 | R2 | The footprint is no better than Electron's, and Meilisearch makes it worse ([C1](#compromise-register)). | High, medium | Measure on the VM and the machine; trim the bundle; the FTS5 fallback. |
-| R3 | Meilisearch on Linux arm64 and inside a Flatpak: the lock has no arm64 pin, the 121 to 126 MB binary, orphan processes after a crash, the peak memory. | Medium, medium | S9 before M1; the FTS5 fallback. |
+| R3 | Meilisearch on x86-64 Linux and inside a `.deb` or Flatpak sandbox: the amd64 binary was never run, the 121 to 126 MB binary, the transient of about 550 MB while indexing, `PR_SET_PDEATHSIG` under a sandbox (arm64 container: passed). | Low, medium | Run S9 again on the VM and the x86-64 machine (Gates B and C). |
 | R4 | The Rust, Swift and TypeScript implementations drift, and Windows adds a fourth. | High, high | D7's corpus; run it in CI on every side; D12. |
 | R5 | Input methods other than IBus-on-X11 with one engine: Wayland's text-input, Fcitx 5, Japanese and Chinese engines (unverified). | Medium, high | The Gate B matrix (N7). |
 | R6 | Orca with `GtkTextView` and with the web view's content (unverified; only the AT-SPI tree was read). | Medium, high | Gate B with Orca on; N6. |
@@ -615,6 +642,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | **S4b** | **Hidden marks** for the Live tab | C10; R7 | **Done:** the mechanism works; caret, selection, copy and IME unproven |
 | **S5** | **The preview bundle in WebKitGTK** | D4; R1 | **Done with the sandbox off, in a throwaway container:** renders every component; sandbox-on unverified ([RESULT](../apps/linux/spikes/s5-preview/RESULT.md)) |
 | **S6** | **Versions, closure, memory** | D6; R2 | **Done in a container:** 232 MB of libraries; 329 to 452 MB PSS with the preview on ([RESULT](../apps/linux/spikes/container/RESULT.md)) |
+| **S9** | **Meilisearch from Rust, like the desktop** | D5; R3 | **Done (Linux arm64, no network; macOS):** 274 of 274 answers identical on both corpora; hard kill and restart; the sidecar dies with the app; the Linux arm64 pin verified ([RESULT](../apps/linux/spikes/s9-meili/RESULT.md)) |
 
 **Spikes still to run:**
 
@@ -622,7 +650,6 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 |---|---|---|---|
 | **S7** | **The real desktop:** the shell and preview on an Ubuntu 24.04 VM, GNOME on Wayland and Xorg, the WebKitGTK sandbox **on**, Orca, IBus and Fcitx, scales 100 to 200 %, system dark mode, memory | R1, R5, R6, R14; N2 to N10 | **Gate B** |
 | **S8** | **The Live tab:** arrow keys, selection, copy and IME across hidden marks; headings drawn large; an inline image; a 5,000-line note | C10, R7 | Decide whether the Live tab is in v1 |
-| **S9** | **The Meilisearch sidecar from Rust on Linux:** spawn, health, key file, pid file, crash cleanup, x64 and arm64, memory and start-up, inside a Flatpak | D5, R3 | M1's search can start |
 | **S10** | **Packaging dry runs:** a `.deb` on a clean VM, a Flatpak manifest, the AppArmor profile if R1 needs one | D6, R1, R12 | Gate C |
 
 **Gate A** (yours, before any production code): accept the shape, [D12](#decisions) settled, the VM named, the floor ([D13](#decisions)) and
@@ -635,7 +662,7 @@ and preview on real GNOME, the sandbox on. **Gate C** (the physical x86-64 machi
 | # | Step | Gate |
 |---|---|---|
 | 1 | The workspace: `crates/core` promoted from S1, a Linux CI job (x64 and arm64) running `cargo test` against the corpus with actions pinned to SHAs, the settings store | |
-| 2 | Core operations against the corpus: notes, groups, notebooks, Trash Can (`store-script.json`, `trash-script.json`), frontmatter, links, image rules, autosave sessions; S9's Meilisearch supervisor and index | |
+| 2 | Core operations against the corpus: notes, groups, notebooks, Trash Can (`store-script.json`, `trash-script.json`), frontmatter, links, image rules, autosave sessions; the supervisor and index promoted from S9, fed in `DISPLAY_ORDER`, with the arm64 pin added to the lock | |
 | 3 | The shell: sidebar, note, Markdown, Preview and Split, search, System and dark mode, the preview bundle build wired into the app | **Gate B** (S7) |
 | 4 | M1: organization, images, backup and restore, the five schemes, accessibility and IME basics | M1 installed on the VM |
 | 5 | M2: typing aids, `<Mark>`, find, spelling, attachments, the Images page, windows, S8's decision | M2 installed |
@@ -659,7 +686,7 @@ Worked out by running it, in [spikes/README.md](../apps/linux/spikes/README.md#w
 
 - **A container can show:** that the code builds and runs against Ubuntu 24.04's libraries; a libadwaita window under Xvfb and under a
   headless Weston; the toolkit's accessibility tree; an IBus engine composing into the editor; WebKitGTK rendering the preview (with its
-  sandbox off); library sizes and `Depends`.
+  sandbox off); a bundled Meilisearch started, killed, restarted and queried (no network); library sizes and `Depends`.
 - **A container cannot show:** GNOME Shell and mutter (a headless mutter was not tried), whether it *feels* native, Orca, Wayland text input,
   Fcitx, system fonts and accent colours, **WebKitGTK's sandbox** (Docker denies user namespaces) and Ubuntu's AppArmor behaviour, portals,
   drag and drop between apps, `.deb` installation, real memory and speed (llvmpipe inflates the shell by about 125 MB), and x86-64 for the GTK
@@ -678,7 +705,8 @@ Every item here is **unverified**; none should be read as working.
 - Changing the system's dark mode or font while the app runs (both were forced from inside the app).
 - A real `.deb`, Flatpak or AppImage build; the size of a real package; `apt` resolving the `Depends`; Flathub's view of the home-folder permission.
 - Fedora's SQLite having FTS5 (Fedora 45 ships 3.53.4); x86-64 behaviour of the GTK app (only the core ran there, emulated); arm64 hardware.
-- Meilisearch started from Rust on Linux, on arm64, in a Flatpak, and its memory there.
+- Meilisearch on **x86-64** Linux (the amd64 binary was never run), inside a `.deb` or Flatpak sandbox, under Ubuntu's AppArmor, started from the GTK app's main thread, and whether `--max-indexing-memory` would cap its indexing transient. What *was* run, on Linux arm64 in a container: the supervisor, the index, 274 answers, the kill tests ([S9](../apps/linux/spikes/s9-meili/RESULT.md)).
+- Whether the desktop's own TypeScript search client pays the ~40 ms per query the Rust client paid until it asked for `id` only.
 - `libspelling` or `gspell` from Rust; `GtkSourceCompletion` for `<` and `[[`; clipboard image paste; drag and drop; the portals; `AdwBreakpoint` collapsing the sidebar.
 - The Live tab beyond hiding: arrow keys, selection, copy of hidden text, IME, headings, inline images, 5,000 lines.
 - A note-link click from the preview and typing in the editor driving the preview (the paths are wired and the first render was seen; neither was exercised by hand).
@@ -695,7 +723,9 @@ Reported, not filled:
 4. **The sync design places the engine in "the desktop app's main process and the iPad app"** only; the native Linux (and Windows) apps each add one.
 5. **A third copy of the schema text** exists (TypeScript, Swift, Rust), kept identical by hand.
 6. **The "reads what the Swift core wrote" half of the generator has no Linux twin** except `s1-core/tools/rust-fixtures.test.ts`.
-7. **The Docker image `ubuntu:24.04` on this Mac was an x86-64 image** (earlier Linux work ran emulated); the spikes force `--platform linux/arm64` for native speed.
+7. **`meilisearch.lock.json` and `scripts/meilisearch-lock.mjs`'s platform pattern lack `linux-arm64`** (values and source in [S9](../apps/linux/spikes/s9-meili/RESULT.md#the-binary-used-and-the-pin-linux-needs)); not edited. The Windows design also needs an entry the lock does not have.
+8. **The desktop's search query has no `attributesToRetrieve`**, so it returns whole notes it throws away; in the Rust client on Linux that cost ~44 ms per query (S9). Whether the TypeScript client does too is unverified.
+9. **The Docker image `ubuntu:24.04` on this Mac was an x86-64 image** (earlier Linux work ran emulated); the spikes force `--platform linux/arm64` for native speed.
 
 ## Docs to change when it ships
 
@@ -722,6 +752,8 @@ Reported, not filled:
   physical x86-64 machine before release (D7); one container run with WebKitGTK's sandbox off (D8). Nothing was verified on a real GNOME
   desktop. No gate has been passed.
 
+- 2026-11-07 (later): **Meilisearch bundling made explicit and proven (S9)**, at your instruction to bundle it like Windows and the Electron app: same lock, process, flags, key handling and index; 274 of 274 committed answers identical over both corpora on Linux arm64 and macOS; hard kill and restart; the sidecar dies with the app (54 ms); the Linux arm64 pin verified and the binary downloaded once with your approval. D5 firmed, D23 added, C1, C4, R3 and the spikes table updated. Found: feed documents in `DISPLAY_ORDER`; ask for `id` only (44 ms to 0.7 ms per query in this client).
+
 ## Sources
 
 - In this repository: [ipad-app-design.md](ipad-app-design.md) (the template), [architecture/data-model.md](architecture/data-model.md),
@@ -732,7 +764,7 @@ Reported, not filled:
 - On branch `claude/ipad-app-design-build-683ed8` (PR #247): `apps/ios/conformance/` (the corpus), `apps/web/scripts/ios-conformance-fixtures.test.ts`
   (its generator), `apps/ios/CompositionCore/` (the Swift reference the Rust was ported from).
 - The spikes' own result notes: [S1](../apps/linux/spikes/s1-core/RESULT.md), [S2](../apps/linux/spikes/s1-core/RESULT-search.md),
-  [S3 to S4b](../apps/linux/spikes/s3-shell/RESULT.md), [S5](../apps/linux/spikes/s5-preview/RESULT.md), [S6](../apps/linux/spikes/container/RESULT.md).
+  [S3 to S4b](../apps/linux/spikes/s3-shell/RESULT.md), [S5](../apps/linux/spikes/s5-preview/RESULT.md), [S6](../apps/linux/spikes/container/RESULT.md), [S9](../apps/linux/spikes/s9-meili/RESULT.md).
 - Package versions: `apt-cache policy` in `ubuntu:24.04` and `ubuntu:26.04`, `dnf repoquery` in `fedora:latest` (45); crate versions from crates.io;
-  Meilisearch assets from `gh api repos/meilisearch/meilisearch/releases/tags/v1.53.1`. No GNOME, GTK, libadwaita, WebKitGTK or Qt
+  Meilisearch assets and digests from `gh api repos/meilisearch/meilisearch/releases/tags/v1.53.1`; the `linux-aarch64` binary itself downloaded once, with your approval, and checked against that digest. No GNOME, GTK, libadwaita, WebKitGTK or Qt
   documentation was consulted for this page.

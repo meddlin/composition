@@ -13,6 +13,7 @@ passes Gate A. Dates are 2026-11-07. Rust 1.97.1.
 | **S4b** | Can the Live tab's hidden marks be done with `invisible` text tags? | [`s3-shell/src/bin/live_marks.rs`](s3-shell/src/bin/live_marks.rs) | same note: the mechanism works; caret, selection and copy over hidden text not tried |
 | **S5** | Can the desktop's own preview run standalone in WebKitGTK? | [`s5-preview/`](s5-preview/) | [RESULT.md](s5-preview/RESULT.md): yes, with the WebKit sandbox disabled in a throwaway container; sandbox-on unverified |
 | **S6** | What must a package carry, and what does it cost in memory? | [`container/`](container/) | [RESULT.md](container/RESULT.md): 232 MB of libraries; 329 to 452 MB PSS with the preview on (no saving shown) |
+| **S9** | Can Rust bundle and drive Meilisearch exactly as the desktop does (decided D5)? | [`s9-meili/`](s9-meili/) | [RESULT.md](s9-meili/RESULT.md): yes. 274 of 274 committed answers identical over both corpora, on Linux arm64 and macOS; hard kill and restart; the sidecar dies 54 ms after the app is killed; the Linux arm64 pin verified |
 
 Not done, and needed before the gates: see [What was not verified](../../../docs/linux-native-app-design.md#what-was-not-verified).
 
@@ -26,6 +27,7 @@ docker build --platform linux/arm64 -t composition-linux-spike:24.04 apps/linux/
 ```
 
 - **S1, S2** (needs a checkout of the iPad branch for the shared corpus; see `s1-core/run.sh`): `IPAD_TREE=<checkout> apps/linux/spikes/s1-core/run.sh`
+- **S9**: `MEILISEARCH_BIN=<the pinned v1.53.1 binary for your platform> COMPOSITION_CONFORMANCE_DIR=<the generator's output, as for S1> cargo test --release -- --test-threads=1 --nocapture` in `s9-meili/`; on Linux run it in the container with `docker run --init` (a zombie otherwise looks alive to the kill tests)
 - **S5**: `apps/linux/spikes/s5-preview/build.sh` (needs `pnpm --dir apps/web install` first), then `verify.sh <note.md>`
 - **S3**: build in the container with `cargo build --release` in `s3-shell/`; run through `container/xvfb-run.sh` (see the commands in
   `s3-shell/RESULT.md`, and `container/*.sh` for the AT-SPI, IME and footprint runs)
