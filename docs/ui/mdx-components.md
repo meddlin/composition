@@ -492,8 +492,11 @@ replaced as one change, so one undo takes it back.
 - **Copy cells**: the shown values with tabs between them, which Excel takes as cells when pasted.
 - **Not kept**, and the dialog says so: cell formats (a percent or a currency is the plain number), colours, fonts, column widths set by hand (columns
   are sized to their content), and a formula that gave a date shows the number of days, since a sheet has no cell formats.
-- **In the desktop app the download is disabled, with the reason**: the app blocks every download and has no native "save a file the page made"
-  bridge yet, so there it offers Copy cells only. In a browser the file is a normal download.
+- **Where the file goes.** In a browser the file is a normal download. The desktop app blocks every download, so there the page hands the file
+  (its bytes, a suggested name and whether it is `.xlsx` or `.csv`) to the app through `saveFile`, and the app opens the system's **save dialog**
+  with that name; the Export window says **Saved.** when it is written and says nothing when you dismiss the save dialog. The page never names a place: only the dialog does, the
+  app writes the file there only after you have chosen, and a failure (a full disk, a folder it cannot write to) says why. The name is only a
+  suggestion: the app removes any folder from it, and the file always ends in the extension for its type.
 - Checked in Excel itself: a workbook made this way (28 formulas, `SUMIFS` `XLOOKUP` `IFS` `TEXTJOIN` `MAXIFS` `EDATE` `INDEX`/`MATCH` `TEXT` `IFERROR`
   `IFNA` and more) opened with no repair prompt and no Protected View, Excel calculated it again, and **all 68 cells came to what this engine had calculated**.
 
