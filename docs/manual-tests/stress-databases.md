@@ -27,6 +27,8 @@ are about 20 MB, 60 MB and 230 MB.
 | `--seed N` | Random seed. Default 1. |
 | `--layout realistic\|flat` | `realistic` (default): several notebooks, groups nested four deep, a few very large groups, about 6% of notes ungrouped. `flat`: one notebook, no groups, every note ungrouped: the worst case for a long list. |
 | `--no-huge` | Leave out the edge-case notes tagged `huge` (about 15 MB). Use it to see what the note count alone costs. |
+| `--line-notes LIST` | Also add one note per line count in the list (`500,5000,10000`), titled `LINES: 5,000 lines`, ungrouped, in the first notebook. They are written last from a random stream of their own, so asking for them changes no other note. |
+| `--line-profile mixed\|plain` | What those notes hold. `mixed` (default) is headings, wrapped paragraphs, lists, code, quotes and tables; `plain` is wrapped paragraphs only. |
 
 ## Open it
 
@@ -89,6 +91,36 @@ ungrouped note for that size, with longer timeouts. That run took about ten minu
 To measure one database you already have, without building or generating anything, use the lower-level script:
 `NODE_PATH=$(npm root -g) apps/web/scripts/sample-db/measure/run-suite.sh <folder holding composition.db> [sections]`.
 The top of `measure/measure.mjs` lists its knobs.
+
+## Notes of 500, 5,000 and 10,000 lines
+
+A second test, for one question: what does the editor do as a single note gets longer? It makes a small database (100 notes,
+so the sidebar costs next to nothing and the line count is what changes) with one extra note for each line count, opens each
+in the built app on the Split tab, types ten characters on Split, Markdown and Live, and visits Preview.
+
+```bash
+pnpm manual:stress:lines                         # 500, 5,000 and 10,000 lines (a few minutes)
+pnpm manual:stress --lines 1000,20000            # other line counts
+pnpm manual:stress:lines --line-profile plain    # paragraphs only: no headings, lists or code
+pnpm manual:stress --sizes 1k --lines            # the 1,000-note run and this one in one go
+```
+
+It takes the other options of the stress test too (`--skip-build`, `--results`, `--install-playwright`; `--sections` does
+not apply to it). From GitHub, **Actions, Stress test (line counts), Run workflow** lets you pick the line counts and the
+profile. It runs only when you start it and never on a schedule; a pull request that changes the workflow or the scripts runs
+the 500-line note alone as a smoke test.
+
+**What the notes hold.** A note of *N* lines has *N* body lines (its frontmatter is extra), all hard-wrapped at 80 columns.
+`mixed` is a title, then a heading about every 25 lines, with paragraphs, lists, code blocks, quotes and tables between them
+(with the default seed: about 20, 160 and 370 headings, and 19, 200 and 390 KB for 500, 5,000 and 10,000 lines). `plain` has no
+headings and no markup (29, 290 and 585 KB). Run both to tell the effect of *more lines* from the effect of *more headings*:
+the Markdown tab places its heading rail once per heading, so a `mixed` note costs more there than a `plain` one of the same
+length ([finding 6](../stress-test-findings.md)).
+
+**Reading the table.** One column per note. Each keystroke row shows the median and the worst key, because a long note can type
+quickly and still freeze for seconds now and then. Typing stops after 30 seconds, so a slow note gets fewer than ten keys, and
+the cell says how many (`2.3 s / 16 s (5 of 10 keys)`): trust a median over five keys less than one over ten. The results
+are `lines.json` (or `lines-plain.json`) in the results folder, with the rest.
 
 ## The weekly run
 

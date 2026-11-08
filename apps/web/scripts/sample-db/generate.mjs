@@ -20,6 +20,11 @@
  *                  `flat`: one notebook, no groups, every note ungrouped (the worst case for a long list)
  *   --no-huge      leave out the edge-case notes tagged `huge` (200 KB to 3 MB each, about 15 MB in all), to see the
  *                  cost of the note count alone. Without it every database holds the same edge-case set, whatever its size.
+ *   --line-notes LIST   also add one note for each line count in LIST (for example 500,5000,10000), titled
+ *                  `LINES: 5,000 lines`, ungrouped, in the first notebook. They come last and from their own random stream,
+ *                  so asking for them never changes any other note. The count is of body lines: the frontmatter is extra.
+ *   --line-profile P    what those notes hold: `mixed` (default: headings, paragraphs, lists, code, quotes and tables, as a
+ *                  long note really looks) or `plain` (wrapped paragraphs only, so just the number of lines changes)
  *   --force        replace an existing composition.db in DIR
  *
  * The schema below is the final shape db.ts migrates to, written out whole so the app opens the file without migrating
@@ -36,6 +41,7 @@ import {
   codeDocument,
   edgeCases,
   everydayDocument,
+  lineDocument,
   loremDocument,
   loremSentence,
   makeRng,
@@ -98,7 +104,7 @@ const GROUP_WORDS = ["Projects", "Archive", "Reading", "Ideas", "Drafts", "Refer
 const TAG_POOL = [...GROUP_WORDS.map((w) => w.toLowerCase()), "todo", "draft", "idea", "important", "wip", "reference", "meeting", "snippet", "story", "lorem", "mdx", "test", "typescript", "python", "sql", "rust", "go", "css", "shell", "q1", "q2", "q3", "q4", "2024", "2025", "2026", "personal", "work", "urgent", "someday", "book", "article", "video", "recipe", "bug", "design", "api", "docs"];
 
 function parseArgs(argv) {
-  const args = { notes: undefined, out: undefined, seed: 1, layout: "realistic", force: false, huge: true };
+  const args = { notes: undefined, out: undefined, seed: 1, layout: "realistic", force: false, huge: true, lineNotes: [], lineProfile: "mixed" };
   for (let i = 0; i < argv.length; i++) {
     const flag = argv[i];
     const value = () => {
@@ -112,6 +118,8 @@ function parseArgs(argv) {
     else if (flag === "--layout") args.layout = value();
     else if (flag === "--force") args.force = true;
     else if (flag === "--no-huge") args.huge = false;
+    else if (flag === "--line-notes") args.lineNotes = value().split(",").map((item) => Number(item.trim()));
+    else if (flag === "--line-profile") args.lineProfile = value();
     else if (flag === "--help" || flag === "-h") args.help = true;
     else throw new Error(`Unknown option ${flag}`);
   }
@@ -163,10 +171,20 @@ function weightedIndexPicker(weights, r) {
 
 const iso = (ms) => new Date(ms).toISOString();
 
-export function generate({ notes: total, out, seed = 1, layout = "realistic", force = false, huge = true, log = () => {} }) {
+/**
+ * @param {{
+ *   notes: number, out: string, seed?: number, layout?: string, force?: boolean, huge?: boolean,
+ *   lineNotes?: number[], lineProfile?: string, log?: (line: string) => void,
+ * }} options  See the options at the top of this file; they are the same, by their camelCase names.
+ */
+export function generate({ notes: total, out, seed = 1, layout = "realistic", force = false, huge = true, lineNotes = [], lineProfile = "mixed", log = () => {} }) {
   if (!Number.isInteger(total) || total < 100) throw new Error("--notes must be a whole number of at least 100");
   if (!out) throw new Error("--out is required");
   if (layout !== "realistic" && layout !== "flat") throw new Error('--layout must be "realistic" or "flat"');
+  if (lineProfile !== "mixed" && lineProfile !== "plain") throw new Error('--line-profile must be "mixed" or "plain"');
+  if (!lineNotes.every((count) => Number.isInteger(count) && count >= 1 && count <= 1_000_000) || new Set(lineNotes).size !== lineNotes.length) {
+    throw new Error("--line-notes must be a list of different whole numbers of lines, each from 1 to 1,000,000");
+  }
 
   const dir = path.resolve(out);
   const dbPath = path.join(dir, "composition.db");
@@ -273,6 +291,7 @@ export function generate({ notes: total, out, seed = 1, layout = "realistic", fo
     }
   };
   const nextPosition = new Map();
+  const lineManifest = [];
 
   db.transaction(() => {
     notebookShare.forEach((_, index) => {
@@ -344,6 +363,29 @@ export function generate({ notes: total, out, seed = 1, layout = "realistic", fo
       stats.byKind[plan.kind] = (stats.byKind[plan.kind] ?? 0) + 1;
       if (index % 5000 === 4999) log(`  ${index + 1} / ${order.length} notes`);
     });
+
+    // Notes of an exact number of lines: last, and from a random stream of their own, so no other note depends on them.
+    const lineRng = makeRng((seed ^ 0x6c696e65) >>> 0);
+    lineNotes.forEach((count, k) => {
+      const title = `LINES: ${count.toLocaleString("en-US")} lines`;
+      const tags = ["line-count", lineProfile];
+      const at = iso(ANCHOR_END - (lineNotes.length - k) * 3_600_000);
+      const content = frontmatterOf({ title, description: "", tags, createdAt: at, updatedAt: at }) + lineDocument(lineRng, count, lineProfile);
+      insertNote.run({
+        id: order.length + 1 + k,
+        title,
+        content,
+        createdAt: at,
+        updatedAt: at,
+        tags: tags.join(","),
+        description: "",
+        groupId: null,
+        position: null,
+        notebookId: 1,
+        uuid: uuid(),
+      });
+      lineManifest.push({ lines: count, title, profile: lineProfile, bytes: Buffer.byteLength(content) });
+    });
   })();
 
   db.pragma("wal_checkpoint(TRUNCATE)");
@@ -373,6 +415,7 @@ export function generate({ notes: total, out, seed = 1, layout = "realistic", fo
     edgeCases: edge.length,
     contentBytes: { total: stats.bytes, median: pct(0.5), p90: pct(0.9), p99: pct(0.99), max: stats.maxBytes },
     dbBytes: fs.statSync(dbPath).size,
+    ...(lineManifest.length ? { lineNotes: lineManifest } : {}),
   };
   fs.writeFileSync(path.join(dir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
   return { dir, dbPath, manifest };
@@ -382,14 +425,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const args = parseArgs(process.argv.slice(2));
     if (args.help || args.notes === undefined || !args.out) {
-      console.log("Usage: node scripts/sample-db/generate.mjs --notes N --out DIR [--seed N] [--layout realistic|flat] [--no-huge] [--force]");
+      console.log("Usage: node scripts/sample-db/generate.mjs --notes N --out DIR [--seed N] [--layout realistic|flat] [--no-huge] [--line-notes 500,5000] [--line-profile mixed|plain] [--force]");
       process.exit(args.help ? 0 : 1);
     }
     const started = Date.now();
     const { dir, manifest } = generate({ ...args, log: (line) => console.log(line) });
     const mb = (n) => `${(n / 1_048_576).toFixed(1)} MB`;
     console.log(
-      `Wrote ${manifest.notes} notes in ${manifest.groups} groups across ${manifest.notebooks.length} notebook(s) to ${dir} ` +
+      `Wrote ${manifest.notes} notes${manifest.lineNotes ? ` and ${manifest.lineNotes.length} line-count note(s)` : ""} in ${manifest.groups} groups across ${manifest.notebooks.length} notebook(s) to ${dir} ` +
         `(${mb(manifest.dbBytes)}, ${((Date.now() - started) / 1000).toFixed(1)} s)\n` +
         `Open it with: COMPOSITION_SETTINGS_PATH=${path.join(dir, "settings.json")} pnpm --dir apps/web dev`,
     );

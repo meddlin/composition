@@ -7,6 +7,9 @@
 #   pnpm manual:stress --sizes 1k,10k,50k      add the 50,000-note run (needs about 4 GB for the server and more for the browser)
 #   pnpm manual:stress --skip-build            reuse the last build (it will not notice code changes since)
 #
+#   pnpm manual:stress:lines                   one note each of 500, 5,000 and 10,000 lines, in every editor tab
+#   pnpm manual:stress --lines 1000,20000      other line counts (add --line-profile plain to take the markup out)
+#
 # Exit status: 0 when every step completed, 1 when a step timed out, a tab crashed or a run stopped early, 2 on a usage or
 # set-up problem. How slow things are is reported, never failed on: that moves with the machine.
 set -uo pipefail
@@ -29,6 +32,11 @@ Usage: stress-test.sh [options]
   --skip-build          do not rebuild the app first (the default builds, so the numbers match the code)
   --install-playwright  install the pinned Playwright and its Chromium if it is not found (into ~/.cache, not the repo)
   --keep-databases      keep the generated databases (about 20, 60 and 230 MB) instead of deleting them
+  --lines [LIST]        also (or, without --sizes and --quick, only) run notes of exact line counts, comma separated
+                        (default 500,5000,10000): one small database with a `LINES: N lines` note for each, opened and typed
+                        in on Split, Markdown and Live and visited on Preview. --sections does not apply to this run.
+  --line-profile P      what those notes hold: mixed (default: headings, paragraphs, lists, code, quotes and tables) or plain
+                        (wrapped paragraphs only, so that just the number of lines changes)
   -h, --help            this text
 
 Needs: node, pnpm, `pnpm --dir apps/web install`, and Playwright (or --install-playwright).
@@ -52,18 +60,31 @@ LEAN=0
 QUICK=0
 INSTALL_PLAYWRIGHT=0
 KEEP=0
+LINES_MODE=0
+LINES="500,5000,10000"
+LINE_PROFILE=mixed
 
 while [ $# -gt 0 ]; do
   case $1 in
-    --sizes | --sections | --results | --seed)
+    --sizes | --sections | --results | --seed | --line-profile)
       [ $# -ge 2 ] || fail "$1 needs a value"
       case $1 in
         --sizes) SIZES=$2 ;;
         --sections) SECTIONS=$2 ;;
         --results) RESULTS=$2 ;;
         --seed) SEED=$2 ;;
+        --line-profile) LINE_PROFILE=$2 ;;
       esac
       shift 2
+      ;;
+    --lines)
+      LINES_MODE=1
+      # An optional list of line counts; a bare --lines (or one followed by another option) means the default three.
+      if [ $# -ge 2 ] && [[ $2 =~ ^[0-9][0-9,]*$ ]]; then
+        LINES=$2
+        shift
+      fi
+      shift
       ;;
     --quick) QUICK=1; shift ;;
     --lean) LEAN=1; shift ;;
@@ -79,8 +100,10 @@ if [ "$QUICK" = 1 ]; then
   : "${SIZES:=1k}"
   : "${SECTIONS:=load,open,typing}"
 fi
-: "${SIZES:=1k,10k}"
+# Asking for the line-count notes alone means just those, not the usual sizes as well.
+[ "$LINES_MODE" = 1 ] || : "${SIZES:=1k,10k}"
 case $SEED in '' | *[!0-9]*) fail "--seed must be a whole number" ;; esac
+case $LINE_PROFILE in mixed | plain) ;; *) fail "--line-profile must be mixed or plain" ;; esac
 
 notes_for() {
   case $1 in
@@ -92,10 +115,18 @@ notes_for() {
   esac
 }
 
-IFS=',' read -r -a SIZE_LIST <<< "$SIZES"
-for size in "${SIZE_LIST[@]}"; do
+# macOS still ships bash 3.2, where expanding an empty array under `set -u` is an error: hence the ${arr[@]+...} form.
+SIZE_LIST=()
+[ -z "$SIZES" ] || IFS=',' read -r -a SIZE_LIST <<< "$SIZES"
+for size in ${SIZE_LIST[@]+"${SIZE_LIST[@]}"}; do
   notes_for "$size" > /dev/null || fail "unknown size '$size' (use 1k, 10k, 50k or a number of notes)"
 done
+if [ "$LINES_MODE" = 1 ]; then
+  IFS=',' read -r -a LINE_LIST <<< "$LINES"
+  for count in "${LINE_LIST[@]}"; do
+    case $count in '' | *[!0-9]* | 0*) fail "--lines wants whole numbers of lines, comma separated (got '$count')" ;; esac
+  done
+fi
 
 # ---- prerequisites -----------------------------------------------------------------------------------------------------
 command -v node > /dev/null || fail "node was not found"
@@ -109,8 +140,11 @@ if [ "$INSTALL_PLAYWRIGHT" = 1 ]; then
   if ! playwright_found; then
     cache="${COMPOSITION_STRESS_CACHE:-${XDG_CACHE_HOME:-$HOME/.cache}/composition-stress}/playwright-$PLAYWRIGHT_VERSION"
     mkdir -p "$cache" || fail "could not create $cache"
-    echo "Installing Playwright $PLAYWRIGHT_VERSION into $cache"
-    npm install --prefix "$cache" --no-save --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" > /dev/null || fail "npm could not install playwright@$PLAYWRIGHT_VERSION"
+    # Already there from an earlier run: use it, without going to the network again.
+    if [ ! -f "$cache/node_modules/playwright/package.json" ]; then
+      echo "Installing Playwright $PLAYWRIGHT_VERSION into $cache"
+      npm install --prefix "$cache" --no-save --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" > /dev/null || fail "npm could not install playwright@$PLAYWRIGHT_VERSION"
+    fi
     export NODE_PATH="$cache/node_modules${NODE_PATH:+:$NODE_PATH}"
     playwright_found || fail "Playwright was installed into $cache but cannot be loaded from here"
   fi
@@ -158,7 +192,7 @@ fi
 # ---- run each size -----------------------------------------------------------------------------------------------------
 status=0
 result_files=()
-for size in "${SIZE_LIST[@]}"; do
+for size in ${SIZE_LIST[@]+"${SIZE_LIST[@]}"}; do
   notes=$(notes_for "$size")
   label=$size
   [ "$LEAN" = 0 ] || label="$size-lean"
@@ -181,10 +215,27 @@ for size in "${SIZE_LIST[@]}"; do
   echo "== $label: measuring"
   suite=("$HERE/measure/run-suite.sh" "$db")
   [ -z "$sections" ] || suite+=("$sections")
-  env "${run_env[@]}" RESULTS_DIR="$RESULTS" "${suite[@]}" || status=1
+  env ${run_env[@]+"${run_env[@]}"} RESULTS_DIR="$RESULTS" "${suite[@]}" || status=1
   # Listed even if the run left no file, so the summary reports it as a failure instead of leaving it out.
   result_files+=("$RESULTS/$label.json")
 done
+
+# ---- notes of exact line counts ----------------------------------------------------------------------------------------
+if [ "$LINES_MODE" = 1 ]; then
+  label=lines
+  [ "$LINE_PROFILE" = mixed ] || label="lines-$LINE_PROFILE"
+  db="$WORK/$label"
+
+  # A small database (so the sidebar costs next to nothing and the line count is what changes) plus one note per line count.
+  echo
+  echo "== $label: making a small database with notes of $LINES lines ($LINE_PROFILE)"
+  generate=(node "$HERE/generate.mjs" --notes 100 --no-huge --line-notes "$LINES" --line-profile "$LINE_PROFILE" --out "$db" --seed "$SEED" --force)
+  "${generate[@]}" > "$WORK/generate-$label.log" 2>&1 || { cat "$WORK/generate-$label.log" >&2; fail "could not generate the $label database"; }
+
+  echo "== $label: measuring"
+  env "STEP_TIMEOUT_MS=${STEP_TIMEOUT_MS:-180000}" "TYPE_BUDGET_MS=${TYPE_BUDGET_MS:-30000}" RESULTS_DIR="$RESULTS" "$HERE/measure/run-suite.sh" "$db" "load,lines" || status=1
+  result_files+=("$RESULTS/$label.json")
+fi
 
 # ---- summary -----------------------------------------------------------------------------------------------------------
 echo

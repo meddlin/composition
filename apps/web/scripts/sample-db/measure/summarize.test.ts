@@ -97,3 +97,66 @@ describe("summarize", () => {
     expect(markdown).toContain("**50k**: `pageerror: Minified React error #418");
   });
 });
+
+describe("summarize, line-count notes", () => {
+  const linesRun = (extra: Record<string, unknown>[] = []) => ({
+    steps: [
+      { name: "load /", htmlMB: 2, interactiveMs: 900, maxLongMs: 100, domNodes: 1000, jsHeapMB: 20 },
+      // Deliberately out of order: the columns must come out smallest first.
+      step("lines[LINES: 10,000 lines] open (Split)", { ms: 14_200 }),
+      step("lines[LINES: 10,000 lines] typing, Split", { keyLatencyMs: { n: 3, p50: 9_800, p95: 9_900, max: 9_900, mean: 9_800 } }),
+      step("lines[LINES: 500 lines] open (Split)", { ms: 450 }),
+      step("lines[LINES: 500 lines] typing, Split", { keyLatencyMs: { n: 10, p50: 61, p95: 80, max: 90, mean: 64 } }),
+      step("lines[LINES: 500 lines] switch to Markdown", { ms: 120 }),
+      step("lines[LINES: 5,000 lines] open (Split)", { ms: 2_300 }),
+      step("lines[LINES: 5,000 lines] typing, Split", { keyLatencyMs: { n: 10, p50: 700, p95: 800, max: 900, mean: 710 } }),
+      ...extra,
+    ],
+    finishedAt: "2026-11-08T04:00:00.000Z",
+  });
+
+  it("makes a column for each line count, smallest first, with the units a person reads", () => {
+    const { markdown, failures } = summarize([{ label: "lines", run: linesRun() }]);
+
+    expect(failures).toEqual([]);
+    expect(markdown).toContain("### Note line counts");
+    expect(markdown).toContain("| | 500 lines | 5,000 lines | 10,000 lines |");
+    expect(markdown).toContain("| Open (Split tab) | 0.5 s | 2.3 s | 14 s |");
+    expect(markdown).toContain("| Keystroke, Split (median / worst) | 61 ms / 90 ms | 700 ms / 900 ms | 9.8 s / 9.9 s (3 of 10 keys) |");
+    // Not measured for the other notes: a dash, not a made-up number.
+    expect(markdown).toContain("| Switch to Markdown | 0.1 s | – | – |");
+  });
+
+  it("says when the typing ran out of time before all ten keys", () => {
+    const { markdown } = summarize([{ label: "lines", run: linesRun() }]);
+
+    expect(markdown).toContain("(3 of 10 keys)");
+    expect(markdown).not.toContain("90 ms (");
+  });
+
+  it("shows a failed step as failed, and lists it among the failures", () => {
+    const timedOut = linesRun([{ name: "lines[LINES: 10,000 lines] switch to Live", failed: "TIMEOUT after 180s" }]);
+    const { markdown, failures } = summarize([{ label: "lines", run: timedOut }]);
+
+    expect(markdown).toContain("| Switch to Live | – | – | failed |");
+    expect(failures[0].problems).toEqual(["lines[LINES: 10,000 lines] switch to Live: TIMEOUT after 180s"]);
+  });
+
+  it("names the run above each table when several runs have line-count notes, and omits the table when none does", () => {
+    const both = summarize([
+      { label: "lines", run: linesRun() },
+      { label: "lines-plain", run: linesRun() },
+    ]).markdown;
+    const neither = summarize([{ label: "1k", run: run(1) }]).markdown;
+
+    expect(both).toContain("### Note line counts (lines)");
+    expect(both).toContain("### Note line counts (lines-plain)");
+    expect(neither).not.toContain("line counts");
+  });
+
+  it("reports a database with no line-count notes as a failure of the section", () => {
+    const empty = { steps: [{ name: "lines: find the line-count notes", failed: "no `LINES: N lines` notes in this database" }], finishedAt: "x" };
+
+    expect(summarize([{ label: "lines", run: empty }]).failures).toHaveLength(1);
+  });
+});

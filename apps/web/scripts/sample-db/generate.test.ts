@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as frontmatter from "@/lib/composition/frontmatter";
 import { generate } from "./generate.mjs";
 
 /**
@@ -169,5 +170,112 @@ describe("sample database generator", () => {
     expect(() => generate({ notes: 150, out: dir, force: true })).not.toThrow();
     expect(() => generate({ notes: 99, out: path.join(dir, "tiny") })).toThrow(/at least 100/);
     expect(() => generate({ notes: 100, out: path.join(dir, "small") })).toThrow(/too small/);
+  });
+});
+
+describe("line-count notes", () => {
+  const readNotes = (dbPath: string) => {
+    const db = new Database(dbPath, { readonly: true });
+    const rows = db.prepare("SELECT id, title, content, tags, group_id, notebook_id FROM notes ORDER BY id").all() as {
+      id: number;
+      title: string;
+      content: string;
+      tags: string;
+      group_id: number | null;
+      notebook_id: number;
+    }[];
+    db.close();
+    return rows;
+  };
+  const bodyOf = (content: string) => frontmatter.parse(content)[1];
+  const linesIn = (text: string) => (text.match(/\n/g) ?? []).length;
+
+  it("adds a note of exactly each line count, after the others, ungrouped, in the first notebook", () => {
+    const { dbPath, manifest } = generate({ notes: 150, out: dir, seed: 3, huge: false, lineNotes: [500, 5000, 10000] });
+    const notes = readNotes(dbPath);
+    const added = notes.filter((n) => n.title.startsWith("LINES: "));
+
+    expect(notes).toHaveLength(153);
+    expect(added.map((n) => n.title)).toEqual(["LINES: 500 lines", "LINES: 5,000 lines", "LINES: 10,000 lines"]);
+    expect(added.map((n) => n.id)).toEqual([151, 152, 153]);
+    expect(added.map((n) => linesIn(bodyOf(n.content)))).toEqual([500, 5000, 10000]);
+    for (const note of added) {
+      expect(note.group_id).toBeNull();
+      expect(note.notebook_id).toBe(1);
+      expect(note.tags).toBe("line-count,mixed");
+    }
+    expect(manifest.lineNotes?.map((n) => [n.lines, n.profile])).toEqual([[500, "mixed"], [5000, "mixed"], [10000, "mixed"]]);
+    // The count excludes the frontmatter block, which every note carries on top.
+    expect(frontmatter.parse(added[0].content)[0]?.title).toBe("LINES: 500 lines");
+  });
+
+  it("never changes any other note, and writes no manifest entry when none were asked for", () => {
+    const base = generate({ notes: 150, out: path.join(dir, "base"), seed: 3, huge: false });
+    const withLines = generate({ notes: 150, out: path.join(dir, "with"), seed: 3, huge: false, lineNotes: [500, 5000] });
+    const others = (dbPath: string) => readNotes(dbPath).filter((n) => n.id <= 150);
+
+    expect(others(withLines.dbPath)).toEqual(others(base.dbPath));
+    expect(base.manifest.lineNotes).toBeUndefined();
+    expect(withLines.manifest.lineNotes).toHaveLength(2);
+  });
+
+  it("gives the same notes for the same seed and different ones for another", () => {
+    const body = (seed: number, name: string) =>
+      readNotes(generate({ notes: 150, out: path.join(dir, name), seed, huge: false, lineNotes: [500] }).dbPath).at(-1)!.content;
+
+    const first = body(5, "a");
+
+    expect(body(5, "b")).toBe(first);
+    expect(body(6, "c")).not.toBe(first);
+  });
+
+  it("makes the mixed profile a real long note: headings, and code fences that all close", () => {
+    const { dbPath } = generate({ notes: 150, out: dir, seed: 1, huge: false, lineNotes: [500, 5000, 10000] });
+    for (const note of readNotes(dbPath).filter((n) => n.title.startsWith("LINES: "))) {
+      const body = bodyOf(note.content);
+      const lines = linesIn(body);
+      const headings = (body.match(/^#{1,6} /gm) ?? []).length;
+      const fences = (body.match(/^```/gm) ?? []).length;
+
+      // About one heading every 25 lines: well away from none, and from one a line.
+      expect(headings, note.title).toBeGreaterThan(lines / 60);
+      expect(headings, note.title).toBeLessThan(lines / 10);
+      expect(fences % 2, `${note.title}: every code fence closes`).toBe(0);
+      expect(fences, note.title).toBeGreaterThan(0);
+    }
+  });
+
+  it("makes the plain profile wrapped paragraphs and nothing else", () => {
+    const { dbPath, manifest } = generate({ notes: 150, out: dir, seed: 1, huge: false, lineNotes: [500, 5000], lineProfile: "plain" });
+    for (const note of readNotes(dbPath).filter((n) => n.title.startsWith("LINES: "))) {
+      const body = bodyOf(note.content);
+
+      expect(note.tags).toBe("line-count,plain");
+      expect(body).not.toMatch(/^(#|```|[-*>|]|\d+\.)/m);
+      expect(Math.max(...body.split("\n").map((line) => line.length))).toBeLessThanOrEqual(80);
+      expect(body).toContain("\n\n");
+    }
+    expect(manifest.lineNotes?.every((n) => n.profile === "plain")).toBe(true);
+  });
+
+  it("reads back through the app's own note listing", async () => {
+    generate({ notes: 150, out: dir, seed: 1, huge: false, lineNotes: [500] });
+    vi.stubEnv("COMPOSITION_SETTINGS_PATH", path.join(dir, "settings.json"));
+    vi.resetModules();
+    const { listNotes } = await import("@/lib/composition/notesRepo");
+
+    const found = listNotes().find((n) => n.title === "LINES: 500 lines");
+    expect(found?.uuid).toMatch(/^[0-9a-f]{32}$/);
+    expect(found?.notebookId).toBe(1);
+  });
+
+  it("refuses a bad list of line counts or a profile it does not know", () => {
+    const out = (name: string) => path.join(dir, name);
+
+    expect(() => generate({ notes: 150, out: out("a"), lineNotes: [0] })).toThrow(/line-notes/);
+    expect(() => generate({ notes: 150, out: out("b"), lineNotes: [2_000_000] })).toThrow(/line-notes/);
+    expect(() => generate({ notes: 150, out: out("c"), lineNotes: [500, 500] })).toThrow(/line-notes/);
+    expect(() => generate({ notes: 150, out: out("d"), lineNotes: [1.5] })).toThrow(/line-notes/);
+    expect(() => generate({ notes: 150, out: out("e"), lineNotes: [500], lineProfile: "fancy" })).toThrow(/line-profile/);
   });
 });

@@ -45,6 +45,63 @@ const ROWS = [
   ["Main thread blocked by an autosave", (r) => seconds(find(r, /^autosave/)?.blockedMs)],
 ];
 
+const LINES_STEP = /^lines\[LINES: ([\d,]+) lines\] (.+)$/;
+// measure.mjs types "abcdefghij" in each tab; a note slow enough to run out of time budget gets fewer keys.
+const PLANNED_KEYS = 10;
+
+/** The steps of the `lines` section, as [line count, Map of step name without its note -> step], smallest note first. */
+function lineSteps(run) {
+  const byCount = new Map();
+  for (const step of run.steps) {
+    const match = LINES_STEP.exec(step.name);
+    if (!match) continue;
+    const count = Number(match[1].replace(/,/g, ""));
+    if (!byCount.has(count)) byCount.set(count, new Map());
+    byCount.get(count).set(match[2], step);
+  }
+  return [...byCount.entries()].sort(([a], [b]) => a - b);
+}
+
+/** Under a second in milliseconds, longer in seconds. */
+const duration = (ms) => (ms < 1000 ? millis(ms) : seconds(ms));
+
+/** [label, the step's name in measure.mjs, how to show it]. */
+const LINE_ROWS = [
+  ["Open (Split tab)", "open (Split)", "time"],
+  ["Keystroke, Split (median / worst)", "typing, Split", "key"],
+  ["Switch to Markdown", "switch to Markdown", "time"],
+  ["Keystroke, Markdown (median / worst)", "typing, Markdown", "key"],
+  ["Switch to Live", "switch to Live", "time"],
+  ["Keystroke, Live (median / worst)", "typing, Live", "key"],
+  ["Switch to Preview", "switch to Preview", "time"],
+];
+
+function lineCell(step, kind) {
+  if (!step) return "–";
+  if (step.failed) return "failed";
+  if (kind === "time") return seconds(step.ms) ?? "–";
+  const key = step.keyLatencyMs;
+  if (!key) return "–";
+  // The worst key matters as much as the middle one: a note can type quickly and still freeze for seconds now and then, and with
+  // only a few keys in the time budget the median alone can hide it.
+  const text = `${duration(key.p50)} / ${duration(key.max)}`;
+  return key.n < PLANNED_KEYS ? `${text} (${key.n} of ${PLANNED_KEYS} keys)` : text;
+}
+
+/** One table of a run's line-count notes, a column each; empty when the run has none. `label` is shown when several runs have them. */
+function lineTable(run, label) {
+  const counts = lineSteps(run);
+  if (!counts.length) return [];
+  const table = [
+    label ? `### Note line counts (${label})` : "### Note line counts",
+    "",
+    `| | ${counts.map(([count]) => `${count.toLocaleString("en-US")} lines`).join(" | ")} |`,
+    `|---|${counts.map(() => "---:").join("|")}|`,
+  ];
+  for (const [name, stepName, kind] of LINE_ROWS) table.push(`| ${name} | ${counts.map(([, steps]) => lineCell(steps.get(stepName), kind)).join(" | ")} |`);
+  return [...table, ""];
+}
+
 /** What went hard wrong in one run, as short sentences. */
 export function failuresOf(run) {
   const problems = [];
@@ -73,6 +130,9 @@ export function summarize(runs) {
     for (const [name, values] of rows) lines.push(`| ${name} | ${values.map((v) => v ?? "–").join(" | ")} |`);
     lines.push("");
   }
+
+  const withLines = runs.filter(({ run }) => lineSteps(run).length);
+  for (const { label, run } of withLines) lines.push(...lineTable(run, withLines.length > 1 ? label : undefined));
 
   const failures = runs.map(({ label, run }) => ({ label, problems: failuresOf(run) })).filter(({ problems }) => problems.length);
   if (failures.length) {

@@ -533,4 +533,68 @@ export function edgeCases(r) {
   return cases;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// A note of an exact number of lines
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** `text` broken into lines of at most `width` characters, at word boundaries. */
+function wrapLines(text, width = 80) {
+  const lines = [];
+  let line = "";
+  for (const word of text.split(" ")) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = line ? `${line} ${word}` : word;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * A note body of exactly `lines` lines, each ending in a newline, for the line-count stress notes.
+ *
+ * `mixed` is what a long note really looks like: a title, then a heading about every 25 lines, hard-wrapped paragraphs,
+ * lists, code blocks, quotes and tables, so the preview, the heading rail and the syntax highlighting all have work.
+ * `plain` is hard-wrapped paragraphs separated by blank lines and nothing else (no headings, no markup), so that only the
+ * number of lines changes from one note to the next.
+ *
+ * Blocks are never cut: when the next one would pass `lines`, the last few lines are short paragraphs instead.
+ */
+export function lineDocument(r, lines, profile = "mixed") {
+  const plain = profile === "plain";
+  const paragraph = (sentences) => {
+    const text = Array.from({ length: sentences }, () => (plain ? loremSentence(r) : decorate(r, loremSentence(r)))).join(" ");
+    return [...wrapLines(text), ""];
+  };
+  const blocks = plain
+    ? [[() => paragraph(r.int(2, 6)), 1]]
+    : [
+        [() => [`## ${loremTitle(r)}`, ""], 2.5],
+        [() => paragraph(r.int(2, 6)), 5],
+        [() => [...loremList(r).split("\n"), ""], 1.2],
+        [() => [...codeFence(r).split("\n"), ""], 1.2],
+        [() => [...loremQuote(r).split("\n"), ""], 0.4],
+        [() => [...loremTable(r).split("\n"), ""], 0.4],
+      ];
+
+  const out = plain ? [] : [`# ${loremTitle(r)}`, ""];
+  while (out.length < lines) {
+    const block = r.weighted(blocks)();
+    if (block.length <= lines - out.length) {
+      out.push(...block);
+      continue;
+    }
+    // Not room for another block: finish with short paragraphs, so the count is exact and no block is cut in half.
+    let text = true;
+    while (out.length < lines) {
+      out.push(text ? loremSentence(r, r.int(5, 9)) : "");
+      text = !text;
+    }
+  }
+  return `${out.join("\n")}\n`;
+}
+
 export { LOREM_WORDS, camel, cap };

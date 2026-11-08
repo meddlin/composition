@@ -4,8 +4,9 @@
  *
  *   node measure.mjs <label> <port> <out.json> [sections]
  *
- * sections: comma list of load,sidebar,open,typing,autosave,pages,linkpicker,heavy (default: all but heavy). `heavy` opens
- * the big edge-case notes in every editor tab and needs the full (not --no-huge) database.
+ * sections: comma list of load,sidebar,open,typing,autosave,pages,linkpicker,heavy,lines (default: all but heavy and lines).
+ * `heavy` opens the big edge-case notes in every editor tab and needs the full (not --no-huge) database. `lines` does the
+ * same for the `LINES: N lines` notes that generate.mjs --line-notes adds (500, 5,000 and 10,000 lines, say).
  *
  * Environment:
  *   REGULAR_TITLE      the ordinary note to open and type in (run-suite.sh picks one with pick-regular.mjs)
@@ -237,6 +238,41 @@ async function firstRegularTitle() {
   });
 }
 
+/**
+ * Opens `title` on the Split tab (the default, so the first open is what a user sees first), types in Split, Markdown and
+ * Live, and visits Preview, recording every step as `prefix[title] ...`. A step that hangs or crashes the tab is recorded and
+ * the browser restarted, so the next note still gets measured. Used for the `heavy` and the `lines` sections.
+ */
+async function exerciseNote(title, prefix) {
+  if (crashed) await recover(`before ${title}`);
+  await step(`${prefix}[${title}] open (Split)`, async () => {
+    await tab("Split").catch(() => {});
+    await openNote(title);
+  }, { timeout: STEP_TIMEOUT });
+  const opened = results.steps[results.steps.length - 1];
+  if (opened.failed) {
+    await recover(`"${title}" hung or crashed`);
+    return;
+  }
+  await typingStep(`${prefix}[${title}] typing, Split`, async () => {
+    await page.waitForSelector(MD, { timeout: 30000 });
+    await focusMarkdown();
+  }, "abcdefghij", { timeout: STEP_TIMEOUT });
+  for (const [mode, ready, focus] of [
+    ["Markdown", MD, focusMarkdown],
+    ["Live", ".cm-content", focusLive],
+  ]) {
+    const sw = await step(`${prefix}[${title}] switch to ${mode}`, () => tab(mode), { ready: () => page.waitForSelector(ready, { timeout: 120000 }), timeout: STEP_TIMEOUT });
+    if (sw.failed) {
+      await recover(`"${title}" ${mode} failed`);
+      return;
+    }
+    await typingStep(`${prefix}[${title}] typing, ${mode}`, focus, "abcdefghij", { timeout: STEP_TIMEOUT });
+  }
+  const preview = await step(`${prefix}[${title}] switch to Preview`, () => tab("Preview"), { ready: () => page.waitForSelector("h1", { timeout: 120000 }), timeout: STEP_TIMEOUT });
+  if (preview.failed) await recover(`"${title}" preview failed`);
+}
+
 (async () => {
   await launch();
 
@@ -370,6 +406,7 @@ async function firstRegularTitle() {
   if (WANT.has("open") || WANT.has("typing") || WANT.has("autosave") || WANT.has("linkpicker")) {
     regular = await firstRegularTitle();
     results.notes.push(`regular note used: ${regular}`);
+    if (!regular) log("WARNING: no ordinary note was found, so the open, typing, autosave and link-picker steps are skipped");
   }
   if (WANT.has("open") && regular) {
     // Open a different note first so opening `regular` is a real change.
@@ -461,33 +498,24 @@ async function firstRegularTitle() {
       "EDGE: 300 footnotes",
     ];
     const only = (process.env.HEAVY_ONLY || "").split("|").filter(Boolean);
-    for (const title of HEAVY.filter((t) => !only.length || only.some((o) => t.includes(o)))) {
-      if (crashed) await recover(`before ${title}`);
-      // Start every note on Split, the default, so the first open shows what a user sees first.
-      await step(`heavy[${title}] open (Split)`, async () => {
-        await tab("Split").catch(() => {});
-        await openNote(title);
-      }, { timeout: STEP_TIMEOUT });
-      const hung = results.steps[results.steps.length - 1];
-      if (hung.failed) {
-        await recover(`"${title}" hung or crashed`);
-        continue;
-      }
-      await typingStep(`heavy[${title}] typing, Split`, async () => {
-        await page.waitForSelector(MD, { timeout: 30000 });
-        await focusMarkdown();
-      }, "abcdefghij", { timeout: STEP_TIMEOUT });
-      for (const [mode, ready, focus] of [
-        ["Markdown", MD, focusMarkdown],
-        ["Live", ".cm-content", focusLive],
-      ]) {
-        const sw = await step(`heavy[${title}] switch to ${mode}`, () => tab(mode), { ready: () => page.waitForSelector(ready, { timeout: 120000 }), timeout: STEP_TIMEOUT });
-        if (sw.failed) { await recover(`"${title}" ${mode} failed`); break; }
-        await typingStep(`heavy[${title}] typing, ${mode}`, focus, "abcdefghij", { timeout: STEP_TIMEOUT });
-      }
-      const pv = await step(`heavy[${title}] switch to Preview`, () => tab("Preview"), { ready: () => page.waitForSelector("h1", { timeout: 120000 }), timeout: STEP_TIMEOUT });
-      if (pv.failed) await recover(`"${title}" preview failed`);
+    for (const title of HEAVY.filter((t) => !only.length || only.some((o) => t.includes(o)))) await exerciseNote(title, "heavy");
+  }
+
+  // ------------------------------------------------------------------------------------------------ notes of N lines
+  if (WANT.has("lines")) {
+    // The notes generate.mjs --line-notes adds, found by their titles in the sidebar: smallest first.
+    const titles = await page.evaluate(() =>
+      [...document.querySelectorAll('nav[aria-label="Notes"] button')].map((b) => /^(LINES: [\d,]+ lines)(?:Updated|Created)/.exec(b.textContent)?.[1]).filter(Boolean),
+    );
+    const count = (title) => Number(title.replace(/\D/g, ""));
+    const ordered = [...new Set(titles)].sort((a, b) => count(a) - count(b));
+    if (ordered.length === 0) {
+      const entry = { name: "lines: find the line-count notes", failed: "no `LINES: N lines` notes in this database (make it with generate.mjs --line-notes)" };
+      results.steps.push(entry);
+      save();
+      log("FAIL", entry.name, entry.failed);
     }
+    for (const title of ordered) await exerciseNote(title, "lines");
   }
 
   Object.assign(results, { finishedAt: new Date().toISOString(), consoleErrorsTotal: consoleErrors.length, finalMetrics: await cdpMetrics().catch(() => null) });

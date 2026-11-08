@@ -64,7 +64,11 @@ grep -q "Ready in" "$WORK/server.log" || { echo "server did not become ready:"; 
 grep -q "localhost:$PORT" "$WORK/server.log" || { echo "the server that is ready is not on port $PORT"; exit 5; }
 echo "serving a copy of $NAME on port $PORT (run folder $WORK)"
 
-REGULAR_TITLE=$(node "$HERE/pick-regular.mjs" "$WORK") || exit 3
+# Only the sections that type in an ordinary note need one, so not finding one is a warning, not the end of the run.
+REGULAR_TITLE=$(node "$HERE/pick-regular.mjs" "$WORK") || {
+  echo "warning: no ordinary note in this database; the open, typing, autosave and link-picker sections will be skipped"
+  REGULAR_TITLE=""
+}
 export REGULAR_TITLE
 echo "regular note: $REGULAR_TITLE"
 
