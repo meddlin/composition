@@ -74,7 +74,7 @@ Open **Sheet tour** in split view.
 | **Budget** | Letters over the columns, row numbers down the side, numbers flush right. Revenue is 1,140 / 760 / 900 and the last row says **245** units and **2,800**. Its total is in its own CSV row, so its tag says `totals="true"` |
 | **Orders by region** | Dates written `2026-03-04` are in the Due column as written. B6 is **2,040** (the West rows added up). Point at B6: its formula is shown |
 | **Squares** | 300 rows in a box 240 pixels tall: it scrolls, and the header and row numbers stay in view. Scroll to the bottom: the last running total is **9,045,050** |
-| **Not calculated** | B2 shows **#NAME?**, in the error colour; pointing at it says the function `FILTER` is not calculated here. B3 is 14, which does not depend on it |
+| **Not calculated** | B2 and B4 show **#NAME?**, in the error colour; pointing at one says the function `FILTER` (or `LET`) is not calculated here. B3 is 14, which does not depend on either |
 | Every sheet, in every colour scheme | Readable in all of them (Settings > Appearance). Light is the one nobody has looked at yet |
 | The editor on the left | Switch to **Markdown** only: the sheets are the `csv` and `formulas` blocks you see, plain text |
 
@@ -96,7 +96,7 @@ Continue from test 2 (or repeat it). In the editor of **Budget**:
 
 1. Its formulas are `=[@Units]*[@Price]` and `=SUM([Units])`: names, not letters. Select the Units column's letter and press **Column left**: the formulas keep working, since they say which column, not where it is.
 2. **Untick Last row is a totals row.** The totals row's `SUM([Units])` now reads its own cell, and the sheet says so. Tick it again: it is right.
-3. **Rename the header** *Units* to *Qty*. The formulas that used it now say **#REF!**. This is a known difference from Excel, which rewrites them; it is listed in the plan as not built. Undo.
+3. **Rename the header** *Units* to *Qty* (press **F2** on it and type). The formulas that used it follow, as in Excel: select a cell in the Revenue column and the line above the grid reads `=[@Qty]*[@Price]`; the totals row reads `=SUM([Qty])`; the numbers do not change. Rename it to *Unit count*: the formulas read `[@[Unit count]]`. Paste over the header with a cell copied from elsewhere: the same. Clear the header cell instead: the formulas keep the old name and say **#REF!**, since a column with no name has none to follow. Undo.
 
 ### 4. Promote, paste and start
 
@@ -120,7 +120,7 @@ Open **Sheet: promote, paste and start** (or any note), put the caret on an empt
 
 Then the other workbooks, each from the dialog:
 
-- `carried.xlsx`, sheet **Carried**: **10 formulas**: **4** calculated, **4** carried (*STDEV, NETWORKDAYS, TODAY*, and *its result is not the one Excel saved*), **2** values. Insert it: the Tape row shows **999** with a dot (Excel's saved value, not our 10). The `LET` formula is kept as a **value** because its own name, `x`, reads as a defined name; that is a known limit, not what the plan wants, and is listed there.
+- `carried.xlsx`, sheet **Carried**: **10 formulas**: **4** calculated, **5** carried (*STDEV, NETWORKDAYS, LET, TODAY*, and *its result is not the one Excel saved*), **1** value. Insert it: the Tape row shows **999** with a dot (Excel's saved value, not our 10). The `LET` one is **carried** too (*the function LET*): the file has it as `_xlfn.LET(_xlpm.x,B4,_xlpm.x*2)` as Excel saves it, and it is shown as `LET(x,B4,x*2)`.
 - `old-1904.xlsx`: no formulas. The dates come across as **2026-03-04** and **2026-03-09**, the dates Excel shows (a 1904 workbook stores them as other numbers).
 - Cancel at any point: nothing is inserted. A file you choose is read in the page: nothing is sent anywhere.
 
@@ -146,6 +146,11 @@ In **Sheet tour**, point at **Orders by region** and choose **Export…**.
 | Open it in **Excel** | **No repair prompt.** The formulas are there: B6 `=SUMIFS(B2:B5,A2:A5,"West")`, and it shows **2,040**; D2 shows **West: 1,140**; the dates in Due are dates, shown `yyyy-mm-dd`; the sheet is named for the caption. Edit B2 in Excel: B6 changes |
 | **CSV** | A file of the values the sheet shows. Open it in Excel by double-clicking: it opens as columns with nothing garbled (it is UTF-8 with the byte order mark Excel needs) |
 | **Copy cells** | Paste into Excel: tabs become cells |
+
+A `LET`, which Excel stores with marks the others do not need: in **Sheet tour**, export **Not calculated** as **.xlsx** and open it in Excel.
+
+- B4 shows **6** and B3 shows **14**, with **no repair prompt**. Click B4: Excel shows `=LET(x,A4,x*2)`; the file holds `_xlfn.LET(_xlpm.x,A4,_xlpm.x*2)`, with `_xlpm.` before each `x` as Excel itself saves it. **This is the one form the app writes that has never been opened in Excel here** (Excel's AppleScript cannot leave Protected View for a file made on this machine), so it is yours to look at: a repair prompt, `#NAME?` or a `x` that Excel treats as a name means the prefix is wrong, and what Excel did is worth writing down.
+- B2 is the `FILTER` one: write down how Excel shows it too.
 
 Then the harder one: in **Sheet: re-import**, export the imported **Orders** sheet as **.xlsx** and open it in Excel.
 
@@ -185,7 +190,7 @@ Please report: workbooks that took more than a second to import (say how big), a
 Start the terminal app on the home (the command `launch` prints) and open **Sheet tour** and **Sheet: re-import**.
 
 - Each sheet is **aligned text with Excel's column letters and the row numbers**, the caption in bold above it; numbers are flush right.
-- **Not calculated** lists *B2* with its reason under the block, since a terminal cannot be pointed at a cell.
+- **Not calculated** lists *B2* and *B4* with their reasons under the block, since a terminal cannot be pointed at a cell.
 - The imported sheet has a line **Imported from orders.xlsx, sheet Orders, A1:J8**, and its carried cells show Excel's value without being listed as not calculated.
 - **Squares** shows the first 50 rows and says how many it left out.
 

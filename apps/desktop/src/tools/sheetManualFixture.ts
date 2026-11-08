@@ -54,7 +54,7 @@ function noteBodies(imported: string): { title: string; body: string }[] {
       Array.from({ length: 300 }, (_, i) => `C${i + 2} =SUM(B$2:B${i + 2})`).join("\n"),
     ),
     "## A formula this engine cannot calculate",
-    sheet({ title: "Not calculated" }, "Value,Result\n5,\n7,", "B2 =FILTER(A2:A3,A2:A3>5)\nB3 =A3*2"),
+    sheet({ title: "Not calculated" }, "Value,Result\n5,\n7,\n3,", "B2 =FILTER(A2:A3,A2:A3>5)\nB3 =A3*2\nB4 =LET(x,A4,x*2)"),
     "The end.",
   ];
   const paste = [

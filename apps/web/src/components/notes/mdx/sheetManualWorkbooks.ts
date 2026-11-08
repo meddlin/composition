@@ -130,7 +130,7 @@ function carriedWorkbook(): Uint8Array {
         A1: cellS("Item"), B1: cellS("Qty"), C1: cellS("Price"), D1: cellS("Calculated here"), E1: cellS("Why it differs or is carried"),
         A2: cellS("Pens"), B2: cellN(12), C2: cellN(1.5), D2: cellN(18, { f: "B2*C2" }), E2: cellN(5.2, { f: "STDEV(B2:B6)" }),
         A3: cellS("Paper"), B3: cellN(3), C3: cellN(4), D3: cellN(12, { f: "B3*C3" }), E3: cellN(7, { f: "NETWORKDAYS(DATE(2026,3,2),DATE(2026,3,10))" }),
-        A4: cellS("Ink"), B4: cellN(8), C4: cellN(6), D4: cellN(48, { f: "B4*C4" }), E4: cellN(16, { f: "LET(x,B4,x*2)" }),
+        A4: cellS("Ink"), B4: cellN(8), C4: cellN(6), D4: cellN(48, { f: "B4*C4" }), E4: cellN(16, { f: "_xlfn.LET(_xlpm.x,B4,_xlpm.x*2)" }),
         A5: cellS("Tape"), B5: cellN(20), C5: cellN(0.5), D5: cellN(999, { f: "B5*C5" }), E5: cellS("(a stale value: the saved number is 999, not 10)"),
         A6: cellS("Glue"), B6: cellN(5), C6: cellN(2), D6: cellN(10, { f: "B6*C6" }), E6: cellN(46090, { f: "TODAY()" }),
         A7: cellS("Elsewhere"), B7: cellN(1), C7: cellN(1), D7: cellN(42, { f: "Notes!A1*2" }),

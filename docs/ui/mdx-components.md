@@ -436,7 +436,7 @@ D4 =SUM([Revenue])
   in it reads the rows above it. Without it that formula would read its own cell, and the sheet says so. `[#Totals]` is that row, and `[@Units]` in it is `#VALUE!`, as in Excel.
 - **A column the sheet has not** is `#REF!` where it is written (so `IFERROR([Nope],0)` is 0); **`@` in a row that is not one of the data** is `#VALUE!`; what Excel's grammar has no such form for (`[[#Headers],[#Totals]]`, two columns that are not a range) is `#NAME?`,
   and pointing at the cell says why. **A table's name** (`Table1[Revenue]`) is not read in a sheet, which is one table with no name: write `[Revenue]`.
-- **They keep working when rows and columns come and go**, since they say which column and not where it is. Renaming a header does not change the formulas that use it (Excel changes them; this does not), so they say `#REF!` until they are changed.
+- **They keep working when rows and columns come and go**, since they say which column and not where it is. **Renaming a header renames the column in the formulas that use it**, as Excel does: typing over a header in the grid (or pasting over it) turns `[@Units]` into `[@Qty]` and `SUM([Units])` into `SUM([Qty])`, writing the new name with brackets of its own where Excel does (`[@[Unit Price]]`). A header that is cleared or typed as a formula renames nothing, nor does one whose name another column repeats (the first of them is the one the formulas read), and editing the CSV text by hand is not seen as a rename.
 - **On export** each is written as the range it stands for (`$D$2:$D$3`), since Excel would not know the table. **On import** the tables of the file are read, so `Table1[Revenue]` and `[@Units]` come across as formulas (see below).
 - Checked in Excel itself: 38 cases over a table and a table with a totals row (`excel-verified-tables.json`) give the same here.
 
@@ -489,7 +489,7 @@ range is read when its box is left or Enter is pressed), says what would come ac
   - **[carried](#carried-formulas)** when its function is not one this engine has (`FILTER`, `LET`…), or the result differs, or Excel shows the
     result as a date (a sheet has no cell formats, so a recalculated date would show as a number of days);
   - **kept as a value** when it reads anything outside the range: another sheet or workbook, a cell above or left of it or beyond it, a column of a table that the range does not
-    hold, a table on another sheet, or a defined name. Whole columns and rows inside the range's columns and rows are inside. **A table's columns are read from the file**
+    hold, a table on another sheet, or a defined name (a name that a `LET` or `LAMBDA` gives is the formula's own, not a defined name). Whole columns and rows inside the range's columns and rows are inside. **A table's columns are read from the file**
     (`Table1[Revenue]`, `[@Units]`, `Table1[[#This Row],[Units]]` become ranges of that table, with its totals row left out of the data), so they stay formulas when the range holds the table.
 - **The dialog says all of it first**: the size, how many formulas there are, and how many of each kind, with the reasons ("1 is carried … Why: the
   function FILTER (1)").
@@ -534,6 +534,7 @@ replaced as one change, so one undo takes it back.
   with that name; the Export window says **Saved.** when it is written and says nothing when you dismiss the save dialog. The page never names a place: only the dialog does, the
   app writes the file there only after you have chosen, and a failure (a full disk, a folder it cannot write to) says why. The name is only a
   suggestion: the app removes any folder from it, and the file always ends in the extension for its type.
+- **A `LET` or `LAMBDA`** is written the way Excel saves one: `_xlfn.LET(_xlpm.x,5,_xlpm.x*2)`, with `_xlpm.` before each name it gives, where it is given and where it is used (and read back the same way on import). Without them Excel can refuse to open the file. This follows [XlsxWriter's notes](https://xlsxwriter.readthedocs.io/working_with_formulas.html); it has **not** been opened in Excel here (see the manual test).
 - Checked in Excel itself: a workbook made this way (28 formulas, `SUMIFS` `XLOOKUP` `IFS` `TEXTJOIN` `MAXIFS` `EDATE` `INDEX`/`MATCH` `TEXT` `IFERROR`
   `IFNA` and more) opened with no repair prompt and no Protected View, Excel calculated it again, and **all 68 cells came to what this engine had calculated**.
 

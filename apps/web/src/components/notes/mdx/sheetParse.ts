@@ -145,6 +145,43 @@ export function parseAddress(text: string): { row: number; col: number } | undef
 
 const PREFIX = /^(?:_xlfn\.)?(?:_xlws\.)?/i;
 
+/** The name a LET or LAMBDA gives, as the file spells it (`_xlpm.x`) or as Excel shows it (`x`), without the prefix and in lower case. */
+export const boundName = (text: string) => text.replace(/^_xlpm\./i, "").toLowerCase();
+
+/**
+ * The names a formula gives itself with LET and LAMBDA (`LET(x,5,x*2)`, `LAMBDA(n,n+1)`), lower case: they stand for a value in the
+ * formula and are not names defined in the workbook. Where each is given (the odd arguments of a LET but its last, all the
+ * parameters of a LAMBDA but its last) is read from the tokens; a name used outside the call it was given in is not told apart.
+ */
+export function boundNames(tokens: readonly Token[]): Set<string> {
+  const names = new Set<string>();
+  for (let i = 0; i + 1 < tokens.length; i++) {
+    const call = tokens[i];
+    if (call.kind !== "ident" || tokens[i + 1].kind !== "op" || tokens[i + 1].text !== "(") continue;
+    const fn = call.text.replace(PREFIX, "").toUpperCase();
+    if (fn !== "LET" && fn !== "LAMBDA") continue;
+    const args: Token[][] = [[]];
+    let depth = 0;
+    for (let j = i + 2; j < tokens.length; j++) {
+      const token = tokens[j];
+      if (token.kind === "op" && (token.text === "(" || token.text === "{")) depth++;
+      else if (token.kind === "op" && (token.text === ")" || token.text === "}")) {
+        if (depth === 0) break;
+        depth--;
+      } else if (token.kind === "op" && token.text === "," && depth === 0) {
+        args.push([]);
+        continue;
+      }
+      args[args.length - 1].push(token);
+    }
+    args.forEach((arg, k) => {
+      const given = fn === "LET" ? k % 2 === 0 : true;
+      if (given && k < args.length - 1 && arg.length === 1 && arg[0].kind === "ident") names.add(boundName(arg[0].text));
+    });
+  }
+  return names;
+}
+
 class Parser {
   private at = 0;
   private depth = 0;

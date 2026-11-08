@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { type TableDef, resolveStructuredReferences } from "./sheetStructured";
+import { type TableDef, renameColumnReferences, resolveStructuredReferences } from "./sheetStructured";
 
 /** A table at A1:E5: a header row, four data rows (rows 2 to 5), and five columns. */
 const TABLE: TableDef = { row1: 0, col1: 0, row2: 4, col2: 4, headerRows: 1, totalsRows: 0, columns: ["Region", "Product", "Units", "Unit Price", "Revenue"] };
@@ -139,5 +139,54 @@ describe("what it leaves alone, and what it does not read", () => {
 
   it("works without the equals sign", () => {
     expect(resolve("SUM([Revenue])")).toBe("SUM($E$2:$E$5)");
+  });
+});
+
+describe("renameColumnReferences", () => {
+  const rename = (formula: string, from: string, to: string) => renameColumnReferences(formula, from, to);
+
+  it("renames the column in each form of reference, and leaves the text around it as it was", () => {
+    expect(rename("=[@Units]*[@Price]", "Units", "Qty")).toBe("=[@Qty]*[@Price]");
+    expect(rename("=SUM([Units])+SUM([Units])", "Units", "Qty")).toBe("=SUM([Qty])+SUM([Qty])");
+    // The brackets it was written with are kept, as they are valid for any name.
+    expect(rename("=[@[Unit Price]]*2", "Unit Price", "Cost")).toBe("=[@[Cost]]*2");
+    expect(rename("=[[#This Row],[Units]]*2", "Units", "Qty")).toBe("=[[#This Row],[Qty]]*2");
+    expect(rename("=SUMIFS([Revenue],[Region],\"West\")", "Region", "Area")).toBe("=SUMIFS([Revenue],[Area],\"West\")");
+    expect(rename("=SUM([[Region]:[Revenue]])", "Revenue", "Sales")).toBe("=SUM([[Region]:[Sales]])");
+    expect(rename("=SUM([[#Data],[Units]:[Revenue]])", "Units", "Qty")).toBe("=SUM([[#Data],[Qty]:[Revenue]])");
+    expect(rename("=SUM([[#Headers], [Units]])", "Units", "Qty")).toBe("=SUM([[#Headers], [Qty]])");
+    expect(rename("=[[Units]]", "Units", "Qty")).toBe("=[[Qty]]");
+  });
+
+  it("matches the name without regard to case or the spaces around it, as a reference does", () => {
+    expect(rename("=SUM([units])", "Units", "Qty")).toBe("=SUM([Qty])");
+    expect(rename("=SUM([Units])", " units ", "Qty")).toBe("=SUM([Qty])");
+  });
+
+  it("gives the new name brackets of its own where Excel does, and escapes the marks that need it", () => {
+    expect(rename("=[@Units]", "Units", "Unit Price")).toBe("=[@[Unit Price]]");
+    expect(rename("=SUM([Units])", "Units", "Unit Price")).toBe("=SUM([Unit Price])");
+    expect(rename("=SUM([Units])", "Units", "Total, units")).toBe("=SUM([[Total, units]])");
+    expect(rename("=SUM([Units])", "Units", "Q[1]")).toBe("=SUM([[Q'[1']]])");
+    expect(rename("=[@Units]", "Units", "It's")).toBe("=[@[It''s]]");
+  });
+
+  it("finds a name that was written with an escape", () => {
+    expect(rename("=SUM([It''s])", "It's", "Its")).toBe("=SUM([Its])");
+    expect(rename("=SUM([Q'[1']])", "Q[1]", "Q1")).toBe("=SUM([Q1])");
+  });
+
+  it("leaves other columns, the special items, a text that looks like a reference and a formula with none as they were", () => {
+    expect(rename("=[@Price]*2", "Units", "Qty")).toBe("=[@Price]*2");
+    expect(rename("=ROWS([#Headers])+ROWS([#All])", "Headers", "Qty")).toBe("=ROWS([#Headers])+ROWS([#All])");
+    expect(rename("=[@]", "Units", "Qty")).toBe("=[@]");
+    expect(rename('=IF(A1="[Units]",[Price],0)', "Units", "Qty")).toBe('=IF(A1="[Units]",[Price],0)');
+    expect(rename("=B2*C2", "Units", "Qty")).toBe("=B2*C2");
+    expect(rename("=B2*", "Units", "Qty")).toBe("=B2*");
+  });
+
+  it("does nothing for an empty new name", () => {
+    expect(rename("=SUM([Units])", "Units", "")).toBe("=SUM([Units])");
+    expect(rename("=SUM([Units])", "Units", "  ")).toBe("=SUM([Units])");
   });
 });

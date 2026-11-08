@@ -55,17 +55,17 @@ describe("the workbooks", () => {
     expect(range.tables?.[0].columns).toEqual(["Region", "Product", "Units", "Unit Price", "Revenue", "Due", "Share", "Status"]);
   });
 
-  it("carried.xlsx has a stale value, a function the engine lacks, a volatile one and two reads outside the range", async () => {
+  it("carried.xlsx has a stale value, functions the engine lacks (LET written as Excel saves it), a volatile one and a read of another sheet", async () => {
     const text = await checked("carried.xlsx");
     expect(text).toContain("10 formulas:");
     expect(text).toContain("4 are kept as formulas, calculated here, where they gave the number Excel saved.");
-    expect(text).toContain("4 are carried");
+    expect(text).toContain("5 are carried");
+    expect(text).toContain("the function LET (1)");
     expect(text).toContain("the function STDEV (1)");
     expect(text).toContain("the function NETWORKDAYS (1)");
     expect(text).toContain("its result is not the one Excel saved (1)");
     expect(text).toContain("the function TODAY (1)");
-    expect(text).toContain("2 are kept as values");
-    expect(text).toContain("another sheet or workbook (1)");
+    expect(text).toContain("1 is kept as a value, because it reads outside the range: another sheet or workbook (1).");
   });
 
   it("old-1904.xlsx counts days from 1904, and its dates come across as the dates Excel shows", async () => {
@@ -150,8 +150,10 @@ describe("setup", () => {
     // Squares: 300 rows, the last running total being the sum of the first 300 squares.
     expect(squares.rows.length).toBe(301);
     expect(squares.rows[300][2].value).toBe((300 * 301 * 601) / 6);
-    // The sheet with a formula this engine cannot calculate has exactly one.
-    expect(notCalculated.summary.notCalculated).toBe(1);
+    // The sheet with formulas this engine cannot calculate has two: a FILTER and a LET.
+    expect(notCalculated.summary.notCalculated).toBe(2);
+    // A LET goes into an export the way Excel saves one, with its names marked.
+    expect(notCalculated.rows[3][1].formula).toBe("_xlfn.LET(_xlpm.x,A4,_xlpm.x*2)");
   });
 
   it("the re-import note's sheet is as an import writes it: the tag says where it came from and its fingerprint matches", async () => {

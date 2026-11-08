@@ -5,7 +5,7 @@
  * the formula's own tokens, so a cell name inside a text (`"A3"`), a function (`LOG10(`) or another sheet's
  * reference is left as it is. A formula that cannot be read comes back unchanged.
  */
-import { parseAddress, tokenize, type Token } from "./sheetParse";
+import { boundName, boundNames, parseAddress, tokenize, type Token } from "./sheetParse";
 import { columnLabel } from "./sheetData";
 
 export type Shift = {
@@ -155,6 +155,7 @@ export function rebaseReferences(formula: string, origin: { row: number; col: nu
     return { outside: "a formula that cannot be read" };
   }
   const replacements: { from: number; to: number; text: string }[] = [];
+  const bound = boundNames(tokens);
   const begin = (token: Token) => lead + token.at;
   const end = (token: Token) => lead + token.at + token.text.length;
   const inside = (row: number, col: number) => row >= 0 && row < size.rows && col >= 0 && col < size.cols;
@@ -209,8 +210,8 @@ export function rebaseReferences(formula: string, origin: { row: number; col: nu
       );
       continue;
     }
-    // TRUE and FALSE are values; anything else that is a name is something defined outside the grid.
-    if (!/^(?:TRUE|FALSE)$/i.test(token.text)) return { outside: "a defined name" };
+    // TRUE and FALSE are values, and a name a LET or LAMBDA gives is the formula's own; anything else that is a name is something defined outside the grid.
+    if (!/^(?:TRUE|FALSE)$/i.test(token.text) && !bound.has(boundName(token.text))) return { outside: "a defined name" };
   }
 
   let result = formula;

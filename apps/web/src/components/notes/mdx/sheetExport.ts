@@ -19,7 +19,7 @@ import { columnLabel, parseFormulas, parseSheet } from "./sheetData";
 import { isoDateSerial } from "./sheetDate";
 import { type SheetSource, formatCsv } from "./sheetDraft";
 import { calculate, typeCell } from "./sheetFormula";
-import { parseAddress, tokenize } from "./sheetParse";
+import { boundName, boundNames, parseAddress, tokenize } from "./sheetParse";
 import { findInSheet, resolveStructuredReferences, sheetTableOf } from "./sheetStructured";
 import { type Scalar, isError } from "./sheetValue";
 
@@ -62,7 +62,7 @@ const XLFN = new Set(
     "CEILING.MATH CEILING.PRECISE CHISQ.DIST CHISQ.DIST.RT CHISQ.INV CHISQ.INV.RT CHISQ.TEST CHOOSECOLS CHOOSEROWS COMBINA CONCAT CONFIDENCE.NORM " +
     "CONFIDENCE.T COT COTH COVARIANCE.P COVARIANCE.S CSC CSCH DAYS DECIMAL DROP ERF.PRECISE ERFC.PRECISE EXPAND EXPON.DIST F.DIST F.DIST.RT F.INV " +
     "F.INV.RT F.TEST FILTERXML FLOOR.MATH FLOOR.PRECISE FORECAST.ETS FORECAST.LINEAR FORMULATEXT GAMMA GAMMA.DIST GAMMA.INV GAMMALN.PRECISE GAUSS " +
-    "HSTACK HYPGEOM.DIST IFNA IFS ISFORMULA ISOWEEKNUM LET LOGNORM.DIST LOGNORM.INV MAXIFS MINIFS MODE.MULT MODE.SNGL MUNIT NEGBINOM.DIST " +
+    "HSTACK HYPGEOM.DIST IFNA IFS ISFORMULA ISOWEEKNUM LAMBDA LET LOGNORM.DIST LOGNORM.INV MAXIFS MINIFS MODE.MULT MODE.SNGL MUNIT NEGBINOM.DIST " +
     "NETWORKDAYS.INTL NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV NUMBERVALUE PDURATION PERCENTILE.EXC PERCENTILE.INC PERCENTRANK.EXC PERCENTRANK.INC " +
     "PERMUTATIONA PHI POISSON.DIST QUARTILE.EXC QUARTILE.INC QUERYSTRING RANDARRAY RANK.AVG RANK.EQ RRI SEC SECH SEQUENCE SHEET SHEETS SKEW.P SORTBY " +
     "STDEV.P STDEV.S SWITCH T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T T.TEST TAKE TEXTAFTER TEXTBEFORE TEXTJOIN TEXTSPLIT TOCOL TOROW UNICHAR UNICODE " +
@@ -83,8 +83,14 @@ export function toFileFormula(formula: string): string {
     return text;
   }
   const marks: { at: number; prefix: string }[] = [];
+  const bound = boundNames(tokens);
   tokens.forEach((token, index) => {
-    if (token.kind !== "ident" || tokens[index + 1]?.kind !== "op" || tokens[index + 1].text !== "(") return;
+    if (token.kind !== "ident") return;
+    if (tokens[index + 1]?.kind !== "op" || tokens[index + 1].text !== "(") {
+      // A name a LET or LAMBDA gives is saved with `_xlpm.` where it is given and where it is used, and Excel will not open the file without it.
+      if (bound.has(boundName(token.text)) && !/^_xlpm\./i.test(token.text)) marks.push({ at: token.at, prefix: "_xlpm." });
+      return;
+    }
     const name = token.text.toUpperCase();
     if (name.startsWith("_XL")) return; // already written the file's way
     if (XLWS.has(name)) marks.push({ at: token.at, prefix: "_xlfn._xlws." });

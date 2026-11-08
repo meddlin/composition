@@ -54,13 +54,14 @@ function errorText(cell: CellObject): string {
 
 /**
  * A formula as Excel's own name for each function: the file saves a newer one as `_xlfn.XLOOKUP`, and a dynamic-array one
- * as `_xlfn._xlws.FILTER`; SheetJS takes off the first, and this the rest.
+ * as `_xlfn._xlws.FILTER`; SheetJS takes off the first, and this the rest, with the `_xlpm.` the file puts before each name a LET
+ * or LAMBDA gives (`_xlfn.LET(_xlpm.x,5,_xlpm.x*2)` is `LET(x,5,x*2)` as Excel shows it).
  */
 const withoutPrefixes = (formula: string) =>
   // The pieces in quotes (the odd ones) are texts, and are left as they are.
   formula
     .split(/("(?:[^"]|"")*")/)
-    .map((piece, index) => (index % 2 === 1 ? piece : piece.replace(/(?<![A-Za-z0-9_.])(?:_xl(?:fn|ws)\.)+/gi, "")))
+    .map((piece, index) => (index % 2 === 1 ? piece : piece.replace(/(?<![A-Za-z0-9_.])(?:_xl(?:fn|ws|pm)\.)+/gi, "")))
     .join("");
 
 /** A cell as the import takes it, or `null` for one with nothing in it (no value and no formula). */

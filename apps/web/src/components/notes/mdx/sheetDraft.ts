@@ -10,6 +10,7 @@
 import { columnLabel, parseFormulas, parseSheet } from "./sheetData";
 import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, calculate, type Calculated } from "./sheetFormula";
 import { shiftReferences, type Shift } from "./sheetRefs";
+import { renameColumnReferences } from "./sheetStructured";
 
 export type Draft = {
   /** Every row, the header row first, each `columns` cells long. */
@@ -92,13 +93,33 @@ export function draftFromSource(csv: string, formulasText: string, totals = fals
   return { rows, columns: sheet.columns, ...(carried.size > 0 && kept.some((cells) => cells.some((cell) => cell !== null)) ? { carried: kept } : {}), ...withTotals(totals) };
 }
 
-/** The draft with one cell changed to `input`, as it is kept (see `commitInput`). */
+/**
+ * The rows with the formulas that name a column renamed, for each header that was typed over with another name (`before` is the
+ * header row as it was, and `rows[0]` is as it is): what Excel does to a formula when a table's header is renamed. A header that was
+ * cleared or is a formula renames nothing, nor does one that was not the first column of its name (the one a reference reads), nor
+ * does a rename whose new name is another one's old name (a swap), which would be applied twice.
+ */
+function withRenamedHeaders(before: readonly string[] | undefined, rows: readonly (readonly string[])[]): readonly (readonly string[])[] {
+  if (!before) return rows;
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const changed = rows[0].flatMap((to, c) => (before[c] !== undefined && before[c] !== to && before[c].trim() !== "" && to !== "" && !isFormulaInput(before[c]) && !isFormulaInput(to) ? [{ c, from: before[c], to }] : []));
+  const renames = changed.filter(({ c, from, to }) => before.findIndex((name) => same(name, from)) === c && !changed.some((other) => same(other.from, to) && !same(other.from, from)));
+  if (renames.length === 0) return rows;
+  return rows.map((cells, r) => {
+    if (r === 0) return cells;
+    const next = cells.map((cell) => (isFormulaInput(cell) ? renames.reduce((formula, { from, to }) => renameColumnReferences(formula, from, to), cell) : cell));
+    return next.every((text, c) => text === cells[c]) ? cells : next;
+  });
+}
+
+/** The draft with one cell changed to `input`, as it is kept (see `commitInput`). A header typed over renames the column in the formulas that name it. */
 export function setCell(draft: Draft, row: number, col: number, input: string): Draft {
   const value = commitInput(input);
   if (draft.rows[row]?.[col] === undefined || draft.rows[row][col] === value) return draft;
+  const rows = draft.rows.map((cells, r) => (r === row ? cells.map((cell, c) => (c === col ? value : cell)) : cells));
   return {
     ...draft,
-    rows: draft.rows.map((cells, r) => (r === row ? cells.map((cell, c) => (c === col ? value : cell)) : cells)),
+    rows: row === 0 ? withRenamedHeaders(draft.rows[0], rows) : rows,
     carried: withCarried(draft, (grid) => (grid[row][col] = null)),
   };
 }
@@ -198,7 +219,7 @@ export function pasteBlock(draft: Draft, row: number, col: number, block: readon
         Array.from({ length: columns }, (_, c) => (r >= row && r < row + block.length && c >= col && c < col + (block[r - row]?.length ?? 0) ? null : (draft.carried?.[r]?.[c] ?? null))),
       )
     : undefined;
-  return { draft: { rows, columns, ...(carried?.some((cells) => cells.some((cell) => cell !== null)) ? { carried } : {}), ...withTotals(draft.totals) }, cut };
+  return { draft: { rows: withRenamedHeaders(draft.rows[0], rows), columns, ...(carried?.some((cells) => cells.some((cell) => cell !== null)) ? { carried } : {}), ...withTotals(draft.totals) }, cut };
 }
 
 /**

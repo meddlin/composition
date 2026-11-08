@@ -561,7 +561,8 @@ and CSV. **Gate F.**
   in Excel, opened from a file whose tables are defined in its own XML, and this engine gives the same for all of them
   ([`excel-verified-tables.json`](../spikes/sheet/excel-verified-tables.json), [`sheetStructured.excel.test.ts`](../apps/web/src/components/notes/mdx/sheetStructured.excel.test.ts)).
   **Excel corrected one thing I had assumed:** `@` outside a table's rows is `#VALUE!`, not `#REF!`. (Excel's AppleScript cannot make a table reliably: `make new list object` shifted a column. The file route is the way.)
-- **Not built:** renaming a header does not rewrite the formulas that name it (Excel does); a table's name for a sheet's own table (a sheet has none: `Table1[Revenue]` typed in a sheet says so); a table
+- **Built afterwards:** renaming a header (typing or pasting over it in the grid) now renames the column in the formulas that name it, as Excel does; see `withRenamedHeaders` in `sheetDraft.ts`.
+- **Not built:** a table's name for a sheet's own table (a sheet has none: `Table1[Revenue]` typed in a sheet says so); a table
   that Excel keeps on another sheet being read by a formula here; `TableName` alone for the whole data range; a totals row's own functions (a `SUBTOTAL` over a column is carried, as the engine
   lacks it).
 - **Not checked:** a workbook saved by Excel itself with tables (the file route used here writes the table XML by hand, as Excel does; a real file has more attributes, which are ignored);
@@ -584,8 +585,10 @@ features. **Gate G.**
 - **What was checked here:** each sample workbook through the real import gives the counts the document states, and the notes the real sheet code reads as the document says
   ([`sheetManualFixture.test.ts`](../apps/desktop/src/tools/sheetManualFixture.test.ts), 10 tests); `setup`, `check` and `launch` through the real launcher; the three notes drawn in the web app on a scratch home;
   the counts for narrower ranges and for an export imported again were computed with the real code and are in the document.
-- **A finding:** in `LET(x,B4,x*2)` the import reads `x` as a defined name, so the cell is kept as a **value**, not carried; the cell shows Excel's number either way, but an export would not have the formula. It is in the document
-  as a known limit. **Not built.**
+- **A finding, fixed:** in `LET(x,B4,x*2)` the import read `x` as a defined name, so the cell was kept as a **value** and an export would not have had the formula. A name a `LET` or `LAMBDA` gives is now the formula's own
+  (`boundNames` in `sheetParse.ts`), so it is carried. Excel saves those names as `_xlpm.x`, which is now taken off on reading and **put back on export** (`_xlfn.LET(_xlpm.x,5,_xlpm.x*2)`); an export without it makes Excel refuse
+  the file, per [XlsxWriter's documentation](https://xlsxwriter.readthedocs.io/working_with_formulas.html) and several libraries' bug reports. **Not checked in Excel:** a file opened locally lands in Protected View here, which its AppleScript cannot leave, so the export form is
+  from that documentation and test 7 of the manual test is where it is looked at.
 - **Not checked:** the desktop app and the terminal app on the scratch home (their commands are printed, not started here), every step that needs Excel (they are the owner's), a password-protected workbook (no sample can be made
   without Excel), and the first time the fixture test runs in CI (`apps/desktop` was not installed in this worktree, so it was run with the web app's `vitest`).
 

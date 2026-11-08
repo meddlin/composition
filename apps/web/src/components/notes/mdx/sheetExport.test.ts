@@ -25,6 +25,15 @@ describe("toFileFormula", () => {
     expect(toFileFormula("=UNIQUE(A2:A9)")).toBe("_xlfn.UNIQUE(A2:A9)");
   });
 
+  it("puts _xlpm. before each name a LET or a LAMBDA gives, where it is given and where it is used, as Excel saves them", () => {
+    expect(toFileFormula("=LET(x,5,x*2)")).toBe("_xlfn.LET(_xlpm.x,5,_xlpm.x*2)");
+    expect(toFileFormula("=LET(a,B2,b,a+1,a*b)")).toBe("_xlfn.LET(_xlpm.a,B2,_xlpm.b,_xlpm.a+1,_xlpm.a*_xlpm.b)");
+    expect(toFileFormula("=LAMBDA(n,n+1)(4)")).toBe("_xlfn.LAMBDA(_xlpm.n,_xlpm.n+1)(4)");
+    expect(toFileFormula("=LET(x,5,x*TaxRate)")).toBe("_xlfn.LET(_xlpm.x,5,_xlpm.x*TaxRate)");
+    expect(toFileFormula("=_xlfn.LET(_xlpm.x,5,_xlpm.x*2)")).toBe("_xlfn.LET(_xlpm.x,5,_xlpm.x*2)");
+    expect(toFileFormula('=LET(x,"x",x&"x")')).toBe('_xlfn.LET(_xlpm.x,"x",_xlpm.x&"x")');
+  });
+
   it("does the ones inside others, and leaves a text, a name and a prefix already there alone", () => {
     expect(toFileFormula('=IFERROR(XLOOKUP("XLOOKUP(",A:A,B:B),IFS(A1>1,"a",TRUE,"b"))')).toBe('IFERROR(_xlfn.XLOOKUP("XLOOKUP(",A:A,B:B),_xlfn.IFS(A1>1,"a",TRUE,"b"))');
     expect(toFileFormula("=_xlfn.XLOOKUP(A1,B:B,C:C)")).toBe("_xlfn.XLOOKUP(A1,B:B,C:C)");

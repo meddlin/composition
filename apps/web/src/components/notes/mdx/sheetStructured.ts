@@ -178,6 +178,57 @@ function toRange(spec: Spec, table: TableDef, cell: Cell | null): string | { uns
   return single ? at(rows[0], cols[0]) : `${at(rows[0], cols[0])}:${at(rows[1], cols[1])}`;
 }
 
+const escapeName = (name: string) => name.replace(/([[\]#'])/g, "'$1");
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** A column name that Excel writes between single brackets in `[@Name]`; any other has brackets of its own there (`[@[Unit Price]]`). */
+const SIMPLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** A column name with a mark in it that Excel writes between double brackets in `Table[[Name]]`. */
+const MARKED_NAME = /[,:.[\]#'"{}$^&*+=\-<>/\t\n]/;
+
+/** One reference's text (`[Units]`, `[@[Unit Price]]`, `[[#Data],[Region]:[Revenue]]`) with the column called `from` called `to`; the rest of the text is as it was. */
+function renameInReference(text: string, from: string, to: string): string {
+  const swap = (raw: string) => (sameName(unescapeName(raw), from) ? escapeName(to) : raw);
+  const item = (piece: string): string => {
+    const trimmed = piece.trim();
+    if (trimmed.startsWith("#") || trimmed.startsWith("[#")) return piece;
+    const pair = /^\[((?:'.|[^'\]])*)\](\s*:\s*)\[((?:'.|[^'\]])*)\]$/.exec(trimmed);
+    if (pair) return piece.replace(trimmed, () => `[${swap(pair[1])}]${pair[2]}[${swap(pair[3])}]`);
+    const one = /^\[((?:'.|[^'\]])*)\]$/.exec(trimmed);
+    return one ? piece.replace(trimmed, () => `[${swap(one[1])}]`) : piece;
+  };
+  const inner = text.slice(1, -1);
+  const at = inner.startsWith("@");
+  const rest = at ? inner.slice(1) : inner;
+  if (rest.startsWith("[")) return `[${at ? "@" : ""}${splitTopLevel(rest).map(item).join(",")}]`;
+  // A bare name, `[Revenue]` or `[@Units]`: it takes brackets of its own when the new name has a mark or a space in it.
+  const name = rest.trim();
+  if (name === "" || name.startsWith("#") || !sameName(unescapeName(name), from)) return text;
+  const escaped = escapeName(to);
+  if (at) return SIMPLE_NAME.test(to) ? `[@${escaped}]` : `[@[${escaped}]]`;
+  return MARKED_NAME.test(to) ? `[[${escaped}]]` : `[${escaped}]`;
+}
+
+/**
+ * The formula with the column called `from` named `to` in each reference to the table's columns: what Excel does to the formulas that
+ * use a column when its header is renamed. A reference to another column, and everything else in the formula, is left as it was.
+ */
+export function renameColumnReferences(formula: string, from: string, to: string): string {
+  if (!formula.includes("[") || to.trim() === "") return formula;
+  const lead = formula.startsWith("=") ? 1 : 0;
+  let tokens: Token[];
+  try {
+    tokens = tokenize(formula.slice(lead));
+  } catch {
+    return formula;
+  }
+  let result = formula;
+  for (const token of tokens.filter((t) => t.kind === "structured").reverse()) {
+    const renamed = renameInReference(token.text, from, to);
+    if (renamed !== token.text) result = result.slice(0, lead + token.at) + renamed + result.slice(lead + token.at + token.text.length);
+  }
+  return result;
+}
+
 const adjacent = (before: Token | undefined, after: Token) => before !== undefined && before.kind === "ident" && before.at + before.text.length === after.at;
 
 /**

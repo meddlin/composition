@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { boundNames, tokenize } from "./sheetParse";
 import { rebaseReferences, shiftReferences, type Shift } from "./sheetRefs";
 
 const insertRow = (at: number): Shift => ({ axis: "row", at, delta: 1 });
@@ -151,7 +152,40 @@ describe("rebaseReferences", () => {
     expect(rebaseReferences('=C3&"open', FROM_B2, SIZE)).toMatchObject({ outside: "a formula that cannot be read" });
   });
 
+  it("reads a name a LET or a LAMBDA gives as the formula's own, and moves the cells it reads", () => {
+    expect(rebaseReferences("=LET(x,C3,x*2)", FROM_B2, SIZE)).toEqual({ formula: "=LET(x,B2,x*2)" });
+    expect(rebaseReferences("=LET(a,C3,b,a+1,a*b)", FROM_B2, SIZE)).toEqual({ formula: "=LET(a,B2,b,a+1,a*b)" });
+    expect(rebaseReferences("=LET(x,C3,LET(y,x+1,y*x))", FROM_B2, SIZE)).toEqual({ formula: "=LET(x,B2,LET(y,x+1,y*x))" });
+    expect(rebaseReferences("=LAMBDA(n,n+1)(C3)", FROM_B2, SIZE)).toEqual({ formula: "=LAMBDA(n,n+1)(B2)" });
+    expect(rebaseReferences("=LET(X,C3,x*2)", FROM_B2, SIZE)).toEqual({ formula: "=LET(X,B2,x*2)" });
+    expect(rebaseReferences("=LET(_xlpm.x,C3,_xlpm.x*2)", FROM_B2, SIZE)).toEqual({ formula: "=LET(_xlpm.x,B2,_xlpm.x*2)" });
+  });
+
+  it("still finds a defined name beside a LET, or a name the LET does not give, and the cells it reads outside the range", () => {
+    expect(rebaseReferences("=LET(x,C3,x*TaxRate)", FROM_B2, SIZE)).toMatchObject({ outside: "a defined name" });
+    expect(rebaseReferences("=LET(x,Z99,x*2)", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("not in the range") });
+    // The last argument of a LET is its result, not a name it gives.
+    expect(rebaseReferences("=LET(x,C3,y)", FROM_B2, SIZE)).toMatchObject({ outside: "a defined name" });
+  });
+
   it("reads a formula with no leading equals sign, as the files hold them", () => {
     expect(rebaseReferences("C3*D3", FROM_B2, SIZE)).toEqual({ formula: "B2*C2" });
+  });
+});
+
+describe("boundNames", () => {
+  const names = (formula: string) => [...boundNames(tokenize(formula))].sort();
+
+  it("gives the names a LET gives (its odd arguments but the last) and a LAMBDA gives (all but the last), in lower case", () => {
+    expect(names("LET(x,5,y,x+1,x*y)")).toEqual(["x", "y"]);
+    expect(names("LET(X,5,X*2)")).toEqual(["x"]);
+    expect(names("LAMBDA(a,b,a+b)(1,2)")).toEqual(["a", "b"]);
+    expect(names("_xlfn.LET(_xlpm.x,5,_xlpm.x*2)")).toEqual(["x"]);
+  });
+
+  it("reads each call at its own level: a nested one, a comma inside a function or an array, and an argument that is not a lone name", () => {
+    expect(names("LET(x,SUM(1,2),y,{1,2,3},LET(z,x+y,z))")).toEqual(["x", "y", "z"]);
+    expect(names("LET(x+1,5,2)")).toEqual([]);
+    expect(names("SUM(x,5)")).toEqual([]);
   });
 });

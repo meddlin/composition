@@ -112,6 +112,14 @@ describe("importRange: formulas", () => {
     expect(summary).toMatchObject({ calculated: 1, carried: 1 });
   });
 
+  it("carries a LET, whose names are its own and not defined names, and keeps the formula for an export", () => {
+    const { source, summary } = imported(range([[v("A"), v("B")], [v(8), f("LET(x,A2,x*2)", 16)]]));
+    expect(source.formulas).toBe("B2 carried =LET(x,A2,x*2)");
+    expect(source.csv).toBe("A,B\n8,16");
+    expect(summary).toMatchObject({ formulas: 1, carried: 1, values: 0 });
+    expect(summary.carriedWhy).toEqual([{ reason: "the function LET", count: 1 }]);
+  });
+
   it("carries a formula whose result Excel shows as a date, which would be drawn as a number of days", () => {
     const { source } = imported(range([[v("Start"), v("End")], [v(46085, { kind: "date" }), f("A2+30", 46115, { kind: "date" })]]));
     expect(source.csv).toBe("Start,End\n2026-03-04,2026-04-03");

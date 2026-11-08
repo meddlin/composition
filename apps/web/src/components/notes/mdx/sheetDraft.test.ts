@@ -232,6 +232,55 @@ describe("column names in formulas, when rows and columns come and go", () => {
     const { sheet } = calculateDraft(deleteColumn(NAMED, 1));
     expect(sheet.rows[3][2]).toBe("#REF!");
   });
+
+  describe("when a header is renamed", () => {
+    it("renames the column in every formula that names it, as Excel does, and calculates the same", () => {
+      const renamed = setCell(NAMED, 0, 1, "Qty");
+      expect(renamed.rows[0][1]).toBe("Qty");
+      expect(renamed.rows[1][3]).toBe("=[@Qty]*[@Price]");
+      expect(renamed.rows[2][3]).toBe("=[@Qty]*[@Price]");
+      expect(renamed.rows[3][1]).toBe("=SUM([Qty])");
+      expect(renamed.rows[3][3]).toBe("=SUM([Revenue])");
+      expect(calculateDraft(renamed).sheet.rows).toEqual(calculateDraft(NAMED).sheet.rows.map((row, r) => (r === 0 ? ["Region", "Qty", "Price", "Revenue"] : row)));
+    });
+
+    it("keeps the rows it did not change as they were, and gives a name with a space brackets of its own", () => {
+      const renamed = setCell(NAMED, 0, 2, "Unit Price");
+      expect(renamed.rows[3]).toBe(NAMED.rows[3]);
+      expect(renamed.rows[1][3]).toBe("=[@Units]*[@[Unit Price]]");
+    });
+
+    it("takes a change of case for a rename, as Excel does", () => {
+      expect(setCell(NAMED, 0, 1, "units").rows[1][3]).toBe("=[@units]*[@Price]");
+    });
+
+    it("leaves the formulas alone when the header is cleared, is typed as a formula, or is not the first column of its name", () => {
+      expect(setCell(NAMED, 0, 1, "").rows[1][3]).toBe("=[@Units]*[@Price]");
+      expect(setCell(NAMED, 0, 1, "=1+1").rows[1][3]).toBe("=[@Units]*[@Price]");
+      const twice = draft([["A", "A"], ["=[A]", "1"]]);
+      expect(setCell(twice, 0, 1, "B").rows[1][0]).toBe("=[A]");
+      expect(setCell(twice, 0, 0, "B").rows[1][0]).toBe("=[B]");
+    });
+
+    it("is only the header row: a cell below it that holds the same text renames nothing", () => {
+      expect(setCell(NAMED, 1, 0, "Units").rows[1][3]).toBe("=[@Units]*[@Price]");
+    });
+
+    it("renames the columns too when a block is pasted over the header, and not when the new names swap two of them", () => {
+      const pasted = pasteBlock(NAMED, 0, 1, [["Qty", "Cost"]]).draft;
+      expect(pasted.rows[1][3]).toBe("=[@Qty]*[@Cost]");
+      expect(pasted.rows[3][1]).toBe("=SUM([Qty])");
+      const swapped = pasteBlock(NAMED, 0, 1, [["Price", "Units"]]).draft;
+      expect(swapped.rows[1][3]).toBe("=[@Units]*[@Price]");
+    });
+
+    it("keeps a carried formula carried, with its formula renamed", () => {
+      const carried: Draft = { ...draft([["Qty", "Twice"], ["4", "=[Qty]*2"]]), carried: [[null, null], [null, "8"]] };
+      const renamed = setCell(carried, 0, 0, "Units");
+      expect(renamed.rows[1][1]).toBe("=[Units]*2");
+      expect(renamed.carried).toEqual([[null, null], [null, "8"]]);
+    });
+  });
 });
 
 describe("pasteBlock", () => {

@@ -178,6 +178,8 @@ describe("sourceCell", () => {
     expect(sourceCell({ t: "n", v: 1, f: "_xlws.FILTER(A1:A5,B1:B5>2)" })?.formula).toBe("FILTER(A1:A5,B1:B5>2)");
     expect(sourceCell({ t: "n", v: 1, f: "_xlfn._xlws.SORT(A1:A5)+_xlfn.IFS(A1,1)" })?.formula).toBe("SORT(A1:A5)+IFS(A1,1)");
     expect(sourceCell({ t: "n", v: 1, f: 'CONCAT("_xlfn.",A1)' })?.formula).toBe('CONCAT("_xlfn.",A1)');
+    expect(sourceCell({ t: "n", v: 16, f: "_xlfn.LET(_xlpm.x,B4,_xlpm.x*2)" })?.formula).toBe("LET(x,B4,x*2)");
+    expect(sourceCell({ t: "n", v: 1, f: 'CONCAT("_xlpm.",A1)' })?.formula).toBe('CONCAT("_xlpm.",A1)');
   });
 
   it("keeps an empty text that a formula gave, which is a value", () => {
