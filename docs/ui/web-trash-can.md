@@ -56,3 +56,7 @@ Images pasted into a note are never deleted either way (see
 A note's attached files (desktop only) stay while it is in the Trash Can, so a restored
 note gets them back, and are deleted with the note when it is permanently deleted (see
 [attachments.md](../architecture/attachments.md#deleting)).
+
+A note that owns a **PDF** (desktop) keeps the PDF, its marks and its bookmarks the same way. The delete dialog and the Trash Can row say what is
+inside ("its PDF (212 MB), 41 highlights, 6 bookmarks"), and the dialog also says how many notes cite it: their quotes stay and their links stop
+working until it is restored. See [pdf.md](pdf.md#deleting-a-pdf).

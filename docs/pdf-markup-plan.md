@@ -1,9 +1,11 @@
 # PDF reading, markup and notes: design and build plan
 
 Import a PDF, mark it up (on the iPad, with the Apple Pencil), keep bookmarks, and read it with your notes beside it. On the
-desktop the same PDF opens next to a note you type while you read. Status: **design only. Nothing is built, and nothing here has
-been tried in code or on a device.** Decided with the owner on 2026-11-07, in a question-by-question session (the decisions are
-in [What is decided](#what-is-decided)). Anything marked **my pick** is a judgment the owner has not made; **Inference** is
+desktop the same PDF opens next to a note you type while you read. Status (2026-11-07): **the desktop side is built, Steps 1 to 6
+of the [build order](#build-order)**, and checked by tests and by driving the real app; **nothing has been tried on the iPad, or on a
+real textbook by hand** (Gate P1 is the owner's). The design was decided with the owner in a question-by-question session (the
+decisions are in [What is decided](#what-is-decided)); read the sections below as the design, and the build order and change log
+for what was found when it was built. Anything marked **my pick** is a judgment the owner has not made; **Inference** is
 reasoning from a fact, not a measurement; **unverified** means no source or test confirmed it.
 
 ## Goal and use cases
@@ -488,7 +490,10 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      a signed PDF (a full rewrite drops the signature, as spike D said), memory on a file near the 1 GB limit, the utility process
      started from a **packaged** app (CI checks that the worker is unpacked where it will be started, not that it runs there), and
      Windows and Linux.
-6. **Docs and the manual test.** [Docs to change](#docs-to-change-when-it-ships) and `docs/manual-tests/pdf.md`.
+6. **Docs and the manual test. Done 2026-11-07.** [ui/pdf.md](ui/pdf.md) (what you see and do), [architecture/pdf.md](architecture/pdf.md)
+   (how it works inside), [manual-tests/pdf.md](manual-tests/pdf.md) (Gate P1, the checklist to run by hand), and every doc in
+   [Docs to change](#docs-to-change-when-it-ships), each updated for what is built; the iPad rows are proposals and stay ⬜. Every
+   link and anchor in the changed pages was checked.
 7. **Gate P1 (yours):** the manual test by hand on a real textbook and a real manual.
 8. **iPad M1 finishes** as planned (not part of this plan).
 9. **M2, in order:** the Swift core's three tables against the shared fixtures; the PDFKit reader and the split; typed markup,
@@ -619,18 +624,19 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
 
 ## Docs to change when it ships
 
-- [feature-matrix.md](feature-matrix.md): a PDF section (desktop ✅; web and CLI only the file and the note).
+All done with Step 6 (2026-11-07), except where a line says what is left.
+
+- [feature-matrix.md](feature-matrix.md): a PDFs section (desktop ✅; web and CLI only the file and the note), and a line under "Shared data, uneven features".
 - [architecture/data-model.md](architecture/data-model.md) (three tables, `documents/`, the uuid pass over nine tables) and
-  [architecture/backup-restore.md](architecture/backup-restore.md): **done with Step 1**. [architecture/attachments.md](architecture/attachments.md)
-  still wants one line saying a PDF is not an attachment.
-- [ui/panels.md](ui/panels.md) (the PDF panel and its pair), [ui/note-links.md](ui/note-links.md) (`pdf:` links), and the
-  shortcuts list.
-- [ipad-app-design.md](ipad-app-design.md): the tracker rows, M2's scope (this widens D13), and new compromise rows (markup is
-  invisible to other apps until exported; annotated export simplifies textured ink). Plus its build plan, when the iPad branch
-  is on `main`.
-- [cross-device-sync-design.md](cross-device-sync-design.md): documents and marks on the fast-follow list.
+  [architecture/backup-restore.md](architecture/backup-restore.md): done with Step 1. [architecture/attachments.md](architecture/attachments.md)
+  says a PDF is not an attachment. [architecture/search.md](architecture/search.md) says what a PDF's note is indexed with.
+- [ui/panels.md](ui/panels.md) (the PDF panel and its pair), [ui/note-links.md](ui/note-links.md) (`pdf:` links),
+  [ui/web-trash-can.md](ui/web-trash-can.md), and the shortcuts list (`shortcuts.ts`, done with Step 3).
+- [ipad-app-design.md](ipad-app-design.md): M2's scope (this widens D13) and its exit criteria, a "PDFs (new)" tracker section (all ⬜), and
+  compromises C20 and C21. **Left:** its build plan, when the iPad branch is on `main`.
+- [cross-device-sync-design.md](cross-device-sync-design.md): documents and marks on the fast-follow list, with their records and hazards.
 - [product-positioning.md](product-positioning.md): the attachment-search row.
-- New: `docs/ui/pdf.md`, `docs/architecture/pdf.md`, `docs/manual-tests/pdf.md`, and a line in [index.md](index.md).
+- New: [ui/pdf.md](ui/pdf.md), [architecture/pdf.md](architecture/pdf.md), [manual-tests/pdf.md](manual-tests/pdf.md), and the line in [index.md](index.md).
 
 ## Change log
 
@@ -673,3 +679,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   Sans Math is bundled too. 63 checks in the real app; pdf.js renders of the writer's output pass on all nine geometries, native
   and flattened; the web suite has 4,198 tests and the desktop suite 774. Picks and findings are listed under Step 5 in the
   [build order](#build-order).
+- 2026-11-07: **Step 6 done** (docs and the manual test). Three new pages (what you see and do, how it works inside, and the
+  checklist for Gate P1) and updates to the feature matrix, panels, note links, the Trash Can, search, attachments, the iPad
+  design (M2 scope, tracker rows, C20 and C21), the sync design (documents and marks on the fast follow) and the positioning
+  page. Nothing in the code changed. **Next: Gate P1, which is yours** (`docs/manual-tests/pdf.md`, on a real textbook and a real
+  manual); then the iPad's M2 work, which waits for the iPad branch.
