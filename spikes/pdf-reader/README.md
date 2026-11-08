@@ -58,3 +58,38 @@ node coords/compare.mjs /tmp/pdfjs.json /tmp/pdfkit.json        # all checks pas
 SPIKE_NEGATIVE=1 node coords/pdfjs.mjs /tmp/geometry.pdf > /tmp/pdfjs-negative.json
 node coords/compare.mjs /tmp/pdfjs-negative.json /tmp/pdfkit.json
 ```
+
+## Spike D: which library writes the marks into a PDF
+
+Question: which library can write highlights, underlines, strikeouts, text notes and ink into a PDF as native annotations, or
+burn them in (Flatten), with a licence we can ship, and does the result look right in both viewers and on a big file? The
+findings are in the plan's [Spike D findings](../../docs/pdf-markup-plan.md#spike-d-findings-2026-11-07).
+
+`export/marks.mjs` holds the marks (raw user space, one colour per kind). `export/adapters/pdflib.mjs` writes them with any of
+the three pdf-lib variants (`pdf-lib`, `@cantoo/pdf-lib`, `@pdfme/pdf-lib`), native with hand-written appearance streams or
+flattened; `adapters/pdfjs.mjs` tries pdf.js's own `saveDocument()`. `export/write.mjs` runs one adapter and prints time and
+peak memory. `export/pdfkit-render.swift` renders the result with PDFKit and lists the annotations PDFKit reads, and
+`export/check.mjs` looks for each mark inside its own rectangle in a pdf.js render and a PDFKit render (exit 1 on a failure).
+`export/run.sh` does all three. `export/encrypted.mjs` and `export/unicode.mjs` are the encryption and text-in-other-scripts
+checks, and `export/verify-big.mjs` checks that a big file's pages, outline, labels and annotations survive.
+
+```bash
+swiftc -O export/pdfkit-render.swift -o /tmp/pdfkit-render
+export PDFKIT_RENDER=/tmp/pdfkit-render
+
+# the nine geometries of spike C (see above for geometry.pdf), native and flattened, for each variant
+export/run.sh @cantoo/pdf-lib /tmp/geometry.pdf /tmp/export native
+export/run.sh @cantoo/pdf-lib /tmp/geometry.pdf /tmp/export flatten
+export/run.sh pdfjs /tmp/geometry.pdf /tmp/export native          # fails: pdf.js cannot write underline or strikeout
+
+# a real PDF: mark only some pages, and compare with the unmarked file instead of looking for colours
+MARK_PAGES=10,20 DIFF=1 export/run.sh @cantoo/pdf-lib /path/to/real.pdf /tmp/export native
+
+# time and memory on the 405 MB textbook of spike A
+MARK_PAGES=0,99,299,599 /usr/bin/time -l node export/write.mjs @cantoo/pdf-lib /tmp/textbook.pdf /tmp/marked.pdf native
+
+node export/encrypted.mjs encrypted.pdf ""                        # what each variant does with a password-protected file
+node export/unicode.mjs /path/to/a-font-with-coverage.ttf /tmp/unicode.pdf
+```
+
+`noap` as a fifth argument to `run.sh` leaves the appearance streams out.

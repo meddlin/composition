@@ -4,7 +4,11 @@
   "version": "0.0.0",
   "type": "commonjs",
   "dependencies": {
+    "@cantoo/pdf-lib": "2.11.1",
+    "@pdfme/pdf-lib": "6.2.8",
     "electron": "45.2.1",
+    "fontkit": "2.0.4",
+    "pdf-lib": "1.17.1",
     "pdfjs-dist": "6.5.438"
   },
   "main": "main.js"

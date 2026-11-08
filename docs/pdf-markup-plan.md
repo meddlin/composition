@@ -276,9 +276,11 @@ markup** checkbox, off by default:
 | **Flattened** | Burned into the page | Burned in | Burned in, exactly as drawn |
 
 Native marks stay editable and visible in other apps; flattened ones look identical everywhere and cannot be edited. The iPad
-writes native annotations with PDFKit. The desktop needs a PDF writer, which is spike D: `pdf-lib` is MIT but, as I recall, no
-longer maintained (**unverified**), and a maintained fork or another library may be better. Whatever it is, it must not be
-AGPL and must pass the licence-notices step.
+writes native annotations with PDFKit. The desktop writes them with `@cantoo/pdf-lib` (MIT, a maintained fork of `pdf-lib`),
+chosen by spike D ([findings](#spike-d-findings-2026-11-07)): it writes the annotations with appearance streams, or burns
+them into the page for Flatten, and rewrites the whole file in a utility process with a progress bar. A text note goes through
+an embedded font, never a standard one. Export of a password-protected PDF writes an **unprotected** copy (the writer
+decrypts it), and asks for the password if the file needs one.
 
 ## Search
 
@@ -326,7 +328,9 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      a fixture with rotated, cropped and offset pages, pdf.js and PDFKit compared. PDFKit runs on macOS, so its half was a
      command-line Swift program on this Mac with no simulator. Still untested: PDFKit on the iPad itself, and real
      multi-line selections.
-   - **D, the export writer.** Which library writes native annotations and flattens, with a licence and a size check.
+   - **D, the export writer. Done 2026-11-07;** see [Spike D findings](#spike-d-findings-2026-11-07). `@cantoo/pdf-lib`, tried
+     against two other variants and pdf.js on the nine geometries and on four real files (one of 183 MB). Still untested: a
+     signed PDF, AES-256, Acrobat, and non-Latin text notes with a font we may ship.
    - **B, PencilKit over PDFKit,** needs the iPad: finger scroll, selection and Pencil drawing together; ink latency; memory on
      500 pages. It runs at the start of M2 and gates the iPad's ink, not the desktop's work.
 1. **Shared schema and core (TypeScript).** The three tables with uuids, repos, `removeOrphans` for documents, backup and
@@ -404,6 +408,46 @@ PDFKit on iPadOS (the same framework, but the UIKit conversions such as `PDFView
 Chromium's canvas (the spike used a Node canvas, though the conversions are pure arithmetic); and the export itself (writing
 `/QuadPoints` into a file, which is spike D).
 
+## Spike D findings (2026-11-07)
+
+The checks are in [`spikes/pdf-reader/export`](../spikes/pdf-reader/README.md#spike-d-which-library-writes-the-marks-into-a-pdf).
+Each candidate writes the same marks (a highlight, an underline, a strikeout, a text note and an ink path, in raw user space)
+onto the nine geometries of spike C, as native annotations and again flattened. The result is then drawn by pdf.js and by
+PDFKit, and the check looks for each mark inside its own rectangle. On real PDFs, which already have colour on the page, it
+compares against a render of the original instead: each mark must change pixels inside its rectangle and nothing outside the
+rectangles of all the marks.
+
+**Candidates.** `pdf-lib` (MIT; last release May 2022, 320 open issues, 31 million downloads a week), and two maintained forks
+with the same API: `@cantoo/pdf-lib` 2.11.1 (MIT; released September 2026) and `@pdfme/pdf-lib` 6.2.8 (MIT; part of the pdfme
+project). pdf.js's own `saveDocument()` was also tried. `mupdf` is AGPL and excluded. PDFium compiled to WebAssembly
+(`@embedpdf/pdfium`, MIT) was **not tried**: it would mean driving PDFium's C interface by hand, and the forks already work.
+
+| Question | Answer |
+|---|---|
+| Do the forks write native annotations that both viewers draw in the right place? | **Yes.** All three pdf-lib variants, native with hand-written appearance streams: 9 of 9 geometries pass in pdf.js and in PDFKit, and each viewer reads back `Highlight`, `Underline`, `StrikeOut`, `FreeText` and `Ink` as native annotations. Flattened: 9 of 9, with no annotation left in the file. |
+| On real files? | **Yes.** Against the originals, native and flattened, in both viewers: the 183 MB, 4,351-page DaVinci Resolve manual (linearized, with object and cross-reference streams; pages 11, 21, 101 and 2001; all three variants), and two older files (Ghostscript 6.5 and dvipdfm output; `@cantoo`). The manual's own link annotations, outline (21 entries) and page labels survived. A small sample: four real files. |
+| Are appearance streams needed? | **Yes, write them.** Without one (`pdf-lib`'s output), both viewers still draw highlights, underlines, strikeouts and ink from the annotation's own data, but pdf.js draws **no text note** and the highlight's shape then differs by viewer (PDFKit's inset). With an appearance stream they match. |
+| Can pdf.js itself write the marks? | **No.** `saveDocument()` appends an incremental update, which is attractive, but this version can create only Highlight, FreeText, Ink and Stamp: **no Underline or StrikeOut**. PDFKit did not draw its Ink output, and it peaked at 1.5 GB on the 405 MB textbook (3.8 times the file) because it also builds a full copy. Rejected. |
+| How big and how fast on a big file? | The synthetic 405 MB, 600-page textbook: 0.4 to 0.5 s and 0.9 GB for 20 marks; 0.8 s and 0.95 GB with 3,000 (every page); flattened on every page 0.5 s and 1.0 GB, and the file grows 11 MB. The real 183 MB manual: **`@cantoo` 8.5 s and 0.75 GB; `pdf-lib` and `@pdfme` 3.5 to 4.7 s and 0.8 GB.** So memory is about 2 to 4.5 times the file, and `@cantoo` is about twice as slow. At the 1 GB import limit that extrapolates to 2 to 4.5 GB (**not measured**). Minified, `pdf-lib` is 525 KB and `@cantoo` 614 KB. |
+| Encrypted PDFs? | Tested with RC4 40-bit and 128-bit files (a restricted copy that opens without a password, and one that needs a user password). Plain `load` fails on every variant. **`ignoreEncryption: true` "works" but writes a file that still says it is encrypted with new unencrypted objects in it: never use it.** With the `password` option, only **`@cantoo` decrypts both sizes** and saves an unencrypted copy; `@pdfme` fails on the 40-bit file (a `TypeError`) and `pdf-lib` does not support it. pdf.js opens the no-password ones itself and raises `PasswordException` for the other. AES-256 was not tested (my generator could not make one). |
+| Text notes in other scripts? | A standard PDF font holds WinAnsi only. `pdf-lib` and `@pdfme` throw on 日本語, Привет, ≤ and emoji; **`@cantoo` silently writes a `?` for each one**, which would lose a user's note without a sound. Embedding a font through `fontkit` 2.0.4 (MIT) with subsetting worked: "Café ≤ Привет 日本語" came out right, pdf.js read the same text back, and the page cost 13 KB (the font file was 22.7 MB; a local test font that cannot be shipped). |
+
+**My pick:** `@cantoo/pdf-lib` plus `fontkit`, because it is maintained, has the original's API (so the original is a one-line
+swap if the fork ever causes trouble) and is the only one that handles encrypted files. Always write appearance streams.
+Export runs in a utility process with a progress bar (a full rewrite takes seconds on a big file and holds the whole file in
+memory), never through `ignoreEncryption`, and never lets a text note reach a standard font: it embeds a font. The licence
+notices gain `@cantoo/pdf-lib`, `fontkit`, their dependencies (all MIT, 0BSD, or MIT with Zlib) and the font.
+
+**What it changed in the plan:** the writer is chosen ([Export annotated PDF](#export-annotated-pdf)), X9 is answered, and two
+risks are new (X11, X12).
+
+**What it did not test:** a digitally signed PDF (a full rewrite invalidates the signature; an incremental update would not,
+and this is the cost of not writing one); AcroForms; AES-256; whether a text note on a rotated page reads upright (the check
+saw glyph pixels inside the rectangle, not their orientation); PencilKit's textured strokes simplified to ink paths (that
+part is on the iPad, which writes with PDFKit); opening the result in Acrobat (PDFKit is Preview's framework, so Preview
+should match, but it was not opened there); a hostile or damaged PDF; more than four real files; and the utility process
+itself in Electron.
+
 ## Risks and unknowns
 
 | # | Risk | Mitigation |
@@ -416,8 +460,10 @@ Chromium's canvas (the spike used a Node canvas, though the conversions are pure
 | X6 | A backup grows large and slow with textbooks; a Trash Can holds a large file for 60 days. | Counts in the Backup card and the Trash Can row; no cap beyond 1 GB per file. |
 | X7 | The TypeScript and Swift implementations drift on the three tables. | The shared fixtures (the iPad design's [conformance corpus](ipad-app-design.md#keeping-two-implementations-honest)). |
 | X8 | PDF in M2 widens v1 and the rewrite is already larger than v1 can afford (R3). | The order in P19; `<Ink>` pages are cut first. |
-| X9 | The export writer is unmaintained, too big, or has the wrong licence. | Spike D. |
+| X9 | The export writer is unmaintained, too big, or has the wrong licence. **Answered by spike D:** `@cantoo/pdf-lib` is MIT, maintained and 614 KB minified, and writes native and flattened marks that pdf.js and PDFKit draw in the right place. | Keep the original `pdf-lib` as a swap; the spike D checks in `spikes/pdf-reader/export` as a regression test when the code exists. |
 | X10 | A native-annotation export looks different in another app (PencilKit textures). | Said in the dialog; Flatten is one checkbox away. |
+| X11 | A text note in another script loses its characters on export: a standard font holds WinAnsi only, and `@cantoo` writes `?` without an error. | Embed a font through `fontkit`, bundle one the app may redistribute (an OFL one such as Noto Sans), and decide how far its coverage goes (CJK and emoji are large). Test a note in each script. **Open.** |
+| X12 | Export of a big file uses 2 to 4.5 times its size in memory and takes seconds; it rewrites the whole file, so a signature in the original is lost and a linearized file is not. | A utility process with progress; say so in the dialog for a signed PDF; an incremental writer of our own is the way out if it ever bites (not built). |
 
 ## Not in scope
 
@@ -450,3 +496,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   goes on all nine test geometries when it is stored in **raw PDF user space**; the plan's first convention (relative to the
   crop box) fails on pages whose boxes do not start at 0,0 and is replaced. PDFKit's highlight quad points are relative to
   the annotation's bounds, and its `bounds(for:)` is unrotated.
+- 2026-11-07: **spike D done** ([findings](#spike-d-findings-2026-11-07)). `@cantoo/pdf-lib` (MIT, maintained) writes native and
+  flattened marks that pdf.js and PDFKit draw in the right place, on the nine geometries and on four real files including a
+  183 MB, 4,351-page manual; pdf.js's own save cannot write underlines or strikeouts. Appearance streams are required for text
+  notes. Two new risks: a text note in another script (a standard font writes `?` without an error) and export memory of 2 to
+  4.5 times the file. Export drops encryption.
