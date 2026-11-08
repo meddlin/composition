@@ -266,7 +266,7 @@ struct BackupTests {
             let directory = live.directory.appendingPathComponent(".restore-failing", isDirectory: true)
             try FileManager.default.createDirectory(at: directory.appendingPathComponent("app_data"), withIntermediateDirectories: true)
             try Data("theirs".utf8).write(to: directory.appendingPathComponent("app_data/theirs-bbbbbbbbbbbb.png"))
-            let staged = StagedBackup(directory: directory, createdAt: "x", counts: BackupCounts(), settings: nil, hasImages: true, hasAttachments: false)
+            let staged = StagedBackup(directory: directory, createdAt: "x", counts: BackupCounts(), settings: nil, hasImages: true, hasAttachments: false, hasDocuments: false)
 
             #expect {
                 try Backup.apply(staged, to: live)
@@ -304,6 +304,43 @@ struct BackupTests {
             try Backup.apply(try Backup.stage(file, in: target), to: target)
             #expect(try sha256(of: target.attachmentsURL.appendingPathComponent("big-aaaaaaaaaaaa.bin")) == hash)
             #expect(try FileManager.default.attributesOfItem(atPath: target.attachmentsURL.appendingPathComponent("big-aaaaaaaaaaaa.bin").path)[.size] as? Int == megabytes * 1024 * 1024)
+        }
+    }
+
+    @Test("the PDFs a note owns, with their marks and uuids, ride through a backup and a restore")
+    func pdfsInABackup() throws {
+        try withScratch { scratch in
+            let source = location(scratch, "source")
+            try FileManager.default.createDirectory(at: source.directory, withIntermediateDirectories: true)
+            let database = try CompositionDatabase.open(at: source.databaseURL)
+            defer { try? database.close() }
+            let note = try database.createNote(title: "Paper")
+            try database.pool.write { db in
+                try db.execute(
+                    sql: "INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, created_at) VALUES (?, 'Paper.pdf', 'p1-Paper.pdf', 'abc', 9, 3, '2026-11-08T00:00:00.000Z')",
+                    arguments: [note.id])
+                try db.execute(sql: "INSERT INTO pdf_annotations (document_id, page, kind, color, created_at, updated_at) VALUES (1, 0, 'highlight', 'yellow', 'x', 'x')")
+                try db.execute(sql: "INSERT INTO pdf_bookmarks (document_id, page, created_at) VALUES (1, 2, 'x')")
+            }
+            let pdf = Data("%PDF-1.7\n".utf8)
+            try FileManager.default.createDirectory(at: source.documentsURL, withIntermediateDirectories: true)
+            try pdf.write(to: source.documentsURL.appendingPathComponent("p1-Paper.pdf"))
+            let file = scratch.directory.appendingPathComponent("backups/backup.tar.gz")
+
+            let summary = try Backup.create(database: database, location: source, to: file)
+            #expect(summary.counts.documents == 1)
+
+            let target = location(scratch, "target")
+            let staged = try Backup.stage(file, in: target)
+            #expect(staged.hasDocuments && staged.counts.documents == 1)
+            try Backup.apply(staged, to: target)
+            #expect(try Data(contentsOf: target.documentsURL.appendingPathComponent("p1-Paper.pdf")) == pdf)
+            let restored = try CompositionDatabase.open(at: target.databaseURL)
+            defer { try? restored.close() }
+            let uuids = try restored.pool.read { db in
+                try (String.fetchAll(db, sql: "SELECT uuid FROM documents") + String.fetchAll(db, sql: "SELECT uuid FROM pdf_annotations") + String.fetchAll(db, sql: "SELECT uuid FROM pdf_bookmarks"))
+            }
+            #expect(uuids.count == 3 && uuids.allSatisfy { $0.count == 32 }, "every row has a uuid, filled by the trigger")
         }
     }
 }

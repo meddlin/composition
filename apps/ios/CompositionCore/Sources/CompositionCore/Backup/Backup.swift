@@ -9,6 +9,7 @@ import GRDB
 //   composition.db            a consistent snapshot of the database (VACUUM INTO)
 //   app_data/<image>          every pasted image
 //   attachments/<file>        every attached file
+//   documents/<file>          every PDF a note owns
 //
 // Restoring is two steps so nothing is touched until the file is known to be good: `stage` unpacks and checks it in a
 // scratch folder, and `apply` swaps it in, with a rollback if anything fails halfway.
@@ -24,6 +25,8 @@ public struct DataLocation: Sendable, Equatable {
     public var imagesURL: URL { directory.appendingPathComponent(BackupNames.imageDirectory, isDirectory: true) }
     /// Attached files.
     public var attachmentsURL: URL { directory.appendingPathComponent(BackupNames.attachmentDirectory, isDirectory: true) }
+    /// The PDFs notes own (the iPad has no PDF reader yet, but a backup carries the files and their marks through).
+    public var documentsURL: URL { directory.appendingPathComponent(BackupNames.documentDirectory, isDirectory: true) }
     /// Text typed but not yet in the database (see `NoteDrafts`). Never part of a backup.
     public var draftsURL: URL { directory.appendingPathComponent("drafts", isDirectory: true) }
 }
@@ -36,6 +39,7 @@ public struct BackupCounts: Codable, Equatable, Sendable {
     public var trashedGroups = 0
     public var images = 0
     public var attachments = 0
+    public var documents = 0
     public var todos = 0
     public var archivedTodos = 0
     /// The Contacts plugin's rolodex (the iPad has no plugins, C6, but a backup carries the rows through).
@@ -59,6 +63,7 @@ public struct StagedBackup: Sendable {
     public let settings: Data?
     public let hasImages: Bool
     public let hasAttachments: Bool
+    public let hasDocuments: Bool
 }
 
 enum BackupNames {
@@ -69,6 +74,7 @@ enum BackupNames {
     static let database = "composition.db"
     static let imageDirectory = "app_data"
     static let attachmentDirectory = "attachments"
+    static let documentDirectory = "documents"
     /// SQLite's side files; present only while a connection is open, or after a crash.
     static let databaseSuffixes = ["-wal", "-shm", "-journal"]
     /// Manifest and settings are small; anything bigger is not one.
@@ -123,6 +129,7 @@ public enum Backup {
 
         let images = try storedFiles(in: location.imagesURL).filter(BackupNames.isImageName)
         let attachments = try storedFiles(in: location.attachmentsURL).filter(BackupNames.isStoredName)
+        let documents = try storedFiles(in: location.documentsURL).filter(BackupNames.isStoredName)
         counts.images = images.count
         let createdAt = Timestamp.now(now)
 
@@ -145,6 +152,9 @@ public enum Backup {
             }
             for name in attachments {
                 try tar.addFile(named: "\(BackupNames.attachmentDirectory)/\(name)", from: location.attachmentsURL.appendingPathComponent(name))
+            }
+            for name in documents {
+                try tar.addFile(named: "\(BackupNames.documentDirectory)/\(name)", from: location.documentsURL.appendingPathComponent(name))
             }
             try tar.finish()
             try output.close()
@@ -217,6 +227,7 @@ public enum Backup {
             counts.trashedNotes = count("trashed_notes")
             counts.trashedGroups = count("trashed_groups")
             counts.attachments = count("attachments")
+            counts.documents = count("documents")
             counts.archivedTodos = count("todos", where: "archived_at IS NOT NULL")
             counts.todos = count("todos") - counts.archivedTodos
             counts.contacts = count("contacts")
@@ -263,6 +274,7 @@ public enum Backup {
             var seen = Set<String>()
             var images = 0
             var attachments = 0
+            var documents = 0
 
             try TarReader.forEachFile(in: file) { entry in
                 guard seen.insert(entry.name).inserted else { throw BackupError.duplicateEntry(entry.name) }
@@ -289,8 +301,9 @@ public enum Backup {
                     guard parts.count == 2,
                         (parts[0] == BackupNames.imageDirectory && BackupNames.isImageName(parts[1]))
                             || (parts[0] == BackupNames.attachmentDirectory && BackupNames.isStoredName(parts[1]))
+                            || (parts[0] == BackupNames.documentDirectory && BackupNames.isStoredName(parts[1]))
                     else { throw BackupError.unknownFile(entry.name) }
-                    if parts[0] == BackupNames.imageDirectory { images += 1 } else { attachments += 1 }
+                    if parts[0] == BackupNames.imageDirectory { images += 1 } else if parts[0] == BackupNames.documentDirectory { documents += 1 } else { attachments += 1 }
                     let folder = directory.appendingPathComponent(parts[0], isDirectory: true)
                     try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
                     target = folder.appendingPathComponent(parts[1])
@@ -307,7 +320,7 @@ public enum Backup {
             counts.images = images
             return StagedBackup(
                 directory: directory, createdAt: manifest.createdAt, counts: counts, settings: settings,
-                hasImages: images > 0, hasAttachments: attachments > 0)
+                hasImages: images > 0, hasAttachments: attachments > 0, hasDocuments: documents > 0)
         } catch {
             try? fileManager.removeItem(at: directory)
             throw error
@@ -357,7 +370,7 @@ public enum Backup {
         }
     }
 
-    /// Replaces the current database, images and attachments with the staged ones, then removes the scratch folder. What
+    /// Replaces the current database, images, attachments and PDFs with the staged ones, then removes the scratch folder. What
     /// was there is set aside first and put back if anything fails, so the app is never left half restored.
     ///
     /// The caller must have closed the database (`CompositionDatabase.close()`), and should have taken a backup of the
@@ -383,6 +396,7 @@ public enum Backup {
             + [
                 (location.imagesURL, staged.hasImages ? staged.directory.appendingPathComponent(BackupNames.imageDirectory) : nil),
                 (location.attachmentsURL, staged.hasAttachments ? staged.directory.appendingPathComponent(BackupNames.attachmentDirectory) : nil),
+                (location.documentsURL, staged.hasDocuments ? staged.directory.appendingPathComponent(BackupNames.documentDirectory) : nil),
             ]
 
         var setAside: [(current: URL, parked: URL)] = []
