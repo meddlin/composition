@@ -210,7 +210,7 @@ A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for
 
 ## Colour schemes and fonts (build plan Step 10)
 
-65. **The schemes.** Open More (…), *Appearance…*: **System, Dark, Light, Forest, Wine and Cream**, each with a swatch. Choose each in turn: the whole app (the sidebar, the list, the note, the sheet itself, the status bar and the keyboard) changes at once, and the choice is ticked.
+65. **The schemes.** Tap **Appearance** at the foot of the first column (the one headed Notebooks; open it with the button at the top left if it is hidden; it is in the More menu too, and it names the scheme in force): **System, Dark, Light, Forest, Wine and Cream**, each with a swatch. Choose each in turn: the whole app (the sidebar, the list, the note, the sheet itself, the status bar and the keyboard) changes at once, and the choice is ticked.
 66. **System.** Choose System, then switch the iPad between Light and Dark (Control Centre): the app follows. System is the choice on a fresh install.
 67. **Your own notes in each scheme.** Open a long note with a few components (an Info, a chart, a `<Mark>` of each colour) on the Preview and Split tabs in every scheme: everything reads easily, the five highlight colours too. Put the desktop beside it in the same scheme: the desktop's is the reference; say what looks different.
 68. **The editor.** On the Markdown tab, headings, bold, italics, code, links, `<Info>` tags, list markers and the frontmatter are each coloured, and legible, in every scheme; they are the desktop's editor colours.

@@ -169,4 +169,19 @@ final class AppearanceUITests: XCTestCase {
         app.buttons["Serif"].firstMatch.tap()
         XCTAssertTrue(editor.label.contains("Serif") || (editor.value as? String)?.contains("Serif") == true, "and is now serif: \(editor.label)")
     }
+
+    /// The way in is in plain sight at the foot of the first column (not only in the More menu): a finger-sized button that says what it is and which scheme is in force.
+    func testTheAppearanceButtonAtTheFootOfTheFirstColumnOpensTheSheet() throws {
+        try launch()  // (not with `-theme`, which would override what is chosen)
+        let button = app.buttons["sidebar-appearance"]
+        XCTAssertTrue(button.waitForExistence(timeout: 10), "the first column has an Appearance button")
+        XCTAssertGreaterThanOrEqual(button.frame.height, 44, "a finger high")
+        XCTAssertTrue(button.label.hasPrefix("Appearance"), "it says what it is, and then which scheme is in force: \(button.label)")
+        button.tap()
+        XCTAssertTrue(app.buttons["scheme-forest"].waitForExistence(timeout: 10), "it opens the sheet of schemes")
+        app.buttons["scheme-forest"].tap()
+        app.buttons["Done"].tap()
+        let named = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'Forest'"), object: app.buttons["sidebar-appearance"])
+        XCTAssertEqual(XCTWaiter().wait(for: [named], timeout: 10), .completed, "and the button names the scheme just chosen: \(app.buttons["sidebar-appearance"].label)")
+    }
 }

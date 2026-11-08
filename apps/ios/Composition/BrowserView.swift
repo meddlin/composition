@@ -28,6 +28,7 @@ struct BrowserView: View {
             SidebarView(model: model, prompt: $prompt, moving: $moving)
                 // Wider where the text is large, so that the names of notebooks are not broken to fit.
                 .navigationSplitViewColumnWidth(min: 250, ideal: textSize.isAccessibilitySize ? 420 : 320, max: 520)
+                .safeAreaInset(edge: .bottom) { appearanceButton }
                 .navigationTitle("Notebooks")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
@@ -119,6 +120,40 @@ struct BrowserView: View {
             case .newNotebook: await model.createNotebook(named: name)
             case .rename(let item): await model.rename(item, to: name)
             }
+        }
+    }
+
+    /// The way into the colour schemes and fonts, in plain sight at the foot of the first column (it is in the More menu too): it says what it is and which scheme is in force.
+    private var appearanceButton: some View {
+        Button { showingAppearance = true } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "paintpalette").foregroundStyle(look.brand).frame(width: 26).accessibilityHidden(true)
+                Text("Appearance")
+                Spacer(minLength: 8)
+                // At the accessibility sizes the name alone would fill the column; the sheet itself says which scheme is chosen.
+                if !textSize.isAccessibilitySize {
+                    Text(schemeName).font(.callout).foregroundStyle(look.mutedText).lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(look.foreground)
+        // Solid, like the list's footer beside it, so that what is written on it has a known colour behind it.
+        .background(look.panel)
+        .overlay(alignment: .top) { Rectangle().fill(look.border).frame(height: 1) }
+        .accessibilityHint("Colour scheme and fonts")
+        .accessibilityIdentifier("sidebar-appearance")
+    }
+
+    /// "Cream" for the scheme named "Cream (warm light)", or "System".
+    private var schemeName: String {
+        switch model.appearance.scheme {
+        case .system: "System"
+        case .theme(let name): Theme.named(name).map { $0.label.components(separatedBy: " (").first ?? $0.label } ?? name
         }
     }
 
