@@ -42,6 +42,40 @@ leaves no note behind. If the same bytes are already in the library the answer i
 picked path, which the main process holds (at most four, newest kept); **Import a separate copy** sends the token back, so the page never
 learns where the file is. The reader counts the pages on first open and tells the store, which saves the count.
 
+**A password.** `openPdf(id, password?)` hands the password to pdf.js, which raises `PasswordException` with a code (1: needed, 2: wrong); that becomes a
+`PdfPasswordError(incorrect)`, whose message says nothing of the password. `usePdfViewer` catches it, shows a `password` phase (`PdfPasswordDialog` in the reader) and
+tries again with what is typed, until the PDF opens. The password that worked goes to the **documents store** (`rememberPassword`), a `Map` that is not part of the
+snapshot, so it is not in what every panel reads, in React state, in storage, or in the database, and a panel opened again, in any window (they share the store), is
+offered it first. It is in memory only: nothing writes it, and the smoke test looks for it in every file the app wrote after quitting. It leaves the renderer in
+exactly one place: an export sends it to the main process (`ExportPdfOptions.password`, checked by `exportOptions` in `validate.ts`: a non-empty string of at most 1,024
+characters, never named in an error), which hands it to the export's utility process in the job message and nowhere else.
+
+**The PDF's own title.** The note is first titled from the file's name (`pdfTitleFromFileName`). When the reader opens the file, `usePdfViewer` asks pdf.js
+for its metadata and passes the title up (`onTitle`, through `PdfReader` to the panel, which calls `store.retitleFromPdf`). `pdfTitle.ts` holds the rules,
+as pure functions: the XMP `dc:title` is read before the Info dictionary's `Title` (as pdf.js's own viewer orders them); a title is *sensible* if it has
+a letter or digit, is one line of at most 200 characters, and is not a placeholder, a file name or garbled; and `retitleFromPdf` says whether to change
+the note, which it does only when the note's current title is exactly the one the file's name gives (so a title the user typed is never replaced) and
+differs from the PDF's. The store changes the title in the owner note's frontmatter and saves it through `editNote`, like any edit; the server reads the
+title column back from it. There is **no stored marker** of having done it: after the change the note no longer has the file's title, so the next open
+finds nothing to do. (The one case that would repeat it: the user types the file-derived title back by hand.)
+
+**File > Import PDF…** carries no path either. `importPdfMenu.ts` puts the item (id `import-pdf`) at the top of Electron's default File menu, found by role
+(`fileMenuIndex` in `appMenu.ts`), and its click runs `requestImportPdf` (`importPdfRequest.ts`): it brings the main window forward and pushes
+`IMPORT_PDF_CHANNEL` to that one window's page, with no payload (with no main window it opens one, as the Dock icon does, and starts no import). The
+preload's `onImportPdfRequest(listener)` delivers it; `useImportPdfRequest` in `NotesApp` runs the same `onImportPdf` the sidebar button runs, with the target
+the page already knows (the open group page, else the notebook's top level), so the main process opens the picker as ever. The main window is tracked in
+`index.ts` (`mainWindow`), since a pop-out has no workspace of its own to answer.
+
+**A dropped file** is the other way in, and the path still never comes from the page. The page's drop handler (`usePdfDrop` for the window,
+`DropZone` in `GroupTree.tsx` for a group row) hands the drop's `File` to `importDroppedPdf(file, target)`. A `File` cannot cross the bridge, so
+that one method is written by hand in the preload script: it reads the path with Electron's `webUtils.getPathForFile` and sends only that to the
+main process (the page never sees it, and a `File` the page makes up has no path, which the preload sends as an empty string). The main process
+then checks it before `service.importPdf` looks inside the file (`droppedPdf.ts`): an absolute path, a name ending in `.pdf`, a real file (the link
+is followed, not a folder), and not inside the application data folder, which would copy the library into itself. A duplicate is answered with a
+token exactly as the picker's is. `DocumentsApi.importDroppedPdf` takes a `File` while the main process implements `DocumentsHost`, the same
+interface with a path in its place. The window's handler runs in the capture phase, so it sees the drop before a note editor (which would take
+a dropped file as text); a group row marks itself `data-pdf-drop-zone`, and the window's handler leaves drops on it to the row.
+
 `removeOrphans` (the sweep that runs when the app opens and clears the Trash Can of expired notes, and when a note is deleted for good by hand) deletes the file, marks and bookmarks
 of any PDF whose owner note is gone for good, next to the attachments' own sweep; each is swept on its own, so one failing does not skip the other.
 
@@ -137,7 +171,13 @@ finds the unpacked copy. It reads the PDF, writes the copy as `<target>.part` an
   Noto Sans Math for a character the first lacks (both SIL OFL, subsetted per export, embedded only when a note needs them). On a page whose `/Rotate`
   is 90, 180 or 270 the appearance carries a matrix that turns it back, so it reads upright, as the reader shows it. A note with a character neither font has
   **refuses the export**, naming it, rather than letting the library write a `?`.
-- **Refused:** a password-protected PDF (never `ignoreEncryption`, which writes a file that still says it is encrypted), and a file that cannot be read.
+- **Protected PDFs.** `PDFDocument.load` is given the password (an empty one when none was sent, which opens a PDF that is only restricted). A PDF that needs one that was not
+  given, or a wrong one, is refused with a reason that does not repeat it. **The copy is protected the way the original was** (`originalProtection`, `protectCopy`): the library
+  decrypts a file it was given the password of and leaves its encryption dictionary behind as an unused object, which is where the permission flags (`/P`) are read, so the
+  copy has the same limits on printing, copying and so on; it is encrypted with the same password (AES-256, whatever the original used) and a made-up owner password that is
+  kept by no one, so the limits cannot be lifted. A test pins that behaviour of the library (an upgrade that changes it fails the test instead of writing an unprotected copy).
+  `ignoreEncryption` is never used, since it writes a file that still says it is encrypted. A file that is not protected is not protected by the export, even if a password was sent.
+- **Refused:** a file that cannot be read, a PDF whose password was not given or is wrong, and a note with a character no font can draw.
   **Left out and counted:** ink (its stroke format is not final, D9) and a mark on a page the PDF does not have.
 - **Lost by a full rewrite:** a digital signature, and a linearized file's linearization.
 
@@ -152,7 +192,7 @@ checked against the stored-name pattern, and the export reads only the library's
 - Unit tests beside each module (validation, the repositories against a real database, the store and its undo, geometry, selection to marks, the layers,
   the reader with a fake viewer, the pairing and link following, the export's structure on nine geometries, the process runner).
 - [`fixtures/conformance/pdf`](../../fixtures/conformance/README.md): the schema, the validation rules and operation scripts that the Swift core must reproduce.
-- `pnpm --dir apps/desktop smoke:pdf` drives the real app (import, ranges under the CSP, the reader, marks, undo, citations and following, the Notes tab,
+- `pnpm --dir apps/desktop smoke:pdf` drives the real app (import, dragging PDFs in with Chromium's own drag events and importing through the File menu, ranges under the CSP, the reader, marks, undo, citations and following, the Notes tab,
   export native and flattened read back, delete and the Trash Can, restart). `smoke.mjs` checks the bridge's members and, for a packaged app, that the
   export worker is unpacked.
 - `spikes/pdf-reader/export/app-writer-check.mjs` renders the writer's output with pdf.js on the nine geometries (native and flattened) and compares it

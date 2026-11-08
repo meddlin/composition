@@ -59,6 +59,20 @@ export function findImageRefs(content: string): Set<string> {
 }
 
 /**
+ * Which notes still point at each stored image, by file name, in the order the notes are given. What lets an
+ * image be found again after the text that pointed at it is gone (see `listImages` in service.ts).
+ */
+export function imageUsage(
+  notes: readonly { id: number; title: string; content: string }[],
+): Map<string, { id: number; title: string }[]> {
+  const usedIn = new Map<string, { id: number; title: string }[]>();
+  for (const { id, title, content } of notes) {
+    for (const name of findImageRefs(content)) usedIn.set(name, [...(usedIn.get(name) ?? []), { id, title }]);
+  }
+  return usedIn;
+}
+
+/**
  * The `<Image>` tag that shows a stored image, to paste into a note. The tag is
  * text for a note and the clipboard, never HTML a browser parses, and `name` is
  * a validated file name that can't contain a quote or angle bracket.

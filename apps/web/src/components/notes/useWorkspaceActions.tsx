@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import type { PdfContents } from "@/lib/composition/documentsApi";
+import type { ImportPdfResult, PdfContents } from "@/lib/composition/documentsApi";
 import type { DuplicateImport } from "@/lib/composition/documentsStore";
 import { describeCitingNotes, describeContents } from "@/lib/composition/pdfContents";
 import { canMoveGroup } from "@/lib/composition/groupMove";
@@ -56,13 +56,27 @@ export function useWorkspaceActions(store: WorkspaceStore, options: Options = {}
     });
   }
 
-  /** Picks a PDF in the native dialog and imports it into a new note; says why when it is refused, asks when it is a duplicate. */
-  async function importPdf(groupId: number | null, notebookId: number) {
-    setGroupError(null);
-    const result = await store.importPdf({ groupId, notebookId }, windowId);
+  /** Shows what an import came to: why it was refused, the question about a duplicate, or that a note was made. */
+  function afterImport(result: ImportPdfResult, groupId: number | null, notebookId: number) {
     if (result.error) setGroupError(result.error);
     else if (result.duplicate) setDuplicate({ ...result.duplicate, target: { groupId, notebookId } });
     else if (result.note) onCreated?.();
+  }
+
+  /** Picks a PDF in the native dialog and imports it into a new note; says why when it is refused, asks when it is a duplicate. */
+  async function importPdf(groupId: number | null, notebookId: number) {
+    setGroupError(null);
+    afterImport(await store.importPdf({ groupId, notebookId }, windowId), groupId, notebookId);
+  }
+
+  /** Imports the PDF dropped on the window or a group, the same way. One at a time: the question about a duplicate has room for one. */
+  async function importDropped(files: File[], groupId: number | null, notebookId: number) {
+    const [file, ...others] = files;
+    if (!file) return;
+    setGroupError(null);
+    const result = await store.importDroppedPdf(file, { groupId, notebookId }, windowId);
+    afterImport(result, groupId, notebookId);
+    if (others.length > 0 && !result.error) setGroupError("Only one PDF is imported at a time; drop the others again.");
   }
 
   async function importCopy(pending: DuplicateImport) {
@@ -78,6 +92,7 @@ export function useWorkspaceActions(store: WorkspaceStore, options: Options = {}
     onSelectGroup: (id) => onSelectGroup?.(id),
     onCreate: (groupId, notebookId) => void store.createNote(groupId, notebookId, windowId).then(() => onCreated?.()),
     onImportPdf: store.documents.available ? (groupId, notebookId) => void importPdf(groupId, notebookId) : undefined,
+    onDropPdf: store.documents.available ? (files, groupId, notebookId) => void importDropped(files, groupId, notebookId) : undefined,
     onDelete: (id) => setPendingDelete({ kind: "note", id }),
     onCreateGroup: (name, parentId, notebookId) => void store.createGroup(name, parentId, notebookId),
     onRenameGroup: (id, name) => store.renameGroup(id, name),

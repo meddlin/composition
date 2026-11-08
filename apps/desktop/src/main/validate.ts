@@ -264,10 +264,19 @@ function records(method: string, value: unknown, name: string, limit: number): R
   return value.map((item) => record(method, item, name));
 }
 
-/** How to export: only whether to flatten, as a real boolean. */
-function exportOptions(method: string, value: unknown): { flatten: boolean } {
+/** The longest password taken: far more than a person types, and a bound on what a page can send. */
+const MAX_PASSWORD_LENGTH = 1024;
+
+/**
+ * How to export: whether to flatten, as a real boolean, and the password a protected PDF was opened with, when there is one (a
+ * non-empty string; nothing else rides along). An invalid value is reported by the name of the argument, never by its value.
+ */
+function exportOptions(method: string, value: unknown): { flatten: boolean; password?: string } {
   const given = record(method, value, "options");
-  return typeof given.flatten === "boolean" ? { flatten: given.flatten } : fail(method, "options");
+  if (typeof given.flatten !== "boolean") return fail(method, "options");
+  if (given.password === undefined) return { flatten: given.flatten };
+  if (typeof given.password !== "string" || given.password === "" || given.password.length > MAX_PASSWORD_LENGTH) return fail(method, "options");
+  return { flatten: given.flatten, password: given.password };
 }
 
 /** Arguments of the desktop-only PDF methods (see documents.ts). Ids and a target only: no path ever comes from the renderer. */
@@ -275,6 +284,8 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   listDocuments: none,
   importPdf: ([target]) => [importTarget("importPdf", target)],
   importPdfCopy: ([token, target]) => [text("importPdfCopy", token, "token"), importTarget("importPdfCopy", target)],
+  // The path is the preload's reading of a dropped File, not the page's word; main checks it again (droppedPdf.ts).
+  importDroppedPdf: ([path, target]) => [text("importDroppedPdf", path, "path"), importTarget("importDroppedPdf", target)],
   setDocumentPageCount: ([documentId, pageCount]) => [id("setDocumentPageCount", documentId, "documentId"), wholeNumber("setDocumentPageCount", pageCount, "pageCount", 1)],
   saveDocumentViewState: ([documentId, state]) => [id("saveDocumentViewState", documentId, "documentId"), record("saveDocumentViewState", state, "state")],
   listBookmarks: ([documentId]) => [id("listBookmarks", documentId, "documentId")],

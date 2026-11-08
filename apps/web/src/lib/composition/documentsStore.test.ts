@@ -89,6 +89,33 @@ describe("the documents store", () => {
       expect(await store.importPdf({ groupId: null, notebookId: 1 })).toEqual({ error: "bridge down" });
     });
 
+    it("imports a dropped file into the target group, and adds the PDF that came of it", async () => {
+      const added = { note: { id: 32 } as never, document: doc(5, 32) };
+      const { store, deps } = setup([doc(1)], { importDroppedPdf: vi.fn(async () => added) });
+      await store.load();
+      const file = new File(["%PDF-1.7"], "Dropped.pdf", { type: "application/pdf" });
+
+      const result = await store.importDropped(file, { groupId: 7, notebookId: 1 });
+
+      expect(deps.importDroppedPdf).toHaveBeenCalledWith(file, { groupId: 7, notebookId: 1 });
+      expect(result).toBe(added);
+      expect(store.getSnapshot().documents.map((d) => d.id)).toEqual([1, 5]);
+    });
+
+    it("changes nothing for a dropped file that is refused or already in the library, and answers a bridge failure as an error", async () => {
+      const file = new File([""], "x.pdf");
+      for (const result of [{ error: "x.pdf: only PDF files can be dropped here." }, { duplicate: { token: "t", fileName: "x.pdf", existing: [] } }]) {
+        const { store } = setup([doc(1)], { importDroppedPdf: vi.fn(async () => result) });
+        await store.load();
+
+        expect(await store.importDropped(file, { groupId: null, notebookId: 1 })).toBe(result);
+        expect(store.getSnapshot().documents).toEqual([doc(1)]);
+      }
+      const { store } = setup([], { importDroppedPdf: vi.fn(async () => Promise.reject(new Error("bridge down"))) });
+
+      expect(await store.importDropped(file, { groupId: null, notebookId: 1 })).toEqual({ error: "bridge down" });
+    });
+
     it("imports a duplicate as a separate copy with the token and target it was given", async () => {
       const added = { note: { id: 31 } as never, document: doc(4, 31) };
       const { store, deps } = setup([doc(1)], { importPdfCopy: vi.fn(async () => added) });
@@ -99,6 +126,39 @@ describe("the documents store", () => {
       expect(deps.importPdfCopy).toHaveBeenCalledWith("tok", { groupId: 2, notebookId: 1 });
       expect(result).toBe(added);
       expect(store.byId(4)).toEqual(doc(4, 31));
+    });
+  });
+
+  describe("a protected PDF's password", () => {
+    it("is remembered for that PDF alone, for as long as the store lives", () => {
+      const { store } = setup([doc(1), doc(2)]);
+
+      expect(store.passwordFor(1)).toBeUndefined();
+      store.rememberPassword(1, "s3cret");
+
+      expect(store.passwordFor(1)).toBe("s3cret");
+      expect(store.passwordFor(2)).toBeUndefined();
+    });
+
+    it("is kept out of the snapshot, which every panel reads and anything may inspect, and out of what the backend is sent", async () => {
+      const { store, deps } = setup([doc(1)]);
+      await store.load();
+      store.rememberPassword(1, "s3cret");
+      store.setPageCount(1, 5);
+      store.saveViewState(1, { page: 2 });
+
+      expect(JSON.stringify(store.getSnapshot())).not.toContain("s3cret");
+      expect(JSON.stringify(Object.values(deps).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock?.calls ?? []))).not.toContain("s3cret");
+    });
+
+    it("does not tell the listeners: nothing is drawn from it", () => {
+      const { store } = setup([doc(1)]);
+      const listener = vi.fn();
+      store.subscribe(listener);
+
+      store.rememberPassword(1, "s3cret");
+
+      expect(listener).not.toHaveBeenCalled();
     });
   });
 
@@ -194,7 +254,7 @@ describe("the documents store", () => {
 
 describe("exporting a PDF with its marks", () => {
   it("asks the backend, and passes on what came of it", async () => {
-    const result = { saved: true as const, fileName: "a (annotated).pdf", written: 2, skipped: { ink: 0, offPage: 0 } };
+    const result = { saved: true as const, fileName: "a (annotated).pdf", written: 2, skipped: { ink: 0, offPage: 0 }, passwordProtected: false };
     const api = fakeDocumentsApi({ exportDocument: vi.fn(async () => result) });
     const store = createDocumentsStore(api);
 

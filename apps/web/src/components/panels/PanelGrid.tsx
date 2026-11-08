@@ -200,7 +200,7 @@ function PdfView({ panelId, state, shared }: { panelId: PanelId; state: PdfPanel
       title={document?.fileName ?? "PDF"}
     >
       {document ? (
-        <PdfReader key={document.id} document={document} documents={store.documents} pairing={pairing} />
+        <PdfReader key={document.id} document={document} documents={store.documents} pairing={pairing} onTitle={(title) => store.retitleFromPdf(document.id, title)} />
       ) : (
         <Empty>
           <EmptyHeader>

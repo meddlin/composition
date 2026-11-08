@@ -3,7 +3,8 @@
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useEffect, useRef, useState, type RefObject } from "react";
 import type { PdfRect, PdfViewState } from "@/lib/composition/pdfMarkup";
-import { loadPdfjs, openPdf, PdfFileError } from "./pdfjs";
+import { pdfOwnTitle } from "@/lib/composition/pdfTitle";
+import { loadPdfjs, openPdf, PdfFileError, PdfPasswordError, type OpenedPdf } from "./pdfjs";
 import type { PageOnScreen } from "./selectionMarks";
 
 /** What pdf.js's outline calls an entry: a title, where it goes, and the entries under it. */
@@ -39,6 +40,12 @@ type Options = {
   viewState: PdfViewState;
   /** Told how many pages the file has, once known. */
   onPageCount: (pageCount: number) => void;
+  /** The password this PDF was opened with earlier in the session, if it has one; tried first so the user is not asked again. */
+  password?: string;
+  /** Told the password the user typed, once it has opened the PDF (never when the PDF needs none). */
+  onPassword?: (password: string) => void;
+  /** Told the title the PDF gives itself, when it opens and it has one worth showing (pdfTitle.ts); never told otherwise. */
+  onTitle?: (title: string) => void;
   /** Told where the reader is, after it has settled (not at every step of a scroll). */
   onViewState: (state: PdfViewState) => void;
 };
@@ -46,6 +53,15 @@ type Options = {
 export type PdfViewer =
   | { phase: "loading" }
   | { phase: "error"; message: string }
+  | {
+      /** The PDF needs a password to open: the reader asks for it and hands it to `submit`. */
+      phase: "password";
+      /** The last one given was not right. */
+      incorrect: boolean;
+      /** A password was given and is being tried. */
+      checking: boolean;
+      submit: (password: string) => void;
+    }
   | {
       phase: "ready";
       pageCount: number;
@@ -85,11 +101,36 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
 
     (async () => {
       const { lib, viewer } = await loadPdfjs();
-      const opened = await openPdf(options.documentId);
-      if (cancelled) {
-        opened.destroy();
-        return;
+      // A protected PDF: the password remembered this session first, then whatever the user types, until it opens. The password
+      // goes to pdf.js and to `onPassword` (which keeps it in memory) and nowhere else, and is never written to the console.
+      let password = latest.current.password;
+      let typed: string | null = null;
+      let opened: OpenedPdf | undefined;
+      while (!opened) {
+        try {
+          opened = await openPdf(options.documentId, password);
+        } catch (error) {
+          if (!(error instanceof PdfPasswordError)) throw error;
+          typed = await new Promise<string>((resolve) => {
+            if (cancelled) return;
+            setState({
+              phase: "password",
+              incorrect: error.incorrect,
+              checking: false,
+              submit: (given) => {
+                setState({ phase: "password", incorrect: false, checking: true, submit: () => {} });
+                resolve(given);
+              },
+            });
+          });
+          password = typed;
+        }
+        if (cancelled) {
+          opened?.destroy();
+          return;
+        }
       }
+      if (typed !== null) latest.current.onPassword?.(typed);
       const doc: PDFDocumentProxy = opened.doc;
 
       const eventBus = new viewer.EventBus();
@@ -182,6 +223,15 @@ export function usePdfViewer(container: RefObject<HTMLDivElement | null>, viewer
         },
       };
       controlsRef.current = controls;
+
+      // The PDF's own title is for the note to take, if the user has not named it; a file with no usable metadata says nothing.
+      void doc
+        .getMetadata()
+        .then(({ info, metadata }) => {
+          const title = pdfOwnTitle({ xmpTitle: metadata?.get("dc:title"), infoTitle: (info as { Title?: unknown } | null)?.Title });
+          if (title !== null && !cancelled) latest.current.onTitle?.(title);
+        })
+        .catch(() => {});
 
       eventBus.on("pagesinit", () => {
         const { viewState, onPageCount } = latest.current;

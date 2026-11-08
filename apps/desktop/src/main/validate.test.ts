@@ -246,6 +246,26 @@ describe("DOCUMENT_VALIDATORS", () => {
     expect(DOCUMENT_VALIDATORS.importPdfCopy(["abc123", { groupId: null, notebookId: 2, path: "/x" }])).toEqual(["abc123", { groupId: null, notebookId: 2 }]);
   });
 
+  it("takes the password a protected PDF was opened with for an export, as a non-empty string, and nothing else with it", () => {
+    expect(DOCUMENT_VALIDATORS.exportDocument([1, { flatten: false, password: "s3cret", path: "/etc/passwd" }])).toEqual([1, { flatten: false, password: "s3cret" }]);
+    expect(DOCUMENT_VALIDATORS.exportDocument([1, { flatten: true }])).toEqual([1, { flatten: true }]);
+    expect(DOCUMENT_VALIDATORS.exportDocument([1, { flatten: true, password: "x".repeat(1024) }])).toEqual([1, { flatten: true, password: "x".repeat(1024) }]);
+  });
+
+  it("refuses a password that is empty, too long or not a string, without saying what it was", () => {
+    for (const password of ["", "x".repeat(1025), 7, null, ["a"], { a: 1 }]) {
+      const attempt = () => DOCUMENT_VALIDATORS.exportDocument([1, { flatten: false, password }]);
+      expect(attempt).toThrow(InvalidArgumentsError);
+      expect(attempt).toThrow(/^exportDocument: invalid options$/);
+    }
+  });
+
+  it("takes the path the preload read from a dropped file, with only the target's two ids", () => {
+    expect(DOCUMENT_VALIDATORS.importDroppedPdf(["/Users/me/Downloads/book.pdf", { groupId: 4, notebookId: 1, path: "/etc/passwd" }, "extra"])).toEqual(["/Users/me/Downloads/book.pdf", { groupId: 4, notebookId: 1 }]);
+    // A File with no path arrives as an empty string; the main process answers it with a message, so it is not an invalid call.
+    expect(DOCUMENT_VALIDATORS.importDroppedPdf(["", { groupId: null, notebookId: 2 }])).toEqual(["", { groupId: null, notebookId: 2 }]);
+  });
+
   it("takes marks as lists of records for the service to check, and no more than 500 at once", () => {
     const mark = { page: 0, kind: "highlight", color: "yellow", rects: [[0, 0, 1, 1]] };
     expect(DOCUMENT_VALIDATORS.addAnnotations([3, [mark, mark]])).toEqual([3, [mark, mark]]);
@@ -264,6 +284,9 @@ describe("DOCUMENT_VALIDATORS", () => {
     ["importPdf", [{ groupId: "4", notebookId: 1 }]],
     ["importPdf", [{ groupId: 4 }]],
     ["importPdf", [null]],
+    ["importDroppedPdf", [undefined, { groupId: null, notebookId: 1 }]],
+    ["importDroppedPdf", [{ path: "/x.pdf" }, { groupId: null, notebookId: 1 }]],
+    ["importDroppedPdf", ["/x.pdf", { groupId: "1", notebookId: 1 }]],
     ["importPdfCopy", [5, { groupId: null, notebookId: 1 }]],
     ["importPdfCopy", ["tok", "target"]],
     ["setDocumentPageCount", [1, 0]],

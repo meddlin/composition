@@ -30,6 +30,9 @@ import {
 import type { RevealRequest } from "./GroupTree";
 import { NoteSidebar } from "./NoteSidebar";
 import { PdfNoteIdsProvider } from "./pdfNotes";
+import { droppedPdfs } from "./pdfFiles";
+import { useImportPdfRequest } from "./useImportPdfRequest";
+import { usePdfDrop } from "./usePdfDrop";
 import { NoteArea, useNoteSurface } from "./noteSurface";
 import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
@@ -298,8 +301,18 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
   const emptyNotebookIds = new Set(notebooks.map((n) => n.id));
   for (const item of [...notes, ...groups]) emptyNotebookIds.delete(item.notebookId);
 
+  // A PDF dropped anywhere on the window outside a group row goes where the sidebar is: the group whose page is open, else the
+  // notebook's top level (where "+ Import PDF…" puts it).
+  const pdfDrop = usePdfDrop({
+    enabled: actions.onDropPdf !== undefined,
+    onDrop: (data) => actions.onDropPdf?.(droppedPdfs(data), viewedGroup?.id ?? null, notebookId),
+  });
+  const pdfDropPlace = viewedGroup?.name ?? notebooks.find((n) => n.id === notebookId)?.name ?? "this notebook";
+  // File > Import PDF… in the app's menu opens the same picker as the button, into the same place a dropped PDF goes.
+  useImportPdfRequest(actions.onImportPdf && (() => actions.onImportPdf?.(viewedGroup?.id ?? null, notebookId)));
+
   return (
-    <div className="flex h-screen flex-col">
+    <div className="relative flex h-screen flex-col" {...pdfDrop.handlers}>
       <header className="flex shrink-0 items-center gap-2 border-b p-2">
         <Button
           variant={homeOpen ? "secondary" : "ghost"}
@@ -370,6 +383,7 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
             onSelectGroup={selectGroup}
             onCreate={(groupId) => actions.onCreate(groupId, notebookId)}
             onImportPdf={actions.onImportPdf && ((groupId) => actions.onImportPdf?.(groupId, notebookId))}
+            onDropPdf={actions.onDropPdf && ((files, groupId) => actions.onDropPdf?.(files, groupId, notebookId))}
             onDelete={actions.onDelete}
             onCreateGroup={(name, parentId) => actions.onCreateGroup(name, parentId, notebookId)}
             onRenameGroup={actions.onRenameGroup}
@@ -423,6 +437,11 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
       </div>
       {surface.dialog}
       {confirmDialog}
+      {pdfDrop.active && (
+        <div aria-hidden className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-background/60 ring-2 ring-inset ring-primary">
+          <p className="rounded-md bg-popover px-4 py-2 text-sm font-medium text-popover-foreground shadow-md">Drop the PDF to import it into “{pdfDropPlace}”</p>
+        </div>
+      )}
     </div>
   );
 }

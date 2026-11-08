@@ -39,6 +39,8 @@ export type DesktopBridge = CompositionApi &
     onPopoutClosed(listener: (windowId: string) => void): () => void;
     /** Calls `listener` each time the weekly cycle has changed the to-do list (a week closed, or old items were purged); returns the function that stops listening. */
     onTodosChanged(listener: () => void): () => void;
+    /** Calls `listener` each time the user picks File > Import PDF… (the app tells only its main window); returns the function that stops listening. */
+    onImportPdfRequest(listener: () => void): () => void;
     /** Calls `listener` with how the app looks each time the scheme, a font or the sun's city is saved; returns the function that stops listening. */
     onAppearance(listener: AppearanceListener): () => void;
     /** Calls `listener` with each update state the app pushes; returns the function that stops listening. */

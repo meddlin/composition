@@ -93,6 +93,32 @@ describe("importing a PDF", () => {
     expect(store.documents.forNote(5)?.id).toBe(50);
   });
 
+  it("opens a dropped PDF's note and its PDF the same way, first in the list", async () => {
+    const made = note(7, { title: "Dropped Book" });
+    const result: ImportPdfResult = { note: made as never, document: pdf(70, 7) };
+    const { store, api } = setup([note(1)], [], { importDroppedPdf: vi.fn(async () => result) });
+    const file = new File(["%PDF-1.7"], "Dropped Book.pdf", { type: "application/pdf" });
+
+    const answer = await store.importDroppedPdf(file, target);
+
+    expect(api.importDroppedPdf).toHaveBeenCalledWith(file, target);
+    expect(answer).toBe(result);
+    expect(store.getSnapshot().notes.map((n) => n.id)).toEqual([7, 1]);
+    expect(kinds(store)).toEqual(["pdf", "note"]);
+    expect(store.documents.forNote(7)?.id).toBe(70);
+  });
+
+  it("leaves everything as it was when a dropped file is refused", async () => {
+    const result: ImportPdfResult = { error: "notes.txt: only PDF files can be dropped here." };
+    const { store } = setup([note(1)], [], { importDroppedPdf: vi.fn(async () => result) });
+    const before = store.getSnapshot();
+
+    expect(await store.importDroppedPdf(new File([""], "notes.txt"), target)).toBe(result);
+
+    expect(store.getSnapshot().notes).toBe(before.notes);
+    expect(store.getSnapshot().panels).toBe(before.panels);
+  });
+
   it("leaves everything as it was when the picker is cancelled, the file is refused or it is a duplicate", async () => {
     for (const result of [{ canceled: true }, { error: "x.txt: this doesn't look like a PDF." }, { duplicate: { token: "t", fileName: "a.pdf", existing: [] } }] as ImportPdfResult[]) {
       const { store } = setup([note(1)], [], { importPdf: vi.fn(async () => result) });
@@ -289,5 +315,92 @@ describe("putting Markdown into a note", () => {
 
     expect(store.insertIntoNote(1, "x", "block")).toBe(false);
     expect(store.insertIntoNote(99, "x", "block")).toBe(false);
+  });
+});
+
+describe("giving a PDF's note the title the PDF gives itself", () => {
+  const book = pdf(10, 2);
+  const withTitle = (title: string, body = "My notes.\n") => frontmatter.generate(title, { createdAt: "2026-01-01", updatedAt: "2026-01-01" }) + body;
+
+  /** A workspace whose notes can be saved, with the owner note's text set up as a test needs it. */
+  function owned(content: string | null) {
+    const saveNoteContent = vi.fn(async (id: number, text: string) => note(id, { content: text, title: frontmatter.parse(text)[0]?.title ?? "" }));
+    const owner = note(2, { title: "book10", content: content ?? "No frontmatter here.\n" });
+    const api = fakeDocumentsApi({ listDocuments: vi.fn(async () => [book]) });
+    const store = createWorkspaceStore({ notes: [note(1), owner], groups: [] }, { deleteNote: vi.fn(async () => {}), saveNoteContent } as unknown as WorkspaceDeps, undefined, {
+      documents: createDocumentsStore(api),
+      panels: {},
+    });
+    return { store, saveNoteContent, text: () => store.getSnapshot().notes.find((n) => n.id === 2)!.content };
+  }
+
+  it("retitles a note that still has the title made from the file's name, in its frontmatter, and keeps the rest of the text", async () => {
+    const { store, text } = owned(withTitle("book10"));
+    await store.documents.load();
+
+    expect(store.retitleFromPdf(10, "Designing Data-Intensive Applications")).toBe(true);
+
+    const [fm, body] = frontmatter.parse(text());
+    expect(fm?.title).toBe("Designing Data-Intensive Applications");
+    expect(body).toBe("My notes.\n");
+  });
+
+  it("saves it like any other edit", async () => {
+    const { store, saveNoteContent } = owned(withTitle("book10"));
+    await store.documents.load();
+
+    store.retitleFromPdf(10, "Designing Data-Intensive Applications");
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(saveNoteContent).toHaveBeenCalledOnce();
+    expect(saveNoteContent.mock.calls[0][0]).toBe(2);
+    expect(frontmatter.parse(saveNoteContent.mock.calls[0][1] as string)[0]?.title).toBe("Designing Data-Intensive Applications");
+    expect(store.getSnapshot().notes.find((n) => n.id === 2)?.title).toBe("Designing Data-Intensive Applications");
+  });
+
+  it("never replaces a title the user changed, and asks nothing of the backend", async () => {
+    const { store, saveNoteContent, text } = owned(withTitle("My copy of the book"));
+    await store.documents.load();
+    const before = text();
+
+    expect(store.retitleFromPdf(10, "Designing Data-Intensive Applications")).toBe(false);
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(text()).toBe(before);
+    expect(saveNoteContent).not.toHaveBeenCalled();
+  });
+
+  it("does it once: with the new title the note is no longer the one made from the file's name", async () => {
+    const { store } = owned(withTitle("book10"));
+    await store.documents.load();
+
+    expect(store.retitleFromPdf(10, "A Real Title")).toBe(true);
+    expect(store.retitleFromPdf(10, "A Real Title")).toBe(false);
+    expect(store.retitleFromPdf(10, "Another Title")).toBe(false);
+  });
+
+  it("does nothing for a PDF with no title, a PDF that is not in the library, or a note with no frontmatter to change", async () => {
+    const { store, text } = owned(withTitle("book10"));
+    await store.documents.load();
+    const before = text();
+
+    expect(store.retitleFromPdf(10, null)).toBe(false);
+    expect(store.retitleFromPdf(404, "A Real Title")).toBe(false);
+    expect(text()).toBe(before);
+
+    const bare = owned(null);
+    await bare.store.documents.load();
+    expect(bare.store.retitleFromPdf(10, "A Real Title")).toBe(false);
+    expect(bare.text()).toBe("No frontmatter here.\n");
+  });
+
+  it("does nothing once the note has been deleted (it stays on screen to be read, not written to)", async () => {
+    const { store, saveNoteContent } = owned(withTitle("book10"));
+    await store.documents.load();
+    store.removeNote(2);
+
+    expect(store.retitleFromPdf(10, "A Real Title")).toBe(false);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(saveNoteContent).not.toHaveBeenCalled();
   });
 });

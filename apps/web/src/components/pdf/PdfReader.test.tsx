@@ -10,7 +10,7 @@ import type { PdfViewer, PdfViewerControls } from "./usePdfViewer";
 // pdf.js needs a real browser and real layout, so the hook that drives it is replaced by a fake whose state a test sets: what
 // is under test is the reader's own bar, find box, sidebar and the bookkeeping it asks the documents store to do.
 let viewer: PdfViewer = { phase: "loading" };
-let lastOptions: { documentId: number; viewState: object; onPageCount: (n: number) => void; onViewState: (s: object) => void } | null = null;
+let lastOptions: { documentId: number; viewState: object; onPageCount: (n: number) => void; onViewState: (s: object) => void; onTitle?: (title: string) => void; password?: string; onPassword?: (password: string) => void } | null = null;
 vi.mock("./usePdfViewer", () => ({
   usePdfViewer: (_container: unknown, _pages: unknown, options: typeof lastOptions) => {
     lastOptions = options;
@@ -59,6 +59,8 @@ function documents(over: Partial<DocumentsStore> = {}) {
     byId: vi.fn(() => ({ ...document_, viewState: { page: 3 } })),
     saveViewState: vi.fn(),
     setPageCount: vi.fn(),
+    passwordFor: vi.fn(() => undefined),
+    rememberPassword: vi.fn(),
     listBookmarks: vi.fn(async () => []),
     addBookmark: vi.fn(async () => ({}) as never),
     renameBookmark: vi.fn(async () => null),
@@ -114,6 +116,83 @@ describe("the reader", () => {
 
     expect(store.setPageCount).toHaveBeenCalledWith(7, 412);
     expect(store.saveViewState).toHaveBeenCalledWith(7, { page: 5 });
+  });
+
+  it("passes on the title the PDF gives itself, for the note that owns it to take, and asks for nothing when there is no one to tell", () => {
+    const onTitle = vi.fn();
+    render(<PdfReader document={document_} documents={documents()} onTitle={onTitle} />);
+
+    lastOptions?.onTitle?.("Designing Data-Intensive Applications");
+
+    expect(onTitle).toHaveBeenCalledWith("Designing Data-Intensive Applications");
+    cleanup();
+    render(<PdfReader document={document_} documents={documents()} />);
+    expect(lastOptions?.onTitle).toBeUndefined();
+  });
+
+  describe("a PDF protected by a password", () => {
+    const asking = (over: Partial<Extract<PdfViewer, { phase: "password" }>> = {}): PdfViewer => ({ phase: "password", incorrect: false, checking: false, submit: vi.fn(), ...over });
+
+    it("asks for the password in a dialog that names the file, and hands what was typed to the viewer", () => {
+      const submit = vi.fn();
+      viewer = asking({ submit });
+      render(<PdfReader document={document_} documents={documents()} />);
+
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).getByText("This PDF needs a password")).toBeTruthy();
+      expect(dialog.textContent).toContain("“book.pdf” is protected by a password");
+      fireEvent.change(within(dialog).getByLabelText("Password"), { target: { value: "s3cret" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Open" }));
+
+      expect(submit).toHaveBeenCalledWith("s3cret");
+      // Emptied as soon as it is sent.
+      expect((within(dialog).getByLabelText("Password") as HTMLInputElement).value).toBe("");
+    });
+
+    it("sends nothing for an empty box", () => {
+      const submit = vi.fn();
+      viewer = asking({ submit });
+      render(<PdfReader document={document_} documents={documents()} />);
+
+      expect((screen.getByRole("button", { name: "Open" }) as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.submit(screen.getByLabelText("Password"));
+
+      expect(submit).not.toHaveBeenCalled();
+    });
+
+    it("says when the password was not right, and that it is being tried", () => {
+      viewer = asking({ incorrect: true });
+      const { rerender } = render(<PdfReader document={document_} documents={documents()} />);
+      expect(within(screen.getByRole("dialog")).getByRole("alert").textContent).toBe("That password is not right. Try again.");
+
+      viewer = asking({ checking: true });
+      rerender(<PdfReader document={document_} documents={documents()} />);
+      expect((screen.getByRole("button", { name: "Opening…" }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByLabelText("Password") as HTMLInputElement).disabled).toBe(true);
+    });
+
+    it("leaves the panel saying so when the box is cancelled, with a button that asks again", () => {
+      viewer = asking();
+      render(<PdfReader document={document_} documents={documents()} />);
+
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(screen.getByText("This PDF is protected by a password.")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Enter password…" }));
+      expect(screen.getByRole("dialog")).toBeTruthy();
+    });
+
+    it("keeps the password the viewer reports in the documents store, and offers the remembered one to the viewer first", () => {
+      const store = documents({ passwordFor: vi.fn(() => "remembered") });
+      render(<PdfReader document={document_} documents={store} />);
+
+      expect(store.passwordFor).toHaveBeenCalledWith(7);
+      expect(lastOptions?.password).toBe("remembered");
+      lastOptions?.onPassword?.("typed");
+
+      expect(store.rememberPassword).toHaveBeenCalledWith(7, "typed");
+    });
   });
 
   describe("once open", () => {
@@ -620,7 +699,7 @@ describe("the notes beside the PDF", () => {
 });
 
 describe("exporting a copy with the marks", () => {
-  const saved = (over: Record<string, unknown> = {}) => ({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 }, ...over });
+  const saved = (over: Record<string, unknown> = {}) => ({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false, ...over });
   const startExport = () => {
     fireEvent.click(screen.getByRole("button", { name: "Export annotated PDF" }));
     return screen.getByRole("dialog", { name: "Export annotated PDF" });
@@ -689,6 +768,34 @@ describe("exporting a copy with the marks", () => {
     expect((screen.getByRole("button", { name: "Export annotated PDF" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("exports a protected PDF with the password it was opened with, says the copy is protected the same way, and says so in the dialog", async () => {
+    viewer = ready();
+    const store = documents({ passwordFor: vi.fn(() => "s3cret"), exportDocument: vi.fn(async () => saved({ passwordProtected: true })) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    const dialog = startExport();
+    expect(dialog.textContent).toContain("This PDF is protected by a password. The copy is protected with the same password");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Export…" }));
+
+    const status = await screen.findByText(/Saved “book/);
+    expect(status.textContent).toContain("The copy is protected with the same password.");
+    expect(store.exportDocument).toHaveBeenCalledWith(7, { flatten: false, password: "s3cret" });
+  });
+
+  it("offers a PDF with no password nothing about one, and sends none", async () => {
+    viewer = ready();
+    const store = documents({ exportDocument: vi.fn(async () => saved()) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    const dialog = startExport();
+    expect(dialog.textContent).not.toContain("password");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Export…" }));
+
+    const status = await screen.findByText(/Saved “book/);
+    expect(status.textContent).not.toContain("password");
+    expect("password" in (store.exportDocument as ReturnType<typeof vi.fn>).mock.calls[0][1]).toBe(false);
+  });
+
   it("says what was left out", async () => {
     viewer = ready();
     const store = documents({ exportDocument: vi.fn(async () => saved({ written: 1, skipped: { ink: 2, offPage: 1 } })) } as never);
@@ -703,12 +810,12 @@ describe("exporting a copy with the marks", () => {
 
   it("shows why an export failed, and lets it be dismissed", async () => {
     viewer = ready();
-    const store = documents({ exportDocument: vi.fn(async () => ({ error: "This PDF is password-protected, so it cannot be exported with its marks." })) } as never);
+    const store = documents({ exportDocument: vi.fn(async () => ({ error: "The password does not open this PDF, so it cannot be exported." })) } as never);
     render(<PdfReader document={document_} documents={store} />);
 
     fireEvent.click(within(startExport()).getByRole("button", { name: "Export…" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("password-protected");
+    expect((await screen.findByRole("alert")).textContent).toContain("password does not open");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alert")).toBeNull();
   });

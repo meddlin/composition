@@ -67,6 +67,7 @@ const expectedBridge = [
   "onUpdateState",
   "onAppearance",
   "onTodosChanged",
+  "onImportPdfRequest",
   "onPopoutClosed",
   "onAssistantEvent",
   "initial",

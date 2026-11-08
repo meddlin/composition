@@ -17,6 +17,7 @@ function bridge(): DocumentsApi {
 export const listDocuments: DocumentsApi["listDocuments"] = () => bridge().listDocuments();
 export const importPdf: DocumentsApi["importPdf"] = (target) => bridge().importPdf(target);
 export const importPdfCopy: DocumentsApi["importPdfCopy"] = (token, target) => bridge().importPdfCopy(token, target);
+export const importDroppedPdf: DocumentsApi["importDroppedPdf"] = (file, target) => bridge().importDroppedPdf(file, target);
 export const setDocumentPageCount: DocumentsApi["setDocumentPageCount"] = (id, pageCount) => bridge().setDocumentPageCount(id, pageCount);
 export const saveDocumentViewState: DocumentsApi["saveDocumentViewState"] = (id, state) => bridge().saveDocumentViewState(id, state);
 export const listBookmarks: DocumentsApi["listBookmarks"] = (id) => bridge().listBookmarks(id);

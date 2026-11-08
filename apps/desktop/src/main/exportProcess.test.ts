@@ -25,7 +25,7 @@ describe("runExport", () => {
 
     events.emit("spawn");
     expect(child.postMessage).toHaveBeenCalledWith(job);
-    const outcome: ExportOutcome = { ok: true, written: 3, skipped: { ink: 0, offPage: 0 } };
+    const outcome: ExportOutcome = { ok: true, written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false };
     events.emit("message", outcome);
 
     expect(await done).toEqual(outcome);

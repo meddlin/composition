@@ -41,10 +41,27 @@ const FIRST_BYTES = 64 * 1024;
 
 export class PdfFileError extends Error {}
 
+/**
+ * The PDF needs a password to open: none was given (`incorrect` false), or the one given is not right (`incorrect` true). The
+ * message says nothing of the password; callers ask the user and try again with `openPdf(id, password)`.
+ */
+export class PdfPasswordError extends Error {
+  constructor(readonly incorrect: boolean) {
+    super(incorrect ? "The password is not right." : "This PDF is protected by a password.");
+  }
+}
+
+/** pdf.js's `PasswordResponses.INCORRECT_PASSWORD`; the other code it raises with a `PasswordException` is NEED_PASSWORD (1). */
+const INCORRECT_PASSWORD = 2;
+
 export type OpenedPdf = { doc: PDFDocumentProxy; destroy: () => void };
 
-/** Opens the PDF with this id. Throws `PdfFileError` with a message to show when its bytes can't be read. */
-export async function openPdf(documentId: number): Promise<OpenedPdf> {
+/**
+ * Opens the PDF with this id, with `password` if it has one (the password is handed to pdf.js and goes nowhere else). Throws
+ * `PdfPasswordError` when it needs one that was not given or is not right, and `PdfFileError` with a message to show when its
+ * bytes can't be read.
+ */
+export async function openPdf(documentId: number, password?: string): Promise<OpenedPdf> {
   const { lib } = await loadPdfjs();
   const url = documentUrl(documentId);
 
@@ -85,6 +102,7 @@ export async function openPdf(documentId: number): Promise<OpenedPdf> {
     cMapPacked: true,
     standardFontDataUrl: `${assets()}standard_fonts/`,
     iccUrl: `${assets()}iccs/`,
+    ...(password === undefined ? {} : { password }),
   });
   try {
     const doc = await task.promise;
@@ -92,7 +110,7 @@ export async function openPdf(documentId: number): Promise<OpenedPdf> {
   } catch (error) {
     void task.destroy();
     const name = (error as { name?: string }).name;
-    if (name === "PasswordException") throw new PdfFileError("This PDF is protected by a password, which Composition cannot ask for yet.");
+    if (name === "PasswordException") throw new PdfPasswordError((error as { code?: number }).code === INCORRECT_PASSWORD);
     if (name === "InvalidPDFException") throw new PdfFileError("This file is not a PDF Composition can read.");
     throw new PdfFileError("The PDF could not be opened.");
   }

@@ -287,19 +287,142 @@ describe("layoutNote", () => {
   });
 });
 
-describe("what cannot be exported", () => {
-  it("refuses a password-protected PDF, with a reason, rather than writing one that still says it is encrypted", async () => {
-    const doc = await PDFDocument.create();
-    doc.addPage([612, 792]);
-    await doc.encrypt({ userPassword: "secret", ownerPassword: "owner", permissions: {} });
-    const protectedBytes = await doc.save();
+/** A one-page PDF with a line of text, protected the way the test says (or not at all). */
+async function protectedPdf(encryption: Parameters<PDFDocument["encrypt"]>[0] | null): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  doc.addPage([612, 792]).drawText("Locked fixture text", { x: 100, y: 300, size: 24, font });
+  if (encryption) doc.encrypt({ allowWeakCryptography: true, ...encryption });
+  return doc.save();
+}
 
-    const refused = exportAnnotatedPdf(protectedBytes, [mark({})], { flatten: false, fonts });
+/** What pdf.js, the reader, makes of bytes: its words and the permission flags it reports, or the kind of failure it raised. */
+async function inReader(bytes: Uint8Array, password?: string): Promise<{ text: string; permissions: unknown } | { failure: string }> {
+  const task = pdfjs.getDocument({ data: new Uint8Array(bytes), verbosity: 0, ...(password === undefined ? {} : { password }) });
+  try {
+    const doc = await task.promise;
+    const text = (await (await doc.getPage(1)).getTextContent()).items.map((item) => ("str" in item ? item.str : "")).join("");
+    return { text, permissions: await doc.getPermissions() };
+  } catch (error) {
+    return { failure: `${(error as Error).name}:${(error as { code?: number }).code ?? ""}` };
+  } finally {
+    await task.destroy();
+  }
+}
+
+describe("a PDF protected by a password", () => {
+  const exportWith = (bytes: Uint8Array, password?: string, marks: PdfAnnotation[] = [mark({})]) => exportAnnotatedPdf(bytes, marks, { flatten: false, fonts, password });
+
+  it("is refused without its password, with what to do about it", async () => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner" });
+
+    const refused = exportWith(locked);
 
     await expect(refused).rejects.toBeInstanceOf(ExportRefused);
-    await expect(refused).rejects.toThrow(/password-protected/);
+    await expect(refused).rejects.toThrow(/protected by a password.*enter the password/);
   });
 
+  it("is refused with a wrong password, and the message does not say what was tried", async () => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner" });
+
+    const error = await exportWith(locked, "guess-guess").catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(ExportRefused);
+    expect((error as Error).message).toMatch(/does not open this PDF/);
+    expect((error as Error).message).not.toContain("guess-guess");
+  });
+
+  it("is exported with its password: the marks are in the copy, and the copy needs the same password", async () => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner" });
+    expect(await inReader(locked)).toEqual({ failure: "PasswordException:1" });
+
+    const result = await exportWith(locked, "secret");
+
+    expect(result.passwordProtected).toBe(true);
+    expect(result.written).toBe(1);
+    // Asked of the reader, the way a person would open it: no password, a wrong one, the right one.
+    expect(await inReader(result.bytes)).toEqual({ failure: "PasswordException:1" });
+    expect(await inReader(result.bytes, "wrong")).toEqual({ failure: "PasswordException:2" });
+    const opened = await inReader(result.bytes, "secret");
+    expect(opened).toMatchObject({ text: "Locked fixture text" });
+    // And the writer's own library agrees, and finds the highlight.
+    await expect(PDFDocument.load(result.bytes)).rejects.toThrow(/encrypted/);
+    const reread = await PDFDocument.load(result.bytes, { password: "secret" });
+    expect(reread.getPage(0).node.Annots()?.size()).toBe(1);
+  });
+
+  it.each(["AES-256", "AES-128", "RC4-128", "RC4-40"] as const)("is exported when it was protected with %s", async (algorithm) => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner", algorithm });
+
+    const result = await exportWith(locked, "secret");
+
+    expect(result.passwordProtected).toBe(true);
+    expect(await inReader(result.bytes, "secret")).toMatchObject({ text: "Locked fixture text" });
+    expect(await inReader(result.bytes)).toEqual({ failure: "PasswordException:1" });
+  });
+
+  it("gives the copy the same limits on printing and copying as the original, however they were set", async () => {
+    for (const permissions of [{}, { printing: "lowResolution" as const }, { printing: "highResolution" as const, copying: true, annotating: true }, { modifying: true, documentAssembly: true, contentAccessibility: true }]) {
+      const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner", algorithm: "AES-256", permissions });
+      const original = await inReader(locked, "secret");
+
+      const result = await exportWith(locked, "secret");
+      const copy = await inReader(result.bytes, "secret");
+
+      expect(copy, JSON.stringify(permissions)).toMatchObject({ permissions: (original as { permissions: unknown }).permissions });
+      expect((copy as { permissions: unknown }).permissions).not.toBeNull();
+    }
+  });
+
+  it("is protected by a password that opens it only with the limits, not by the one it was given as owner", async () => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner", algorithm: "AES-256", permissions: {} });
+
+    const result = await exportWith(locked, "secret");
+
+    // Someone who knows the password they were given still opens it under the original's limits; the owner password is made up and not kept.
+    // pdf.js reports the allowed actions as a set: empty, since this one was made with none allowed.
+    expect(await inReader(result.bytes, "secret")).toMatchObject({ permissions: new Set() });
+    expect(await inReader(result.bytes, "owner")).toEqual({ failure: "PasswordException:2" });
+  });
+
+  it("is flattened and protected as well", async () => {
+    const locked = await protectedPdf({ userPassword: "secret", ownerPassword: "owner" });
+
+    const result = await exportAnnotatedPdf(locked, [mark({})], { flatten: true, fonts, password: "secret" });
+
+    expect(result.passwordProtected).toBe(true);
+    const reread = await PDFDocument.load(result.bytes, { password: "secret" });
+    expect(reread.getPage(0).node.Annots()?.size() ?? 0).toBe(0);
+  });
+});
+
+describe("a PDF that is only restricted, with no password to open it", () => {
+  it("is exported without one, and the copy has the same limits and still needs no password", async () => {
+    const restricted = await protectedPdf({ userPassword: "", ownerPassword: "owner", algorithm: "AES-256", permissions: { printing: false, copying: false } });
+    const original = await inReader(restricted);
+    expect(original).toMatchObject({ text: "Locked fixture text" });
+
+    const result = await exportAnnotatedPdf(restricted, [mark({})], { flatten: false, fonts });
+
+    expect(result.passwordProtected).toBe(false);
+    const copy = await inReader(result.bytes);
+    expect(copy).toMatchObject({ text: "Locked fixture text", permissions: (original as { permissions: unknown }).permissions });
+    await expect(PDFDocument.load(result.bytes)).rejects.toThrow(/encrypted/);
+  });
+});
+
+describe("a PDF with no protection", () => {
+  it("is not protected by the export, even if a password is given with it", async () => {
+    const plain = await protectedPdf(null);
+
+    const result = await exportAnnotatedPdf(plain, [mark({})], { flatten: false, fonts, password: "stale" });
+
+    expect(result.passwordProtected).toBe(false);
+    expect(await inReader(result.bytes)).toMatchObject({ text: "Locked fixture text", permissions: null });
+  });
+});
+
+describe("what cannot be exported", () => {
   it("refuses a file that is not a PDF, with a reason", async () => {
     const refused = exportAnnotatedPdf(new TextEncoder().encode("not a pdf at all"), [mark({})], { flatten: false, fonts });
 
