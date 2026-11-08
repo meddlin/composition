@@ -64,7 +64,13 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     private(set) var stats = EditorStats()
     var hideMode = HideMode.off {
-        didSet { if hideMode != oldValue { configureHiding(); restyle(force: true) } }
+        didSet {
+            guard hideMode != oldValue else { return }
+            configureHiding()
+            restyle(force: true)
+            // `restyle` leaves no model: read the note again, so that the marks can follow the caret from here on.
+            if hideMode == .attributes { scheduleFullPass(after: 0) }
+        }
     }
     var completionItems: [String] = []
 
@@ -135,7 +141,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
         let storage = textView.textStorage  // fine under TextKit 2; `layoutManager` is the one to avoid
         let full = NSRange(location: 0, length: storage.length)
-        let caret = paragraphRange(around: textView.selectedRange)
+        // The caret's line, or the whole code block it is in (both fences show, so it is plain you are inside one).
+        let caret = LiveReveal.range(forLine: paragraphRange(around: textView.selectedRange), spans: spans)
         lastCaretParagraph = caret
         storage.beginEditing()
         for key in Self.managedKeys { storage.removeAttribute(key, range: full) }
@@ -243,7 +250,10 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         if restylePending, textView.markedTextRange == nil { restyle() }
         // Hiding follows the caret: only the paragraph it left and the one it entered change.
         guard hideMode == .attributes else { return }
-        let paragraph = paragraphRange(around: textView.selectedRange)
+        let line = paragraphRange(around: textView.selectedRange)
+        // A code block is shown whole while the caret is in it (see `LiveReveal`).
+        let paragraph = model.map { LiveReveal.range(forLine: line, spans: $0.spans(in: line)) } ?? line
+        guard model != nil else { return scheduleFullPass(after: 0.3) }  // nothing to follow the caret with yet: the pass that makes it also reveals
         guard paragraph != lastCaretParagraph else { return }
         let left = lastCaretParagraph
         lastCaretParagraph = paragraph
@@ -338,7 +348,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         let window = model!.edited(replacing: merged.range, withLength: merged.newLength, in: storage.mutableString)
         applyColours(to: window, using: model!)
         stats.rereadCharacters = window.length
-        lastCaretParagraph = paragraphRange(around: textView.selectedRange)
+        let line = paragraphRange(around: textView.selectedRange)
+        lastCaretParagraph = LiveReveal.range(forLine: line, spans: model!.spans(in: line))
     }
 
     /// Puts the colours of `model` on `range` of the text, and nothing else: it clears what a colour put there before, and sets what the
@@ -415,6 +426,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         stats.lastCorrectionCharacters = hadModel ? dirty.reduce(0) { $0 + $1.length } : 0
         stats.spans = fresh.blockCount
         model = fresh
+        let line = paragraphRange(around: textView.selectedRange)
+        lastCaretParagraph = LiveReveal.range(forLine: line, spans: fresh.spans(in: line))
         sliceGeneration += 1
         stats.sliceTotalMilliseconds = 0
         refreshCounts()

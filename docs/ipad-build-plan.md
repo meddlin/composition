@@ -9,7 +9,7 @@ Pencil) and M3 (the first release) get their own plans when M1 is in hand. Dates
 search; images; the MDX components other than `<Ink>` and `<YouTube>`'s player; the six colour schemes and a System scheme; backup and
 restore both ways; installed on your iPad from Xcode.
 **Out of scope:** `<Ink>` and the Pencil canvas (M2), the release polish and TestFlight (M3), sync, the plugins, **any AI helper
-([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)), which stays after v1.
+([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)): **it is in v1** (you, 2026-11-08) but not in M1: it is built right after M1 closes, before M2 (see [After M1: the Live view](#after-m1-the-live-view)).
 
 ## Where M1 starts
 
@@ -62,7 +62,7 @@ Recommendations are mine. **G1 and G2 were decided on 2026-11-06 (Gate A is pass
 | G4 | **Change-capture triggers and the outbox.** | **Fallback stays: the iPad runs on the `uuid` alone.** Re-check `main` at Gate B. | They are not on `main` yet ([D8](ipad-app-design.md#decisions)). Safe for v1; they can arrive as a later `CREATE … IF NOT EXISTS`. |
 | G5 | **What the iPad writes to `settings.json` in a backup.** Today it writes none, so favorites are lost both ways; a *partial* file would reset the desktop's colour scheme and city on restore (it replaces, above). | **When the iPad was set up from a desktop backup, keep that backup's `settings.json` and change only the favorites (and city); otherwise write one only after you first favorite something, with defaults for the rest, and say so when you export.** | It makes the round trip keep the desktop's own scheme. The remaining cost: an iPad that never saw a desktop backup still hands the desktop default settings along with its favorites. Step 1 builds it and tests it through the real restore. |
 | G6 | **How to read frontmatter's YAML.** | **A small parser for the known keys, checked against the desktop's `js-yaml` over a corpus; Yams only if the corpus shows it is not enough.** | Yams is a new dependency (the design wants a row for it first), and libyaml and `js-yaml` disagree on some edge cases, so a corpus is needed either way. The desktop falls back to "no frontmatter" when the block is not a YAML mapping; the parser must do the same. **Outcome (2026-11-06): neither Yams nor a hand parser; a port of js-yaml's loader and dumper, with no new dependency (Step 3).** |
-| G7 | **The Live tab stays after v1.** | **Yes. Reopen only if the on-device checks in [manual-tests/ipad.md](manual-tests/ipad.md) (items 14 to 19) go well.** | One way of hiding marks works in the Simulator, but arrow keys, selection and VoiceOver are untried. |
+| G7 | **The Live tab stays after v1.** | **Reversed (you, 2026-11-08): the Live tab is in v1,** built right after M1, before M2. The on-device checks in [manual-tests/ipad.md](manual-tests/ipad.md) (item 17 above all) decide how it is built. | One way of hiding marks works in the Simulator, but arrow keys, selection and VoiceOver are untried. |
 
 ## Build order
 
@@ -173,7 +173,7 @@ has to add the system's other window sizes. Steps 1 to 6 have been checked that 
     over the main screens and the largest text size, check our buttons' size, and open each licence. Details, decisions and what is not done in [Step 11 status](ipad-app-design.md#step-11-status). **Not done:** VoiceOver by a person; the real Split View, Slide Over and Stage Manager; a real iPad.
 12. **Install and Gate B.** A Release build on your iPad; the manual test page; every M1 row at least built. **Gate B:** the on-device
     answers from the editor lab (Scribble, the Pencil in a text view, arrow keys over hidden marks, VoiceOver, the iPad's speed) decide whether the editor stands
-    as designed ([D4, D5](ipad-app-design.md#decisions)) and whether the Live tab stays out of v1 ([G7](#decisions-to-make)). Then the exit criteria below.
+    as designed ([D4, D5](ipad-app-design.md#decisions)) and how the Live tab is to be built, now that it is in v1 ([G7](#decisions-to-make), reversed 2026-11-08). Then the exit criteria below.
     **Prepared 2026-11-07 (nothing installed on your iPad by me):** a **Release** build succeeds for the Simulator and for a device (`generic/platform=iOS`, signed with your Apple Development identity and the team's wildcard profile, no provisioning changes), and the Release build was run in the Simulator (imported 1,001 notes, listed them, opened a note). Every M1 row of the tracker is now at least built: the one that was not, *Insert a stored image* (the desktop's Shift+M list of images already stored; the cut line keeps it), was built the same day (*Image ▸ Stored Image…* and ⌘⇧M; a port of `listImages`, `matchImages` and the usage join with an oracle, two UI tests), and two rows that were marked ⬜ although built are corrected. [manual-tests/ipad.md](manual-tests/ipad.md) has a **first sitting** (an ordered hour, Gate B's items first). **Before the install:** the app icon is in (the desktop's notebook on a terracotta tile, `Assets.xcassets`); the bundle id is still the `.dev` placeholder.
 
 **Your steps** are 0, the on-device checks in Step 5 and Step 12, and G3 when M3 nears. Everything else I can do and show you.
@@ -182,6 +182,16 @@ has to add the system's other window sizes. Steps 1 to 6 have been checked that 
 
 From the design: it installs and runs on your iPad; you can create, edit, search, delete and restore from the Trash Can; a backup made on the
 desktop restores on the iPad and the reverse, **favorites included**; every M1 row is at least built; Gates A and B are passed; S6 is done; **every screen works in landscape and in portrait** (you: mostly landscape).
+
+## After M1: the Live view
+
+**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). A short note on how; it is planned in step form when M1 is done.
+
+- **The spec** is the desktop's Live tab (CodeMirror 6, PRs #223, #234 and #235): the note drawn as it will read, with the syntax shown only where the caret is, headings and rules drawn large, images inline.
+- **The starting point** is in the lab: *Hide: tiny and clear* (a tiny, clear font on the marks outside the caret's line), which "works well" on the iPad (item 17), with `HighlightModel` for the marks and `LiveReveal` for what stays showing (the caret's line, or the whole of a code block, so both fences show).
+- **To build:** a fourth tab beside Markdown, Preview and Split; headings, rules and images drawn as they will read; the rule for what stays showing, for the other multi-line things (lists, quotes, tables) as well as code; the arrow keys and selection handles across hidden marks; undo and the Pencil (Scribble) with marks hidden; VoiceOver, which reads marks that are only invisible (an accessibility label for the text, or hiding them from VoiceOver too, to be tried on the iPad).
+- **Checked by:** unit tests of the reveal rules, UI tests that move the caret through a note, and new items on the manual test page.
+- **If it does not come out well,** it ships reduced (the Markdown tab is the fallback, [C12](ipad-app-design.md#compromise-register)).
 
 ## Risks
 
@@ -193,7 +203,7 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 | Frontmatter YAML differs between `js-yaml` and the iPad's parser | Medium / medium | [G6](#decisions-to-make); the corpus; the desktop's "not a mapping, so no frontmatter" rule. |
 | Restoring an iPad backup changes the desktop's settings | Medium / medium | [G5](#decisions-to-make); Step 1 tests it through the real restore first. |
 | The Pencil or Scribble misbehaves in the editor (a composition is cut, a stroke is lost) | Unknown / high | The colouring skips compositions by design; items 14 to 16 of the manual test; Gate B. |
-| Hiding marks reads badly to VoiceOver, so the Live tab is dropped | Medium / low for M1 | [G7](#decisions-to-make): the Live tab is not in M1. |
+| Hiding marks reads badly to VoiceOver, or the arrow keys and selection handles misbehave across them | Medium / medium: the Live tab is in v1 | [G7](#decisions-to-make), reversed: it is in v1, built right after M1. Item 17 of the manual test says how bad it is; the Live tab can ship reduced, with the Markdown tab as the fallback. |
 | Parallel sessions collide on the shared fixtures file | High if ignored | One `ios-conformance-<name>.test.ts` per port. |
 | Your notes differ from the synthetic ones (long notes, odd frontmatter, many images) | Medium / medium | Your own backup in every step's check; the manual test asks for notes that look wrong. |
 | The CI job runs on a preview Xcode image | Low / low | The fallback is written into [ios-core.yml](../.github/workflows/ios-core.yml). |

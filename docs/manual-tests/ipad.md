@@ -47,7 +47,7 @@ The page below is long. For the first time on the iPad with the Release build, t
 6. **The way you hold it** (items 34, 36): landscape, and turning it with the keyboard up.
 7. **Looks and access** (items 65, 73, 74, 75, 78): the schemes in your light, VoiceOver, the largest text, a narrow window.
 
-Gate B needs from you: the speed line, whether Scribble and the Pencil behaved, whether the arrow keys over hidden marks were odd, and your call on the Live tab.
+Gate B needs from you: the speed line, whether Scribble and the Pencil behaved, and how the hidden marks behaved under the arrow keys and the selection handles (item 17): the Live tab is in v1, so this decides how it is built.
 
 ## What to try
 
@@ -97,7 +97,7 @@ Use a **Release** build (install step 6) for the numbers.
    Also try typing a line of three backticks (a code fence) in the middle of the note: the colours below it should change to code within about half a second, in a blink and not a freeze.
 16. **Views in the text.** In *5,000 lines with views* (or with the **+** button, *Insert a view*, then *Ink canvas*: a grey box that says "draw here with the Pencil"), draw in the grey canvas with the **Pencil**. The text must not scroll under the stroke, and
    the stroke must be there after you scroll away and back.
-17. **Hide syntax.** Choose *Hide: tiny and clear* on the *Sample* note. Tap into a paragraph (its marks should come back), then use the arrow keys to cross from one
+17. **Hide syntax.** (Answered 2026-11-08: it works well; moving into a code block now shows both fences, not only the caret's line's.) Choose *Hide: tiny and clear* on the *Sample* note. Tap into a paragraph (its marks should come back), and into the code block (both its fences should show), then use the arrow keys to cross from one
    paragraph to the next, and drag the selection handles over a hidden mark. Note anything odd: the caret stuck for a press or two, a selection that includes marks you
    cannot see, a jump when a paragraph reflows. If you use VoiceOver, move over a bold word and note whether it says "asterisk".
 18. **Find, and the `<` list.** *Find* should open the system find bar and mark every match. Type `<` at the start of a line: the list should sit by the caret, also with the
