@@ -266,5 +266,6 @@ None of these were tried, so the estimates are reasoning from the profiles above
   database (fixed: the harness now checks which process owns the port); a click that timed out later landed and left the sidebar
   collapsed for the following steps (fixed: wait for the page to be idle after load); a click at the editor's left edge hit the
   Headings rail, not the editor; `next dev`, run once to profile, rewrote `apps/web/AGENTS.md` (restored, not part of this change).
-- **Reproduce:** [manual-tests/stress-databases.md](manual-tests/stress-databases.md). The Playwright harness used here is in
-  `apps/web/scripts/sample-db/measure/`.
+- **Reproduce:** `pnpm manual:stress` (see [manual-tests/stress-databases.md](manual-tests/stress-databases.md)) builds the
+  app, makes the databases and runs the Playwright harness in `apps/web/scripts/sample-db/measure/`; the weekly workflow
+  `.github/workflows/stress-test.yml` runs the same script. Absolute times differ from machine to machine: compare sizes within a run.

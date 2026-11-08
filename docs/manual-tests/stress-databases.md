@@ -42,22 +42,67 @@ open a copy if you want to run the same database twice.
 
 Only the web app has been checked against these files. The desktop and terminal apps open the same `composition.db`.
 
-## Measure it
+## Run the stress test from the terminal
 
-`apps/web/scripts/sample-db/measure/` is the Playwright harness the [findings](../stress-test-findings.md) were taken with.
-It copies a database, starts the built app on a free port, drives headless Chromium through the sidebar, the note tabs,
-typing and autosave, and writes a JSON file of timings (wall time, main-thread blocking, per-key latency, autosave
-payloads):
+One command builds the web app, makes the databases, drives headless Chromium through each one (the sidebar, the note
+tabs, typing, autosave, the Home and Settings pages, the `[[` picker), and prints a table of what it found:
 
 ```bash
-pnpm --dir apps/web build
-NODE_PATH=$(npm root -g) apps/web/scripts/sample-db/measure/run-suite.sh ~/composition-stress/10k
+pnpm manual:stress --quick                        # about two minutes: 1,000 notes, load, open and typing only
+pnpm manual:stress                                # 1,000 and 10,000 notes, everything (a few minutes each)
+pnpm manual:stress --sizes 1k,10k,50k             # add the 50,000-note run (see below)
+pnpm manual:stress --skip-build --sections typing # reuse the last build, measure only typing
 ```
 
-It needs Playwright, which `apps/web` does not depend on (`npm i -g playwright && npx playwright install chromium`).
-Pass a comma-separated list as the second argument to run only some sections (`load,sidebar,open,typing,autosave,pages,linkpicker`,
-or `heavy` for the big edge-case notes), and see the top of `measure.mjs` for the knobs. The 50,000-note run needs about
-3 GB for the server and several for the browser, and takes the better part of an hour.
+| Option | Meaning |
+|---|---|
+| `--sizes LIST` | `1k`, `10k`, `50k` or a note count, comma separated. Default `1k,10k`. |
+| `--sections LIST` | `load,sidebar,open,typing,autosave,pages,linkpicker` (default all of them). `heavy` opens the big edge-case notes in every editor tab and takes much longer. |
+| `--quick` | `1k` with `load,open,typing`. |
+| `--lean` | Databases without the giant edge-case notes (`--no-huge`), to see what the note count alone costs. |
+| `--seed N` | The databases' seed. Default 1, so runs are comparable. |
+| `--results DIR` | Where the output goes. Default `stress-results/<time>` at the repo root (gitignored). |
+| `--skip-build` | Do not rebuild first. The default builds, so the numbers match the code you have checked out. |
+| `--install-playwright` | Install the pinned Playwright and its Chromium if they are missing. |
+| `--keep-databases` | Keep the generated databases instead of deleting them. |
+
+**You need** `pnpm --dir apps/web install`, and Playwright, which `apps/web` does not depend on. `--install-playwright`
+installs the version pinned in `apps/web/scripts/sample-db/measure/PLAYWRIGHT_VERSION` into `~/.cache/composition-stress`
+(not into the repo); on a fresh Linux machine set `PLAYWRIGHT_WITH_DEPS=1` as well, to get the system libraries Chromium needs.
+Or install it yourself (`npm install --global playwright@<that version> && npx playwright install chromium`, with
+`NODE_PATH=$(npm root -g)` if it is still not found).
+
+**Output** in the results folder: `summary.md` (the table, also printed), `<size>.json` (every step's timings, for diffing
+two runs), `<size>.server.log` (where an error behind a failed step shows up) and `build.log`.
+
+**Exit status:** 0 when every step completed; 1 when a step timed out, a tab crashed or a run stopped early; 2 for a
+usage or set-up problem. How slow things are is reported but never fails the run: absolute times move with the machine
+(the cloud sandbox these numbers were first taken on ran the same work 3 to 4 times slower after it was restored: the
+generator took 1.3–2 s where it had taken 0.5 s), so compare sizes within one run, and runs with each other only on the same
+kind of machine. If you want to gate on speed, gate on ratios
+between sizes (for example a 10,000-note keystroke against a 1,000-note one in the same run), which cancel the machine out.
+
+**The 50,000-note run** needs about 4 GB for the server and several more for the browser. With the groups open (the app's
+default) it killed the browser tab in my runs, so `stress-test.sh` holds every group closed from the start and works in an
+ungrouped note for that size, with longer timeouts. That run took about ten minutes. It is not in the weekly run.
+
+To measure one database you already have, without building or generating anything, use the lower-level script:
+`NODE_PATH=$(npm root -g) apps/web/scripts/sample-db/measure/run-suite.sh <folder holding composition.db> [sections]`.
+The top of `measure/measure.mjs` lists its knobs.
+
+## The weekly run
+
+`.github/workflows/stress-test.yml` runs that same script:
+
+- **Every Monday** at 05:17 UTC, on 1,000 and 10,000 notes.
+- **On demand**: Actions, Stress test, Run workflow, where you choose the sizes and sections.
+- **On a pull request that changes the workflow or `apps/web/scripts/sample-db/`**, as the two-minute `--quick` version, so
+  changes to the stress test itself are tried before they merge. No other pull request runs it.
+
+The table is in the run's job summary, and the JSON and logs are kept for 90 days as the `stress-test-results` artifact. The
+job is red only on a hard failure (a timeout, a crash, an unfinished run), never on speed. A scheduled workflow runs from
+the default branch only, so the Monday run starts once the workflow is on `main`, and GitHub pauses scheduled workflows after
+60 days without activity in the repository.
 
 ## What is in them
 

@@ -34,7 +34,16 @@ kill_tree() {
   for child in $(pgrep -P "$pid" 2>/dev/null); do kill_tree "$child"; done
   kill "$pid" 2>/dev/null
 }
-cleanup() { [ -n "$SERVER_PID" ] && kill_tree "$SERVER_PID"; }
+cleanup() {
+  [ -z "$SERVER_PID" ] || kill_tree "$SERVER_PID"
+  # With RESULTS_DIR set the run folder (a copy of the database, 20 to 230 MB) is no longer needed once the server's log,
+  # which is where an error behind a failed step shows up, has been kept next to the results. Without it, the results are
+  # in the run folder itself, so it stays.
+  if [ "$RESULTS" != "$WORK" ] && [ -n "$WORK" ] && [ -d "$WORK" ]; then
+    [ ! -f "$WORK/server.log" ] || cp "$WORK/server.log" "$RESULTS/$NAME.server.log" 2> /dev/null
+    rm -rf "$WORK"
+  fi
+}
 trap cleanup EXIT
 
 cp "$SRC/composition.db" "$WORK/composition.db"
@@ -62,4 +71,4 @@ echo "regular note: $REGULAR_TITLE"
 node "$HERE/measure.mjs" "$NAME" "$PORT" "$RESULTS/$NAME.json" "$SECTIONS"
 STATUS=$?
 echo "results: $RESULTS/$NAME.json"
-exit $STATUS
+exit "$STATUS"
