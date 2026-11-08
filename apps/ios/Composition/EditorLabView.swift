@@ -21,6 +21,7 @@ struct EditorLabView: View {
         NavigationStack {
             EditorTextView(lab: lab)
                 .ignoresSafeArea(.keyboard, edges: [])
+                .safeAreaInset(edge: .top) { tips }
                 .safeAreaInset(edge: .bottom) { hud }
                 .navigationTitle("Editor lab (S3)")
                 .navigationBarTitleDisplayMode(.inline)
@@ -62,6 +63,17 @@ struct EditorLabView: View {
             Button { lab.presentFind() } label: { Label("Find", systemImage: "magnifyingglass") }
             Button { lab.measureFullLayout() } label: { Label("Lay out everything", systemImage: "ruler") }
         }
+    }
+
+    /// What to try, since the buttons above are icons: the Pencil, the canvas, and where the numbers are.
+    private var tips: some View {
+        Text("Write with the Apple Pencil in the text (Scribble: turn it on in Settings, Apple Pencil). To draw, tap the + button above (Insert a view), choose Ink canvas, and draw in the grey box. The numbers below are for the manual test.")
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.bar)
     }
 
     private var hud: some View {

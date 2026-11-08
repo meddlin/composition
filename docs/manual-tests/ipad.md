@@ -40,7 +40,7 @@ Importing **replaces** everything in the app with the backup: nothing is merged 
 The page below is long. For the first time on the iPad with the Release build, this is the order I would take, most important first, about an hour. **Use a copy of your notes** (they get edited). Stop at the first thing that goes wrong and tell me; the rest can wait.
 
 1. **It runs and your notes are in** (items 1, 11): install the Release build, restore your backup, quit and reopen.
-2. **The editor, which Gate B turns on** (items 14, 15, 16, 17, 19): Scribble, typing in a long note and the *Typing speed test* line (please send me that line), the Pencil in a canvas, the arrow keys over hidden marks, turning the iPad. These are the answers that settle [D4 and D5](../ipad-app-design.md#decisions) and whether the Live tab stays out of v1 ([G7](../ipad-build-plan.md#decisions-to-make)).
+2. **The editor, which Gate B turns on** (items 14, 15, 16, 17, 19; **first turn Scribble on**: Settings, Apple Pencil, Scribble, or the Pencil only scrolls the page): Scribble, typing in a long note and the *Typing speed test* line (please send me that line), the Pencil in a canvas, the arrow keys over hidden marks, turning the iPad. These are the answers that settle [D4 and D5](../ipad-app-design.md#decisions) and whether the Live tab stays out of v1 ([G7](../ipad-build-plan.md#decisions-to-make)).
 3. **Nothing typed is lost** (items 20, 21, 26): type and leave, type and swipe the app away, come back to where you were.
 4. **The round trip with the desktop** (items 9, 25, 39, 52): export a backup, restore it in the desktop app, and back.
 5. **Writing for real** (items 27, 33, 53, 57, 82): a new note, Scribble in the editor, the `<` list, the `[[` picker, a stored picture put back.
@@ -87,7 +87,7 @@ without changing it), and a 5,000-line note with and without views in it. The li
 costs. It has been run in the Simulator only (what it showed is in [S3 status](../ipad-app-design.md#s3-status)); these are the things only the iPad can show.
 Use a **Release** build (install step 6) for the numbers.
 
-14. **Scribble.** With the Pencil, write a few words into the text on the *Sample* note, between lines and at the end. They should turn into text, and the colours
+14. **Scribble.** (It must be on in the iPad's Settings, Apple Pencil, Scribble; with it off, the Pencil only scrolls the page, as a finger does. If unsure, try it in Safari's address bar first.) With the Pencil, write a few words into the text on the *Sample* note, between lines and at the end. They should turn into text, and the colours
    should carry on (a stray half-word of colouring while you write is fine; text lost or doubled is not). Try it inside a bold word too.
 15. **Typing in a long note.** Choose *5,000 lines*, tap into the middle, and type for a few seconds on the on-screen keyboard and on a hardware one. Does it keep up?
    Since build plan Step 5 only the paragraphs around what you type are coloured at once (the rest is checked a third of a second after you stop), so it should keep up easily: in the Simulator it
@@ -95,7 +95,7 @@ Use a **Release** build (install step 6) for the numbers.
    **Then tap *Typing speed test* (the speedometer button, in a Release build):** it types 400 characters into the middle of *5,000 lines with views* and shows a line with the median, 95th percentile and
    worst of our own work per keystroke. Please send me that line: it is the iPad's number for the 16 ms budget.
    Also try typing a line of three backticks (a code fence) in the middle of the note: the colours below it should change to code within about half a second, in a blink and not a freeze.
-16. **Views in the text.** In *5,000 lines with views* (or with *Insert a view*), draw in the grey canvas with the **Pencil**. The text must not scroll under the stroke, and
+16. **Views in the text.** In *5,000 lines with views* (or with the **+** button, *Insert a view*, then *Ink canvas*: a grey box that says "draw here with the Pencil"), draw in the grey canvas with the **Pencil**. The text must not scroll under the stroke, and
    the stroke must be there after you scroll away and back.
 17. **Hide syntax.** Choose *Hide: tiny and clear* on the *Sample* note. Tap into a paragraph (its marks should come back), then use the arrow keys to cross from one
    paragraph to the next, and drag the selection handles over a hidden mark. Note anything odd: the caret stuck for a press or two, a selection that includes marks you

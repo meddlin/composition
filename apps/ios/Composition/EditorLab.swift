@@ -600,7 +600,7 @@ private final class LabViewProvider: NSTextAttachmentViewProvider {
             view.clipsToBounds = true
             return view
         case .ink:
-            let canvas = PKCanvasView()
+            let canvas = LabCanvasView()
             canvas.drawingPolicy = .anyInput
             canvas.backgroundColor = .secondarySystemBackground
             canvas.isScrollEnabled = false
@@ -618,6 +618,33 @@ private final class LabViewProvider: NSTextAttachmentViewProvider {
         case .ink: return CGRect(x: 0, y: 0, width: width, height: 200)
         case .panel: return CGRect(x: 0, y: 0, width: width, height: 96)
         }
+    }
+}
+
+/// The lab's ink canvas: a grey box that says so, until something is drawn in it (otherwise nothing tells you it can be drawn in).
+private final class LabCanvasView: PKCanvasView, PKCanvasViewDelegate {
+    private let hint = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        delegate = self
+        hint.text = "Ink canvas: draw here with the Pencil"
+        hint.font = .preferredFont(forTextStyle: .callout)
+        hint.textColor = .secondaryLabel
+        hint.textAlignment = .center
+        hint.isUserInteractionEnabled = false
+        addSubview(hint)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        hint.frame = bounds
+    }
+
+    func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+        hint.isHidden = !drawing.strokes.isEmpty
     }
 }
 
@@ -700,7 +727,7 @@ enum LabText {
 
         ---
 
-        Type a `<` at the start of a line to open the completion list. Pull down the keyboard and write with the Pencil to try Scribble.
+        Things to try: type a `<` at the start of a line to open the completion list; write with the Pencil right in the text (Scribble: it must be on in Settings, Apple Pencil); and choose Insert a view, then Ink canvas, and draw in the grey box that appears.
 
         """
 
