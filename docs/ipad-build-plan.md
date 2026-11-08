@@ -185,7 +185,7 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 ## After M1: the Live view
 
-**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). A short note on how; it is planned in step form when M1 is done.
+**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). The step-by-step plan is [ipad-live-view-plan.md](ipad-live-view-plan.md) (written 2026-11-08; its six decisions were taken as proposed); a short note on how follows.
 
 - **The spec** is the desktop's Live tab (CodeMirror 6, PRs #223, #234 and #235): the note drawn as it will read, with the syntax shown only where the caret is, headings and rules drawn large, images inline.
 - **The starting point** is in the lab: *Hide: tiny and clear* (a tiny, clear font on the marks outside the caret's line), which "works well" on the iPad (item 17), with `HighlightModel` for the marks and `LiveReveal` for what stays showing (the caret's line, or the whole of a code block, so both fences show).
