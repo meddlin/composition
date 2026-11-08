@@ -249,6 +249,14 @@ The **Image** menu has *Stored Image…* (⌘⇧M with a hardware keyboard, on t
 86. **Hide both lists.** In a note, tap the button at the left of the toolbar (arrows pointing outwards): the notebooks and the notes list both go, and the note has the whole screen; in *Split* the halves are now side by side. Tap it again (arrows pointing inwards): both come back. The system's button beside it still shows or hides the notebooks alone.
 87. **VoiceOver on the divider.** With VoiceOver on, find "Divider between the editor and the preview" and swipe up or down: it moves a tenth at a time, and says how many percent the editor has.
 
+## The Live look spike (Live view plan, step L1)
+
+In the Editor lab (More, Editor lab): the Hide syntax menu (the eye with a line through it) has **Live look (spike L1)**. It is not the Live tab, only what the Live view will draw without changing the text. Choose it on the *Sample* note.
+
+88. **Headings and marks.** The `# Editor lab` heading is large and bold (the `#` hidden) and `## Code` is a size smaller; bold, italic, strikethrough and code show without their marks.
+89. **A rule and a picture.** The `---` near the end is a line across the page; the line `![A picture…](lab-picture.png)` under the heading is a coloured picture, not its text. Tap the picture: its Markdown shows and the picture sits just after it. Tap the rule: its three dashes show. Tap away: both are drawn again.
+90. **The caret through them.** With a hardware keyboard, move the caret down through the picture's line and past the rule with the arrow keys: it should take one press for each line, never stick, and the text must not jump. Try dragging the selection handles across the picture and the rule, and writing a word with the Pencil beside them. Tell me anything odd.
+
 ## What it leaves out
 
 Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in

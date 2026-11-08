@@ -35,6 +35,12 @@ struct EditorLabView: View {
                 benchmark = await lab.runTypingBenchmark()
             } else {
                 await load(.sample)
+                // Developer shortcut: `-labHide live` (or `attributes`) chooses a way of hiding at launch.
+                switch UserDefaults.standard.string(forKey: "labHide") {
+                case "live": lab.hideMode = .live
+                case "attributes": lab.hideMode = .attributes
+                default: break
+                }
             }
         }
     }
@@ -67,7 +73,7 @@ struct EditorLabView: View {
 
     /// What to try, since the buttons above are icons: the Pencil, the canvas, and where the numbers are.
     private var tips: some View {
-        Text("Write with the Apple Pencil in the text (Scribble: turn it on in Settings, Apple Pencil). To draw, tap the + button above (Insert a view), choose Ink canvas, and draw in the grey box. The numbers below are for the manual test.")
+        Text("Write with the Apple Pencil in the text (Scribble: turn it on in Settings, Apple Pencil). To draw, tap the + button above (Insert a view), choose Ink canvas, and draw in the grey box. Hide syntax ▸ Live look is the Live view's drawing spike (step L1). The numbers below are for the manual test.")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -15,9 +15,30 @@ enum HideMode: String, CaseIterable, Identifiable {
     case attributes = "Hide: tiny and clear"
     /// The text content storage hands TextKit a paragraph with the syntax left out (the characters then differ from the store's).
     case substitute = "Hide: substitute"
+    /// Step L1 of the Live view plan: as "tiny and clear", and the rest of what the Live view draws without changing the text (docs/ipad-live-view-plan.md):
+    /// headings large, a rule as a line, a picture in place of its Markdown.
+    case live = "Live look (spike L1)"
 
     var id: String { rawValue }
 }
+
+extension NSAttributedString.Key {
+    /// On a paragraph the Live look draws something on: a `LabDrawing`'s raw value.
+    static let labDraw = NSAttributedString.Key("labDraw")
+}
+
+/// What a paragraph is drawn as, in place of its text.
+enum LabDrawing: String {
+    /// `---` hidden, a line across the page.
+    case rule
+    /// `![alt](src)` hidden, the picture in its place.
+    case picture
+    /// The caret is in `![alt](src)`: the text shows, and the picture is drawn after it.
+    case pictureAfter
+}
+
+/// The height the picture takes (in the spike every picture is the same gradient).
+private let labPictureHeight: CGFloat = 160
 
 struct EditorStats: Equatable {
     var characters = 0
@@ -48,7 +69,7 @@ struct EditorStats: Equatable {
 
 @MainActor
 @Observable
-final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentStorageDelegate {
+final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentStorageDelegate, @MainActor NSTextLayoutManagerDelegate {
     let textView: UITextView = {
         let view = UITextView(usingTextLayoutManager: true)  // TextKit 2. Never touch `layoutManager`: that falls back to TextKit 1.
         view.isFindInteractionEnabled = true
@@ -69,10 +90,12 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             configureHiding()
             restyle(force: true)
             // `restyle` leaves no model: read the note again, so that the marks can follow the caret from here on.
-            if hideMode == .attributes { scheduleFullPass(after: 0) }
+            if hidesMarks { scheduleFullPass(after: 0) }
         }
     }
     var completionItems: [String] = []
+    /// The ways of hiding that keep the characters and only change how they look.
+    private var hidesMarks: Bool { hideMode == .attributes || hideMode == .live }
 
     private var restylePending = false
     private var lastCaretParagraph = NSRange(location: 0, length: 0)
@@ -93,6 +116,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     override init() {
         super.init()
         textView.delegate = self
+        textView.textLayoutManager?.delegate = self
         NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated { self?.storageProcessedEditing() }
         }
@@ -108,10 +132,16 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     private static var boldFont: UIFont { UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: 15, weight: .bold)) }
     private static let hiddenFont = UIFont.systemFont(ofSize: 0.5)
 
+    /// A heading as the desktop's Live tab draws it: H1 twice the text, H2 one and a half times, H3 one and a quarter, the rest the size of the text, all bold.
+    private static func headingFont(level: Int) -> UIFont {
+        let size: CGFloat = switch level { case 1: 30; case 2: 22.5; case 3: 18.75; default: 15 }
+        return UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: .bold))
+    }
+
     private func attributes(for kind: HighlightKind) -> [NSAttributedString.Key: Any] {
         switch kind {
         case .frontmatter: [.foregroundColor: UIColor.secondaryLabel]
-        case .heading: [.foregroundColor: UIColor.systemBlue, .font: Self.boldFont]
+        case .heading(let level): [.foregroundColor: UIColor.systemBlue, .font: hideMode == .live ? Self.headingFont(level: level) : Self.boldFont]
         case .strong: [.font: Self.boldFont]
         case .emphasis: [.foregroundColor: UIColor.systemIndigo]
         case .strikethrough: [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: UIColor.secondaryLabel]
@@ -126,7 +156,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         }
     }
 
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .paragraphStyle, .labDraw]
 
     /// Colours the whole text, at once, on the main thread: what every edit used to do, and what the experimental `substitute` way of hiding
     /// still does. The editor proper colours what was typed (`recolourAfterEdit`) and the rest in a pause (`runFullPass`).
@@ -149,11 +179,12 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         storage.addAttributes([.font: Self.baseFont, .foregroundColor: UIColor.label], range: full)
         for span in spans where span.range.upperBound <= storage.length {
             var attrs = attributes(for: span.kind)
-            if hideMode == .attributes, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0, !(span.range.length == 0) {
+            if hidesMarks, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0, !(span.range.length == 0) {
                 attrs = [.font: Self.hiddenFont, .foregroundColor: UIColor.clear]
             }
             storage.addAttributes(attrs, range: span.range)
         }
+        applyDrawing(in: full, rules: spans.filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
         let applied = clock.now
 
@@ -249,7 +280,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     func textViewDidChangeSelection(_ textView: UITextView) {
         if restylePending, textView.markedTextRange == nil { restyle() }
         // Hiding follows the caret: only the paragraph it left and the one it entered change.
-        guard hideMode == .attributes else { return }
+        guard hidesMarks else { return }
         let line = paragraphRange(around: textView.selectedRange)
         // A code block is shown whole while the caret is in it (see `LiveReveal`).
         let paragraph = model.map { LiveReveal.range(forLine: line, spans: $0.spans(in: line)) } ?? line
@@ -367,11 +398,12 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             let clipped = NSIntersectionRange(span.range, range)
             guard clipped.length > 0 else { continue }
             var attrs = attributes(for: span.kind)
-            if hideMode == .attributes, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0 {
+            if hidesMarks, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0 {
                 attrs = [.font: Self.hiddenFont, .foregroundColor: UIColor.clear]
             }
             storage.addAttributes(attrs, range: clipped)
         }
+        applyDrawing(in: range, rules: model.spans(in: range).filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
     }
 
@@ -449,6 +481,51 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         stats.sliceTotalMilliseconds += spent
         stats.worstSliceMilliseconds = max(stats.worstSliceMilliseconds, spent)
         DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.putOn(pieces, from: index + 1, using: fresh, generation: generation) } }
+    }
+
+    // MARK: The Live look (step L1)
+
+    /// Paragraphs the Live look draws something on in place of their text: a rule (`---`) and a picture (a line that is only `![alt](src)`). The text
+    /// stays where it is, hidden like the marks are (a tiny, clear font), and the paragraph is made as tall as what is drawn, with the attribute
+    /// `labDraw` for `LabDrawingFragment` to read. While the caret is in the paragraph the text shows, and a picture is drawn after it.
+    private func applyDrawing(in range: NSRange, rules: [NSRange], caret: NSRange, storage: NSTextStorage) {
+        guard hideMode == .live else { return }
+        let ns = storage.mutableString
+        let picture = try! NSRegularExpression(pattern: "^!\\[[^\\]]*\\]\\([^)]*\\)[ \\t]*$")
+        var drawn: [(NSRange, LabDrawing)] = []
+        for rule in rules where NSIntersectionRange(rule, range).length > 0 || rule.location == range.upperBound {
+            drawn.append((ns.paragraphRange(for: NSRange(location: rule.location, length: 0)), .rule))
+        }
+        ns.enumerateSubstrings(in: range, options: [.byParagraphs]) { text, _, enclosing, _ in
+            guard let text, picture.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil else { return }
+            drawn.append((enclosing, .picture))
+        }
+        for (paragraph, kind) in drawn {
+            let revealed = NSIntersectionRange(paragraph, caret).length > 0
+            let style = NSMutableParagraphStyle()
+            switch (kind, revealed) {
+            case (.rule, false):
+                style.minimumLineHeight = 28
+                storage.addAttributes([.font: Self.hiddenFont, .foregroundColor: UIColor.clear, .paragraphStyle: style, .labDraw: LabDrawing.rule.rawValue], range: paragraph)
+            case (.picture, false):
+                style.minimumLineHeight = labPictureHeight
+                storage.addAttributes([.font: Self.hiddenFont, .foregroundColor: UIColor.clear, .paragraphStyle: style, .labDraw: LabDrawing.picture.rawValue], range: paragraph)
+            case (.picture, true):
+                style.paragraphSpacing = labPictureHeight + 8
+                storage.addAttributes([.paragraphStyle: style, .labDraw: LabDrawing.pictureAfter.rawValue], range: paragraph)
+            default: break  // a rule the caret is on shows as its three dashes, and nothing is drawn
+            }
+        }
+    }
+
+    /// TextKit asks for the fragment that lays out and draws each paragraph; those marked for drawing get one that also draws a rule or a picture.
+    func textLayoutManager(_ textLayoutManager: NSTextLayoutManager, textLayoutFragmentFor location: any NSTextLocation, in textElement: NSTextElement) -> NSTextLayoutFragment {
+        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0,
+            let raw = paragraph.attributedString.attribute(.labDraw, at: 0, effectiveRange: nil) as? String, let kind = LabDrawing(rawValue: raw)
+        {
+            return LabDrawingFragment(textElement: textElement, range: textElement.elementRange, kind: kind)
+        }
+        return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 
     // MARK: Hiding the syntax, second way
@@ -661,6 +738,63 @@ private final class LabCanvasView: PKCanvasView, PKCanvasViewDelegate {
     }
 }
 
+/// A paragraph's layout fragment that also draws a rule across the page or a picture, in the space the paragraph was made tall enough for.
+private final class LabDrawingFragment: NSTextLayoutFragment {
+    let kind: LabDrawing
+
+    init(textElement: NSTextElement, range: NSTextRange?, kind: LabDrawing) {
+        self.kind = kind
+        super.init(textElement: textElement, range: range)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to
+    /// a sliver: it is widened to the lines of text, and, for a picture shown after the revealed text, lengthened to take the paragraph's spacing too.
+    override var renderingSurfaceBounds: CGRect {
+        let base = super.renderingSurfaceBounds
+        let container = textLayoutManager?.textContainer
+        let padding = container?.lineFragmentPadding ?? 0
+        let width = max((container?.size.width ?? base.width) - 2 * padding, base.width)
+        let height = max(base.height, layoutFragmentFrame.height) + (kind == .pictureAfter ? labPictureHeight + 8 : 0)
+        return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
+    }
+
+    override func draw(at point: CGPoint, in context: CGContext) {
+        super.draw(at: point, in: context)  // the text itself (hidden, except while the caret is in it)
+        let frame = layoutFragmentFrame
+        // The fragment is only as wide as its (tiny, hidden) text, so what is drawn takes the width of the lines of text: the container's, less its padding.
+        let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
+        let width = max((textLayoutManager?.textContainer?.size.width ?? frame.width) - 2 * padding, frame.width)
+        let left = point.x + padding
+        switch kind {
+        case .rule:
+            context.setStrokeColor(UIColor.label.withAlphaComponent(0.35).cgColor)
+            context.setLineWidth(1)
+            context.move(to: CGPoint(x: left, y: point.y + frame.height / 2))
+            context.addLine(to: CGPoint(x: left + width, y: point.y + frame.height / 2))
+            context.strokePath()
+        case .picture:
+            drawPicture(in: CGRect(x: left, y: point.y, width: min(width, 560), height: frame.height).insetBy(dx: 0, dy: 4), context: context)
+        case .pictureAfter:
+            // After the text's own lines: the fragment's frame is taller than they are, because it includes the paragraph's spacing, which is where this goes.
+            let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
+            drawPicture(in: CGRect(x: left, y: point.y + textBottom + 4, width: min(width, 560), height: labPictureHeight), context: context)
+        }
+    }
+
+    private func drawPicture(in rect: CGRect, context: CGContext) {
+        UIGraphicsPushContext(context)
+        defer { UIGraphicsPopContext() }
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [UIColor.systemTeal.cgColor, UIColor.systemIndigo.cgColor] as CFArray, locations: [0, 1])!
+        let path = UIBezierPath(roundedRect: rect, cornerRadius: 8)
+        context.saveGState()
+        path.addClip()
+        context.drawLinearGradient(gradient, start: rect.origin, end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
+        context.restoreGState()
+    }
+}
+
 private struct LabPanel: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -712,6 +846,8 @@ enum LabText {
         createdAt: 2026-11-06
         ---
         # Editor lab
+
+        ![A picture, drawn in place of this line](lab-picture.png)
 
         Type here. Text with **bold**, *emphasis*, ~~strikethrough~~, `inline code` and a [link](https://example.com).
         Staging resets <Mark color="green">every night</Mark>.

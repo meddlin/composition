@@ -193,6 +193,8 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 - **Checked by:** unit tests of the reveal rules, UI tests that move the caret through a note, and new items on the manual test page.
 - **If it does not come out well,** it ships reduced (the Markdown tab is the fallback, [C12](ipad-app-design.md#compromise-register)).
 
+**M1 is done (the author, 2026-11-08).** The code is merged ([#247](https://github.com/meddlin/composition/pull/247)), every M1 row is built, Gate B was answered on the iPad (typing speed, Scribble and the Pencil in a text view, hidden marks, VoiceOver), and the author has run the manual test page's checks on a Release build and calls it done. What was **not** re-checked by anyone but the author, and so is not in any test: the real Split View, Slide Over and Stage Manager as a person would use them, and the export-and-restore round trip by hand. The next piece of work is [the Live view](ipad-live-view-plan.md).
+
 ## Risks
 
 | Risk | Likelihood / impact | Mitigation |
