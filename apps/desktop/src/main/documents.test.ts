@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import type { PdfDocument } from "../../../web/src/lib/composition/documentsApi";
 import type { ImportPdfOutcome } from "../../../web/src/lib/composition/service";
 import { createDocumentsApi, type DocumentUi } from "./documents";
@@ -6,6 +9,9 @@ import { createDocumentsApi, type DocumentUi } from "./documents";
 const document: PdfDocument = { id: 1, uuid: "a".repeat(32), noteId: 5, fileName: "book.pdf", size: 10, pageCount: 0, viewState: {}, createdAt: "x" };
 const note = { id: 5, title: "book" } as never;
 const target = { groupId: 3, notebookId: 1 };
+const scratch = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "composition-documents-")));
+const dataFolder = path.join(scratch, "data");
+afterAll(() => fs.rmSync(scratch, { recursive: true, force: true }));
 
 function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
   const service = {
@@ -28,7 +34,8 @@ function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
   const nativeUi: DocumentUi = {
     pickPdf: vi.fn(async () => "/inbox/book.pdf"),
     pickExportPath: vi.fn(async () => "/out/book (annotated).pdf"),
-    exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 } })),
+    exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false })),
+    dataFolder: () => dataFolder,
     ...ui,
   };
   return { api: createDocumentsApi(service, nativeUi), service, ui: nativeUi };
@@ -65,6 +72,51 @@ describe("importPdf", () => {
 
     expect(result).toEqual({ duplicate: { token: expect.stringMatching(/^[0-9a-f]{16}$/), fileName: "book.pdf", existing } });
     expect(JSON.stringify(result)).not.toContain("/inbox");
+  });
+});
+
+describe("importDroppedPdf", () => {
+  const dropped = path.join(scratch, "Downloads", "Dropped Book.pdf");
+  fs.mkdirSync(path.dirname(dropped), { recursive: true });
+  fs.writeFileSync(dropped, "%PDF-1.7\n");
+
+  it("imports the file the preload read the path of, into the group the page named, after checking it", async () => {
+    const { api, service, ui } = setup({ status: "added", note, document });
+
+    const result = await api.importDroppedPdf(dropped, target);
+
+    expect(service.importPdf).toHaveBeenCalledWith(dropped, target);
+    expect(result).toEqual({ note, document });
+    expect(ui.pickPdf).not.toHaveBeenCalled();
+  });
+
+  it("imports nothing for a path that fails the check, and says why", async () => {
+    const { api, service } = setup({ status: "added", note, document });
+
+    expect(await api.importDroppedPdf("", target)).toEqual({ error: "Drop a PDF file from your computer." });
+    expect(await api.importDroppedPdf(path.join(scratch, "notes.txt"), target)).toEqual({ error: "notes.txt: only PDF files can be dropped here." });
+    const inside = path.join(dataFolder, "documents", "abc-book.pdf");
+    fs.mkdirSync(path.dirname(inside), { recursive: true });
+    fs.writeFileSync(inside, "%PDF-1.7\n");
+    expect(await api.importDroppedPdf(inside, target)).toEqual({ error: expect.stringMatching(/inside Composition's own data folder/) });
+    expect(service.importPdf).not.toHaveBeenCalled();
+  });
+
+  it("answers a PDF the library already has the way the picker does, so Import a separate copy works with the token", async () => {
+    const { api, service } = setup({ status: "duplicate", existing: [{ document, noteTitle: "My textbook" }] });
+
+    const result = await api.importDroppedPdf(dropped, target);
+
+    expect(result).toEqual({ duplicate: { token: expect.stringMatching(/^[0-9a-f]{16}$/), fileName: "Dropped Book.pdf", existing: [{ document, noteTitle: "My textbook" }] } });
+    service.importPdf.mockResolvedValueOnce({ status: "added", note, document });
+    await api.importPdfCopy(result.duplicate!.token, target);
+    expect(service.importPdf).toHaveBeenLastCalledWith(dropped, target, { allowDuplicate: true });
+  });
+
+  it("passes on a reason to show when the service refuses the file", async () => {
+    const { api } = setup({ status: "refused", error: "Dropped Book.pdf: this doesn't look like a PDF." });
+
+    expect(await api.importDroppedPdf(dropped, target)).toEqual({ error: "Dropped Book.pdf: this doesn't look like a PDF." });
   });
 });
 
@@ -144,7 +196,23 @@ describe("exportDocument", () => {
 
     expect(ui.pickExportPath).toHaveBeenCalledWith("book (annotated).pdf");
     expect(ui.exportPdf).toHaveBeenCalledWith({ sourcePath: "/library/documents/abc-book.pdf", targetPath: "/out/book (annotated).pdf", marks, flatten: true });
-    expect(result).toEqual({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 } });
+    expect(result).toEqual({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false });
+  });
+
+  it("hands the writer the password a protected PDF was opened with, only when there is one, and says the copy is protected", async () => {
+    const protectedCopy = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 1, skipped: { ink: 0, offPage: 0 }, passwordProtected: true })) });
+    protectedCopy.service.documentForExport.mockReturnValue({ path: "/library/documents/abc-book.pdf", fileName: "book.pdf", marks: [] });
+
+    const result = await protectedCopy.api.exportDocument(1, { flatten: false, password: "s3cret" });
+
+    expect(protectedCopy.ui.exportPdf).toHaveBeenCalledWith({ sourcePath: "/library/documents/abc-book.pdf", targetPath: "/out/book (annotated).pdf", marks: [], flatten: false, password: "s3cret" });
+    expect(result).toMatchObject({ saved: true, passwordProtected: true });
+    // Not in anything handed back to the page.
+    expect(JSON.stringify(result)).not.toContain("s3cret");
+
+    const plain = setup({ status: "refused", error: "x" });
+    await plain.api.exportDocument(1, { flatten: false });
+    expect("password" in (plain.ui.exportPdf as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(false);
   });
 
   it("does nothing when the dialog is cancelled", async () => {
@@ -175,7 +243,7 @@ describe("exportDocument", () => {
     const failed = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: false as const, error: "A text note has characters that cannot be written." })) });
     expect(await failed.api.exportDocument(1, options)).toEqual({ error: "A text note has characters that cannot be written." });
 
-    const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 } })) });
+    const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 }, passwordProtected: false })) });
     expect(await partial.api.exportDocument(1, options)).toMatchObject({ saved: true, written: 2, skipped: { ink: 1, offPage: 0 } });
   });
 });

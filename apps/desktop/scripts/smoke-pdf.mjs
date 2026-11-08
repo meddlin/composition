@@ -60,9 +60,12 @@ const launch = () =>
   });
 
 const consoleProblems = [];
+// Everything the page said, of any kind, to check that a password never reaches the console.
+const consoleAll = [];
 async function open(app) {
   const page = await app.firstWindow();
   page.on("console", (message) => {
+    consoleAll.push(message.text());
     if (message.type() === "error" || /Refused to|Content Security Policy/i.test(message.text())) consoleProblems.push(message.text());
   });
   page.on("pageerror", (error) => consoleProblems.push(`pageerror: ${error.message}`));
@@ -75,6 +78,30 @@ async function open(app) {
 const documents = (page) => page.evaluate(() => window.composition.listDocuments());
 /** Makes the native picker answer with this file, as the user choosing it would. */
 const pick = (app, file) => app.evaluate(({ dialog }, chosen) => void (dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [chosen] })), file);
+
+/**
+ * Drags real files from outside the app onto a point of the window, the way the operating system does: Chromium's own drag
+ * events, so the page gets File objects that have paths (webUtils.getPathForFile can read them). `steps` is how far to go:
+ * "over" holds the drag above the point (to look at the drop hint), "drop" lets go.
+ */
+async function dragFiles(page, files, at, steps = "drop") {
+  const cdp = await page.context().newCDPSession(page);
+  const data = { items: [], files, dragOperationsMask: 1 };
+  const send = (type) => cdp.send("Input.dispatchDragEvent", { type, x: at.x, y: at.y, data });
+  await send("dragEnter");
+  await send("dragOver");
+  if (steps === "drop") await send("drop");
+  // Letting go of a drag held over the window without dropping: the drag is called off.
+  return async () => {
+    if (steps !== "drop") await send("dragCancel").catch(() => {});
+    await cdp.detach();
+  };
+}
+const centerOf = async (locator) => {
+  const box = await locator.boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+};
+const notesNow = (page) => page.evaluate(() => window.__workspace.store.getSnapshot().notes.map((n) => ({ id: n.id, title: n.title, groupId: n.groupId })));
 
 let app = await launch();
 let page;
@@ -466,6 +493,284 @@ try {
   check("with dark pages still on", (await again.getByRole("button", { name: "Dark pages" }).getAttribute("aria-pressed")) === "true");
   await page.screenshot({ path: path.join(out, "pdf-restored.png") });
   check("no CSP violations or errors after the restart either", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- Dragging a PDF in (plan P16): onto a group, onto the window, and the ways it is refused
+  const sidebar = page.locator('nav[aria-label="Notes"]');
+  const docsBefore = (await documents(page)).length;
+  const groupId = await page.evaluate(async () => {
+    const store = window.__workspace.store;
+    await store.createGroup("Reading", null, store.getSnapshot().notebooks[0].id);
+    return store.getSnapshot().groups.find((g) => g.name === "Reading").id;
+  });
+  const row = sidebar.getByText("Reading", { exact: true });
+  await row.waitFor();
+  const onGroup = path.join(home, "Dropped Notes.pdf");
+  fs.writeFileSync(onGroup, makeTestPdf({ pages: 3 }));
+  const release = await dragFiles(page, [onGroup], await centerOf(row), "over");
+  check("a PDF dragged over a group highlights the group", (await row.evaluate((el) => el.closest("[data-pdf-drop-zone]")?.className ?? "")).includes("bg-accent"));
+  await page.screenshot({ path: path.join(out, "pdf-drag-over-group.png") });
+  await release();
+  await dragFiles(page, [onGroup], await centerOf(row));
+  await page.getByRole("region", { name: "PDF: Dropped Notes.pdf" }).waitFor({ timeout: 20_000 });
+  const inGroup = (await notesNow(page)).find((n) => n.title === "Dropped Notes");
+  check("a PDF dropped on a group is imported into it, titled from its file name, and opens beside its note", inGroup?.groupId === groupId && (await documents(page)).length === docsBefore + 1, JSON.stringify(inGroup));
+
+  const onWindow = path.join(home, "Window Drop.pdf");
+  fs.writeFileSync(onWindow, makeTestPdf({ pages: 2 }));
+  const editor = page.locator('textarea[aria-label="Markdown editor"]').first();
+  await editor.waitFor();
+  // The note panels sit in a row that scrolls sideways; a drag can only be aimed at what is on screen.
+  await editor.scrollIntoViewIfNeeded();
+  const overEditor = await centerOf(editor);
+  const hold = await dragFiles(page, [onWindow], overEditor, "over");
+  check("a PDF dragged over the window shows what dropping it will do", /Drop the PDF to import it into “[^”]+”/.test(await page.locator("body").innerText()));
+  await page.screenshot({ path: path.join(out, "pdf-drag-over-window.png") });
+  await hold();
+  await dragFiles(page, [onWindow], overEditor);
+  await page.getByRole("region", { name: "PDF: Window Drop.pdf" }).waitFor({ timeout: 20_000 });
+  const onTop = (await notesNow(page)).find((n) => n.title === "Window Drop");
+  check("a PDF dropped on the window (here on a note's editor) is imported at the notebook's top level", onTop?.groupId === null && (await documents(page)).length === docsBefore + 2, JSON.stringify(onTop));
+  check("and no editor took it as text", (await page.locator('textarea[aria-label="Markdown editor"]').evaluateAll((all) => all.map((el) => el.value).join(""))).includes("%PDF") === false);
+
+  const sameBytes = path.join(home, "Window Drop again.pdf");
+  fs.copyFileSync(onWindow, sameBytes);
+  await dragFiles(page, [sameBytes], await centerOf(row));
+  const dup = page.getByRole("alertdialog");
+  await dup.waitFor();
+  check("dropping a file the library already has asks first, naming the note", /“Window Drop again.pdf” has exactly the same contents as “Window Drop”/.test(await dup.innerText()) && (await documents(page)).length === docsBefore + 2, await dup.innerText());
+  await dup.getByRole("button", { name: "Import a separate copy" }).click();
+  await waitFor(async () => (await documents(page)).length === docsBefore + 3);
+  // The document is in the database a moment before the page has the note, so the note is waited for.
+  const copied = await waitFor(async () => (await notesNow(page)).find((n) => n.title === "Window Drop again")).catch(() => undefined);
+  check("Import a separate copy imports it into the group it was dropped on", copied?.groupId === groupId, JSON.stringify(copied));
+
+  // Refusals: nothing is imported, and the reason shows.
+  const count = async () => (await documents(page)).length;
+  const settled = await count();
+  const inside = path.join(home, ".composition", "documents", fs.readdirSync(path.join(home, ".composition", "documents"))[0]);
+  await dragFiles(page, [inside], await centerOf(row));
+  await sidebar.getByRole("alert").waitFor();
+  check("a file from the app's own data folder is refused, with the reason", /inside Composition's own data folder/.test(await sidebar.getByRole("alert").innerText()) && (await count()) === settled, await sidebar.getByRole("alert").innerText());
+
+  const second = path.join(home, "Second Drop.pdf");
+  fs.writeFileSync(second, makeTestPdf({ pages: 4 }));
+  const third = path.join(home, "Third Drop.pdf");
+  fs.writeFileSync(third, makeTestPdf({ pages: 5 }));
+  await dragFiles(page, [second, third], await centerOf(row));
+  await page.getByRole("region", { name: "PDF: Second Drop.pdf" }).waitFor({ timeout: 20_000 });
+  await sidebar.getByRole("alert").waitFor();
+  check("dropping two PDFs imports the first and says the other was not imported", /Only one PDF is imported at a time/.test(await sidebar.getByRole("alert").innerText()) && (await count()) === settled + 1 && !(await notesNow(page)).some((n) => n.title === "Third Drop"));
+
+  // A File the page makes up has no path, so the bridge has nothing to give the main process: it cannot import one.
+  const forged = await page.evaluate(async () => {
+    const data = new DataTransfer();
+    data.items.add(new File([new Uint8Array([37, 80, 68, 70, 45])], "Forged.pdf", { type: "application/pdf" }));
+    document.querySelector('nav[aria-label="Notes"] [data-pdf-drop-zone]').dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+    return new Promise((resolve) => setTimeout(() => resolve(document.querySelector('nav[aria-label="Notes"] [role="alert"]')?.textContent ?? null), 1500));
+  });
+  check("a File made up by the page (no path from the operating system) is refused", forged === "Drop a PDF file from your computer." && (await count()) === settled + 1, String(forged));
+  const direct = await page.evaluate(() => window.composition.importDroppedPdf({ path: "/etc/hosts", name: "x.pdf" }, { groupId: null, notebookId: 1 }));
+  check("and so is anything that is not a File, even naming a path", /Drop a PDF file from your computer/.test(direct.error ?? "") && (await count()) === settled + 1, JSON.stringify(direct));
+
+  const txt = path.join(home, "notes.txt");
+  fs.writeFileSync(txt, "not a pdf");
+  const notesBeforeTxt = (await notesNow(page)).length;
+  await dragFiles(page, [txt], await centerOf(row));
+  await sleep(800);
+  check("a text file dropped on a group is not imported", (await count()) === settled + 1 && (await notesNow(page)).length === notesBeforeTxt);
+  check("no CSP violations or errors after dragging PDFs in", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- File > Import PDF… (plan P16)
+  const fileMenu = await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu();
+    const file = menu.items.find((item) => item.role?.toLowerCase() === "filemenu" || item.label === "File");
+    return file ? file.submenu.items.map((item) => (item.type === "separator" ? "-" : item.label)) : null;
+  });
+  check("the File menu starts with Import PDF… and a separator, above what Electron puts there", fileMenu?.[0] === "Import PDF…" && fileMenu?.[1] === "-" && fileMenu.length > 2, JSON.stringify(fileMenu));
+  /** Picks File > Import PDF… the way the menu would, whichever window is in front. */
+  const chooseImportPdf = () => app.evaluate(({ Menu, BrowserWindow }) => void Menu.getApplicationMenu().getMenuItemById("import-pdf").click(undefined, BrowserWindow.getAllWindows()[0]));
+  const cancelPicker = () => app.evaluate(({ dialog }) => void (dialog.showOpenDialog = async () => ({ canceled: true, filePaths: [] })));
+
+  const fromMenu = path.join(home, "From the Menu.pdf");
+  fs.writeFileSync(fromMenu, makeTestPdf({ pages: 3, chapters: [["Menu chapter", 1, []]] }));
+  const menuBefore = await count();
+  await pick(app, fromMenu);
+  await chooseImportPdf();
+  await page.getByRole("region", { name: "PDF: From the Menu.pdf" }).waitFor({ timeout: 20_000 });
+  const menuTop = (await notesNow(page)).find((n) => n.title === "From the Menu");
+  check("File > Import PDF… opens the picker and imports into the notebook's top level, with its PDF open beside its note", menuTop?.groupId === null && (await count()) === menuBefore + 1, JSON.stringify(menuTop));
+  await page.screenshot({ path: path.join(out, "pdf-file-menu-import.png") });
+
+  await cancelPicker();
+  await chooseImportPdf();
+  await sleep(800);
+  check("cancelling the picker imports nothing", (await count()) === menuBefore + 1);
+
+  // With a group's page open, the sidebar is "on" that group: the PDF goes into it.
+  await row.click();
+  await page.getByRole("heading", { name: "Reading" }).first().waitFor();
+  const menuInGroup = path.join(home, "Menu Into Group.pdf");
+  fs.writeFileSync(menuInGroup, makeTestPdf({ pages: 2, chapters: [["Another chapter", 1, []]] }));
+  await pick(app, menuInGroup);
+  await chooseImportPdf();
+  await page.getByRole("region", { name: "PDF: Menu Into Group.pdf" }).waitFor({ timeout: 20_000 });
+  const menuGroup = (await notesNow(page)).find((n) => n.title === "Menu Into Group");
+  check("with a group's page open, File > Import PDF… imports into that group", menuGroup?.groupId === groupId && (await count()) === menuBefore + 2, JSON.stringify(menuGroup));
+
+  await pick(app, fromMenu);
+  await chooseImportPdf();
+  const menuDup = page.getByRole("alertdialog");
+  await menuDup.waitFor();
+  check("the same file chosen through the menu asks the same duplicate question", /“From the Menu.pdf” has exactly the same contents as “From the Menu”/.test(await menuDup.innerText()) && (await count()) === menuBefore + 2, await menuDup.innerText());
+  await menuDup.getByRole("button", { name: "Cancel" }).click();
+  check("no CSP violations or errors after the File menu import", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- The PDF's own title (plan P16): the note takes it when the reader first opens the file, unless the user named the note
+  const savedNotes = () => page.evaluate(async () => (await window.composition.loadWorkspace()).notes.map((n) => ({ id: n.id, title: n.title, content: n.content })));
+  const titled = path.join(home, "Metadata_Title.pdf");
+  fs.writeFileSync(titled, makeTestPdf({ pages: 3, title: "Designing Data-Intensive Applications" }));
+  await pick(app, titled);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  await page.getByRole("region", { name: "PDF: Metadata_Title.pdf" }).waitFor({ timeout: 20_000 });
+  const retitled = await waitFor(async () => (await savedNotes()).find((n) => n.title === "Designing Data-Intensive Applications")).catch(() => null);
+  check("a note made from a file with a title in its metadata takes that title, saved in its frontmatter", Boolean(retitled) && /^title: Designing Data-Intensive Applications$/m.test(retitled.content), JSON.stringify((await savedNotes()).map((n) => n.title)));
+  check("and the row in the sidebar shows it, not the file's name", (await sidebar.getByText("Designing Data-Intensive Applications", { exact: true }).count()) >= 1 && (await sidebar.getByText("Metadata Title", { exact: true }).count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-own-title.png") });
+
+  const both = path.join(home, "Both_Titles.pdf");
+  fs.writeFileSync(both, makeTestPdf({ pages: 2, title: "Info Title", xmpTitle: "XMP Title Wins" }));
+  await pick(app, both);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  await page.getByRole("region", { name: "PDF: Both_Titles.pdf" }).waitFor({ timeout: 20_000 });
+  check("when the PDF has both, the XMP title is the one taken", Boolean(await waitFor(async () => (await savedNotes()).some((n) => n.title === "XMP Title Wins")).catch(() => false)), JSON.stringify((await savedNotes()).map((n) => n.title)));
+
+  const junk = path.join(home, "Junk_Title.pdf");
+  fs.writeFileSync(junk, makeTestPdf({ pages: 2, title: "Untitled" }));
+  await pick(app, junk);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  const junkReader = page.getByRole("region", { name: "PDF: Junk_Title.pdf" });
+  await junkReader.waitFor({ timeout: 20_000 });
+  await junkReader.locator(".textLayer").first().waitFor({ timeout: 20_000 });
+  await sleep(1500);
+  check("a placeholder title (\"Untitled\") is not taken: the note keeps the title made from the file's name", (await savedNotes()).some((n) => n.title === "Junk Title") && !(await savedNotes()).some((n) => n.title === "Untitled"), JSON.stringify((await savedNotes()).map((n) => n.title)));
+
+  // A note the user had already named before the reader first opened its PDF (imported without opening it, then renamed) keeps its name.
+  const renamedFile = path.join(home, "Renamed_Before.pdf");
+  fs.writeFileSync(renamedFile, makeTestPdf({ pages: 2, title: "A Title The User Never Sees" }));
+  await pick(app, renamedFile);
+  const renamed = await page.evaluate(async () => {
+    const notebookId = window.__workspace.store.getSnapshot().notebooks[0].id;
+    const result = await window.composition.importPdf({ groupId: null, notebookId });
+    if (!result.note) return result.error ?? "no note";
+    await window.composition.saveNoteContent(result.note.id, result.note.content.replace(/^title: .*$/m, "title: My own name for it"));
+    return result.note.id;
+  });
+  await page.reload();
+  await page.waitForSelector('nav[aria-label="Notes"]', { timeout: 30_000 });
+  await page.getByRole("button", { name: /My own name for it/ }).first().click();
+  const renamedReader = page.getByRole("region", { name: "PDF: Renamed_Before.pdf" });
+  await renamedReader.waitFor({ timeout: 20_000 });
+  await renamedReader.locator(".textLayer").first().waitFor({ timeout: 20_000 });
+  await sleep(1500);
+  const afterOpen = (await savedNotes()).find((n) => n.id === renamed);
+  check("a note the user had already named keeps its name when the reader first opens its PDF", afterOpen?.title === "My own name for it" && !(await savedNotes()).some((n) => n.title === "A Title The User Never Sees"), JSON.stringify(afterOpen?.title));
+  check("no CSP violations or errors after reading PDF titles", consoleProblems.length === 0, consoleProblems.join(" | "));
+
+  // ---- A PDF protected by a password: the reader asks for it, and keeps it in memory only
+  const secret = "open sesame";
+  const lockedFile = path.join(home, "Locked_Book.pdf");
+  const locked = await PDFDocument.load(makeTestPdf({ pages: 3 }));
+  locked.encrypt({ userPassword: secret, ownerPassword: "owner-only", algorithm: "AES-256" });
+  fs.writeFileSync(lockedFile, await locked.save());
+  await pick(app, lockedFile);
+  await page.getByRole("button", { name: "+ Import PDF…" }).click();
+  const lockedReader = page.getByRole("region", { name: "PDF: Locked_Book.pdf" });
+  await lockedReader.waitFor({ timeout: 20_000 });
+  const askDialog = page.getByRole("dialog", { name: "This PDF needs a password" });
+  await askDialog.waitFor();
+  check("a PDF protected by a password imports, and the reader asks for the password in a dialog naming the file", /“Locked_Book.pdf” is protected by a password/.test(await askDialog.innerText()), await askDialog.innerText());
+  await page.screenshot({ path: path.join(out, "pdf-password-dialog.png") });
+  await askDialog.getByLabel("Password").fill("not the one");
+  await askDialog.getByRole("button", { name: "Open" }).click();
+  await askDialog.getByRole("alert").waitFor();
+  check("a wrong password says so and asks again", /That password is not right/.test(await askDialog.getByRole("alert").innerText()) && (await lockedReader.locator(".textLayer").count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-password-wrong.png") });
+  await askDialog.getByLabel("Password").fill(secret);
+  await askDialog.getByRole("button", { name: "Open" }).click();
+  await lockedReader.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("the right password opens the PDF: its first page is drawn, with its text", (await lockedReader.locator(".canvasWrapper canvas").count()) >= 1 && (await page.getByRole("dialog", { name: "This PDF needs a password" }).count()) === 0);
+  await page.screenshot({ path: path.join(out, "pdf-password-opened.png") });
+
+  // Closed and opened again in the same session, it is not asked about again.
+  await lockedReader.getByRole("button", { name: "Close panel" }).click();
+  await lockedReader.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: /Locked Book/ }).first().click();
+  await lockedReader.waitFor({ timeout: 20_000 });
+  await lockedReader.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("opened again in the same session, it opens without asking again", (await page.getByRole("dialog", { name: "This PDF needs a password" }).count()) === 0);
+
+  // The password is in memory only: not in what the page holds in the open, not in its storage, not in what it said.
+  const held = await page.evaluate(() => JSON.stringify({ documents: window.__workspace.store.documents.getSnapshot(), workspace: window.__workspace.store.getSnapshot(), local: { ...localStorage }, session: { ...sessionStorage } }));
+  check("the password is not in the workspace, the documents or the page's storage", !held.includes(secret) && !held.includes("not the one"));
+  check("and the page never said it in the console", !consoleAll.some((line) => line.includes(secret) || line.includes("not the one")));
+
+  // Quit: nothing was written down, and the next launch asks again.
+  await app.close();
+  const filesWith = (needle) => {
+    const hits = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const file = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(file);
+        else if (entry.isFile() && fs.readFileSync(file).includes(needle)) hits.push(path.relative(home, file));
+      }
+    };
+    walk(home);
+    return hits;
+  };
+  const written = [...filesWith(secret), ...filesWith("not the one")];
+  check("after quitting, the password is in no file the app wrote (the database, settings, its browser profile)", written.length === 0, written.join(", "));
+  app = await launch();
+  page = await open(app);
+  await page.getByRole("button", { name: /Locked Book/ }).first().click();
+  const askAgain = page.getByRole("dialog", { name: "This PDF needs a password" });
+  await askAgain.waitFor({ timeout: 20_000 });
+  check("after a restart the password is asked for again", true);
+  await askAgain.getByRole("button", { name: "Cancel" }).click();
+  await askAgain.waitFor({ state: "detached" });
+  const lockedAgain = page.getByRole("region", { name: "PDF: Locked_Book.pdf" });
+  check("cancelling leaves the panel saying the PDF is protected, with a button that asks again", (await lockedAgain.getByText("This PDF is protected by a password.").count()) === 1 && (await lockedAgain.getByRole("button", { name: "Enter password…" }).count()) === 1);
+  await lockedAgain.getByRole("button", { name: "Enter password…" }).click();
+  await askAgain.waitFor();
+  await askAgain.getByLabel("Password").fill(secret);
+  await askAgain.getByRole("button", { name: "Open" }).click();
+  await lockedAgain.locator(".textLayer", { hasText: pageText(1) }).first().waitFor({ timeout: 20_000 });
+  check("and the password then opens it", true);
+
+  // Exported with its marks, the copy is protected with the same password (the chosen policy), and the library's file is as it was.
+  const lockedDoc = (await documents(page)).find((d) => d.fileName === "Locked_Book.pdf");
+  await page.evaluate((id) => window.composition.addAnnotations(id, [{ page: 0, kind: "highlight", color: "yellow", rects: [[100, 696, 300, 720]], quote: "Page 1" }]), lockedDoc.id);
+  const lockedCopy = path.join(home, "Locked copy.pdf");
+  await app.evaluate(({ dialog }, chosen) => void (dialog.showSaveDialog = async () => ({ canceled: false, filePath: chosen })), lockedCopy);
+  await lockedAgain.getByRole("button", { name: "Export annotated PDF" }).click();
+  const lockedExport = page.getByRole("dialog", { name: "Export annotated PDF" });
+  check("the export dialog says the copy of a protected PDF is protected with the same password", /The copy is protected with the same password, and has the same limits on printing and copying/.test(await lockedExport.innerText()), await lockedExport.innerText());
+  await lockedExport.getByRole("button", { name: "Export…" }).click();
+  const lockedSaid = await waitFor(async () => (await lockedAgain.getByRole("status").innerText().catch(() => "")).match(/Saved .*/)?.[0] ?? false, { timeout: 30_000 }).catch(() => false);
+  check("exporting says it saved the copy with its mark, protected with the same password", /Saved “Locked copy.pdf” with 1 mark\. The copy is protected with the same password\./.test(lockedSaid || ""), String(lockedSaid));
+  const copyBytes = fs.readFileSync(lockedCopy);
+  let openedWithout = "opened";
+  try {
+    await PDFDocument.load(copyBytes);
+  } catch (error) {
+    openedWithout = /encrypted/i.test(error.message) ? "refused" : error.message;
+  }
+  const reread = await PDFDocument.load(copyBytes, { password: secret });
+  check("the copy cannot be opened without the password, and with it has the mark", openedWithout === "refused" && reread.getPages()[0].node.Annots()?.size() === 1, openedWithout);
+  check("the PDF in the library is still the original, protected as it was", Buffer.compare(fs.readFileSync(path.join(home, ".composition", "documents", fs.readdirSync(path.join(home, ".composition", "documents")).find((name) => name.endsWith("Locked_Book.pdf")))), fs.readFileSync(lockedFile)) === 0);
+  check("no password went into the console, and none was written into the copy's folder as a file of its own", !consoleAll.some((line) => line.includes(secret)) && fs.readdirSync(home).every((name) => !name.endsWith(".part")));
+  await page.screenshot({ path: path.join(out, "pdf-password-exported.png") });
+  check("no CSP violations or errors around the password prompt", consoleProblems.length === 0, consoleProblems.join(" | "));
 } catch (error) {
   // A step that cannot go on: say what the page showed, which is usually the whole story.
   console.error(error);

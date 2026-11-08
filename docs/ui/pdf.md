@@ -19,15 +19,34 @@ The web app and the terminal app have no reader. They keep the PDF's note and it
 
 ## A PDF is a note that owns a PDF
 
-Importing a PDF makes a note, titled from the file's name (underscores read as spaces, `Designing_Data.pdf` is "Designing Data"; you can
-rename it), and attaches the file to it. The note sits in the notebook tree like any other: it has a PDF icon, it can be put in a group,
-favorited, found by title, and deleted to the Trash Can. Its text starts empty; write in it as in any note.
+Importing a PDF makes a note, titled from the file's name (underscores read as spaces, `Designing_Data.pdf` is "Designing Data"), and attaches
+the file to it. **When the PDF opens and has a title of its own in its metadata, the note takes that title** ("Designing Data-Intensive
+Applications" instead of "Designing Data"), once: only a note that still has the title made from the file's name is retitled, so a title you
+typed is never replaced, and renaming it later sticks. A title that is not a real one is passed over: a placeholder such as "Untitled" or
+"Document1", a file name such as "report.docx", garbled text, or more than 200 characters. The note sits in the notebook tree like any other:
+it has a PDF icon, it can be put in a group, favorited, found by title, and deleted to the Trash Can. Its text starts empty; write in it as in
+any note.
 
 - **Import:** **+ Import PDF…** under the note list opens the system's file picker. The file must look like a PDF and be at most 1 GB.
-  The file is **copied** into the app's data folder; the original is left alone and never changed. A new row appears in the group
-  you are looking at, and the PDF and its note open.
+  The file is **copied** into the app's data folder; the original is left alone and never changed. A new row appears at the top level of
+  the notebook you are looking at, and the PDF and its note open.
+- **File > Import PDF…:** the same picker, from the menu bar, at the top of the File menu. It goes where the sidebar is: into the group whose
+  page is open, else the top level of the notebook you are looking at (the button under the note list always uses the top level). It brings
+  the main window forward first, so it works from a pop-out too. With the Settings page showing, the menu item does nothing: go back to the notes first.
+- **Drag a PDF in:** drag a `.pdf` from Finder, Explorer or your file manager and drop it **on a group** in the sidebar (the row lights up)
+  or on **Ungrouped**, and the new row lands in that group. Drop it **anywhere else in the window**, the note editor included, and it
+  lands where the sidebar is: in the group whose page is open, else at the top level of the notebook. While a PDF is over the window, a hint
+  says where it will go. It then goes through the same checks and the same duplicate question as the button. One PDF at a time: if you
+  drop several, the first is imported and a message says to drop the others again. A file that is not a PDF is left alone, a PDF from
+  inside Composition's own data folder is refused (it is already in the library), and so is a file dragged out of a web page, which has
+  no place on your disk.
 - **A PDF you already have:** if the file's contents are the same as one in the library, a dialog says which note has it and offers
   **Open it** or **Import a separate copy**. Nothing is imported until you choose.
+- **A PDF that needs a password** imports like any other (only the file is copied). When the reader opens it, a small dialog asks for the password.
+  A wrong one says so and asks again; the right one opens the PDF, and everything below works as for any PDF: reading, marks, citations, find, export.
+  **Cancel** leaves the panel saying the PDF is protected, with an **Enter password…** button. The password is kept **in memory only**, for as long as
+  the app stays open: opening the PDF again (or in a pop-out) does not ask again, but after you quit it does. It is never saved to disk, put in the
+  database or settings, or written to the log. (A PDF that only limits printing or copying and needs no password to open opens without any prompt.)
 - **Your marks are not written into the file.** They are kept beside it, so the PDF stays exactly as you imported it. **Export annotated
   PDF** (below) writes a copy with the marks in it, for other apps.
 
@@ -165,7 +184,11 @@ What to know:
   common math come out right. A note with any other character (Chinese, Japanese, Korean, emoji) **stops the export**, which names the
   note's page and the characters, so nothing is lost silently. Change that note, or delete it, and export again.
 - **Ink** (from the iPad) is left out for now, and the message says how many marks were.
-- **A password-protected PDF** cannot be exported with its marks. (The reader cannot open one to mark, either.)
+- **A password-protected PDF** is exported with the password you opened it with, and **the copy is protected with the same password** and has the same
+  limits on printing and copying as the original; the export dialog says so. It opens in other apps with that password, so exporting never leaves a
+  readable copy of a private document on disk. The copy is encrypted with AES-256, whatever the original used. A PDF that only limits printing or
+  copying, with no password to open it, is exported the same way: the copy has the same limits and still needs no password. (If you opened the
+  PDF with an *owner* password, the copy opens with that password but keeps the original's limits.)
 - **A signed PDF** loses its signature in the copy, since the whole file is rewritten.
 - The copy is written next to its final name and renamed into place, so a failed export never leaves half a PDF behind.
 
@@ -188,6 +211,5 @@ good, so are the file and its marks.
 
 ## Not built yet
 
-Dragging a `.pdf` onto a group or the window, and **Import PDF…** in the File menu (the button under the note list is the one way in);
-the PDF's own title from its metadata; a prompt for a password-protected PDF; ink and handwritten notes (the iPad app, milestone M2); the
+Ink and handwritten notes (the iPad app, milestone M2); the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

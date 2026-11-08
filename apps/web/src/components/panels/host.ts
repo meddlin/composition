@@ -8,6 +8,8 @@ export type SidebarActions = {
   onCreate: (groupId: number | null, notebookId: number) => void;
   /** Imports a PDF into a new note there; absent where there are no PDFs (the web app). */
   onImportPdf?: (groupId: number | null, notebookId: number) => void;
+  /** Imports the PDF dropped on a group or the window into a new note there (the first of `files`); absent where there are no PDFs. */
+  onDropPdf?: (files: File[], groupId: number | null, notebookId: number) => void;
   onDelete: (noteId: number) => void;
   onCreateGroup: (name: string, parentId: number | null, notebookId: number) => void;
   onRenameGroup: (id: number, name: string) => void;

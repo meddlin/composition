@@ -8,6 +8,8 @@ import { createBackupApi } from "./backup";
 import { createDocumentsApi } from "./documents";
 import { runExport, workerPath } from "./exportProcess";
 import { installCliToolMenuItem } from "./cliToolMenu";
+import { requestImportPdf } from "./importPdfRequest";
+import { installImportPdfMenuItem } from "./importPdfMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
 import { closeDb, contactsService, defaultSharedLocationPath, feedsService, indexReportNotes, listNotes, loadWebSettings, panelsService, readingListService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
@@ -129,6 +131,7 @@ const documents = createDocumentsApi(service, {
   },
   exportPdf: (job) =>
     runExport(() => utilityProcess.fork(workerPath(__dirname), [], { serviceName: "Composition PDF export", stdio: "ignore" }), job),
+  dataFolder: () => loadWebSettings().appDataDir,
   async pickPdf() {
     const options = {
       properties: ["openFile"] as "openFile"[],
@@ -262,8 +265,11 @@ const popouts = createPopoutManager({
   installReadingListGuard: attachReadingListGuard,
 });
 
+/** The window the app opened first: the one whose page holds the workspace, and answers File > Import PDF…. */
+let mainWindow: BrowserWindow | null = null;
+
 function openMainWindow(): BrowserWindow {
-  return createMainWindow({
+  const opened = createMainWindow({
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
@@ -272,6 +278,11 @@ function openMainWindow(): BrowserWindow {
     popouts,
     installReadingListGuard: attachReadingListGuard,
   });
+  mainWindow = opened;
+  opened.on("closed", () => {
+    if (mainWindow === opened) mainWindow = null;
+  });
+  return opened;
 }
 
 async function main(): Promise<void> {
@@ -330,6 +341,7 @@ async function main(): Promise<void> {
   });
   updates.installMenuItem();
   installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
+  installImportPdfMenuItem(() => requestImportPdf({ mainWindow: () => mainWindow, openMainWindow: () => void openMainWindow() }));
   updates.manager.start();
 
   app.on("activate", () => {

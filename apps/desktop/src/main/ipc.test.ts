@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
-import { DOCUMENT_METHODS, type DocumentsApi } from "../../../web/src/lib/composition/documentsApi";
+import { DOCUMENT_METHODS, type DocumentsApi, type DocumentsHost } from "../../../web/src/lib/composition/documentsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
@@ -64,7 +64,7 @@ function setup() {
     assistant,
     api: api as unknown as CompositionApi,
     attachments: attachments as unknown as AttachmentsApi,
-    documents: documents as unknown as DocumentsApi,
+    documents: documents as unknown as DocumentsHost,
     backup: backup as unknown as DesktopBackupApi,
     panels: panels as unknown as PanelsApi,
     todos: todos as unknown as TodosApi,

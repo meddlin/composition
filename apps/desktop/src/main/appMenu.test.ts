@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appMenuIndex, insertionIndex } from "./appMenu";
+import { appMenuIndex, fileMenuIndex, FILE_MENU_IMPORT_INDEX, insertionIndex } from "./appMenu";
 
 describe("appMenuIndex", () => {
   const linuxMenus = [{ role: "fileMenu" }, { role: "editMenu" }, { role: "viewMenu" }, { role: "windowMenu" }, { role: "help" }];
@@ -36,5 +36,22 @@ describe("insertionIndex", () => {
   it("goes last in the Help menu on Linux", () => {
     expect(insertionIndex([{ label: "Learn More" }, { label: "Documentation" }], "linux")).toBe(2);
     expect(insertionIndex([], "linux")).toBe(0);
+  });
+});
+
+describe("fileMenuIndex", () => {
+  it("is the File menu, found by its role in Electron's default menu", () => {
+    expect(fileMenuIndex([{ role: "appMenu" }, { role: "fileMenu" }, { role: "editMenu" }])).toBe(1);
+    expect(fileMenuIndex([{ role: "fileMenu" }, { role: "editMenu" }, { role: "help" }])).toBe(0);
+  });
+
+  it("falls back to the label, and is none when there is no File menu", () => {
+    expect(fileMenuIndex([{ label: "Composition" }, { label: "File" }])).toBe(1);
+    expect(fileMenuIndex([{ role: "editMenu" }, { role: "help" }])).toBe(-1);
+    expect(fileMenuIndex([])).toBe(-1);
+  });
+
+  it("puts Import PDF… first in the File menu, above what Electron puts there", () => {
+    expect(FILE_MENU_IMPORT_INDEX).toBe(0);
   });
 });

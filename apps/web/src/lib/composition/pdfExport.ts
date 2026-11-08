@@ -1,8 +1,10 @@
 import {
   drawObject,
-  EncryptedPDFError,
+  PDFDict,
   PDFDocument,
   PDFHexString,
+  PDFName,
+  PDFNumber,
   PDFString,
   popGraphicsState,
   pushGraphicsState,
@@ -42,10 +44,18 @@ export type ExportOptions = {
   flatten: boolean;
   /** The bundled fonts for text notes: Noto Sans (Latin, Greek, Cyrillic), and Noto Sans Math for what it lacks. */
   fonts: { text: Uint8Array; math: Uint8Array };
+  /**
+   * The password the PDF opens with, when it needs one. It unlocks the file to write the marks into it, and the copy is then
+   * protected with the same password and the same limits on printing and copying (see `protectCopy`). Used here and nowhere else:
+   * it is never written to a file or into a message.
+   */
+  password?: string;
 };
 
 export type ExportResult = {
   bytes: Uint8Array;
+  /** The copy is protected by the original's password (and its limits on printing and copying). */
+  passwordProtected: boolean;
   /** How many marks were written. */
   written: number;
   /** Marks left out, and why, for the dialog to say. */
@@ -331,8 +341,10 @@ export async function embedNoteFonts(doc: PDFDocument, fonts: ExportOptions["fon
 }
 
 /**
- * The PDF `bytes` with `marks` written into it. Throws `ExportRefused` when the PDF is password-protected or cannot be read,
- * or when a text note has a character no bundled font can draw (nothing is written then, so nothing is lost silently).
+ * The PDF `bytes` with `marks` written into it. A PDF that needs a password is opened with `options.password`, and the copy is
+ * protected with the same password and limits. Throws `ExportRefused` when the PDF needs a password that was not given or is
+ * wrong, or cannot be read, or when a text note has a character no bundled font can draw (nothing is written then, so nothing
+ * is lost silently).
  */
 export async function exportAnnotatedPdf(bytes: Uint8Array, marks: readonly PdfAnnotation[], options: ExportOptions): Promise<ExportResult> {
   // The notes first: a note that cannot be written stops the export before the file is read at all.
@@ -345,16 +357,60 @@ export async function exportAnnotatedPdf(bytes: Uint8Array, marks: readonly PdfA
 
   let doc: PDFDocument;
   try {
-    doc = await PDFDocument.load(bytes, { updateMetadata: false });
+    // An empty password opens a PDF that is only restricted (printing or copying limited, but no password to open it), as it
+    // does in the reader; one that needs a password says so, or says the one given is wrong.
+    doc = await PDFDocument.load(bytes, { updateMetadata: false, password: options.password ?? "" });
   } catch (error) {
-    if (error instanceof EncryptedPDFError) {
-      throw new ExportRefused("This PDF is password-protected, so it cannot be exported with its marks. Export it from the app that protected it.");
+    const reason = error instanceof Error ? error.message : "";
+    if (/needs password|is encrypted/i.test(reason)) {
+      throw new ExportRefused("This PDF is protected by a password. Open it in the reader and enter the password, then export again.");
     }
-    throw new ExportRefused(`This PDF could not be read for export: ${error instanceof Error ? error.message : "it may be damaged"}.`);
+    if (/password incorrect/i.test(reason)) throw new ExportRefused("The password does not open this PDF, so it cannot be exported.");
+    throw new ExportRefused(`This PDF could not be read for export: ${reason || "it may be damaged"}.`);
   }
+  // Read before anything is written: what the original's protection was, for the copy to have the same.
+  const protection = originalProtection(doc);
 
   const needsMath = notes.some((m) => missingCharacters((m.body as PdfTextNoteBody).text, [covered[0]]).length > 0);
   const fonts = notes.length > 0 ? await embedNoteFonts(doc, options.fonts, needsMath) : null;
   const { written, skipped } = writeMarks(doc, marks, options.flatten, fonts);
-  return { bytes: await doc.save(), written, skipped };
+  if (protection) protectCopy(doc, protection, options.password ?? "");
+  return { bytes: await doc.save(), passwordProtected: protection !== null && options.password !== undefined, written, skipped };
+}
+
+/** What the original's protection allowed, as the PDF library takes it for a new document. */
+type Protection = NonNullable<Parameters<PDFDocument["encrypt"]>[0]["permissions"]>;
+
+/**
+ * The protection the original had, or null for a PDF that had none. The library decrypts a file it was given the password of and
+ * leaves its encryption dictionary behind as an unused object, which is where the permission flags (`/P`) are read from. A test
+ * pins that, since it is behaviour of the library rather than something it documents.
+ */
+function originalProtection(doc: PDFDocument): Protection | null {
+  for (const [, object] of doc.context.enumerateIndirectObjects()) {
+    if (!(object instanceof PDFDict) || object.get(PDFName.of("Filter"))?.toString() !== "/Standard") continue;
+    const flags = object.get(PDFName.of("P"));
+    if (!(flags instanceof PDFNumber)) continue;
+    const p = flags.asNumber();
+    const has = (bit: number) => (p & (1 << (bit - 1))) !== 0;
+    return {
+      printing: has(12) ? "highResolution" : has(3) ? "lowResolution" : false,
+      modifying: has(4),
+      copying: has(5),
+      annotating: has(6),
+      fillingForms: has(9),
+      contentAccessibility: has(10),
+      documentAssembly: has(11),
+    };
+  }
+  return null;
+}
+
+/**
+ * Protects the copy the way the original was: the password it opens with, and the same limits on printing and copying. The
+ * password that opens a copy is the one given; the one that lifts its limits is made up here and kept by no one, as for a
+ * PDF whose owner password is not shared. AES-256, whatever the original used.
+ */
+function protectCopy(doc: PDFDocument, permissions: Protection, password: string): void {
+  doc.encrypt({ userPassword: password, ownerPassword: globalThis.crypto.randomUUID(), permissions, algorithm: "AES-256" });
 }
