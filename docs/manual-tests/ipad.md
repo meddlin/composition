@@ -253,7 +253,7 @@ The **Image** menu has *Stored Image…* (⌘⇧M with a hardware keyboard, on t
 
 In the Editor lab (More, Editor lab): the Hide syntax menu (the eye with a line through it) has **Live look (spike L1)**. It is not the Live tab, only what the Live view will draw without changing the text. Choose it on the *Sample* note.
 
-88. **Headings and marks.** The `# Editor lab` heading is large and bold (the `#` hidden) and `## Code` is a size smaller; bold, italic, strikethrough and code show without their marks.
+88. **Headings and marks.** The `# Editor lab` heading is large and bold (the `#` hidden) and `## Code` is a size smaller; bold, italic, strikethrough and code show without their marks. Type `*test*` on a line of its own and move off it: `test` is **slanted** (not just coloured), and `***both***` is bold and slanted.
 89. **A rule and a picture.** The `---` near the end is a line across the page; the line `![A picture…](lab-picture.png)` under the heading is a coloured picture, not its text. Tap the picture: its Markdown shows and the picture sits just after it. Tap the rule: its three dashes show. Tap away: both are drawn again.
 90. **The caret through them.** With a hardware keyboard, move the caret down through the picture's line and past the rule with the arrow keys: it should take one press for each line, never stick, and the text must not jump. Try dragging the selection handles across the picture and the rule, and writing a word with the Pencil beside them. Tell me anything odd.
 

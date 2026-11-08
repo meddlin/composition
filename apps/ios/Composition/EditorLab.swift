@@ -156,7 +156,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         }
     }
 
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .paragraphStyle, .labDraw]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .paragraphStyle, .obliqueness, .labDraw]
 
     /// Colours the whole text, at once, on the main thread: what every edit used to do, and what the experimental `substitute` way of hiding
     /// still does. The editor proper colours what was typed (`recolourAfterEdit`) and the rest in a pause (`runFullPass`).
@@ -184,6 +184,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             }
             storage.addAttributes(attrs, range: span.range)
         }
+        applyItalics(spans.filter { $0.kind == .emphasis }.map(\.range), storage: storage)
         applyDrawing(in: full, rules: spans.filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
         let applied = clock.now
@@ -403,7 +404,9 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             }
             storage.addAttributes(attrs, range: clipped)
         }
-        applyDrawing(in: range, rules: model.spans(in: range).filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
+        let inRange = model.spans(in: range)
+        applyItalics(inRange.filter { $0.kind == .emphasis }.compactMap { NSIntersectionRange($0.range, range).length > 0 ? NSIntersectionRange($0.range, range) : nil }, storage: storage)
+        applyDrawing(in: range, rules: inRange.filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
     }
 
@@ -484,6 +487,32 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     }
 
     // MARK: The Live look (step L1)
+
+    /// Draws `*emphasis*` in italics, as the desktop's Live tab does (`.cm-live-emphasis`); the Markdown look only tints it. Done after every span's
+    /// attributes are on, to the font each character already has, so that bold inside italic (`***both***`) keeps both.
+    private func applyItalics(_ ranges: [NSRange], storage: NSTextStorage) {
+        guard hideMode == .live else { return }
+        for range in ranges where range.upperBound <= storage.length {
+            storage.enumerateAttribute(.font, in: range) { value, run, _ in
+                guard let font = value as? UIFont, font.pointSize > 1 else { return }  // the marks' tiny font stays as it is
+                let (italic, slanted) = Self.italic(of: font)
+                storage.addAttribute(.font, value: italic, range: run)
+                if slanted { storage.addAttribute(.obliqueness, value: 0.2, range: run) }
+            }
+        }
+    }
+
+    /// The italic of `font`, at its size and weight. The system's monospaced face may have no italic of its own, and then the same font is returned, to be
+    /// slanted with `.obliqueness` (the second value says so).
+    private static func italic(of font: UIFont) -> (UIFont, slanted: Bool) {
+        let traits = font.fontDescriptor.symbolicTraits.union(.traitItalic)
+        if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) {
+            let italic = UIFont(descriptor: descriptor, size: font.pointSize)
+            let name = italic.fontName.lowercased()
+            if name.contains("italic") || name.contains("oblique") { return (italic, false) }
+        }
+        return (font, true)
+    }
 
     /// Paragraphs the Live look draws something on in place of their text: a rule (`---`) and a picture (a line that is only `![alt](src)`). The text
     /// stays where it is, hidden like the marks are (a tiny, clear font), and the paragraph is made as tall as what is drawn, with the attribute
