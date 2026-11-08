@@ -1,4 +1,4 @@
-import { BESIDE_VIEW, KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfPanelState } from "./kinds";
+import { BESIDE_VIEW, KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfGoTo, type PdfPanelState } from "./kinds";
 import { launcherFor, type LauncherKind } from "./launchers";
 import {
   closePanel as closeLayout,
@@ -207,8 +207,39 @@ export function openPdfPair(panels: PanelsState, windowId: WindowId, noteId: num
 
   const notePanel = window.focusOrder.find((id) => noteIdOf(withNote.byId[id]) === noteId);
   if (notePanel === undefined) return withNote;
-  const state: PdfPanelState = { documentId };
+  const state: PdfPanelState = { documentId, noteId, follow: false };
   return splitPanel(withNote, notePanel, "left", { id: newId(), kind: "pdf", state });
+}
+
+/**
+ * A `pdf:` link followed in the note of `fromPanelId`: the PDF panel the window already shows for that document is focused
+ * and asked to show the place; otherwise a PDF panel opens to the left of the note, paired with it, and the note stays where
+ * it is. Beside or in place makes no difference here, so there is no such choice.
+ */
+export function openLinkedPdf(panels: PanelsState, fromPanelId: PanelId, documentId: number, goTo: PdfGoTo | null, newId: () => PanelId): PanelsState {
+  const windowId = windowOf(panels, fromPanelId);
+  if (windowId === undefined) return panels;
+
+  const showing = panels.windows[windowId].focusOrder.find((id) => pdfDocumentIdOf(panels.byId[id]) === documentId);
+  if (showing !== undefined) {
+    const focusedPdf = focusPanel(panels, showing);
+    return goTo ? setPanelState(focusedPdf, showing, { ...(panels.byId[showing].state as PdfPanelState), goTo } satisfies PdfPanelState) : focusedPdf;
+  }
+  const state: PdfPanelState = { documentId, noteId: noteIdOf(panels.byId[fromPanelId]), follow: false, ...(goTo ? { goTo } : {}) };
+  return splitPanel(panels, fromPanelId, "left", { id: newId(), kind: "pdf", state });
+}
+
+/**
+ * The reader has shown what a PDF panel was asked to: the request is dropped, so that restoring the layout does not repeat it.
+ * Given `seq`, only that request is dropped: a newer one that arrived meanwhile stays.
+ */
+export function clearPdfGoTo(panels: PanelsState, panelId: PanelId, seq?: number): PanelsState {
+  const panel = panels.byId[panelId];
+  const asked = panel?.kind === "pdf" ? (panel.state as PdfPanelState).goTo : undefined;
+  if (!panel || asked === undefined || (seq !== undefined && asked.seq !== seq)) return panels;
+  const { goTo, ...rest } = panel.state as PdfPanelState;
+  void goTo;
+  return setPanelState(panels, panelId, rest satisfies PdfPanelState);
 }
 
 /** A new note panel beside `panelId` showing the note, on the editor tab, focused. */
@@ -313,6 +344,53 @@ export function assistantSubject(panels: PanelsState, panelId: PanelId): number 
   const state = panel.state as AssistantPanelState;
   if (!state.follow) return state.noteId;
   return lastNoteIn(panels, windowId) ?? (windowId === MAIN_WINDOW ? null : lastNoteIn(panels, MAIN_WINDOW));
+}
+
+/**
+ * The note a PDF panel is paired with, which Quote and Cite this page write to: its own when it is pinned; when it follows,
+ * the note the user last worked in (the AI helper's rule). Null for a panel that is not a PDF panel, or when no note panel
+ * shows a note.
+ */
+export function pdfSubject(panels: PanelsState, panelId: PanelId): number | null {
+  const panel = panels.byId[panelId];
+  const windowId = windowOf(panels, panelId);
+  if (!panel || panel.kind !== "pdf" || windowId === undefined) return null;
+
+  const state = panel.state as PdfPanelState;
+  if (!state.follow) return state.noteId;
+  return lastNoteIn(panels, windowId) ?? (windowId === MAIN_WINDOW ? null : lastNoteIn(panels, MAIN_WINDOW));
+}
+
+/** Turns following on or off for a PDF panel. Off pins it to the note it is paired with now; with none to pin to, it keeps following. */
+export function setPdfFollow(panels: PanelsState, panelId: PanelId, follow: boolean): PanelsState {
+  const panel = panels.byId[panelId];
+  if (!panel || panel.kind !== "pdf" || (panel.state as PdfPanelState).follow === follow) return panels;
+
+  const noteId = follow ? null : pdfSubject(panels, panelId);
+  if (!follow && noteId === null) return panels;
+  return setPanelState(panels, panelId, { ...(panel.state as PdfPanelState), noteId, follow } satisfies PdfPanelState);
+}
+
+/**
+ * Shows a note in the PDF panel's paired note panel and pins the PDF to it (what picking a note in the reader's Notes tab
+ * does). With no panel showing the paired note, the note opens to the right of the PDF.
+ */
+export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: number, newId: () => PanelId): PanelsState {
+  const windowId = windowOf(panels, panelId);
+  const panel = panels.byId[panelId];
+  if (windowId === undefined || !panel || panel.kind !== "pdf") return panels;
+
+  const pairedNote = pdfSubject(panels, panelId);
+  const showing = panels.windows[windowId].focusOrder.find((id) => noteIdOf(panels.byId[id]) === noteId);
+  const pairedPanel = pairedNote === null ? undefined : panels.windows[windowId].focusOrder.find((id) => noteIdOf(panels.byId[id]) === pairedNote);
+  const withNote =
+    showing !== undefined
+      ? focusPanel(panels, showing)
+      : pairedPanel !== undefined
+        ? showNote(panels, pairedPanel, noteId)
+        : noteBeside(panels, panelId, "right", noteId, newId);
+  // The PDF is pinned to the note it was asked to show, so that Quote goes there.
+  return setPanelState(withNote, panelId, { ...(panel.state as PdfPanelState), noteId, follow: false } satisfies PdfPanelState);
 }
 
 /**

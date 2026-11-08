@@ -15,11 +15,16 @@ export type NotesBrowserState = { notebookId: number | null };
  */
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
+/** A place a followed `pdf:` link asked the reader to show: a page (from 1), the mark on it if the link names one, and which ask this is. */
+export type PdfGoTo = { page: number; mark: string | null; seq: number };
+
 /**
- * What a PDF panel saves: the PDF it shows (none when it was saved before the PDF existed or its note is gone). Where the
- * reader was in it, its zoom and the dark-pages choice are the PDF's own (`documents.view_state`), not the panel's.
+ * What a PDF panel saves: the PDF it shows (none when it was saved before the PDF existed or its note is gone), and the note
+ * it is paired with, as the AI helper is: pinned to `noteId`, or following the note the user works in (then `noteId` is not
+ * used). Quote and Cite this page write to that note. Where the reader was in the PDF, its zoom and the dark-pages choice are
+ * the PDF's own (`documents.view_state`), not the panel's. `goTo` is a request the reader answers and then clears; it is not saved.
  */
-export type PdfPanelState = { documentId: number | null };
+export type PdfPanelState = { documentId: number | null; noteId: number | null; follow: boolean; goTo?: PdfGoTo };
 
 /** How a to-do panel shows the items: as the nested list, as a board with a column per status, as the reports, or the archive. */
 export type TodoView = "list" | "board" | "reports" | "archive";
@@ -124,11 +129,15 @@ export const KINDS: Record<
   },
   pdf: {
     minWidth: 360,
-    initialState: (): PdfPanelState => ({ documentId: null }),
-    restore(saved) {
+    initialState: (): PdfPanelState => ({ documentId: null, noteId: null, follow: true }),
+    restore(saved, context) {
       if (!isRecord(saved)) return null;
       // The PDF may be gone since (its note deleted for good); the panel then says so, so it is not checked here.
-      return { documentId: Number.isSafeInteger(saved.documentId) ? (saved.documentId as number) : null } satisfies PdfPanelState;
+      const documentId = Number.isSafeInteger(saved.documentId) ? (saved.documentId as number) : null;
+      // A panel saved before PDFs had a pairing, or pinned to a note that is gone, follows the note in use instead.
+      const pinned = typeof saved.noteId === "number" && Number.isInteger(saved.noteId) && context.hasNote(saved.noteId) ? saved.noteId : null;
+      if (saved.follow === false && pinned !== null) return { documentId, noteId: pinned, follow: false } satisfies PdfPanelState;
+      return { documentId, noteId: null, follow: true } satisfies PdfPanelState;
     },
   },
   todo: {

@@ -5,7 +5,9 @@ import {
   BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  Link2Icon,
   MoonIcon,
+  NotebookPenIcon,
   PanelLeftIcon,
   Redo2Icon,
   SearchIcon,
@@ -16,15 +18,18 @@ import {
   MoveHorizontalIcon,
   XIcon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useElementWidth } from "../notes/useElementWidth";
-import type { PdfDocument } from "@/lib/composition/documentsApi";
+import type { PdfAnnotation, PdfCitation, PdfDocument } from "@/lib/composition/documentsApi";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
+import { pageCitation, quoteBlock } from "@/lib/composition/pdfRefs";
 import { cn } from "@/lib/utils";
+import type { Insertion } from "../notes/noteInsertions";
+import type { PdfGoTo } from "../panels/kinds";
 import { MarkLayers, usePageLayers } from "./PdfMarkLayers";
-import { BookmarkList, HighlightList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
+import { BookmarkList, HighlightList, NotesList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { useMarkEditing } from "./useMarkEditing";
 import { usePdfViewer, type PdfViewer } from "./usePdfViewer";
@@ -32,12 +37,36 @@ import { usePdfViewer, type PdfViewer } from "./usePdfViewer";
 /** How wide the panel must be for the outline and bookmarks to sit beside the pages rather than over them. */
 const SIDEBAR_BESIDE_MIN_WIDTH = 600;
 
+/** How long the mark a followed link names is drawn attention to. */
+const FLASH_MS = 1600;
+
+/** How the reader works with the notes beside it: where its citations go, who cites it, and what a followed link asked of it. */
+export type PdfPairing = {
+  /** What a citation calls the PDF: the title of its own note. */
+  title: string;
+  /** The PDF's own note, then every note that links to it. */
+  citations: PdfCitation[];
+  /** The note Quote and Cite this page write to, and its title; null when there is none to write to. */
+  noteId: number | null;
+  noteTitle: string | null;
+  /** Whether the pairing follows the note in use rather than staying with one. */
+  follow: boolean;
+  /** A followed link's ask: the reader shows it once it is open, then says so with `onGoToDone`. */
+  goTo?: PdfGoTo;
+  /** Puts Markdown into the paired note; false when it is not there to write to. */
+  insert: (markdown: string, how: Insertion) => boolean;
+  onToggleFollow: () => void;
+  onOpenNote: (noteId: number) => void;
+  onNewNote: () => void;
+  onGoToDone: (seq: number) => void;
+};
+
 /**
  * A PDF being read: the pages (drawn by pdf.js as they scroll into view), and above them a bar with the page, the zoom,
  * find, the dark-pages toggle and a bookmark button, with the outline and bookmarks in a sidebar. Where the reader was,
  * its zoom and the dark-pages choice are remembered for the PDF.
  */
-export function PdfReader({ document, documents }: { document: PdfDocument; documents: DocumentsStore }) {
+export function PdfReader({ document, documents, pairing }: { document: PdfDocument; documents: DocumentsStore; pairing?: PdfPairing }) {
   const root = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const pages = useRef<HTMLDivElement>(null);
@@ -66,6 +95,49 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
   const edit = useMarkEditing({ pdf: document, documents, controls: ready?.controls ?? null, container });
   const layers = usePageLayers(ready?.controls ?? null);
 
+  // Quote and Cite this page write into the paired note, and say so when there is none.
+  const [notice, setNotice] = useState<string | null>(null);
+  function put(markdown: string, how: Insertion) {
+    if (!pairing) return;
+    if (pairing.noteId === null) return setNotice("Open a note beside this PDF to write in.");
+    setNotice(pairing.insert(markdown, how) ? null : "That note is no longer there to write in.");
+  }
+  const cite = { uuid: document.uuid, title: pairing?.title ?? "" };
+  function quote(mark: PdfAnnotation) {
+    if (ready && mark.quote !== "") put(quoteBlock(cite, mark.quote, mark.page + 1, mark.uuid, ready.labels), "block");
+  }
+  function citePage() {
+    if (ready) put(pageCitation(cite, ready.page, ready.labels), "inline");
+  }
+  const quotedIn = useMemo(() => {
+    const titles = new Map<string, string[]>();
+    for (const citation of pairing?.citations ?? []) {
+      for (const mark of citation.marks) titles.set(mark, [...(titles.get(mark) ?? []), citation.title.trim() || "Untitled"]);
+    }
+    return (uuid: string) => titles.get(uuid) ?? [];
+  }, [pairing?.citations]);
+
+  // A followed link asks for a page, and perhaps a mark on it: shown once, when the PDF is open and its marks are known.
+  const goTo = pairing?.goTo;
+  const goToDone = useRef(pairing?.onGoToDone);
+  useEffect(() => {
+    goToDone.current = pairing?.onGoToDone;
+  });
+  const shown = useRef(0);
+  const marksKnown = edit.status !== "loading";
+  useEffect(() => {
+    if (!goTo || !ready || !marksKnown || shown.current === goTo.seq) return;
+    shown.current = goTo.seq;
+    const mark = goTo.mark === null ? undefined : edit.marks.find((m) => m.uuid === goTo.mark);
+    const rect = mark?.rects?.[0] ?? (mark?.body as { rect?: [number, number, number, number] } | null | undefined)?.rect;
+    if (mark && rect) ready.controls.goToRect(mark.page + 1, rect);
+    else ready.controls.goToPage(Math.min(goTo.page, ready.pageCount));
+    // The mark keeps its flash for a moment, then the ask is dropped.
+    const seq = goTo.seq;
+    window.setTimeout(() => goToDone.current?.(seq), FLASH_MS);
+  }, [goTo, ready, marksKnown, edit.marks]);
+  const flashId = goTo?.mark ? (edit.marks.find((m) => m.uuid === goTo.mark)?.id ?? null) : null;
+
   function onKeyDown(event: KeyboardEvent) {
     if (edit.onKeyDown(event)) return;
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
@@ -90,6 +162,7 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
         onRedo={edit.redo}
         placing={edit.placing}
         onTogglePlacing={edit.togglePlacing}
+        paired={pairing ? { follow: pairing.follow, noteTitle: pairing.noteTitle, onToggleFollow: pairing.onToggleFollow, onCite: citePage } : null}
         onAddBookmark={() => {
           if (!ready) return;
           void documents.addBookmark(document.id, ready.page - 1, "").then(() => {
@@ -98,10 +171,18 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
           });
         }}
       />
-      {edit.error && (
+      {(edit.error ?? notice) && (
         <div role="alert" className="flex shrink-0 items-center gap-2 border-b bg-destructive/10 px-3 py-1 text-sm text-destructive">
-          <span className="flex-1">{edit.error}</span>
-          <Button variant="ghost" size="icon-xs" aria-label="Dismiss" onClick={edit.clearError}>
+          <span className="flex-1">{edit.error ?? notice}</span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Dismiss"
+            onClick={() => {
+              edit.clearError();
+              setNotice(null);
+            }}
+          >
             <XIcon />
           </Button>
         </div>
@@ -114,14 +195,14 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
             className={cn("flex w-60 shrink-0 flex-col border-r bg-background", narrow && "absolute inset-y-0 left-0 z-10 max-w-[85%] shadow-md")}
           >
             <div role="tablist" aria-label="Sidebar" className="flex shrink-0 border-b text-sm">
-              {(["outline", "bookmarks", "highlights"] as const).map((tab) => (
+              {(pairing ? (["outline", "bookmarks", "highlights", "notes"] as const) : (["outline", "bookmarks", "highlights"] as const)).map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   role="tab"
                   aria-selected={sidebar === tab}
                   onClick={() => setSidebar(tab)}
-                  className={cn("flex-1 px-3 py-1.5 capitalize", sidebar === tab ? "border-b-2 border-foreground font-medium" : "text-muted-foreground hover:text-foreground")}
+                  className={cn("flex-1 px-1.5 py-1.5 text-[13px] capitalize", sidebar === tab ? "border-b-2 border-foreground font-medium" : "text-muted-foreground hover:text-foreground")}
                 >
                   {tab}
                 </button>
@@ -133,7 +214,9 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
               ) : sidebar === "outline" ? (
                 <OutlineTree items={ready.outline} controls={ready.controls} />
               ) : sidebar === "highlights" ? (
-                <HighlightList marks={edit.marks} labels={ready.labels} controls={ready.controls} selectedId={edit.selectedId} onSelect={(mark) => edit.select(mark.id)} onComment={edit.comment} onDelete={edit.remove} />
+                <HighlightList marks={edit.marks} labels={ready.labels} controls={ready.controls} selectedId={edit.selectedId} onSelect={(mark) => edit.select(mark.id)} onComment={edit.comment} onDelete={edit.remove} onQuote={pairing ? quote : undefined} quotedIn={pairing ? quotedIn : undefined} />
+              ) : sidebar === "notes" && pairing ? (
+                <NotesList citations={pairing.citations} pairedNoteId={pairing.noteId} onOpen={pairing.onOpenNote} onNewNote={pairing.onNewNote} />
               ) : (
                 <BookmarkList documentId={document.id} documents={documents} controls={ready.controls} labels={ready.labels} refreshKey={bookmarksRead} />
               )}
@@ -161,6 +244,8 @@ export function PdfReader({ document, documents }: { document: PdfDocument; docu
               layers={layers}
               dark={dark}
               marks={edit.marks}
+              flashId={flashId}
+              onQuote={pairing ? quote : undefined}
               selectedId={edit.selectedId}
               placing={edit.placing}
               draft={edit.draft}
@@ -195,6 +280,7 @@ function Toolbar({
   onRedo,
   placing,
   onTogglePlacing,
+  paired,
   onAddBookmark,
 }: {
   viewer: PdfViewer;
@@ -210,6 +296,8 @@ function Toolbar({
   onRedo: () => void;
   placing: boolean;
   onTogglePlacing: () => void;
+  /** What the toolbar offers for the note beside the PDF; null when the PDF has none (nothing to cite into). */
+  paired: { follow: boolean; noteTitle: string | null; onToggleFollow: () => void; onCite: () => void } | null;
   onAddBookmark: () => void;
 }) {
   const ready = viewer.phase === "ready" ? viewer : null;
@@ -239,6 +327,27 @@ function Toolbar({
       <Button variant="ghost" size="icon-sm" aria-label="Add a text note" aria-pressed={placing} disabled={!ready} onClick={onTogglePlacing} title="Add a text note: click where it goes on a page">
         <StickyNoteIcon />
       </Button>
+      {paired && (
+        <>
+          <Button variant="ghost" size="icon-sm" aria-label="Cite this page" disabled={!ready} onClick={paired.onCite} title="Put a link to this page into the note beside the PDF">
+            <Link2Icon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Follow the note in use"
+            aria-pressed={paired.follow}
+            onClick={paired.onToggleFollow}
+            title={
+              paired.follow
+                ? "Quoting into the note you use last. Click to stay with one note."
+                : `Quoting into ${paired.noteTitle ? `“${paired.noteTitle}”` : "its note"}. Click to follow the note you use instead.`
+            }
+          >
+            <NotebookPenIcon />
+          </Button>
+        </>
+      )}
       <Button variant="ghost" size="icon-sm" aria-label="Find in this PDF" aria-pressed={findOpen} disabled={!ready} onClick={onToggleFind} title="Find in this PDF (Ctrl/Cmd+F)">
         <SearchIcon />
       </Button>

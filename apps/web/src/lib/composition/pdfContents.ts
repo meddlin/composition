@@ -18,3 +18,10 @@ export function describeContents(contents: PdfContents): string {
   if (contents.bookmarks > 0) parts.push(plural(contents.bookmarks, "bookmark"));
   return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
+
+/** What deleting the PDF does to the notes that cite it, for the delete dialog; null when none do. */
+export function describeCitingNotes(contents: PdfContents): string | null {
+  if (contents.citingNotes === 0) return null;
+  const them = contents.citingNotes === 1 ? "1 note cites it; its quote stays" : `${contents.citingNotes} notes cite it; their quotes stay`;
+  return `${them} and ${contents.citingNotes === 1 ? "its links stop" : "their links stop"} working.`;
+}

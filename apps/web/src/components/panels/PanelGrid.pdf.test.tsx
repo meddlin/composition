@@ -4,10 +4,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DocumentsApi, PdfDocument } from "@/lib/composition/documentsApi";
 import { createDocumentsStore } from "@/lib/composition/documentsStore";
 import { createWorkspaceStore, type WorkspaceDeps } from "../notes/workspaceStore";
+import type { Note } from "../notes/types";
+import type { PdfPanelState } from "./kinds";
+import type { PdfPairing } from "../pdf/PdfReader";
 import { PanelGrid, type PanelHost } from "./PanelGrid";
 
 // pdf.js needs a real browser; what the panel does around the reader is what is under test.
-vi.mock("../pdf/PdfReader", () => ({ PdfReader: ({ document }: { document: PdfDocument }) => <div data-testid="reader">reading {document.fileName}</div> }));
+let lastPairing: PdfPairing | undefined;
+// The note panel is tested on its own; here it only has to be there for the PDF to be paired with.
+vi.mock("../notes/NotePane", () => ({ NotePane: () => <div data-testid="note-pane" /> }));
+vi.mock("../pdf/PdfReader", () => ({
+  PdfReader: ({ document, pairing }: { document: PdfDocument; pairing?: PdfPairing }) => {
+    lastPairing = pairing;
+    return <div data-testid="reader">reading {document.fileName}</div>;
+  },
+}));
 
 globalThis.ResizeObserver ??= class {
   observe() {}
@@ -49,7 +60,7 @@ function setup(documentId: number | null, listDocuments: DocumentsApi["listDocum
   const store = createWorkspaceStore({ notes: [], groups: [] }, {} as WorkspaceDeps, undefined, { panels: {}, documents: createDocumentsStore(api) });
   const [panelId] = Object.keys(store.getSnapshot().panels.byId);
   store.setPanelKind(panelId, "pdf");
-  store.setPanelState(panelId, { documentId });
+  store.setPanelState(panelId, { documentId, noteId: null, follow: true });
   render(<PanelGrid store={store} host={host} />);
   return store;
 }
@@ -91,5 +102,81 @@ describe("a PDF panel", () => {
     act(() => store.setPanelState(panelId, { documentId: 2 }));
 
     await waitFor(() => expect(screen.getByTestId("reader").textContent).toBe("reading book2.pdf"));
+  });
+});
+
+describe("a PDF panel beside notes", () => {
+  const note = (id: number, title: string, content = ""): Note => ({ id, title, content, tags: "", description: "", createdAt: "x", updatedAt: "x", groupId: null, notebookId: 1 });
+  const book = doc(1);
+
+  async function paired() {
+    const notes = [note(11, "Textbook"), note(5, "Chapter 3", `> q\n> — [Book, p. 4](pdf:${book.uuid}#p=4)`), note(6, "Unrelated")];
+    const api = { listDocuments: async () => [book] } as DocumentsApi;
+    const store = createWorkspaceStore({ notes, groups: [] }, { deleteNote: vi.fn(async () => {}) } as unknown as WorkspaceDeps, undefined, { panels: {}, documents: createDocumentsStore(api) });
+    await store.documents.load();
+    store.openNote(11);
+    render(<PanelGrid store={store} host={host} />);
+    await screen.findByTestId("reader");
+    const { panels } = store.getSnapshot();
+    const pdfPanelId = Object.keys(panels.byId).find((id) => panels.byId[id].kind === "pdf")!;
+    const stateOf = () => store.getSnapshot().panels.byId[pdfPanelId].state as PdfPanelState;
+    return { store, stateOf, pdfPanelId };
+  }
+
+  it("hands the reader its title, the notes that cite it, and the note it is paired with", async () => {
+    await paired();
+
+    expect(lastPairing?.title).toBe("Textbook");
+    expect(lastPairing?.noteId).toBe(11);
+    expect(lastPairing?.noteTitle).toBe("Textbook");
+    expect(lastPairing?.follow).toBe(false);
+    expect(lastPairing?.citations).toEqual([
+      { noteId: 11, title: "Textbook", owner: true, pages: [], marks: [] },
+      { noteId: 5, title: "Chapter 3", owner: false, pages: [4], marks: [] },
+    ]);
+  });
+
+  it("writes Quote and Cite to the paired note, at its end when no editor has it open", async () => {
+    const { store } = await paired();
+
+    expect(lastPairing?.insert("> quote", "block")).toBe(true);
+
+    expect(store.getSnapshot().notes.find((n) => n.id === 11)?.content).toBe("> quote\n");
+  });
+
+  it("switches between staying with its note and following the note in use", async () => {
+    const { stateOf } = await paired();
+
+    act(() => lastPairing?.onToggleFollow());
+
+    await waitFor(() => expect(stateOf()).toMatchObject({ follow: true, noteId: null }));
+  });
+
+  it("shows a note from the Notes tab beside the PDF, and pairs the PDF with it", async () => {
+    const { store, stateOf } = await paired();
+
+    act(() => lastPairing?.onOpenNote(5));
+
+    await waitFor(() => expect(stateOf()).toMatchObject({ follow: false, noteId: 5 }));
+    const { panels } = store.getSnapshot();
+    expect(Object.values(panels.byId).some((panel) => panel.kind === "note" && (panel.state as { noteId: number }).noteId === 5)).toBe(true);
+  });
+
+  it("drops what a followed link asked, once the reader says it has shown it", async () => {
+    const { store, stateOf, pdfPanelId } = await paired();
+    store.setPanelState(pdfPanelId, { ...stateOf(), goTo: { page: 4, mark: null, seq: 9 } });
+    await waitFor(() => expect(lastPairing?.goTo).toEqual({ page: 4, mark: null, seq: 9 }));
+
+    act(() => lastPairing?.onGoToDone(9));
+
+    await waitFor(() => expect(stateOf().goTo).toBeUndefined());
+  });
+
+  it("is not paired when its PDF's own note is gone, such as in the Trash Can", async () => {
+    const { store } = await paired();
+
+    act(() => store.removeNote(11));
+
+    await waitFor(() => expect(lastPairing).toBeUndefined());
   });
 });

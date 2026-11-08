@@ -8,6 +8,7 @@ import { createPluginsStore, unsavedPlugins, type PluginsStore } from "@/lib/com
 import { DEFAULT_PLUGIN_SETTINGS, type PluginSettings } from "@/lib/composition/plugins";
 import { createContactsStore, unavailableContacts, type ContactsStore } from "@/lib/composition/contactsStore";
 import type { ImportPdfResult, ImportTarget } from "@/lib/composition/documentsApi";
+import { pdfLink, type PdfRef } from "@/lib/composition/pdfRefs";
 import { createDocumentsStore, unavailableDocuments, type DocumentsStore, type DuplicateImport } from "@/lib/composition/documentsStore";
 import { createFeedsStore, unavailableFeeds, type FeedsStore } from "@/lib/composition/feedsStore";
 import { createReadingListStore, unavailableReadingList, type ReadingListStore } from "@/lib/composition/readingListStore";
@@ -28,6 +29,10 @@ import {
   movePanelToNewWindow as movePanelToNewWindowIn,
   movePanelToWindow as movePanelToWindowIn,
   openLinkedNote as openLinkedNoteIn,
+  openLinkedPdf as openLinkedPdfIn,
+  openNoteForPdf as openNoteForPdfIn,
+  clearPdfGoTo as clearPdfGoToIn,
+  setPdfFollow as setPdfFollowIn,
   resizePanels as resizePanelsIn,
   dropNote as dropNoteIn,
   openAssistantFor as openAssistantForIn,
@@ -45,9 +50,10 @@ import {
   type PanelsState,
   type WindowId,
 } from "../panels/panelsState";
-import { createNoteFromAnswer } from "./createNoteFromAnswer";
+import { createNoteFromAnswer, createNoteWith } from "./createNoteFromAnswer";
+import { appendMarkdown, insertIntoOpenNote, type Insertion } from "./noteInsertions";
 import { closePane, dropNote, initialPanes, openNote, type PaneState } from "./panes";
-import { applySavedNote, type Group, type Note, type Notebook } from "./types";
+import { applySavedNote, noteTitle, type Group, type Note, type Notebook } from "./types";
 
 /** How long after the last keystroke a note is saved. */
 export const AUTOSAVE_DELAY_MS = 500;
@@ -199,6 +205,27 @@ export type WorkspaceStore = {
   /** A link followed in the preview of the note in `fromPanelId`: its note opens in that panel, or beside it. */
   openLinkedNote(noteId: number, fromPanelId: PanelId, beside: boolean): void;
   /**
+   * A `pdf:` link followed in the note in `fromPanelId`: the PDF's panel shows the page and mark it names, opening beside the
+   * note, paired with it, if the window shows none. Nothing happens for a PDF that is not here or whose note is in the Trash Can.
+   */
+  openLinkedPdf(ref: PdfRef, fromPanelId: PanelId): void;
+  /** Turns a PDF panel's following of the note in use on or off; off pins it to the note it is paired with now. */
+  setPdfFollow(panelId: PanelId, follow: boolean): void;
+  /** The PDF panel has shown what a followed link asked of it (the ask with this `seq`; a newer one is kept). */
+  clearPdfGoTo(panelId: PanelId, seq?: number): void;
+  /** Shows a note in the PDF panel's paired note panel, and pins the PDF to it (a pick in the reader's Notes tab). */
+  openNoteForPdf(panelId: PanelId, noteId: number): void;
+  /**
+   * Makes a note whose first line links to the PDF, in the group of the PDF's own note, shows it in the PDF's paired note
+   * panel and pins the PDF to it. Null when the PDF or its note is not there.
+   */
+  newNoteForPdf(documentId: number, panelId: PanelId): Promise<Note | null>;
+  /**
+   * Puts Markdown into a note at its caret when it is open in an editor, and at the end of it when it is not (a quote sent to a
+   * note that is pinned but not showing). False when the note is not there to be written to.
+   */
+  insertIntoNote(noteId: number, markdown: string, how: Insertion): boolean;
+  /**
    * Opens the AI helper for the note in a note panel, and says which AI panel it is; null for a panel that shows no
    * note (see `openAssistantFor` in `panelsState.ts`).
    */
@@ -277,6 +304,8 @@ export function createWorkspaceStore(
   const grid = options.panels !== undefined;
   const plugins = options.plugins ?? createPluginsStore(unsavedPlugins, initial.plugins ?? DEFAULT_PLUGIN_SETTINGS);
   const documents = options.documents ?? createDocumentsStore(unavailableDocuments, false);
+  // Each followed `pdf:` link is a new ask of the reader, which tells it apart from the one before.
+  let goToCount = 0;
   let panelCount = 0;
   const newPanelId = () => `p${++panelCount}`;
   let windowCount = 0;
@@ -694,6 +723,40 @@ export function createWorkspaceStore(
       if (!state.notes.some((n) => n.id === noteId)) return;
       flushSaves();
       updatePanels((panels) => openLinkedNoteIn(panels, fromPanelId, noteId, beside, newPanelId));
+    },
+    openLinkedPdf: (ref, fromPanelId) => {
+      const document = documents.getSnapshot().documents.find((d) => d.uuid === ref.uuid);
+      if (!document || !state.notes.some((n) => n.id === document.noteId)) return;
+      const goTo = ref.page === null && ref.mark === null ? null : { page: ref.page ?? 1, mark: ref.mark, seq: ++goToCount };
+      updatePanels((panels) => openLinkedPdfIn(panels, fromPanelId, document.id, goTo, newPanelId));
+    },
+    setPdfFollow: (panelId, follow) => updatePanels((panels) => setPdfFollowIn(panels, panelId, follow)),
+    clearPdfGoTo: (panelId, seq) => updatePanels((panels) => clearPdfGoToIn(panels, panelId, seq)),
+    openNoteForPdf: (panelId, noteId) => {
+      if (!state.notes.some((n) => n.id === noteId)) return;
+      flushSaves();
+      updatePanels((panels) => openNoteForPdfIn(panels, panelId, noteId, newPanelId));
+    },
+    newNoteForPdf: async (documentId, panelId) => {
+      const document = documents.byId(documentId);
+      const owner = document && state.notes.find((n) => n.id === document.noteId);
+      if (!document || !owner) return null;
+      flushSaves();
+      const link = pdfLink({ uuid: document.uuid, title: noteTitle(owner) });
+      const created = await createNoteWith(`Notes on ${noteTitle(owner)}`, `${link}\n\n`, owner.groupId, owner.notebookId, {
+        createNote: deps.createNote,
+        saveNoteContent: deps.saveNoteContent,
+      });
+      set({ notes: [created, ...state.notes] });
+      updatePanels((panels) => openNoteForPdfIn(panels, panelId, created.id, newPanelId));
+      return created;
+    },
+    insertIntoNote: (noteId, markdown, how) => {
+      const note = state.notes.find((n) => n.id === noteId);
+      if (!note) return false;
+      if (insertIntoOpenNote(noteId, markdown, how)) return true;
+      editNote(noteId, appendMarkdown(note.content, markdown));
+      return true;
     },
     openAssistantFor: (panelId) => {
       const opened = openAssistantForIn(state.panels, panelId, newPanelId);

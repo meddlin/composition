@@ -65,6 +65,20 @@ export type PdfContents = {
   /** How many pages have ink on them (ink is one record per page). */
   inkPages: number;
   bookmarks: number;
+  /** How many notes other than the owner cite the PDF: their quotes stay, and their links stop working. */
+  citingNotes: number;
+};
+
+/** A note that belongs with a PDF: its owner, or one whose text links to it, and what it cites of it. */
+export type PdfCitation = {
+  noteId: number;
+  title: string;
+  /** The note that owns the PDF (listed first, whether or not its text links to it). */
+  owner: boolean;
+  /** The pages (from 1) its links name. */
+  pages: number[];
+  /** The uuids of the marks its links name. */
+  marks: string[];
 };
 
 /** Where an imported PDF's note goes: the group and notebook the sidebar is on. */

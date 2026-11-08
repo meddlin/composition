@@ -12,7 +12,7 @@ afterEach(cleanup);
 
 const note = (id: number, title = `Note ${id}`): Note => ({ id, title, content: "", tags: "", description: "", createdAt: "x", updatedAt: "x", groupId: null, notebookId: 1 });
 const pdf = (id: number, noteId: number): PdfDocument => ({ id, uuid: String(id).padStart(32, "0"), noteId, fileName: `book${id}.pdf`, size: 10, pageCount: 0, viewState: {}, createdAt: "x" });
-const contents: PdfContents = { fileName: "book10.pdf", size: 212_000_000, marks: { highlight: 41, underline: 0, strikethrough: 0, text: 0, ink: 2 }, inkPages: 2, bookmarks: 6 };
+const contents: PdfContents = { fileName: "book10.pdf", size: 212_000_000, marks: { highlight: 41, underline: 0, strikethrough: 0, text: 0, ink: 2 }, inkPages: 2, bookmarks: 6, citingNotes: 3 };
 
 function setup(over: Partial<DocumentsApi> = {}, { available = true, notes = [note(1), note(2, "Textbook")] } = {}) {
   const api = fakeDocumentsApi({
@@ -140,6 +140,7 @@ describe("deleting a note that owns a PDF", () => {
     const dialog = await screen.findByRole("alertdialog");
     await waitFor(() => expect(dialog.textContent).toContain("with its PDF (212 MB), 41 highlights, 2 ink pages and 6 bookmarks"));
     expect(dialog.textContent).toContain("permanently deleted after 60 days");
+    expect(dialog.textContent).toContain("3 notes cite it; their quotes stay and their links stop working.");
   });
 
   it("holds the Delete button until it knows what is inside", async () => {

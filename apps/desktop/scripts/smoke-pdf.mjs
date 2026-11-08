@@ -313,6 +313,72 @@ try {
   check("a text note is retyped by a double click", true);
   await page.screenshot({ path: path.join(out, "pdf-marks-all.png") });
 
+  // ---- Notes cite the PDF: Quote, Cite this page, following a link
+  const noteEditor = page.locator('textarea[aria-label="Markdown editor"]');
+  const editorText = () => noteEditor.inputValue();
+  await reader.getByRole("button", { name: "Outline and bookmarks" }).click();
+  await reader.getByRole("tab", { name: "highlights" }).click();
+  await reader.getByRole("list", { name: "Highlights" }).waitFor();
+  const firstHighlight = (await marksOf()).find((m) => m.kind === "highlight" && m.page === 5);
+  await reader.getByRole("button", { name: /^Quote the highlight on page/ }).first().click();
+  const quoted = await waitFor(async () => (await editorText()).includes("pdf:")).catch(() => false);
+  const quoteLine = `> ${pageText(6)}\n>\n> — [*Designing Data*, p. 3](pdf:${doc.uuid}#p=6&a=${firstHighlight.uuid})`;
+  check("Quote puts the highlight's words into the note beside the PDF, as a block quote that cites the page and the mark", Boolean(quoted) && (await editorText()).includes(quoteLine), await editorText());
+  await reader.getByRole("button", { name: "Outline and bookmarks" }).click();
+  await reader.getByRole("complementary", { name: "PDF sidebar" }).waitFor({ state: "detached" });
+  await pageBox.fill("9");
+  await pageBox.press("Enter");
+  await waitFor(async () => (await pageBox.inputValue()) === "9");
+  await reader.getByRole("button", { name: "Cite this page" }).click();
+  const cited = await waitFor(async () => (await editorText()).includes(`(pdf:${doc.uuid}#p=9)`)).catch(() => false);
+  check("Cite this page puts a link to the page the reader is on into the note, by its printed label", Boolean(cited) && /\[\*Designing Data\*, p\. 6\]\(pdf:/.test(await editorText()), await editorText());
+  await page.screenshot({ path: path.join(out, "pdf-quote.png") });
+
+  // The preview draws both as links, and following one shows the page and flashes the mark.
+  await page.getByRole("tab", { name: "Preview" }).click();
+  const previewLink = page.getByRole("link", { name: "Designing Data, p. 3" });
+  await previewLink.waitFor();
+  check("the preview draws a citation as a link", (await page.getByRole("link", { name: "Designing Data, p. 6" }).count()) === 1);
+  await pageBox.fill("1");
+  await pageBox.press("Enter");
+  await waitFor(async () => (await pageBox.inputValue()) === "1");
+  await previewLink.click();
+  await waitFor(async () => (await pageBox.inputValue()) === "6", { timeout: 15_000 });
+  check("following a citation goes to its page", true);
+  const flashed = await reader.locator("[data-flash]").first().waitFor({ timeout: 10_000 }).then(() => true, () => false);
+  check("and flashes the mark it names", flashed);
+  await page.screenshot({ path: path.join(out, "pdf-followed.png") });
+  const goToDropped = await waitFor(async () =>
+    (await page.evaluate(() => Object.values(window.__workspace.store.getSnapshot().panels.byId).filter((p) => p.kind === "pdf").every((p) => p.state.goTo === undefined))),
+  ).catch(() => false);
+  check("the flash ends and the ask is dropped, so a restored layout does not repeat it", Boolean(goToDropped) && (await reader.locator("[data-flash]").count()) === 0);
+  await page.getByRole("link", { name: "Designing Data, p. 6" }).click();
+  await waitFor(async () => (await pageBox.inputValue()) === "9", { timeout: 15_000 });
+  check("a citation of a page alone goes there too", true);
+  check("and no second PDF panel was opened for the link", (await page.evaluate(() => Object.values(window.__workspace.store.getSnapshot().panels.byId).filter((p) => p.kind === "pdf").length)) === 1);
+  await page.getByRole("tab", { name: "Markdown" }).click();
+
+  // The Notes tab lists the notes that cite the PDF, and makes a new one.
+  await reader.getByRole("button", { name: "Outline and bookmarks" }).click();
+  await reader.getByRole("tab", { name: "notes" }).click();
+  const notesList = reader.getByRole("list", { name: "Notes" });
+  await notesList.waitFor();
+  check("the Notes tab lists the PDF's own note, with the pages it cites", /Designing Data\s*This PDF's own note · 2 pages/.test((await notesList.innerText()).replace(/\n/g, "")), await notesList.innerText());
+  await reader.getByRole("button", { name: "New note for this PDF" }).click();
+  const made = await waitFor(async () => page.evaluate(() => window.__workspace.store.getSnapshot().notes.find((n) => n.title === "Notes on Designing Data") ?? null)).catch(() => null);
+  check("New note for this PDF makes a note whose first line links to the PDF", Boolean(made) && made.content.includes(`[Designing Data](pdf:${doc.uuid})`), JSON.stringify(made));
+  const pinned = await waitFor(async () => (await page.evaluate(() => Object.values(window.__workspace.store.getSnapshot().panels.byId).find((p) => p.kind === "pdf").state.noteId)) === made?.id).catch(() => false);
+  check("and shows it beside the PDF, which is now paired with it", Boolean(pinned) && (await editorText()).includes(`pdf:${doc.uuid}`));
+  await reader.getByRole("tab", { name: "notes" }).click();
+  check("the new note is listed, and it is the paired one", (await notesList.getByRole("button", { name: /Notes on Designing Data/ }).getAttribute("aria-current")) === "true");
+  await reader.getByRole("button", { name: "Outline and bookmarks" }).click();
+  await reader.getByRole("complementary", { name: "PDF sidebar" }).waitFor({ state: "detached" });
+  check("the app has no CSP violations or errors after all that", consoleProblems.length === 0, consoleProblems.join(" | "));
+  // Back to the page the marks are on, which is where the restart below is expected to find the reader.
+  await pageBox.fill("6");
+  await pageBox.press("Enter");
+  await waitFor(async () => (await documents(page))[0]?.viewState.page === 5, { timeout: 8000 });
+
   // ---- A second import of the same file asks first
   await pick(app, copyFile);
   await page.getByRole("button", { name: "+ Import PDF…" }).click();
@@ -322,8 +388,8 @@ try {
   check("and nothing was imported yet", (await documents(page)).length === 1);
   await dialog.getByRole("button", { name: "Import a separate copy" }).click();
   await waitFor(async () => (await documents(page)).length === 2);
-  const noted = await waitFor(async () => (await page.evaluate(() => window.__workspace.store.getSnapshot().notes.length)) === 2).catch(() => false);
-  check("a separate copy can be imported on request, as another note", Boolean(noted), String(await page.evaluate(() => window.__workspace.store.getSnapshot().notes.map((n) => n.title))));
+  const noted = await waitFor(async () => (await page.evaluate(() => window.__workspace.store.getSnapshot().notes.length)) === 3).catch(() => false);
+  check("a separate copy can be imported on request, as another note (beside the original and the note made for it)", Boolean(noted), String(await page.evaluate(() => window.__workspace.store.getSnapshot().notes.map((n) => n.title))));
   check("the app has no CSP violations or errors so far", consoleProblems.length === 0, consoleProblems.join(" | "));
 
   // ---- Delete the first PDF's note: the dialog says what is inside
@@ -334,6 +400,7 @@ try {
   await confirm.waitFor();
   const said = await waitFor(async () => /its PDF \(\d[\d.]* [KM]?B\), \d+ highlights?.* and 1 bookmark/.test(await confirm.innerText()) && (await confirm.innerText())).catch(() => false);
   check("the delete dialog names what is inside: the PDF, its marks and its bookmark", Boolean(said), await confirm.innerText());
+  check("and says how many notes cite it, whose quotes stay", /1 note cites it; its quote stays and its links stop working\./.test(await confirm.innerText()), await confirm.innerText());
   await confirm.getByRole("button", { name: "Delete", exact: true }).click();
   await waitFor(async () => !(await page.evaluate((id) => window.__workspace.store.getSnapshot().notes.some((n) => n.id === id), firstNote)));
   const trash = await page.evaluate(() => window.composition.loadTrash());

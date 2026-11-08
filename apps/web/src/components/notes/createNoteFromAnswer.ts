@@ -13,8 +13,13 @@ type Api = {
  * written under that block; saving the bare answer would leave the note without one.
  */
 export async function createNoteFromAnswer(text: string, groupId: number | null, notebookId: number | null, api: Api): Promise<Note> {
-  const created = await api.createNote(titleFromAnswer(text), groupId, notebookId);
+  return createNoteWith(titleFromAnswer(text), text, groupId, notebookId, api);
+}
+
+/** Makes a note called `title` in `groupId` of `notebookId` holding `body` under its title block. */
+export async function createNoteWith(title: string, body: string, groupId: number | null, notebookId: number | null, api: Api): Promise<Note> {
+  const created = await api.createNote(title, groupId, notebookId);
   const [fm] = frontmatter.parse(created.content);
-  const body = text.endsWith("\n") ? text : `${text}\n`;
-  return api.saveNoteContent(created.id, fm ? frontmatter.render(fm, body) : body);
+  const text = body.endsWith("\n") ? body : `${body}\n`;
+  return api.saveNoteContent(created.id, fm ? frontmatter.render(fm, text) : text);
 }

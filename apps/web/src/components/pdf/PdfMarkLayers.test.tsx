@@ -113,6 +113,33 @@ describe("marks on the text", () => {
   });
 });
 
+describe("a mark a followed link names", () => {
+  it("is drawn attention to, and no other mark is", () => {
+    const p = props({ marks: [mark(1), mark(2, { rects: [[100, 600, 300, 620]] })], flashId: 2 });
+    render(<MarkLayers {...p} />);
+
+    const flashing = p.layers[0].under.querySelectorAll("[data-flash]");
+    expect(flashing).toHaveLength(1);
+    expect(flashing[0].getAttribute("data-mark-id")).toBe("2");
+    expect(flashing[0].classList.contains("animate-pulse")).toBe(true);
+    expect(p.layers[0].under.querySelector('[data-mark-id="1"]')?.hasAttribute("data-flash")).toBe(false);
+  });
+
+  it("is a text note too", () => {
+    const p = props({ marks: [note(5)], flashId: 5 });
+    render(<MarkLayers {...p} />);
+
+    expect(p.layers[0].over.querySelector('[data-mark-id="5"]')?.hasAttribute("data-flash")).toBe(true);
+  });
+
+  it("is nothing when no link asked for one", () => {
+    const p = props({ marks: [mark(1), note(5)] });
+    render(<MarkLayers {...p} />);
+
+    expect(document.querySelector("[data-flash]")).toBeNull();
+  });
+});
+
 describe("text notes", () => {
   it("shows a note's words in its box, in the page's units, and selects it on a click", () => {
     const p = props({ marks: [note(5, "Check the proof")] });
@@ -223,6 +250,26 @@ describe("the popover of a selected mark", () => {
     fireEvent.click(within(p.layers[0].over).getByRole("button", { name: "Delete this mark" }));
 
     expect(p.onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
+  it("offers to quote the words of a mark into the note beside the PDF, when the reader can", () => {
+    const p = props({ marks: [mark(1)], selectedId: 1, onQuote: vi.fn() });
+    render(<MarkLayers {...p} />);
+
+    fireEvent.click(within(p.layers[0].over).getByRole("button", { name: "Quote in the note" }));
+
+    expect(p.onQuote).toHaveBeenCalledWith(expect.objectContaining({ id: 1 }));
+  });
+
+  it("offers no quote when the reader has no note to quote into, or the mark has no words", () => {
+    const without = props({ marks: [mark(1)], selectedId: 1 });
+    const { unmount } = render(<MarkLayers {...without} />);
+    expect(within(without.layers[0].over).queryByRole("button", { name: "Quote in the note" })).toBeNull();
+    unmount();
+
+    const text = props({ marks: [note(5)], selectedId: 5, onQuote: vi.fn() });
+    render(<MarkLayers {...text} />);
+    expect(within(text.layers[0].over).queryByRole("button", { name: "Quote in the note" })).toBeNull();
   });
 
   it("has no comment box for a text note, which is its words", () => {

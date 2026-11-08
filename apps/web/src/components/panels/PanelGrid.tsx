@@ -1,12 +1,15 @@
 "use client";
 
 import { FileTextIcon, FolderTreeIcon, BookOpenIcon, BookUserIcon, LayoutDashboardIcon, ListTodoIcon, LinkIcon, MessageSquareIcon, RssIcon, StickyNoteIcon } from "lucide-react";
-import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
+import { Fragment, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty";
 import { cn } from "@/lib/utils";
 import { NotePane } from "../notes/NotePane";
-import { PdfReader } from "../pdf/PdfReader";
+import { citationsFor } from "@/lib/composition/pdfRefs";
+import { noteTitle } from "../notes/types";
+import { PdfReader, type PdfPairing } from "../pdf/PdfReader";
+import { usePdfLinks } from "../pdf/usePdfLinks";
 import { ResizeHandle } from "../notes/ResizeHandle";
 import type { WorkspaceSnapshot, WorkspaceStore } from "../notes/workspaceStore";
 import { AiPanel } from "./AiPanel";
@@ -23,7 +26,7 @@ import { PanelFrame } from "./PanelFrame";
 import { PluginOffPanel } from "./PluginOffPanel";
 import { usePlugins } from "../plugins/usePlugins";
 import { PanelMenu } from "./PanelMenu";
-import { MAIN_WINDOW, focusedPanelId, type KindId, type PanelsState, type WindowId } from "./panelsState";
+import { MAIN_WINDOW, focusedPanelId, pdfSubject, type KindId, type PanelsState, type WindowId } from "./panelsState";
 
 export type { PanelHost } from "./host";
 
@@ -159,6 +162,29 @@ function PdfView({ panelId, state, shared }: { panelId: PanelId; state: PdfPanel
   const document = state.documentId === null ? undefined : snapshot.documents.find((d) => d.id === state.documentId);
   const loaded = snapshot.status === "ready" || snapshot.status === "error";
 
+  // The notes beside the PDF: the one Quote writes to, and every note that cites it.
+  const notes = shared.snapshot.notes;
+  const owner = document && notes.find((n) => n.id === document.noteId);
+  const citations = useMemo(() => (document ? citationsFor(notes, document) : []), [notes, document]);
+  const pairedId = pdfSubject(shared.snapshot.panels, panelId);
+  const paired = pairedId === null ? undefined : notes.find((n) => n.id === pairedId);
+  const pairing: PdfPairing | undefined =
+    document && owner
+      ? {
+          title: noteTitle(owner),
+          citations,
+          noteId: paired?.id ?? null,
+          noteTitle: paired ? noteTitle(paired) : null,
+          follow: state.follow,
+          goTo: state.goTo,
+          insert: (markdown, how) => (paired ? store.insertIntoNote(paired.id, markdown, how) : false),
+          onToggleFollow: () => store.setPdfFollow(panelId, !state.follow),
+          onOpenNote: (noteId) => store.openNoteForPdf(panelId, noteId),
+          onNewNote: () => void store.newNoteForPdf(document.id, panelId),
+          onGoToDone: (seq) => store.clearPdfGoTo(panelId, seq),
+        }
+      : undefined;
+
   return (
     <PanelFrame
       store={store}
@@ -174,7 +200,7 @@ function PdfView({ panelId, state, shared }: { panelId: PanelId; state: PdfPanel
       title={document?.fileName ?? "PDF"}
     >
       {document ? (
-        <PdfReader key={document.id} document={document} documents={store.documents} />
+        <PdfReader key={document.id} document={document} documents={store.documents} pairing={pairing} />
       ) : (
         <Empty>
           <EmptyHeader>
@@ -221,6 +247,7 @@ function AwaitingNote({ onCreateNote }: { onCreateNote: () => void }) {
 
 function NoteView({ panelId, state, shared }: { panelId: PanelId; state: NotePanelState; shared: Shared }) {
   const { store, host, snapshot, focusedId } = shared;
+  const pdfLinks = usePdfLinks(store, panelId, snapshot.notes);
   const live = snapshot.notes.find((n) => n.id === state.noteId);
   // A note that was deleted while it is shown is kept, as it last was, by the workspace.
   const note = live ?? snapshot.deleted.find((n) => n.id === state.noteId);
@@ -243,6 +270,7 @@ function NoteView({ panelId, state, shared }: { panelId: PanelId; state: NotePan
       onDropNote={() => {}}
       notes={snapshot.notes}
       onOpenNote={(noteId, beside) => store.openLinkedNote(noteId, panelId, beside)}
+      pdfLinks={pdfLinks}
       onNewNoteFromText={(text) => host.onNewNoteFromText(note.id, text)}
       panel={{
         panelId,

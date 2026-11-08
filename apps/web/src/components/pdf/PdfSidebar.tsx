@@ -1,17 +1,17 @@
 "use client";
 
-import { ChevronRightIcon, PencilIcon, StrikethroughIcon, Trash2Icon, UnderlineIcon, HighlighterIcon, StickyNoteIcon, PenLineIcon } from "lucide-react";
+import { ChevronRightIcon, PencilIcon, QuoteIcon, StrikethroughIcon, Trash2Icon, UnderlineIcon, HighlighterIcon, StickyNoteIcon, PenLineIcon, PlusIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { PdfAnnotation, PdfBookmark } from "@/lib/composition/documentsApi";
+import type { PdfAnnotation, PdfBookmark, PdfCitation } from "@/lib/composition/documentsApi";
 import type { PdfTextNoteBody } from "@/lib/composition/pdfMarkup";
 import { paintFor } from "./pdfGeometry";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
 import { cn } from "@/lib/utils";
 import type { OutlineItem, PdfViewerControls } from "./usePdfViewer";
 
-export type SidebarTab = "outline" | "bookmarks" | "highlights";
+export type SidebarTab = "outline" | "bookmarks" | "highlights" | "notes";
 
 /** What a page is called to the reader: its printed label when the PDF has one ("xii", "42"), else its number. */
 export function pageName(page: number, labels: string[] | null): string {
@@ -189,6 +189,8 @@ export function HighlightList({
   onSelect,
   onComment,
   onDelete,
+  onQuote,
+  quotedIn,
 }: {
   marks: PdfAnnotation[];
   labels: string[] | null;
@@ -197,6 +199,10 @@ export function HighlightList({
   onSelect: (mark: PdfAnnotation) => void;
   onComment: (mark: PdfAnnotation, comment: string) => void;
   onDelete: (mark: PdfAnnotation) => void;
+  /** Quotes a mark into the paired note. */
+  onQuote?: (mark: PdfAnnotation) => void;
+  /** The titles of the notes that already cite a mark, to show it has been quoted. */
+  quotedIn?: (markUuid: string) => string[];
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
@@ -222,6 +228,7 @@ export function HighlightList({
               .filter((m) => m.page === page)
               .map((mark) => {
                 const Icon = KIND_ICON[mark.kind];
+                const quoted = quotedIn?.(mark.uuid) ?? [];
                 return (
                   <li key={mark.id} data-mark-id={mark.id} className={cn("group flex items-start gap-1.5 px-2 py-0.5", mark.id === selectedId && "bg-accent/60")}>
                     <span style={{ background: paintFor(mark.color).fill }} className="mt-1 flex size-5 shrink-0 items-center justify-center rounded">
@@ -267,6 +274,16 @@ export function HighlightList({
                         )
                       )}
                     </div>
+                    {quoted.length > 0 && (
+                      <span title={`Quoted in ${quoted.join(", ")}`} aria-label={`Quoted in ${quoted.join(", ")}`} className="mt-1 flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+                        <QuoteIcon className="size-3.5" />
+                      </span>
+                    )}
+                    {onQuote && mark.quote !== "" && (
+                      <Button variant="ghost" size="icon-xs" aria-label={`Quote the ${mark.kind} on page ${pageName(page + 1, labels)}`} title="Quote these words into the note beside the PDF" onClick={() => onQuote(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                        <QuoteIcon />
+                      </Button>
+                    )}
                     <Button variant="ghost" size="icon-xs" aria-label={`Delete the ${mark.kind} on page ${pageName(page + 1, labels)}`} onClick={() => onDelete(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
                       <Trash2Icon />
                     </Button>
@@ -276,6 +293,52 @@ export function HighlightList({
           </ul>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * The notes that belong with the PDF: its own note first, then every note whose text links to it, with how many of its pages
+ * each cites. Picking one shows it in the note panel beside the PDF; the note the PDF is paired with is marked.
+ */
+export function NotesList({
+  citations,
+  pairedNoteId,
+  onOpen,
+  onNewNote,
+}: {
+  citations: PdfCitation[];
+  pairedNoteId: number | null;
+  onOpen: (noteId: number) => void;
+  onNewNote: () => void;
+}) {
+  return (
+    <div className="py-1 text-sm">
+      <ul aria-label="Notes">
+        {citations.map((citation) => {
+          const cited = citation.pages.length;
+          return (
+            <li key={citation.noteId}>
+              <button
+                type="button"
+                aria-current={citation.noteId === pairedNoteId ? "true" : undefined}
+                onClick={() => onOpen(citation.noteId)}
+                className={cn("block w-full px-3 py-1 text-left hover:bg-accent hover:text-accent-foreground", citation.noteId === pairedNoteId && "bg-accent/60")}
+              >
+                <span className="block truncate">{citation.title.trim() || "Untitled"}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {citation.owner ? "This PDF's own note" : "Cites this PDF"}
+                  {cited > 0 && ` · ${cited === 1 ? "1 page" : `${cited} pages`}`}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+      <Button variant="ghost" size="sm" onClick={onNewNote} className="mx-2 mt-1 w-[calc(100%-1rem)] justify-start">
+        <PlusIcon />
+        New note for this PDF
+      </Button>
     </div>
   );
 }

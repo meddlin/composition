@@ -411,8 +411,45 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      back; Highlights lists every mark (not only highlights) by page, with its words and comment.
    - **Not checked:** a text note on a rotated page (its box and its orientation in the export, Step 5), a selection through a
      two-column page in a real textbook (Gate P1), and the keys on Windows and Linux.
-4. **Notes and links.** `pdf:` links (preview, editor, Live tab), Quote, Cite this page, link following, the Notes tab, New note
-   for this PDF, pin and follow.
+4. **Notes and links. Built 2026-11-07,** checked in the real app by the same `smoke:pdf` (now 58 checks, three runs in a row
+   all passing). `pdf:` links in the preview, Quote, Cite this page, following a link, the Notes tab, New note for this PDF, pin
+   and follow. What was built:
+   - **The link format** is in `pdfRefs.ts`: `pdf:<uuid>#p=<page>&a=<mark uuid>`, read tolerantly (a damaged part is dropped and
+     the rest kept), with the writers for a quote block, a page citation and a whole-PDF link, `escapeMarkdown` for text copied
+     out of a PDF, and the scan that finds which pages and marks a note cites.
+   - **The preview** draws a `pdf:` link as a link (`NoteLink.tsx`; `usePdfLinks` says whether the PDF is here). A link whose
+     PDF is not on this device, or whose note is in the Trash Can, is shown struck through, "PDF not on this device", with its
+     words still readable; the web app has no PDFs, so every such link there is dead.
+   - **Following a link** (`openLinkedPdf` in `panelsState.ts`): the PDF panel the window shows for that document is focused
+     and asked for the page and mark, or a PDF panel opens to the left of the note, paired with it, and the note stays where it
+     is. The reader shows the page once it is open and its marks are read, flashes the mark for 1.6 seconds, then drops the ask.
+   - **The pairing** (`PdfPanelState` is now `{documentId, noteId, follow, goTo?}`): a PDF panel is pinned to a note or follows
+     the note in use, as the AI helper does (`pdfSubject`, `setPdfFollow`); the pen-and-notebook button in the reader's toolbar
+     switches it. Opening a PDF's note pins the panel to it; a panel saved before this follows.
+   - **Quote** is a button in a mark's popover and in the Highlights tab; **Cite this page** is a toolbar button. Both put
+     Markdown into the paired note through its editor, at its caret as typing would (`noteInsertions.ts`, `insertMarkdown` on
+     the editor's controls), and at the end of the note when it is not open or the user has not been in it yet; never in the
+     frontmatter. Without a paired note the reader says so instead of doing nothing.
+   - **The Notes tab** lists the PDF's own note first and every note whose text links to the PDF, with how many pages each cites;
+     picking one shows it in the paired note panel and pins the PDF to it. **New note for this PDF** makes "Notes on <title>" in
+     the owner note's group, its first line a link to the PDF, and shows it the same way. The Highlights tab marks the
+     highlights a note already quotes, and names the notes.
+   - **The delete dialog** now ends "N notes cite it; their quotes stay and their links stop working." (the owner note does not
+     count).
+   - **Findings:** (1) Consecutive quoted lines are one Markdown paragraph, so this plan's two-line example (the words, then
+     the citation) runs together in the preview; the citation is now a paragraph of its own, after an empty quoted line. (2)
+     The renderer already holds every note's text, so the Notes tab reads citations from the notes in memory, which follows
+     what is typed at once; the scan on the database side (`listCitations` in `documentsRepo.ts`) is only for the delete
+     dialog's count, and there is no IPC method for it. (3) The editor and the Live tab already draw any `[text](target)` link,
+     so `pdf:` links needed nothing there; as with `note:` links, only the preview follows them. (4) Opengrep's
+     `unsafe-dynamic-method` rejects calling `list[list.length - 1](...)`; the registry of open editors uses `.at(-1)`.
+   - **My picks, made while building:** Quote is not offered for a text note (its words are its own); a quote's words are
+     escaped so that the PDF's punctuation starts no Markdown or MDX; the printed page label is in the link text and the physical
+     page in `p=`; a link to the whole PDF only focuses or opens the panel, and Cmd-click makes no difference to a `pdf:` link;
+     when a note is open in two panels the later editor takes the quote; the ask to go to a page is kept in the panel's state
+     but is not saved.
+   - **Not checked:** a PDF opened from a link in a pop-out window, a quote into a note open in another window, a very large
+     page where the mark is not drawn before the flash ends, and the iPad's Markdown preview (M2).
 5. **Search and export.** The owner note's search entry, and Export annotated PDF.
 6. **Docs and the manual test.** [Docs to change](#docs-to-change-when-it-ships) and `docs/manual-tests/pdf.md`.
 7. **Gate P1 (yours):** the manual test by hand on a real textbook and a real manual.
@@ -588,3 +625,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   the keys, all stored in raw PDF user space with one record per page for a selection that crosses pages. 44 checks in the real
   app (`pnpm smoke:pdf`); the web suite has 4,009 tests and the desktop suite 754. The fixtures are unchanged (no schema
   change). Picks and findings are listed under Step 3 in the [build order](#build-order).
+- 2026-11-07: **Step 4 built** (notes and links). `pdf:` links in the preview and following them to the page and mark, Quote and
+  Cite this page into the paired note, the Notes tab, New note for this PDF, pin and follow, and the delete dialog's count of
+  citing notes. 58 checks in the real app; the web suite has 4,119 tests and the desktop suite 754. The quote block now has
+  an empty quoted line before its citation so that the preview shows it on its own line. Picks and findings are listed under
+  Step 4 in the [build order](#build-order).

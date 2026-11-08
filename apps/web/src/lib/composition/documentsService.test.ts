@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { describeContents } from "./pdfContents";
+import { describeCitingNotes, describeContents } from "./pdfContents";
 import { pdfTitleFromFileName } from "./documentNames";
 
 vi.mock("./searchIndex", () => ({
@@ -177,9 +177,74 @@ describe("the reader's own calls", () => {
       marks: { highlight: 3, underline: 1, strikethrough: 0, text: 0, ink: 2 },
       inkPages: 1,
       bookmarks: 1,
+      citingNotes: 0,
     });
     expect(describeContents(contents!)).toBe("its PDF (2 KB), 3 highlights, 1 underline, 1 ink page and 1 bookmark");
     expect(await service.describeDocument(9999)).toBeNull();
+  });
+});
+
+describe("the notes that cite a PDF", () => {
+  async function importBook() {
+    const { service, notes, notebook } = await setup();
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    return { service, notes, notebook, note: result.note, document: result.document };
+  }
+  const mark = "7b1d0000000000000000000000000001";
+
+  it("lists the owner first, even with no link in it, then each live note whose text links to the PDF", async () => {
+    const { notes, note, document } = await importBook();
+    const first = notes.createNote("Chapter 1");
+    const second = notes.createNote("Chapter 2");
+    notes.createNote("Unrelated");
+    notes.updateNoteContent(first.id, `> quote\n> — [*Book*, p. 44](pdf:${document.uuid}#p=44&a=${mark})\nand [page 9](pdf:${document.uuid}#p=9)`);
+    notes.updateNoteContent(second.id, `see [the book](pdf:${document.uuid})`);
+
+    const citations = (await import("./documentsRepo")).listCitations(document.id);
+
+    expect(citations.map((c) => [c.noteId, c.owner])).toEqual([[note.id, true], [second.id, false], [first.id, false]]);
+    expect(citations.find((c) => c.noteId === first.id)).toEqual({ noteId: first.id, title: "Chapter 1", owner: false, pages: [44, 9], marks: [mark] });
+    expect(citations[0]).toEqual({ noteId: note.id, title: "book", owner: true, pages: [], marks: [] });
+  });
+
+  it("leaves out a note that cites another PDF, and a note in the Trash Can", async () => {
+    const { service, notes, document } = await importBook();
+    const other = notes.createNote("Other");
+    const trashed = notes.createNote("Trashed");
+    notes.updateNoteContent(other.id, `[x](pdf:${"a".repeat(32)}#p=2)`);
+    notes.updateNoteContent(trashed.id, `[x](pdf:${document.uuid}#p=2)`);
+    await service.deleteNote(trashed.id);
+
+    const citations = (await import("./documentsRepo")).listCitations(document.id);
+
+    expect(citations.map((c) => c.title)).toEqual(["book"]);
+  });
+
+  it("is empty for a PDF that is gone", async () => {
+    await importBook();
+
+    expect((await import("./documentsRepo")).listCitations(9999)).toEqual([]);
+  });
+
+  it("counts the notes other than the owner in what deleting the PDF's note takes with it, and says so", async () => {
+    const { service, notes, note, document } = await importBook();
+    for (const title of ["a", "b"]) notes.updateNoteContent(notes.createNote(title).id, `[x](pdf:${document.uuid})`);
+    notes.updateNoteContent(note.id, `my own link [x](pdf:${document.uuid}#p=1)`);
+
+    const contents = await service.describeDocument(note.id);
+
+    expect(contents?.citingNotes).toBe(2);
+    expect(describeCitingNotes(contents!)).toBe("2 notes cite it; their quotes stay and their links stop working.");
+  });
+});
+
+describe("describeCitingNotes", () => {
+  const contents = { fileName: "a.pdf", size: 1, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0 };
+
+  it("is nothing when no note cites the PDF, and singular for one", () => {
+    expect(describeCitingNotes({ ...contents, citingNotes: 0 })).toBeNull();
+    expect(describeCitingNotes({ ...contents, citingNotes: 1 })).toBe("1 note cites it; its quote stays and its links stop working.");
   });
 });
 
@@ -211,7 +276,7 @@ describe("marks through the service", () => {
 });
 
 describe("describeContents", () => {
-  const empty = { fileName: "a.pdf", size: 212_000_000, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0 };
+  const empty = { fileName: "a.pdf", size: 212_000_000, marks: { highlight: 0, underline: 0, strikethrough: 0, text: 0, ink: 0 }, inkPages: 0, bookmarks: 0, citingNotes: 0 };
 
   it("is just the PDF when nobody has marked it", () => {
     expect(describeContents(empty)).toBe("its PDF (212 MB)");

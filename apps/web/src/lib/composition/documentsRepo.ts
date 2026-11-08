@@ -1,6 +1,7 @@
 import { getDb } from "./db";
-import type { PdfContents, PdfDocument } from "./documentsApi";
+import type { PdfCitation, PdfContents, PdfDocument } from "./documentsApi";
 import { normalizeViewState, parseViewState, type PdfViewState } from "./pdfMarkup";
+import { citationsFor } from "./pdfRefs";
 
 /** A PDF plus where its bytes are and their hash: the name of the file in `<application data>/documents/`. */
 export type StoredDocument = PdfDocument & { storedName: string; sha256: string };
@@ -160,5 +161,26 @@ export function documentContents(noteId: number): PdfContents | null {
     db.prepare("SELECT COUNT(DISTINCT page) AS n FROM pdf_annotations WHERE document_id = ? AND kind = 'ink'").get(document.id) as { n: number }
   ).n;
   const bookmarks = (db.prepare("SELECT COUNT(*) AS n FROM pdf_bookmarks WHERE document_id = ?").get(document.id) as { n: number }).n;
-  return { fileName: document.fileName, size: document.size, marks, inkPages, bookmarks };
+  const citingNotes = listCitations(document.id).filter((c) => !c.owner).length;
+  return { fileName: document.fileName, size: document.size, marks, inkPages, bookmarks, citingNotes };
+}
+
+/**
+ * The notes that belong with a PDF: its owner first, then every live note whose text links to it (`pdf:<uuid>`), the most
+ * recently changed first, each with the pages and marks its links name. Notes record no links, so this reads their text on
+ * demand (the plan's pick: a personal library is small enough, and an index waits until this measures slow). A note in the
+ * Trash Can is not live and is left out, as it is for `note:` links.
+ */
+export function listCitations(documentId: number): PdfCitation[] {
+  const db = getDb();
+  const document = db.prepare("SELECT uuid, note_id FROM documents WHERE id = ?").get(documentId) as { uuid: string; note_id: number } | undefined;
+  if (!document) return [];
+  // A uuid is 32 hex digits, so it holds nothing LIKE treats as a wildcard.
+  const rows = db
+    .prepare("SELECT id, title, content, updated_at FROM notes WHERE content LIKE ? OR id = ?")
+    .all(`%pdf:${document.uuid}%`, document.note_id) as { id: number; title: string; content: string; updated_at: string }[];
+  return citationsFor(
+    rows.map((row) => ({ id: row.id, title: row.title, content: row.content, updatedAt: row.updated_at })),
+    { uuid: document.uuid, noteId: document.note_id },
+  );
 }

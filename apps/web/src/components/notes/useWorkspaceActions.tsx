@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { PdfContents } from "@/lib/composition/documentsApi";
 import type { DuplicateImport } from "@/lib/composition/documentsStore";
-import { describeContents } from "@/lib/composition/pdfContents";
+import { describeCitingNotes, describeContents } from "@/lib/composition/pdfContents";
 import { canMoveGroup } from "@/lib/composition/groupMove";
 import { TRASH_RETENTION_DAYS } from "@/lib/composition/trash";
 import type { SidebarActions } from "../panels/host";
@@ -143,7 +143,7 @@ export function useWorkspaceActions(store: WorkspaceStore, options: Options = {}
         pendingNotebook
           ? "The notebook is empty. It is deleted for good; it doesn't go to the Trash Can."
           : pdfContents
-            ? `It moves to the Trash Can in Settings, where you can restore it, and is permanently deleted after ${TRASH_RETENTION_DAYS} days, with ${describeContents(pdfContents)}.`
+            ? `It moves to the Trash Can in Settings, where you can restore it, and is permanently deleted after ${TRASH_RETENTION_DAYS} days, with ${describeContents(pdfContents)}.${describeCitingNotes(pdfContents) ? ` ${describeCitingNotes(pdfContents)}` : ""}`
             : `It moves to the Trash Can in Settings, where you can restore it. Items in the Trash Can are permanently deleted after ${TRASH_RETENTION_DAYS} days.`
       }
       confirmLabel="Delete"

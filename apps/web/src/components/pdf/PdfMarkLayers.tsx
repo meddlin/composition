@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2Icon } from "lucide-react";
+import { QuoteIcon, Trash2Icon } from "lucide-react";
 import { Fragment, useEffect, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ export function usePageLayers(controls: PdfViewerControls | null): PageLayers[] 
 const boxStyle = (box: Box): CSSProperties => ({ position: "absolute", left: box.left, top: box.top, width: box.right - box.left, height: box.bottom - box.top });
 
 /** The marks of one page that lie on its text: tinted, underlined or struck through. */
-function TextMarks({ marks, layers, selectedId, dark }: { marks: PdfAnnotation[]; layers: PageLayers; selectedId: number | null; dark: boolean }) {
+function TextMarks({ marks, layers, selectedId, flashId, dark }: { marks: PdfAnnotation[]; layers: PageLayers; selectedId: number | null; flashId: number | null; dark: boolean }) {
   return (
     <>
       {marks
@@ -67,6 +67,7 @@ function TextMarks({ marks, layers, selectedId, dark }: { marks: PdfAnnotation[]
         .map((mark) => {
           const paint = paintFor(mark.color);
           const selected = mark.id === selectedId;
+          const flashing = mark.id === flashId;
           return boxesOf(mark, layers.viewport).map((box, index) => {
             const h = box.bottom - box.top;
             const line = Math.max(1.5, h * 0.09);
@@ -76,10 +77,12 @@ function TextMarks({ marks, layers, selectedId, dark }: { marks: PdfAnnotation[]
                 data-mark-id={mark.id}
                 data-mark-kind={mark.kind}
                 data-mark-color={mark.color}
+                data-flash={flashing ? "" : undefined}
+                className={flashing ? "animate-pulse" : undefined}
                 style={{
                   ...boxStyle(box),
                   ...(mark.kind === "highlight" ? { background: paint.fill, mixBlendMode: dark ? ("screen" as const) : ("multiply" as const) } : {}),
-                  ...(selected ? { outline: `2px solid ${paint.line}`, outlineOffset: 1 } : {}),
+                  ...(selected || flashing ? { outline: `${flashing ? 3 : 2}px solid ${paint.line}`, outlineOffset: 1 } : {}),
                 }}
               >
                 {mark.kind !== "highlight" && (
@@ -126,6 +129,7 @@ function MarkPopover({
   onRecolor,
   onComment,
   onDelete,
+  onQuote,
 }: {
   mark: PdfAnnotation;
   box: Box;
@@ -133,6 +137,7 @@ function MarkPopover({
   onRecolor: (color: string) => void;
   onComment: (comment: string) => void;
   onDelete: () => void;
+  onQuote?: () => void;
 }) {
   const [draft, setDraft] = useState(mark.comment);
   const isNote = mark.kind === "text";
@@ -159,6 +164,11 @@ function MarkPopover({
           />
         ))}
         <div className="flex-1" />
+        {onQuote && (
+          <Button variant="ghost" size="icon-xs" aria-label="Quote in the note" title="Quote these words into the note beside the PDF" onClick={onQuote}>
+            <QuoteIcon />
+          </Button>
+        )}
         <Button variant="ghost" size="icon-xs" aria-label="Delete this mark" onClick={onDelete}>
           <Trash2Icon />
         </Button>
@@ -189,6 +199,10 @@ export type MarkLayersProps = {
   selectedId: number | null;
   /** The pages are drawn inverted, where a highlight has to lighten the page instead of darkening it to show. */
   dark?: boolean;
+  /** A mark to draw attention to for a moment (the one a followed link names). */
+  flashId?: number | null;
+  /** Quote a mark into the paired note; the popover offers it on a mark that has words. */
+  onQuote?: (mark: PdfAnnotation) => void;
   /** Dropping a text note: the next click on a page puts a draft box there. */
   placing: boolean;
   /** A text note being typed for the first time: it is not a mark until it has words in it. */
@@ -208,7 +222,7 @@ export type MarkLayersProps = {
 
 /** Draws the reader's marks into the layers of the pages that are drawn. */
 export function MarkLayers(props: MarkLayersProps) {
-  const { layers, marks, selectedId, placing, draft, editingId, dark = false } = props;
+  const { layers, marks, selectedId, placing, draft, editingId, dark = false, flashId = null } = props;
   return (
     <>
       {layers.map((page) => {
@@ -218,7 +232,7 @@ export function MarkLayers(props: MarkLayersProps) {
         const scale = scaleOf(page.viewport);
         return (
           <Fragment key={page.pageNumber}>
-            {createPortal(<TextMarks marks={here} layers={page} selectedId={selectedId} dark={dark} />, page.under)}
+            {createPortal(<TextMarks marks={here} layers={page} selectedId={selectedId} flashId={flashId} dark={dark} />, page.under)}
             {createPortal(
               <>
                 {here
@@ -236,6 +250,8 @@ export function MarkLayers(props: MarkLayersProps) {
                         key={note.id}
                         data-mark-id={note.id}
                         data-mark-kind="text"
+                        data-flash={note.id === flashId ? "" : undefined}
+                        className={note.id === flashId ? "animate-pulse" : undefined}
                         role="note"
                         tabIndex={0}
                         onPointerDown={(event) => event.stopPropagation()}
@@ -247,7 +263,7 @@ export function MarkLayers(props: MarkLayersProps) {
                           event.stopPropagation();
                           props.onEdit(note.id);
                         }}
-                        style={{ ...boxStyle(box), fontSize, lineHeight: 1.25, pointerEvents: "auto", cursor: "text", padding: 3, overflow: "hidden", whiteSpace: "pre-wrap", color: "#111", background: paint.fill.replace(/[\d.]+\)$/, "0.85)"), border: `1px solid ${paint.line}`, borderRadius: 3, outline: note.id === selectedId ? `2px solid ${paint.line}` : undefined }}
+                        style={{ ...boxStyle(box), fontSize, lineHeight: 1.25, pointerEvents: "auto", cursor: "text", padding: 3, overflow: "hidden", whiteSpace: "pre-wrap", color: "#111", background: paint.fill.replace(/[\d.]+\)$/, "0.85)"), border: `1px solid ${paint.line}`, borderRadius: 3, outline: note.id === selectedId || note.id === flashId ? `${note.id === flashId ? 3 : 2}px solid ${paint.line}` : undefined }}
                       >
                         {body.text}
                       </div>
@@ -278,6 +294,7 @@ export function MarkLayers(props: MarkLayersProps) {
                     onRecolor={(color) => props.onRecolor(selected, color)}
                     onComment={(comment) => props.onComment(selected, comment)}
                     onDelete={() => props.onDelete(selected)}
+                    onQuote={props.onQuote && selected.quote !== "" ? () => props.onQuote?.(selected) : undefined}
                   />
                 )}
               </>,
