@@ -23,6 +23,10 @@ An attachment is not part of the note's text. Unlike an [image](images.md), noth
 the Markdown refers to it: the note's attachments are a list kept beside it, shown in a
 table at the bottom of the note.
 
+A **PDF the app reads and marks up is not an attachment.** An attachment is a file the app never displays or opens; a reader needs the
+opposite, so a PDF has its own table, folder and serving path, and the rules below are unchanged. Attaching a PDF to a note is still
+just attaching a file. See [pdf.md](pdf.md).
+
 ## What the user sees
 
 At the bottom of each open note there is an **Attachments** bar with an **Attach files**

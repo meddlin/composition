@@ -36,7 +36,8 @@ import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/
 import { type SheetSource } from "./mdx/sheetDraft";
 import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
 import { NoteLinkMenu } from "./NoteLinkMenu";
-import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
+import { NoteLinksProvider, type NoteLinks, type PdfLinks } from "./NoteLink";
+import { placeMarkdown, type Insertion } from "./noteInsertions";
 import type { PaneView } from "./panes";
 import { useCodeHighlighting } from "./useCodeHighlighting";
 import type { Note } from "./types";
@@ -60,6 +61,8 @@ export type MarkdownEditorControls = {
   insertDiagram: () => void;
   /** Opens the sheet editor: on the sheet or Markdown table the caret is in, else on a new sheet, which goes in at the caret. */
   editSheet: () => void;
+  /** Puts Markdown into the note at the caret (at the end if the user has not been in the editor yet), as a block or inline. */
+  insertMarkdown: (markdown: string, how: Insertion) => void;
 };
 
 const NO_MATCHES: Match[] = [];
@@ -84,6 +87,8 @@ type Props = {
   notes?: readonly Note[];
   /** Opens a note a link points at; `beside` asks for it next to this one rather than in its place. */
   onOpenNote?: (noteId: number, beside: boolean) => void;
+  /** What a `pdf:` link needs; without it (the web app has no PDFs) every such link is shown as dead. */
+  pdfLinks?: PdfLinks;
   /** Highlights this phrase in whichever of the editor and preview are showing. */
   find?: FindState;
   /** Set to a ref to get the editor's controls (see `MarkdownEditorControls`). */
@@ -108,6 +113,7 @@ export function MarkdownEditor({
   idBase,
   notes = NO_NOTES,
   onOpenNote,
+  pdfLinks,
   find,
   controls,
   readOnly = false,
@@ -181,7 +187,23 @@ export function MarkdownEditor({
     const { start, end: stop } = surface.selection();
     setDiagram({ source: { kind: "new" }, at: diagramRange(text, Math.min(start, end), Math.min(stop, end), bodyStart) });
   }
-  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet }));
+  // The caret is only the user's once they have been in the editor: before that the text is added at the end.
+  const caretTouched = useRef(false);
+  useEffect(() => {
+    const host = grid.current;
+    const touch = () => void (caretTouched.current = true);
+    host?.addEventListener("focusin", touch);
+    return () => host?.removeEventListener("focusin", touch);
+  }, []);
+
+  function insertMarkdown(markdown: string, how: Insertion) {
+    const text = latest.current;
+    const bodyStart = text.length - parse(text)[1].length;
+    const placed = placeMarkdown(text, caretTouched.current ? surface.selection() : { start: text.length, end: text.length }, bodyStart, markdown, how);
+    pendingCaret.current = placed.start + placed.caret;
+    replaceText(placed.start, placed.end, placed.text);
+  }
+  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet, insertMarkdown }));
 
   const drawioEditing = useMemo<DrawioEditing>(
     () => ({ edit: (name) => setDiagram({ source: { kind: "edit", name }, at: { start: 0, end: 0 } }) }),
@@ -371,8 +393,8 @@ export function MarkdownEditor({
   }
 
   const noteLinks = useMemo<NoteLinks>(
-    () => ({ exists: (id) => notes.some((n) => n.id === id), open: onOpenNote ?? (() => {}) }),
-    [notes, onOpenNote],
+    () => ({ exists: (id) => notes.some((n) => n.id === id), open: onOpenNote ?? (() => {}), pdf: pdfLinks }),
+    [notes, onOpenNote, pdfLinks],
   );
 
   const highlight = value.length <= MAX_HIGHLIGHT_CHARS;

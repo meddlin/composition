@@ -17,6 +17,8 @@ import { FindBar } from "./FindBar";
 import type { FindOptions } from "./findMatches";
 import { HeaderImageDialog, type HeaderImageChoice } from "./HeaderImageDialog";
 import { MarkdownEditor, type FindState, type MarkdownEditorControls } from "./MarkdownEditor";
+import type { PdfLinks } from "./NoteLink";
+import { registerNoteInserter } from "./noteInsertions";
 import { SIDE_BY_SIDE_MIN_WIDTH, shownView, stepView, type DropZone, type PaneView } from "./panes";
 import { readPaneSelection } from "./paneSelection";
 import { ResizeHandle } from "./ResizeHandle";
@@ -57,6 +59,8 @@ type Props = {
   notes: readonly Note[];
   /** A link in the preview was followed; `beside` asks for the note next to this one. */
   onOpenNote: (noteId: number, beside: boolean) => void;
+  /** What the note's `pdf:` links need; the web app has no PDFs and gives none, so its `pdf:` links are shown as dead. */
+  pdfLinks?: PdfLinks;
   /** An answer from the AI helper to make into a separate new note. */
   onNewNoteFromText: (text: string) => void;
   /** Set when the note is in a panel of the desktop app's grid: its own controls replace the close button, and drops mean panels. */
@@ -86,6 +90,7 @@ export function NotePane({
   onDropNote,
   notes,
   onOpenNote,
+  pdfLinks,
   onNewNoteFromText,
   panel,
 }: Props) {
@@ -100,6 +105,11 @@ export function NotePane({
   // dock takes room from.
   const noteColumn = useRef<HTMLDivElement>(null);
   const editor = useRef<MarkdownEditorControls>(null);
+  // The PDF reader's Quote and Cite this page put text into the note through its editor, at the caret.
+  useEffect(() => {
+    if (deleted) return;
+    return registerNoteInserter(note.id, (markdown, how) => editor.current?.insertMarkdown(markdown, how));
+  }, [note.id, deleted]);
   const canSplit = useMinWidth(noteColumn, SIDE_BY_SIDE_MIN_WIDTH);
   const paneWidth = useElementWidth(section);
 
@@ -379,6 +389,7 @@ export function NotePane({
           onRatioCommit={onRatioCommit}
           notes={notes}
           onOpenNote={onOpenNote}
+          pdfLinks={pdfLinks}
           readOnly={deleted}
         />
         </div>

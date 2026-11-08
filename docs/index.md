@@ -57,6 +57,10 @@ See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for h
 
 See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.
 
+See [ui/pdf.md](ui/pdf.md) for reading a PDF with your notes beside it (desktop app): a PDF as a note that owns it, marks kept beside the file (highlights, underlines, strikethroughs and text notes; Apple Pencil ink comes with the iPad app), Quote and `pdf:` citations that lead back to the page, and **Export annotated PDF**; [architecture/pdf.md](architecture/pdf.md) for how it works inside, [manual-tests/pdf.md](manual-tests/pdf.md) to check it by hand, and [pdf-markup-plan.md](pdf-markup-plan.md) for the design, the spikes and what is still to build.
+
+See [manual-tests/stress-databases.md](manual-tests/stress-databases.md) for the generated 1,000-, 10,000- and 50,000-note databases (and the harness that measures the web app on them), and [stress-test-findings.md](stress-test-findings.md) for what they showed: a note over 1,000,000 characters that cannot be saved, a sidebar that re-renders on every keystroke, and a first page and an autosave that carry every note's text.
+
 ## Features
 
 - [x] Create note

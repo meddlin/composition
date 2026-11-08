@@ -43,6 +43,17 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Field filters, like `tag: software` | ✅ | ✅ | ✅ | The same parser in all three: `tag`, `title`, `description`, `created`, `updated` |
 | Search engine comes with the app | ❌ | ❌ | ✅ | CLI starts a `meilisearch` you installed, and keeps working without one (search says why it is off). Web needs `pnpm meili` run by hand. Desktop bundles it |
 
+## PDFs
+
+| Feature | CLI | Web | Desktop | Notes |
+|---|:-:|:-:|:-:|---|
+| Import a PDF as a note that owns it; it sits in the tree and goes to the Trash Can like any note | ❌ | ❌ | ✅ | **+ Import PDF…** under the note list. The CLI and web keep the note and its file (and a backup carries them) but cannot import or read one. [pdf.md](ui/pdf.md) |
+| Read it in a panel beside its note, with outline, bookmarks, find, zoom and dark pages | ❌ | ❌ | ✅ | pdf.js; opens a 300 MB textbook at once. Where you were is remembered. [architecture/pdf.md](architecture/pdf.md) |
+| Highlight, underline, strikethrough and typed notes on the page, with undo and redo | ❌ | ❌ | ✅ | Five colors, a one-line comment, a **Highlights** tab. Marks are stored beside the file and never written into it. Ink arrives with the iPad app |
+| Cite a PDF from a note: **Quote**, **Cite this page**, `pdf:` links that flash the mark | ❌ | ❌ | ✅ | The citations are Markdown. The CLI shows them as text, and web as struck-through text ("PDF not on this device"). [note-links.md](ui/note-links.md#linking-to-a-pdf) |
+| Export annotated PDF, native or flattened | ❌ | ❌ | ✅ | A copy for other apps; text notes in Latin, Greek and Cyrillic. [pdf.md](ui/pdf.md#export-annotated-pdf) |
+| Search finds a PDF's note by the words in its marks and bookmarks | ✅ | ✅ | ✅ | The index is the shared data layer's, so it holds them wherever the database is shared; only the desktop app makes marks. The full text of a PDF is not searched |
+
 ## Viewing a note
 
 | Feature | CLI | Web | Desktop | Notes |
@@ -114,3 +125,7 @@ product can't show. The rule so far is that the product that can't show it must 
   Can keeps its attachments, so a restored note gets them back; they are deleted when the
   note is permanently deleted (by hand or after 60 days). The CLI's "move the data" setting
   carries the attachments folder along.
+- **PDFs:** a PDF is a note that owns a file, with its marks and bookmarks in their own tables, so no app rewrites them by saving a
+  note. Only the desktop app imports, reads and marks one. Moving the note to the Trash Can keeps the file and marks, so a restored
+  note gets them back; they are deleted when the note is permanently deleted. A backup carries the `documents` folder
+  ([architecture/pdf.md](architecture/pdf.md)).

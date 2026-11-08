@@ -8,9 +8,9 @@ const allOff = Object.fromEntries(PLUGINS.map((plugin) => [plugin.id, false])) a
 const kinds = (enabled: PluginSettings) => availableLaunchers(enabled).map((launcher) => launcher.kind);
 
 describe("the launchers", () => {
-  it("are every kind but the empty panel and a note, each once, in the empty panel's order", () => {
+  it("are every kind but the empty panel, a note and a PDF, each once, in the empty panel's order", () => {
     expect(LAUNCHERS.map((launcher) => launcher.kind)).toEqual(["notes-browser", "ai", "todo", "reading-list", "rss", "contacts"]);
-    expect(Object.keys(KINDS).filter((kind) => !isLauncherKind(kind as never))).toEqual(["empty", "note"]);
+    expect(Object.keys(KINDS).filter((kind) => !isLauncherKind(kind as never))).toEqual(["empty", "note", "pdf"]);
   });
 
   it("have a name, an icon and a way to be found in the palette", () => {

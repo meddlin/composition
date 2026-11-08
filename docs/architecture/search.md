@@ -90,6 +90,11 @@ time:
   rebuilds it, so a stale or empty index is never shown as "no matches". A document shape change
   (the `description` field was added) is handled the same way.
 
+A note that owns a PDF is indexed with one more thing: the words of its PDF's marks (their quotes, comments and text notes) and its bookmarks' labels,
+appended to its content (`marksSearchText`, [pdf.md](pdf.md#search)). A search returns ids only, so the added words are never shown; they only make
+the note findable. A change to a mark or bookmark re-indexes the owner note afterwards, in the background; `reindexAll` adds them for every owner note
+in one query. The text of the PDF itself is not indexed.
+
 ```mermaid
 sequenceDiagram
     participant Svc as service

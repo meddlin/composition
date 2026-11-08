@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { DOCUMENT_METHODS, type DocumentsApi } from "../../../web/src/lib/composition/documentsApi";
 import { ASSISTANT_METHODS } from "../../../web/src/lib/composition/assistantApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
@@ -30,6 +31,9 @@ function setup() {
   const attachments = Object.fromEntries(
     ATTACHMENT_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof AttachmentsApi]: ReturnType<typeof vi.fn> };
+  const documents = Object.fromEntries(
+    DOCUMENT_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
+  ) as unknown as { [K in keyof DocumentsApi]: ReturnType<typeof vi.fn> };
   const backup = Object.fromEntries(
     BACKUP_METHODS.map((m) => [m, vi.fn(async () => `${m}-result`)]),
   ) as unknown as { [K in keyof DesktopBackupApi]: ReturnType<typeof vi.fn> };
@@ -60,6 +64,7 @@ function setup() {
     assistant,
     api: api as unknown as CompositionApi,
     attachments: attachments as unknown as AttachmentsApi,
+    documents: documents as unknown as DocumentsApi,
     backup: backup as unknown as DesktopBackupApi,
     panels: panels as unknown as PanelsApi,
     todos: todos as unknown as TodosApi,
@@ -71,16 +76,16 @@ function setup() {
     isTrustedUrl: (url) => isTrustedUrl(url, [OWN]),
     initial: () => ({ theme: "dark" }),
   });
-  return { handlers, listeners, api, attachments, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant };
+  return { handlers, listeners, api, attachments, documents, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant };
 }
 
 const own: IpcEventLike = { senderFrame: { url: `${OWN}/settings/` } };
 
 describe("registerIpc", () => {
-  it("registers one handler per API, attachment, backup, panels, to-do, Reading List, contacts, feed, update, window and AI helper method, and nothing else", () => {
+  it("registers one handler per API, attachment, PDF, backup, panels, to-do, Reading List, contacts, feed, update, window and AI helper method, and nothing else", () => {
     const { handlers } = setup();
     expect([...handlers.keys()].sort()).toEqual(
-      [...API_METHODS, ...ATTACHMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...CONTACTS_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
+      [...API_METHODS, ...ATTACHMENT_METHODS, ...DOCUMENT_METHODS, ...BACKUP_METHODS, ...PANELS_METHODS, ...TODO_METHODS, ...READING_LIST_METHODS, ...CONTACTS_METHODS, ...FEED_METHODS, ...UPDATE_METHODS, ...WINDOW_METHODS, ...ASSISTANT_METHODS].map(channelFor).sort(),
     );
   });
 

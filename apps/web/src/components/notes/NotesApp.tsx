@@ -29,6 +29,7 @@ import {
 } from "./notebookPanelPrefs";
 import type { RevealRequest } from "./GroupTree";
 import { NoteSidebar } from "./NoteSidebar";
+import { PdfNoteIdsProvider } from "./pdfNotes";
 import { NoteArea, useNoteSurface } from "./noteSurface";
 import { ResizeHandle } from "./ResizeHandle";
 import { SearchBar } from "./SearchBar";
@@ -346,37 +347,40 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
         ) : (
           <div aria-hidden className="w-px shrink-0 bg-border" />
         )}
-        <NoteSidebar
-          notes={notebookNotes}
-          groups={notebookGroups}
-          notebooks={notebooks}
-          notebookId={notebookId}
-          collapsedNotebookName={
-            notebookPanel.collapsed ? notebooks.find((n) => n.id === notebookId)?.name : undefined
-          }
-          onExpandNotebooks={() => setNotebookPanelPrefs({ collapsed: false })}
-          activeId={viewedGroup ? null : focusedId}
-          viewedGroupId={viewedGroup?.id ?? null}
-          reveal={reveal}
-          onRevealed={() => setReveal(null)}
-          width={layout.sidebarWidth}
-          groupError={groupError}
-          favorites={favorites}
-          onToggleFavorite={toggleFavorite}
-          onSelect={selectNote}
-          onOpenBeside={openBeside}
-          onSelectGroup={selectGroup}
-          onCreate={(groupId) => actions.onCreate(groupId, notebookId)}
-          onDelete={actions.onDelete}
-          onCreateGroup={(name, parentId) => actions.onCreateGroup(name, parentId, notebookId)}
-          onRenameGroup={actions.onRenameGroup}
-          onDeleteGroup={actions.onDeleteGroup}
-          onMoveGroup={actions.onMoveGroup}
-          onMoveNoteToGroup={actions.onMoveNoteToGroup}
-          onPlaceNote={actions.onPlaceNote}
-          onPlaceGroup={actions.onPlaceGroup}
-          onMoveGroupToNotebook={actions.onMoveGroupToNotebook}
-        />
+        <PdfNoteIdsProvider store={store}>
+          <NoteSidebar
+            notes={notebookNotes}
+            groups={notebookGroups}
+            notebooks={notebooks}
+            notebookId={notebookId}
+            collapsedNotebookName={
+              notebookPanel.collapsed ? notebooks.find((n) => n.id === notebookId)?.name : undefined
+            }
+            onExpandNotebooks={() => setNotebookPanelPrefs({ collapsed: false })}
+            activeId={viewedGroup ? null : focusedId}
+            viewedGroupId={viewedGroup?.id ?? null}
+            reveal={reveal}
+            onRevealed={() => setReveal(null)}
+            width={layout.sidebarWidth}
+            groupError={groupError}
+            favorites={favorites}
+            onToggleFavorite={toggleFavorite}
+            onSelect={selectNote}
+            onOpenBeside={openBeside}
+            onSelectGroup={selectGroup}
+            onCreate={(groupId) => actions.onCreate(groupId, notebookId)}
+            onImportPdf={actions.onImportPdf && ((groupId) => actions.onImportPdf?.(groupId, notebookId))}
+            onDelete={actions.onDelete}
+            onCreateGroup={(name, parentId) => actions.onCreateGroup(name, parentId, notebookId)}
+            onRenameGroup={actions.onRenameGroup}
+            onDeleteGroup={actions.onDeleteGroup}
+            onMoveGroup={actions.onMoveGroup}
+            onMoveNoteToGroup={actions.onMoveNoteToGroup}
+            onPlaceNote={actions.onPlaceNote}
+            onPlaceGroup={actions.onPlaceGroup}
+            onMoveGroupToNotebook={actions.onMoveGroupToNotebook}
+          />
+        </PdfNoteIdsProvider>
         <ResizeHandle
           label="Resize sidebar"
           valueNow={layout.sidebarWidth}
