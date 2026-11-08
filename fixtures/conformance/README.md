@@ -24,6 +24,10 @@ The three tables of the PDF reader ([pdf-markup-plan.md](../../docs/pdf-markup-p
 | `validation.json` | What makes a mark, a bookmark label and a reading position valid, and what each is stored as. | Run every `input` through the matching function. `stored` is what must come out; `invalid: true` means it must be refused (the message is not compared). |
 | `scripts.json` | Operation scripts over the repositories, each with what every step returned and what the three tables hold at the end. | Replay `steps` against a fresh database with the Swift repositories, and compare with `expect`. |
 
+The Swift side is `PdfConformanceTests` in `apps/ios/CompositionCore/Tests/CompositionCoreTests/`, run by `swift test` there (these
+files are committed, so it needs no fixture folder) and by `apps/ios/scripts/conformance.sh`, which first checks that the TypeScript
+still writes them.
+
 Reading the files:
 
 - **`{"$repeat": ["a", 501]}`** stands for 501 letters `a`: JSON has no way to write a long string, and the 500-character
