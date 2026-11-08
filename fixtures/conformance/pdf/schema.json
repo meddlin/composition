@@ -1,0 +1,293 @@
+{
+  "columns": {
+    "documents": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": false,
+        "default": null,
+        "primaryKey": true
+      },
+      {
+        "name": "note_id",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "file_name",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "stored_name",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "sha256",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "size",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "page_count",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "view_state",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      }
+    ],
+    "pdf_annotations": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": false,
+        "default": null,
+        "primaryKey": true
+      },
+      {
+        "name": "document_id",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "page",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "kind",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "color",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "rects",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "quote",
+        "type": "TEXT",
+        "notnull": true,
+        "default": "''",
+        "primaryKey": false
+      },
+      {
+        "name": "comment",
+        "type": "TEXT",
+        "notnull": true,
+        "default": "''",
+        "primaryKey": false
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "group_uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      }
+    ],
+    "pdf_bookmarks": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": false,
+        "default": null,
+        "primaryKey": true
+      },
+      {
+        "name": "document_id",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "page",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "label",
+        "type": "TEXT",
+        "notnull": true,
+        "default": "''",
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      }
+    ]
+  },
+  "objects": [
+    {
+      "type": "table",
+      "name": "documents",
+      "table": "documents",
+      "sql": "CREATE TABLE documents ( id INTEGER PRIMARY KEY AUTOINCREMENT, note_id INTEGER NOT NULL, file_name TEXT NOT NULL, stored_name TEXT NOT NULL, sha256 TEXT NOT NULL, size INTEGER NOT NULL, page_count INTEGER NOT NULL, view_state TEXT, created_at TEXT NOT NULL , uuid TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "pdf_annotations",
+      "table": "pdf_annotations",
+      "sql": "CREATE TABLE pdf_annotations ( id INTEGER PRIMARY KEY AUTOINCREMENT, document_id INTEGER NOT NULL, page INTEGER NOT NULL, kind TEXT NOT NULL, color TEXT NOT NULL, rects TEXT, quote TEXT NOT NULL DEFAULT '', comment TEXT NOT NULL DEFAULT '', body TEXT, group_uuid TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL , uuid TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "pdf_bookmarks",
+      "table": "pdf_bookmarks",
+      "sql": "CREATE TABLE pdf_bookmarks ( id INTEGER PRIMARY KEY AUTOINCREMENT, document_id INTEGER NOT NULL, page INTEGER NOT NULL, label TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL , uuid TEXT)"
+    },
+    {
+      "type": "index",
+      "name": "idx_documents_note_id",
+      "table": "documents",
+      "sql": "CREATE UNIQUE INDEX idx_documents_note_id ON documents (note_id)"
+    },
+    {
+      "type": "index",
+      "name": "idx_documents_sha256",
+      "table": "documents",
+      "sql": "CREATE INDEX idx_documents_sha256 ON documents (sha256)"
+    },
+    {
+      "type": "index",
+      "name": "idx_documents_uuid",
+      "table": "documents",
+      "sql": "CREATE UNIQUE INDEX idx_documents_uuid ON documents (uuid)"
+    },
+    {
+      "type": "index",
+      "name": "idx_pdf_annotations_page",
+      "table": "pdf_annotations",
+      "sql": "CREATE INDEX idx_pdf_annotations_page ON pdf_annotations (document_id, page)"
+    },
+    {
+      "type": "index",
+      "name": "idx_pdf_annotations_uuid",
+      "table": "pdf_annotations",
+      "sql": "CREATE UNIQUE INDEX idx_pdf_annotations_uuid ON pdf_annotations (uuid)"
+    },
+    {
+      "type": "index",
+      "name": "idx_pdf_bookmarks_document",
+      "table": "pdf_bookmarks",
+      "sql": "CREATE INDEX idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page)"
+    },
+    {
+      "type": "index",
+      "name": "idx_pdf_bookmarks_uuid",
+      "table": "pdf_bookmarks",
+      "sql": "CREATE UNIQUE INDEX idx_pdf_bookmarks_uuid ON pdf_bookmarks (uuid)"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_documents_fill_uuid",
+      "table": "documents",
+      "sql": "CREATE TRIGGER trg_documents_fill_uuid AFTER INSERT ON documents WHEN NEW.uuid IS NULL BEGIN UPDATE documents SET uuid = lower(hex(randomblob(16))) WHERE rowid = NEW.rowid; END"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_pdf_annotations_fill_uuid",
+      "table": "pdf_annotations",
+      "sql": "CREATE TRIGGER trg_pdf_annotations_fill_uuid AFTER INSERT ON pdf_annotations WHEN NEW.uuid IS NULL BEGIN UPDATE pdf_annotations SET uuid = lower(hex(randomblob(16))) WHERE rowid = NEW.rowid; END"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_pdf_bookmarks_fill_uuid",
+      "table": "pdf_bookmarks",
+      "sql": "CREATE TRIGGER trg_pdf_bookmarks_fill_uuid AFTER INSERT ON pdf_bookmarks WHEN NEW.uuid IS NULL BEGIN UPDATE pdf_bookmarks SET uuid = lower(hex(randomblob(16))) WHERE rowid = NEW.rowid; END"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import * as attachments from "./attachments";
 import type { AddAttachmentsResult, Attachment, AttachmentActionResult } from "./attachmentsApi";
 import type { StoredAttachment } from "./attachmentsRepo";
 import * as attachmentsRepo from "./attachmentsRepo";
+import * as documents from "./documents";
 import { chatGptStatus, listAssistantModels, saveAssistantSettings, signOutChatGpt, startChatGptSignIn, streamAssistantChat } from "./assistantService";
 import type {
   CompositionApi,
@@ -293,19 +294,24 @@ export async function deleteNote(id: number): Promise<void> {
 }
 
 /**
- * Deletes the attachments of notes that are gone for good. The note is already
+ * Deletes the attachments, and the PDFs with their marks, of notes that are gone for good. The note is already
  * gone, so a failure here leaves a stray file, not a half-deleted note: log it
- * and carry on.
+ * and carry on. Each is swept on its own, so one failing does not skip the other.
  */
 async function removeOrphanedAttachments(): Promise<void> {
-  try {
-    await attachments.removeOrphans(loadWebSettings().appDataDir);
-  } catch (error) {
-    console.error("[attachments] cleanup failed:", error);
+  for (const [label, sweep] of [
+    ["attachments", attachments.removeOrphans],
+    ["documents", documents.removeOrphans],
+  ] as const) {
+    try {
+      await sweep(loadWebSettings().appDataDir);
+    } catch (error) {
+      console.error(`[${label}] cleanup failed:`, error);
+    }
   }
 }
 
-/** Clears Trash Can items past their retention window, and the attachments of any notes among them. */
+/** Clears Trash Can items past their retention window, and the attachments and PDFs of any notes among them. */
 async function purgeExpiredTrash(): Promise<void> {
   trashRepo.purgeExpired();
   await removeOrphanedAttachments();
@@ -458,9 +464,12 @@ export async function restoreBackup(file: string): Promise<BackupResult> {
 
     let safetyBackup: string | undefined;
     try {
-      const hasCurrentData = [dbPath, images.imageDir(appDataDir), attachments.attachmentDir(appDataDir)].some((p) =>
-        fs.existsSync(p),
-      );
+      const hasCurrentData = [
+        dbPath,
+        images.imageDir(appDataDir),
+        attachments.attachmentDir(appDataDir),
+        documents.documentDir(appDataDir),
+      ].some((p) => fs.existsSync(p));
       if (hasCurrentData) {
         safetyBackup = path.join(/*turbopackIgnore: true*/ backup.defaultBackupDir(), backup.backupFileName(new Date(), "pre-restore"));
         await backup.createBackup({ file: safetyBackup, db: getDb(), appDataDir, settings });

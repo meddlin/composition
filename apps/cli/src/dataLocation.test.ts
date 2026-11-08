@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ATTACHMENT_DIR_NAME, IMAGE_DIR_NAME, type WebSettings } from "./backend";
+import { ATTACHMENT_DIR_NAME, DOCUMENT_DIR_NAME, IMAGE_DIR_NAME, type WebSettings } from "./backend";
 import { ApplicationDataMoveError, moveApplicationData } from "./dataLocation";
 
 let root: string;
@@ -72,6 +72,8 @@ function writeAllApplicationData(dir: string) {
   fs.writeFileSync(path.join(dir, "meili_master_key"), "secret");
   fs.mkdirSync(path.join(dir, ATTACHMENT_DIR_NAME));
   fs.writeFileSync(path.join(dir, ATTACHMENT_DIR_NAME, "a.pdf"), "attachment");
+  fs.mkdirSync(path.join(dir, DOCUMENT_DIR_NAME));
+  fs.writeFileSync(path.join(dir, DOCUMENT_DIR_NAME, "book.pdf"), "document");
   fs.mkdirSync(path.join(dir, IMAGE_DIR_NAME));
   fs.writeFileSync(path.join(dir, IMAGE_DIR_NAME, "pic.png"), "image");
 }
@@ -83,9 +85,10 @@ describe("moveApplicationData", () => {
     // If either changes there, the move must follow: a pasted image left behind is a broken link.
     expect(IMAGE_DIR_NAME).toBe("app_data");
     expect(ATTACHMENT_DIR_NAME).toBe("attachments");
+    expect(DOCUMENT_DIR_NAME).toBe("documents");
   });
 
-  it("moves every managed file, images and attachments included", () => {
+  it("moves every managed file, images, attachments and PDFs included", () => {
     const oldDir = path.join(root, "old");
     const newDir = path.join(root, "new");
     writeAllApplicationData(oldDir);
@@ -106,6 +109,7 @@ describe("moveApplicationData", () => {
     expect(read(newDir, "meili.log")).toBe("log");
     expect(read(newDir, "meili_master_key")).toBe("secret");
     expect(read(newDir, ATTACHMENT_DIR_NAME, "a.pdf")).toBe("attachment");
+    expect(read(newDir, DOCUMENT_DIR_NAME, "book.pdf")).toBe("document");
     expect(read(newDir, IMAGE_DIR_NAME, "pic.png")).toBe("image");
     expect(fs.existsSync(oldDir)).toBe(false);
   });

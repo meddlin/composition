@@ -19,10 +19,11 @@ export type {
   Workspace,
 } from "../../web/src/lib/composition/api";
 export { closeDb } from "../../web/src/lib/composition/db";
-// The folders, beside the database, that hold pasted images and attached files, and how a note's
+// The folders, beside the database, that hold pasted images, attached files and PDFs, and how a note's
 // Markdown points at one (`app_data/<name>`).
 export { IMAGE_DIR_NAME, imageNameFromRef } from "../../web/src/lib/composition/imageRefs";
 export { ATTACHMENT_DIR_NAME } from "../../web/src/lib/composition/attachmentNames";
+export { DOCUMENT_DIR_NAME } from "../../web/src/lib/composition/documentNames";
 export type { Attachment } from "../../web/src/lib/composition/attachmentsApi";
 // Backup and restore: the sentence that says what a backup holds, and byte sizes.
 export { describeCounts } from "../../web/src/lib/composition/backupApi";

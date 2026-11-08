@@ -10,7 +10,7 @@ vi.mock("@/lib/composition/backupClient", () => ({
   restoreBackup: vi.fn(),
 }));
 
-const counts = { notes: 12, groups: 3, trashedNotes: 0, trashedGroups: 0, images: 4, attachments: 1, todos: 0, archivedTodos: 0, contacts: 0 };
+const counts = { notes: 12, groups: 3, trashedNotes: 0, trashedGroups: 0, images: 4, attachments: 1, documents: 0, todos: 0, archivedTodos: 0, contacts: 0 };
 const reload = vi.fn();
 
 beforeEach(() => {

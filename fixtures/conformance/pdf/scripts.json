@@ -1,0 +1,1115 @@
+{
+  "scripts": [
+    {
+      "name": "a PDF with marks of every kind, bookmarks and a reading position",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "Designing Data.pdf", "storedName": "0123456789ab-Designing_Data.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 212000000, "pageCount": 0},
+        {"op": "setPageCount", "id": 1, "pageCount": 600},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 41, "kind": "highlight", "color": "yellow", "rects": [[72.5,600,300.25,620],[72.5,580,210,600]], "quote": "two lines of text"}},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 41, "kind": "underline", "color": "green", "rects": [[72,500,150,510]], "comment": "look\nthis up"}},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 42, "kind": "strikethrough", "color": "pink", "rects": [[10,10,20,20]]}},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 42, "kind": "text", "color": "orange", "body": {"rect": [400,100,560,160], "text": "Margin note", "fontSize": 12}}},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 43, "kind": "ink", "color": "black", "body": {"strokes": [[[1,2],[3,4]]]}}},
+        {"op": "updateAnnotation", "id": 2, "changes": {"comment": "check chapter 5", "color": "blue"}},
+        {"op": "addBookmark", "documentId": 1, "page": 9, "label": "Chapter 1"},
+        {"op": "addBookmark", "documentId": 1, "page": 3},
+        {"op": "renameBookmark", "id": 2, "label": "Preface"},
+        {"op": "deleteBookmark", "id": 1},
+        {"op": "setViewState", "id": 1, "state": {"page": 41, "zoom": 1.25, "darkPages": true}}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "Designing Data.pdf",
+              "storedName": "0123456789ab-Designing_Data.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 212000000,
+              "pageCount": 0,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 41,
+              "kind": "highlight",
+              "color": "yellow",
+              "rects": [
+                [
+                  72.5,
+                  600,
+                  300.25,
+                  620
+                ],
+                [
+                  72.5,
+                  580,
+                  210,
+                  600
+                ]
+              ],
+              "quote": "two lines of text",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 41,
+              "kind": "underline",
+              "color": "green",
+              "rects": [
+                [
+                  72,
+                  500,
+                  150,
+                  510
+                ]
+              ],
+              "quote": "",
+              "comment": "look this up",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 3,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 42,
+              "kind": "strikethrough",
+              "color": "pink",
+              "rects": [
+                [
+                  10,
+                  10,
+                  20,
+                  20
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 4,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 42,
+              "kind": "text",
+              "color": "orange",
+              "rects": null,
+              "quote": "",
+              "comment": "",
+              "body": {
+                "rect": [
+                  400,
+                  100,
+                  560,
+                  160
+                ],
+                "text": "Margin note",
+                "fontSize": 12
+              },
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 5,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 43,
+              "kind": "ink",
+              "color": "black",
+              "rects": null,
+              "quote": "",
+              "comment": "",
+              "body": {
+                "strokes": [
+                  [
+                    [
+                      1,
+                      2
+                    ],
+                    [
+                      3,
+                      4
+                    ]
+                  ]
+                ]
+              },
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 41,
+              "kind": "underline",
+              "color": "blue",
+              "rects": [
+                [
+                  72,
+                  500,
+                  150,
+                  510
+                ]
+              ],
+              "quote": "",
+              "comment": "check chapter 5",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 9,
+              "label": "Chapter 1",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 3,
+              "label": "",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 3,
+              "label": "Preface",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": null
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "Designing Data.pdf",
+            "stored_name": "0123456789ab-Designing_Data.pdf",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 212000000,
+            "page_count": 600,
+            "view_state": "{\"page\":41,\"zoom\":1.25,\"darkPages\":true}",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "annotations": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 41,
+            "kind": "highlight",
+            "color": "yellow",
+            "rects": "[[72.5,600,300.25,620],[72.5,580,210,600]]",
+            "quote": "two lines of text",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 41,
+            "kind": "underline",
+            "color": "blue",
+            "rects": "[[72,500,150,510]]",
+            "quote": "",
+            "comment": "check chapter 5",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 3,
+            "document_id": 1,
+            "page": 42,
+            "kind": "strikethrough",
+            "color": "pink",
+            "rects": "[[10,10,20,20]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 4,
+            "document_id": 1,
+            "page": 42,
+            "kind": "text",
+            "color": "orange",
+            "rects": null,
+            "quote": "",
+            "comment": "",
+            "body": "{\"rect\":[400,100,560,160],\"text\":\"Margin note\",\"fontSize\":12}",
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 5,
+            "document_id": 1,
+            "page": 43,
+            "kind": "ink",
+            "color": "black",
+            "rects": null,
+            "quote": "",
+            "comment": "",
+            "body": "{\"strokes\":[[[1,2],[3,4]]]}",
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "bookmarks": [
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 3,
+            "label": "Preface",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "one PDF per note, and marks only on pages the PDF has",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "a.pdf", "storedName": "000000000001-a.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 5},
+        {"op": "addDocument", "noteId": 1, "fileName": "again.pdf", "storedName": "000000000002-again.pdf", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 10, "pageCount": 5},
+        {"op": "addDocument", "noteId": 99, "fileName": "orphan.pdf", "storedName": "000000000003-orphan.pdf", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 10, "pageCount": 5},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 5, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 4, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addBookmark", "documentId": 1, "page": 5, "label": "past the end"},
+        {"op": "addBookmark", "documentId": 1, "page": 4, "label": "last page"},
+        {"op": "addAnnotation", "documentId": 7, "input": {"page": 0, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addDocument", "noteId": 2, "fileName": "b.pdf", "storedName": "000000000004-b.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 0},
+        {"op": "addAnnotation", "documentId": 2, "input": {"page": 800, "kind": "highlight", "color": "blue", "rects": [[0,0,1,1]]}}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a.pdf",
+              "storedName": "000000000001-a.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 4,
+              "kind": "highlight",
+              "color": "yellow",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 4,
+              "label": "last page",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "noteId": 2,
+              "fileName": "b.pdf",
+              "storedName": "000000000004-b.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 0,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 2,
+              "page": 800,
+              "kind": "highlight",
+              "color": "blue",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "a.pdf",
+            "stored_name": "000000000001-a.pdf",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 10,
+            "page_count": 5,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "note_id": 2,
+            "file_name": "b.pdf",
+            "stored_name": "000000000004-b.pdf",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 10,
+            "page_count": 0,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "annotations": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 4,
+            "kind": "highlight",
+            "color": "yellow",
+            "rects": "[[0,0,1,1]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 2,
+            "page": 800,
+            "kind": "highlight",
+            "color": "blue",
+            "rects": "[[0,0,1,1]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "bookmarks": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 4,
+            "label": "last page",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a selection that crossed pages is one record per page, and one delete removes it all",
+      "steps": [
+        {"op": "setNotes", "live": [1], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "a.pdf", "storedName": "000000000001-a.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 10},
+        {"op": "addAnnotationGroup", "documentId": 1, "inputs": [{"page": 3, "kind": "highlight", "color": "yellow", "rects": [[0,0,5,5]], "quote": "end of page 3"},{"page": 4, "kind": "highlight", "color": "yellow", "rects": [[0,0,5,5]], "quote": "start of page 4"}]},
+        {"op": "addAnnotationGroup", "documentId": 1, "inputs": [{"page": 3, "kind": "underline", "color": "green", "rects": [[0,10,5,15]]}]},
+        {"op": "addAnnotationGroup", "documentId": 1, "inputs": [{"page": 6, "kind": "highlight", "color": "pink", "rects": [[0,0,5,5]]},{"page": 99, "kind": "highlight", "color": "pink", "rects": [[0,0,5,5]]}]},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 3, "kind": "highlight", "color": "blue", "rects": [[20,20,30,30]]}},
+        {"op": "deleteAnnotation", "id": 2},
+        {"op": "deleteAnnotation", "id": 2}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a.pdf",
+              "storedName": "000000000001-a.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 10,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 3,
+                "kind": "highlight",
+                "color": "yellow",
+                "rects": [
+                  [
+                    0,
+                    0,
+                    5,
+                    5
+                  ]
+                ],
+                "quote": "end of page 3",
+                "comment": "",
+                "body": null,
+                "groupUuid": "<group-1>",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 4,
+                "kind": "highlight",
+                "color": "yellow",
+                "rects": [
+                  [
+                    0,
+                    0,
+                    5,
+                    5
+                  ]
+                ],
+                "quote": "start of page 4",
+                "comment": "",
+                "body": null,
+                "groupUuid": "<group-1>",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 3,
+                "kind": "underline",
+                "color": "green",
+                "rects": [
+                  [
+                    0,
+                    10,
+                    5,
+                    15
+                  ]
+                ],
+                "quote": "",
+                "comment": "",
+                "body": null,
+                "groupUuid": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": {
+              "id": 4,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 3,
+              "kind": "highlight",
+              "color": "blue",
+              "rects": [
+                [
+                  20,
+                  20,
+                  30,
+                  30
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 3,
+                "kind": "highlight",
+                "color": "yellow",
+                "rects": [
+                  [
+                    0,
+                    0,
+                    5,
+                    5
+                  ]
+                ],
+                "quote": "end of page 3",
+                "comment": "",
+                "body": null,
+                "groupUuid": "<group-1>",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 4,
+                "kind": "highlight",
+                "color": "yellow",
+                "rects": [
+                  [
+                    0,
+                    0,
+                    5,
+                    5
+                  ]
+                ],
+                "quote": "start of page 4",
+                "comment": "",
+                "body": null,
+                "groupUuid": "<group-1>",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": []
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "a.pdf",
+            "stored_name": "000000000001-a.pdf",
+            "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "size": 10,
+            "page_count": 10,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "annotations": [
+          {
+            "id": 3,
+            "document_id": 1,
+            "page": 3,
+            "kind": "underline",
+            "color": "green",
+            "rects": "[[0,10,5,15]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 4,
+            "document_id": 1,
+            "page": 3,
+            "kind": "highlight",
+            "color": "blue",
+            "rects": "[[20,20,30,30]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "bookmarks": []
+      }
+    },
+    {
+      "name": "a PDF follows its note through the Trash Can and goes when the note is gone for good",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "a.pdf", "storedName": "000000000001-a.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 5},
+        {"op": "addDocument", "noteId": 2, "fileName": "b.pdf", "storedName": "000000000002-b.pdf", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 10, "pageCount": 5},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 0, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addBookmark", "documentId": 1, "page": 1, "label": "one"},
+        {"op": "addAnnotation", "documentId": 2, "input": {"page": 0, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addBookmark", "documentId": 2, "page": 1, "label": "two"},
+        {"op": "setNotes", "live": [1], "trashed": [2]},
+        {"op": "deleteOrphanedDocuments"},
+        {"op": "setNotes", "live": [], "trashed": [2]},
+        {"op": "deleteOrphanedDocuments"},
+        {"op": "deleteOrphanedDocuments"},
+        {"op": "addDocument", "noteId": 2, "fileName": "c.pdf", "storedName": "000000000003-c.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 5}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a.pdf",
+              "storedName": "000000000001-a.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "noteId": 2,
+              "fileName": "b.pdf",
+              "storedName": "000000000002-b.pdf",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "size": 10,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 0,
+              "kind": "highlight",
+              "color": "yellow",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 1,
+              "label": "one",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 2,
+              "page": 0,
+              "kind": "highlight",
+              "color": "yellow",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 2,
+              "page": 1,
+              "label": "two",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": []
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "noteId": 1,
+                "fileName": "a.pdf",
+                "storedName": "000000000001-a.pdf",
+                "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "size": 10,
+                "pageCount": 5,
+                "viewState": {},
+                "createdAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": []
+          },
+          {
+            "error": true
+          }
+        ],
+        "documents": [
+          {
+            "id": 2,
+            "note_id": 2,
+            "file_name": "b.pdf",
+            "stored_name": "000000000002-b.pdf",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 10,
+            "page_count": 5,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "annotations": [
+          {
+            "id": 2,
+            "document_id": 2,
+            "page": 0,
+            "kind": "highlight",
+            "color": "yellow",
+            "rects": "[[0,0,1,1]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "bookmarks": [
+          {
+            "id": 2,
+            "document_id": 2,
+            "page": 1,
+            "label": "two",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "deleting a PDF deletes its marks and bookmarks, and ids are not reused",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "a.pdf", "storedName": "000000000001-a.pdf", "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "size": 10, "pageCount": 5},
+        {"op": "addAnnotation", "documentId": 1, "input": {"page": 0, "kind": "highlight", "color": "yellow", "rects": [[0,0,1,1]]}},
+        {"op": "addBookmark", "documentId": 1, "page": 1, "label": "one"},
+        {"op": "deleteDocument", "id": 1},
+        {"op": "deleteDocument", "id": 1},
+        {"op": "addDocument", "noteId": 1, "fileName": "a2.pdf", "storedName": "000000000002-a2.pdf", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "size": 11, "pageCount": 5},
+        {"op": "addAnnotation", "documentId": 2, "input": {"page": 0, "kind": "underline", "color": "green", "rects": [[0,0,1,1]]}}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a.pdf",
+              "storedName": "000000000001-a.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 0,
+              "kind": "highlight",
+              "color": "yellow",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 1,
+              "label": "one",
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a.pdf",
+              "storedName": "000000000001-a.pdf",
+              "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "size": 10,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "a2.pdf",
+              "storedName": "000000000002-a2.pdf",
+              "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "size": 11,
+              "pageCount": 5,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 2,
+              "page": 0,
+              "kind": "underline",
+              "color": "green",
+              "rects": [
+                [
+                  0,
+                  0,
+                  1,
+                  1
+                ]
+              ],
+              "quote": "",
+              "comment": "",
+              "body": null,
+              "groupUuid": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          }
+        ],
+        "documents": [
+          {
+            "id": 2,
+            "note_id": 1,
+            "file_name": "a2.pdf",
+            "stored_name": "000000000002-a2.pdf",
+            "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "size": 11,
+            "page_count": 5,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "annotations": [
+          {
+            "id": 2,
+            "document_id": 2,
+            "page": 0,
+            "kind": "underline",
+            "color": "green",
+            "rects": "[[0,0,1,1]]",
+            "quote": "",
+            "comment": "",
+            "body": null,
+            "group_uuid": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "bookmarks": []
+      }
+    }
+  ]
+}

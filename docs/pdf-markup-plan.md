@@ -333,9 +333,27 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      signed PDF, AES-256, Acrobat, and non-Latin text notes with a font we may ship.
    - **B, PencilKit over PDFKit,** needs the iPad: finger scroll, selection and Pencil drawing together; ink latency; memory on
      500 pages. It runs at the start of M2 and gates the iPad's ink, not the desktop's work.
-1. **Shared schema and core (TypeScript).** The three tables with uuids, repos, `removeOrphans` for documents, backup and
-   restore of `documents/`, the counts message, tests as each earlier schema opened (the intent of `db.test.ts`), and fixtures
-   the Swift core will replay.
+1. **Shared schema and core (TypeScript). Done 2026-11-07.** The three tables with uuids (the uuid pass now covers nine),
+   repos, `removeOrphans` for documents, backup and restore of `documents/`, the counts message, tests as each earlier schema
+   opened (the intent of `db.test.ts`), and fixtures the Swift core will replay
+   ([`fixtures/conformance/pdf`](../fixtures/conformance/README.md): the schema, the validation rules, and five operation
+   scripts with their end states). The files are `documentsRepo.ts`, `pdfMarkupRepo.ts`, `documents.ts` (import, hash, serve a
+   path, remove, sweep), `pdfMarkup.ts` (the rules) and `documentsApi.ts` (the types); `service.ts`, `backup.ts`,
+   `dataLocation.ts` (the CLI's move) and `metrics.ts` know the new folder. **My picks, made while building** (change any):
+   - A PDF is given only to a **live** note, so you cannot import into a trashed one; one note, one PDF.
+   - **`page_count` is 0 until the reader counts the pages**, and a mark may be on any page until then (after, only on a page
+     the PDF has). Step 2 decides whether the main process counts at import or the reader does on first open.
+   - A mark's **color** is one of the five names for a highlight, underline or strikethrough, and any lowercase name for a text
+     note or ink. A **comment** is one line (line breaks become a space) of at most 500 characters, a **bookmark label** at most
+     200. Rectangles are stored **rounded to a thousandth of a point**. Ink's strokes are any JSON object or array until the
+     stroke format freezes at Gate C.
+   - **Deleting a mark deletes its whole selection** when it crossed pages (one highlight on screen, so one delete).
+   - **The backup format stays at version 1.** A backup that holds PDFs is refused by an older build ("contains a file
+     Composition doesn't know") rather than restored without them.
+   - **"Assets on disk"** in Settings now counts the PDFs with the attached files.
+
+   Not in this step, on purpose: the delete dialog's and the Trash Can row's summary of what is inside (Step 2), its count of
+   citing notes (Step 4), the service and IPC wrappers the reader calls (Step 2), and the Swift side (M2).
 2. **Import and the reader.** Importing, serving bytes, the `pdf` panel kind, the PDF row in the tree, the pair opening, outline,
    bookmarks, resume, find, dark pages, the new delete dialog and Trash Can row.
 3. **Text markup.** Highlight, underline, strikethrough, typed text notes, the Highlights tab, undo and redo.
@@ -474,9 +492,9 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
 ## Docs to change when it ships
 
 - [feature-matrix.md](feature-matrix.md): a PDF section (desktop ✅; web and CLI only the file and the note).
-- [architecture/data-model.md](architecture/data-model.md) (three tables, `documents/`, the uuid pass over nine tables),
-  [architecture/backup-restore.md](architecture/backup-restore.md), and [architecture/attachments.md](architecture/attachments.md)
-  (one line saying a PDF is not an attachment).
+- [architecture/data-model.md](architecture/data-model.md) (three tables, `documents/`, the uuid pass over nine tables) and
+  [architecture/backup-restore.md](architecture/backup-restore.md): **done with Step 1**. [architecture/attachments.md](architecture/attachments.md)
+  still wants one line saying a PDF is not an attachment.
 - [ui/panels.md](ui/panels.md) (the PDF panel and its pair), [ui/note-links.md](ui/note-links.md) (`pdf:` links), and the
   shortcuts list.
 - [ipad-app-design.md](ipad-app-design.md): the tracker rows, M2's scope (this widens D13), and new compromise rows (markup is
@@ -501,3 +519,8 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   183 MB, 4,351-page manual; pdf.js's own save cannot write underlines or strikeouts. Appearance streams are required for text
   notes. Two new risks: a text note in another script (a standard font writes `?` without an error) and export memory of 2 to
   4.5 times the file. Export drops encryption.
+- 2026-11-07: **Step 1 built** (shared schema and core). The three tables, their repositories, the PDF file layer, the orphan sweep,
+  backup and restore of `documents/`, the counts message and the conformance fixtures in `fixtures/conformance/pdf`. About
+  110 new tests; the web suite (3,814 tests) and the desktop suite (706) pass, and so does everything in the CLI suite that
+  passed before (it has 144 failures on a clean checkout too: it wants Node 26 for OpenTUI and this machine has 24). Picks made while building are listed under Step 1 in
+  the [build order](#build-order). Nothing is user-visible yet.
