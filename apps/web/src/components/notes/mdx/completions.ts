@@ -1,4 +1,5 @@
 import type { mdxComponents } from "./components";
+import { insideFence } from "./fences";
 
 export type MdxCompletion = {
   name: string;
@@ -75,12 +76,8 @@ export type CompletionTrigger = {
 
 /** A `<` that starts a tag: not glued to a word (`a<b`) and not part of `<<`. */
 const OPEN_TAG = /(?:^|[^\w<])<([A-Za-z]*)$/;
-const FENCE = /^ {0,3}(?:`{3,}|~{3,})/gm;
 
-/** Whether the line starting at `lineStart` sits inside a fenced code block. */
-export function insideFence(text: string, lineStart: number): boolean {
-  return (text.slice(0, lineStart).match(FENCE)?.length ?? 0) % 2 === 1;
-}
+export { insideFence };
 
 /**
  * The `<` the caret is just after, if the user is starting a tag there.

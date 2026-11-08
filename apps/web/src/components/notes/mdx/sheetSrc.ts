@@ -6,7 +6,7 @@
  * A sheet is found by reading the note line by line, so a fence inside it that holds the text `</Sheet>` (a cell can)
  * does not end it, and a tag shown inside a fenced code block is an example of one, not a sheet.
  */
-import { insideFence } from "./completions";
+import { insideFence } from "./fences";
 import { isTotalsRow } from "./sheetData";
 import { type SheetSource } from "./sheetDraft";
 
