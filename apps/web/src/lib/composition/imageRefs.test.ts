@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findImageRefs, imageAlt, imageMarkdown, imageNameFromRef, imageRef, imageTag, isImageName } from "./imageRefs";
+import { findImageRefs, imageAlt, imageMarkdown, imageNameFromRef, imageRef, imageTag, imageUsage, isImageName } from "./imageRefs";
 
 describe("imageRef / imageNameFromRef", () => {
   it("round-trips a stored image's name", () => {
@@ -71,6 +71,23 @@ describe("findImageRefs", () => {
     ].join("\n");
 
     expect(findImageRefs(content)).toEqual(new Set());
+  });
+});
+
+describe("imageUsage", () => {
+  it("lists the notes that point at each image, in the order the notes are given", () => {
+    const usage = imageUsage([
+      { id: 2, title: "Second", content: "![a](app_data/one-111111111111.png)" },
+      { id: 1, title: "First", content: '<Image src="app_data/one-111111111111.png" alt="" /> ![b](app_data/two-222222222222.jpg)' },
+      { id: 3, title: "Plain", content: "nothing here" },
+    ]);
+
+    expect(usage.get("one-111111111111.png")).toEqual([
+      { id: 2, title: "Second" },
+      { id: 1, title: "First" },
+    ]);
+    expect(usage.get("two-222222222222.jpg")).toEqual([{ id: 1, title: "First" }]);
+    expect(usage.get("three-333333333333.png")).toBeUndefined();
   });
 });
 

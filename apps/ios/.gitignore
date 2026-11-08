@@ -1,0 +1,6 @@
+# Swift Package Manager and Xcode build output. Package.resolved is committed (pinned dependencies).
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
