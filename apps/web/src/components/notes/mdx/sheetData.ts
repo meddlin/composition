@@ -18,6 +18,7 @@
  * kept, and why only blank rows before the header and after the last row are dropped.
  */
 import { parseCsv, parseNumber } from "./chartData";
+import { parseAddress } from "./sheetParse";
 
 export type Sheet = {
   /** Every row, the header row first, each padded with empty cells to `columns`. */
@@ -56,6 +57,37 @@ export function parseSheet(csv: string): SheetParse {
 
   const columns = rows.reduce((widest, row) => Math.max(widest, row.length), 0);
   return { sheet: { rows: rows.map((row) => (row.length < columns ? [...row, ...Array<string>(columns - row.length).fill("")] : row)), columns } };
+}
+
+export type FormulasParse = {
+  /** Each formula by the address of its cell, in capitals and without dollar signs: `E2` -> `=C2*D2`. */
+  formulas: Map<string, string>;
+  /** The lines, counted from 1, that are not a cell and a formula. */
+  problems: number[];
+};
+
+/**
+ * The formulas block that goes beside the CSV one, a line to a cell, in Excel's own syntax:
+ *
+ *     ```formulas
+ *     E2 =C2*D2
+ *     E3 =C3*D3
+ *     C4 =SUM(C2:C3)
+ *     ```
+ *
+ * The CSV holds what each cell shows; this holds the formulas that make some of them, which are calculated again
+ * when the sheet is drawn (see sheetFormula.ts). A line for a cell twice is the later one; a blank line is nothing.
+ */
+export function parseFormulas(text: string): FormulasParse {
+  const formulas = new Map<string, string>();
+  const problems: number[] = [];
+  text.split(/\r?\n/).forEach((line, index) => {
+    if (line.trim() === "") return;
+    const match = /^\s*(\$?[A-Za-z]{1,3}\$?\d+)\s+(=.*?)\s*$/.exec(line);
+    if (!match || !parseAddress(match[1])) problems.push(index + 1);
+    else formulas.set(match[1].replace(/\$/g, "").toUpperCase(), match[2]);
+  });
+  return { formulas, problems };
 }
 
 /** A column's name as Excel writes it: A to Z, then AA, AB… (0 is A). */

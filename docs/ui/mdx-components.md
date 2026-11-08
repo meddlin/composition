@@ -303,9 +303,10 @@ East,80,9.5,760
 </Sheet>
 ````
 
-This is the first, read-only step of [spreadsheets in notes](../sheet-component-plan.md): the data is a CSV block in
-the note, which is Markdown text like the rest of it. Editing it in a grid, formulas and importing from Excel are the
-steps after, and are not built yet.
+This is the first part of [spreadsheets in notes](../sheet-component-plan.md): the data is a CSV block in the note,
+which is Markdown text like the rest of it, and a `formulas` block beside it can calculate some of the cells
+([below](#formulas-in-a-sheet)). It is read-only so far: editing it in a grid and importing from Excel are the steps
+after, and are not built yet.
 
 - **Blank lines around the fence**, as for `<Chart>`, which is what makes it a code block and keeps Markdown from
   rewrapping it.
@@ -327,16 +328,80 @@ steps after, and are not built yet.
 - **A big sheet is said so.** Past 100,000 characters the editor stops colouring the whole note, and a sheet that
   size says so under itself.
 - The block tagged `csv` is read. With none, the first block is, since a fence the author forgot to tag is still
-  meant. Any other fenced block beside the `csv` one is ignored (a `formulas` block will hold formulas, in a later step).
+  meant. The block tagged `formulas` is read as formulas, and only if it is tagged (no stand-in).
 - A table that can't be drawn (no data) shows a short notice in place of the grid, saying so, so the rest of the note
   stays put.
 - Colours are the active theme's own, so a sheet reads in every scheme. It is a table with a label saying how big it is,
   and its scrolling area can be reached with the keyboard.
 - The terminal draws the cells as aligned text, with the letters and row numbers (see [In the CLI](#in-the-cli)).
 
+### Formulas in a sheet
+
+A second block, tagged `formulas`, gives a cell a formula, a line to a cell, in Excel's own syntax:
+
+````mdx
+<Sheet title="Q3 budget">
+
+```csv
+Region,Units,Price,Revenue
+West,120,9.5,
+East,80,9.5,
+Total,,,
+```
+
+```formulas
+D2 =B2*C2
+D3 =B3*C3
+B4 =SUM(B2:B3)
+D4 =SUM(D2:D3)
+```
+
+</Sheet>
+````
+
+The CSV block holds what each cell shows; the `formulas` block holds the formula that makes some of them, which is
+calculated again each time the sheet is drawn, so the numbers in the CSV are not trusted over the formula. The same
+formulas will work in Excel: the syntax is Excel's, and each rule below was read off real Excel.
+
+- **A line is a cell and a formula**, `E2 =C2*D2`: the address in Excel's form (the header is row 1), a space, and the
+  formula starting with `=`. A later line for the same cell wins. A line that is not one is said so under the sheet
+  (by its number) and the rest are used.
+- **A formula can use any cell**, one that is a formula too, in any order, and a range (`B2:B9`, a whole column `B:B`,
+  `$B$2`). A formula under the last CSV row, or right of the last column, adds that row or column to the grid (a
+  totals row made only of formulas has no row in the CSV), up to 5,000 rows and 100 columns.
+- **Pointing at a formula cell shows its formula**, and what it could not calculate.
+- **Excel 365's rules:** arrays work everywhere (`SUM(B1:B5*2)`, `SUMPRODUCT((A2:A9="West")*(C2:C9))`,
+  `COUNTIF(A2:A9,A2:A9)`), text is compared without regard to case, a number and a text that looks like one are
+  different things (as in a lookup) except where Excel reads one as the other (arithmetic, `COUNTIF`), `0.1+0.2-0.3` is
+  0 where it is the last step of a formula, and a number is shown to 15 digits.
+- **What it calculates** (94 functions, the table is [`sheetFunctions.ts`](../../apps/web/src/components/notes/mdx/sheetFunctions.ts)):
+  - *Sums and counts:* `SUM` `PRODUCT` `SUMPRODUCT` `AVERAGE` `MIN` `MAX` `COUNT` `COUNTA` `COUNTBLANK` `LARGE` `SMALL` `MEDIAN` `RANK`
+  - *By a condition:* `SUMIF` `SUMIFS` `COUNTIF` `COUNTIFS` `AVERAGEIF` `AVERAGEIFS` `MAXIFS` `MINIFS`, with Excel's criteria
+    (`">=5"`, `"<>West"`, `"A*"`, `"?pple"`, `"a~*b"`)
+  - *Lookups:* `VLOOKUP` `HLOOKUP` `INDEX` `MATCH` `XLOOKUP` `CHOOSE` `ROW` `COLUMN` `ROWS` `COLUMNS`
+  - *Numbers:* `ROUND` `ROUNDUP` `ROUNDDOWN` `TRUNC` `INT` `ABS` `SIGN` `MOD` `POWER` `SQRT` `CEILING` `FLOOR` `EXP` `LN` `LOG` `LOG10` `PI`
+  - *Logic:* `IF` `IFS` `IFERROR` `IFNA` `SWITCH` `AND` `OR` `NOT` `TRUE` `FALSE` `NA`, and the tests `ISBLANK` `ISNUMBER`
+    `ISTEXT` `ISLOGICAL` `ISERROR` `ISERR` `ISNA` `ERROR.TYPE`
+  - *Text:* `LEN` `LEFT` `RIGHT` `MID` `UPPER` `LOWER` `PROPER` `TRIM` `SUBSTITUTE` `FIND` `SEARCH` `EXACT` `REPT` `CONCAT`
+    `CONCATENATE` `TEXTJOIN` `VALUE` `TEXT` `CHAR` `CODE`; `TEXT` knows the digit formats (`0.00`, `#,##0`, `0%`,
+    `$0.00`, `;` sections) and the date letters (`yyyy-mm-dd`, `mmm d, yyyy`, `dddd`)
+  - *Dates* (as numbers: Excel's days from 1900, with its 29 February 1900): `DATE` `YEAR` `MONTH` `DAY` `EOMONTH` `EDATE` `WEEKDAY`
+- **What it does not calculate says so, and is not guessed.** A function not in the list (`FILTER`, `LET`, `TODAY`,
+  `NETWORKDAYS`…), another sheet (`Sheet2!A1`), a table's `[Column]`, a name, a text Excel would read as a date
+  (`"1/2/2026"+1`), a `TEXT` format with a time, a fraction or E notation, `XLOOKUP` by binary search, a formula that
+  refers to itself, or one that fills several cells makes the cell **`#NAME?`**, and pointing at it says why. So does
+  every cell that depends on it. (Later, an imported formula Excel calculated will keep Excel's value instead.)
+- **A formula is limited as in Excel:** 8,192 characters, 64 levels of nesting.
+
+The engine is pure TypeScript with no `eval` (the desktop app forbids it) and no library: [`sheetFormula.ts`](../../apps/web/src/components/notes/mdx/sheetFormula.ts)
+calculates, [`sheetParse.ts`](../../apps/web/src/components/notes/mdx/sheetParse.ts) reads the syntax,
+[`sheetCriteria.ts`](../../apps/web/src/components/notes/mdx/sheetCriteria.ts) matches criteria, and so on. It is tested against
+real Excel: [`excel-verified-cases.json`](../../spikes/sheet/excel-verified-cases.json) holds more than 1,200 formulas with the
+result Excel gave each, and `node spikes/sheet/run-in-excel.mjs` runs new ones in Excel on a Mac and records them.
+
 Source: [`mdx/Sheet.tsx`](../../apps/web/src/components/notes/mdx/Sheet.tsx) and
-[`mdx/sheetData.ts`](../../apps/web/src/components/notes/mdx/sheetData.ts), which reads the CSV (and is shared with the
-terminal app, whose drawing is [`sheetText.ts`](../../apps/cli/src/sheetText.ts)). The CSV reader is `parseCsv` in
+[`mdx/sheetData.ts`](../../apps/web/src/components/notes/mdx/sheetData.ts), which reads the CSV and the `formulas` block (and is
+shared with the terminal app, whose drawing is [`sheetText.ts`](../../apps/cli/src/sheetText.ts)). The CSV reader is `parseCsv` in
 [`chartData.ts`](../../apps/web/src/components/notes/mdx/chartData.ts), with an option that keeps blank rows.
 
 ## How it renders
@@ -375,8 +440,8 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Footnotes>`, and the list at the end of a note without it | A box titled `Footnotes`, one numbered line per footnote; a link keeps its address in brackets after its words. Citations in the text are superscript digits (`¹`), since `[1]` would be read as a link. The definitions are not left where they were written. |
 | `<YouTube>` | A link to the video on youtube.com, `▶ title`, since a terminal can't play it. A `url` that isn't a YouTube video is said so in words. |
 | `<Repo>` | A link to the repository, `⎇ owner/name`, with the description after it. A `url` that isn't a repository is said so in words. |
-| `<Chart>` | A code block of bars made of block characters, one per value, under the title in bold. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
-| `<Sheet>` | A code block of the cells, with Excel's column letters and the row numbers, under the title in bold; a column that holds only numbers is flush right, and a cell is cut at 24 characters. A sheet over 50 rows below the header shows the first 50 and says how many it left out. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
+| `<Chart>` | A code block of bars made of block characters, one per value, under the title in bold. Its formulas are calculated, and a cell that could not be is listed under the block ("Not calculated: B2 (the function FILTER)"), since a terminal cannot be pointed at a cell. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
+| `<Sheet>` | A code block of the cells, with Excel's column letters and the row numbers, under the title in bold; a column that holds only numbers is flush right, and a cell is cut at 24 characters. A sheet over 50 rows below the header shows the first 50 and says how many it left out. Its formulas are calculated, and a cell that could not be is listed under the block ("Not calculated: B2 (the function FILTER)"), since a terminal cannot be pointed at a cell. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 | `<Drawio>` | The same as `<Image>`: the diagram's picture, which is a PNG. The terminal has no editor, so it cannot change one. |
 

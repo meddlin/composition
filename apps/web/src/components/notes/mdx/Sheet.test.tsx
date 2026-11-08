@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { Sheet, blockText } from "./Sheet";
+import { Sheet, blockText, formulasText } from "./Sheet";
 
 const fence = (language: string, text: string) => (
   <pre>
@@ -36,6 +36,15 @@ describe("blockText", () => {
   it("falls back to the first code block, then to whatever text there is", () => {
     expect(blockText(fence("text", "a,b"), "csv")).toBe("a,b");
     expect(blockText("a,b", "csv")).toBe("a,b");
+  });
+});
+
+describe("formulasText", () => {
+  it("is the text of the formulas fence, and nothing at all when there is none, where a block that is not tagged is the CSV", () => {
+    expect(formulasText([fence("csv", "a,b\n1,2"), fence("formulas", "B2 =A2+1")])).toBe("B2 =A2+1");
+    expect(formulasText(fence("csv", "a,b\n1,2"))).toBe("");
+    expect(formulasText(fence("text", "a,b"))).toBe("");
+    expect(formulasText("a,b")).toBe("");
   });
 });
 
@@ -83,16 +92,87 @@ describe("Sheet", () => {
     expect(screen.getByRole("cell", { name: "#DIV/0!" }).className).toContain("text-destructive");
   });
 
-  it("reads the csv fence and ignores a formulas fence after it", () => {
+  it("reads the csv fence, and a formulas fence after it is not drawn as cells", () => {
     render(
       <Sheet>
         {fence("csv", "a,b\n1,2")}
-        {fence("formulas", "B2 =A2+1")}
+        {fence("formulas", "B2 =A2+10")}
       </Sheet>,
     );
 
     expect(screen.getByRole("region", { name: "Sheet: 1 row by 2 columns" })).toBeTruthy();
-    expect(screen.queryByText(/=A2\+1/)).toBeNull();
+    expect(screen.queryByText(/=A2\+10/)).toBeNull();
+  });
+
+  describe("formulas", () => {
+    const budget = (formulas: string) => (
+      <Sheet>
+        {fence("csv", "Units,Price,Revenue\n2,3,\n5,7,")}
+        {fence("formulas", formulas)}
+      </Sheet>
+    );
+
+    it("calculates the formulas block, and each cell shows its result in place of what the CSV had", () => {
+      render(budget("C2 =A2*B2\nC3 =A3*B3"));
+
+      expect(screen.getAllByRole("cell").map((cell) => cell.textContent)).toEqual(["2", "3", "6", "5", "7", "35"]);
+    });
+
+    it("sets a calculated number flush right and shows an error as one", () => {
+      render(budget("C2 =A2*B2\nC3 =A3/0"));
+
+      expect(screen.getByRole("cell", { name: "6" }).className).toContain("text-right");
+      expect(screen.getByRole("cell", { name: "#DIV/0!" }).className).toContain("text-destructive");
+    });
+
+    it("shows a cell's formula when it is pointed at, and a long cell's text only where there is no formula", () => {
+      render(budget("C2 =A2*B2"));
+
+      expect(screen.getByRole("cell", { name: "6" }).getAttribute("title")).toBe("=A2*B2");
+      expect(screen.getByRole("cell", { name: "7" }).getAttribute("title")).toBeNull();
+    });
+
+    it("lets a formula use a cell that is a formula, whatever order the block lists them in", () => {
+      render(budget("C3 =C2+A3\nC2 =A2*B2"));
+
+      expect(screen.getByRole("cell", { name: "11" })).toBeTruthy();
+    });
+
+    it("says what it could not calculate: the cell is #NAME?, and pointing at it says why", () => {
+      render(budget("C2 =FILTER(A2:A3,TRUE)\nC3 =C2+1"));
+
+      const cells = screen.getAllByRole("cell", { name: "#NAME?" });
+      expect(cells).toHaveLength(2);
+      expect(cells[0].className).toContain("text-destructive");
+      expect(cells[0].getAttribute("title")).toBe("=FILTER(A2:A3,TRUE)\nNot calculated: the function FILTER");
+      expect(cells[1].getAttribute("title")).toContain("Not calculated: the function FILTER");
+    });
+
+    it("says which lines of the formulas block it could not read, and calculates the rest", () => {
+      render(budget("C2 =A2*B2\nthis is not one\nC3 A3*B3\n\n"));
+
+      expect(screen.getByRole("cell", { name: "6" })).toBeTruthy();
+      expect(screen.getByText(/2 lines that are not a cell and a formula \(line 2, 3\)/)).toBeTruthy();
+    });
+
+    it("says nothing about formulas of a sheet that has none", () => {
+      render(<Sheet>{fence("csv", "a,b\n1,2")}</Sheet>);
+
+      expect(screen.queryByText(/formulas block/)).toBeNull();
+      expect(screen.getByRole("cell", { name: "2" }).getAttribute("title")).toBeNull();
+    });
+
+    it("sizes the columns by what the formulas came to", () => {
+      render(
+        <Sheet>
+          {fence("csv", "a,b\n1,")}
+          {fence("formulas", 'B2 =REPT("x",30)')}
+        </Sheet>,
+      );
+
+      expect(screen.getByRole("cell", { name: "x".repeat(30) })).toBeTruthy();
+      expect(document.querySelectorAll("col")[2].getAttribute("style")).toContain("32ch");
+    });
   });
 
   it("draws a header with no rows below it", () => {

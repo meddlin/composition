@@ -19,7 +19,7 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { chartMarkdown } from "./chartText";
 import { sheetMarkdown } from "./sheetText";
-import { HEADINGS_PROP, imageNameFromRef, parseChart, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
+import { HEADINGS_PROP, calculate, imageNameFromRef, parseChart, parseFormulas, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
@@ -357,13 +357,30 @@ function blockOf(node: Node, lang: string): string {
   return wanted ? (wanted.value ?? "") : csvOf(node);
 }
 
+/** The text of the `formulas` block under a tag, if it has one: no stand-in, as the CSV has, since it would be read as formulas. */
+function formulasOf(node: Node): string {
+  const blocks: Node[] = [];
+  const collect = (n: Node) => {
+    if (n.type === "code") blocks.push(n);
+    else n.children?.forEach(collect);
+  };
+  collect(node);
+  return blocks.find((block) => block.lang === "formulas")?.value ?? "";
+}
+
 /**
- * `<Sheet>` as its cells in a code block (see sheetText.ts), since a terminal can't draw a grid. A table
- * that can't be drawn is said so in words, as on the web.
+ * `<Sheet>` as its cells in a code block (see sheetText.ts), since a terminal can't draw a grid. Its formulas are
+ * calculated, as on the web, and a cell that could not be is listed under it, since there is no pointing at a cell.
+ * A table that can't be drawn is said so in words, as on the web.
  */
 function sheetText(element: Node): string {
   const parsed = parseSheet(blockOf(element, "csv"));
-  return parsed.sheet ? sheetMarkdown(parsed.sheet, attribute(element, "title")) : parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
+  if (!parsed.sheet) return parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
+  const { sheet, results } = calculate(parsed.sheet, parseFormulas(formulasOf(element)).formulas);
+  const notCalculated = [...results].filter(([, result]) => result.unsupported.length > 0).map(([address, result]) => `${address} (${result.unsupported[0]})`);
+  const shown = notCalculated.slice(0, 5).join("; ");
+  const note = notCalculated.length > 0 ? `\n\nNot calculated: ${shown.replace(/[\\[\]<>`*_]/g, "\\$&")}${notCalculated.length > 5 ? `; and ${notCalculated.length - 5} more` : ""}.` : "";
+  return sheetMarkdown(sheet, attribute(element, "title")) + note;
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {

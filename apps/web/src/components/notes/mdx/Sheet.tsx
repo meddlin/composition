@@ -1,7 +1,8 @@
 import { Children, isValidElement, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { textOf } from "./Chart";
-import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, parseSheet, viewportHeight } from "./sheetData";
+import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, parseFormulas, parseSheet, viewportHeight } from "./sheetData";
+import { calculate } from "./sheetFormula";
 
 /** Every row is this tall, in pixels, which is what lets a long sheet draw only the rows in view. */
 const ROW_PX = 28;
@@ -37,6 +38,12 @@ export function blockText(children: ReactNode, language: string): string {
   return textOf(wanted ? wanted.props.children : children);
 }
 
+/** The text of the `formulas` block, if the tag has one: not the first block as a stand-in, as the CSV has, since it would be read as formulas. */
+export function formulasText(children: ReactNode): string {
+  const block = codeBlocks(children).find((candidate) => candidate.props.className?.split(/\s+/).includes("language-formulas"));
+  return block ? textOf(block.props.children) : "";
+}
+
 const notice = (text: string) => (
   <span role="img" aria-label="Sheet not drawn" className="not-prose my-4 block text-muted-foreground italic">
     {text}
@@ -57,6 +64,10 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
  *
  *     </Sheet>
  *
+ * A `formulas` block beside it, a line to a cell in Excel's own syntax (`E2 =C2*D2`), makes those cells formulas, calculated
+ * when the sheet is drawn (see sheetFormula.ts); a cell shows its formula when pointed at. One the engine cannot calculate
+ * shows `#NAME?` and says why, and is never a guess.
+ *
  * `title` captions it and `height` is how tall it may grow, in pixels (360 by default), after which it scrolls.
  * Drawn like a spreadsheet: Excel's column letters over the header row, row numbers down the side (the header
  * is row 1), numbers flush right, the header and the numbers kept in view as it scrolls. A long sheet draws only
@@ -67,12 +78,15 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
  */
 export function Sheet({ title, height, children }: { title?: string; height?: string; children?: ReactNode }) {
   const csv = blockText(children, "csv");
+  const formulaSource = formulasText(children);
   const parsed = useMemo(() => parseSheet(csv), [csv]);
-  const widths = useMemo(() => (parsed.sheet ? columnWidths(parsed.sheet) : []), [parsed]);
+  const formulas = useMemo(() => parseFormulas(formulaSource), [formulaSource]);
+  const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas) : undefined), [parsed, formulas]);
+  const widths = useMemo(() => (calculated ? columnWidths(calculated.sheet) : []), [calculated]);
   const [scrollTop, setScrollTop] = useState(0);
-  if (parsed.error !== undefined) return notice(parsed.error);
+  if (!calculated) return notice(parsed.error ?? "");
 
-  const { rows, columns } = parsed.sheet;
+  const { rows, columns } = calculated.sheet;
   const header = rows[0];
   const bodyRows = rows.length - 1;
   const viewport = viewportHeight(height);
@@ -89,6 +103,14 @@ export function Sheet({ title, height, children }: { title?: string; height?: st
       </tr>
     ) : null;
 
+  // What pointing at a cell says: its formula, and what could not be calculated of it; else a long cell in full.
+  const cellTitle = (address: string, cell: string, width: number) => {
+    const formula = formulas.formulas.get(address);
+    if (formula === undefined) return cell.length > width ? cell : undefined;
+    const unsupported = calculated.results.get(address)?.unsupported ?? [];
+    return unsupported.length > 0 ? `${formula}\nNot calculated: ${unsupported.join("; ")}` : formula;
+  };
+
   const gutter = `sticky left-0 border-r border-b ${STUCK} px-2 text-right text-xs font-normal text-muted-foreground`;
   const shown = [];
   for (let b = first; b < last; b++) {
@@ -101,7 +123,7 @@ export function Sheet({ title, height, children }: { title?: string; height?: st
         {row.map((cell, c) => (
           <td
             key={c}
-            title={cell.length > widths[c] ? cell : undefined}
+            title={cellTitle(`${columnLabel(c)}${b + 2}`, cell, widths[c])}
             className={cn(
               "h-7 overflow-hidden border-r border-b px-2 py-0 leading-[27px] text-ellipsis whitespace-nowrap",
               isNumberCell(cell) && "text-right",
@@ -153,6 +175,11 @@ export function Sheet({ title, height, children }: { title?: string; height?: st
           </tbody>
         </table>
       </div>
+      {formulas.problems.length > 0 ? (
+        <p className="mt-1 text-xs text-destructive">
+          The formulas block has {count(formulas.problems.length, "line")} that {formulas.problems.length === 1 ? "is" : "are"} not a cell and a formula (line {formulas.problems.join(", ")}). Write each as E2 =C2*D2.
+        </p>
+      ) : null}
       {csv.length > SHEET_LARGE_CHARS ? (
         <p className="mt-1 text-xs text-muted-foreground">
           This sheet is {csv.length.toLocaleString("en-US")} characters. Past {SHEET_LARGE_CHARS.toLocaleString("en-US")} the editor stops colouring the note.

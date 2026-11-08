@@ -61,13 +61,14 @@ describe("NoteMarkdown", () => {
     expect(screen.getByText("After.")).toBeDefined();
   });
 
-  it("draws a <Sheet> from the CSV block inside it, and leaves a formulas block unread", () => {
-    renderNote('Before.\n\n<Sheet title="Q3">\n\n```csv\nRegion,Units\nWest,120\n```\n\n```formulas\nB2 =A2*2\n```\n\n</Sheet>\n\nAfter.');
+  it("draws a <Sheet> from the CSV block inside it, and calculates a formulas block beside it", () => {
+    renderNote('Before.\n\n<Sheet title="Q3">\n\n```csv\nUnits,Double\n120,\n```\n\n```formulas\nB2 =A2*2\n```\n\n</Sheet>\n\nAfter.');
 
     expect(screen.getByRole("region", { name: "Q3: 1 row by 2 columns" })).toBeDefined();
     expect(screen.getByRole("cell", { name: "120" })).toBeDefined();
+    expect(screen.getByRole("cell", { name: "240" })).toBeDefined();
     // The table is the sheet's data, not text left in the note.
-    expect(screen.queryByText(/Region,Units/)).toBeNull();
+    expect(screen.queryByText(/Units,Double/)).toBeNull();
     expect(screen.queryByText(/A2\*2/)).toBeNull();
     expect(screen.getByText("After.")).toBeDefined();
     expect(screen.queryByRole("alert")).toBeNull();

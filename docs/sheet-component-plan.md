@@ -3,7 +3,8 @@
 A note can hold data that is best read as a spreadsheet: a budget, a comparison, a range copied from an Excel
 workbook. A Markdown table is not enough for it (no formulas, no sorting, awkward to edit, no way to bring a
 range in from Excel). This page is the design for a **`<Sheet>` MDX component**: a grid you can edit, with
-formulas, whose data stays in the note's text. Nothing here is built yet. Dates are 2026-11-07.
+formulas, whose data stays in the note's text. Built so far: the read-only grid and the formula engine (Steps 1 and 2 of
+the [build order](#build-order)); not yet: editing, Excel import and export. Dates are 2026-11-07 and 2026-11-08.
 
 **In scope:** author a sheet in a note; bring a range in from an Excel workbook and refresh it later; formulas
 (including `SUMIFS` and column-name references); export; the terminal app drawing it.
@@ -190,9 +191,12 @@ Recommendations are mine. S5, S7, S8 and S11 are decided (owner, 2026-11-07); th
 ## Architecture
 
 ```
-mdx/sheetData.ts      pure: the CSV block <-> a grid, A1 addressing; shared with the terminal app
+mdx/sheetData.ts      pure: the CSV block <-> a grid, A1 addressing, the `formulas` block; shared with the terminal app
 apps/cli/src/sheetText.ts   the terminal app's drawing: the grid as aligned text in a code block
-mdx/sheetFormula.ts   pure: tokenize, parse, evaluate; the function table; error values
+mdx/sheetFormula.ts   pure: calculates a grid's formulas (`evaluate`, `calculate`); mdx/sheetParse.ts reads the syntax
+mdx/sheetFunctions*.ts  the function table (math and logic; text and dates; criteria and lookups)
+mdx/sheetValue.ts, sheetMatrix.ts, sheetCriteria.ts, sheetFormat.ts, sheetDate.ts   Excel's rules: values and coercion,
+                      arrays, criteria and wildcards, `TEXT` formats, the 1900 calendar
 mdx/Sheet.tsx         the preview: the grid, the Edit and Re-import buttons
 SheetDialog.tsx       the editor dialog (like DrawioDialog)
 mdx/sheetSrc.ts       finds the Nth <Sheet> in the note and rewrites it (like drawioSrc.ts)
@@ -328,7 +332,7 @@ the owner's look (Gate B). What it is, and where it differs from the words above
   header and row numbers kept in view), the entries in the `<` menu and the prop menu, the terminal's text table
   ([`sheetText.ts`](../apps/cli/src/sheetText.ts)), and [the docs](ui/mdx-components.md#sheet). `parseCsv` gained a
   `keepBlankRows` option, because it dropped blank rows and that would have moved every row's number off its place in
-  the text. A `formulas` block beside the CSV is read past, not read yet (the `csv` block is chosen by its tag).
+  the text. A `formulas` block beside the CSV was read past in this step (the `csv` block is chosen by its tag); Step 2 reads it.
 - **Refinement of S11/S13, for the owner to confirm: a sheet of up to 100 rows below the header is drawn whole, and only
   a longer one is windowed.** The preview's find-in-note searches the page's own text, so a window would hide most of
   even a small sheet from it. The cost of windowing a long sheet is the same: find sees only the rows drawn.
@@ -343,8 +347,50 @@ the owner's look (Gate B). What it is, and where it differs from the words above
 - **Not checked:** a light colour scheme, a narrow window, the desktop app's own window (it runs the same renderer), and
   the terminal app's drawing in a real terminal (its text is tested, not looked at).
 
-**Step 2: the engine.** `sheetFormula.ts` with the function list the oracle asked for, `SUMIFS` family first,
-error values, and the fixtures from the oracle (formula, inputs, Excel's value). **Gate C.**
+**Step 2: the engine.** `sheetFormula.ts`, `SUMIFS` family first, error values, and the fixtures taken from real Excel. **Gate C.**
+*Built 2026-11-08; waiting for the owner's look (Gate C). What it is, and where it differs from the words above:*
+
+- **Built:** a parser ([`sheetParse.ts`](../apps/web/src/components/notes/mdx/sheetParse.ts), Excel's syntax and precedence, no `eval`),
+  an evaluator ([`sheetFormula.ts`](../apps/web/src/components/notes/mdx/sheetFormula.ts)) and **94 functions**
+  (`sheetFunctions*.ts`: the `SUMIFS` family with Excel's criteria and wildcards, `VLOOKUP`/`HLOOKUP`/`INDEX`/`MATCH`/`XLOOKUP`,
+  `IF` and its kind, text, `TEXT`, dates, rounding). The rules are Excel's and are in the files that hold them: coercion,
+  comparison and number-to-text (`sheetValue.ts`), arrays (`sheetMatrix.ts`), criteria (`sheetCriteria.ts`), the 1900 calendar with
+  its 29 February (`sheetDate.ts`). It reads the `formulas` block of S7 (`parseFormulas`, `E2 =C2*D2`, a line to a cell).
+- **Refinement for the owner to confirm: the formulas are drawn.** The plan's Step 2 was the engine alone. Without more, Gate C would
+  be tests nobody can look at, so the `<Sheet>` in the preview and the terminal app calculate the `formulas` block when they draw
+  (a cell shows its formula when pointed at; an unreadable line in the block is said). Nothing in Step 2 edits a sheet.
+- **What it will not do says so.** A function it lacks, another sheet, a table's `[Column]`, a name, a text Excel would read as a date,
+  a `TEXT` format with a time, a fraction or E notation, a formula that refers to itself or fills several cells: the cell is `#NAME?`,
+  its `unsupported` list says why (and so does every cell that depends on it), and nothing is guessed. Step 4 decides what to show
+  for an imported formula it could not calculate (S7: Excel's own value, "carried"); for one typed in, `#NAME?` is right.
+- **Checked against real Excel, not read from its documentation.** [`run-in-excel.mjs`](../spikes/sheet/run-in-excel.mjs) runs formulas in a
+  new Excel workbook and records the result; [`excel-verified-cases.json`](../spikes/sheet/excel-verified-cases.json) now holds **1,216**
+  of them, and `sheetFormula.excel.test.ts` runs each through the engine: all match. About 985 were written while building it, and then
+  **231 were held out**: written, run in Excel, and only then given to the engine. 131 of the first 135 matched at once (the
+  other four: three gaps, all arrays given where Excel lifts over them, now fixed, and one case that depends on where it sits, removed);
+  all 97 of the second round (arrays, errors, whole columns, text, formats) matched.
+- **Found by running Excel, which the documentation does not say** (each is a case): `IF("TRUE",…)` reads the text as a logical;
+  `AND(TRUE,"a")` ignores the text; `(-8)^(1/3)` is -2; a number goes to E notation only past 20 characters (`1E-18` is written out,
+  `1.5E-18` is not); a number typed in a formula is cut, not rounded, to 15 digits; `0.1+0.2-0.3` is 0 only as a formula's last step, and
+  `(0.1+0.2-0.3)` is not; `SUM(0.1,0.2,-0.3)` is 0 but `SUM(0.1,0.2,-0.3,0)` is not; `"1,2345"+0` is 12345 and `"1,23"+0` is `#VALUE!`;
+  `COUNTIF(r,"<>")` counts an empty text and `COUNTIF(r,"=")` does not; `MATCH` and `VLOOKUP` by approximate match run a binary
+  search that gives `West` for a key of `Zed` in an unsorted column; `XLOOKUP` with a missing 4th argument is `#N/A`, with `""` it is `""`.
+- **Safe:** Excel's own limits are enforced (64 levels of nesting, 8,192 characters), cells are calculated without recursion (a running
+  total down 5,000 rows, and one that has to look down it, both work), each range is read once however many formulas use it
+  (5,000 `SUMIFS` over 5,000 rows run in the test), and a formula that refers to itself is flagged, not looped on.
+- **Not decided by me, my picks to confirm:** (1) the CSV cell is read as Excel reads typed input (`typeCell`): `1,234`, `12%`, `$5` are numbers;
+  `007` stays text, so does a date (`2026-03-04`), and arithmetic on a date-like text is flagged rather than guessed (this is S12's
+  question, and Step 4 settles it); `TRUE` and `FALSE`, in capitals, are logicals. (2) The arrays and the dynamic-array functions follow Excel 365,
+  and numbers and text follow its US-English conventions (a comma between thousands, `.` the decimal point, English day and month names).
+- **Not checked:** the function list was chosen **without the owner's inventory run**, so it is my guess at what real workbooks use;
+  the owner's workbooks have not been through the engine (a script that compares the engine with a workbook's cached values is the
+  tool for that, and the import of Step 4 does the same); Excel for Windows and other versions (only Excel for Mac 16.114.4); the
+  light scheme, a narrow window, the desktop app's window; the terminal app in a real terminal; text order beyond what `Intl.Collator`
+  gives (Excel's was matched on 30 pairs of punctuation, digits, accents and `ß`; a Swift port will need its own collation).
+- **Known gaps** (each says so in the cell, none is wrong): `TODAY` and `NOW` (they change on their own, which the stored values do not),
+  `FILTER` `SORT` `UNIQUE` `LET` `LAMBDA` and the other dynamic-array functions, `OFFSET` and `INDIRECT`, `NETWORKDAYS` `DATEDIF`,
+  `STDEV` and the statistics beyond the ones listed, `ROW` of a whole column, `XLOOKUP` by binary search, a `CHAR` above 127.
+  `COUNTBLANK` of a whole column counts the cells the sheet holds, not Excel's million.
 
 **Step 3: the editor.** The dialog, `sheetSrc.ts`, the shortcut, the `<` menu entry, promote-a-table. **Gate D.**
 

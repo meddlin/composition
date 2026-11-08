@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { columnLabel, columnWidths, isErrorValue, isNumberCell, parseSheet, viewportHeight, type Sheet } from "./sheetData";
+import { columnLabel, columnWidths, isErrorValue, isNumberCell, parseFormulas, parseSheet, viewportHeight, type Sheet } from "./sheetData";
 
 const sheetOf = (csv: string): Sheet => {
   const parsed = parseSheet(csv);
@@ -48,6 +48,44 @@ describe("parseSheet", () => {
   it("handles a sheet far larger than a note would hold, without running out of stack", () => {
     const csv = `a,b\n${Array.from({ length: 150_000 }, (_, i) => `${i},x`).join("\n")}`;
     expect(sheetOf(csv).rows).toHaveLength(150_001);
+  });
+});
+
+describe("parseFormulas", () => {
+  it("reads a line to a cell, its address and its formula, in Excel's syntax", () => {
+    const { formulas, problems } = parseFormulas("E2 =C2*D2\nE3 =C3*D3\nC4 =SUM(C2:C3)");
+
+    expect([...formulas]).toEqual([
+      ["E2", "=C2*D2"],
+      ["E3", "=C3*D3"],
+      ["C4", "=SUM(C2:C3)"],
+    ]);
+    expect(problems).toEqual([]);
+  });
+
+  it("keeps spaces inside a formula and drops those around it, and writes the address in capitals without dollars", () => {
+    const { formulas } = parseFormulas('  e2   =IF(A1 = "a b", 1, 2)   \n$F$3\t=1');
+
+    expect(formulas.get("E2")).toBe('=IF(A1 = "a b", 1, 2)');
+    expect(formulas.get("F3")).toBe("=1");
+  });
+
+  it("takes the later line for a cell that is given twice, and passes over blank lines, and CRLF", () => {
+    const { formulas, problems } = parseFormulas("A1 =1\r\n\r\nA1 =2\r\n");
+
+    expect(formulas.get("A1")).toBe("=2");
+    expect(problems).toEqual([]);
+  });
+
+  it("counts the lines that are not a cell and a formula, from 1, and reads the others", () => {
+    const { formulas, problems } = parseFormulas("A1 =1\nnonsense\nA2 2+2\nXFE1 =1\nA0 =1\nA3 =3");
+
+    expect([...formulas.keys()]).toEqual(["A1", "A3"]);
+    expect(problems).toEqual([2, 3, 4, 5]);
+  });
+
+  it("reads no formulas from nothing", () => {
+    expect(parseFormulas("")).toEqual({ formulas: new Map(), problems: [] });
   });
 });
 
