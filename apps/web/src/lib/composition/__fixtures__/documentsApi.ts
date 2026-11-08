@@ -10,6 +10,7 @@ export function fakeDocumentsApi(over: Partial<DocumentsApi> = {}): DocumentsApi
     listDocuments: vi.fn(async () => []),
     importPdf: vi.fn(async () => ({ canceled: true })),
     importPdfCopy: vi.fn(async () => ({ canceled: true })),
+    importDroppedPdf: vi.fn(async () => ({ canceled: true })),
     setDocumentPageCount: vi.fn(async () => {}),
     saveDocumentViewState: vi.fn(async () => {}),
     listBookmarks: vi.fn(async () => []),

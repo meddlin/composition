@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import { API_METHODS } from "../../../web/src/lib/composition/api";
 import { ATTACHMENT_METHODS } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS } from "../../../web/src/lib/composition/backupApi";
@@ -12,7 +12,7 @@ import { ASSISTANT_METHODS, type AssistantEventMessage } from "../../../web/src/
 import { UPDATE_METHODS, type UpdateState } from "../../../web/src/lib/composition/updatesApi";
 import type { AppearanceMessage } from "../../../web/src/lib/composition/appearanceApi";
 import { WINDOW_METHODS } from "../../../web/src/lib/composition/windowApi";
-import { APPEARANCE_CHANNEL, ASSISTANT_EVENT_CHANNEL, channelFor, INITIAL_CHANNEL, POPOUT_CLOSED_CHANNEL, TODOS_CHANGED_CHANNEL, UPDATE_STATE_CHANNEL } from "../shared/channels";
+import { APPEARANCE_CHANNEL, ASSISTANT_EVENT_CHANNEL, channelFor, IMPORT_PDF_CHANNEL, INITIAL_CHANNEL, POPOUT_CLOSED_CHANNEL, TODOS_CHANGED_CHANNEL, UPDATE_STATE_CHANNEL } from "../shared/channels";
 
 /**
  * Exposes `window.composition`: every CompositionApi, AttachmentsApi, DocumentsApi, DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AI helper
@@ -26,6 +26,21 @@ const api = Object.fromEntries(
     (...args: unknown[]) => ipcRenderer.invoke(channelFor(method), ...args),
   ]),
 );
+
+/**
+ * A PDF dropped on the window. The page can hand over only the File the drop gave it: its path is read here, by Electron, from
+ * what the operating system supplied, and goes straight to the main process, which checks it. The page never sees the path,
+ * and a File it makes up has none (the answer is then an error, not an import).
+ */
+function importDroppedPdf(file: File, target: unknown): Promise<unknown> {
+  let path = "";
+  try {
+    path = webUtils.getPathForFile(file);
+  } catch {
+    // Not a File at all: main answers that there is nothing to import.
+  }
+  return ipcRenderer.invoke(channelFor("importDroppedPdf"), path, target);
+}
 
 /** Calls `listener` with each pushed update state; returns the function that stops listening. */
 function onUpdateState(listener: (state: UpdateState) => void): () => void {
@@ -55,6 +70,13 @@ function onTodosChanged(listener: () => void): () => void {
   return () => void ipcRenderer.removeListener(TODOS_CHANGED_CHANNEL, handler);
 }
 
+/** Calls `listener` each time the user picks File > Import PDF… (only the main window is told); returns the function that stops listening. */
+function onImportPdfRequest(listener: () => void): () => void {
+  const handler = () => listener();
+  ipcRenderer.on(IMPORT_PDF_CHANNEL, handler);
+  return () => void ipcRenderer.removeListener(IMPORT_PDF_CHANNEL, handler);
+}
+
 /** Calls `listener` with the id of each pop-out window the user closes; returns the function that stops listening. */
 function onPopoutClosed(listener: (windowId: string) => void): () => void {
   const handler = (_event: unknown, windowId: string) => listener(windowId);
@@ -64,8 +86,10 @@ function onPopoutClosed(listener: (windowId: string) => void): () => void {
 
 contextBridge.exposeInMainWorld("composition", {
   ...api,
+  importDroppedPdf,
   onAppearance,
   onTodosChanged,
+  onImportPdfRequest,
   onPopoutClosed,
   onUpdateState,
   onAssistantEvent,

@@ -44,6 +44,8 @@ type Props = {
   onCreate: (groupId: number | null) => void;
   /** Imports a PDF into a new note at the top level (or in the group); absent where there are no PDFs (the web app). */
   onImportPdf?: (groupId: number | null) => void;
+  /** Imports the PDF dropped on a group (or, with null, outside any group) into a new note there; absent where there are no PDFs. */
+  onDropPdf?: (files: File[], groupId: number | null) => void;
   onDelete: (id: number) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
@@ -75,6 +77,7 @@ export function NoteSidebar({
   onSelectGroup,
   onCreate,
   onImportPdf,
+  onDropPdf,
   onDelete,
   onCreateGroup,
   onRenameGroup,
@@ -199,6 +202,7 @@ export function NoteSidebar({
           onSelectGroup={onSelectGroup}
           onDeleteNote={onDelete}
           onCreateNote={onCreate}
+          onDropPdf={onDropPdf}
           onCreateGroup={onCreateGroup}
           onRenameGroup={onRenameGroup}
           onDeleteGroup={onDeleteGroup}

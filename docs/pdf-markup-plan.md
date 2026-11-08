@@ -281,8 +281,9 @@ Native marks stay editable and visible in other apps; flattened ones look identi
 writes native annotations with PDFKit. The desktop writes them with `@cantoo/pdf-lib` (MIT, a maintained fork of `pdf-lib`),
 chosen by spike D ([findings](#spike-d-findings-2026-11-07)): it writes the annotations with appearance streams, or burns
 them into the page for Flatten, and rewrites the whole file in a utility process with a progress bar. A text note goes through
-an embedded font, never a standard one. Export of a password-protected PDF writes an **unprotected** copy (the writer
-decrypts it), and asks for the password if the file needs one.
+an embedded font, never a standard one. **Export of a password-protected PDF** uses the password the reader opened it with and writes a copy **protected with the
+same password and the same limits on printing and copying** (the owner's choice, 2026-11-08; this section first said an unprotected copy, which would have left a readable
+copy of a private document on disk).
 
 ## Search
 
@@ -684,3 +685,32 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   design (M2 scope, tracker rows, C20 and C21), the sync design (documents and marks on the fast follow) and the positioning
   page. Nothing in the code changed. **Next: Gate P1, which is yours** (`docs/manual-tests/pdf.md`, on a real textbook and a real
   manual); then the iPad's M2 work, which waits for the iPad branch.
+- 2026-11-08: **Import gaps, item 1: dragging a PDF in** (P16). A `.pdf` dropped on a group (or Ungrouped) is imported into it; dropped anywhere else in
+  the window, into the open group page or the notebook's top level, with a hint while it is over the window. **The owner's choice:** the preload
+  script reads the dropped `File`'s path with `webUtils.getPathForFile` and sends it straight to the main process, so the page never names a
+  path and a `File` it makes up has none; main checks it (absolute, `.pdf`, a real file, not inside the data folder) before the import's own
+  checks and the duplicate question. One PDF at a time. The smoke test (`smoke:pdf`, now with the drag checks) drives it with Chromium's own
+  drag events. Picks: a drop is taken ahead of a note editor, which would read a file as text; a text file dragged in is left alone. Still to do:
+  the PDF's own title, the password prompt.
+- 2026-11-08: **Import gaps, item 2: File > Import PDF…** (P16). A menu item at the top of the File menu (with a separator under it) brings the main
+  window forward and tells its page to start the import its own button starts, into the group whose page is open or else the notebook's top level (the
+  same place a window drop goes); the page asks the main process to open the picker, so no path is involved. Added to `appMenu.test.ts` (placement) and
+  `importPdfRequest.test.ts` (the click), with `useImportPdfRequest.test.tsx` on the page side, and to `smoke:pdf` (menu content, top level, into an open group, cancel,
+  duplicate) and the bridge list in `smoke.mjs`. Picks: no keyboard shortcut (none is free that the editor does not use); the item does nothing while the Settings page
+  is showing; with no main window open it opens one and imports nothing. Still to do: the PDF's own title, the password prompt.
+- 2026-11-08: **Import gaps, item 3: the PDF's own title** (P16). When the reader opens a PDF whose note still has the title made from the file's name, and the PDF's
+  metadata has a sensible title (XMP `dc:title` first, then Info `Title`; not a placeholder, a file name, garbled, empty or over 200 characters), the note takes it,
+  through the workspace store, in its frontmatter, saved like any edit. A title the user changed is never replaced. Pick: **no stored "done" marker**; the test
+  is whether the note still has the file-derived title, which the change itself ends (a stored flag would have changed the view-state schema the iPad core
+  reproduces). Checked in the real app by `smoke:pdf` (a title taken, XMP over Info, a placeholder passed over, a note renamed before its PDF first opened
+  keeps its name); `pdf-fixture.mjs` can now write an Info title and an XMP title. Still to do: the password prompt.
+- 2026-11-08: **Import gaps, item 4: a prompt for a password-protected PDF.** When pdf.js raises `PasswordException`, the reader asks for the password in a small dialog,
+  tells a wrong one, and tries again; Cancel leaves the panel with an **Enter password…** button. The password is kept in memory only (the documents store, not in its
+  snapshot), so reopening the PDF in the same session does not ask again and a restart does; it is never stored or logged (the smoke test searches every file the app wrote
+  after quitting, and the console). **The owner's choice for export:** it takes the password and writes a copy **protected with the same password**, not an unprotected one:
+  same user password, the original's permission flags (read from the encryption dictionary the library leaves behind once it has decrypted the file; a test pins that), a
+  made-up owner password kept by no one, AES-256. Tested against pdf.js on AES-256, AES-128, RC4-128 and RC4-40 originals, and on a PDF that is only restricted (no password to
+  open; it now exports too, with its limits kept, where it used to be refused as "password-protected"). Checked in the real app by `smoke:pdf` (dialog, wrong then right
+  password, no second question, nothing written to disk, asked again after a restart, Cancel and Enter password…, export through the utility process read back). Picks:
+  the password box is emptied as soon as it is sent; a wrong password is asked for again with no limit; a PDF opened with an *owner* password exports with that as the copy's
+  password and keeps the original's limits. **With this, the four gaps Steps 1 to 6 left are built**; `docs/ui/pdf.md` no longer lists them as not built.

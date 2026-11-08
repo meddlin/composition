@@ -26,12 +26,32 @@ describe("the export worker", () => {
 
     const outcome = await runExport({ sourcePath: source, targetPath: target, marks: [highlight, note("Café ≤ Привет")], flatten: false });
 
-    expect(outcome).toEqual({ ok: true, written: 2, skipped: { ink: 0, offPage: 0 } });
+    expect(outcome).toEqual({ ok: true, written: 2, skipped: { ink: 0, offPage: 0 }, passwordProtected: false });
     const written = await PDFDocument.load(fs.readFileSync(target));
     expect(written.getPages()[0].node.Annots()?.size()).toBe(2);
     expect(fs.readdirSync(dir).sort()).toEqual(["in.pdf", "out.pdf"]);
     // the source is as it was
     expect((await PDFDocument.load(fs.readFileSync(source))).getPages()[0].node.Annots()).toBeUndefined();
+  });
+
+  it("opens a PDF that needs a password with the one it is given, and protects the copy with it", async () => {
+    const source = path.join(dir, "locked.pdf");
+    const target = path.join(dir, "out.pdf");
+    const doc = await PDFDocument.create();
+    doc.addPage([612, 792]);
+    doc.encrypt({ userPassword: "s3cret", ownerPassword: "owner" });
+    fs.writeFileSync(source, await doc.save());
+
+    const withoutIt = await runExport({ sourcePath: source, targetPath: target, marks: [highlight], flatten: false });
+    expect(withoutIt.ok === false && withoutIt.error).toMatch(/protected by a password/);
+    expect(fs.readdirSync(dir)).toEqual(["locked.pdf"]);
+
+    const outcome = await runExport({ sourcePath: source, targetPath: target, marks: [highlight], flatten: false, password: "s3cret" });
+
+    expect(outcome).toEqual({ ok: true, written: 1, skipped: { ink: 0, offPage: 0 }, passwordProtected: true });
+    await expect(PDFDocument.load(fs.readFileSync(target))).rejects.toThrow(/encrypted/);
+    expect((await PDFDocument.load(fs.readFileSync(target), { password: "s3cret" })).getPages()[0].node.Annots()?.size()).toBe(1);
+    expect(fs.readdirSync(dir).sort()).toEqual(["locked.pdf", "out.pdf"]);
   });
 
   it("says why, and writes nothing, when a text note cannot be written", async () => {

@@ -85,11 +85,16 @@ export type PdfCitation = {
 export type ExportPdfOptions = {
   /** Draw the marks into the pages (every app shows them the same, none can be edited) instead of adding annotations. */
   flatten: boolean;
+  /**
+   * The password the PDF was opened with, when it needs one. The one case where something the page typed goes to the main
+   * process: it unlocks the file for the export, which protects the copy with the same password. Never stored or logged.
+   */
+  password?: string;
 };
 
 /** What an export did, or why it did not: nothing is said of where, since the page never knows a path. */
 export type ExportPdfResult =
-  | { saved: true; fileName: string; written: number; skipped: { ink: number; offPage: number } }
+  | { saved: true; fileName: string; written: number; skipped: { ink: number; offPage: number }; passwordProtected: boolean }
   | { canceled: true }
   | { error: string };
 
@@ -124,6 +129,12 @@ export interface DocumentsApi {
   importPdf(target: ImportTarget): Promise<ImportPdfResult>;
   /** Imports the file a refused `importPdf` found a duplicate of (`token`), as a separate copy, into a new note. */
   importPdfCopy(token: string, target: ImportTarget): Promise<ImportPdfResult>;
+  /**
+   * Imports a PDF dropped on the window, into a new note in the target group. The page hands over the `File` the drop gave it;
+   * the preload script (not the page) reads its path and sends that to the main process, which checks it. The page never sees
+   * the path, and a File it makes up has none.
+   */
+  importDroppedPdf(file: File, target: ImportTarget): Promise<ImportPdfResult>;
   /** Records how many pages the reader counted. */
   setDocumentPageCount(documentId: number, pageCount: number): Promise<void>;
   /** Remembers where the reader was in a PDF. */
@@ -151,11 +162,20 @@ export interface DocumentsApi {
   restoreAnnotations(documentId: number, annotations: PdfAnnotation[]): Promise<PdfAnnotation[]>;
 }
 
+/**
+ * What the main process implements: DocumentsApi, except that a dropped file arrives as the path the preload script read from it
+ * (the page's `File` cannot cross the bridge).
+ */
+export type DocumentsHost = Omit<DocumentsApi, "importDroppedPdf"> & {
+  importDroppedPdf(path: string, target: ImportTarget): Promise<ImportPdfResult>;
+};
+
 /** Every method of DocumentsApi, as data; the check below fails to compile if one is missing (see API_METHODS in api.ts). */
 export const DOCUMENT_METHODS = [
   "listDocuments",
   "importPdf",
   "importPdfCopy",
+  "importDroppedPdf",
   "setDocumentPageCount",
   "saveDocumentViewState",
   "listBookmarks",

@@ -12,6 +12,8 @@ afterEach(cleanup);
 
 const note = (id: number, title = `Note ${id}`): Note => ({ id, title, content: "", tags: "", description: "", createdAt: "x", updatedAt: "x", groupId: null, notebookId: 1 });
 const pdf = (id: number, noteId: number): PdfDocument => ({ id, uuid: String(id).padStart(32, "0"), noteId, fileName: `book${id}.pdf`, size: 10, pageCount: 0, viewState: {}, createdAt: "x" });
+const dropped = new File(["%PDF-1.7"], "Dropped.pdf", { type: "application/pdf" });
+const other = new File(["%PDF-1.7"], "Other.pdf", { type: "application/pdf" });
 const contents: PdfContents = { fileName: "book10.pdf", size: 212_000_000, marks: { highlight: 41, underline: 0, strikethrough: 0, text: 0, ink: 2 }, inkPages: 2, bookmarks: 6, citingNotes: 3 };
 
 function setup(over: Partial<DocumentsApi> = {}, { available = true, notes = [note(1), note(2, "Textbook")] } = {}) {
@@ -28,6 +30,8 @@ function setup(over: Partial<DocumentsApi> = {}, { available = true, notes = [no
     return (
       <div>
         {actions.onImportPdf && <button onClick={() => actions.onImportPdf?.(4, 1)}>import a pdf</button>}
+        {actions.onDropPdf && <button onClick={() => actions.onDropPdf?.([dropped, other], 4, 1)}>drop two pdfs</button>}
+        {actions.onDropPdf && <button onClick={() => actions.onDropPdf?.([dropped], 4, 1)}>drop a pdf</button>}
         <button onClick={() => actions.onDelete(2)}>delete textbook</button>
         <button onClick={() => actions.onDelete(1)}>delete note</button>
         {groupError && <p role="alert">{groupError}</p>}
@@ -127,6 +131,61 @@ describe("importing a PDF from the sidebar", () => {
       await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
       expect(api.importPdfCopy).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("importing a PDF dropped on the window or a group", () => {
+  it("is offered only where there are PDFs", () => {
+    setup({}, { available: false });
+
+    expect(screen.queryByRole("button", { name: "drop a pdf" })).toBeNull();
+  });
+
+  it("imports the file into the group and notebook it was dropped on, and tells the window a note was made", async () => {
+    const made: ImportPdfResult = { note: note(5) as never, document: pdf(50, 5) };
+    const { api, onCreated, store } = setup({ importDroppedPdf: vi.fn(async () => made) });
+
+    fireEvent.click(screen.getByRole("button", { name: "drop a pdf" }));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalled());
+    expect(api.importDroppedPdf).toHaveBeenCalledWith(dropped, { groupId: 4, notebookId: 1 });
+    expect(store.getSnapshot().notes.map((n) => n.id)).toContain(5);
+  });
+
+  it("imports only the first of several PDFs, and says the others were not", async () => {
+    const made: ImportPdfResult = { note: note(5) as never, document: pdf(50, 5) };
+    const { api } = setup({ importDroppedPdf: vi.fn(async () => made) });
+
+    fireEvent.click(screen.getByRole("button", { name: "drop two pdfs" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Only one PDF is imported at a time; drop the others again.");
+    expect(api.importDroppedPdf).toHaveBeenCalledTimes(1);
+    expect(api.importDroppedPdf).toHaveBeenCalledWith(dropped, { groupId: 4, notebookId: 1 });
+  });
+
+  it("says why a dropped file was refused, instead of the note about the others", async () => {
+    setup({ importDroppedPdf: vi.fn(async () => ({ error: "Dropped.pdf: this is already inside Composition's own data folder." })) });
+
+    fireEvent.click(screen.getByRole("button", { name: "drop two pdfs" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe("Dropped.pdf: this is already inside Composition's own data folder.");
+  });
+
+  it("asks about a PDF already in the library, and imports a separate copy into the place it was dropped", async () => {
+    const copy: ImportPdfResult = { note: note(6, "Dropped copy") as never, document: pdf(60, 6) };
+    const { api, store } = setup({
+      importDroppedPdf: vi.fn(async () => ({ duplicate: { token: "tok", fileName: "Dropped.pdf", existing: [{ document: pdf(10, 2), noteTitle: "Textbook" }] } })),
+      importPdfCopy: vi.fn(async () => copy),
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "drop a pdf" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("“Dropped.pdf” has exactly the same contents as “Textbook”");
+    expect(api.importPdfCopy).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Import a separate copy" }));
+
+    await waitFor(() => expect(api.importPdfCopy).toHaveBeenCalledWith("tok", { groupId: 4, notebookId: 1 }));
+    await waitFor(() => expect(store.getSnapshot().notes.map((n) => n.id)).toContain(6));
   });
 });
 
