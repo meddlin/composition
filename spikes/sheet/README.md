@@ -25,12 +25,28 @@ node spikes/sheet/inventory.mjs a.xlsx b.xlsx c.xlsx      # several at once, wit
 
 Bring the output back and it settles how large the formula engine has to be.
 
-## `excel-verified-cases.json`
+## `excel-verified-cases.json` and `run-in-excel.mjs`: the engine's tests, from real Excel
 
-34 cases (`SUMIFS` family, `COUNTIF`, lookups, `ROUND`, `TEXT`, dates) that were each run in real Microsoft
-Excel for Mac 16.114.4 on 2026-11-07: the data and formulas in `layout` and `cases[].formula` were entered into a
-new workbook and `cases[].excel` is what Excel returned. They are the first test cases for our own engine
-(`mdx/sheetFormula.ts`, Step 2). Add more the same way; Excel, not a reading of its documentation, decides.
+More than 1,200 formulas, each run in real Microsoft Excel for Mac, with what Excel returned. They are the test cases
+of the formula engine (`apps/web/src/components/notes/mdx/sheetFormula.ts`), which must give the same: the test is
+`sheetFormula.excel.test.ts`. Excel, not a reading of its documentation, is the spec.
+
+- `cells`: the sheet the formulas run in (a number, a boolean, a text, `{ "text": "1" }` for a number stored as text, or
+  `{ "formula": "=B1+1" }` for a cell that is a formula). `ranges`: names for use as `{NAME}` in a formula.
+- `cases`: `{ label, formula, excel }`. `excel` is a number, a text, a boolean, or `{ "error": "#N/A" }`.
+
+To add a case, add `{ "label": "...", "formula": "..." }` (no `excel`) and run:
+
+```bash
+node spikes/sheet/run-in-excel.mjs            # run the cases that have no result yet
+node spikes/sheet/run-in-excel.mjs --all      # run them all again and report any that changed
+node spikes/sheet/run-in-excel.mjs --dry-run  # print the AppleScript, run nothing
+```
+
+It builds `cells` in a **new** workbook, enters each formula with `formula2` (Excel's dynamic-array mode), reads the
+results back, and closes the workbook without saving; nothing you have open is touched. It needs Excel on a Mac, and the first
+run asks macOS for permission to control it. A formula that depends on where it is (`ROW()`, `SUM(2:2)`) cannot be a case:
+the results are all in one column.
 
 ## What is not here
 
