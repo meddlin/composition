@@ -18,13 +18,19 @@ function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
     renameBookmark: vi.fn(async () => null),
     removeBookmark: vi.fn(async () => {}),
     describeDocument: vi.fn(async () => null),
+    documentForExport: vi.fn(() => ({ path: "/library/documents/abc-book.pdf", fileName: "book.pdf", marks: [] as never[] })),
     listAnnotations: vi.fn(async () => []),
     addAnnotations: vi.fn(async () => []),
     updateAnnotation: vi.fn(async () => null),
     deleteAnnotation: vi.fn(async () => []),
     restoreAnnotations: vi.fn(async () => []),
   };
-  const nativeUi: DocumentUi = { pickPdf: vi.fn(async () => "/inbox/book.pdf"), ...ui };
+  const nativeUi: DocumentUi = {
+    pickPdf: vi.fn(async () => "/inbox/book.pdf"),
+    pickExportPath: vi.fn(async () => "/out/book (annotated).pdf"),
+    exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 } })),
+    ...ui,
+  };
   return { api: createDocumentsApi(service, nativeUi), service, ui: nativeUi };
 }
 
@@ -123,5 +129,53 @@ describe("the rest", () => {
     expect(service.updateAnnotation).toHaveBeenCalledWith(2, { color: "pink" });
     expect(service.deleteAnnotation).toHaveBeenCalledWith(2);
     expect(service.restoreAnnotations).toHaveBeenCalledWith(1, []);
+  });
+});
+
+describe("exportDocument", () => {
+  const options = { flatten: false };
+
+  it("asks where to save, offering the PDF's name with (annotated), and has the copy written there with the marks", async () => {
+    const marks = [{ id: 1 }] as never[];
+    const { api, service, ui } = setup({ status: "refused", error: "x" });
+    service.documentForExport.mockReturnValue({ path: "/library/documents/abc-book.pdf", fileName: "book.pdf", marks });
+
+    const result = await api.exportDocument(1, { flatten: true });
+
+    expect(ui.pickExportPath).toHaveBeenCalledWith("book (annotated).pdf");
+    expect(ui.exportPdf).toHaveBeenCalledWith({ sourcePath: "/library/documents/abc-book.pdf", targetPath: "/out/book (annotated).pdf", marks, flatten: true });
+    expect(result).toEqual({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 } });
+  });
+
+  it("does nothing when the dialog is cancelled", async () => {
+    const { api, ui } = setup({ status: "refused", error: "x" }, { pickExportPath: vi.fn(async () => null) });
+
+    expect(await api.exportDocument(1, options)).toEqual({ canceled: true });
+    expect(ui.exportPdf).not.toHaveBeenCalled();
+  });
+
+  it("says so when the PDF is gone, without asking where to save", async () => {
+    const { api, service, ui } = setup({ status: "refused", error: "x" });
+    service.documentForExport.mockReturnValue(null as never);
+
+    expect(await api.exportDocument(1, options)).toEqual({ error: "This PDF is no longer in the library." });
+    expect(ui.pickExportPath).not.toHaveBeenCalled();
+  });
+
+  it("never overwrites the PDF in the library, even when the dialog is pointed at it", async () => {
+    const { api, ui } = setup({ status: "refused", error: "x" }, { pickExportPath: vi.fn(async () => "/library/documents/../documents/abc-book.pdf") });
+
+    const result = await api.exportDocument(1, options);
+
+    expect(result).toEqual({ error: "Choose another file: the PDF in the library is never overwritten." });
+    expect(ui.exportPdf).not.toHaveBeenCalled();
+  });
+
+  it("passes on why an export failed, and what it left out when it did not", async () => {
+    const failed = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: false as const, error: "A text note has characters that cannot be written." })) });
+    expect(await failed.api.exportDocument(1, options)).toEqual({ error: "A text note has characters that cannot be written." });
+
+    const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 } })) });
+    expect(await partial.api.exportDocument(1, options)).toMatchObject({ saved: true, written: 2, skipped: { ink: 1, offPage: 0 } });
   });
 });

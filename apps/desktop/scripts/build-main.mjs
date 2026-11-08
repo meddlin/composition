@@ -23,6 +23,15 @@ const common = {
 
 const configs = [
   {
+    // The PDF export runs in a utility process of its own (src/main/exportProcess.ts). Everything it needs is bundled, the two
+    // fonts for text notes as bytes, so that it is one file that can be started from the unpacked part of the app.
+    ...common,
+    entryPoints: ["src/worker/exportWorker.ts"],
+    outfile: "dist/export-worker.js",
+    loader: { ".ttf": "binary" },
+    external: ["electron"],
+  },
+  {
     ...common,
     entryPoints: ["src/main/index.ts"],
     outfile: "dist/main.js",

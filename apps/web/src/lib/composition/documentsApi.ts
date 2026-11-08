@@ -81,6 +81,18 @@ export type PdfCitation = {
   marks: string[];
 };
 
+/** How a PDF is exported with its marks. */
+export type ExportPdfOptions = {
+  /** Draw the marks into the pages (every app shows them the same, none can be edited) instead of adding annotations. */
+  flatten: boolean;
+};
+
+/** What an export did, or why it did not: nothing is said of where, since the page never knows a path. */
+export type ExportPdfResult =
+  | { saved: true; fileName: string; written: number; skipped: { ink: number; offPage: number } }
+  | { canceled: true }
+  | { error: string };
+
 /** Where an imported PDF's note goes: the group and notebook the sidebar is on. */
 export type ImportTarget = { groupId: number | null; notebookId: number };
 
@@ -122,6 +134,11 @@ export interface DocumentsApi {
   removeBookmark(bookmarkId: number): Promise<void>;
   /** What deleting the note would take with it; null when the note owns no PDF. */
   describeDocument(noteId: number): Promise<PdfContents | null>;
+  /**
+   * Writes a copy of the PDF with its marks in it, to a file the user chooses in the operating system's own dialog (the page
+   * never names a path). The PDF in the library is not changed.
+   */
+  exportDocument(documentId: number, options: ExportPdfOptions): Promise<ExportPdfResult>;
   /** Every mark of a PDF, by page. */
   listAnnotations(documentId: number): Promise<PdfAnnotation[]>;
   /** Makes the marks of one selection: one per page it covers, tied together when there are several. Refuses all or none. */
@@ -146,6 +163,7 @@ export const DOCUMENT_METHODS = [
   "renameBookmark",
   "removeBookmark",
   "describeDocument",
+  "exportDocument",
   "listAnnotations",
   "addAnnotations",
   "updateAnnotation",

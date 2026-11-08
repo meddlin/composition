@@ -1,11 +1,12 @@
 import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 import { broadcastAppearance, notifyAppearanceChanges, notifyTranslucencyChange, type AppearanceMessage } from "./appearance";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { createDocumentsApi } from "./documents";
+import { runExport, workerPath } from "./exportProcess";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
@@ -115,8 +116,19 @@ const attachments = createAttachmentsApi(service, {
   reveal: (file) => shell.showItemInFolder(file),
 });
 
-// A PDF to import is chosen in a native dialog too; the page is only told which note and PDF came of it.
+// A PDF to import is chosen in a native dialog too; the page is only told which note and PDF came of it. Exporting one asks
+// for the file to save in a native dialog, and writes it in a utility process (exportProcess.ts).
 const documents = createDocumentsApi(service, {
+  async pickExportPath(defaultName) {
+    const options = { defaultPath: defaultName, filters: [{ name: "PDF", extensions: ["pdf"] }] };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, options)
+      : await dialog.showSaveDialog(options);
+    return canceled || !filePath ? null : filePath;
+  },
+  exportPdf: (job) =>
+    runExport(() => utilityProcess.fork(workerPath(__dirname), [], { serviceName: "Composition PDF export", stdio: "ignore" }), job),
   async pickPdf() {
     const options = {
       properties: ["openFile"] as "openFile"[],

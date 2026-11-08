@@ -211,6 +211,14 @@ try {
   );
   check("the initial theme is applied before paint", posture.theme === "dark", posture.theme);
 
+  // The PDF export runs in a utility process, which is started from a real file: in a packaged app, the copy of its script
+  // that electron-builder unpacks from the archive (asarUnpack in electron-builder.yml).
+  if (packaged) {
+    const resources = await app.evaluate(() => process.resourcesPath);
+    const worker = path.join(resources, "app.asar.unpacked", "dist", "export-worker.js");
+    check("the PDF export worker is unpacked from the app archive, where a child process can start it", fs.existsSync(worker) && fs.statSync(worker).size > 1_000_000, worker);
+  }
+
   // ---- Navigation: desktop has no Docs viewer
   check("no Docs link in the sidebar", (await page.getByRole("link", { name: "Docs" }).count()) === 0);
   check("Settings link is present", (await page.getByRole("link", { name: "Settings" }).count()) === 1);

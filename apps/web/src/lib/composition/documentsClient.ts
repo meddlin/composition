@@ -24,6 +24,7 @@ export const addBookmark: DocumentsApi["addBookmark"] = (id, page, label) => bri
 export const renameBookmark: DocumentsApi["renameBookmark"] = (id, label) => bridge().renameBookmark(id, label);
 export const removeBookmark: DocumentsApi["removeBookmark"] = (id) => bridge().removeBookmark(id);
 export const describeDocument: DocumentsApi["describeDocument"] = (noteId) => bridge().describeDocument(noteId);
+export const exportDocument: DocumentsApi["exportDocument"] = (id, options) => bridge().exportDocument(id, options);
 export const listAnnotations: DocumentsApi["listAnnotations"] = (id) => bridge().listAnnotations(id);
 export const addAnnotations: DocumentsApi["addAnnotations"] = (id, inputs) => bridge().addAnnotations(id, inputs);
 export const updateAnnotation: DocumentsApi["updateAnnotation"] = (id, changes) => bridge().updateAnnotation(id, changes);

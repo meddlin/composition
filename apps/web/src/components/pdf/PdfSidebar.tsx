@@ -206,11 +206,15 @@ export function HighlightList({
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [filter, setFilter] = useState("");
   if (marks.length === 0) {
     return <p className="px-3 py-2 text-sm text-muted-foreground">No highlights yet. Select text on a page and choose a highlight, an underline or a strikethrough.</p>;
   }
 
-  const pages = [...new Set(marks.map((m) => m.page))];
+  // What is typed narrows the list to the marks whose words, comment or text note say it (case aside).
+  const wanted = filter.trim().toLowerCase();
+  const shown = wanted === "" ? marks : marks.filter((m) => `${markText(m)}\n${m.comment}`.toLowerCase().includes(wanted));
+  const pages = [...new Set(shown.map((m) => m.page))];
   function jump(mark: PdfAnnotation) {
     onSelect(mark);
     const rect = mark.rects?.[0] ?? (mark.body as Partial<PdfTextNoteBody> | null)?.rect;
@@ -219,80 +223,84 @@ export function HighlightList({
   }
 
   return (
-    <div aria-label="Highlights" role="list" className="py-1 text-sm">
-      {pages.map((page) => (
-        <div key={page} role="listitem">
-          <div className="px-3 pb-0.5 pt-2 text-xs font-medium text-muted-foreground">Page {pageName(page + 1, labels)}</div>
-          <ul>
-            {marks
-              .filter((m) => m.page === page)
-              .map((mark) => {
-                const Icon = KIND_ICON[mark.kind];
-                const quoted = quotedIn?.(mark.uuid) ?? [];
-                return (
-                  <li key={mark.id} data-mark-id={mark.id} className={cn("group flex items-start gap-1.5 px-2 py-0.5", mark.id === selectedId && "bg-accent/60")}>
-                    <span style={{ background: paintFor(mark.color).fill }} className="mt-1 flex size-5 shrink-0 items-center justify-center rounded">
-                      <Icon className="size-3.5" aria-label={mark.kind} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <button type="button" onClick={() => jump(mark)} className="block w-full rounded px-1 text-left hover:bg-accent hover:text-accent-foreground">
-                        <span className="line-clamp-3">{markText(mark)}</span>
-                      </button>
-                      {editing === mark.id ? (
-                        <Input
-                          autoFocus
-                          aria-label="Comment"
-                          value={draft}
-                          maxLength={500}
-                          onChange={(event) => setDraft(event.target.value)}
-                          onBlur={() => {
-                            setEditing(null);
-                            if (draft !== mark.comment) onComment(mark, draft);
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") event.currentTarget.blur();
-                            if (event.key === "Escape") {
-                              setDraft(mark.comment);
-                              setEditing(null);
-                            }
-                          }}
-                          className="mt-0.5 h-7"
-                        />
-                      ) : (
-                        mark.kind !== "ink" &&
-                        mark.kind !== "text" && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setDraft(mark.comment);
-                              setEditing(mark.id);
-                            }}
-                            className="block w-full truncate rounded px-1 text-left text-xs text-muted-foreground hover:text-foreground"
-                          >
-                            {mark.comment || "Add a comment"}
-                          </button>
-                        )
-                      )}
-                    </div>
-                    {quoted.length > 0 && (
-                      <span title={`Quoted in ${quoted.join(", ")}`} aria-label={`Quoted in ${quoted.join(", ")}`} className="mt-1 flex size-5 shrink-0 items-center justify-center text-muted-foreground">
-                        <QuoteIcon className="size-3.5" />
+    <div className="py-1 text-sm">
+      <Input aria-label="Filter highlights" placeholder="Filter highlights" value={filter} onChange={(event) => setFilter(event.target.value)} className="mx-2 mb-1 h-7 w-[calc(100%-1rem)]" />
+      {shown.length === 0 && <p className="px-3 py-2 text-muted-foreground">No highlight says that.</p>}
+      <div aria-label="Highlights" role="list">
+        {pages.map((page) => (
+          <div key={page} role="listitem">
+            <div className="px-3 pb-0.5 pt-2 text-xs font-medium text-muted-foreground">Page {pageName(page + 1, labels)}</div>
+            <ul>
+              {shown
+                .filter((m) => m.page === page)
+                .map((mark) => {
+                  const Icon = KIND_ICON[mark.kind];
+                  const quoted = quotedIn?.(mark.uuid) ?? [];
+                  return (
+                    <li key={mark.id} data-mark-id={mark.id} className={cn("group flex items-start gap-1.5 px-2 py-0.5", mark.id === selectedId && "bg-accent/60")}>
+                      <span style={{ background: paintFor(mark.color).fill }} className="mt-1 flex size-5 shrink-0 items-center justify-center rounded">
+                        <Icon className="size-3.5" aria-label={mark.kind} />
                       </span>
-                    )}
-                    {onQuote && mark.quote !== "" && (
-                      <Button variant="ghost" size="icon-xs" aria-label={`Quote the ${mark.kind} on page ${pageName(page + 1, labels)}`} title="Quote these words into the note beside the PDF" onClick={() => onQuote(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
-                        <QuoteIcon />
+                      <div className="min-w-0 flex-1">
+                        <button type="button" onClick={() => jump(mark)} className="block w-full rounded px-1 text-left hover:bg-accent hover:text-accent-foreground">
+                          <span className="line-clamp-3">{markText(mark)}</span>
+                        </button>
+                        {editing === mark.id ? (
+                          <Input
+                            autoFocus
+                            aria-label="Comment"
+                            value={draft}
+                            maxLength={500}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onBlur={() => {
+                              setEditing(null);
+                              if (draft !== mark.comment) onComment(mark, draft);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") event.currentTarget.blur();
+                              if (event.key === "Escape") {
+                                setDraft(mark.comment);
+                                setEditing(null);
+                              }
+                            }}
+                            className="mt-0.5 h-7"
+                          />
+                        ) : (
+                          mark.kind !== "ink" &&
+                          mark.kind !== "text" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDraft(mark.comment);
+                                setEditing(mark.id);
+                              }}
+                              className="block w-full truncate rounded px-1 text-left text-xs text-muted-foreground hover:text-foreground"
+                            >
+                              {mark.comment || "Add a comment"}
+                            </button>
+                          )
+                        )}
+                      </div>
+                      {quoted.length > 0 && (
+                        <span title={`Quoted in ${quoted.join(", ")}`} aria-label={`Quoted in ${quoted.join(", ")}`} className="mt-1 flex size-5 shrink-0 items-center justify-center text-muted-foreground">
+                          <QuoteIcon className="size-3.5" />
+                        </span>
+                      )}
+                      {onQuote && mark.quote !== "" && (
+                        <Button variant="ghost" size="icon-xs" aria-label={`Quote the ${mark.kind} on page ${pageName(page + 1, labels)}`} title="Quote these words into the note beside the PDF" onClick={() => onQuote(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                          <QuoteIcon />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="icon-xs" aria-label={`Delete the ${mark.kind} on page ${pageName(page + 1, labels)}`} onClick={() => onDelete(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
+                        <Trash2Icon />
                       </Button>
-                    )}
-                    <Button variant="ghost" size="icon-xs" aria-label={`Delete the ${mark.kind} on page ${pageName(page + 1, labels)}`} onClick={() => onDelete(mark)} className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100">
-                      <Trash2Icon />
-                    </Button>
-                  </li>
-                );
-              })}
-          </ul>
-        </div>
-      ))}
+                    </li>
+                  );
+                })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

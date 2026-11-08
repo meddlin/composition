@@ -120,6 +120,13 @@ const packages = new Map([
     "js-yaml",
     // The PDF reader (Apache-2.0); its worker and assets also travel inside the renderer, with their own LICENSE (pnpm copy:pdfjs).
     "pdfjs-dist",
+    // Export annotated PDF (src/worker/exportWorker.ts, bundled into dist/export-worker.js): the writer, fontkit to embed a font in
+    // it, and the two fonts a text note is written in (Noto Sans and Noto Sans Math, SIL Open Font License 1.1, whose text is
+    // LICENSE_FONT in each package).
+    "@cantoo/pdf-lib",
+    "fontkit",
+    "@expo-google-fonts/noto-sans",
+    "@expo-google-fonts/noto-sans-math",
   ]),
   // better-sqlite3 is a native module loaded at runtime from node_modules.
   // The RSS Reader's feed parser, bundled into the main process (esbuild) with its own dependencies.
@@ -131,7 +138,7 @@ const packages = new Map([
     : (warnings.push("apps/cli has no node_modules, so the command line tool's packages are missing from THIRD_PARTY_NOTICES.txt."), [])),
 ]);
 
-const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.|-|$)/i;
+const LICENSE_FILE = /^(licen[cs]e|copying|notice)(\.|-|_|$)/i;
 const sections = [];
 for (const [key, dir] of [...packages].sort(([a], [b]) => a.localeCompare(b))) {
   let license = "unknown";

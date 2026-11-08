@@ -17,6 +17,7 @@ export function fakeDocumentsApi(over: Partial<DocumentsApi> = {}): DocumentsApi
     renameBookmark: vi.fn(async () => null),
     removeBookmark: vi.fn(async () => {}),
     describeDocument: vi.fn(async () => null),
+    exportDocument: vi.fn(async () => ({ canceled: true as const })),
     listAnnotations: vi.fn(async () => []),
     addAnnotations: vi.fn(async () => []),
     updateAnnotation: vi.fn(async () => null),

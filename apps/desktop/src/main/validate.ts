@@ -263,6 +263,12 @@ function records(method: string, value: unknown, name: string, limit: number): R
   return value.map((item) => record(method, item, name));
 }
 
+/** How to export: only whether to flatten, as a real boolean. */
+function exportOptions(method: string, value: unknown): { flatten: boolean } {
+  const given = record(method, value, "options");
+  return typeof given.flatten === "boolean" ? { flatten: given.flatten } : fail(method, "options");
+}
+
 /** Arguments of the desktop-only PDF methods (see documents.ts). Ids and a target only: no path ever comes from the renderer. */
 export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   listDocuments: none,
@@ -275,6 +281,7 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   renameBookmark: ([bookmarkId, label]) => [id("renameBookmark", bookmarkId, "bookmarkId"), text("renameBookmark", label, "label")],
   removeBookmark: ([bookmarkId]) => [id("removeBookmark", bookmarkId, "bookmarkId")],
   describeDocument: ([noteId]) => [id("describeDocument", noteId, "noteId")],
+  exportDocument: ([documentId, options]) => [id("exportDocument", documentId, "documentId"), exportOptions("exportDocument", options)],
   listAnnotations: ([documentId]) => [id("listAnnotations", documentId, "documentId")],
   addAnnotations: ([documentId, inputs]) => [id("addAnnotations", documentId, "documentId"), records("addAnnotations", inputs, "inputs", MAX_MARKS_AT_ONCE)],
   updateAnnotation: ([annotationId, changes]) => [id("updateAnnotation", annotationId, "annotationId"), record("updateAnnotation", changes, "changes")],

@@ -10,11 +10,14 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import electronPath from "electron";
 import { _electron as electron } from "playwright-core";
 import { makeTestPdf, pageText } from "./pdf-fixture.mjs";
 
 const desktopDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// The export's result is read back with the writer's own library, which the web package has.
+const { PDFDocument, PDFDict, PDFName } = createRequire(path.join(desktopDir, "../web/package.json"))("@cantoo/pdf-lib");
 const packaged = process.env.SMOKE_EXECUTABLE;
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-pdf-smoke-"));
 const userData = path.join(home, "userData");
@@ -378,6 +381,43 @@ try {
   await pageBox.fill("6");
   await pageBox.press("Enter");
   await waitFor(async () => (await documents(page))[0]?.viewState.page === 5, { timeout: 8000 });
+
+  // ---- Export a copy with the marks in it, native and then flattened
+  /** The annotation kinds on each page of a written PDF, counted, and how many pages it has. */
+  async function readBack(file) {
+    const written = await PDFDocument.load(fs.readFileSync(file));
+    const kinds = {};
+    for (const written_page of written.getPages()) {
+      for (const entry of written_page.node.Annots()?.asArray() ?? []) {
+        const kind = written.context.lookup(entry, PDFDict).lookup(PDFName.of("Subtype")).toString();
+        kinds[kind] = (kinds[kind] ?? 0) + 1;
+      }
+    }
+    return { kinds, pages: written.getPageCount() };
+  }
+  const exportTo = async (file, { flatten }) => {
+    await app.evaluate(({ dialog }, chosen) => void (dialog.showSaveDialog = async () => ({ canceled: false, filePath: chosen })), file);
+    await reader.getByRole("button", { name: "Export annotated PDF" }).click();
+    const exportDialog = page.getByRole("dialog", { name: "Export annotated PDF" });
+    if (flatten) await exportDialog.getByRole("checkbox", { name: "Flatten markup" }).click();
+    await exportDialog.getByRole("button", { name: "Export…" }).click();
+    return reader.getByRole("status").filter({ hasText: /^Saved/ }).innerText({ timeout: 60_000 });
+  };
+  const nativeCopy = path.join(home, "exported.pdf");
+  const nativeSaid = await exportTo(nativeCopy, { flatten: false });
+  const native = await readBack(nativeCopy);
+  check("Export asks where to save, writes the copy out of the main process and says how many marks it holds", /^Saved “exported\.pdf” with \d+ marks?\./.test(nativeSaid), nativeSaid);
+  check("the copy's marks are native annotations: the highlights, the underline and the text note", native.kinds["/Highlight"] === 3 && native.kinds["/Underline"] === 1 && native.kinds["/FreeText"] === 1 && native.pages === 12, JSON.stringify(native));
+  const flatCopy = path.join(home, "exported-flat.pdf");
+  await reader.getByRole("button", { name: "Dismiss" }).click();
+  await exportTo(flatCopy, { flatten: true });
+  const flat = await readBack(flatCopy);
+  check("flattened, the marks are drawn into the pages and no annotation is left", Object.keys(flat.kinds).length === 0 && flat.pages === 12 && fs.statSync(flatCopy).size > fs.statSync(pdfFile).size, JSON.stringify(flat));
+  const libraryFile = path.join(home, ".composition", "documents", fs.readdirSync(path.join(home, ".composition", "documents"))[0]);
+  check("the PDF in the library is exactly as it was imported", Buffer.compare(fs.readFileSync(libraryFile), fs.readFileSync(pdfFile)) === 0);
+  check("no partial file is left beside the copies", fs.readdirSync(home).every((name) => !name.endsWith(".part")));
+  await page.screenshot({ path: path.join(out, "pdf-exported.png") });
+  await reader.getByRole("button", { name: "Dismiss" }).click();
 
   // ---- A second import of the same file asks first
   await pick(app, copyFile);

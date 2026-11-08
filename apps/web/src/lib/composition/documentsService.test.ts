@@ -248,6 +248,108 @@ describe("describeCitingNotes", () => {
   });
 });
 
+describe("what a PDF's owner note is found by", () => {
+  async function importBook() {
+    const { service, notes, notebook } = await setup();
+    const marks = await import("./pdfMarkupRepo");
+    const result = await service.importPdf(pdf("book.pdf"), { groupId: null, notebookId: notebook.id });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    return { service, notes, marks, note: result.note, document: result.document };
+  }
+  const rect = [[0, 0, 5, 5]];
+
+  it("is the words of its marks and bookmarks, one per line by page, with a text note's words and each comment", async () => {
+    const { marks, note, document } = await importBook();
+    marks.addAnnotation(document.id, { page: 4, kind: "underline", color: "green", rects: rect, quote: "B-tree nodes split", comment: "key idea" });
+    marks.addAnnotation(document.id, { page: 1, kind: "highlight", color: "yellow", rects: rect, quote: "an early line" });
+    marks.addAnnotation(document.id, { page: 2, kind: "text", color: "yellow", body: { rect: [0, 0, 50, 20], text: "my own words" } });
+    marks.addBookmark(document.id, 3, "Chapter on indexes");
+    marks.addAnnotation(document.id, { page: 5, kind: "ink", color: "black", body: { strokes: [] } });
+
+    const found = marks.marksSearchText(note.id);
+
+    expect(found.get(note.id)).toBe("an early line\nmy own words\nB-tree nodes split\nkey idea\nChapter on indexes");
+    expect([...found.keys()]).toEqual([note.id]);
+  });
+
+  it("is nothing for a note that owns no PDF, or a PDF nobody has marked", async () => {
+    const { marks, notes, note } = await importBook();
+    const other = notes.createNote("Plain");
+
+    expect(marks.marksSearchText(other.id).size).toBe(0);
+    expect(marks.marksSearchText(note.id).size).toBe(0);
+    expect(marks.marksSearchText().size).toBe(0);
+  });
+
+  it("is listed for every owner note when the whole index is rebuilt", async () => {
+    const { service, marks, note, document } = await importBook();
+    const notebookId = (await import("./notebooksRepo")).listNotebooks()[0].id;
+    const result = await service.importPdf(pdf("other.pdf", "different bytes"), { groupId: null, notebookId });
+    if (result.status !== "added") throw new Error("expected an added PDF");
+    marks.addAnnotation(document.id, { page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "first book" });
+    marks.addAnnotation(result.document.id, { page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "second book" });
+
+    const everything = marks.marksSearchText();
+
+    expect(everything.get(note.id)).toBe("first book");
+    expect(everything.get(result.note.id)).toBe("second book");
+  });
+
+  it("puts the owner note back into the search index when its marks or bookmarks change", async () => {
+    const { service, note, document } = await importBook();
+    const indexNote = vi.mocked((await import("./searchIndex")).indexNote);
+    indexNote.mockClear();
+
+    const [first] = await service.addAnnotations(document.id, [{ page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "words" }]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(1));
+    await service.updateAnnotation(first.id, { comment: "check" });
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(2));
+    await service.addBookmark(document.id, 1, "here");
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(3));
+    await service.deleteAnnotation(first.id);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(4));
+    await service.restoreAnnotations(document.id, [first]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(5));
+
+    expect(indexNote.mock.calls.every(([indexed]) => indexed.id === note.id)).toBe(true);
+  });
+
+  it("asks for only one more pass when marks change while the note is being indexed", async () => {
+    const { service, document } = await importBook();
+    const indexNote = vi.mocked((await import("./searchIndex")).indexNote);
+    indexNote.mockClear();
+    let release: () => void = () => {};
+    indexNote.mockImplementationOnce(() => new Promise<void>((resolve) => (release = resolve)));
+
+    const [first] = await service.addAnnotations(document.id, [{ page: 0, kind: "highlight", color: "yellow", rects: rect, quote: "words" }]);
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(1));
+    await service.updateAnnotation(first.id, { comment: "one" });
+    await service.updateAnnotation(first.id, { comment: "two" });
+    await service.addBookmark(document.id, 1, "here");
+    expect(indexNote).toHaveBeenCalledTimes(1);
+
+    release();
+    await vi.waitFor(() => expect(indexNote).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(indexNote).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not index anything for a change that changed nothing", async () => {
+    const { service, document } = await importBook();
+    const searchIndex = await import("./searchIndex");
+    const indexNote = vi.mocked(searchIndex.indexNote);
+    indexNote.mockClear();
+
+    await service.addAnnotations(document.id, []);
+    await service.deleteAnnotation(9999);
+    await service.updateAnnotation(9999, { comment: "x" });
+    await service.removeBookmark(9999);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(indexNote).not.toHaveBeenCalled();
+  });
+});
+
 describe("marks through the service", () => {
   it("makes, lists, changes, deletes and restores marks, a selection across pages as one", async () => {
     const { service, notebook } = await setup();

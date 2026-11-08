@@ -55,6 +55,7 @@ function documents(over: Partial<DocumentsStore> = {}) {
     removeMark: vi.fn(async () => ({})),
     undoMark: vi.fn(async () => ({})),
     redoMark: vi.fn(async () => ({})),
+    exportDocument: vi.fn(async () => ({ canceled: true })),
     byId: vi.fn(() => ({ ...document_, viewState: { page: 3 } })),
     saveViewState: vi.fn(),
     setPageCount: vi.fn(),
@@ -405,6 +406,26 @@ describe("the notes beside the PDF", () => {
     expect(screen.queryByRole("button", { name: "Follow the note in use" })).toBeNull();
   });
 
+  describe("filtering the highlights", () => {
+    it("narrows the list to the marks whose words, comment or note say what is typed, and says when none do", () => {
+      viewer = ready();
+      showMarks([mark(1, { quote: "B-trees keep keys sorted" }), mark(2, { quote: "hash tables", comment: "compare with the B-tree" }), mark(3, { quote: "something else" })]);
+      render(<PdfReader document={document_} documents={documents()} />);
+      openSidebar("highlights");
+      const list = () => screen.getByRole("list", { name: "Highlights" });
+      expect(within(list()).getAllByRole("listitem").length).toBeGreaterThan(0);
+
+      fireEvent.change(screen.getByRole("textbox", { name: "Filter highlights" }), { target: { value: "B-TREE" } });
+
+      expect(within(list()).getByText("B-trees keep keys sorted")).toBeTruthy();
+      expect(within(list()).getByText("hash tables")).toBeTruthy();
+      expect(within(list()).queryByText("something else")).toBeNull();
+
+      fireEvent.change(screen.getByRole("textbox", { name: "Filter highlights" }), { target: { value: "zzz" } });
+      expect(screen.getByText("No highlight says that.")).toBeTruthy();
+    });
+  });
+
   describe("the Notes tab", () => {
     it("lists the PDF's own note first and the notes that cite it, and marks the one it is paired with", () => {
       viewer = ready();
@@ -595,5 +616,100 @@ describe("the notes beside the PDF", () => {
 
       expect(c.goToPage).toHaveBeenCalledWith(9);
     });
+  });
+});
+
+describe("exporting a copy with the marks", () => {
+  const saved = (over: Record<string, unknown> = {}) => ({ saved: true, fileName: "book (annotated).pdf", written: 3, skipped: { ink: 0, offPage: 0 }, ...over });
+  const startExport = () => {
+    fireEvent.click(screen.getByRole("button", { name: "Export annotated PDF" }));
+    return screen.getByRole("dialog", { name: "Export annotated PDF" });
+  };
+
+  it("waits until the PDF is open", () => {
+    render(<PdfReader document={document_} documents={documents()} />);
+
+    expect((screen.getByRole("button", { name: "Export annotated PDF" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("asks about flattening first, with the marks left as annotations unless that is ticked", async () => {
+    viewer = ready();
+    const store = documents({ exportDocument: vi.fn(async () => saved()) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    const dialog = startExport();
+    expect((within(dialog).getByRole("checkbox", { name: "Flatten markup" }) as HTMLButtonElement).getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Export…" }));
+
+    await screen.findByText(/Saved “book \(annotated\)\.pdf” with 3 marks\./);
+    expect(store.exportDocument).toHaveBeenCalledWith(7, { flatten: false });
+    expect(screen.queryByRole("dialog", { name: "Export annotated PDF" })).toBeNull();
+  });
+
+  it("flattens when the box is ticked", async () => {
+    viewer = ready();
+    const store = documents({ exportDocument: vi.fn(async () => saved({ written: 1 })) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    const dialog = startExport();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Flatten markup" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Export…" }));
+
+    await screen.findByText(/with 1 mark\./);
+    expect(store.exportDocument).toHaveBeenCalledWith(7, { flatten: true });
+  });
+
+  it("gives up without a word when the dialog is cancelled, or the save dialog is", async () => {
+    viewer = ready();
+    const store = documents();
+    render(<PdfReader document={document_} documents={store} />);
+
+    fireEvent.click(within(startExport()).getByRole("button", { name: "Cancel" }));
+    expect(store.exportDocument).not.toHaveBeenCalled();
+    fireEvent.click(within(startExport()).getByRole("button", { name: "Export…" }));
+
+    await waitFor(() => expect(store.exportDocument).toHaveBeenCalled());
+    await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says it is exporting, and keeps the button out of reach, until it is done", async () => {
+    viewer = ready();
+    let finish: (value: unknown) => void = () => {};
+    const store = documents({ exportDocument: vi.fn(() => new Promise((resolve) => (finish = resolve))) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    fireEvent.click(within(startExport()).getByRole("button", { name: "Export…" }));
+
+    expect(await screen.findByRole("status")).toBeTruthy();
+    expect(screen.getByRole("status").textContent).toContain("Exporting…");
+    expect((screen.getByRole("button", { name: "Export annotated PDF" }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => finish(saved()));
+    expect(screen.getByRole("status").textContent).toContain("Saved");
+    expect((screen.getByRole("button", { name: "Export annotated PDF" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("says what was left out", async () => {
+    viewer = ready();
+    const store = documents({ exportDocument: vi.fn(async () => saved({ written: 1, skipped: { ink: 2, offPage: 1 } })) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    fireEvent.click(within(startExport()).getByRole("button", { name: "Export…" }));
+
+    const status = await screen.findByText(/Saved “book/);
+    expect(status.textContent).toContain("2 ink marks were left out (ink is not exported yet).");
+    expect(status.textContent).toContain("1 mark on a page this PDF does not have was left out.");
+  });
+
+  it("shows why an export failed, and lets it be dismissed", async () => {
+    viewer = ready();
+    const store = documents({ exportDocument: vi.fn(async () => ({ error: "This PDF is password-protected, so it cannot be exported with its marks." })) } as never);
+    render(<PdfReader document={document_} documents={store} />);
+
+    fireEvent.click(within(startExport()).getByRole("button", { name: "Export…" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("password-protected");
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

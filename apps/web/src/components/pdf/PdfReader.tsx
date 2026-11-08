@@ -5,6 +5,7 @@ import {
   BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  DownloadIcon,
   Link2Icon,
   MoonIcon,
   NotebookPenIcon,
@@ -28,6 +29,7 @@ import { pageCitation, quoteBlock } from "@/lib/composition/pdfRefs";
 import { cn } from "@/lib/utils";
 import type { Insertion } from "../notes/noteInsertions";
 import type { PdfGoTo } from "../panels/kinds";
+import { ExportPdfDialog } from "./ExportPdfDialog";
 import { MarkLayers, usePageLayers } from "./PdfMarkLayers";
 import { BookmarkList, HighlightList, NotesList, OutlineTree, pageName, type SidebarTab } from "./PdfSidebar";
 import { SelectionToolbar } from "./SelectionToolbar";
@@ -95,8 +97,29 @@ export function PdfReader({ document, documents, pairing }: { document: PdfDocum
   const edit = useMarkEditing({ pdf: document, documents, controls: ready?.controls ?? null, container });
   const layers = usePageLayers(ready?.controls ?? null);
 
+  // Exporting a copy with the marks in it: the dialog asks about flattening, then the native save dialog opens and the copy is written
+  // out of the main process, so the reader says when it is under way and how it went.
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exported, setExported] = useState<string | null>(null);
+
   // Quote and Cite this page write into the paired note, and say so when there is none.
   const [notice, setNotice] = useState<string | null>(null);
+  async function exportPdf(flatten: boolean) {
+    setExportOpen(false);
+    setExported(null);
+    setNotice(null);
+    setExporting(true);
+    const result = await documents.exportDocument(document.id, { flatten });
+    setExporting(false);
+    if ("error" in result) return setNotice(result.error);
+    if ("canceled" in result) return;
+    const left = [
+      result.skipped.ink > 0 && `${result.skipped.ink} ink ${result.skipped.ink === 1 ? "mark was" : "marks were"} left out (ink is not exported yet).`,
+      result.skipped.offPage > 0 && `${result.skipped.offPage} ${result.skipped.offPage === 1 ? "mark" : "marks"} on a page this PDF does not have ${result.skipped.offPage === 1 ? "was" : "were"} left out.`,
+    ].filter(Boolean);
+    setExported([`Saved “${result.fileName}” with ${result.written} ${result.written === 1 ? "mark" : "marks"}.`, ...left].join(" "));
+  }
   function put(markdown: string, how: Insertion) {
     if (!pairing) return;
     if (pairing.noteId === null) return setNotice("Open a note beside this PDF to write in.");
@@ -162,6 +185,8 @@ export function PdfReader({ document, documents, pairing }: { document: PdfDocum
         onRedo={edit.redo}
         placing={edit.placing}
         onTogglePlacing={edit.togglePlacing}
+        exporting={exporting}
+        onExport={() => setExportOpen(true)}
         paired={pairing ? { follow: pairing.follow, noteTitle: pairing.noteTitle, onToggleFollow: pairing.onToggleFollow, onCite: citePage } : null}
         onAddBookmark={() => {
           if (!ready) return;
@@ -187,6 +212,17 @@ export function PdfReader({ document, documents, pairing }: { document: PdfDocum
           </Button>
         </div>
       )}
+      {(exporting || exported) && (
+        <div role="status" className="flex shrink-0 items-center gap-2 border-b bg-muted px-3 py-1 text-sm">
+          <span className="flex-1">{exporting ? "Exporting…" : exported}</span>
+          {!exporting && (
+            <Button variant="ghost" size="icon-xs" aria-label="Dismiss" onClick={() => setExported(null)}>
+              <XIcon />
+            </Button>
+          )}
+        </div>
+      )}
+      <ExportPdfDialog open={exportOpen} onOpenChange={setExportOpen} onExport={(flatten) => void exportPdf(flatten)} />
       {ready && findOpen && <FindBar viewer={ready} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
       <div className="relative flex min-h-0 flex-1">
         {sidebar !== null && (
@@ -280,6 +316,8 @@ function Toolbar({
   onRedo,
   placing,
   onTogglePlacing,
+  exporting,
+  onExport,
   paired,
   onAddBookmark,
 }: {
@@ -296,6 +334,8 @@ function Toolbar({
   onRedo: () => void;
   placing: boolean;
   onTogglePlacing: () => void;
+  exporting: boolean;
+  onExport: () => void;
   /** What the toolbar offers for the note beside the PDF; null when the PDF has none (nothing to cite into). */
   paired: { follow: boolean; noteTitle: string | null; onToggleFollow: () => void; onCite: () => void } | null;
   onAddBookmark: () => void;
@@ -350,6 +390,9 @@ function Toolbar({
       )}
       <Button variant="ghost" size="icon-sm" aria-label="Find in this PDF" aria-pressed={findOpen} disabled={!ready} onClick={onToggleFind} title="Find in this PDF (Ctrl/Cmd+F)">
         <SearchIcon />
+      </Button>
+      <Button variant="ghost" size="icon-sm" aria-label="Export annotated PDF" disabled={!ready || exporting} onClick={onExport} title="Export a copy of this PDF with its marks in it">
+        <DownloadIcon />
       </Button>
       <Button variant="ghost" size="icon-sm" aria-label="Bookmark this page" disabled={!ready} onClick={onAddBookmark} title="Bookmark this page">
         <BookmarkPlusIcon />

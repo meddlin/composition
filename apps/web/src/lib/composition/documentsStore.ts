@@ -1,4 +1,4 @@
-import type { DocumentsApi, ExistingPdf, ImportPdfResult, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import type { DocumentsApi, ExistingPdf, ExportPdfOptions, ExportPdfResult, ImportPdfResult, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
 import { createMarksController, type DocumentMarks } from "./documentMarks";
 import type { AnnotationChanges, PdfAnnotationInput, PdfViewState } from "./pdfMarkup";
 
@@ -43,6 +43,8 @@ export type DocumentsStore = {
   addBookmark(documentId: number, page: number, label: string): Promise<PdfBookmark>;
   renameBookmark(bookmarkId: number, label: string): Promise<PdfBookmark | null>;
   removeBookmark(bookmarkId: number): Promise<void>;
+  /** Writes a copy of the PDF with its marks in it, to a file the user picks; says what came of it, and never throws. */
+  exportDocument(documentId: number, options: ExportPdfOptions): Promise<ExportPdfResult>;
   /** What deleting the PDF's note would take with it, for the delete dialog; null when the note owns no PDF. */
   describe(noteId: number): Promise<PdfContents | null>;
   /** Reads a PDF's marks (once: the store keeps them current as they change). */
@@ -148,6 +150,13 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     renameBookmark: (bookmarkId, label) => deps.renameBookmark(bookmarkId, label),
     removeBookmark: (bookmarkId) => deps.removeBookmark(bookmarkId),
     describe: (noteId) => deps.describeDocument(noteId),
+    async exportDocument(documentId, options) {
+      try {
+        return await deps.exportDocument(documentId, options);
+      } catch (error) {
+        return { error: reason(error) };
+      }
+    },
     loadMarks: (documentId) => marks.load(documentId),
     addMarks: (documentId, inputs) => marks.make(documentId, inputs),
     changeMark: (mark, changes) => marks.change(mark, changes),
@@ -171,6 +180,7 @@ export const unavailableDocuments: DocumentsDeps = {
   renameBookmark: () => Promise.reject(new Error(UNAVAILABLE)),
   removeBookmark: () => Promise.reject(new Error(UNAVAILABLE)),
   describeDocument: () => Promise.reject(new Error(UNAVAILABLE)),
+  exportDocument: () => Promise.reject(new Error(UNAVAILABLE)),
   listAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
   addAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
   updateAnnotation: () => Promise.reject(new Error(UNAVAILABLE)),

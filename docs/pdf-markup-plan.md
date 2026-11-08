@@ -450,7 +450,44 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      but is not saved.
    - **Not checked:** a PDF opened from a link in a pop-out window, a quote into a note open in another window, a very large
      page where the mark is not drawn before the flash ends, and the iPad's Markdown preview (M2).
-5. **Search and export.** The owner note's search entry, and Export annotated PDF.
+5. **Search and export. Built 2026-11-07,** checked in the real app by the same `smoke:pdf` (now 63 checks, twice in a row all
+   passing) and, for the writer, by `spikes/pdf-reader/export/app-writer-check.mjs` (pdf.js renders of the output on spike C's nine
+   geometries, native and flattened: 18 of 18). What was built:
+   - **Search:** the owner note's entry in the search index also holds the words of its PDF's marks (quotes, comments, text notes)
+     and bookmark labels, after its own text and never shown, so searching "B-tree" finds the textbook's note
+     (`marksSearchText` in `pdfMarkupRepo.ts`, used by `searchIndex.ts` for one note and for a full rebuild). A change to a mark or
+     bookmark puts the note back in the index without the caller waiting; a burst of changes while it is indexing asks for only one
+     more pass (`reindexOwnerSoon` in `service.ts`). The Highlights tab has a filter box over the words, comments and notes.
+   - **Export annotated PDF:** a toolbar button opens a dialog (Flatten markup, off by default), then the operating system's save
+     dialog (the page never names a path), and the copy is written in a **utility process** (`exportProcess.ts` starts it for each
+     export and ends it when it answers; `src/worker/exportWorker.ts` is its script, bundled with both fonts into
+     `dist/export-worker.js` and unpacked from the app archive, `asarUnpack` in `electron-builder.yml`). It writes the copy beside its
+     name with `.part` and renames it into place, so a failure leaves no half a PDF. The PDF in the library is never written to,
+     and a target that is that file is refused.
+   - **The writer** is `pdfExport.ts` (`@cantoo/pdf-lib` 2.11.1 and `fontkit` 2.0.4, exact pins): native marks are Highlight,
+     Underline, StrikeOut and FreeText annotations with hand-written appearance streams (highlights multiply into the page, as the
+     reader draws them), each carrying its uuid (`NM`), change time (`M`) and comment (`Contents`); flattened, the same appearances
+     are drawn into the page's content and no annotation is added. Existing annotations (links) survive. Text notes are laid out
+     by their own line breaking and written with an embedded font, upright on a rotated page (the appearance's matrix turns it back
+     by the page's rotation).
+   - **Findings:** (1) **Noto Sans has no `≤ ≥ ≠ ≈ → √ ∞ ✓`** (it covers Latin, Greek and Cyrillic and little else), which the
+     choice offered to the owner implied it did; so the second bundled font is **Noto Sans Math** (about 1 MB, same licence), used
+     for a character the first lacks, and neither is embedded unless a note needs it (a subset costs a few KB). (2) Text on a
+     rotated page reads upright in pdf.js on all four rotations, with or without a crop or media box offset, closing the
+     "not tested" of spike D. (3) A note's words wrap to the displayed box, so on a page turned 90 degrees a wide box is a narrow
+     one on screen, as in the reader. (4) vitest reads a `.ttf` as a URL, not bytes, so the desktop config has a small plugin that
+     gives the fonts as bytes, as esbuild's binary loader does in the build. (5) The licence notices now include the writer,
+     fontkit and both fonts with the OFL text (`LICENSE_FONT`, which the collector's filename pattern now matches).
+   - **My picks, made while building:** a text note with a character neither font can draw **stops the export and names the note
+     and the characters** (the owner's choice, 2026-11-07: Latin, Greek and Cyrillic; no system fonts, no CJK); there is no bar,
+     only "Exporting…" and then "Saved “name” with N marks.", since a rewrite has no steps to report; **ink is left out and
+     counted** (its stroke format is not final and the desktop has none), as is a mark on a page the PDF does not have; a
+     password-protected PDF is refused with a reason (the reader cannot open one to mark, either); the suggested name is the
+     PDF's name with " (annotated)"; a text note is filled a little lighter than the reader's, which blends with the page.
+   - **Not checked:** the output in Acrobat or PDFKit (pdf.js only; PDFKit was checked for spike D's writer, not this code), AES-256,
+     a signed PDF (a full rewrite drops the signature, as spike D said), memory on a file near the 1 GB limit, the utility process
+     started from a **packaged** app (CI checks that the worker is unpacked where it will be started, not that it runs there), and
+     Windows and Linux.
 6. **Docs and the manual test.** [Docs to change](#docs-to-change-when-it-ships) and `docs/manual-tests/pdf.md`.
 7. **Gate P1 (yours):** the manual test by hand on a real textbook and a real manual.
 8. **iPad M1 finishes** as planned (not part of this plan).
@@ -571,7 +608,7 @@ itself in Electron.
 | X8 | PDF in M2 widens v1 and the rewrite is already larger than v1 can afford (R3). | The order in P19; `<Ink>` pages are cut first. |
 | X9 | The export writer is unmaintained, too big, or has the wrong licence. **Answered by spike D:** `@cantoo/pdf-lib` is MIT, maintained and 614 KB minified, and writes native and flattened marks that pdf.js and PDFKit draw in the right place. | Keep the original `pdf-lib` as a swap; the spike D checks in `spikes/pdf-reader/export` as a regression test when the code exists. |
 | X10 | A native-annotation export looks different in another app (PencilKit textures). | Said in the dialog; Flatten is one checkbox away. |
-| X11 | A text note in another script loses its characters on export: a standard font holds WinAnsi only, and `@cantoo` writes `?` without an error. | Embed a font through `fontkit`, bundle one the app may redistribute (an OFL one such as Noto Sans), and decide how far its coverage goes (CJK and emoji are large). Test a note in each script. **Open.** |
+| X11 | A text note in another script loses its characters on export: a standard font holds WinAnsi only, and `@cantoo` writes `?` without an error. **Answered by the owner, 2026-11-07:** Latin, Greek and Cyrillic only. | Noto Sans, and Noto Sans Math for the symbols it lacks (both OFL, bundled into the export worker); a note with a character neither can draw stops the export and is named. CJK and emoji are not supported. |
 | X12 | Export of a big file uses 2 to 4.5 times its size in memory and takes seconds; it rewrites the whole file, so a signature in the original is lost and a linearized file is not. | A utility process with progress; say so in the dialog for a signed PDF; an incremental writer of our own is the way out if it ever bites (not built). |
 
 ## Not in scope
@@ -630,3 +667,9 @@ The full-text and OCR rows are *later*, not *never*; the others are decisions to
   citing notes. 58 checks in the real app; the web suite has 4,119 tests and the desktop suite 754. The quote block now has
   an empty quoted line before its citation so that the preview shows it on its own line. Picks and findings are listed under
   Step 4 in the [build order](#build-order).
+- 2026-11-07: **Step 5 built** (search and export). The owner note is found by the words of its marks and bookmarks, and the
+  Highlights tab filters; **Export annotated PDF** writes a copy with native annotations or flattened, in a utility process, with
+  text notes in an embedded font. X11 is answered by the owner (Latin, Greek, Cyrillic); Noto Sans lacks math symbols, so Noto
+  Sans Math is bundled too. 63 checks in the real app; pdf.js renders of the writer's output pass on all nine geometries, native
+  and flattened; the web suite has 4,198 tests and the desktop suite 774. Picks and findings are listed under Step 5 in the
+  [build order](#build-order).

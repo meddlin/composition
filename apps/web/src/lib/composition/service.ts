@@ -86,6 +86,32 @@ async function bestEffortIndex(work: () => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * A PDF's marks are part of what its owner note is found by, so the note goes back into the index when they change. Marks change
+ * in bursts (a highlight, then its comment, then a recolor), so a change while the note is being indexed only asks for one
+ * more pass afterwards, and the caller does not wait for any of it.
+ */
+const reindexing = new Map<number, "running" | "again">();
+function reindexOwnerSoon(documentId: number): void {
+  if (reindexing.has(documentId)) {
+    reindexing.set(documentId, "again");
+    return;
+  }
+  reindexing.set(documentId, "running");
+  void (async () => {
+    try {
+      do {
+        reindexing.set(documentId, "running");
+        const document = documentsRepo.getDocument(documentId);
+        const note = document ? notesRepo.getNote(document.noteId) : null;
+        if (note) await bestEffortIndex(() => searchIndex.indexNote(note));
+      } while (reindexing.get(documentId) === "again");
+    } finally {
+      reindexing.delete(documentId);
+    }
+  })();
+}
+
 export async function loadWorkspace(): Promise<Workspace> {
   const { sidebarWidth, editorRatio, favorites, writing, home, plugins } = loadWebSettings();
   // Opening the app is when expired Trash Can items are cleared out.
@@ -459,6 +485,12 @@ export function findDocumentFile(id: number): { path: string; fileName: string }
   return found ? { path: found.path, fileName: found.document.fileName } : null;
 }
 
+/** What an export needs: where the PDF's bytes are, and every mark on it. Null when the row is gone or the file is. */
+export function documentForExport(documentId: number): { path: string; fileName: string; marks: PdfAnnotation[] } | null {
+  const file = findDocumentFile(documentId);
+  return file ? { ...file, marks: pdfMarkupRepo.listAnnotations(documentId) } : null;
+}
+
 export async function setDocumentPageCount(documentId: number, pageCount: number): Promise<void> {
   documentsRepo.setPageCount(documentId, pageCount);
 }
@@ -472,15 +504,21 @@ export async function listBookmarks(documentId: number): Promise<PdfBookmark[]> 
 }
 
 export async function addBookmark(documentId: number, page: number, label: string): Promise<PdfBookmark> {
-  return pdfMarkupRepo.addBookmark(documentId, page, label);
+  const bookmark = pdfMarkupRepo.addBookmark(documentId, page, label);
+  reindexOwnerSoon(documentId);
+  return bookmark;
 }
 
 export async function renameBookmark(bookmarkId: number, label: string): Promise<PdfBookmark | null> {
-  return pdfMarkupRepo.renameBookmark(bookmarkId, label);
+  const bookmark = pdfMarkupRepo.renameBookmark(bookmarkId, label);
+  if (bookmark) reindexOwnerSoon(bookmark.documentId);
+  return bookmark;
 }
 
 export async function removeBookmark(bookmarkId: number): Promise<void> {
+  const bookmark = pdfMarkupRepo.getBookmark(bookmarkId);
   pdfMarkupRepo.deleteBookmark(bookmarkId);
+  if (bookmark) reindexOwnerSoon(bookmark.documentId);
 }
 
 export async function describeDocument(noteId: number): Promise<PdfContents | null> {
@@ -492,19 +530,27 @@ export async function listAnnotations(documentId: number): Promise<PdfAnnotation
 }
 
 export async function addAnnotations(documentId: number, inputs: readonly PdfAnnotationInput[]): Promise<PdfAnnotation[]> {
-  return pdfMarkupRepo.addAnnotationGroup(documentId, inputs);
+  const added = pdfMarkupRepo.addAnnotationGroup(documentId, inputs);
+  if (added.length > 0) reindexOwnerSoon(documentId);
+  return added;
 }
 
 export async function updateAnnotation(annotationId: number, changes: AnnotationChanges): Promise<PdfAnnotation | null> {
-  return pdfMarkupRepo.updateAnnotation(annotationId, changes);
+  const updated = pdfMarkupRepo.updateAnnotation(annotationId, changes);
+  if (updated) reindexOwnerSoon(updated.documentId);
+  return updated;
 }
 
 export async function deleteAnnotation(annotationId: number): Promise<PdfAnnotation[]> {
-  return pdfMarkupRepo.deleteAnnotation(annotationId);
+  const removed = pdfMarkupRepo.deleteAnnotation(annotationId);
+  if (removed.length > 0) reindexOwnerSoon(removed[0].documentId);
+  return removed;
 }
 
 export async function restoreAnnotations(documentId: number, annotations: readonly PdfAnnotation[]): Promise<PdfAnnotation[]> {
-  return pdfMarkupRepo.restoreAnnotations(documentId, annotations);
+  const restored = pdfMarkupRepo.restoreAnnotations(documentId, annotations);
+  if (restored.length > 0) reindexOwnerSoon(documentId);
+  return restored;
 }
 
 /*

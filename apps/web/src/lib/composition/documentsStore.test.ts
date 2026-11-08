@@ -191,3 +191,26 @@ describe("the documents store", () => {
     expect(none.getSnapshot()).toMatchObject({ status: "error", error: "PDFs are only available in the desktop app." });
   });
 });
+
+describe("exporting a PDF with its marks", () => {
+  it("asks the backend, and passes on what came of it", async () => {
+    const result = { saved: true as const, fileName: "a (annotated).pdf", written: 2, skipped: { ink: 0, offPage: 0 } };
+    const api = fakeDocumentsApi({ exportDocument: vi.fn(async () => result) });
+    const store = createDocumentsStore(api);
+
+    expect(await store.exportDocument(4, { flatten: true })).toEqual(result);
+    expect(api.exportDocument).toHaveBeenCalledWith(4, { flatten: true });
+  });
+
+  it("says why, and does not throw, when the backend does", async () => {
+    const store = createDocumentsStore(fakeDocumentsApi({ exportDocument: vi.fn(async () => Promise.reject(new Error("The save dialog failed."))) }));
+
+    expect(await store.exportDocument(4, { flatten: false })).toEqual({ error: "The save dialog failed." });
+  });
+
+  it("is refused where there are no PDFs, as in the web app", async () => {
+    const store = createDocumentsStore(unavailableDocuments, false);
+
+    expect(await store.exportDocument(1, { flatten: false })).toEqual({ error: "PDFs are only available in the desktop app." });
+  });
+});

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { DocumentsApi, ImportPdfResult, ImportTarget } from "../../../web/src/lib/composition/documentsApi";
 import type { ImportPdfOutcome } from "../../../web/src/lib/composition/service";
 import type { service as Service } from "./backend";
+import type { ExportJob, ExportOutcome } from "./exportJob";
 
 /**
  * The desktop-only DocumentsApi (see apps/web/src/lib/composition/documentsApi.ts).
@@ -13,10 +14,14 @@ import type { service as Service } from "./backend";
  * ahead without the page ever being told where the file is.
  */
 
-/** The native piece this needs, as a plain function, so tests don't need Electron. */
+/** The native pieces this needs, as plain functions, so tests don't need Electron. */
 export type DocumentUi = {
   /** The path of the PDF the user picked, or null if they cancelled. */
   pickPdf(): Promise<string | null>;
+  /** Where the user wants an exported copy saved (the save dialog, offering `defaultName`), or null if they cancelled. */
+  pickExportPath(defaultName: string): Promise<string | null>;
+  /** Writes the export, out of the main process (see exportProcess.ts). */
+  exportPdf(job: ExportJob): Promise<ExportOutcome>;
 };
 
 type DocumentService = Pick<
@@ -30,6 +35,7 @@ type DocumentService = Pick<
   | "renameBookmark"
   | "removeBookmark"
   | "describeDocument"
+  | "documentForExport"
   | "listAnnotations"
   | "addAnnotations"
   | "updateAnnotation"
@@ -75,6 +81,17 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
     renameBookmark: (bookmarkId, label) => service.renameBookmark(bookmarkId, label),
     removeBookmark: (bookmarkId) => service.removeBookmark(bookmarkId),
     describeDocument: (noteId) => service.describeDocument(noteId),
+
+    async exportDocument(documentId, options) {
+      const input = service.documentForExport(documentId);
+      if (!input) return { error: "This PDF is no longer in the library." };
+      const targetPath = await ui.pickExportPath(`${input.fileName.replace(/\.pdf$/i, "")} (annotated).pdf`);
+      if (!targetPath) return { canceled: true };
+      // The PDF in the library is never written to, even if the user points the dialog at it.
+      if (path.resolve(targetPath) === path.resolve(input.path)) return { error: "Choose another file: the PDF in the library is never overwritten." };
+      const outcome = await ui.exportPdf({ sourcePath: input.path, targetPath, marks: input.marks, flatten: options.flatten });
+      return outcome.ok ? { saved: true, fileName: path.basename(targetPath), written: outcome.written, skipped: outcome.skipped } : { error: outcome.error };
+    },
     listAnnotations: (documentId) => service.listAnnotations(documentId),
     addAnnotations: (documentId, inputs) => service.addAnnotations(documentId, inputs),
     updateAnnotation: (annotationId, changes) => service.updateAnnotation(annotationId, changes),

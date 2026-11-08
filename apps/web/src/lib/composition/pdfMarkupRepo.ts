@@ -254,6 +254,49 @@ export function deleteAnnotation(id: number): PdfAnnotation[] {
   })();
 }
 
+// --- search ------------------------------------------------------------------
+
+/**
+ * The words a PDF's owner note is found by, besides its own text: the quotes and comments of its marks, what its text notes
+ * say, and its bookmarks' labels, one per line, by page. Kept apart from the note's content (the search index holds both under
+ * the note's id), so searching "B-tree" finds the textbook's note when a highlight in it says so. With `noteId`, only that
+ * note's; otherwise every owner note's (the whole index is being rebuilt).
+ */
+export function marksSearchText(noteId?: number): Map<number, string> {
+  const db = getDb();
+  const where = noteId === undefined ? "" : "WHERE d.note_id = ?";
+  const args = noteId === undefined ? [] : [noteId];
+  const marks = db
+    .prepare(
+      `SELECT d.note_id AS note_id, a.kind AS kind, a.quote AS quote, a.comment AS comment, a.body AS body
+       FROM pdf_annotations a JOIN documents d ON d.id = a.document_id ${where} ORDER BY d.note_id, a.page, a.id`,
+    )
+    .all(...args) as { note_id: number; kind: string; quote: string; comment: string; body: string | null }[];
+  const labels = db
+    .prepare(`SELECT d.note_id AS note_id, b.label AS label FROM pdf_bookmarks b JOIN documents d ON d.id = b.document_id ${where} ORDER BY d.note_id, b.page, b.id`)
+    .all(...args) as { note_id: number; label: string }[];
+
+  const lines = new Map<number, string[]>();
+  const add = (id: number, text: string | undefined) => {
+    const line = text?.trim();
+    if (line) lines.set(id, [...(lines.get(id) ?? []), line]);
+  };
+  for (const mark of marks) {
+    if (mark.kind === "text") {
+      try {
+        add(mark.note_id, (JSON.parse(mark.body ?? "null") as { text?: string } | null)?.text);
+      } catch {
+        // A damaged body has no words to find.
+      }
+    } else {
+      add(mark.note_id, mark.quote);
+    }
+    add(mark.note_id, mark.comment);
+  }
+  for (const { note_id, label } of labels) add(note_id, label);
+  return new Map([...lines].map(([id, found]) => [id, found.join("\n")]));
+}
+
 // --- bookmarks ---------------------------------------------------------------
 
 export function listBookmarks(documentId: number): PdfBookmark[] {
