@@ -36,10 +36,12 @@ export class SyntaxProblem {
   constructor(readonly message: string) {}
 }
 
-type Token = {
+export type Token = {
   kind: "num" | "str" | "ident" | "op" | "err" | "structured";
   text: string;
   value?: string;
+  /** Where in the formula's text the token starts, so a reference can be rewritten in place (see sheetRefs.ts). */
+  at: number;
 };
 
 const NUMBER = /^(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/;
@@ -48,7 +50,7 @@ const IDENT = /^\$?[A-Za-z]{1,3}\$?\d+(?![A-Za-z0-9_.(])|^[A-Za-z_][A-Za-z0-9_.]
 const ERROR_LITERAL = /^#(?:NULL!|DIV\/0!|VALUE!|REF!|NAME\?|NUM!|N\/A)/;
 const OPERATORS = ["<>", "<=", ">=", "+", "-", "*", "/", "^", "&", "=", "<", ">", "%", ":", ",", "(", ")", ";", "{", "}", "!", "@"];
 
-function tokenize(text: string): Token[] {
+export function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   while (i < text.length) {
@@ -60,7 +62,7 @@ function tokenize(text: string): Token[] {
     }
     const number = NUMBER.exec(rest);
     if (number) {
-      tokens.push({ kind: "num", text: number[0] });
+      tokens.push({ at: i, kind: "num", text: number[0] });
       i += number[0].length;
     } else if (char === '"') {
       let value = "";
@@ -73,7 +75,7 @@ function tokenize(text: string): Token[] {
         } else if (rest[j] === '"') break;
         else value += rest[j++];
       }
-      tokens.push({ kind: "str", text: rest.slice(0, j + 1), value });
+      tokens.push({ at: i, kind: "str", text: rest.slice(0, j + 1), value });
       i += j + 1;
     } else if (char === "'") {
       // A quoted sheet name: 'Q3 budget'!A1
@@ -84,12 +86,12 @@ function tokenize(text: string): Token[] {
         else if (rest[j] === "'") break;
         else j++;
       }
-      tokens.push({ kind: "ident", text: rest.slice(0, j + 1) });
+      tokens.push({ at: i, kind: "ident", text: rest.slice(0, j + 1) });
       i += j + 1;
     } else if (char === "#") {
       const error = ERROR_LITERAL.exec(rest);
       if (!error) throw new SyntaxProblem(`the text ${rest.slice(0, 8)}`);
-      tokens.push({ kind: "err", text: error[0] });
+      tokens.push({ at: i, kind: "err", text: error[0] });
       i += error[0].length;
     } else if (char === "[") {
       let depth = 0;
@@ -99,18 +101,18 @@ function tokenize(text: string): Token[] {
         else if (rest[j] === "]" && --depth === 0) break;
       }
       if (j >= rest.length) throw new SyntaxProblem("a [ without its ]");
-      tokens.push({ kind: "structured", text: rest.slice(0, j + 1) });
+      tokens.push({ at: i, kind: "structured", text: rest.slice(0, j + 1) });
       i += j + 1;
     } else {
       const ident = IDENT.exec(rest);
       if (ident) {
-        tokens.push({ kind: "ident", text: ident[0] });
+        tokens.push({ at: i, kind: "ident", text: ident[0] });
         i += ident[0].length;
         continue;
       }
       const op = OPERATORS.find((candidate) => rest.startsWith(candidate));
       if (!op) throw new SyntaxProblem(`the character ${char}`);
-      tokens.push({ kind: "op", text: op });
+      tokens.push({ at: i, kind: "op", text: op });
       i += op.length;
     }
   }

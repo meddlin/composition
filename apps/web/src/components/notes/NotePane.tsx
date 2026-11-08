@@ -1,6 +1,6 @@
 "use client";
 
-import { ImageIcon, MessageSquareIcon, SearchIcon, ShapesIcon, XIcon } from "lucide-react";
+import { ImageIcon, MessageSquareIcon, SearchIcon, ShapesIcon, Table2Icon, XIcon } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { parse, withHeaderImage } from "@/lib/composition/frontmatter";
@@ -288,6 +288,18 @@ export function NotePane({
           <ShapesIcon />
           {/* In a panel, which has little room, only the icon shows. */}
           <span className={panel ? "sr-only" : undefined}>Diagram</span>
+        </Button>
+        <Button
+          variant="ghost"
+          size={panel ? "icon-xs" : "xs"}
+          onClick={() => editor.current?.editSheet()}
+          disabled={deleted}
+          aria-keyshortcuts="Control+Shift+G Meta+Shift+G"
+          title="Edit the sheet or table the caret is in, or start a new sheet (Ctrl/Cmd+Shift+G)"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <Table2Icon />
+          <span className={panel ? "sr-only" : undefined}>Sheet</span>
         </Button>
         <Button
           variant="ghost"

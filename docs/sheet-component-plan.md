@@ -185,7 +185,7 @@ Recommendations are mine. S5, S7, S8 and S11 are decided (owner, 2026-11-07); th
 | S10 | **Pivot tables.** | **A pivot imports as its cells; Re-import after refreshing it in Excel.** A native `<Pivot from="…">` over note data is a later component if you want to pivot data you author here. | Nothing in the library reads pivot definitions, and values are what you see anyway. A native pivot is the first step toward reinventing Excel; wait for a reason. |
 | S11 | **Size.** *Revised at Gate A, 2026-11-07.* | **Decided (owner, 2026-11-07).** **Warn when the note passes 100,000 characters (about 800 to 1,600 rows, depending on columns; past that the editor stops colouring the note), refuse an import over 5,000 rows with a suggestion to narrow the range, and always draw the grid with virtual scrolling.** | A note is one `TEXT` value that is saved, searched, synced and parsed whole. Past the cap the honest answer is a linked file, which is S2's deferred feature, so the cap is what makes deferring it safe. |
 | S12 | **Numbers, dates and formats.** | **Numbers are stored raw, dates as `YYYY-MM-DD`, everything else as the text Excel showed. No cell styles in v1.** Currency and percent display is a later per-column hint. | CSV carries no types. Storing the formatted text would break arithmetic; storing Excel's date serials would be unreadable. Step 0 tries both on real workbooks. |
-| S13 | **The grid control.** | **Choose in Step 3 between our own and a headless MIT/Apache table library. Virtual scrolling is required** (Gate A: an un-virtualized grid took 397 ms at 5,000 rows, a 60-row window about 4 ms). | Heavy data needs virtualization. The test is the same as for the engine: licence, CSP, and one `<Sheet>` costing nothing in a note that has none (loaded on demand). |
+| S13 | **The grid control.** *Decided in Step 3, 2026-11-08: our own, no library.* | **Choose in Step 3 between our own and a headless MIT/Apache table library. Virtual scrolling is required** (Gate A: an un-virtualized grid took 397 ms at 5,000 rows, a 60-row window about 4 ms). | Heavy data needs virtualization. The test is the same as for the engine: licence, CSP, and one `<Sheet>` costing nothing in a note that has none (loaded on demand). |
 | S14 | **iPad.** | **Not in v1.** Until it has a Swift port the iPad shows a sheet's text. | The component list there is ten; this is the eleventh, with its own vectors. |
 
 ## Architecture
@@ -198,8 +198,9 @@ mdx/sheetFunctions*.ts  the function table (math and logic; text and dates; crit
 mdx/sheetValue.ts, sheetMatrix.ts, sheetCriteria.ts, sheetFormat.ts, sheetDate.ts   Excel's rules: values and coercion,
                       arrays, criteria and wildcards, `TEXT` formats, the 1900 calendar
 mdx/Sheet.tsx         the preview: the grid, the Edit and Re-import buttons
-SheetDialog.tsx       the editor dialog (like DrawioDialog)
-mdx/sheetSrc.ts       finds the Nth <Sheet> in the note and rewrites it (like drawioSrc.ts)
+SheetDialog.tsx       the editor dialog (like DrawioDialog); SheetGrid.tsx is the grid in it (virtualized, keyboard, clipboard)
+mdx/sheetSrc.ts       finds a <Sheet> in the note, rewrites its two blocks, reads a Markdown table (like drawioSrc.ts)
+mdx/sheetDraft.ts     pure: the grid as typed text; rows, columns, paste, the two blocks in and out; mdx/sheetRefs.ts moves references
 sheetImport.ts        loaded on demand: SheetJS -> grid + provenance + formula check
 ```
 
@@ -393,6 +394,54 @@ the owner's look (Gate B). What it is, and where it differs from the words above
   `COUNTBLANK` of a whole column counts the cells the sheet holds, not Excel's million.
 
 **Step 3: the editor.** The dialog, `sheetSrc.ts`, the shortcut, the `<` menu entry, promote-a-table. **Gate D.**
+*Built 2026-11-08; waiting for the owner's look (Gate D). What it is, and where it differs from the words above:*
+
+- **Built:** an **Edit sheet** button on a sheet in the preview (like **Edit diagram**), a **Sheet** button in the note's toolbar and
+  **Ctrl/Cmd+Shift+G**, which open the grid dialog ([`SheetDialog.tsx`](../apps/web/src/components/notes/SheetDialog.tsx),
+  [`SheetGrid.tsx`](../apps/web/src/components/notes/SheetGrid.tsx)) on the sheet the caret is in, else on the Markdown table the
+  caret is in (**promote**: saving replaces the table with a sheet), else on a new sheet at the caret. In the grid: arrows, Tab and Enter,
+  typing to replace and F2 to edit, formulas typed as `=…` and shown as their result, range selection (keys, shift-click, drag, a column
+  letter or row number), Delete, copy, cut and a **paste of a range from Excel**, rows and columns in and out, undo and redo, Ctrl/Cmd+S.
+  **Save sheet** writes both blocks and the note changes as one edit (one undo). The pure parts are tested on their own:
+  [`sheetSrc.ts`](../apps/web/src/components/notes/mdx/sheetSrc.ts), [`sheetDraft.ts`](../apps/web/src/components/notes/mdx/sheetDraft.ts),
+  [`sheetRefs.ts`](../apps/web/src/components/notes/mdx/sheetRefs.ts). It is described in [mdx-components.md](ui/mdx-components.md#editing-a-sheet).
+- **S13 decided: our own grid, no library.** The preview already windows rows (a fixed row height, a window and a spacer), the grid needs
+  the same, and a table library would have added a dependency (and its licence and CSP check) for the part that is not hard: the
+  hard parts are the keyboard, the selection and the clipboard, which a library does not do for a spreadsheet either. Only the rows in view
+  are drawn, so a sheet of 5,000 rows costs what one of 50 does (a test draws 5,001 rows and counts under 80); it is one tab stop
+  with `aria-activedescendant`, so a cell scrolled out of the window is no loss of focus.
+- **Inserting and deleting rows and columns move the formulas, as Excel does.** Without this the editor would corrupt a sheet silently
+  (a row put in above a total would leave the total pointing at the old cells), so [`sheetRefs.ts`](../apps/web/src/components/notes/mdx/sheetRefs.ts)
+  rewrites the references from the formula's own tokens: a reference below a new row moves, a range with a row put inside it grows (one with a
+  row put just below does not, which is Excel's famous gotcha), a deleted row shrinks a range, a reference to a deleted cell is `#REF!`;
+  cell names inside a text, function names (`LOG10(`) and another sheet's cells are left alone. **These rules are Excel's as I know them,
+  and were not run against Excel** (the runner reads formulas; it cannot insert a row).
+- **What is saved.** The CSV holds each cell's value, a formula's result included (S7), and the `formulas` block the formulas, down the
+  rows. The empty rows at the foot and empty columns at the right are left off. **Row 1 must not be empty while other rows are**: the CSV
+  reader drops a leading blank row, which would move every address up, so Save says so instead of writing it.
+  A text that begins with `=` is held as `'=…`, as in Excel, so it is never taken for a formula.
+- **Refinement for the owner to confirm, how it behaves** (my picks, from Excel's habits; each is one line to change): **Enter moves down**
+  (it does not start editing; F2 or typing does), and after Tab-ing along a row Enter goes back to the column the row began in;
+  **Enter after typing in the last row starts a new row** (empty ones at the foot are left off when saved); **Tab goes on to the next
+  control** past the first or last cell, so the grid is not a trap; the shortcut is **Ctrl/Cmd+Shift+G** (G for grid; nothing else in the app
+  uses it, and it replaces the browser's "find previous" in the editor only); the **`<` menu entry stays as it was** (it inserts the
+  empty tag, to type a CSV into), since the menu is text in the editor and the dialog is a separate way in.
+- **Found by running it, and fixed:** the first open put the keyboard on the first toolbar button, not the grid (the dialog now leaves
+  the focus to the grid); clicking another cell while one was being typed in sent the selection back to the typed cell (the commit by
+  blur no longer moves it); a preview opened before a code change kept the old handler (a reload fixes that, only a dev-server matter).
+- **Checked:** web 5,228 tests, typecheck and ESLint clean. In the browser, on a scratch database: **Edit sheet** from the preview, typing
+  with the keyboard (a table typed row by row with Tab and Enter, a formula in it, Ctrl/Cmd+S), a row put in above a total (the formulas
+  below it moved and the range grew, in the note's text after Save), a Markdown table promoted, a new sheet at the end of the note,
+  a 300-row sheet (Ctrl+Down to the last row, Page Down, the highlighted cell kept in view), and **one undo of the note took a saved sheet
+  back to what it was**.
+- **Not checked:** a range copied from a real Excel (tested with the clipboard text Excel puts there, a tab between cells and a line break
+  between rows, not with Excel itself); Safari and Windows; a light colour scheme; a narrow window; the desktop app's own window; a screen
+  reader (the grid is an ARIA grid, and has not been listened to); typing with an input method (the grid leaves a composition alone,
+  untested); a sheet at the limit of 5,001 rows in the editor by hand (its window is tested, the typing is not).
+- **Known gaps** (the dialog and [mdx-components.md](ui/mdx-components.md#editing-a-sheet) say so): dragging to fill, copying a formula to another cell
+  with its references moved (it pastes as text), pointing at a cell to put its address in a formula, column widths you set, sorting and
+  filtering, cell formats, and finding text in the grid. **For Step 4:** Save writes `#NAME?` in the CSV for a formula the engine cannot
+  calculate, which is right for one typed here and wrong for an imported one, whose Excel value must be kept (S7, carried).
 
 **Step 4: Excel in.** Paste a range, **Import from Excel…** (values first; formulas recalculated where they match
 and carried where they do not), the `formulas` block, the import summary, provenance props. Then column-name

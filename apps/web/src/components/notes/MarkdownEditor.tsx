@@ -21,6 +21,8 @@ import { highlightRange, removeHighlight, type TextRange } from "./highlightText
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
+import { SheetDialog, type SheetEditSource } from "./SheetDialog";
+import { SheetEditContext, type SheetEditing } from "./SheetEdit";
 import { BOLD_SHORTCUT, emphasisFor, ITALIC_SHORTCUT, toggleEmphasis } from "./emphasis";
 import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
 import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
@@ -31,6 +33,8 @@ import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./Mark
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
 import { DRAWIO_SHORTCUT, diagramRange, insertDiagram, isDrawioShortcut, replaceDiagramSrc } from "./mdx/drawioSrc";
 import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
+import { type SheetSource } from "./mdx/sheetDraft";
+import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import type { PaneView } from "./panes";
@@ -54,9 +58,14 @@ export type FindState = {
 export type MarkdownEditorControls = {
   /** Opens the draw.io editor to draw a diagram, which goes into the note at the caret. */
   insertDiagram: () => void;
+  /** Opens the sheet editor: on the sheet or Markdown table the caret is in, else on a new sheet, which goes in at the caret. */
+  editSheet: () => void;
 };
 
 const NO_MATCHES: Match[] = [];
+
+/** What a sheet saved from the editor replaces: nothing (a new one goes in at `start`), a Markdown table, or the sheet that was opened. */
+type SheetTarget = { kind: "new"; start: number; end: number } | { kind: "promote"; start: number; text: string } | { kind: "edit"; start: number; text: string };
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -85,8 +94,8 @@ type Props = {
 
 const NO_NOTES: readonly Note[] = [];
 
-/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram editor, indenting lines and bold and italic. */
-const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT} ${BOLD_SHORTCUT} ${ITALIC_SHORTCUT}`;
+/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram and sheet editors, indenting lines and bold and italic. */
+const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${SHEET_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT} ${BOLD_SHORTCUT} ${ITALIC_SHORTCUT}`;
 
 export function MarkdownEditor({
   noteId,
@@ -172,7 +181,7 @@ export function MarkdownEditor({
     const { start, end: stop } = surface.selection();
     setDiagram({ source: { kind: "new" }, at: diagramRange(text, Math.min(start, end), Math.min(stop, end), bodyStart) });
   }
-  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram }));
+  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet }));
 
   const drawioEditing = useMemo<DrawioEditing>(
     () => ({ edit: (name) => setDiagram({ source: { kind: "edit", name }, at: { start: 0, end: 0 } }) }),
@@ -196,6 +205,98 @@ export function MarkdownEditor({
     if (next === text) return;
     latest.current = next;
     onChange(next);
+  }
+
+  // The sheet editor: opened on a sheet, on a Markdown table to promote, or on a new sheet; `target` is what its result replaces.
+  const [sheet, setSheet] = useState<{ source: SheetEditSource; target: SheetTarget } | null>(null);
+
+  function openSheet(span: SheetSpan, text: string) {
+    setSheet({ source: { kind: "edit", ...sheetSource(span) }, target: { kind: "edit", start: span.start, text: text.slice(span.start, span.end) } });
+  }
+
+  /** The sheet editor on what the caret is in: a sheet (to change it), a Markdown table (to promote it), else a new sheet at the caret. */
+  function startSheet() {
+    const text = surface.text();
+    const bodyStart = text.length - parse(text)[1].length;
+    const at = Math.min(surface.selection().start, text.length);
+    // The frontmatter is metadata, never a sheet or a table, and what is selected there is not a choice of place.
+    const span = at >= bodyStart ? sheetAt(text, at) : null;
+    if (span) return openSheet(span, text);
+    const table = at >= bodyStart ? tableAt(text, at) : null;
+    if (table) return setSheet({ source: { kind: "promote", rows: table.rows }, target: { kind: "promote", start: table.start, text: text.slice(table.start, table.end) } });
+    const place = sheetRange(text, at, bodyStart);
+    setSheet({ source: { kind: "new" }, target: { kind: "new", ...place } });
+  }
+
+  const sheetEditing = useMemo<SheetEditing>(
+    () => ({
+      edit: (offset) => {
+        const text = latest.current;
+        const span = sheetAt(text, text.length - parse(text)[1].length + offset);
+        if (span) openSheet(span, text);
+      },
+    }),
+    [],
+  );
+
+  /**
+   * Puts `edit` in the note as typing would (so undo takes it back in one step), with the caret `edit.caret` after
+   * its start. Where typing isn't possible (a hidden textarea) the text is replaced and undo starts over, as it
+   * does for a pasted image.
+   */
+  function applyAsTyping(edit: { start: number; end: number; text: string; caret: number }) {
+    if (showLive) {
+      // The live editor keeps its own undo history, in which this is one step.
+      surface.replace(edit.start, edit.end, edit.text, edit.caret);
+      return;
+    }
+    const el = textarea.current;
+    if (!el) return;
+    const after = el.value.slice(0, edit.start) + edit.text + el.value.slice(edit.end);
+    const caret = edit.start + edit.caret;
+    el.focus();
+    if (document.activeElement === el) {
+      el.setSelectionRange(edit.start, edit.end);
+      document.execCommand?.("insertText", false, edit.text);
+    }
+    if (el.value === after) {
+      el.setSelectionRange(caret, caret);
+      return;
+    }
+    pendingCaret.current = caret;
+    replaceText(edit.start, edit.end, edit.text);
+  }
+
+  /** The sheet was saved: a new one goes in at the caret, a promoted table is replaced by its sheet, and a changed one has its blocks rewritten. */
+  function sheetSaved(source: SheetSource) {
+    const saved = sheet;
+    setSheet(null);
+    if (!saved) return;
+    // After the dialog has gone: while it is open it holds the focus, and typing into the editor then isn't possible.
+    setTimeout(() => {
+      const text = surface.text();
+      const { target } = saved;
+      if (target.kind === "new") {
+        const start = Math.min(target.start, text.length);
+        const edit = insertSheet(text, start, Math.min(Math.max(target.end, start), text.length), source);
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      if (target.kind === "promote") {
+        const table = tableAt(text, target.start);
+        if (!table || text.slice(table.start, table.end) !== target.text) return changedUnderneath(text);
+        const edit = insertSheet(text, table.start, table.end, source);
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      const span = findOpenedSheet(text, { start: target.start, text: target.text });
+      if (!span) return changedUnderneath(text);
+      const next = writeSheet(text, span, source);
+      const end = span.end + (next.length - text.length);
+      applyAsTyping({ start: span.start, end: span.end, text: next.slice(span.start, end), caret: end - span.start });
+    }, 0);
+  }
+
+  function changedUnderneath(text: string) {
+    setEditNotice({ reason: "The note changed while the sheet was open, so the sheet was not saved.", value: text });
   }
 
   /**
@@ -266,26 +367,7 @@ export function MarkdownEditor({
     }
     setEditNotice(null);
 
-    if (showLive) {
-      // The live editor keeps its own undo history, in which this is one step.
-      surface.replace(edit.start, edit.end, edit.text, edit.caret);
-      return;
-    }
-    const el = textarea.current;
-    if (!el) return;
-    const after = before.slice(0, edit.start) + edit.text + before.slice(edit.end);
-    const caret = edit.start + edit.caret;
-    el.focus();
-    if (document.activeElement === el) {
-      el.setSelectionRange(edit.start, edit.end);
-      document.execCommand?.("insertText", false, edit.text);
-    }
-    if (el.value === after) {
-      el.setSelectionRange(caret, caret);
-      return;
-    }
-    pendingCaret.current = caret;
-    replaceText(edit.start, edit.end, edit.text);
+    applyAsTyping(edit);
   }
 
   const noteLinks = useMemo<NoteLinks>(
@@ -376,6 +458,11 @@ export function MarkdownEditor({
     if (isDrawioShortcut(event) && !event.isComposing) {
       event.preventDefault(); // Keep the browser from claiming it too (it bookmarks all tabs).
       startDiagram();
+      return;
+    }
+    if (isSheetShortcut(event) && !event.isComposing && !readOnly) {
+      event.preventDefault(); // Keep the browser from claiming it too (it finds the previous match).
+      startSheet();
       return;
     }
     if (isImageToMdxShortcut(event) && !event.isComposing) {
@@ -580,7 +667,10 @@ export function MarkdownEditor({
             {fm && <FrontmatterCard fm={fm} />}
             <NoteLinksProvider value={noteLinks}>
               <DrawioEditContext.Provider value={drawioEditing}>
-                <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+                {/* A note that can't be changed has no Edit button on its sheets. */}
+                <SheetEditContext.Provider value={readOnly ? null : sheetEditing}>
+                  <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+                </SheetEditContext.Provider>
               </DrawioEditContext.Provider>
             </NoteLinksProvider>
           </PreviewHighlightMenu>
@@ -645,6 +735,7 @@ export function MarkdownEditor({
         onClose={() => setDiagram(null)}
         onSaved={diagramSaved}
       />
+      <SheetDialog open={sheet !== null} source={sheet?.source ?? { kind: "new" }} onClose={() => setSheet(null)} onSaved={sheetSaved} />
     </div>
   );
 }

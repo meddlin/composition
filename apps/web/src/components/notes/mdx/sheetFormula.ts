@@ -321,8 +321,8 @@ export function evaluateSheet(sheet: Sheet, formulas: ReadonlyMap<string, string
 export type Calculated = { sheet: Sheet; results: Evaluation };
 
 /** The grid grows to hold a formula (a totals row of nothing else has no CSV row), but only this far: more is calculated and not shown. */
-const MAX_SHEET_ROWS = 5_001;
-const MAX_SHEET_COLUMNS = 100;
+export const MAX_SHEET_ROWS = 5_001;
+export const MAX_SHEET_COLUMNS = 100;
 
 export function calculate(sheet: Sheet, formulas: ReadonlyMap<string, string>): Calculated {
   const results = evaluateSheet(sheet, formulas);

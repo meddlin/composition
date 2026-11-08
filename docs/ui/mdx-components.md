@@ -305,8 +305,8 @@ East,80,9.5,760
 
 This is the first part of [spreadsheets in notes](../sheet-component-plan.md): the data is a CSV block in the note,
 which is Markdown text like the rest of it, and a `formulas` block beside it can calculate some of the cells
-([below](#formulas-in-a-sheet)). It is read-only so far: editing it in a grid and importing from Excel are the steps
-after, and are not built yet.
+([below](#formulas-in-a-sheet)). It can be [edited in a grid](#editing-a-sheet); importing from Excel is the step after,
+and is not built yet.
 
 - **Blank lines around the fence**, as for `<Chart>`, which is what makes it a code block and keeps Markdown from
   rewrapping it.
@@ -399,10 +399,59 @@ calculates, [`sheetParse.ts`](../../apps/web/src/components/notes/mdx/sheetParse
 real Excel: [`excel-verified-cases.json`](../../spikes/sheet/excel-verified-cases.json) holds more than 1,200 formulas with the
 result Excel gave each, and `node spikes/sheet/run-in-excel.mjs` runs new ones in Excel on a Mac and records them.
 
+### Editing a sheet
+
+A sheet is changed in a grid, in a dialog, and the note's text is rewritten when you **Save sheet**. There is no need to
+touch the CSV by hand, though you can.
+
+- **Opening it.** Point at a sheet in the preview and press **Edit sheet** (the button shows on hover and on focus), or put
+  the caret in a sheet and press **Ctrl/Cmd+Shift+G**, or press the **Sheet** button in the note's toolbar. With the caret
+  in a **Markdown table** the same key turns the table into a sheet (the cells become the grid, and saving replaces the
+  table); anywhere else it starts a new sheet, at the caret (after the frontmatter, and without replacing a selection).
+- **In the grid.** It works as a spreadsheet does. Arrow keys move (with Ctrl/Cmd to the edge, Shift to select a
+  range); **Tab** and **Shift+Tab** move right and left, wrapping to the next row, and past the first or last cell they go on to
+  the next control; **Enter** moves down (Shift+Enter up). Typing a character **replaces** a cell, **F2** or a double click
+  **edits** it, **Enter**, **Tab** or a click elsewhere keeps what was typed and **Escape** drops it. After Tab-ing along a row,
+  Enter goes back to the column the row began in, and Enter after typing in the last row starts a new one. **Delete** clears
+  the selected cells; the column letters and row numbers select a whole column or row.
+- **Formulas.** A cell that starts with `=` is a formula. It shows its result once you leave it, and every formula that reads
+  it is calculated again; the line above the grid shows the address of the active cell and what is in it (and what could
+  not be calculated). A formula the engine cannot calculate is `#NAME?` in the cell, as it is in the preview. A text that
+  really begins with `=` is typed with a leading apostrophe (`'=not a formula`), as in Excel; the apostrophe is not part of it.
+- **Rows and columns** go in above or below (left or right) of the selection, as many as are selected, and come out the
+  same way. Formulas follow as they do in Excel: a reference to a cell below a new row moves down with it, a range with a
+  row put inside it grows (one with a row put just below does not), a range loses a deleted row, and a formula that read a
+  deleted cell shows `#REF!`. The last row or column left is emptied, not removed. A sheet holds at most 5,001 rows
+  (the header included) and 100 columns.
+- **The clipboard.** **Copy** puts the selection on the clipboard as Excel does (a tab between cells, a line break between
+  rows, each cell as it is shown), and **Cut** clears it after. **Paste** lays a range copied from Excel down from the
+  selected cell, growing the grid to hold it (what would pass the size limit is left off, and the dialog says so); one
+  pasted value fills every selected cell.
+- **Undo and redo** (Ctrl/Cmd+Z, +Shift+Z, or the buttons) take back each change made in the grid, up to 100 steps. **Ctrl/Cmd+S**
+  saves, also in the middle of a cell. **Cancel** after changes asks before it throws them away.
+- **What is saved.** The CSV block holds each cell's value, a formula's result included (which is what search, the assistant,
+  `<Chart>` and the terminal read), and the `formulas` block holds the formulas, in order down the rows; a sheet with
+  none has no `formulas` block. The empty rows at the foot and the empty columns at the right are left off. **Row 1 is the
+  header and cannot be empty** while other rows are not (the CSV reader would take it for nothing and every address below
+  would move up), so Save says so instead. The tag's attributes (`title`, `height`) and everything else around the blocks
+  are left as they were, a fence is made longer when a cell holds backticks, and the whole change goes in as one edit,
+  so one undo takes it back (where the editor can't be typed into, as when only the preview shows, the note's undo history
+  starts over, as after a pasted image).
+- **If the note changed** while the dialog was open (it is modal, so only a sync can), the sheet is found again by its text;
+  where it is not there any more the save is refused and the note says so.
+
+Not in the grid yet: dragging to fill, copying a formula to another cell with its references moved, pointing at a cell to put
+its address into a formula, column widths you set, sorting and filtering, cell formats, and finding text in the grid.
+
 Source: [`mdx/Sheet.tsx`](../../apps/web/src/components/notes/mdx/Sheet.tsx) and
 [`mdx/sheetData.ts`](../../apps/web/src/components/notes/mdx/sheetData.ts), which reads the CSV and the `formulas` block (and is
 shared with the terminal app, whose drawing is [`sheetText.ts`](../../apps/cli/src/sheetText.ts)). The CSV reader is `parseCsv` in
-[`chartData.ts`](../../apps/web/src/components/notes/mdx/chartData.ts), with an option that keeps blank rows.
+[`chartData.ts`](../../apps/web/src/components/notes/mdx/chartData.ts), with an option that keeps blank rows. The editor is
+[`SheetDialog.tsx`](../../apps/web/src/components/notes/SheetDialog.tsx) around [`SheetGrid.tsx`](../../apps/web/src/components/notes/SheetGrid.tsx);
+what it does to the note's text is in [`mdx/sheetSrc.ts`](../../apps/web/src/components/notes/mdx/sheetSrc.ts) (find a sheet, rewrite its
+blocks, read a Markdown table), the grid as typed text is [`mdx/sheetDraft.ts`](../../apps/web/src/components/notes/mdx/sheetDraft.ts)
+(rows and columns, the clipboard, the two blocks in and out), and the rule for what a new row does to a formula is
+[`mdx/sheetRefs.ts`](../../apps/web/src/components/notes/mdx/sheetRefs.ts). All of it but the dialog and the grid is pure.
 
 ## How it renders
 

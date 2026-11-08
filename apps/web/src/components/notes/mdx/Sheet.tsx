@@ -1,5 +1,7 @@
-import { Children, isValidElement, useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { PencilIcon } from "lucide-react";
+import { Children, isValidElement, useContext, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { SheetEditContext } from "../SheetEdit";
 import { textOf } from "./Chart";
 import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, parseFormulas, parseSheet, viewportHeight } from "./sheetData";
 import { calculate } from "./sheetFormula";
@@ -52,6 +54,9 @@ const notice = (text: string) => (
 
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
+/** What react-markdown hands a component beside its props: the tag as parsed, which knows where in the note's body it started. */
+type SourceNode = { position?: { start?: { offset?: number } } };
+
 /**
  * A grid of a table, written in a note as a CSV block inside the tag (see sheetData.ts for how it is read):
  *
@@ -76,7 +81,8 @@ const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
  * A figure that is a block, so the tag belongs on lines of its own. One that can't be drawn shows as a notice,
  * like a missing image, rather than vanishing while the block is half-typed.
  */
-export function Sheet({ title, height, children }: { title?: string; height?: string; children?: ReactNode }) {
+export function Sheet({ title, height, children, node }: { title?: string; height?: string; children?: ReactNode; node?: SourceNode }) {
+  const editing = useContext(SheetEditContext);
   const csv = blockText(children, "csv");
   const formulaSource = formulasText(children);
   const parsed = useMemo(() => parseSheet(csv), [csv]);
@@ -84,6 +90,7 @@ export function Sheet({ title, height, children }: { title?: string; height?: st
   const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas) : undefined), [parsed, formulas]);
   const widths = useMemo(() => (calculated ? columnWidths(calculated.sheet) : []), [calculated]);
   const [scrollTop, setScrollTop] = useState(0);
+  const offset = node?.position?.start?.offset;
   if (!calculated) return notice(parsed.error ?? "");
 
   const { rows, columns } = calculated.sheet;
@@ -138,8 +145,18 @@ export function Sheet({ title, height, children }: { title?: string; height?: st
   }
 
   return (
-    <figure className="not-prose my-4">
+    <figure className="group not-prose relative my-4">
       {caption ? <figcaption className="mb-2 text-sm font-semibold">{caption}</figcaption> : null}
+      {editing && offset !== undefined && (
+        <button
+          type="button"
+          onClick={() => editing.edit(offset)}
+          className="absolute top-1 right-2 z-30 inline-flex items-center gap-1 rounded-md border bg-popover/95 px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+        >
+          <PencilIcon className="size-3" />
+          Edit sheet
+        </button>
+      )}
       <div
         role="region"
         aria-label={`${caption || "Sheet"}: ${count(bodyRows, "row")} by ${count(columns, "column")}`}
