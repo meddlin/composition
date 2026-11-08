@@ -179,6 +179,8 @@ export function findOpenedSheet(text: string, opened: { start: number; text: str
 /** The tag for a new sheet holding `source`: the CSV block, and the `formulas` one when there are formulas. */
 export function sheetTag(source: SheetSource): string {
   const formulas = source.formulas === "" ? "" : `\n\n${fenceBlock("formulas", source.formulas)}`;
+  // The tag is note text (MDX source), never HTML a browser parses.
+  // nosemgrep: html-in-template-string
   return `<Sheet>\n\n${fenceBlock("csv", source.csv)}${formulas}\n\n</Sheet>`;
 }
 
@@ -208,7 +210,14 @@ export function insertSheet(text: string, start: number, end: number, source: Sh
 /** A Markdown table in a note, where it is, and its cells (the header row first). */
 export type MarkdownTable = { start: number; end: number; rows: string[][] };
 
-const DELIMITER_ROW = /^\s*\|?(?:\s*:?-+:?\s*\|)*\s*:?-+:?\s*\|?\s*$/;
+const DELIMITER_CELL = /^:?-+:?$/;
+
+/** Whether a line is a table's delimiter row (`| --- | :---: |`): pipes between cells made only of dashes, with a colon at either end for alignment. */
+function isDelimiterRow(line: string): boolean {
+  if (!line.includes("|")) return false;
+  const inner = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  return inner.split("|").every((cell) => DELIMITER_CELL.test(cell.trim()));
+}
 
 /** The cells of a table row: split at the pipes that are not escaped, the ones at either end dropped. */
 function tableCells(line: string): string[] {
@@ -235,7 +244,7 @@ export function tableAt(text: string, position: number): MarkdownTable | null {
   while (last + 1 < lines.length && lines[last + 1].text.includes("|")) last++;
 
   // The table starts one line above its delimiter row, and the position has to be in it.
-  const delimiter = lines.findIndex((line, i) => i > first && i <= last && DELIMITER_ROW.test(line.text));
+  const delimiter = lines.findIndex((line, i) => i > first && i <= last && isDelimiterRow(line.text));
   if (delimiter < 0 || here < delimiter - 1) return null;
   const header = delimiter - 1;
   const body = lines.slice(delimiter + 1, last + 1);

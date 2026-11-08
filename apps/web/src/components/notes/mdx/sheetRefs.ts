@@ -117,7 +117,7 @@ export function shiftReferences(formula: string, shift: Shift): string {
       // Whole columns, `B:D`.
       k += 2;
       if (shift.axis !== "col") continue;
-      const [a, b] = [columnNumber(token.text.replace("$", "")), columnNumber(after.text.replace("$", ""))];
+      const [a, b] = [columnNumber(token.text.replace(/\$/g, "")), columnNumber(after.text.replace(/\$/g, ""))];
       const moved = moveSpan(Math.min(a, b), Math.max(a, b), shift);
       if (!moved) replacements.push({ from: begin(token), to: end(after), text: "#REF!" });
       else {

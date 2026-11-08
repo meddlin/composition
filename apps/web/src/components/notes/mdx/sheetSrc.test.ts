@@ -193,6 +193,20 @@ describe("tableAt", () => {
     ]);
   });
 
+  it("takes only dashes between pipes, with colons for alignment, as a delimiter row", () => {
+    expect(tableAt("| a | b |\n|:--|--:|\n| 1 | 2 |", 0)).not.toBeNull();
+    expect(tableAt("| a | b |\n| - | x |\n| 1 | 2 |", 0)).toBeNull();
+    expect(tableAt("| a |\n|||\n| 1 |", 0)).toBeNull();
+    expect(tableAt("| a |\n| : |\n| 1 |", 0)).toBeNull();
+  });
+
+  it("reads a very long delimiter row without trouble", () => {
+    const wide = `${"| a ".repeat(5000)}|\n${"| --- ".repeat(5000)}x|\n`;
+    const started = performance.now();
+    expect(tableAt(wide, 0)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("is not a table without a delimiter row, or in a fenced code block", () => {
     expect(tableAt("| a | b |\n| c | d |", 0)).toBeNull();
     const fenced = "```\n" + TABLE + "\n```";
