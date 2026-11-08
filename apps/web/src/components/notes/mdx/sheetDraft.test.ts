@@ -14,6 +14,7 @@ import {
   insertRow,
   parseClipboard,
   pasteBlock,
+  rangeFromClipboard,
   setCell,
   trimDraft,
   type Draft,
@@ -258,5 +259,125 @@ describe("trimDraft and commitInput", () => {
 
   it("puts what was typed on one line with no space at either end", () => {
     expect(commitInput("  a\r\n b  ")).toBe("a b");
+  });
+});
+
+
+describe("carried formulas", () => {
+  const CSV = "Item,Price,Looked up,Plus one\nPens,1.5,99,100\nPaper,4,7,8";
+  const FORMULAS = "C2 carried =XLOOKUP(A2,F:F,G:G)\nD2 =C2+1\nC3 carried =XLOOKUP(A3,F:F,G:G)\nD3 =C3+1";
+  const loaded = () => draftFromSource(CSV, FORMULAS);
+
+  it("keeps the formula as the cell's text and the value the CSV holds as what it carries", () => {
+    const draft = loaded();
+    expect(draft.rows[1]).toEqual(["Pens", "1.5", "=XLOOKUP(A2,F:F,G:G)", "=C2+1"]);
+    expect(draft.carried?.[1]).toEqual([null, null, "99", null]);
+    expect(draft.carried?.[2]).toEqual([null, null, "7", null]);
+  });
+
+  it("has nothing carried when no formula is", () => {
+    expect(draftFromSource("A\n1", "A3 =A2+1").carried).toBeUndefined();
+  });
+
+  it("shows a carried cell's value, and calculates what reads it from that", () => {
+    const calculated = calculateDraft(loaded());
+    expect(calculated.sheet.rows[1]).toEqual(["Pens", "1.5", "99", "100"]);
+    expect([...calculated.carried]).toEqual(["C2", "C3"]);
+    expect(calculated.results.get("D2")).toEqual({ value: 100, unsupported: [] });
+  });
+
+  it("is saved as it was: marked carried, with its value, and not calculated", () => {
+    const written = draftToSource(loaded());
+    expect(written).toEqual({ ok: true, source: { csv: CSV, formulas: FORMULAS } });
+  });
+
+  it("becomes an ordinary formula when it is typed over with another, calculated or not calculated like any", () => {
+    const edited = setCell(loaded(), 1, 2, "=FILTER(A2,TRUE)");
+    expect(edited.carried?.[1][2]).toBeNull();
+    expect(edited.carried?.[2][2]).toBe("7");
+    expect(draftToSource(edited)).toMatchObject({ ok: true, source: { csv: expect.stringContaining("Pens,1.5,#NAME?,#NAME?") } });
+  });
+
+  it("keeps a carried cell that is typed over with the text it already has", () => {
+    const draft = loaded();
+    expect(setCell(draft, 1, 2, " =XLOOKUP(A2,F:F,G:G) ")).toBe(draft);
+  });
+
+  it("is no longer carried once the cell is cleared or pasted over", () => {
+    expect(clearCells(loaded(), { row: 1, col: 2 }, { row: 1, col: 2 }).carried?.[1][2]).toBeNull();
+    expect(pasteBlock(loaded(), 2, 2, [["5"]]).draft.carried?.[2][2]).toBeNull();
+    expect(pasteBlock(loaded(), 2, 2, [["5"]]).draft.carried?.[1][2]).toBe("99");
+  });
+
+  it("goes when its last cell does, so the draft has none", () => {
+    const one = draftFromSource("A,B\n1,2", "B2 carried =XLOOKUP(A2,F:F,G:G)");
+    expect(one.carried).toBeDefined();
+    expect(setCell(one, 1, 1, "3").carried).toBeUndefined();
+  });
+
+  it("moves with its row and its column, and its formula moves with it", () => {
+    const below = insertRow(loaded(), 1);
+    expect(below.rows[2][2]).toBe("=XLOOKUP(A3,F:F,G:G)");
+    expect(below.carried?.[2][2]).toBe("99");
+    expect(below.carried?.[1]).toEqual([null, null, null, null]);
+    expect(below.rows[2][3]).toBe("=C3+1");
+
+    const right = insertColumn(loaded(), 1);
+    expect(right.carried?.[1]).toEqual([null, null, null, "99", null]);
+    expect(right.rows[1][3]).toBe("=XLOOKUP(A2,G:G,H:H)");
+
+    const gone = deleteRow(loaded(), 1);
+    expect(gone.carried?.[1]).toEqual([null, null, "7", null]);
+    expect(gone.carried).toHaveLength(2);
+
+    const narrower = deleteColumn(loaded(), 1);
+    expect(narrower.carried?.[1]).toEqual([null, "99", null]);
+  });
+
+  it("keeps the carried values of the rows that are left when empty ones at the foot are trimmed", () => {
+    const wide = { ...loaded(), rows: [...loaded().rows, ["", "", "", ""]], carried: [...(loaded().carried ?? []), [null, null, null, null]] };
+    expect(trimDraft(wide).carried).toHaveLength(3);
+  });
+});
+
+
+describe("rangeFromClipboard", () => {
+  const EXCEL_HTML = '<html xmlns:x="urn:schemas-microsoft-com:office:excel"><table><tr><td>a</td></tr></table></html>';
+
+  it("is the cells of text split by tabs, every row with as many", () => {
+    expect(rangeFromClipboard("Item\tQty\r\nPens\t12\r\n")).toEqual([
+      ["Item", "Qty"],
+      ["Pens", "12"],
+    ]);
+  });
+
+  it("keeps an empty cell in the middle or at the end of a row", () => {
+    expect(rangeFromClipboard("a\t\tc\nd\te\t")).toEqual([
+      ["a", "", "c"],
+      ["d", "e", ""],
+    ]);
+  });
+
+  it("is a single column too, when the HTML of the copy says Excel made it", () => {
+    expect(rangeFromClipboard("a\nb\nc", EXCEL_HTML)).toEqual([["a"], ["b"], ["c"]]);
+    expect(rangeFromClipboard("a\nb\nc")).toBeNull();
+  });
+
+  it("pads the rows of a copy from Excel to the widest", () => {
+    expect(rangeFromClipboard("a\tb\nc", EXCEL_HTML)).toEqual([
+      ["a", "b"],
+      ["c", ""],
+    ]);
+  });
+
+  it("is not any other text: no tab, one cell, rows of different lengths, text indented with tabs", () => {
+    for (const text of ["", "Just a sentence.", "one\ntwo", "single", "a\tb\nc", "\tindented\n\tmore", "a\tb\n\n"]) {
+      expect(rangeFromClipboard(text), JSON.stringify(text)).toBeNull();
+    }
+  });
+
+  it("is not a range too big for a sheet", () => {
+    expect(rangeFromClipboard(Array.from({ length: 5002 }, (_, i) => `${i}\tx`).join("\n"))).toBeNull();
+    expect(rangeFromClipboard(Array.from({ length: 101 }, (_, i) => String(i)).join("\t") + "\n1\t2")).toBeNull();
   });
 });

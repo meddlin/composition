@@ -7,6 +7,7 @@
  * cases are in spikes/sheet/excel-verified-cases.json. A shape Excel accepts that we do not reproduce is not
  * guessed at: it throws `Unsupported`, and the cell says what it could not calculate.
  */
+import { ISO_DATE, isoDateSerial } from "./sheetDate";
 
 export type ErrorCode = "#NULL!" | "#DIV/0!" | "#VALUE!" | "#REF!" | "#NAME?" | "#NUM!" | "#N/A";
 
@@ -111,6 +112,8 @@ export function parseNumberText(text: string): number | null {
   const inner = bracketed ? bracketed[1] : trimmed;
   const parts = NUMBER_TEXT.exec(inner);
   if (!parts) {
+    // A date written 2026-03-04 is read as that date, and one that is not a day (2026-02-30) is not a number, as in Excel.
+    if (ISO_DATE.test(trimmed)) return isoDateSerial(trimmed);
     if (DATE_LIKE.test(trimmed) || OTHER_CURRENCY.test(trimmed)) throw new Unsupported(`the text “${trimmed}” read as a date or a currency`);
     return null;
   }

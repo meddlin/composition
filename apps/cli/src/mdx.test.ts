@@ -255,6 +255,16 @@ describe("parsePreview", () => {
       expect(block).toEqual({ kind: "markdown", source: "```\n  A  B\n1 a  b\n2 1  #NAME?\n```\n\nNot calculated: B2 (the function FILTER)." });
     });
 
+    it("shows a carried formula's value, which is Excel's, and does not list it as not calculated", () => {
+      const [block] = parsePreview(sheet("", csv("a,b\n1,99"), "```formulas\nB2 carried =XLOOKUP(A2,F:F,G:G)\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A   B\n1 a   b\n2 1  99\n```" });
+    });
+
+    it("says where an imported sheet came from, under it", () => {
+      const [block] = parsePreview(sheet(' source="budget.xlsx" sheet="Q3" range="A1:F40" imported="0123456789ab"', csv("a\n1"))).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A\n1 a\n2 1\n```\n\nImported from budget.xlsx, sheet Q3, A1:F40." });
+    });
+
     it("lists no more than five, and counts the rest", () => {
       const lines = Array.from({ length: 7 }, (_, i) => `A${i + 2} =FILTER(B${i + 2},TRUE)`).join("\n");
       const [block] = parsePreview(sheet("", csv(`a\n${"1\n".repeat(7)}`.trimEnd()), `\`\`\`formulas\n${lines}\n\`\`\``)).blocks;

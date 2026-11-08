@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shiftReferences, type Shift } from "./sheetRefs";
+import { rebaseReferences, shiftReferences, type Shift } from "./sheetRefs";
 
 const insertRow = (at: number): Shift => ({ axis: "row", at, delta: 1 });
 const deleteRow = (at: number): Shift => ({ axis: "row", at, delta: -1 });
@@ -105,5 +105,53 @@ describe("shiftReferences: what it leaves alone", () => {
 
   it("reads a formula with no leading equals sign", () => {
     expect(shiftReferences("A3+1", insertRow(0))).toBe("A4+1");
+  });
+});
+
+
+describe("rebaseReferences", () => {
+  const FROM_B2 = { row: 1, col: 1 };
+  const SIZE = { rows: 10, cols: 5 };
+
+  it("moves every reference by where the range began, absolute ones too", () => {
+    expect(rebaseReferences("=C3*D3", FROM_B2, SIZE)).toEqual({ formula: "=B2*C2" });
+    expect(rebaseReferences("=SUM($C$3:C9)+$B4", FROM_B2, SIZE)).toEqual({ formula: "=SUM($B$2:B8)+$A3" });
+  });
+
+  it("is the same formula when the range began at A1", () => {
+    expect(rebaseReferences("=SUMIFS(C2:C9,A2:A9,\"West\")", { row: 0, col: 0 }, SIZE)).toEqual({ formula: "=SUMIFS(C2:C9,A2:A9,\"West\")" });
+  });
+
+  it("leaves a text, a function name and a logical alone", () => {
+    expect(rebaseReferences('=IF(C3="C3",LOG10(D3),TRUE)', FROM_B2, SIZE)).toEqual({ formula: '=IF(B2="C3",LOG10(C2),TRUE)' });
+  });
+
+  it("moves whole columns and whole rows that are inside, and says outside for ones that are not", () => {
+    expect(rebaseReferences("=SUM(C:D)", FROM_B2, SIZE)).toEqual({ formula: "=SUM(B:C)" });
+    expect(rebaseReferences("=SUM(3:4)", FROM_B2, SIZE)).toEqual({ formula: "=SUM(2:3)" });
+    expect(rebaseReferences("=SUM(A:C)", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("columns") });
+    expect(rebaseReferences("=SUM(1:3)", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("rows") });
+  });
+
+  it("is outside when it reads a cell above or left of the range, or below or right of it", () => {
+    expect(rebaseReferences("=A1+C3", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("not in the range") });
+    expect(rebaseReferences("=C3+Z3", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("not in the range") });
+    expect(rebaseReferences("=SUM(C3:C99)", FROM_B2, SIZE)).toMatchObject({ outside: expect.stringContaining("not in the range") });
+  });
+
+  it("is outside when it reads another sheet, another workbook, a table's column or a defined name", () => {
+    expect(rebaseReferences("=Sheet2!C3", FROM_B2, SIZE)).toMatchObject({ outside: "another sheet or workbook" });
+    expect(rebaseReferences("='Q3 budget'!C3", FROM_B2, SIZE)).toMatchObject({ outside: "another sheet or workbook" });
+    expect(rebaseReferences("=[1]Sheet1!C3", FROM_B2, SIZE)).toMatchObject({ outside: expect.any(String) });
+    expect(rebaseReferences("=SUM(Table1[Revenue])", FROM_B2, SIZE)).toMatchObject({ outside: "a table's column" });
+    expect(rebaseReferences("=C3*TaxRate", FROM_B2, SIZE)).toMatchObject({ outside: "a defined name" });
+  });
+
+  it("is outside when it cannot be read", () => {
+    expect(rebaseReferences('=C3&"open', FROM_B2, SIZE)).toMatchObject({ outside: "a formula that cannot be read" });
+  });
+
+  it("reads a formula with no leading equals sign, as the files hold them", () => {
+    expect(rebaseReferences("C3*D3", FROM_B2, SIZE)).toEqual({ formula: "B2*C2" });
   });
 });

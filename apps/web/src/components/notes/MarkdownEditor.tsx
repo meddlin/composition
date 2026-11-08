@@ -1,5 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { parse } from "@/lib/composition/frontmatter";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
@@ -22,6 +23,7 @@ import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { SheetDialog, type SheetEditSource } from "./SheetDialog";
+import { SheetImportDialog, type ImportedSheet } from "./SheetImportDialog";
 import { SheetEditContext, type SheetEditing } from "./SheetEdit";
 import { BOLD_SHORTCUT, emphasisFor, ITALIC_SHORTCUT, toggleEmphasis } from "./emphasis";
 import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
@@ -31,9 +33,10 @@ import { wrapsBeforeColumn } from "./wrapsBeforeColumn";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import { insideFence } from "./mdx/completions";
 import { DRAWIO_SHORTCUT, diagramRange, insertDiagram, isDrawioShortcut, replaceDiagramSrc } from "./mdx/drawioSrc";
 import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
-import { type SheetSource } from "./mdx/sheetDraft";
+import { rangeFromClipboard, type SheetSource } from "./mdx/sheetDraft";
 import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks, type PdfLinks } from "./NoteLink";
@@ -61,14 +64,26 @@ export type MarkdownEditorControls = {
   insertDiagram: () => void;
   /** Opens the sheet editor: on the sheet or Markdown table the caret is in, else on a new sheet, which goes in at the caret. */
   editSheet: () => void;
+  /** Opens **Import from Excel**: a range of a workbook, which goes into the note at the caret as a sheet. */
+  importExcel: () => void;
   /** Puts Markdown into the note at the caret (at the end if the user has not been in the editor yet), as a block or inline. */
   insertMarkdown: (markdown: string, how: Insertion) => void;
 };
 
 const NO_MATCHES: Match[] = [];
 
-/** What a sheet saved from the editor replaces: nothing (a new one goes in at `start`), a Markdown table, or the sheet that was opened. */
-type SheetTarget = { kind: "new"; start: number; end: number } | { kind: "promote"; start: number; text: string } | { kind: "edit"; start: number; text: string };
+/** The workbook reader (SheetJS, 300 KB or so) is loaded when something is imported, not with the editor. */
+const loadWorkbook = (bytes: Uint8Array) => import("./mdx/sheetWorkbook").then((module) => module.readWorkbook(bytes));
+
+/** What a sheet saved from the editor replaces: nothing (a new one goes in at `start`), a Markdown table, the sheet that was opened, or text that was pasted. */
+type SheetTarget =
+  | { kind: "new"; start: number; end: number }
+  | { kind: "promote"; start: number; text: string }
+  | { kind: "edit"; start: number; text: string }
+  | { kind: "range"; start: number; text: string };
+
+/** A paste that looks like a range copied from a spreadsheet: where it went and what it was, until the note changes. */
+type PasteOffer = { value: string; start: number; text: string; rows: string[][] };
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -203,7 +218,7 @@ export function MarkdownEditor({
     pendingCaret.current = placed.start + placed.caret;
     replaceText(placed.start, placed.end, placed.text);
   }
-  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet, insertMarkdown }));
+  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet, importExcel: startImport, insertMarkdown }));
 
   const drawioEditing = useMemo<DrawioEditing>(
     () => ({ edit: (name) => setDiagram({ source: { kind: "edit", name }, at: { start: 0, end: 0 } }) }),
@@ -231,6 +246,72 @@ export function MarkdownEditor({
 
   // The sheet editor: opened on a sheet, on a Markdown table to promote, or on a new sheet; `target` is what its result replaces.
   const [sheet, setSheet] = useState<{ source: SheetEditSource; target: SheetTarget } | null>(null);
+  const [pasteOffer, setPasteOffer] = useState<PasteOffer | null>(null);
+  // Import from Excel, with where in the note the sheet will go (the caret when it was opened).
+  const [importAt, setImportAt] = useState<{ start: number; end: number } | null>(null);
+
+  function startImport() {
+    const text = surface.text();
+    const bodyStart = text.length - parse(text)[1].length;
+    setImportAt(sheetRange(text, Math.min(surface.selection().start, text.length), bodyStart));
+  }
+
+  /** A range was imported: its sheet goes in where the caret was, with where it came from on its tag. */
+  function sheetImported(imported: ImportedSheet) {
+    const place = importAt;
+    setImportAt(null);
+    if (!place) return;
+    // After the dialog has gone, as for a saved sheet (see sheetSaved).
+    setTimeout(() => {
+      const text = surface.text();
+      const start = Math.min(place.start, text.length);
+      const attributes = { source: imported.file, sheet: imported.sheet, range: imported.range, imported: imported.imported };
+      const edit = insertSheet(text, start, start, imported.source, attributes);
+      applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+    }, 0);
+  }
+
+  /**
+   * A paste. Pictures are taken over (see useImageUpload); a range copied from a spreadsheet stays the text it is, as it always
+   * was, and is offered as a sheet: the offer stays until the note is changed again.
+   */
+  function pasted(event: { clipboardData: DataTransfer | null; defaultPrevented: boolean; preventDefault(): void }) {
+    imageUpload.paste(event);
+    if (event.defaultPrevented || !event.clipboardData) return;
+    // The editors take a line break as one character, however the clipboard wrote it.
+    const text = event.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
+    const rows = rangeFromClipboard(text, event.clipboardData.getData("text/html"));
+    if (!rows) return;
+    const before = surface.text();
+    const start = Math.min(surface.selection().start, before.length);
+    if (insideFence(before, before.lastIndexOf("\n", start - 1) + 1)) return;
+    // The browser puts the text in after this handler, so look for it there a moment later.
+    setTimeout(() => {
+      const now = surface.text();
+      if (now.slice(start, start + text.length) === text) setPasteOffer({ value: now, start, text, rows });
+    }, 0);
+  }
+
+  function makeSheetOfPaste() {
+    const offer = pasteOffer;
+    setPasteOffer(null);
+    if (offer) setSheet({ source: { kind: "promote", rows: offer.rows }, target: { kind: "range", start: offer.start, text: offer.text } });
+  }
+
+  const pasteBanner = pasteOffer && pasteOffer.value === value && (
+    <div role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-4 py-2 text-xs">
+      <span className="min-w-[12rem] flex-1">
+        That looks like a range copied from a spreadsheet ({pasteOffer.rows.length} {pasteOffer.rows.length === 1 ? "row" : "rows"} by {pasteOffer.rows[0].length}{" "}
+        {pasteOffer.rows[0].length === 1 ? "column" : "columns"}).
+      </span>
+      <Button variant="outline" size="xs" onClick={makeSheetOfPaste}>
+        Make it a sheet
+      </Button>
+      <Button variant="ghost" size="xs" onClick={() => setPasteOffer(null)}>
+        Keep as text
+      </Button>
+    </div>
+  );
 
   function openSheet(span: SheetSpan, text: string) {
     setSheet({ source: { kind: "edit", ...sheetSource(span) }, target: { kind: "edit", start: span.start, text: text.slice(span.start, span.end) } });
@@ -301,6 +382,11 @@ export function MarkdownEditor({
       if (target.kind === "new") {
         const start = Math.min(target.start, text.length);
         const edit = insertSheet(text, start, Math.min(Math.max(target.end, start), text.length), source);
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      if (target.kind === "range") {
+        if (text.slice(target.start, target.start + target.text.length) !== target.text) return changedUnderneath(text);
+        const edit = insertSheet(text, target.start, target.start + target.text.length, source);
         return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
       }
       if (target.kind === "promote") {
@@ -557,7 +643,7 @@ export function MarkdownEditor({
   const liveEvents: LiveEditorEvents = {
     onKeyDown: handleKey,
     onPaste: (event) => {
-      if (!readOnly) imageUpload.paste(event);
+      if (!readOnly) pasted(event);
     },
     onChange: features.onChange,
     onSelect: features.onSelect,
@@ -603,6 +689,7 @@ export function MarkdownEditor({
             {editNotice.reason}
           </p>
         )}
+        {showEditor && pasteBanner}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
         <div className="note-pane relative flex min-h-0 flex-1 flex-col">
           {highlight && (
@@ -617,7 +704,7 @@ export function MarkdownEditor({
               features.onChange();
             }}
             readOnly={readOnly}
-            onPaste={readOnly ? undefined : imageUpload.paste}
+            onPaste={readOnly ? undefined : pasted}
             // The text is drawn by the highlight layer, but the browser's squiggles still land on the textarea's own text.
             spellCheck
             aria-label="Markdown editor"
@@ -716,6 +803,7 @@ export function MarkdownEditor({
             {editNotice.reason}
           </p>
         )}
+        {showLive && pasteBanner}
         {/* Not mounted while hidden: it is a second copy of the editor, and the plain editor keeps the undo history. */}
         {showLive && (
           // The box the menus are placed in, as the plain editor's wrapper is for its own.
@@ -758,6 +846,7 @@ export function MarkdownEditor({
         onSaved={diagramSaved}
       />
       <SheetDialog open={sheet !== null} source={sheet?.source ?? { kind: "new" }} onClose={() => setSheet(null)} onSaved={sheetSaved} />
+      <SheetImportDialog open={importAt !== null} loadWorkbook={loadWorkbook} onClose={() => setImportAt(null)} onImported={sheetImported} />
     </div>
   );
 }

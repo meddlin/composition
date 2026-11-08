@@ -203,9 +203,16 @@
     },
     "AK4": {
       "formula": "=AK3/AF2"
-    }
+    },
+    "AM1": "2026-03-04",
+    "AM2": "2026-02-30",
+    "AM3": "2026-3-4",
+    "AN1": "1900-02-29",
+    "AN2": "1899-12-31",
+    "AN3": 30
   },
   "ranges": {
+    "DATES": "$AM$1:$AM$3",
     "A": "$A$1:$A$5",
     "B": "$B$1:$B$5",
     "C": "$C$1:$C$4",
@@ -6624,6 +6631,157 @@
       "label": "Number to text: -1.5E-18",
       "formula": "-1.5E-18&\"\"",
       "excel": "-1.5E-18"
+    },
+    {
+      "label": "A date written in a cell is a number: +1",
+      "formula": "AM1+1",
+      "excel": 46086
+    },
+    {
+      "label": "A date written in a cell: plus a number",
+      "formula": "AM1+AN3",
+      "excel": 46115
+    },
+    {
+      "label": "A date written in a cell: YEAR",
+      "formula": "YEAR(AM1)",
+      "excel": 2026
+    },
+    {
+      "label": "A date written in a cell: MONTH",
+      "formula": "MONTH(AM1)",
+      "excel": 3
+    },
+    {
+      "label": "A date written in a cell: DAY",
+      "formula": "DAY(AM1)",
+      "excel": 4
+    },
+    {
+      "label": "A date written in a cell: equals DATE()",
+      "formula": "AM1=DATE(2026,3,4)",
+      "excel": true
+    },
+    {
+      "label": "A date written with one-digit month and day is the same date",
+      "formula": "AM3-AM1",
+      "excel": 0
+    },
+    {
+      "label": "A date written in a cell: ISNUMBER",
+      "formula": "ISNUMBER(AM1)",
+      "excel": true
+    },
+    {
+      "label": "A day the month does not have is text: ISNUMBER",
+      "formula": "ISNUMBER(AM2)",
+      "excel": false
+    },
+    {
+      "label": "A day the month does not have is text: +0",
+      "formula": "AM2+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "1900-02-29 is a date: serial 60",
+      "formula": "AN1+0",
+      "excel": 60
+    },
+    {
+      "label": "A year before 1900 is text: ISNUMBER",
+      "formula": "ISNUMBER(AN2)",
+      "excel": false
+    },
+    {
+      "label": "A date written in a cell: TEXT",
+      "formula": "TEXT(AM1,\"yyyy-mm-dd\")",
+      "excel": "2026-03-04"
+    },
+    {
+      "label": "A date written in a cell: COUNT",
+      "formula": "COUNT({DATES})",
+      "excel": 2
+    },
+    {
+      "label": "A date written in a cell: SUM",
+      "formula": "SUM({DATES})",
+      "excel": 92170
+    },
+    {
+      "label": "A date written in a cell: WEEKDAY",
+      "formula": "WEEKDAY(AM1)",
+      "excel": 4
+    },
+    {
+      "label": "A date written in a cell: EOMONTH",
+      "formula": "EOMONTH(AM1,0)-AM1",
+      "excel": 27
+    },
+    {
+      "label": "A date written in a cell: as text",
+      "formula": "AM1&\"\"",
+      "excel": "46085"
+    },
+    {
+      "label": "A date written in a cell: compared with a text",
+      "formula": "AM1>\"a\"",
+      "excel": false
+    },
+    {
+      "label": "A date written in a cell: MATCH by value",
+      "formula": "MATCH(46085,{DATES},0)",
+      "excel": 1
+    },
+    {
+      "label": "A date written in a cell: COUNTIF by serial",
+      "formula": "COUNTIF({DATES},46085)",
+      "excel": 2
+    },
+    {
+      "label": "A date written in a cell: COUNTIF by ISO text",
+      "formula": "COUNTIF({DATES},\"2026-03-04\")",
+      "excel": 2
+    },
+    {
+      "label": "A date written as text is a date in arithmetic",
+      "formula": "\"2026-03-04\"+1",
+      "excel": 46086
+    },
+    {
+      "label": "A date written as text with one-digit month and day",
+      "formula": "\"2026-3-4\"+0",
+      "excel": 46085
+    },
+    {
+      "label": "A day the month does not have, as text in arithmetic",
+      "formula": "\"2026-02-30\"+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "VALUE of a date written as text",
+      "formula": "VALUE(\"2026-03-04\")",
+      "excel": 46085
+    },
+    {
+      "label": "A date written as text: COUNTIF criteria with an operator",
+      "formula": "COUNTIF({DATES},\">=2026-03-04\")",
+      "excel": 2
+    },
+    {
+      "label": "A date written as text: 1900-02-29",
+      "formula": "\"1900-02-29\"+0",
+      "excel": 60
+    },
+    {
+      "label": "A year before 1900 as text in arithmetic",
+      "formula": "\"1899-12-31\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
     }
   ]
 }

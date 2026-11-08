@@ -79,6 +79,42 @@ describe("SheetDialog: opening", () => {
   });
 });
 
+describe("SheetDialog: carried formulas", () => {
+  const CARRIED: SheetEditSource = {
+    kind: "edit",
+    csv: "Item,Looked up,Plus one\nPens,99,100",
+    formulas: "B2 carried =XLOOKUP(A2,F:F,G:G)\nC2 =B2+1",
+  };
+
+  it("shows a carried cell's value, marks it, and says so in the formula line", () => {
+    open(CARRIED);
+    expect(cell(2, 1).textContent).toBe("99");
+    expect(cell(2, 1).title).toContain("Calculated by Excel");
+    expect(cell(2, 1).className).toContain("after:bg-primary/60");
+    expect(cell(2, 2).textContent).toBe("100");
+    press("ArrowDown");
+    press("ArrowRight");
+    expect(screen.getByTestId("sheet-formula-line").textContent).toContain("Calculated by Excel");
+    expect(screen.getByTestId("sheet-formula-line").textContent).toContain("=XLOOKUP(A2,F:F,G:G)");
+  });
+
+  it("saves it as it was when nothing was done to it", () => {
+    const { onSaved } = open(CARRIED);
+    typeInto("Item 1");
+    fireEvent.click(button("Save sheet"));
+    expect(onSaved).toHaveBeenCalledWith({ csv: "Item 1,Looked up,Plus one\nPens,99,100", formulas: "B2 carried =XLOOKUP(A2,F:F,G:G)\nC2 =B2+1" });
+  });
+
+  it("calculates the cell, and no longer carries it, once it is typed over", () => {
+    const { onSaved } = open(CARRIED);
+    press("ArrowDown");
+    press("ArrowRight");
+    typeInto("=2*21");
+    fireEvent.click(button("Save sheet"));
+    expect(onSaved).toHaveBeenCalledWith({ csv: "Item,Looked up,Plus one\nPens,42,43", formulas: "B2 =2*21\nC2 =B2+1" });
+  });
+});
+
 describe("SheetDialog: saving", () => {
   it("gives back the two blocks as they were when nothing changed", () => {
     const { onSaved } = open(BUDGET);

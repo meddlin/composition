@@ -285,12 +285,34 @@ describe("typeCell", () => {
     expect(typeCell("West")).toBe("West");
   });
 
-  it("leaves text that is not a plain number as text, so an identifier keeps its zeros and a date is not guessed at", () => {
+  it("leaves text that is not a plain number as text, so an identifier keeps its zeros and another date is not guessed at", () => {
     expect(typeCell("007")).toBe("007");
-    expect(typeCell("2026-03-04")).toBe("2026-03-04");
+    expect(typeCell("1/2/2026")).toBe("1/2/2026");
     expect(typeCell("true")).toBe("true");
     expect(typeCell("12 units")).toBe("12 units");
     expect(typeCell("1 2")).toBe("1 2");
+  });
+
+  it("reads a date written 2026-03-04 as that date, the days since 1900, as Excel does a date typed in", () => {
+    expect(typeCell("2026-03-04")).toBe(46085);
+    expect(typeCell("2026-3-4")).toBe(46085);
+    expect(typeCell(" 2026-03-04 ")).toBe(46085);
+    expect(typeCell("1900-01-01")).toBe(1);
+    expect(typeCell("1900-02-29")).toBe(60); // Excel's 29 February 1900, which was not a day
+    expect(typeCell("9999-12-31")).toBe(2958465);
+  });
+
+  it("leaves what is not a date as text: a day the month does not have, a year before 1900, a time", () => {
+    for (const text of ["2026-02-30", "2026-13-01", "2026-00-10", "2026-03-00", "1899-12-31", "2026-03-04 10:30", "26-03-04", "2026-03"]) {
+      expect(typeCell(text)).toBe(text);
+    }
+  });
+
+  it("lets a formula calculate with a date written in a cell", () => {
+    const sheet = { rows: [["Start", "Days", "End"], ["2026-03-04", "30", ""]], columns: 3 };
+    const { results } = calculate(sheet, new Map([["C2", "=A2+B2"]]));
+    expect(results.get("C2")?.value).toBe(46115);
+    expect(calculate(sheet, new Map([["C2", "=TEXT(A2,\"yyyy-mm-dd\")"]])).sheet.rows[1][2]).toBe("2026-03-04");
   });
 });
 
@@ -399,5 +421,27 @@ describe("formatValue", () => {
     expect(formatValue(true)).toBe("TRUE");
     expect(formatValue(null)).toBe("");
     expect(formatValue("West")).toBe("West");
+  });
+});
+
+
+describe("calculate with carried formulas", () => {
+  const sheet = { rows: [["Item", "Price", "Double", "Looked up"], ["Pens", "1.5", "", "4"]], columns: 4 };
+
+  it("does not calculate a carried formula, and shows the value the CSV holds for it", () => {
+    const { sheet: shown, results } = calculate(sheet, new Map([["C2", "=B2*2"], ["D2", "=XLOOKUP(A2,F:F,G:G)"]]), new Set(["D2"]));
+    expect(shown.rows[1]).toEqual(["Pens", "1.5", "3", "4"]);
+    expect(results.has("D2")).toBe(false);
+    expect(results.get("C2")?.value).toBe(3);
+  });
+
+  it("lets a formula that reads a carried cell read the value it holds, and not be flagged as uncalculated", () => {
+    const { results } = calculate(sheet, new Map([["C2", "=D2+1"], ["D2", "=XLOOKUP(A2,F:F,G:G)"]]), new Set(["D2"]));
+    expect(results.get("C2")).toEqual({ value: 5, unsupported: [] });
+  });
+
+  it("grows the grid to hold a carried formula under the last row, as for any other", () => {
+    const { sheet: shown } = calculate(sheet, new Map([["D5", "=XLOOKUP(A2,F:F,G:G)"]]), new Set(["D5"]));
+    expect(shown.rows).toHaveLength(5);
   });
 });

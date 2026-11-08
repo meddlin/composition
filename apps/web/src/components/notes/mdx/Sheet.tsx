@@ -73,7 +73,9 @@ type SourceNode = { position?: { start?: { offset?: number } } };
  * when the sheet is drawn (see sheetFormula.ts); a cell shows its formula when pointed at. One the engine cannot calculate
  * shows `#NAME?` and says why, and is never a guess.
  *
- * `title` captions it and `height` is how tall it may grow, in pixels (360 by default), after which it scrolls.
+ * `title` captions it and `height` is how tall it may grow, in pixels (360 by default), after which it scrolls. A sheet imported from
+ * Excel says where it came from, in `source` (the file's name), `sheet` and `range` (and `imported`, which fingerprints what the import
+ * wrote, for telling later whether the sheet has been changed since; it is not drawn).
  * Drawn like a spreadsheet: Excel's column letters over the header row, row numbers down the side (the header
  * is row 1), numbers flush right, the header and the numbers kept in view as it scrolls. A long sheet draws only
  * the rows in view (`ROW_PX` is what makes that work), so its size is not what it costs.
@@ -81,13 +83,31 @@ type SourceNode = { position?: { start?: { offset?: number } } };
  * A figure that is a block, so the tag belongs on lines of its own. One that can't be drawn shows as a notice,
  * like a missing image, rather than vanishing while the block is half-typed.
  */
-export function Sheet({ title, height, children, node }: { title?: string; height?: string; children?: ReactNode; node?: SourceNode }) {
+export function Sheet({
+  title,
+  height,
+  source,
+  sheet: sheetName,
+  range,
+  children,
+  node,
+}: {
+  title?: string;
+  height?: string;
+  source?: string;
+  sheet?: string;
+  range?: string;
+  /** Fingerprints what an import wrote (see importedHash); not drawn. */
+  imported?: string;
+  children?: ReactNode;
+  node?: SourceNode;
+}) {
   const editing = useContext(SheetEditContext);
   const csv = blockText(children, "csv");
   const formulaSource = formulasText(children);
   const parsed = useMemo(() => parseSheet(csv), [csv]);
   const formulas = useMemo(() => parseFormulas(formulaSource), [formulaSource]);
-  const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas) : undefined), [parsed, formulas]);
+  const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas, formulas.carried) : undefined), [parsed, formulas]);
   const widths = useMemo(() => (calculated ? columnWidths(calculated.sheet) : []), [calculated]);
   const [scrollTop, setScrollTop] = useState(0);
   const offset = node?.position?.start?.offset;
@@ -114,6 +134,7 @@ export function Sheet({ title, height, children, node }: { title?: string; heigh
   const cellTitle = (address: string, cell: string, width: number) => {
     const formula = formulas.formulas.get(address);
     if (formula === undefined) return cell.length > width ? cell : undefined;
+    if (formulas.carried.has(address)) return `${formula}\nCalculated by Excel, and not calculated again here.`;
     const unsupported = calculated.results.get(address)?.unsupported ?? [];
     return unsupported.length > 0 ? `${formula}\nNot calculated: ${unsupported.join("; ")}` : formula;
   };
@@ -133,6 +154,8 @@ export function Sheet({ title, height, children, node }: { title?: string; heigh
             title={cellTitle(`${columnLabel(c)}${b + 2}`, cell, widths[c])}
             className={cn(
               "h-7 overflow-hidden border-r border-b px-2 py-0 leading-[27px] text-ellipsis whitespace-nowrap",
+              // A dot in the corner marks a value that is Excel's, from a formula this engine does not calculate (see parseFormulas).
+              formulas.carried.has(`${columnLabel(c)}${b + 2}`) && "relative after:absolute after:top-1 after:right-1 after:size-1.5 after:rounded-full after:bg-primary/60",
               isNumberCell(cell) && "text-right",
               isErrorValue(cell) && "text-destructive",
             )}
@@ -192,6 +215,13 @@ export function Sheet({ title, height, children, node }: { title?: string; heigh
           </tbody>
         </table>
       </div>
+      {source?.trim() ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Imported from {source.trim()}
+          {sheetName?.trim() ? `, sheet ${sheetName.trim()}` : ""}
+          {range?.trim() ? `, ${range.trim()}` : ""}
+        </p>
+      ) : null}
       {formulas.problems.length > 0 ? (
         <p className="mt-1 text-xs text-destructive">
           The formulas block has {count(formulas.problems.length, "line")} that {formulas.problems.length === 1 ? "is" : "are"} not a cell and a formula (line {formulas.problems.join(", ")}). Write each as E2 =C2*D2.

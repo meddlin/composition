@@ -370,6 +370,11 @@ formulas will work in Excel: the syntax is Excel's, and each rule below was read
   `$B$2`). A formula under the last CSV row, or right of the last column, adds that row or column to the grid (a
   totals row made only of formulas has no row in the CSV), up to 5,000 rows and 100 columns.
 - **Pointing at a formula cell shows its formula**, and what it could not calculate.
+- **A date written in a cell is a date.** `2026-03-04` (the month and day may have one digit) is read as that day, the number
+  of days since 1900, as Excel reads a date typed in: `A2+30`, `YEAR(A2)`, `A2=DATE(2026,3,4)` and `COUNTIF(r,">=2026-03-04")`
+  work, and so does the text `"2026-03-04"+1`. A day the month does not have (`2026-02-30`) or a year before 1900 is text, as
+  in Excel. Another way of writing a date (`1/2/2026`, `4-Mar-2026`) is still not read, and says so. A formula that gives a
+  date shows the number of days, since a sheet has no cell formats: write `TEXT(A2+30,"yyyy-mm-dd")` to show one.
 - **Excel 365's rules:** arrays work everywhere (`SUM(B1:B5*2)`, `SUMPRODUCT((A2:A9="West")*(C2:C9))`,
   `COUNTIF(A2:A9,A2:A9)`), text is compared without regard to case, a number and a text that looks like one are
   different things (as in a lookup) except where Excel reads one as the other (arithmetic, `COUNTIF`), `0.1+0.2-0.3` is
@@ -390,7 +395,7 @@ formulas will work in Excel: the syntax is Excel's, and each rule below was read
   `NETWORKDAYS`…), another sheet (`Sheet2!A1`), a table's `[Column]`, a name, a text Excel would read as a date
   (`"1/2/2026"+1`), a `TEXT` format with a time, a fraction or E notation, `XLOOKUP` by binary search, a formula that
   refers to itself, or one that fills several cells makes the cell **`#NAME?`**, and pointing at it says why. So does
-  every cell that depends on it. (Later, an imported formula Excel calculated will keep Excel's value instead.)
+  every cell that depends on it. A formula that came from Excel and does this is [carried](#carried-formulas) instead.
 - **A formula is limited as in Excel:** 8,192 characters, 64 levels of nesting.
 
 The engine is pure TypeScript with no `eval` (the desktop app forbids it) and no library: [`sheetFormula.ts`](../../apps/web/src/components/notes/mdx/sheetFormula.ts)
@@ -398,6 +403,71 @@ calculates, [`sheetParse.ts`](../../apps/web/src/components/notes/mdx/sheetParse
 [`sheetCriteria.ts`](../../apps/web/src/components/notes/mdx/sheetCriteria.ts) matches criteria, and so on. It is tested against
 real Excel: [`excel-verified-cases.json`](../../spikes/sheet/excel-verified-cases.json) holds more than 1,200 formulas with the
 result Excel gave each, and `node spikes/sheet/run-in-excel.mjs` runs new ones in Excel on a Mac and records them.
+
+### Carried formulas
+
+A formula that came from Excel, and that this engine cannot calculate or calculates differently from Excel, is **carried**: it is
+written with the word `carried` before it, and the cell shows the value Excel calculated, which is in the CSV block.
+
+````mdx
+```csv
+Item,Looked up,Plus one
+Pens,99,100
+```
+
+```formulas
+B2 carried =XLOOKUP(A2,Prices!A:A,Prices!B:B)
+C2 =B2+1
+```
+````
+
+- **A carried formula is not calculated.** The cell shows what the CSV holds, marked with a dot, and pointing at it shows the formula
+  and says it was calculated by Excel. Our number never replaces Excel's where the two could differ.
+- **What reads a carried cell reads that value**: `C2 =B2+1` above is 100, and is calculated as any formula is.
+- **It is as of the import.** Change a cell a carried formula reads and its value is stale; the grid editor keeps it as it was until
+  the cell is typed over, and then it is an ordinary formula (calculated, or `#NAME?` if it cannot be).
+- **Why it exists.** An import must never show a number that disagrees with Excel's, and must not throw a formula away because this
+  engine lacks its function; this keeps both the formula (for the export to come) and Excel's value.
+- In the terminal a carried cell shows the value and is not listed as not calculated.
+
+### Pasting from Excel
+
+A range copied from Excel (or any spreadsheet) arrives in the editor as the tab-separated text it always did. When the text is a
+range, cells split by tabs with the same number in every row, or a copy whose HTML says Excel made it, a line under the editor's top
+edge says so and offers **Make it a sheet**: it opens the grid editor on the cells, and saving replaces the pasted text with the
+sheet. **Keep as text** drops the offer, and so does the next change to the note. Text indented with tabs, a paste into a code block
+and anything with no tabs is not offered. A sheet pasted this way has no formulas: Excel puts only the values on the clipboard.
+
+### Importing from Excel
+
+The **Excel** button in the note's toolbar (**Import from Excel**) takes a workbook, an `.xlsx` or `.xlsm` file chosen with the browser's own file
+picker (the page gets its bytes, never a path, and nothing is sent anywhere), asks which sheet and which range of it (the used range is filled in; a
+range is read when its box is left or Enter is pressed), says what would come across, and **Insert sheet** puts it in the note at the caret.
+
+- **A cell comes across as what Excel showed**: a number as it is (to the 15 digits Excel keeps), a date as `2026-03-04`, a text, a logical, an error. A
+  date with a time, and a time, keep Excel's own text. The range's first row is the header, row 1.
+- **A formula comes across only where it can be trusted** (S5), each checked against the value Excel saved for it, on its own, with the cells it
+  reads as Excel had them:
+  - **kept as a formula**, calculated here, when every cell it reads is inside the range, every function in it is one this engine has, and the number it
+    gives is Excel's to 15 digits;
+  - **[carried](#carried-formulas)** when its function is not one this engine has (`FILTER`, `LET`…), or the result differs, or Excel shows the
+    result as a date (a sheet has no cell formats, so a recalculated date would show as a number of days);
+  - **kept as a value** when it reads anything outside the range: another sheet or workbook, a cell above or left of it or beyond it, a table's column
+    (`Table1[Revenue]`), or a defined name. Whole columns and rows inside the range's columns and rows are inside.
+- **The dialog says all of it first**: the size, how many formulas there are, and how many of each kind, with the reasons ("1 is carried … Why: the
+  function FILTER (1)").
+- **Limits.** A range of more than 5,001 rows (the header included) or 100 columns, or one whose first row is empty, is refused with the reason; a file over
+  50 MB is not read; only the first 100,000 rows of a sheet are read. Empty rows at the foot and empty columns at the right are left off.
+- **What is lost, and said so here:** cell formats (a percent or a currency is the raw number), merged cells, a text's leading and trailing spaces (the CSV
+  trims), and the difference between a number and a text that looks like one (the CSV has no types: a `"123"` Excel keeps as text is read back as a
+  number, which the check against Excel's values catches wherever a formula reads it).
+- **The sheet remembers where it came from** (below), for a later re-import and export.
+
+### Where a sheet came from
+
+An imported sheet says so with `source` (the file's name), `sheet` and `range` (`A1:F40`), drawn as a line under it ("Imported from
+budget.xlsx, sheet Q3, A1:F40") and in the terminal; and `imported`, a fingerprint of the two blocks as the import wrote them
+(the first 12 hex digits of their SHA-256), which is not drawn and is how a later import will tell the sheet has been changed.
 
 ### Editing a sheet
 

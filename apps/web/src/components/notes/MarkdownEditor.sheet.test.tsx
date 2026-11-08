@@ -13,6 +13,19 @@ const SAVED: SheetSource = { csv: "Item,Qty\nPens,12", formulas: "" };
 const SAVED_WITH_FORMULAS: SheetSource = { csv: "Item,Qty\nPens,12\nTotal,12", formulas: "B3 =SUM(B2:B2)" };
 let saving: SheetSource = SAVED;
 
+const IMPORTED = { source: { csv: "Item,Qty\nPens,12", formulas: "" }, file: "budget.xlsx", sheet: "Q3", range: "A1:B2", imported: "0123456789ab" };
+
+// The import dialog, too, is a stand-in: it can "import" a made-up range.
+vi.mock("./SheetImportDialog", () => ({
+  SheetImportDialog: ({ open, onImported, onClose }: { open: boolean; onImported: (imported: typeof IMPORTED) => void; onClose: () => void }) =>
+    open ? (
+      <div role="dialog" aria-label="import dialog">
+        <button onClick={() => onImported(IMPORTED)}>stub import</button>
+        <button onClick={onClose}>stub close import</button>
+      </div>
+    ) : null,
+}));
+
 // The dialog is tested on its own; here it is a stand-in that shows what it was opened for and can "save".
 vi.mock("./SheetDialog", () => ({
   SheetDialog: ({ open, source, onSaved, onClose }: { open: boolean; source: SheetEditSource; onSaved: (source: SheetSource) => void; onClose: () => void }) =>
@@ -147,6 +160,115 @@ describeParity("MarkdownEditor: the sheet editor", (scenario) => {
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("The note changed while the sheet was open"));
     expect(editor.text()).toBe(changed);
+  });
+});
+
+describeParity("MarkdownEditor: Import from Excel", (scenario) => {
+  const importDialog = () => screen.queryByRole("dialog", { name: "import dialog" });
+
+  scenario("is opened from outside, by the pane's Excel button", ({ render }) => {
+    const controls = createRef<MarkdownEditorControls>();
+    render({ initial: "Intro", controls });
+
+    act(() => controls.current?.importExcel());
+
+    expect(importDialog()).not.toBeNull();
+  });
+
+  scenario("puts the imported sheet at the caret, as a block, with where it came from on its tag", async ({ render }) => {
+    const controls = createRef<MarkdownEditorControls>();
+    const editor = render({ initial: `${FRONTMATTER}One Two`, controls });
+    editor.select(FRONTMATTER.length + 4, FRONTMATTER.length + 4);
+    act(() => controls.current?.importExcel());
+
+    fireEvent.click(screen.getByRole("button", { name: "stub import" }));
+
+    await waitFor(() =>
+      expect(editor.reported.at(-1)).toBe(
+        `${FRONTMATTER}One \n\n<Sheet source="budget.xlsx" sheet="Q3" range="A1:B2" imported="0123456789ab">\n\n\`\`\`csv\nItem,Qty\nPens,12\n\`\`\`\n\n</Sheet>\n\nTwo`,
+      ),
+    );
+    expect(importDialog()).toBeNull();
+  });
+
+  scenario("leaves the note as it was when closed without importing", ({ render }) => {
+    const controls = createRef<MarkdownEditorControls>();
+    const editor = render({ initial: "Intro", controls });
+    act(() => controls.current?.importExcel());
+
+    fireEvent.click(screen.getByRole("button", { name: "stub close import" }));
+
+    expect(editor.reported).toEqual([]);
+    expect(importDialog()).toBeNull();
+  });
+});
+
+describeParity("MarkdownEditor: a range pasted from a spreadsheet", (scenario) => {
+  const TSV = "Item\tQty\nPens\t12\nPaper\t3";
+  const banner = () => screen.queryByRole("status");
+
+  /** Pastes `clipboard` at the caret of a note, and puts the text in as the browser does right after the paste handler has run. */
+  function pasteInto(editor: EditorDriver, note: string, at: number, clipboard: string) {
+    editor.type(note, at);
+    editor.select(at, at);
+    editor.paste([], clipboard);
+    editor.type(note.slice(0, at) + clipboard + note.slice(at), at + clipboard.length);
+  }
+
+  scenario("stays text, with an offer to make it a sheet", async ({ render }) => {
+    const editor = render({ initial: "" });
+    pasteInto(editor, "Intro\n\n", 7, TSV);
+
+    await waitFor(() => expect(banner()?.textContent).toContain("3 rows by 2 columns"));
+    expect(editor.text()).toBe(`Intro\n\n${TSV}`);
+  });
+
+  scenario("opens the sheet editor on the pasted cells, and puts the sheet in place of the text", async ({ render }) => {
+    const editor = render({ initial: "" });
+    pasteInto(editor, "Intro\n\n\nOutro", 7, TSV);
+    await waitFor(() => expect(banner()).not.toBeNull());
+
+    fireEvent.click(screen.getByRole("button", { name: "Make it a sheet" }));
+    expect(sourceOf()).toEqual({
+      kind: "promote",
+      rows: [
+        ["Item", "Qty"],
+        ["Pens", "12"],
+        ["Paper", "3"],
+      ],
+    });
+    save();
+
+    await waitFor(() => expect(editor.reported.at(-1)).toBe(`Intro\n\n${TAG}\n\nOutro`));
+    expect(banner()).toBeNull();
+  });
+
+  scenario("is dropped by Keep as text, and by changing the note", async ({ render }) => {
+    const editor = render({ initial: "" });
+    pasteInto(editor, "", 0, TSV);
+    await waitFor(() => expect(banner()).not.toBeNull());
+    fireEvent.click(screen.getByRole("button", { name: "Keep as text" }));
+    expect(banner()).toBeNull();
+    expect(editor.text()).toBe(TSV);
+
+    cleanup();
+    const second = render({ initial: "" });
+    pasteInto(second, "", 0, TSV);
+    await waitFor(() => expect(banner()).not.toBeNull());
+    second.type(`${TSV}!`);
+    await waitFor(() => expect(banner()).toBeNull());
+  });
+
+  scenario("is not offered for ordinary text, for text indented with tabs, or for a paste into a code block", async ({ render }) => {
+    const editor = render({ initial: "" });
+    for (const clipboard of ["Just a sentence.", "Two\nlines", "\tindented\n\tcode"]) {
+      pasteInto(editor, "", 0, clipboard);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(banner(), clipboard).toBeNull();
+    }
+    pasteInto(editor, "```\n\n```", 4, TSV);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(banner()).toBeNull();
   });
 });
 

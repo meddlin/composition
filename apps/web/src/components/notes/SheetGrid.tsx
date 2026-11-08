@@ -350,13 +350,14 @@ export function SheetGrid({ draft, selection, onSelect, onChange, onUndo, onRedo
           const isEditing = editing?.row === r && editing.col === c;
           const address = `${columnLabel(c)}${r + 1}`;
           const unsupported = calculated.results.get(address)?.unsupported ?? [];
+          const carried = calculated.carried.has(address);
           return (
             <td
               key={c}
               id={`${id}-${r}-${c}`}
               role="gridcell"
               aria-selected={selected}
-              title={unsupported.length > 0 ? `Not calculated: ${unsupported.join("; ")}` : undefined}
+              title={carried ? "Calculated by Excel, and not calculated again here. Type over the cell to calculate it." : unsupported.length > 0 ? `Not calculated: ${unsupported.join("; ")}` : undefined}
               onMouseDown={(event) => {
                 if (event.button !== 0 || isEditing) return;
                 dragging.current = true;
@@ -369,6 +370,7 @@ export function SheetGrid({ draft, selection, onSelect, onChange, onUndo, onRedo
               className={cn(
                 "relative h-7 scroll-mt-8 scroll-ml-14 overflow-hidden border-r border-b px-2 py-0 leading-[27px] text-ellipsis whitespace-nowrap",
                 r === 0 && "font-semibold",
+                carried && "after:absolute after:top-1 after:right-1 after:size-1.5 after:rounded-full after:bg-primary/60",
                 selected && "bg-primary/10",
                 active && "outline-2 -outline-offset-2 outline-primary",
                 isNumberCell(value) && "text-right",

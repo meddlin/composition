@@ -62,6 +62,11 @@ export function parseSheet(csv: string): SheetParse {
 export type FormulasParse = {
   /** Each formula by the address of its cell, in capitals and without dollar signs: `E2` -> `=C2*D2`. */
   formulas: Map<string, string>;
+  /**
+   * The cells whose formula is carried (`E2 carried =XLOOKUP(…)`): kept, with the value the CSV holds for it, which is
+   * what Excel calculated, and never calculated here. They are in `formulas` too.
+   */
+  carried: Set<string>;
   /** The lines, counted from 1, that are not a cell and a formula. */
   problems: number[];
 };
@@ -77,17 +82,31 @@ export type FormulasParse = {
  *
  * The CSV holds what each cell shows; this holds the formulas that make some of them, which are calculated again
  * when the sheet is drawn (see sheetFormula.ts). A line for a cell twice is the later one; a blank line is nothing.
+ *
+ * A formula that came from Excel and this engine does not reproduce is **carried**, marked with the word before it:
+ *
+ *     E2 carried =XLOOKUP(A2,Prices!A:A,Prices!B:B)
+ *
+ * Its value is the one in the CSV block, Excel's, and it is not calculated (see S7 in the plan): our number never
+ * replaces Excel's where the two could differ. Everything that reads the cell reads that value.
  */
 export function parseFormulas(text: string): FormulasParse {
   const formulas = new Map<string, string>();
+  const carried = new Set<string>();
   const problems: number[] = [];
   text.split(/\r?\n/).forEach((line, index) => {
     if (line.trim() === "") return;
-    const match = /^\s*(\$?[A-Za-z]{1,3}\$?\d+)\s+(=.*?)\s*$/.exec(line);
-    if (!match || !parseAddress(match[1])) problems.push(index + 1);
-    else formulas.set(match[1].replace(/\$/g, "").toUpperCase(), match[2]);
+    const match = /^\s*(\$?[A-Za-z]{1,3}\$?\d+)\s+(?:(carried)\s+)?(=.*?)\s*$/.exec(line);
+    if (!match || !parseAddress(match[1])) {
+      problems.push(index + 1);
+      return;
+    }
+    const address = match[1].replace(/\$/g, "").toUpperCase();
+    formulas.set(address, match[3]);
+    if (match[2]) carried.add(address);
+    else carried.delete(address);
   });
-  return { formulas, problems };
+  return { formulas, carried, problems };
 }
 
 /** A column's name as Excel writes it: A to Z, then AA, AB… (0 is A). */

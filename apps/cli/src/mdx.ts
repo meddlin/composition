@@ -376,11 +376,16 @@ function formulasOf(node: Node): string {
 function sheetText(element: Node): string {
   const parsed = parseSheet(blockOf(element, "csv"));
   if (!parsed.sheet) return parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
-  const { sheet, results } = calculate(parsed.sheet, parseFormulas(formulasOf(element)).formulas);
+  const { formulas, carried } = parseFormulas(formulasOf(element));
+  const { sheet, results } = calculate(parsed.sheet, formulas, carried);
   const notCalculated = [...results].filter(([, result]) => result.unsupported.length > 0).map(([address, result]) => `${address} (${result.unsupported[0]})`);
   const shown = notCalculated.slice(0, 5).join("; ");
   const note = notCalculated.length > 0 ? `\n\nNot calculated: ${shown.replace(/[\\[\]<>`*_]/g, "\\$&")}${notCalculated.length > 5 ? `; and ${notCalculated.length - 5} more` : ""}.` : "";
-  return sheetMarkdown(sheet, attribute(element, "title")) + note;
+  const source = attribute(element, "source")?.trim();
+  const sheetName = attribute(element, "sheet")?.trim();
+  const range = attribute(element, "range")?.trim();
+  const from = source ? `\n\nImported from ${source}${sheetName ? `, sheet ${sheetName}` : ""}${range ? `, ${range}` : ""}.`.replace(/[\\[\]<>`*_]/g, "\\$&") : "";
+  return sheetMarkdown(sheet, attribute(element, "title")) + from + note;
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {

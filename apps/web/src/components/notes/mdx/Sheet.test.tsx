@@ -104,6 +104,21 @@ describe("Sheet", () => {
     expect(screen.queryByText(/=A2\+10/)).toBeNull();
   });
 
+  it("says where an imported sheet came from, under it, and does not draw the fingerprint", () => {
+    const { container } = render(
+      <Sheet source="budget.xlsx" sheet="Q3" range="A1:F40" imported="0123456789ab">
+        {small}
+      </Sheet>,
+    );
+    expect(screen.getByText("Imported from budget.xlsx, sheet Q3, A1:F40")).toBeTruthy();
+    expect(container.textContent).not.toContain("0123456789ab");
+  });
+
+  it("draws no line about where it came from when it did not", () => {
+    render(<Sheet>{small}</Sheet>);
+    expect(screen.queryByText(/Imported from/)).toBeNull();
+  });
+
   describe("formulas", () => {
     const budget = (formulas: string) => (
       <Sheet>
@@ -130,6 +145,31 @@ describe("Sheet", () => {
 
       expect(screen.getByRole("cell", { name: "6" }).getAttribute("title")).toBe("=A2*B2");
       expect(screen.getByRole("cell", { name: "7" }).getAttribute("title")).toBeNull();
+    });
+
+    it("shows a carried formula's stored value, marked, and says it is Excel's", () => {
+      render(
+        <Sheet>
+          {fence("csv", "Item,Price,Looked up\nPens,1.5,99")}
+          {fence("formulas", "C2 carried =XLOOKUP(A2,F:F,G:G)")}
+        </Sheet>,
+      );
+
+      const cell = screen.getByRole("cell", { name: "99" });
+      expect(cell.getAttribute("title")).toBe("=XLOOKUP(A2,F:F,G:G)\nCalculated by Excel, and not calculated again here.");
+      expect(cell.className).toContain("after:bg-primary/60");
+      expect(cell.className).toContain("text-right");
+    });
+
+    it("lets a formula read a carried cell's value, with nothing said to be uncalculated", () => {
+      render(
+        <Sheet>
+          {fence("csv", "Item,Price,Looked up,Plus one\nPens,1.5,99,")}
+          {fence("formulas", "C2 carried =XLOOKUP(A2,F:F,G:G)\nD2 =C2+1")}
+        </Sheet>,
+      );
+
+      expect(screen.getByRole("cell", { name: "100" }).getAttribute("title")).toBe("=C2+1");
     });
 
     it("lets a formula use a cell that is a formula, whatever order the block lists them in", () => {

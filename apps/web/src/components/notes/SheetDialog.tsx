@@ -207,7 +207,9 @@ function SheetSession({ source, onClose, onSaved }: Omit<Props, "open">) {
         <div className="flex min-w-0 items-center gap-2 rounded-md border px-2 py-1 font-mono text-xs" data-testid="sheet-formula-line">
           <span className="shrink-0 font-semibold">{active}</span>
           <span className="min-w-0 flex-1 truncate">{input}</span>
-          {result && result.unsupported.length > 0 ? (
+          {calculated.carried.has(active) ? (
+            <span className="shrink-0 font-sans text-muted-foreground">Calculated by Excel, not calculated again here</span>
+          ) : result && result.unsupported.length > 0 ? (
             <span className="shrink-0 font-sans text-destructive">Not calculated: {result.unsupported.join("; ")}</span>
           ) : null}
         </div>

@@ -34,6 +34,20 @@ export function ymdToSerial(year: number, month: number, day: number): number | 
   return inRange(monthStart(year < 1900 ? year + 1900 : year, month) + day - 1);
 }
 
+/** A date as the sheet writes one, `2026-03-04` (Excel reads it, typed, as that date; the month and day may have one digit). */
+export const ISO_DATE = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+
+/** The serial number of an ISO date, or `null` where Excel would not take the text for a date (`2026-02-30`, a year before 1900). */
+export function isoDateSerial(text: string): number | null {
+  const match = ISO_DATE.exec(text.trim());
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  if (year < 1900 || month < 1 || month > 12 || day < 1) return null;
+  const serial = ymdToSerial(year, month, day);
+  const back = serial === null ? null : serialToYmd(serial);
+  return back && back.year === year && back.month === month && back.day === day ? serial : null;
+}
+
 /** A serial number (its whole days) as a date, or `null` where Excel says `#NUM!`. Serial 0 is January 0th, 1900. */
 export function serialToYmd(serial: number): Ymd | null {
   const days = Math.floor(serial);

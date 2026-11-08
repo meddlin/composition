@@ -85,7 +85,27 @@ describe("parseFormulas", () => {
   });
 
   it("reads no formulas from nothing", () => {
-    expect(parseFormulas("")).toEqual({ formulas: new Map(), problems: [] });
+    expect(parseFormulas("")).toEqual({ formulas: new Map(), carried: new Set(), problems: [] });
+  });
+
+  it("reads a line marked carried as a formula that is not calculated", () => {
+    const { formulas, carried, problems } = parseFormulas("B2 =A2*2\nC2 carried =XLOOKUP(A2,Prices!A:A,Prices!B:B)\n  D2   carried   =SUM(A2:B2)  ");
+    expect([...formulas]).toEqual([
+      ["B2", "=A2*2"],
+      ["C2", "=XLOOKUP(A2,Prices!A:A,Prices!B:B)"],
+      ["D2", "=SUM(A2:B2)"],
+    ]);
+    expect([...carried]).toEqual(["C2", "D2"]);
+    expect(problems).toEqual([]);
+  });
+
+  it("takes the later line for a cell, carried or not", () => {
+    expect([...parseFormulas("B2 carried =1+1\nB2 =2+2").carried]).toEqual([]);
+    expect([...parseFormulas("B2 =1+1\nB2 carried =2+2").carried]).toEqual(["B2"]);
+  });
+
+  it("does not take another word before the formula for the marker", () => {
+    expect(parseFormulas("B2 later =1+1").problems).toEqual([1]);
   });
 });
 

@@ -176,12 +176,25 @@ export function findOpenedSheet(text: string, opened: { start: number; text: str
   return same.find((span) => span.start === opened.start) ?? same[0] ?? null;
 }
 
-/** The tag for a new sheet holding `source`: the CSV block, and the `formulas` one when there are formulas. */
-export function sheetTag(source: SheetSource): string {
+/** An attribute's value as the tag can hold it: no quote, angle bracket, ampersand or line break, and not so long it swamps the line. */
+export function attributeValue(value: string): string {
+  return value.replace(/["<>&\r\n]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 200);
+}
+
+/**
+ * The tag for a new sheet holding `source`: the CSV block, and the `formulas` one when there are formulas. `attributes` are
+ * written in the order given, as `name="value"`, and left out when empty (an import's `source`, `sheet`, `range`, `imported`).
+ */
+export function sheetTag(source: SheetSource, attributes: Record<string, string> = {}): string {
   const formulas = source.formulas === "" ? "" : `\n\n${fenceBlock("formulas", source.formulas)}`;
+  const props = Object.entries(attributes)
+    .map(([name, value]) => [name, attributeValue(value)] as const)
+    .filter(([, value]) => value !== "")
+    .map(([name, value]) => ` ${name}="${value}"`)
+    .join("");
   // The tag is note text (MDX source), never HTML a browser parses.
   // nosemgrep: html-in-template-string
-  return `<Sheet>\n\n${fenceBlock("csv", source.csv)}${formulas}\n\n</Sheet>`;
+  return `<Sheet${props}>\n\n${fenceBlock("csv", source.csv)}${formulas}\n\n</Sheet>`;
 }
 
 /**
@@ -198,12 +211,12 @@ export type SheetInsertion = { start: number; end: number; text: string; caret: 
  * What to put in the note, replacing `[start, end)`, for a sheet: the tag on lines of its own, with blank lines around it
  * so it stands as a block, and the caret after it, ready to carry on writing.
  */
-export function insertSheet(text: string, start: number, end: number, source: SheetSource): SheetInsertion {
+export function insertSheet(text: string, start: number, end: number, source: SheetSource, attributes: Record<string, string> = {}): SheetInsertion {
   const before = text.slice(0, start);
   const after = text.slice(end);
   const lead = start === 0 || before.endsWith("\n\n") ? "" : before.endsWith("\n") ? "\n" : "\n\n";
   const trail = after === "" || !after.startsWith("\n") ? "\n\n" : after.startsWith("\n\n") ? "" : "\n";
-  const inserted = lead + sheetTag(source) + trail;
+  const inserted = lead + sheetTag(source, attributes) + trail;
   return { start, end, text: inserted, caret: inserted.length };
 }
 

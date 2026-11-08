@@ -446,6 +446,58 @@ the owner's look (Gate B). What it is, and where it differs from the words above
 **Step 4: Excel in.** Paste a range, **Import from Excel…** (values first; formulas recalculated where they match
 and carried where they do not), the `formulas` block, the import summary, provenance props. Then column-name
 references (S9). **Gate E.**
+*Built 2026-11-08 except column-name references (S9); waiting for the owner's look (Gate E). What is built, and where it differs from the words above:*
+
+- **Built:**
+  - **The note's format for a formula that came from Excel (S7's "carried"):** a line `E2 carried =XLOOKUP(…)` in the `formulas` block.
+    A carried cell is not calculated: it shows the value in the CSV (Excel's), marked with a dot and a tooltip, and what reads it reads that
+    value. [`parseFormulas`](../apps/web/src/components/notes/mdx/sheetData.ts) reads the marker, `calculate` takes the carried set, the
+    preview, the terminal app and the grid editor all honour it, and the editor keeps a carried cell as it was until it is typed over.
+  - **A date written `2026-03-04` is read as a date** (S12's open question, settled): `typeCell` and text-to-number coercion give its serial
+    number, as Excel reads a date typed in, and `2026-02-30` or a year before 1900 is text. **Checked in real Excel**: 29 new cases in
+    `excel-verified-cases.json` (including `"2026-03-04"+1`, `VALUE`, `COUNTIF` with `>=2026-03-04`, 1900-02-29 as 60, `2026-02-30` as
+    `#VALUE!`), all matching; the Excel test now types plain string cells as Excel does.
+  - **The import core** ([`sheetImport.ts`](../apps/web/src/components/notes/mdx/sheetImport.ts), pure): a range of cells as Excel saved them in,
+    the CSV and `formulas` blocks and a summary out. Each formula is moved to where the range began and made a **value** if it reads
+    anything outside the range, another sheet, a table or a name ([`rebaseReferences`](../apps/web/src/components/notes/mdx/sheetRefs.ts));
+    otherwise it is checked **on its own against Excel's saved values for the cells it reads** (a copy of each formula sits off to
+    the right of the grid, so a formula is wrong by itself and not because one it reads was, and nothing is over-carried), and is
+    **calculated** if it gives Excel's number to 15 digits, **carried** if its function is unknown or its result differs, or if Excel shows
+    its result as a date. What is left is checked once more together (a chain can drift; a circle Excel did not have). A date cell is
+    written `2026-03-04`, a 1904 workbook is converted, and a date with a time keeps Excel's text. A range with more than 5,001 rows or
+    100 columns, or an empty first row, is refused with the reason.
+  - **Paste from Excel is offered as a sheet** (the text stays text, as today): a range copied from a spreadsheet gets a line with **Make it a
+    sheet**, which opens the grid editor on the cells; both editors, tested.
+  - **Provenance props** `source`, `sheet`, `range`, `imported` on `<Sheet>` (drawn as a line under it and in the terminal; `imported` is a
+    SHA-256 fingerprint of the two blocks, for Step 5).
+  - **The import dialog** ([`SheetImportDialog.tsx`](../apps/web/src/components/notes/SheetImportDialog.tsx)): choose a file, a sheet and a range,
+    read what would come across ("52 formulas: 47 kept, 3 carried because…, 2 kept as values because…"), **Insert sheet**. It takes the
+    reader as a prop and is tested with a made-up workbook.
+- **The workbook reader** ([`sheetWorkbook.ts`](../apps/web/src/components/notes/mdx/sheetWorkbook.ts)): **SheetJS Community Edition 0.20.3**, added by the owner
+  with `pnpm add https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` in `apps/web` (the lockfile holds its SHA-512; it is not on npm past 0.18.5, so
+  **Dependabot cannot track it**: a new version is a line to change by hand). It is `import()`ed only when a workbook is read, so a note, and a
+  sheet in it, pay nothing for it. It reads each cell's formula (SheetJS has already written out a formula Excel shared down a column, and
+  taken off `_xlfn.`; the adapter takes off `_xlws.` too), the value Excel saved, and the number format, which says date, time or number
+  (`numberFormatKind`, tested on 21 formats); errors as the text Excel shows; a 1904 workbook; hidden sheets listed and very hidden ones not.
+  It reads at most 100,000 rows of a sheet and refuses a file that does not start as a zip or an older workbook container (SheetJS would read
+  any text as a sheet), or one over 50 MB, or protected by a password; it never follows a link, runs a macro or reads a pivot (its cells are what it is).
+  Tested on workbooks made by SheetJS and on one **written by hand as XML**, with a shared formula, shared strings with rich text and 1904 days.
+- **The `Import from Excel…` button** ("Excel", next to "Sheet" in the note's toolbar) opens the dialog; **Insert sheet** puts the sheet in the note at
+  the caret with `source`, `sheet`, `range` and `imported` on its tag, as one undo step.
+- **Checked in the browser**, on a scratch database, with a workbook made for it (two sheets, five formula kinds, dates): the dialog listed both sheets with
+  their ranges, said "6 rows by 9 columns; 12 formulas: 10 kept as formulas, 1 carried (the function FILTER), 1 kept as a value (another sheet or
+  workbook)", and the inserted sheet showed its values, its dates as `2026-03-04`, a dot on the carried cell and "Imported from budget.xlsx, sheet Q3
+  budget, A1:I6" under it. Also: carried dots and tooltips, the provenance line, and the paste offer with its dialog and save.
+- **Not checked:** a workbook saved by Excel itself or by another program (the formula, value and format reading is SheetJS's, tested here on files
+  built by SheetJS and by hand, not on yours; a workbook-vs-engine run on your own files is the way to learn what your formulas do: `inventory.mjs`
+  first); a password-protected one (the message is written, not seen); a file near the 50 MB limit; Safari and Windows; the desktop app's window.
+- **Not built, by plan:** column-name references (S9, `=SUM([Revenue])`), which want the table parts of the file; until then a formula that names a
+  table becomes a value on import. The picker offers `.xlsx` and `.xlsm`; SheetJS would also read an `.xls`, which is not promised.
+- **Picks to confirm:** `carried` as the word and its place before the formula; a formula whose result Excel shows as a date is carried
+  (a sheet has no cell formats, so a recalculated date would show as a number of days); text-formatted numbers (`"123"` that Excel keeps
+  as text) become numbers when read back from the CSV, which the formula check catches where a formula depends on one; cells
+  lose leading and trailing spaces, as the CSV reader trims; names and tables make a formula a value, not a carried one, since the
+  export could not write them back.
 
 **Step 5: Excel out and back.** **Re-import** with the `imported` hash and the overwrite warning, **Export…**
 to `.xlsx` (the `_xlfn.` translation, column-name references as ranges, a summary of what could not come along)

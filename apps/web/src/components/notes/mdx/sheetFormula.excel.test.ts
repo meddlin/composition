@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { type FormulaResult, evaluate } from "./sheetFormula";
+import { type FormulaResult, evaluate, typeCell } from "./sheetFormula";
 import { parseAddress } from "./sheetParse";
 import { type Scalar, isError, numberToText } from "./sheetValue";
 
@@ -43,7 +43,8 @@ for (const [address, cell] of Object.entries(spec.cells)) {
   const row = cells[at.row];
   while (row.length <= at.col) row.push(null);
   if (typeof cell === "object" && "formula" in cell) formulas.set(address, cell.formula);
-  else row[at.col] = typeof cell === "object" ? cell.text : cell;
+  // A plain string was typed into the cell in Excel (see run-in-excel.mjs), which reads it as it would anyone's typing: so does `typeCell`.
+  else row[at.col] = typeof cell === "object" ? cell.text : typeof cell === "string" ? typeCell(cell) : cell;
 }
 const RESULT_COLUMN = "AY";
 spec.cases.forEach(({ formula }, index) => formulas.set(`${RESULT_COLUMN}${index + 1}`, `=${expand(formula)}`));

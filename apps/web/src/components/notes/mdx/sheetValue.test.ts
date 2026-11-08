@@ -63,9 +63,16 @@ describe("parseNumberText", () => {
   });
 
   it("does not guess at a text Excel would read as a date or a currency of another country", () => {
-    for (const text of ["1/2/2026", "2026-03-04", "4-Mar-2026", "Mar 4, 2026", "10:30", "€5", "£5"]) {
+    for (const text of ["1/2/2026", "4-Mar-2026", "Mar 4, 2026", "10:30", "€5", "£5"]) {
       expect(() => parseNumberText(text), text).toThrow(Unsupported);
     }
+  });
+
+  it("reads a date written 2026-03-04 as that date, and one that is not a day as no number, as Excel does (both checked in it)", () => {
+    expect(parseNumberText("2026-03-04")).toBe(46085);
+    expect(parseNumberText(" 2026-3-4 ")).toBe(46085);
+    expect(parseNumberText("1900-02-29")).toBe(60);
+    for (const text of ["2026-02-30", "1899-12-31", "2026-13-01"]) expect(parseNumberText(text), text).toBeNull();
   });
 });
 

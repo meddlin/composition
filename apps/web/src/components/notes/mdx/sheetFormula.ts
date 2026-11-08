@@ -17,6 +17,7 @@
  * running total down 5,000 rows is as safe as one down 5.
  */
 import { columnLabel, type Sheet } from "./sheetData";
+import { isoDateSerial } from "./sheetDate";
 import { FUNCTIONS } from "./sheetFunctions";
 import { type EvalContext, type Lazy, attempt, broadcast, finite, power, scalarOf } from "./sheetMatrix";
 import { type Node, SyntaxProblem, parseAddress, parseFormula } from "./sheetParse";
@@ -290,9 +291,10 @@ export function evaluate(cells: readonly (readonly Scalar[])[], formulas: Readon
 
 /**
  * A cell of the sheet's CSV block as a value, as Excel would read it typed in: nothing is a blank, `TRUE` and
- * `FALSE` are logicals, a number may have thousands commas, a `$` or a percent sign, and anything else is text.
- * A text that begins with a zero (`007`, an identifier) stays text; and one that looks like a date does too, so
- * arithmetic on it says it cannot be calculated and is not guessed.
+ * `FALSE` are logicals, a number may have thousands commas, a `$` or a percent sign, a date written `2026-03-04` is
+ * that date (the number of days since 1900, as in Excel), and anything else is text. A text that begins with a zero
+ * (`007`, an identifier) stays text; and one that looks like another kind of date does too, so arithmetic on it says
+ * it cannot be calculated and is not guessed.
  */
 export function typeCell(text: string): Scalar {
   if (text === "") return null;
@@ -300,6 +302,8 @@ export function typeCell(text: string): Scalar {
   if (text === "FALSE") return false;
   const error = errorByCode(text);
   if (error) return error;
+  const date = isoDateSerial(text);
+  if (date !== null) return date;
   if (/^[-+]?0\d/.test(text.trim())) return text;
   try {
     return parseNumberText(text) ?? text;
@@ -321,19 +325,29 @@ export function evaluateSheet(sheet: Sheet, formulas: ReadonlyMap<string, string
 export type Calculated = { sheet: Sheet; results: Evaluation };
 
 /** The grid grows to hold a formula (a totals row of nothing else has no CSV row), but only this far: more is calculated and not shown. */
+const NONE: ReadonlySet<string> = new Set();
+
 export const MAX_SHEET_ROWS = 5_001;
 export const MAX_SHEET_COLUMNS = 100;
 
-export function calculate(sheet: Sheet, formulas: ReadonlyMap<string, string>): Calculated {
-  const results = evaluateSheet(sheet, formulas);
-  const places = [...results.keys()].flatMap((address) => {
+/**
+ * `carried` are formulas of `formulas` that are not calculated: the CSV holds their value (see `parseFormulas`), and the
+ * cells that read them read that. They have no result, and the grid still grows to hold them.
+ */
+export function calculate(sheet: Sheet, formulas: ReadonlyMap<string, string>, carried: ReadonlySet<string> = NONE): Calculated {
+  const live = carried.size === 0 ? formulas : new Map([...formulas].filter(([address]) => !carried.has(address)));
+  const results = evaluateSheet(sheet, live);
+  const places = [...formulas.keys()].flatMap((address) => {
     const at = parseAddress(address);
     return at && at.row < MAX_SHEET_ROWS && at.col < MAX_SHEET_COLUMNS ? [{ address, ...at }] : [];
   });
   const columns = places.reduce((widest, place) => Math.max(widest, place.col + 1), sheet.columns);
   const length = places.reduce((longest, place) => Math.max(longest, place.row + 1), sheet.rows.length);
   const rows = Array.from({ length }, (_, r) => Array.from({ length: columns }, (_, c) => sheet.rows[r]?.[c] ?? ""));
-  for (const { address, row, col } of places) rows[row][col] = formatValue((results.get(address) as FormulaResult).value);
+  for (const { address, row, col } of places) {
+    const result = results.get(address);
+    if (result) rows[row][col] = formatValue(result.value);
+  }
   return { sheet: { rows, columns }, results };
 }
 

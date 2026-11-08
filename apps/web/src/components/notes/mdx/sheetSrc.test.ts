@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findOpenedSheet, findSheets, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, sheetTag, tableAt, writeSheet } from "./sheetSrc";
+import { attributeValue, findOpenedSheet, findSheets, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, sheetTag, tableAt, writeSheet } from "./sheetSrc";
 
 const SHEET = '<Sheet title="Q3">\n\n```csv\nRegion,Units\nWest,120\n```\n\n</Sheet>';
 const WITH_FORMULAS = '<Sheet title="Q3">\n\n```csv\nUnits,Double\n10,20\n```\n\n```formulas\nB2 =A2*2\n```\n\n</Sheet>';
@@ -133,6 +133,19 @@ describe("a new sheet", () => {
   it("is the tag with the CSV in its fence, and the formulas in another when there are any", () => {
     expect(sheetTag(source)).toBe("<Sheet>\n\n```csv\nA,B\n1,2\n```\n\n</Sheet>");
     expect(sheetTag({ csv: "A\n1", formulas: "A3 =A2" })).toBe("<Sheet>\n\n```csv\nA\n1\n```\n\n```formulas\nA3 =A2\n```\n\n</Sheet>");
+  });
+
+  it("carries the attributes it is given, in order, and leaves out an empty one", () => {
+    const tag = sheetTag(source, { source: "budget.xlsx", sheet: "Q3", range: "A1:B2", imported: "0123456789ab", title: "" });
+    expect(tag.split("\n")[0]).toBe('<Sheet source="budget.xlsx" sheet="Q3" range="A1:B2" imported="0123456789ab">');
+    expect(findSheets(tag)).toHaveLength(1);
+    expect(insertSheet("", 0, 0, source, { source: "a.xlsx" }).text).toContain('<Sheet source="a.xlsx">');
+  });
+
+  it("takes the characters out of an attribute that would end it or the tag", () => {
+    expect(attributeValue('my "budget" <final> & more\n(2).xlsx')).toBe("my budget final more (2).xlsx");
+    expect(attributeValue("x".repeat(500))).toHaveLength(200);
+    expect(sheetTag(source, { source: 'a"b>c.xlsx' }).split("\n")[0]).toBe('<Sheet source="a b c.xlsx">');
   });
 
   it("goes on lines of its own, with a blank line around it, and the caret after it", () => {

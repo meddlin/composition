@@ -132,3 +132,88 @@ export function shiftReferences(formula: string, shift: Shift): string {
   for (const { from, to, text } of replacements.sort((x, y) => y.from - x.from)) result = result.slice(0, from) + text + result.slice(to);
   return result;
 }
+
+export type Rebased = { formula: string; outside?: undefined } | { formula?: undefined; outside: string };
+
+/**
+ * A formula that was written in a bigger sheet, for the part of it that is now the whole grid. `origin` is where the
+ * grid's first cell was (from 0, row and column) and `size` how big the grid is: every reference moves by the origin (an
+ * absolute one too, since the grid itself moved), and the formula comes back as `outside`, with the reason, when it
+ * reads anything that is not in the grid: a cell or a range that is not all inside it, another sheet or workbook, a
+ * table's column or a defined name. A formula that cannot be read is outside too. This is what an import does to
+ * the formulas of a range (see sheetImport.ts), which then become values, as the plan's S5 says.
+ *
+ * A whole column (`B:B`) or a whole row is inside when its column or row is: it reads what is in the grid of it, and
+ * whether that is what it read in the sheet is for the caller's check against Excel's values to say.
+ */
+export function rebaseReferences(formula: string, origin: { row: number; col: number }, size: { rows: number; cols: number }): Rebased {
+  const lead = formula.startsWith("=") ? 1 : 0;
+  let tokens: Token[];
+  try {
+    tokens = tokenize(formula.slice(lead));
+  } catch {
+    return { outside: "a formula that cannot be read" };
+  }
+  const replacements: { from: number; to: number; text: string }[] = [];
+  const begin = (token: Token) => lead + token.at;
+  const end = (token: Token) => lead + token.at + token.text.length;
+  const inside = (row: number, col: number) => row >= 0 && row < size.rows && col >= 0 && col < size.cols;
+
+  const cellText = (token: Token, row: number, col: number) => {
+    const [, colDollar, , rowDollar] = CELL.exec(token.text) as RegExpExecArray;
+    return `${colDollar}${columnLabel(col)}${rowDollar}${row + 1}`;
+  };
+
+  for (let k = 0; k < tokens.length; k++) {
+    const token = tokens[k];
+    const next = tokens[k + 1];
+    const after = tokens[k + 2];
+    if (token.kind === "structured") return { outside: "a table's column" };
+    if (token.kind === "op" && token.text === "!") return { outside: "another sheet or workbook" };
+    if (token.kind === "ident" && token.text.startsWith("'")) return { outside: "another sheet or workbook" };
+
+    if (token.kind === "num" && ROW.test(token.text) && isOp(next, ":") && after?.kind === "num" && ROW.test(after.text)) {
+      k += 2;
+      const [a, b] = [Number(token.text) - 1 - origin.row, Number(after.text) - 1 - origin.row];
+      if (!inside(a, 0) || !inside(b, 0)) return { outside: "rows that are not all in the range" };
+      replacements.push({ from: begin(token), to: end(token), text: String(a + 1) }, { from: begin(after), to: end(after), text: String(b + 1) });
+      continue;
+    }
+    if (token.kind !== "ident") continue;
+    if (isOp(next, "(")) continue; // a function
+    if (isOp(next, "!")) return { outside: "another sheet or workbook" };
+    if (next?.kind === "structured") return { outside: "a table's column" };
+    const address = parseAddress(token.text);
+    if (address && CELL.test(token.text)) {
+      const endCell = isOp(next, ":") && after?.kind === "ident" && CELL.test(after.text) ? parseAddress(after.text) : undefined;
+      if (isOp(next, ":") && !endCell) return { outside: "a range that cannot be read" };
+      const first = { row: address.row - origin.row, col: address.col - origin.col };
+      if (!inside(first.row, first.col)) return { outside: "cells that are not in the range" };
+      replacements.push({ from: begin(token), to: end(token), text: cellText(token, first.row, first.col) });
+      if (endCell && after) {
+        k += 2;
+        const last = { row: endCell.row - origin.row, col: endCell.col - origin.col };
+        if (!inside(last.row, last.col)) return { outside: "cells that are not in the range" };
+        replacements.push({ from: begin(after), to: end(after), text: cellText(after, last.row, last.col) });
+      }
+      continue;
+    }
+    if (COLUMN.test(token.text) && isOp(next, ":") && after?.kind === "ident" && COLUMN.test(after.text)) {
+      k += 2;
+      const [a, b] = [columnNumber(token.text.replace(/\$/g, "")) - origin.col, columnNumber(after.text.replace(/\$/g, "")) - origin.col];
+      if (!inside(0, a) || !inside(0, b)) return { outside: "columns that are not all in the range" };
+      const dollar = (text: string) => (text.startsWith("$") ? "$" : "");
+      replacements.push(
+        { from: begin(token), to: end(token), text: `${dollar(token.text)}${columnLabel(a)}` },
+        { from: begin(after), to: end(after), text: `${dollar(after.text)}${columnLabel(b)}` },
+      );
+      continue;
+    }
+    // TRUE and FALSE are values; anything else that is a name is something defined outside the grid.
+    if (!/^(?:TRUE|FALSE)$/i.test(token.text)) return { outside: "a defined name" };
+  }
+
+  let result = formula;
+  for (const { from, to, text } of replacements.sort((x, y) => y.from - x.from)) result = result.slice(0, from) + text + result.slice(to);
+  return { formula: result };
+}
