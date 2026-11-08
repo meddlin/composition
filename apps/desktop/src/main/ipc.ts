@@ -1,5 +1,6 @@
 import { ATTACHMENT_METHODS, type AttachmentsApi } from "../../../web/src/lib/composition/attachmentsApi";
 import { BACKUP_METHODS, type DesktopBackupApi } from "../../../web/src/lib/composition/backupApi";
+import { DOCUMENT_METHODS, type DocumentsApi } from "../../../web/src/lib/composition/documentsApi";
 import { FEED_METHODS, type FeedsApi } from "../../../web/src/lib/composition/feedsApi";
 import { CONTACTS_METHODS, type ContactsApi } from "../../../web/src/lib/composition/contactsApi";
 import { PANELS_METHODS, type PanelsApi } from "../../../web/src/lib/composition/panelsApi";
@@ -12,7 +13,7 @@ import { channelFor, INITIAL_CHANNEL } from "../shared/channels";
 import type { AssistantHost, AssistantSender } from "./assistant";
 import { API_METHODS, type CompositionApi } from "./backend";
 import { isAllowedOrigin } from "./origin";
-import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, FEED_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
+import { ASSISTANT_VALIDATORS, ATTACHMENT_VALIDATORS, BACKUP_VALIDATORS, CONTACTS_VALIDATORS, DOCUMENT_VALIDATORS, FEED_VALIDATORS, PANELS_VALIDATORS, READING_LIST_VALIDATORS, TODO_VALIDATORS, UPDATE_VALIDATORS, VALIDATORS, WINDOW_VALIDATORS } from "./validate";
 
 /** The slice of Electron's `ipcMain` this module uses, so tests don't need Electron. */
 export type IpcMainLike = {
@@ -30,7 +31,7 @@ export type IpcEventLike = {
 export class UntrustedSenderError extends Error {}
 
 /**
- * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi,
+ * Exposes the whole CompositionApi, and the desktop-only AttachmentsApi, DocumentsApi,
  * DesktopBackupApi, PanelsApi, TodosApi, ReadingListApi, ContactsApi, FeedsApi, UpdatesApi, WindowApi and AI helper chat calls, over IPC, one channel per method.
  *
  * Every call is checked twice: the sender must be a frame of our own UI (a
@@ -41,6 +42,7 @@ export function registerIpc(options: {
   ipcMain: IpcMainLike;
   api: CompositionApi;
   attachments: AttachmentsApi;
+  documents: DocumentsApi;
   backup: DesktopBackupApi;
   panels: PanelsApi;
   todos: TodosApi;
@@ -55,7 +57,7 @@ export function registerIpc(options: {
   /** Synchronous snapshot for the preload, taken before the page paints. */
   initial: () => unknown;
 }): void {
-  const { ipcMain, api, attachments, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant, isTrustedUrl, initial } = options;
+  const { ipcMain, api, attachments, documents, backup, panels, todos, readingList, contacts, feeds, updates, window, assistant, isTrustedUrl, initial } = options;
 
   const trusted = (event: IpcEventLike): boolean => {
     const url = event.senderFrame?.url;
@@ -77,6 +79,7 @@ export function registerIpc(options: {
 
   for (const method of API_METHODS) expose(method, VALIDATORS[method], api);
   for (const method of ATTACHMENT_METHODS) expose(method, ATTACHMENT_VALIDATORS[method], attachments);
+  for (const method of DOCUMENT_METHODS) expose(method, DOCUMENT_VALIDATORS[method], documents);
   for (const method of BACKUP_METHODS) expose(method, BACKUP_VALIDATORS[method], backup);
   for (const method of PANELS_METHODS) expose(method, PANELS_VALIDATORS[method], panels);
   for (const method of TODO_METHODS) expose(method, TODO_VALIDATORS[method], todos);

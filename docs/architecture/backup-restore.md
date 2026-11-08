@@ -23,10 +23,12 @@ settings.json             color scheme, city, column sizes, favorites, the AI he
 composition.db            a consistent snapshot of the database
 app_data/<image>          every pasted image
 attachments/<file>        every attached file
+documents/<file>          every PDF a note owns
 ```
 
-The database holds the notes, groups, the Trash Can and the attachment records, so those come
-back too. So do the **to-dos**: the live list, the archive, the activity log, which weeks, months and quarters the weekly cycle has
+The database holds the notes, groups, the Trash Can, the attachment records and the PDFs' marks and
+bookmarks, so those come back too (a PDF's file is in `documents/`, and the counts add `… and 3 PDFs`
+when there are any). So do the **to-dos**: the live list, the archive, the activity log, which weeks, months and quarters the weekly cycle has
 closed, and the links to the reports (the reports themselves are ordinary notes). The counts in the description, and the line the Settings
 screen shows after a backup or restore, say `… and 8 to-dos (31 archived)` when there are any; there is no to-do code in the backup itself,
 because the whole database file is the snapshot ([todo-weekly-cycle.md](todo-weekly-cycle.md)). So are the **contacts** of the Contacts plugin
@@ -55,14 +57,16 @@ Restoring is two steps, so nothing is touched until the file is known to be good
    nothing changed, when the file:
    - is not a gzip'd tar, or is cut short, or has a header that fails its checksum;
    - contains anything but plain files (a link, device or folder-traversal name is an error, not a
-     skip), or any name other than the five above (`app_data/` entries must look like a stored image,
-     `attachments/` entries like a stored file: one path segment, no leading dot);
+     skip), or any name other than the six above (`app_data/` entries must look like a stored image,
+     `attachments/` and `documents/` entries like a stored file: one path segment, no leading dot).
+     An older version of the app refuses a backup that holds PDFs for this reason, saying it does not
+     know the file, rather than restoring it without them;
    - lists a name twice, has no manifest or no database, or comes from a newer format version;
    - holds a database that is not intact SQLite with a `notes` table (`PRAGMA quick_check`).
 2. **Save what is there**: the current data goes to a `composition-pre-restore-….tar.gz` in
    `~/Composition Backups`, so a restore can itself be undone by restoring that file. If that backup
    can't be made, nothing is restored.
-3. **Apply** (`applyStagedBackup`): the database, `app_data/` and `attachments/` are set aside, the
+3. **Apply** (`applyStagedBackup`): the database, `app_data/`, `attachments/` and `documents/` are set aside, the
    staged ones moved in, and the settings merged (the backup's choices, this machine's location). If any
    move fails everything is put back. Then the scratch folder is deleted and the search index rebuilt.
 

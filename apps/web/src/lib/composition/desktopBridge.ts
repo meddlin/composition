@@ -3,6 +3,7 @@ import type { AssistantEventListener, AssistantStreamApi } from "./assistantApi"
 import type { AppearanceListener, AppearanceMessage } from "./appearanceApi";
 import type { AttachmentsApi } from "./attachmentsApi";
 import type { DesktopBackupApi } from "./backupApi";
+import type { DocumentsApi } from "./documentsApi";
 import type { ContactsApi } from "./contactsApi";
 import type { FeedsApi } from "./feedsApi";
 import type { PanelsApi } from "./panelsApi";
@@ -20,6 +21,7 @@ import type { WindowApi } from "./windowApi";
  */
 export type DesktopBridge = CompositionApi &
   AttachmentsApi &
+  DocumentsApi &
   DesktopBackupApi &
   PanelsApi &
   TodosApi &

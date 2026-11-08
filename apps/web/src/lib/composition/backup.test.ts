@@ -76,7 +76,7 @@ describe("createBackup", () => {
     expect(path.dirname(result.file!)).toBe(backups);
     expect(path.basename(result.file!)).toMatch(/^composition-backup-\d{4}-\d{2}-\d{2}-\d{6}\.tar\.gz$/);
     expect(fs.statSync(result.file!).size).toBe(result.bytes);
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0, contacts: 0 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, documents: 0, todos: 0, archivedTodos: 0, contacts: 0 });
     // Only the backup is left in the folder, none of the working files.
     expect(fs.readdirSync(backups)).toEqual([path.basename(result.file!)]);
   });
@@ -147,7 +147,7 @@ describe("createBackup", () => {
 
     const result = await service.createBackup(backups);
 
-    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0, todos: 0, archivedTodos: 0, contacts: 0 });
+    expect(result.counts).toEqual({ notes: 0, groups: 0, trashedNotes: 0, trashedGroups: 0, images: 0, attachments: 0, documents: 0, todos: 0, archivedTodos: 0, contacts: 0 });
   });
 
   it("does not let two run at once", async () => {
@@ -174,7 +174,7 @@ describe("restoreBackup", () => {
     const result = await service.restoreBackup(file!);
 
     expect(result.error).toBeUndefined();
-    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, todos: 0, archivedTodos: 0, contacts: 0 });
+    expect(result.counts).toEqual({ notes: 2, groups: 1, trashedNotes: 1, trashedGroups: 0, images: 1, attachments: 1, documents: 0, todos: 0, archivedTodos: 0, contacts: 0 });
     const workspace = await service.loadWorkspace();
     expect(workspace.notes.map((n) => n.title).sort()).toEqual(["First note", "Second note"]);
     expect(workspace.notes.find((n) => n.id === first.id)).toMatchObject({ groupId: group.id });
@@ -467,7 +467,7 @@ describe("restoreBackup refuses, and changes nothing", () => {
 
   it("an absolute path, a stray file, and an image folder entry that is not an image", async () => {
     const { service } = await populate();
-    for (const name of ["/tmp/escaped.png", "meili.log", "app_data/script.html", "app_data/sub/pic.png", "attachments/.hidden"]) {
+    for (const name of ["/tmp/escaped.png", "meili.log", "app_data/script.html", "app_data/sub/pic.png", "attachments/.hidden", "documents/.hidden", "documents/sub/book.pdf", "documents/../../escaped.pdf"]) {
       const result = await service.restoreBackup(await craft([[name, Buffer.from("x")]]));
       expect(result.error, name).toMatch(/doesn't know/);
     }
@@ -534,12 +534,90 @@ describe("applyStagedBackup", () => {
 
     expect(() =>
       backup.applyStagedBackup(
-        { dir, createdAt: "x", counts: {} as never, settings: null, hasImages: true, hasAttachments: false },
+        { dir, createdAt: "x", counts: {} as never, settings: null, hasImages: true, hasAttachments: false, hasDocuments: false },
         { appDataDir: dataDir(), dbPath: path.join(dataDir(), "composition.db") },
       ),
     ).toThrow(/previous data was put back/);
 
     expect(fs.readdirSync(images)).toEqual(["mine-aaaaaaaaaaaa.png"]);
     expect((await service.loadWorkspace()).notes.map((n) => n.title)).toEqual(["Keep me"]);
+  });
+});
+
+describe("a PDF in a backup", () => {
+  /** `populate`, and the first note owns a PDF with a highlight, an ink page and a bookmark. */
+  async function populateWithPdf() {
+    const context = await populate();
+    const documents = await import("./documents");
+    const marks = await import("./pdfMarkupRepo");
+    const source = path.join(home, "Designing Data.pdf");
+    fs.writeFileSync(source, "%PDF-1.7 textbook");
+    const result = await documents.importDocument(dataDir(), context.first.id, source, { pageCount: 8 });
+    if (result.status !== "added") throw new Error("expected the PDF to be imported");
+    const highlight = marks.addAnnotation(result.document.id, { page: 3, kind: "highlight", color: "green", rects: [[72, 600, 300, 620]], quote: "a line", comment: "check" });
+    const ink = marks.addAnnotation(result.document.id, { page: 5, kind: "ink", color: "black", body: { strokes: [[[1, 2], [3, 4]]] } });
+    const bookmark = marks.addBookmark(result.document.id, 7, "Chapter 7");
+    return { ...context, document: result.document, highlight, ink, bookmark, marks };
+  }
+
+  it("is in the archive under documents/, and counted", async () => {
+    const { service, document } = await populateWithPdf();
+
+    const result = await service.createBackup(backups);
+
+    expect(result.counts).toMatchObject({ documents: 1, attachments: 1 });
+    const names = execFileSync("tar", ["-tzf", result.file!], { encoding: "utf-8" }).trim().split("\n");
+    expect(names).toContain(`documents/${document.storedName}`);
+    expect(names).toHaveLength(6);
+  });
+
+  it("comes back with its file, its uuid, its marks and its bookmark after everything is lost", async () => {
+    const { service, first, document, highlight, ink, bookmark, marks } = await populateWithPdf();
+    const { file } = await service.createBackup(backups);
+    const { closeDb } = await import("./db");
+    closeDb();
+    fs.rmSync(dataDir(), { recursive: true });
+
+    const result = await service.restoreBackup(file!);
+
+    expect(result.error).toBeUndefined();
+    expect(result.counts).toMatchObject({ documents: 1 });
+    const documents = await import("./documentsRepo");
+    expect(documents.getDocumentForNote(first.id)).toEqual(document);
+    expect(fs.readFileSync(path.join(dataDir(), "documents", document.storedName), "utf-8")).toBe("%PDF-1.7 textbook");
+    expect(marks.listAnnotations(document.id)).toEqual([highlight, ink]);
+    expect(marks.listBookmarks(document.id)).toEqual([bookmark]);
+  });
+
+  it("is replaced, not merged, when a backup without it is restored, and the safety backup keeps it", async () => {
+    const { service, first } = await populate();
+    const before = await service.createBackup(path.join(home, "before"));
+    const documents = await import("./documents");
+    const source = path.join(home, "later.pdf");
+    fs.writeFileSync(source, "%PDF-1.7 later");
+    const added = await documents.importDocument(dataDir(), first.id, source);
+    if (added.status !== "added") throw new Error("expected the PDF to be imported");
+
+    const result = await service.restoreBackup(before.file!);
+
+    expect(result.error).toBeUndefined();
+    expect(fs.existsSync(path.join(dataDir(), "documents", added.document.storedName))).toBe(false);
+    expect((await import("./documentsRepo")).getDocumentForNote(first.id)).toBeNull();
+    const kept = execFileSync("tar", ["-tzf", result.safetyBackup!], { encoding: "utf-8" });
+    expect(kept).toContain(`documents/${added.document.storedName}`);
+  });
+
+  it("is taken into account when deciding whether there is current data to keep a safety backup of", async () => {
+    const service = await import("./service");
+    const file = (await service.createBackup(path.join(home, "empty"))).file!;
+    const { closeDb } = await import("./db");
+    closeDb();
+    fs.rmSync(dataDir(), { recursive: true });
+    fs.mkdirSync(path.join(dataDir(), "documents"), { recursive: true });
+    fs.writeFileSync(path.join(dataDir(), "documents", "abcdef012345-orphan.pdf"), "%PDF-1.7");
+
+    const result = await service.restoreBackup(file);
+
+    expect(result.safetyBackup).toBeDefined();
   });
 });

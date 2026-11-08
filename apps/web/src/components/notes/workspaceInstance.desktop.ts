@@ -3,11 +3,13 @@ import { streamChat } from "@/lib/composition/assistantClient";
 import * as client from "@/lib/composition/client";
 import { savePanels } from "@/lib/composition/panelsClient";
 import * as contactsClient from "@/lib/composition/contactsClient";
+import * as documentsClient from "@/lib/composition/documentsClient";
 import * as feedsClient from "@/lib/composition/feedsClient";
 import * as readingListClient from "@/lib/composition/readingListClient";
 import * as todosClient from "@/lib/composition/todosClient";
 import { createPluginsStore } from "@/lib/composition/pluginsStore";
 import { createContactsStore } from "@/lib/composition/contactsStore";
+import { createDocumentsStore } from "@/lib/composition/documentsStore";
 import { createFeedsStore } from "@/lib/composition/feedsStore";
 import { createReadingListStore } from "@/lib/composition/readingListStore";
 import { createTodosStore } from "@/lib/composition/todosStore";
@@ -33,6 +35,7 @@ export function createWorkspace(initial: WorkspaceData, panels?: PanelsToRestore
       readingList: createReadingListStore(readingListClient),
       feeds: createFeedsStore(feedsClient),
       contacts: createContactsStore(contactsClient),
+      documents: createDocumentsStore(documentsClient),
       plugins: createPluginsStore(client, initial.plugins),
       panels: {
         saved: panels?.saved,

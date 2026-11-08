@@ -4,6 +4,7 @@ import { Meilisearch, type EnqueuedTaskPromise } from "meilisearch";
 import * as frontmatter from "./frontmatter";
 import type { Note } from "./notesRepo";
 import { listNotes } from "./notesRepo";
+import { marksSearchText } from "./pdfMarkupRepo";
 import { DEFAULT_APP_DATA_DIR } from "./paths";
 import { parseSearchQuery } from "./searchQuery";
 
@@ -93,12 +94,17 @@ function toTimestamp(iso: string): number {
   return Math.floor(new Date(iso).getTime() / 1000);
 }
 
-function noteToDocument(note: Note) {
+/**
+ * The note as the index holds it. A note that owns a PDF is also found by the words of that PDF's marks (`marks`: the quotes,
+ * comments and text notes, from `marksSearchText`), which are searched with its content and never shown, since a search
+ * returns ids only.
+ */
+function noteToDocument(note: Note, marks = "") {
   return {
     id: note.id,
     title: note.title,
     description: note.description,
-    content: note.content,
+    content: marks === "" ? note.content : `${note.content}\n\n${marks}`,
     tags: frontmatter.tagsFromString(note.tags),
     created_at_ts: toTimestamp(note.createdAt),
     updated_at_ts: toTimestamp(note.updatedAt),
@@ -130,7 +136,7 @@ function ensureIndex(): Promise<void> {
 
 export async function indexNote(note: Note): Promise<void> {
   await ensureIndex();
-  await getClient().index(INDEX_UID).addDocuments([noteToDocument(note)]);
+  await getClient().index(INDEX_UID).addDocuments([noteToDocument(note, marksSearchText(note.id).get(note.id))]);
 }
 
 export async function deleteNoteFromIndex(id: number): Promise<void> {
@@ -143,7 +149,8 @@ export async function reindexAll(notes: Note[]): Promise<void> {
   const index = getClient().index(INDEX_UID);
   await waitFor(index.deleteAllDocuments());
   if (notes.length > 0) {
-    await waitFor(index.addDocuments(notes.map(noteToDocument)));
+    const marks = marksSearchText();
+    await waitFor(index.addDocuments(notes.map((note) => noteToDocument(note, marks.get(note.id)))));
   }
   synced = true;
 }

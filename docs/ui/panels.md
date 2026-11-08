@@ -25,6 +25,7 @@ A panel shows one thing, its *kind*:
 | **Notes browser** | A second tree of a notebook's groups and notes, with its own chosen notebook (a menu at the top). Picking a note opens it in the note panel used last, or in a new one beside the browser. |
 | **AI helper** | The [AI helper](ai-helper.md)'s chat about one note. See below. |
 | **To-do** | A to-do list that archives what is done each week, with an archive and reports. See below. |
+| **PDF** | A PDF being read, with its marks, sidebar and export. It is paired with a note. See [The PDF panel](#the-pdf-panel). |
 
 A window always has at least one panel. Closing the last one leaves a new empty panel; an empty panel that is already alone has no close button.
 
@@ -42,7 +43,7 @@ A window always has at least one panel. Closing the last one leaves a new empty 
 Dropping shows where the panel will land: the half of the target nearest the pointer. Dividers can be nested without limit
 (a column inside a row inside a column), and closing a panel hands its room to the panel after it.
 
-Picking a note in the sidebar **focuses** the panel that already shows it; otherwise it goes in the focused panel if that is an empty or note
+Picking a note in the sidebar **focuses** the panel that already shows it (a note that owns a PDF also opens its PDF, see [The PDF panel](#the-pdf-panel)); otherwise it goes in the focused panel if that is an empty or note
 panel, else in the note panel used last, else in a new panel to the right. So ordinary navigation never makes a second panel for a note.
 
 ## Opening a plugin's panel
@@ -310,6 +311,25 @@ in an empty panel, or **Open Contacts** in the palette; it is on from the start,
 - **Off.** An open Contacts panel says the plugin is off, with **Turn on Contacts**. The contacts are kept, and stay in backups.
 - **Narrow panels.** From a panel width of 640 px the list and the contact sit side by side; below that the panel shows one at a time, with **Back to list**.
 - **Not in the web app or the CLI.** Panels are desktop only. Importing vCards or CSV, groups, and birthday reminders are future work.
+
+## The PDF panel
+
+A PDF is read in a panel of its own, beside the note that owns it ([pdf.md](pdf.md) has the reader, the marks and the export; this is how it
+sits in the grid). Source: [`PdfReader.tsx`](../../apps/web/src/components/pdf/PdfReader.tsx), `openPdfPair`, `openLinkedPdf` and `pdfSubject` in
+[`panelsState.ts`](../../apps/web/src/components/panels/panelsState.ts), and the `pdf` kind in [`kinds.ts`](../../apps/web/src/components/panels/kinds.ts).
+
+- **Opening one.** Picking a PDF's row in the sidebar opens the PDF to the **left** of its note, and focuses the PDF (reading comes first);
+  if the window already shows that PDF it only focuses it. **+ Import PDF…** under the note list does the same for the note it makes. Following a
+  `pdf:` link in a note ([note-links.md](note-links.md#linking-to-a-pdf)) focuses that PDF's panel, or opens one to the left of the note, paired with it.
+- **The pair.** Like the AI helper, a PDF panel is **paired with a note**: pinned to one, or following the note panel you used last (the
+  **Follow the note in use** button in its bar). It starts pinned to its own note, and picking a note in its **Notes** tab shows that note in the
+  paired note panel and pins the PDF to it. **Quote** and **Cite this page** write to the paired note.
+- **Like any panel.** It splits, moves by its header, pops out into its own window and closes; a PDF is never opened in two panels of one window
+  by a link. It is never narrower than 360 px.
+- **Saving and restoring.** A PDF panel saves which PDF it shows and which note it is paired with (or that it follows). Where the reader was, the
+  zoom and dark pages are the PDF's own, remembered per PDF. A PDF that is gone (its note deleted for good) comes back as a panel that says so;
+  a pair pinned to a note that is gone follows instead.
+- **Desktop only.** The web app and the terminal app have no PDF panel.
 
 ## Panel commands and the command palette
 

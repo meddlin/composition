@@ -5,14 +5,15 @@ import { pipeline } from "node:stream/promises";
 import Database from "better-sqlite3";
 import { ATTACHMENT_DIR_NAME } from "./attachmentNames";
 import type { BackupCounts } from "./backupApi";
+import { DOCUMENT_DIR_NAME } from "./documentNames";
 import { IMAGE_DIR_NAME, isImageName } from "./imageRefs";
 import { ArchiveError, readArchive, writeArchive, type ArchiveSource } from "./tarArchive";
 import { parseWebSettings, type WebSettings } from "./webSettings";
 
 /**
  * Backing up and restoring everything Composition keeps: the notes database
- * (notes, groups, the Trash Can, attachment records), the pasted images, the
- * attached files, and the settings that belong to the user rather than to this
+ * (notes, groups, the Trash Can, attachment records, the PDFs' marks and
+ * bookmarks), the pasted images, the attached files, the PDFs, and the settings that belong to the user rather than to this
  * machine. Framework-free, like the rest of the service layer.
  *
  * A backup is one `.tar.gz`, readable by any `tar`:
@@ -22,6 +23,7 @@ import { parseWebSettings, type WebSettings } from "./webSettings";
  *   composition.db            a consistent snapshot of the database (VACUUM INTO)
  *   app_data/<image>          every pasted image
  *   attachments/<file>        every attached file
+ *   documents/<file>          every PDF a note owns
  *
  * Deliberately not in it: the search index (derived, rebuilt after a restore),
  * and the data location (`appDataDir`, `dbPath`). Those say where *this*
@@ -77,6 +79,7 @@ const COUNTED_TABLES = {
   trashedNotes: "trashed_notes",
   trashedGroups: "trashed_groups",
   attachments: "attachments",
+  documents: "documents",
 } as const;
 
 /**
@@ -100,6 +103,7 @@ function countRows(databaseFile: string): Omit<BackupCounts, "images"> {
       trashedNotes: count(COUNTED_TABLES.trashedNotes),
       trashedGroups: count(COUNTED_TABLES.trashedGroups),
       attachments: count(COUNTED_TABLES.attachments),
+      documents: count(COUNTED_TABLES.documents),
       todos: count("todos") - archivedTodos,
       archivedTodos,
       contacts: count("contacts"),
@@ -176,6 +180,7 @@ export async function createBackup(options: {
 
     const images = listFiles(path.join(appDataDir, IMAGE_DIR_NAME)).filter(isImageName);
     const attachments = listFiles(path.join(appDataDir, ATTACHMENT_DIR_NAME)).filter((name) => STORED_NAME.test(name));
+    const documents = listFiles(path.join(appDataDir, DOCUMENT_DIR_NAME)).filter((name) => STORED_NAME.test(name));
     const manifest: Manifest = {
       format: BACKUP_FORMAT,
       version: BACKUP_FORMAT_VERSION,
@@ -189,6 +194,10 @@ export async function createBackup(options: {
       ...attachments.map((name) => ({
         name: `${ATTACHMENT_DIR_NAME}/${name}`,
         file: path.join(appDataDir, ATTACHMENT_DIR_NAME, name),
+      })),
+      ...documents.map((name) => ({
+        name: `${DOCUMENT_DIR_NAME}/${name}`,
+        file: path.join(appDataDir, DOCUMENT_DIR_NAME, name),
       })),
     ];
     await writeArchive(
@@ -217,6 +226,7 @@ export type StagedBackup = {
   settings: WebSettings | null;
   hasImages: boolean;
   hasAttachments: boolean;
+  hasDocuments: boolean;
 };
 
 async function readJson(data: AsyncIterable<Buffer>, size: number, what: string): Promise<unknown> {
@@ -267,6 +277,7 @@ export async function stageBackup(file: string, appDataDir: string): Promise<Sta
     const seen = new Set<string>();
     let images = 0;
     let attachments = 0;
+    let documents = 0;
 
     await readArchive(file, async ({ name, size, data }) => {
       if (seen.has(name)) throw new ArchiveError(`The backup lists ${name} twice.`);
@@ -291,9 +302,11 @@ export async function stageBackup(file: string, appDataDir: string): Promise<Sta
           rest.length === 0 &&
           fileName !== undefined &&
           ((folder === IMAGE_DIR_NAME && isImageName(fileName)) ||
-            (folder === ATTACHMENT_DIR_NAME && STORED_NAME.test(fileName)));
+            (folder === ATTACHMENT_DIR_NAME && STORED_NAME.test(fileName)) ||
+            (folder === DOCUMENT_DIR_NAME && STORED_NAME.test(fileName)));
         if (!valid) throw new ArchiveError(`The backup contains a file Composition doesn't know (${name}), so it was not restored.`);
         if (folder === IMAGE_DIR_NAME) images += 1;
+        else if (folder === DOCUMENT_DIR_NAME) documents += 1;
         else attachments += 1;
         await fs.promises.mkdir(path.join(dir, folder), { recursive: true });
         target = path.join(dir, folder, fileName);
@@ -313,6 +326,7 @@ export async function stageBackup(file: string, appDataDir: string): Promise<Sta
       settings,
       hasImages: images > 0,
       hasAttachments: attachments > 0,
+      hasDocuments: documents > 0,
     };
   } catch (error) {
     await fs.promises.rm(dir, { recursive: true, force: true });
@@ -345,7 +359,7 @@ function moveEntry(source: string, target: string): void {
 }
 
 /**
- * Replaces the current database, images and attachments with the staged ones,
+ * Replaces the current database, images, attachments and PDFs with the staged ones,
  * then removes the scratch folder. What was there is set aside first, and put
  * back if anything fails, so the app is never left half restored. The caller
  * must have closed the database connection, and should have taken a backup of
@@ -363,6 +377,7 @@ export function applyStagedBackup(staged: StagedBackup, locations: { appDataDir:
     ...DATABASE_SUFFIXES.map((suffix): [string, string | null] => [dbPath + suffix, null]),
     [path.join(appDataDir, IMAGE_DIR_NAME), staged.hasImages ? path.join(staged.dir, IMAGE_DIR_NAME) : null],
     [path.join(appDataDir, ATTACHMENT_DIR_NAME), staged.hasAttachments ? path.join(staged.dir, ATTACHMENT_DIR_NAME) : null],
+    [path.join(appDataDir, DOCUMENT_DIR_NAME), staged.hasDocuments ? path.join(staged.dir, DOCUMENT_DIR_NAME) : null],
   ];
 
   const setAside: [string, string][] = [];

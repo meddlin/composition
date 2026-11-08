@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ATTACHMENT_DIR_NAME } from "./attachmentNames";
+import { DOCUMENT_DIR_NAME } from "./documentNames";
 import { IMAGE_DIR_NAME } from "./imageRefs";
 
 /** The "just for fun" numbers on the Settings screen. */
@@ -75,7 +76,8 @@ export function computeMetrics(options: {
     characters,
     averageWords: contents.length === 0 ? 0 : Math.round(words / contents.length),
     databaseBytes: fileBytes(dbPath) + fileBytes(`${dbPath}-wal`) + fileBytes(`${dbPath}-shm`),
-    assetsBytes: directoryBytes(path.join(appDataDir, ATTACHMENT_DIR_NAME)),
+    // attached files and PDFs
+    assetsBytes: directoryBytes(path.join(appDataDir, ATTACHMENT_DIR_NAME)) + directoryBytes(path.join(appDataDir, DOCUMENT_DIR_NAME)),
     mediaBytes: directoryBytes(path.join(appDataDir, IMAGE_DIR_NAME)),
   };
 }
