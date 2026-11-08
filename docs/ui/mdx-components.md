@@ -463,11 +463,46 @@ range is read when its box is left or Enter is pressed), says what would come ac
   number, which the check against Excel's values catches wherever a formula reads it).
 - **The sheet remembers where it came from** (below), for a later re-import and export.
 
+### Re-importing
+
+Point at a sheet that came from Excel (one with `source`, `sheet` and `range`) and press **Re-import**: it opens the import dialog on the same
+workbook's sheet and range, and **replaces the sheet** with what the file holds now, so a workbook you keep editing in Excel can be brought up to
+date. The tag keeps its `title` and other attributes; `source`, `sheet`, `range` and `imported` are set to what was just read, and the blocks are
+replaced as one change, so one undo takes it back.
+
+- **The file is asked for again**, since the page keeps no path (see above). The dialog says which file, sheet and range it replaces, and says so if
+  the file chosen has another name ("This is other.xlsx, and the sheet came from budget.xlsx") or has no such sheet (the first is shown).
+- **Changes are not overwritten without asking.** If the two blocks no longer match the fingerprint, which is to say the sheet was edited after
+  the import, the dialog opens with a warning ("This sheet has been changed since it was imported…") and its button reads **Replace my changes**
+  instead of **Replace sheet**. A sheet with no fingerprint (written by hand) is treated as changed.
+- A sheet is replaced whole: nothing is merged, so formulas typed in it, rows added to it and carried formulas it had are gone, and what the
+  workbook has takes their place (undo brings them back).
+
+### Exporting
+
+**Export…**, on any sheet when it is pointed at, saves it as a file or copies it:
+
+- **An Excel workbook (`.xlsx`) with its formulas.** Each formula is written as a formula **with the value it shows beside it**, as Excel itself
+  saves one, and Excel calculates it again when it opens the file. A function newer than Excel 2007 is written the way the file holds it
+  (`_xlfn.XLOOKUP`, `_xlfn.IFS`, and `_xlfn._xlws.FILTER`), which Excel needs: without the prefix it shows `#NAME?`. A date written `2026-03-04` is
+  written as a date, with that format. A [carried](#carried-formulas) formula is written as it came, with Excel's value, so what this engine
+  could not calculate survives a round trip through Excel. A formula this engine cannot calculate that was typed here is written as a formula with
+  `#NAME?` for its value, and Excel calculates it on opening. The sheet is named for its caption (Excel's limits apply: 31 characters, none of `[]:*?/\`).
+- **CSV (`.csv`)**: the values the sheet shows, formulas calculated, in UTF-8 with the byte order mark Excel needs.
+- **Copy cells**: the shown values with tabs between them, which Excel takes as cells when pasted.
+- **Not kept**, and the dialog says so: cell formats (a percent or a currency is the plain number), colours, fonts, column widths set by hand (columns
+  are sized to their content), and a formula that gave a date shows the number of days, since a sheet has no cell formats.
+- **In the desktop app the download is disabled, with the reason**: the app blocks every download and has no native "save a file the page made"
+  bridge yet, so there it offers Copy cells only. In a browser the file is a normal download.
+- Checked in Excel itself: a workbook made this way (28 formulas, `SUMIFS` `XLOOKUP` `IFS` `TEXTJOIN` `MAXIFS` `EDATE` `INDEX`/`MATCH` `TEXT` `IFERROR`
+  `IFNA` and more) opened with no repair prompt and no Protected View, Excel calculated it again, and **all 68 cells came to what this engine had calculated**.
+
 ### Where a sheet came from
 
 An imported sheet says so with `source` (the file's name), `sheet` and `range` (`A1:F40`), drawn as a line under it ("Imported from
 budget.xlsx, sheet Q3, A1:F40") and in the terminal; and `imported`, a fingerprint of the two blocks as the import wrote them
-(the first 12 hex digits of their SHA-256), which is not drawn and is how a later import will tell the sheet has been changed.
+(the first 12 hex digits of their SHA-256), which is not drawn and is how a re-import tells the sheet has been changed. Editing the sheet in
+the grid and saving without changing anything writes the same text, so the fingerprint stays true.
 
 ### Editing a sheet
 

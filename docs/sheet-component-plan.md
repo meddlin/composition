@@ -502,6 +502,43 @@ references (S9). **Gate E.**
 **Step 5: Excel out and back.** **Re-import** with the `imported` hash and the overwrite warning, **Export…**
 to `.xlsx` (the `_xlfn.` translation, column-name references as ranges, a summary of what could not come along)
 and CSV. **Gate F.**
+*Built 2026-11-08, except what is listed as not built; waiting for the owner's look (Gate F). What it is, and where it differs from the words above:*
+
+- **Built, re-import:** a **Re-import** button on a sheet that has `source`, `sheet` and `range` opens the import dialog in a replace mode
+  ([`SheetImportDialog.tsx`](../apps/web/src/components/notes/SheetImportDialog.tsx)): it says what it replaces, asks for the file again, goes back to the
+  sheet and range the tag names (or says the file has no such sheet, or is another file), and **warns before overwriting a changed sheet**: the
+  fingerprint (`imported`) of the two blocks is compared with the blocks now, and a mismatch, or no fingerprint, opens the dialog with the warning
+  and a button that reads **Replace my changes**. The replacement is one edit (one undo), the tag keeps `title` and its other attributes
+  ([`writeSheet`](../apps/web/src/components/notes/mdx/sheetSrc.ts) now sets attributes), and the fingerprint is the new one. A save in the grid editor
+  that changed nothing writes the same text, so a sheet is not taken for edited just because it was opened (tested).
+- **Built, export:** **Export…** on any sheet ([`SheetExportDialog.tsx`](../apps/web/src/components/notes/SheetExportDialog.tsx)): an `.xlsx`
+  ([`sheetExport.ts`](../apps/web/src/components/notes/mdx/sheetExport.ts) makes the cells, [`sheetWorkbookWrite.ts`](../apps/web/src/components/notes/mdx/sheetWorkbookWrite.ts)
+  the bytes, with SheetJS loaded only then), a CSV (UTF-8 with a byte order mark), or **Copy cells** (tab-separated, which Excel takes as cells). Each formula is
+  written with its value beside it; a carried one as it came, with Excel's value (level 2 of the compatibility table, so a round trip loses nothing);
+  one this engine could not calculate with `#NAME?` for Excel to calculate on opening; a date as a date. The summary says what is and is not kept.
+  **The `_xlfn.` translation** puts the file's prefix on each function Excel added after 2007 (`_xlfn.XLOOKUP`, `_xlfn.IFS`, `_xlfn._xlws.FILTER`, and about
+  180 more; the list is XlsxWriter's and Excel's own).
+- **Checked in real Excel (this closes Gate A's open export test).** A file written by this export opens in Excel for Mac with **no Protected View and no repair
+  prompt** (a file written locally and stripped of its quarantine mark; the earlier blocker was the Protected View of the *downloaded* test files).
+  Excel **calculates every formula again on opening** (SheetJS Community writes no `calcPr`, and Excel treats such a file as an older program's), so a stored value
+  that is wrong is replaced; `XLOOKUP`, `IFS` and `FILTER` work with their prefixes, **`MAXIFS` written without one is `#NAME?`** (the translation is required, not
+  optional), and a date written with `yyyy-mm-dd` shows as one. Then **a sheet with 28 formulas (`SUMIFS` `XLOOKUP` `IFS` `TEXTJOIN` `CONCAT` `MAXIFS` `COUNTIFS` `EDATE`
+  `INDEX`/`MATCH` `TEXT` `IFERROR` `IFNA` `ROUND` `YEAR`/`MONTH` and a date difference) was exported, opened in Excel, and all 68 cells came to what this engine
+  had calculated.** (The script was a one-off, bundled with esbuild and read back with AppleScript; it is not kept.)
+- **Checked in the browser:** an export of an imported sheet downloaded an 18 KB workbook with the right type; a re-import of an untouched sheet showed no warning;
+  after the sheet's text was edited the warning and **Replace my changes** showed; replacing restored Excel's values, set a new fingerprint, and one undo brought
+  the edit back.
+- **Not built, and why:** **saving the file in the desktop app.** The desktop app blocks every download on purpose (`will-download` is cancelled in
+  `readingListGuard.ts`) and, by its own rule, the page never names a path: the way to save is a native dialog opened by the main process, as the backup and the PDF
+  export do, and there is no such bridge for a file the page made. So there **Download is disabled, with the reason, and Copy cells works**. A small
+  `saveFile` bridge (a method in the shared API list, a handler that opens the save dialog and writes the bytes, the preload list and its tests) is a task of its own in
+  `apps/desktop`; the dialog needs only to call it when `window.composition` has it.
+- **Not built, by plan:** column-name references as ranges on export (S9 is not built), a formula that gave a date shown as a date (a sheet has no cell formats),
+  a merge instead of a replace on re-import.
+- **Not checked:** an `.xlsx` opened in Excel for Windows or other versions, in LibreOffice or Numbers; a very large export (5,000 rows by 20 columns: its size and
+  time were not measured); the desktop app's window.
+- **Picks to confirm:** re-import **replaces whole** and warns, with no merge; a sheet with no fingerprint counts as changed; the exported workbook has one sheet named
+  for the caption (or `Sheet1`); a CSV has a byte order mark (Excel needs it; some other programs show it as a stray character).
 
 **Step 6: the owner's by-hand test**, with real workbooks, written up as `manual-tests/sheet.md` like the other
 features. **Gate G.**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attributeValue, findOpenedSheet, findSheets, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, sheetTag, tableAt, writeSheet } from "./sheetSrc";
+import { attributeValue, findOpenedSheet, sheetAttributes, findSheets, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, sheetTag, tableAt, writeSheet } from "./sheetSrc";
 
 const SHEET = '<Sheet title="Q3">\n\n```csv\nRegion,Units\nWest,120\n```\n\n</Sheet>';
 const WITH_FORMULAS = '<Sheet title="Q3">\n\n```csv\nUnits,Double\n10,20\n```\n\n```formulas\nB2 =A2*2\n```\n\n</Sheet>';
@@ -94,6 +94,37 @@ describe("writeSheet", () => {
     const text = '<Sheet title="x">\n\n</Sheet>';
     const next = writeSheet(text, findSheets(text)[0], { csv: "A\n1", formulas: "" });
     expect(next).toBe('<Sheet title="x">\n\n```csv\nA\n1\n```\n\n</Sheet>');
+  });
+});
+
+describe("sheet attributes", () => {
+  const IMPORTED = '<Sheet title="Q3" source="budget.xlsx" sheet="Q3 budget" range="A1:F40" imported="0123456789ab" height="300">\n\n```csv\nA\n1\n```\n\n</Sheet>';
+
+  it("reads the attributes of a tag, in either kind of quotes", () => {
+    expect(sheetAttributes(`<Sheet title="Q3" source='my "file".xlsx' height="300">`)).toEqual({ title: "Q3", source: 'my "file".xlsx', height: "300" });
+    expect(sheetAttributes("<Sheet>")).toEqual({});
+  });
+
+  it("sets some on a rewritten sheet, in place, and leaves the others and the order of them alone", () => {
+    const span = findSheets(IMPORTED)[0];
+    const next = writeSheet(IMPORTED, span, { csv: "A\n2", formulas: "" }, { source: "budget-2.xlsx", range: "A1:F50", imported: "ffffffffffff" });
+    expect(next.split("\n")[0]).toBe('<Sheet title="Q3" source="budget-2.xlsx" sheet="Q3 budget" range="A1:F50" imported="ffffffffffff" height="300">');
+    expect(next).toContain("```csv\nA\n2\n```");
+  });
+
+  it("adds an attribute the tag does not have, at the end, and takes one off that is given empty", () => {
+    const plain = '<Sheet title="Q3">\n\n```csv\nA\n1\n```\n\n</Sheet>';
+    expect(writeSheet(plain, findSheets(plain)[0], { csv: "A\n1", formulas: "" }, { source: "a.xlsx", imported: "0123456789ab" }).split("\n")[0]).toBe('<Sheet title="Q3" source="a.xlsx" imported="0123456789ab">');
+    expect(writeSheet(IMPORTED, findSheets(IMPORTED)[0], { csv: "A\n1", formulas: "" }, { imported: "" }).split("\n")[0]).toBe('<Sheet title="Q3" source="budget.xlsx" sheet="Q3 budget" range="A1:F40" height="300">');
+  });
+
+  it("leaves the tag as it was when no attributes are given", () => {
+    expect(writeSheet(IMPORTED, findSheets(IMPORTED)[0], { csv: "A\n1", formulas: "" })).toBe(IMPORTED);
+  });
+
+  it("keeps the characters out of a value that would end the tag", () => {
+    const plain = "<Sheet>\n\n```csv\nA\n```\n\n</Sheet>";
+    expect(writeSheet(plain, findSheets(plain)[0], { csv: "A", formulas: "" }, { source: 'a">b.xlsx' }).split("\n")[0]).toBe('<Sheet source="a b.xlsx">');
   });
 });
 

@@ -23,7 +23,7 @@ import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
 import { SheetDialog, type SheetEditSource } from "./SheetDialog";
-import { SheetImportDialog, type ImportedSheet } from "./SheetImportDialog";
+import { SheetImportDialog, type ImportedSheet, type Replacing } from "./SheetImportDialog";
 import { SheetEditContext, type SheetEditing } from "./SheetEdit";
 import { BOLD_SHORTCUT, emphasisFor, ITALIC_SHORTCUT, toggleEmphasis } from "./emphasis";
 import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
@@ -37,7 +37,8 @@ import { insideFence } from "./mdx/completions";
 import { DRAWIO_SHORTCUT, diagramRange, insertDiagram, isDrawioShortcut, replaceDiagramSrc } from "./mdx/drawioSrc";
 import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
 import { rangeFromClipboard, type SheetSource } from "./mdx/sheetDraft";
-import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
+import { importedHash } from "./mdx/sheetImport";
+import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetAttributes, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks, type PdfLinks } from "./NoteLink";
 import { placeMarkdown, type Insertion } from "./noteInsertions";
@@ -331,6 +332,38 @@ export function MarkdownEditor({
     setSheet({ source: { kind: "new" }, target: { kind: "new", ...place } });
   }
 
+  // Re-import from Excel into a sheet that is in the note: which one, and what it came from.
+  const [reimport, setReimport] = useState<{ target: { start: number; text: string }; replacing: Replacing } | null>(null);
+
+  /** Opens **Re-import** on the sheet at `offset` into the body: it says where the sheet came from, and whether it has been changed since (its fingerprint no longer matches, or it has none). */
+  async function startReimport(offset: number) {
+    const text = latest.current;
+    const span = sheetAt(text, text.length - parse(text)[1].length + offset);
+    if (!span) return;
+    const attributes = sheetAttributes(text.slice(span.start, span.openEnd));
+    const changed = !attributes.imported || (await importedHash(sheetSource(span))) !== attributes.imported;
+    setReimport({
+      target: { start: span.start, text: text.slice(span.start, span.end) },
+      replacing: { file: attributes.source, sheet: attributes.sheet, range: attributes.range, changed },
+    });
+  }
+
+  /** A re-import was made: the sheet's blocks are replaced, and its tag says where they came from now, and fingerprints what was written. */
+  function sheetReimported(imported: ImportedSheet) {
+    const target = reimport?.target;
+    setReimport(null);
+    if (!target) return;
+    // After the dialog has gone, as for a saved sheet (see sheetSaved).
+    setTimeout(() => {
+      const text = surface.text();
+      const span = findOpenedSheet(text, target);
+      if (!span) return changedUnderneath(text);
+      const next = writeSheet(text, span, imported.source, { source: imported.file, sheet: imported.sheet, range: imported.range, imported: imported.imported });
+      const end = span.end + (next.length - text.length);
+      applyAsTyping({ start: span.start, end: span.end, text: next.slice(span.start, end), caret: end - span.start });
+    }, 0);
+  }
+
   const sheetEditing = useMemo<SheetEditing>(
     () => ({
       edit: (offset) => {
@@ -338,6 +371,7 @@ export function MarkdownEditor({
         const span = sheetAt(text, text.length - parse(text)[1].length + offset);
         if (span) openSheet(span, text);
       },
+      reimport: (offset) => void startReimport(offset),
     }),
     [],
   );
@@ -846,7 +880,16 @@ export function MarkdownEditor({
         onSaved={diagramSaved}
       />
       <SheetDialog open={sheet !== null} source={sheet?.source ?? { kind: "new" }} onClose={() => setSheet(null)} onSaved={sheetSaved} />
-      <SheetImportDialog open={importAt !== null} loadWorkbook={loadWorkbook} onClose={() => setImportAt(null)} onImported={sheetImported} />
+      <SheetImportDialog
+        open={importAt !== null || reimport !== null}
+        replacing={reimport?.replacing}
+        loadWorkbook={loadWorkbook}
+        onClose={() => {
+          setImportAt(null);
+          setReimport(null);
+        }}
+        onImported={reimport ? sheetReimported : sheetImported}
+      />
     </div>
   );
 }

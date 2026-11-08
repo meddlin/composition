@@ -3,6 +3,8 @@ import { createContext } from "react";
 export type SheetEditing = {
   /** Opens the sheet editor on the `<Sheet>` whose tag starts `offset` characters into the note's body. */
   edit: (offset: number) => void;
+  /** Opens **Re-import from Excel** on the imported `<Sheet>` whose tag starts `offset` characters into the note's body. */
+  reimport: (offset: number) => void;
 };
 
 /**

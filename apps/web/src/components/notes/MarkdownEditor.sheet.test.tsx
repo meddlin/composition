@@ -6,6 +6,7 @@ import { MarkdownEditor, type MarkdownEditorControls } from "./MarkdownEditor";
 import { describeParity, type EditorDriver } from "./parityHarness";
 import type { SheetEditSource } from "./SheetDialog";
 import type { SheetSource } from "./mdx/sheetDraft";
+import { importedHash } from "./mdx/sheetImport";
 
 vi.mock("@/lib/composition/client", () => ({ saveImage: vi.fn() }));
 
@@ -17,9 +18,9 @@ const IMPORTED = { source: { csv: "Item,Qty\nPens,12", formulas: "" }, file: "bu
 
 // The import dialog, too, is a stand-in: it can "import" a made-up range.
 vi.mock("./SheetImportDialog", () => ({
-  SheetImportDialog: ({ open, onImported, onClose }: { open: boolean; onImported: (imported: typeof IMPORTED) => void; onClose: () => void }) =>
+  SheetImportDialog: ({ open, replacing, onImported, onClose }: { open: boolean; replacing?: unknown; onImported: (imported: typeof IMPORTED) => void; onClose: () => void }) =>
     open ? (
-      <div role="dialog" aria-label="import dialog">
+      <div role="dialog" aria-label="import dialog" data-replacing={JSON.stringify(replacing ?? null)}>
         <button onClick={() => onImported(IMPORTED)}>stub import</button>
         <button onClick={onClose}>stub close import</button>
       </div>
@@ -329,5 +330,78 @@ describe("MarkdownEditor: editing a sheet from the preview", () => {
     render(<Harness readOnly />);
 
     expect(screen.queryByRole("button", { name: "Edit sheet" })).toBeNull();
+  });
+});
+
+describe("MarkdownEditor: re-importing a sheet", () => {
+  const BLOCKS = { csv: "Item,Qty\nPens,11", formulas: "" };
+  const sheetTag = (attributes: string, blocks: SheetSource = BLOCKS) =>
+    `<Sheet title="Q3"${attributes}>\n\n\`\`\`csv\n${blocks.csv}\n\`\`\`\n\n</Sheet>`;
+  let latest = "";
+
+  function Harness({ initial }: { initial: string }) {
+    const [value, setValue] = useState(initial);
+    return (
+      <MarkdownEditor
+        noteId={7}
+        value={value}
+        onChange={(next) => {
+          latest = next;
+          setValue(next);
+        }}
+        ratio={0.5}
+        onRatioChange={vi.fn()}
+        onRatioCommit={vi.fn()}
+      />
+    );
+  }
+  const replacing = () => JSON.parse(importDialogEl().getAttribute("data-replacing")!);
+  const importDialogEl = () => screen.getByRole("dialog", { name: "import dialog" });
+
+  beforeEach(() => {
+    latest = "";
+  });
+
+  it("opens on the sheet's own tag, and says the sheet is as it was imported when its fingerprint matches", async () => {
+    const hash = await importedHash(BLOCKS);
+    render(<Harness initial={`Intro\n\n${sheetTag(` source="budget.xlsx" sheet="Q3 budget" range="A1:B2" imported="${hash}"`)}\n`} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Re-import" }));
+
+    await waitFor(() => expect(importDialogEl()).toBeTruthy());
+    expect(replacing()).toEqual({ file: "budget.xlsx", sheet: "Q3 budget", range: "A1:B2", changed: false });
+  });
+
+  it("says the sheet has been changed when its fingerprint no longer matches, or it has none", async () => {
+    const hash = await importedHash({ csv: "Item,Qty\nPens,12", formulas: "" });
+    const { unmount } = render(<Harness initial={`${sheetTag(` source="budget.xlsx" sheet="Q3" range="A1:B2" imported="${hash}"`)}\n`} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Re-import" }));
+    await waitFor(() => expect(replacing().changed).toBe(true));
+    unmount();
+    cleanup();
+
+    render(<Harness initial={`${sheetTag(` source="budget.xlsx" sheet="Q3" range="A1:B2"`)}\n`} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Re-import" }));
+    await waitFor(() => expect(replacing().changed).toBe(true));
+  });
+
+  it("replaces the sheet's blocks and its tag's source, sheet, range and fingerprint, and nothing else of the note", async () => {
+    const hash = await importedHash(BLOCKS);
+    const note = `Intro\n\n${sheetTag(` source="budget.xlsx" sheet="Q3 budget" range="A1:B2" imported="${hash}"`)}\n\nOutro\n`;
+    render(<Harness initial={note} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Re-import" }));
+    await waitFor(() => expect(importDialogEl()).toBeTruthy());
+
+    fireEvent.click(screen.getByRole("button", { name: "stub import" }));
+
+    await waitFor(() => expect(latest).not.toBe(""));
+    expect(latest).toBe(`Intro\n\n${sheetTag(' source="budget.xlsx" sheet="Q3" range="A1:B2" imported="0123456789ab"', IMPORTED.source)}\n\nOutro\n`);
+    expect(screen.queryByRole("dialog", { name: "import dialog" })).toBeNull();
+  });
+
+  it("has no Re-import on a sheet that did not come from Excel", () => {
+    render(<Harness initial={`${sheetTag("")}\n`} />);
+
+    expect(screen.queryByRole("button", { name: "Re-import" })).toBeNull();
   });
 });

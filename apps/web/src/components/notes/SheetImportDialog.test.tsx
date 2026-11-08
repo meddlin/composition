@@ -171,6 +171,68 @@ describe("SheetImportDialog", () => {
   });
 });
 
+describe("SheetImportDialog: re-importing", () => {
+  const openReplacing = (replacing: React.ComponentProps<typeof SheetImportDialog>["replacing"], loadWorkbook = vi.fn().mockResolvedValue(BOOK)) => {
+    const onImported = vi.fn();
+    render(<SheetImportDialog open replacing={replacing} loadWorkbook={loadWorkbook} onClose={vi.fn()} onImported={onImported} />);
+    return { onImported };
+  };
+
+  it("says what it replaces, and goes back to the sheet and the range the sheet came from", async () => {
+    openReplacing({ file: "budget.xlsx", sheet: "Q3", range: "A1:C3", changed: false });
+
+    expect(screen.getByRole("heading", { name: "Re-import from Excel" })).toBeTruthy();
+    expect(screen.getByText("Replacing the sheet imported from budget.xlsx, sheet Q3, A1:C3.")).toBeTruthy();
+    choose(xlsx("budget.xlsx"));
+
+    await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>("Range").value).toBe("A1:C3"));
+    expect(screen.getByRole("status").textContent).toContain("by 3 columns");
+    expect(screen.queryByText(/This is /)).toBeNull();
+  });
+
+  it("does not warn about changes when there are none, and its button says it replaces the sheet", async () => {
+    openReplacing({ file: "budget.xlsx", sheet: "Q3", range: "A1:D3", changed: false });
+    choose(xlsx("budget.xlsx"));
+    await screen.findByLabelText("Range");
+
+    expect(screen.queryByText(/has been changed since it was imported/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Replace sheet" })).toBeTruthy();
+  });
+
+  it("warns that the sheet was changed, up front, and asks for the button that says what it throws away", async () => {
+    const { onImported } = openReplacing({ file: "budget.xlsx", sheet: "Q3", range: "A1:D3", changed: true });
+
+    expect(screen.getByRole("alert").textContent).toContain("has been changed since it was imported");
+    expect(screen.getByRole("alert").textContent).toContain("undo brings it back");
+    expect(screen.queryByRole("button", { name: "Replace sheet" })).toBeNull();
+    choose(xlsx("budget.xlsx"));
+    await screen.findByLabelText("Range");
+
+    fireEvent.click(screen.getByRole("button", { name: "Replace my changes" }));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalledTimes(1));
+    expect(onImported.mock.calls[0][0]).toMatchObject({ file: "budget.xlsx", sheet: "Q3", range: "A1:D3" });
+  });
+
+  it("says when the file is not the one the sheet came from", async () => {
+    openReplacing({ file: "budget.xlsx", sheet: "Q3", range: "A1:D3", changed: false });
+
+    choose(xlsx("other.xlsx"));
+
+    expect(await screen.findByText("This is other.xlsx, and the sheet came from budget.xlsx.")).toBeTruthy();
+  });
+
+  it("says when the file has no such sheet, and shows its first", async () => {
+    openReplacing({ file: "budget.xlsx", sheet: "Q4", range: "A1:D3", changed: false });
+
+    choose(xlsx("budget.xlsx"));
+
+    expect(await screen.findByText("This file has no sheet called Q4, so the first one is shown.")).toBeTruthy();
+    expect(screen.getByLabelText<HTMLSelectElement>("Sheet").value).toBe("Q3");
+    expect(screen.getByLabelText<HTMLInputElement>("Range").value).toBe("A1:D3");
+  });
+});
+
 describe("describeImport", () => {
   const summary = { rows: 40, columns: 6, formulas: 0, calculated: 0, carried: 0, values: 0, unchecked: 0, carriedWhy: [], valuesWhy: [] };
 

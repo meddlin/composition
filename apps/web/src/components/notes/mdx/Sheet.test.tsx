@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { SheetEditContext } from "../SheetEdit";
 import { Sheet, blockText, formulasText } from "./Sheet";
 
 const fence = (language: string, text: string) => (
@@ -292,5 +293,56 @@ describe("Sheet", () => {
 
       expect(screen.getByRole("rowheader", { name: "5001" })).toBeTruthy();
     });
+  });
+});
+
+describe("Sheet: Export and Re-import", () => {
+  const body = <>{fence("csv", "Item,Qty\nPens,12")}</>;
+  const context = { edit: vi.fn(), reimport: vi.fn() };
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("has an Export button on every sheet, which opens the export dialog", () => {
+    render(<Sheet title="Q3">{body}</Sheet>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Export…" }));
+
+    expect(screen.getByRole("heading", { name: "Export sheet" })).toBeTruthy();
+    expect(screen.getByRole("dialog").textContent).toContain("2 rows (the first is the header) by 2 columns");
+  });
+
+  it("has no Edit or Re-import button where the note cannot be changed", () => {
+    render(<Sheet source="budget.xlsx" sheet="Q3" range="A1:B2">{body}</Sheet>);
+
+    expect(screen.queryByRole("button", { name: "Edit sheet" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Re-import" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Export…" })).toBeTruthy();
+  });
+
+  it("has a Re-import button on a sheet that says where it came from, and not on one that does not", () => {
+    const node = { position: { start: { offset: 42 } } };
+    const { unmount } = render(
+      <SheetEditContext.Provider value={context}>
+        <Sheet source="budget.xlsx" sheet="Q3" range="A1:B2" node={node}>
+          {body}
+        </Sheet>
+      </SheetEditContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Re-import" }));
+    expect(context.reimport).toHaveBeenCalledWith(42);
+    fireEvent.click(screen.getByRole("button", { name: "Edit sheet" }));
+    expect(context.edit).toHaveBeenCalledWith(42);
+    unmount();
+
+    render(
+      <SheetEditContext.Provider value={context}>
+        <Sheet source="budget.xlsx" node={node}>
+          {body}
+        </Sheet>
+      </SheetEditContext.Provider>,
+    );
+    expect(screen.queryByRole("button", { name: "Re-import" })).toBeNull();
   });
 });

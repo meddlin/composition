@@ -10,8 +10,13 @@ import { type SheetSource } from "./mdx/sheetDraft";
 /** What an import gives the note: the sheet's two blocks and where they came from (see `<Sheet source sheet range imported>`). */
 export type ImportedSheet = { source: SheetSource; file: string; sheet: string; range: string; imported: string };
 
+/** What a re-import is replacing: where the sheet came from (its tag), and whether it has been changed since. */
+export type Replacing = { file?: string; sheet?: string; range?: string; changed: boolean };
+
 type Props = {
   open: boolean;
+  /** Set to re-import into a sheet that is already in the note, rather than put a new one in. */
+  replacing?: Replacing;
   /** Turns the bytes of a file into a workbook (it is loaded when something is imported, not with the note). */
   loadWorkbook: (bytes: Uint8Array) => Promise<Workbook>;
   /** Closed without importing. */
@@ -49,7 +54,7 @@ export function SheetImportDialog({ open, ...props }: Props) {
   return open ? <ImportSession {...props} /> : null;
 }
 
-function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open">) {
+function ImportSession({ loadWorkbook, replacing, onClose, onImported }: Omit<Props, "open">) {
   const picker = useRef<HTMLInputElement>(null);
   const [chosen, setChosen] = useState<Chosen | null>(null);
   const [reading, setReading] = useState(false);
@@ -58,9 +63,12 @@ function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open"
   // What is in the box, and the range it was last settled on (a range is read when it is finished, not with each key).
   const [typed, setTyped] = useState("");
   const [range, setRange] = useState("");
+  // What a re-import found different from the sheet it replaces: another file, or a sheet the file does not have.
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function choose(file: File) {
     setProblem(null);
+    setNotice(null);
     if (file.size > MAX_WORKBOOK_BYTES) {
       setProblem(`That file is ${(file.size / (1024 * 1024)).toFixed(0)} MB, and a workbook is read whole: ${MAX_WORKBOOK_BYTES / (1024 * 1024)} MB is the most.`);
       return;
@@ -70,10 +78,16 @@ function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open"
       const workbook = await loadWorkbook(new Uint8Array(await file.arrayBuffer()));
       const first = workbook.sheets[0];
       if (!first) throw new Error("It has no sheets.");
+      // A re-import goes back to the sheet and range it came from, if the file still has that sheet.
+      const again = replacing?.sheet ? workbook.sheets.find((sheet) => sheet.name === replacing.sheet) : undefined;
+      const chosenSheet = again ?? first;
+      const chosenRange = again && replacing?.range ? replacing.range : chosenSheet.used;
+      if (replacing?.sheet && !again) setNotice(`This file has no sheet called ${replacing.sheet}, so the first one is shown.`);
+      else if (replacing?.file && replacing.file !== file.name) setNotice(`This is ${file.name}, and the sheet came from ${replacing.file}.`);
       setChosen({ file: file.name, workbook });
-      setSheetName(first.name);
-      setTyped(first.used);
-      setRange(first.used);
+      setSheetName(chosenSheet.name);
+      setTyped(chosenRange);
+      setRange(chosenRange);
     } catch (reason) {
       setChosen(null);
       setProblem(`${file.name} could not be read as an Excel workbook${reason instanceof Error && reason.message ? `: ${reason.message}` : "."}`);
@@ -110,13 +124,28 @@ function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open"
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import from Excel</DialogTitle>
+          <DialogTitle>{replacing ? "Re-import from Excel" : "Import from Excel"}</DialogTitle>
           <DialogDescription>
-            Bring a range of an Excel workbook into the note as a sheet. It comes as the values Excel showed; its formulas are kept where they can be trusted.
+            {replacing
+              ? "Read the range of the workbook again and replace this sheet with it, so it has what Excel has now."
+              : "Bring a range of an Excel workbook into the note as a sheet. It comes as the values Excel showed; its formulas are kept where they can be trusted."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
+          {replacing && (
+            <p className="text-sm text-muted-foreground">
+              Replacing the sheet imported from {replacing.file || "a workbook"}
+              {replacing.sheet ? `, sheet ${replacing.sheet}` : ""}
+              {replacing.range ? `, ${replacing.range}` : ""}.
+            </p>
+          )}
+          {replacing?.changed && (
+            <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+              This sheet has been changed since it was imported, or was not imported here. Re-importing replaces it with what is in the workbook, and what was changed or added in
+              the sheet is lost (undo brings it back).
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={reading} onClick={() => picker.current?.click()}>
               <FileSpreadsheetIcon />
@@ -143,6 +172,7 @@ function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open"
               {problem}
             </p>
           )}
+          {notice && <p className="text-sm text-muted-foreground">{notice}</p>}
 
           {chosen && (
             <>
@@ -204,7 +234,7 @@ function ImportSession({ loadWorkbook, onClose, onImported }: Omit<Props, "open"
             Cancel
           </Button>
           <Button size="sm" onClick={() => void insert()} disabled={!outcome?.ok}>
-            Insert sheet
+            {replacing ? (replacing.changed ? "Replace my changes" : "Replace sheet") : "Insert sheet"}
           </Button>
         </div>
       </DialogContent>

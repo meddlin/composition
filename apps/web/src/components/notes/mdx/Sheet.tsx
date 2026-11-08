@@ -1,7 +1,8 @@
-import { PencilIcon } from "lucide-react";
+import { DownloadIcon, PencilIcon, RefreshCwIcon } from "lucide-react";
 import { Children, isValidElement, useContext, useMemo, useState, type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { SheetEditContext } from "../SheetEdit";
+import { SheetExportDialog } from "../SheetExportDialog";
 import { textOf } from "./Chart";
 import { SHEET_LARGE_CHARS, columnLabel, columnWidths, isErrorValue, isNumberCell, parseFormulas, parseSheet, viewportHeight } from "./sheetData";
 import { calculate } from "./sheetFormula";
@@ -51,6 +52,20 @@ const notice = (text: string) => (
     {text}
   </span>
 );
+
+/** A small button over the corner of a sheet, there when it is pointed at or one of them has the keyboard. */
+function SheetTool({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="inline-flex items-center gap-1 rounded-md border bg-popover/95 px-2 py-1 text-xs text-popover-foreground shadow-sm focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
 
 const count = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 
@@ -110,6 +125,7 @@ export function Sheet({
   const calculated = useMemo(() => (parsed.sheet ? calculate(parsed.sheet, formulas.formulas, formulas.carried) : undefined), [parsed, formulas]);
   const widths = useMemo(() => (calculated ? columnWidths(calculated.sheet) : []), [calculated]);
   const [scrollTop, setScrollTop] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const offset = node?.position?.start?.offset;
   if (!calculated) return notice(parsed.error ?? "");
 
@@ -170,16 +186,14 @@ export function Sheet({
   return (
     <figure className="group not-prose relative my-4">
       {caption ? <figcaption className="mb-2 text-sm font-semibold">{caption}</figcaption> : null}
-      {editing && offset !== undefined && (
-        <button
-          type="button"
-          onClick={() => editing.edit(offset)}
-          className="absolute top-1 right-2 z-30 inline-flex items-center gap-1 rounded-md border bg-popover/95 px-2 py-1 text-xs text-popover-foreground opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
-        >
-          <PencilIcon className="size-3" />
-          Edit sheet
-        </button>
-      )}
+      <div className="absolute top-1 right-2 z-30 flex gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        {editing && offset !== undefined && <SheetTool label="Edit sheet" icon={<PencilIcon className="size-3" />} onClick={() => editing.edit(offset)} />}
+        {editing && offset !== undefined && source?.trim() && sheetName?.trim() && range?.trim() && (
+          <SheetTool label="Re-import" icon={<RefreshCwIcon className="size-3" />} onClick={() => editing.reimport(offset)} />
+        )}
+        <SheetTool label="Export…" icon={<DownloadIcon className="size-3" />} onClick={() => setExporting(true)} />
+      </div>
+      {exporting && <SheetExportDialog open source={{ csv, formulas: formulaSource }} title={title} from={source} onClose={() => setExporting(false)} />}
       <div
         role="region"
         aria-label={`${caption || "Sheet"}: ${count(bodyRows, "row")} by ${count(columns, "column")}`}

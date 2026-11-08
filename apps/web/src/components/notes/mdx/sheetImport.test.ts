@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { type SourceCell, type SourceRange, importRange, importedHash, parseRange, rangeText } from "./sheetImport";
 import { parseFormulas, parseSheet } from "./sheetData";
 import { calculate } from "./sheetFormula";
+import { draftFromSource, draftToSource } from "./sheetDraft";
 
 const v = (value: SourceCell["value"], extra: Partial<SourceCell> = {}): SourceCell => ({ value, ...extra });
 const f = (formula: string, value: SourceCell["value"], extra: Partial<SourceCell> = {}): SourceCell => ({ formula, value, ...extra });
@@ -182,6 +183,23 @@ describe("importRange: formulas", () => {
     expect(sheet.rows[3]).toEqual(["Sum", "15", "", "30", ""]);
     expect(sheet.rows[1][4]).toBe("Pens");
     expect([...carried]).toEqual(["E2", "E3"]);
+  });
+});
+
+describe("an import, then the grid editor", () => {
+  it("is written back as it was by a save that changed nothing, so the sheet is not taken for one that was edited", async () => {
+    const { source } = imported(
+      range([
+        [v("Item"), v("Qty"), v("Price"), v("Total"), v("Found"), v("Due"), v("Share")],
+        [v("Pens"), v(12), v(1.5), f("B2*C2", 18), f("FILTER(A2:A3,TRUE)", "Pens"), v(46085, { kind: "date" }), f("D2/D$4", 18 / 30)],
+        [v("Paper"), v(3), v(4), f("B3*C3", 12), f("FILTER(A2:A3,TRUE)", "Pens"), v(46090, { kind: "date" }), f("D3/D$4", 12 / 30)],
+        [v("Sum"), f("SUM(B2:B3)", 15), null, f("SUM(D2:D3)", 30), null, null, null],
+      ]),
+    );
+    expect(source.formulas).toContain("carried");
+    const saved = draftToSource(draftFromSource(source.csv, source.formulas));
+    expect(saved).toEqual({ ok: true, source });
+    expect(await importedHash(saved.ok ? saved.source : source)).toBe(await importedHash(source));
   });
 });
 

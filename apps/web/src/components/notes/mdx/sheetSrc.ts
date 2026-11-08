@@ -127,13 +127,38 @@ function fenceBlock(language: string, content: string, keep?: Fence | null): str
 
 type Replacement = { from: number; to: number; text: string };
 
+/** The attributes of a `<Sheet …>` tag, as written: `name="value"` or `name='value'`. */
+export function sheetAttributes(tag: string): Record<string, string> {
+  const attributes: Record<string, string> = {};
+  for (const match of tag.matchAll(/\s([A-Za-z_][\w.-]*)=(?:"([^"]*)"|'([^']*)')/g)) attributes[match[1]] = match[2] ?? match[3] ?? "";
+  return attributes;
+}
+
+/** The tag with these attributes set: one it already has changes in place, a new one goes at the end, an empty one is taken off; the rest are left as they were. */
+function withAttributes(tag: string, attributes: Record<string, string>): string {
+  const seen = new Set<string>();
+  const changed = tag.replace(/(\s)([A-Za-z_][\w.-]*)=("[^"]*"|'[^']*')/g, (whole, space: string, name: string) => {
+    if (!(name in attributes)) return whole;
+    seen.add(name);
+    const value = attributeValue(attributes[name]);
+    return value === "" ? "" : `${space}${name}="${value}"`;
+  });
+  const added = Object.entries(attributes)
+    .filter(([name, value]) => !seen.has(name) && attributeValue(value) !== "")
+    .map(([name, value]) => ` ${name}="${attributeValue(value)}"`)
+    .join("");
+  return added === "" ? changed : changed.replace(/\s*(\/?>)$/, `${added}$1`);
+}
+
 /**
  * The note with the sheet at `span` holding `source`: its CSV block and its `formulas` block rewritten (the second
  * added when the sheet gets its first formula, taken out when it has none left), and the rest of the tag, its
- * attributes included, left as it was.
+ * attributes included, left as it was. `attributes`, when given, are set on the tag (an import's `source`, `sheet`,
+ * `range` and `imported`, which a re-import changes).
  */
-export function writeSheet(text: string, span: SheetSpan, source: SheetSource): string {
+export function writeSheet(text: string, span: SheetSpan, source: SheetSource, attributes?: Record<string, string>): string {
   const edits: Replacement[] = [];
+  if (attributes) edits.push({ from: span.start, to: span.openEnd, text: withAttributes(text.slice(span.start, span.openEnd), attributes) });
   // A block the sheet does not have yet goes after its CSV block (or the opening tag, if the CSV is missing too).
   let after = span.openEnd;
   let added = "";
