@@ -158,3 +158,5 @@ and [panel-system-research.md](panel-system-research.md) for the pop-out spike a
 See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
 
 See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Design only; nothing is built.
+
+See [linux-native-app-design.md](linux-native-app-design.md) for the design of a native Linux app (Rust, GTK 4 and libadwaita, GNOME first): the architecture, a tracker of which features port, the compromises, the decisions made and still open, what the spikes in `apps/linux/spikes/` showed, and what could not be verified without a real GNOME desktop. Design and spikes only; no production code.
