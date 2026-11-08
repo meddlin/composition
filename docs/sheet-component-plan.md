@@ -603,7 +603,7 @@ features. **Gate G.**
   CSV home.
 - **Writing edits back into the original workbook**, with its other sheets, styles and pivots intact (level 3 of
   [Toward Excel-compatible formulas](#toward-excel-compatible-formulas)).
-- **The iPad's drawing** (S14).
+- **The iPad's drawing** (S14). The iPad's `<` list and prop completions do carry `<Sheet>` (`MdxCompletions.swift`, `MdxProps.swift`), since the iPad core's conformance job (`ios-core.yml`) checks them against the desktop's catalog; the preview does not draw it.
 
 ## Why not a stored `.xlsx`
 
