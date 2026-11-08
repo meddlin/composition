@@ -1,0 +1,14 @@
+# Spike S8: the Live tab on GTK. A GtkSourceView whose Markdown marks are hidden away from the caret, headings drawn large, pictures
+# and rules drawn as overlays, tried with real keystrokes, an input method and a 5,000-line note. Not part of any workspace, not built
+# by CI (see ../README.md).
+[package]
+name = "composition-live-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+sourceview5 = "0.11"
+serde_json = "1"

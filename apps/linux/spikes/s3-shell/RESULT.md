@@ -61,8 +61,7 @@ A caution from writing it: `GtkTextIter::forward_to_line_end` on an **empty** li
 hid the wrong paragraph's marks because of that (fixed: `ends_line()` first). A real Live editor needs a test for it.
 
 **Reading.** On this evidence the GTK mechanism is cheaper and lower-risk than the iPad's, but the part that was easy (hiding) is not the
-part that was hard on the iPad (caret, selection and IME while characters come and go). Treat the Live tab as **Later**, with a spike
-(S8) before it is promised.
+part that was hard on the iPad (caret, selection and IME while characters come and go). Treat the Live tab as **Later**. S8 ([../s8-live/RESULT.md](../s8-live/RESULT.md)) then tried the harder half: keys, copy, undo, an input method and a 5,000-line note.
 
 ## Things the spike got wrong or left rough
 

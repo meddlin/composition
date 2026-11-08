@@ -11,6 +11,7 @@ passes Gate A. Dates are 2026-11-07. Rust 1.97.1.
 | **S3** | Does a libadwaita app over the core build and run on Ubuntu 24.04? | [`s3-shell/`](s3-shell/) | [RESULT.md](s3-shell/RESULT.md): yes, in a container |
 | **S4** | The editor widget: IME, accessibility | `s3-shell/` | same note: GtkSourceView; AT-SPI text interface present; IBus Hangul composes (X11) |
 | **S4b** | Can the Live tab's hidden marks be done with `invisible` text tags? | [`s3-shell/src/bin/live_marks.rs`](s3-shell/src/bin/live_marks.rs) | same note: the mechanism works; caret, selection and copy over hidden text not tried |
+| **S8** | Is the Live tab viable on GTK: keys, copy, undo, input method, a 5,000-line note? | [`s8-live/`](s8-live/) | [RESULT.md](s8-live/RESULT.md): the mechanism and the typing cost are fine (0.05 ms per caret move); `End` and Left at a construct's edge differ from the web; overlay pictures and rules were wrong in a long note. Stays out of v1 |
 | **S5** | Can the desktop's own preview run standalone in WebKitGTK? | [`s5-preview/`](s5-preview/) | [RESULT.md](s5-preview/RESULT.md): yes, with the WebKit sandbox disabled in a throwaway container; sandbox-on unverified |
 | **S6** | What must a package carry, and what does it cost in memory? | [`container/`](container/) | [RESULT.md](container/RESULT.md): 232 MB of libraries; 329 to 452 MB PSS with the preview on (no saving shown) |
 | **S9** | Can Rust bundle and drive Meilisearch exactly as the desktop does (decided D5)? | [`s9-meili/`](s9-meili/) | [RESULT.md](s9-meili/RESULT.md): yes. 274 of 274 committed answers identical over both corpora, on Linux arm64 and macOS; hard kill and restart; the sidecar dies 54 ms after the app is killed; the Linux arm64 pin verified |
@@ -28,6 +29,7 @@ docker build --platform linux/arm64 -t composition-linux-spike:24.04 apps/linux/
 
 - **S1, S2** (needs a checkout of the iPad branch for the shared corpus; see `s1-core/run.sh`): `IPAD_TREE=<checkout> apps/linux/spikes/s1-core/run.sh`
 - **S9**: `MEILISEARCH_BIN=<the pinned v1.53.1 binary for your platform> COMPOSITION_CONFORMANCE_DIR=<the generator's output, as for S1> cargo test --release -- --test-threads=1 --nocapture` in `s9-meili/`; on Linux run it in the container with `docker run --init` (a zombie otherwise looks alive to the kill tests)
+- **S8**: build `s8-live` in the container, then `container/xvfb-run.sh python3 container/live_drive.py [arrows|selection|edits|ime|visuals|big|bigshot]` (needs `composition-linux-spike:24.04`, a data folder with `app_data/demo-photo-0123456789ab.png` at `/data`, and `/shots` to write to)
 - **S5**: `apps/linux/spikes/s5-preview/build.sh` (needs `pnpm --dir apps/web install` first), then `verify.sh <note.md>`
 - **S3**: build in the container with `cargo build --release` in `s3-shell/`; run through `container/xvfb-run.sh` (see the commands in
   `s3-shell/RESULT.md`, and `container/*.sh` for the AT-SPI, IME and footprint runs)
