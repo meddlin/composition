@@ -136,6 +136,9 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     private var selectionSamples: [Double] = []
     /// How many times the putting-on of a full read has run to its end.
     private(set) var finishedPasses = 0
+    /// How many full passes have started, and how many of them were stopped while putting colours on (the long-note check reads both).
+    private(set) var passesStarted = 0
+    private(set) var passesInterrupted = 0
 
     private var restylePending = false
     private var lastCaretParagraph = NSRange(location: 0, length: 0)
@@ -144,8 +147,13 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     private var model: HighlightModel?
     private var pendingEdits = EditAccumulator()
     private var version = 0
+    /// The pause's pass, while it is waiting to start (nil once it has started).
     private var idlePass: DispatchWorkItem?
     private var sliceGeneration = 0
+    /// A full pass is under way, and only one is at a time (see `MarkdownStyler.passRunning`): one that began putting colours on while another still was stopped it, and the one
+    /// it stopped started another, for ever, on a note of about 400,000 characters.
+    private var passRunning = false
+    private var passDue = false
     /// What the speed test (and anything else that wants numbers) can read: how long each keystroke's own work took, in milliseconds.
     private(set) var editSamples: [Double] = []
     /// Developer switch for comparing: `-labLegacyColouring 1` colours the whole note after every edit, as the lab did before Step 5.
@@ -276,6 +284,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         model = nil
         pendingEdits = EditAccumulator()
         version += 1
+        sliceGeneration += 1  // a pass that is putting colours on stops: the text it was made for is gone
         refreshCounts()
         if hideMode == .substitute { restyle(force: true) } else { scheduleFullPass(after: 0) }
     }
@@ -547,8 +556,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         // Two rounds of the three variants, so that a variant is not charged for being first (the first round warms everything up); the second is the one to read.
         // `-labLiveVariant 0|1|2` and `-labLiveRounds n` run one variant, for the notes so long that switching between variants in one process makes the passes
         // interrupt each other (a launch per variant then).
-        let only = UserDefaults.standard.object(forKey: "labLiveVariant") as? Int
-        let rounds = UserDefaults.standard.object(forKey: "labLiveRounds") as? Int ?? 2
+        let only = UserDefaults.standard.string(forKey: "labLiveVariant").flatMap { Int($0) }  // launch arguments arrive as text, so `object(forKey:) as? Int` is nil
+        let rounds = UserDefaults.standard.string(forKey: "labLiveRounds").flatMap { Int($0) } ?? 2
         for round in 1...rounds {
             for (index, (name, hide, reveal)) in variants.enumerated() where only == nil || only == index {
                 var result = await liveVariant(name, hide, reveal, text)
@@ -684,8 +693,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         // 4. A whole synchronous restyle (what a change of look does), and the layout of the whole note.
         let restyled = timed { restyle(force: true) }
         let parse = stats.parseMilliseconds, apply = stats.applyMilliseconds
-        // No full pass is scheduled after this one: on a note of about 400,000 characters a pass takes longer than the 0.3 s after which an interrupted pass schedules
-        // another, and two passes then interrupt each other for good (found by this test; see docs/ipad-live-view-plan.md, L7).
+        // No full pass is scheduled after this one, so that the whole layout below is measured on its own. (On a note of about 400,000 characters the passes used to
+        // interrupt each other for good once one started while another was putting colours on: see `runSettleCheck` and docs/ipad-live-view-plan.md, L7.)
         let wholeLayoutStart = clock.now
         textView.textLayoutManager.map { $0.ensureLayout(for: $0.documentRange) }
         let wholeLayout = ms(clock.now - wholeLayoutStart)
@@ -699,6 +708,77 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             "synchronousRestyle": ["totalMs": restyled.op, "parseMs": parse, "applyMs": apply],
             "wholeLayoutMs": wholeLayout, "fallbackEdits": stats.fallbackEdits, "incrementalEdits": stats.incrementalEdits,
         ]
+    }
+
+    // MARK: Long notes: does the colouring settle?
+
+    /// Nothing is reading or putting colours on, no pass is waiting to start or due, and the colours on the text come from a model.
+    var coloursAreSettled: Bool { model != nil && !passRunning && !passDue && idlePass == nil }
+
+    /// Waits until the colouring has been settled for `quiet`, or `limit` has passed; true when it settled.
+    private func waitForSettle(quiet: Duration = .milliseconds(700), limit: Duration) async -> Bool {
+        let started = clock.now
+        var since: ContinuousClock.Instant?
+        while clock.now - started < limit {
+            if coloursAreSettled {
+                since = since ?? clock.now
+                if clock.now - since! >= quiet { return true }
+            } else {
+                since = nil
+            }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return false
+    }
+
+    /// The check that the background colouring settles on a long note (docs/ipad-live-view-plan.md, L7). The note is opened, and as soon as the first colours go on a second pass
+    /// is asked for, as a look change, a caret move or another window's edit does: it must wait, the colours of the first must go on to the end, and nothing may be stopped
+    /// (nothing was typed, so nothing has a reason to stop). Then 60 letters are typed, and every one must be coloured as an edit, not by reading the whole note again. On a
+    /// 20,000-line note (404,540 characters) the passes used to stop each other for ever. The result is the HUD's text (and `lab-settle.json` in the app's tmp folder).
+    func runSettleCheck(lines: Int, limit: Duration = .seconds(12)) async -> String {
+        let text = LabText.big(lines: lines)
+        let begun = clock.now
+        let passesBefore = passesStarted, interruptedBefore = passesInterrupted
+        load(text)
+        stats.sliceTotalMilliseconds = 0
+        while stats.sliceTotalMilliseconds == 0, clock.now - begun < .seconds(10) { try? await Task.sleep(for: .milliseconds(2)) }  // the first colours are going on
+        // Another pass is asked for, five times over (the lab asks for one at every caret move while it has no model): a pass that read the note meanwhile must not start
+        // putting colours on until the first has done.
+        for _ in 0..<5 {
+            scheduleFullPass(after: 0)
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let opened = await waitForSettle(limit: limit)
+        let openedMs = ms(clock.now - begun)
+        let stopped = passesInterrupted - interruptedBefore
+        var typed = false
+        var quick = 0, fallback = 0
+        if opened {
+            textView.becomeFirstResponder()
+            let whole = (textView.text ?? "") as NSString
+            textView.selectedRange = NSRange(location: whole.paragraphRange(for: NSRange(location: whole.length / 2, length: 0)).location, length: 0)
+            let quickBefore = stats.incrementalEdits, fallbackBefore = stats.fallbackEdits
+            let phrase = Array("Typing in the middle of a long note.")
+            for index in 0..<60 {
+                textView.insertText(String(phrase[index % phrase.count]))
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            typed = await waitForSettle(limit: limit)
+            quick = stats.incrementalEdits - quickBefore
+            fallback = stats.fallbackEdits - fallbackBefore
+        }
+        let passes = passesStarted - passesBefore
+        let settled = opened && typed && stopped == 0
+        let report = settled
+            ? String(format: "Settle check (%d lines, %d characters): SETTLED after %.0f ms · %d passes, %d stopped · typing: %d quick edits, %d not", lines, stats.characters, openedMs, passes, stopped, quick, fallback)
+            : String(format: "Settle check (%d lines, %d characters): DID NOT SETTLE (%@) · %d passes, %d stopped · typing: %d quick edits, %d not", lines, stats.characters, !opened ? "the colouring did not come to rest after the note was opened" : stopped > 0 ? "a pass stopped another" : "the colouring did not come to rest after typing", passes, stopped, quick, fallback)
+        let result: [String: Any] = [
+            "settled": settled, "lines": lines, "characters": stats.characters, "openedMs": openedMs, "passes": passes, "stopped": stopped,
+            "typingQuickEdits": quick, "typingFallbackEdits": fallback, "modelReady": model != nil, "build": _isDebugAssertConfiguration() ? "Debug" : "Release",
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lab-settle.json"))
+        return report
     }
 
     // MARK: Colouring only what was typed
@@ -768,13 +848,16 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     /// differs (all of it, when the note has just been loaded).
     private func scheduleFullPass(after delay: TimeInterval) {
         idlePass?.cancel()
-        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.runFullPass() } }
+        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.idlePass = nil; self?.runFullPass() } }
         idlePass = item
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     private func runFullPass() {
         guard textView.markedTextRange == nil else { return scheduleFullPass(after: 0.3) }  // a composition is under way
+        guard !passRunning else { passDue = true; return }
+        passRunning = true
+        passesStarted += 1
         pendingEdits = EditAccumulator()
         let snapshot = textView.text ?? ""
         let seen = version
@@ -786,7 +869,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, self.version == seen else { return }  // typed again meanwhile: the next pause reads it again
+                    guard let self else { return }
+                    guard self.version == seen else { return self.endPass() }  // typed again meanwhile: the next pause reads it again
                     self.stats.fullReadMilliseconds = self.ms(spent)
                     self.beginPuttingOn(fresh, dirty: dirty, hadModel: known != nil)
                 }
@@ -797,7 +881,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     /// Puts the colours on in small steps, so that the main thread is never held for more than a fraction of a frame; typing stops it.
     private func beginPuttingOn(_ fresh: HighlightModel, dirty: [NSRange], hadModel: Bool) {
         let storage = textView.textStorage
-        guard fresh.length == storage.length else { return scheduleFullPass(after: 0.3) }
+        guard fresh.length == storage.length else { endPass(); return scheduleFullPass(after: 0.3) }
         let ns = storage.mutableString
         var pieces: [NSRange] = []
         for range in dirty {
@@ -826,11 +910,21 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     private static let sliceLength = 3_000
 
+    /// The pass that was running is over, however it ended; the one that was asked for meanwhile, if there is one and nothing is waiting to start already, starts now.
+    private func endPass() {
+        passRunning = false
+        guard passDue else { return }
+        passDue = false
+        if idlePass == nil { scheduleFullPass(after: 0) }
+    }
+
     private func putOn(_ pieces: [NSRange], from index: Int, using fresh: HighlightModel, generation: Int) {
-        guard index < pieces.count else { finishedPasses += 1; return }
+        guard index < pieces.count else { finishedPasses += 1; return endPass() }
         guard generation == sliceGeneration, textView.markedTextRange == nil else {
+            passesInterrupted += 1
             // Interrupted: what is on the text is now partly the old colours, so the next full pass starts from nothing.
             model = nil
+            endPass()
             return scheduleFullPass(after: 0.3)
         }
         let started = clock.now

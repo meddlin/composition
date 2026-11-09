@@ -30,7 +30,11 @@ struct EditorLabView: View {
         }
         .task {
             // Developer shortcut: `-labBenchmark 1` opens the 5,000-line note with views, types into it, and writes lab-benchmark.json.
-            if UserDefaults.standard.integer(forKey: "labLiveBenchmark") > 0 {
+            if UserDefaults.standard.integer(forKey: "labSettle") > 0 {
+                // Developer shortcut: `-labSettle 20000` checks that the background colouring settles on a note of that many lines (see `runSettleCheck`).
+                try? await Task.sleep(for: .seconds(1))
+                benchmark = await lab.runSettleCheck(lines: UserDefaults.standard.integer(forKey: "labSettle"))
+            } else if UserDefaults.standard.integer(forKey: "labLiveBenchmark") > 0 {
                 // Developer shortcut: `-labLiveBenchmark 5000` runs the Live look's speed test (spike L7) on a note of that many lines.
                 try? await Task.sleep(for: .seconds(2))
                 benchmark = await lab.runLiveBenchmark(lines: UserDefaults.standard.integer(forKey: "labLiveBenchmark"))
@@ -117,7 +121,7 @@ struct EditorLabView: View {
             Text(String(format: "colour per edit: last %.2f ms · worst %.2f ms · re-read %d characters · %d quick, %d not", s.lastEditMilliseconds, s.worstEditMilliseconds, s.rereadCharacters, s.incrementalEdits, s.fallbackEdits))
             Text(String(format: "full read: %.0f ms off the main thread · put on in steps: worst %.1f ms, all %.0f ms · corrections %d (%d characters last)", s.fullReadMilliseconds, s.worstSliceMilliseconds, s.sliceTotalMilliseconds, s.corrections, s.lastCorrectionCharacters)
                 + (s.fullLayoutMilliseconds.map { String(format: " · whole layout %.0f ms", $0) } ?? ""))
-            if let benchmark { Text(benchmark) }
+            if let benchmark { Text(benchmark).accessibilityIdentifier("lab-benchmark") }
             if lab.tracksSelection { Text(s.selection).accessibilityIdentifier("lab-selection") }
         }
         .font(.caption.monospacedDigit())
