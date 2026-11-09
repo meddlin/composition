@@ -54,33 +54,14 @@ public enum MarkdownHighlighter {
 
     private struct Builder: MarkupWalker {
         let text: String
-        /// Where each line starts, in UTF-8 bytes.
-        private var lineStarts: [Int] = [0]
-        private let utf8: [UInt8]
+        private let map: SourceMap
         /// The text as UTF-16 units, which is what the ranges are in.
-        private let chars: [UInt16]
-        /// UTF-8 byte offset to UTF-16 offset, or nil when the text is ASCII (they are then the same).
-        private var utf16At: [Int32]?
+        private var chars: [UInt16] { map.chars }
         private var spans: [HighlightSpan] = []
 
         init(text: String) {
             self.text = text
-            utf8 = Array(text.utf8)
-            chars = Array(text.utf16)
-            for (index, byte) in utf8.enumerated() where byte == 0x0A { lineStarts.append(index + 1) }
-            if utf8.count != text.utf16.count {
-                var map = [Int32](repeating: 0, count: utf8.count + 1)
-                var u8 = 0, u16 = 0
-                for scalar in text.unicodeScalars {
-                    let value = scalar.value
-                    let width8 = value < 0x80 ? 1 : value < 0x800 ? 2 : value < 0x10000 ? 3 : 4, width16 = value > 0xFFFF ? 2 : 1
-                    for step in 0..<width8 { map[u8 + step] = Int32(u16) }
-                    u8 += width8
-                    u16 += width16
-                }
-                map[utf8.count] = Int32(u16)
-                utf16At = map
-            }
+            map = SourceMap(text: text)
         }
 
         mutating func run(frontmatter allowed: Bool) -> [HighlightedBlock] {
@@ -91,7 +72,8 @@ public enum MarkdownHighlighter {
                 let head = String(text.unicodeScalars.prefix(end))
                 let whole = NSRange(location: 0, length: head.utf16.count)
                 blocks.append(HighlightedBlock(range: whole, spans: [HighlightSpan(range: whole, kind: .frontmatter)]))
-                let blank = String(head.map { $0 == "\n" ? "\n" : " " })
+                // Per scalar, not per character: a `\r\n` is one character, and blanking it would lose a line and shift every span below.
+                let blank = String(head.unicodeScalars.map { $0 == "\n" || $0 == "\r" ? Character($0) : " " })
                 source = blank + String(text.dropFirst(head.count))
             }
             for child in Document(parsing: source).children {
@@ -122,17 +104,7 @@ public enum MarkdownHighlighter {
 
         // MARK: Positions
 
-        private func offset(_ location: SourceLocation) -> Int {
-            let line = max(location.line - 1, 0)
-            let byte = min((line < lineStarts.count ? lineStarts[line] : utf8.count) + max(location.column - 1, 0), utf8.count)
-            return utf16At.map { Int($0[byte]) } ?? byte
-        }
-
-        private func range(of markup: any Markup) -> Range<Int>? {
-            guard let source = markup.range else { return nil }
-            let start = offset(source.lowerBound), end = offset(source.upperBound)
-            return start <= end ? start..<end : nil
-        }
+        private func range(of markup: any Markup) -> Range<Int>? { map.range(of: markup) }
 
         /// The range from `start` to `end`, or nil when they are the wrong way round. A child's range can lie outside its parent's for odd
         /// input (a quote that swallows a fence), and `Range` refuses to be made backwards.

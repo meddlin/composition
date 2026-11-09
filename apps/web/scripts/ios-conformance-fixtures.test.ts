@@ -4,7 +4,12 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
+import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ImageWidget } from "../src/components/notes/liveImages";
+import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
 
 /**
  * The desktop's side of the iPad app's conformance checks (docs/ipad-app-design.md, "Keeping two implementations honest";
@@ -52,6 +57,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
  *                                  imagesToMdx (imageToMdx.ts), and for the picker of stored images listImages (images.ts, over real
  *                                  folders), imageUsage (imageRefs.ts) and matchImages, usageLabel and formatSize (imagePicker.ts)
+ *   live-expected.json             docs/ipad-live-view-plan.md, step L2: the texts of apps/ios/conformance/live-cases.json, the notes of
+ *                                  mdx-notes.json and the preview showcase, each with the caret and selections tried on it, and what the
+ *                                  real liveDecorations (liveMarkdown.ts, on a real CodeMirror state with the Markdown language) hid,
+ *                                  showed, styled, drew and tinted for each: the Live view's model must agree
  *   organization-cases.json, organization-expected.json
  *                                  build plan Step 7: the pure rules behind the sidebar, run through the real navHistory.ts
  *                                  (record, back, forward), dropEdge.ts and groupListing.ts (buildGroupListing, groupPath)
@@ -954,6 +963,143 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     expect(expected.indents.filter((e) => e !== null).length).toBeGreaterThan(300);
     expect(expected.emphasis.filter((e) => e !== null).length).toBeGreaterThan(300);
   }, 120_000);
+
+  it("writes the Live view cases and what the real liveDecorations make of each", () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const conformance = path.resolve(__dirname, "../../ios/conformance");
+    const committed = JSON.parse(fs.readFileSync(path.join(conformance, "live-cases.json"), "utf8")) as { cases: { group: string; text: string }[] };
+    const mdx = JSON.parse(fs.readFileSync(path.join(conformance, "mdx-notes.json"), "utf8")) as { notes: { name: string; body: string }[] };
+    const showcase = fs.readFileSync(path.join(conformance, "preview-showcase/note.md"), "utf8");
+
+    // Past this many characters the desktop draws only what the syntax tree gives (no tints, no `<Image />`, no highlight tags).
+    const LIMIT = 100_000;
+    const filler = '# Heading\n\n**bold** <Mark color="green">tint</Mark> ![a](b.png) <Image src="c.png" /> *it* `code`\n\n';
+    const sized = (length: number) => filler.repeat(Math.ceil(length / filler.length)).slice(0, length);
+    const texts = [
+      ...committed.cases,
+      ...mdx.notes.map((note) => ({ group: `corpus:${note.name}`, text: note.body })),
+      { group: "corpus:showcase", text: showcase },
+      { group: "limit:at", text: sized(LIMIT) },
+      { group: "limit:over", text: sized(LIMIT + 1) },
+    ];
+
+    // A seeded generator, so that the same selections are tried every run (the Swift side reads them from the file).
+    let seed = 0x9e3779b9;
+    const random = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const selectionsFor = (text: string): [number, number][] => {
+      const length = text.length;
+      const picks: [number, number][] = [];
+      if (length <= 120) {
+        for (let at = 0; at <= length; at++) picks.push([at, at]);
+        for (let at = 0; at < length; at += 2) picks.push([at, at + 1]);
+        picks.push([0, length]);
+      } else {
+        picks.push([0, 0], [length, length], [0, length]);
+        const count = length > 20_000 ? 4 : 40;
+        for (let i = 0; i < count; i++) {
+          const at = Math.floor(random() * (length + 1));
+          picks.push([at, at]);
+        }
+        for (let i = 0; i < count / 2; i++) {
+          const at = Math.floor(random() * length);
+          picks.push([at, Math.min(length, at + 1 + Math.floor(random() * 12))]);
+        }
+      }
+      return picks;
+    };
+
+    const STYLES: Record<string, string> = { "cm-live-strong": "strong", "cm-live-emphasis": "emphasis", "cm-live-strike": "strike", "cm-live-code": "code" };
+    type Pair = [number, number];
+    const byValue = (a: unknown, b: unknown) => (JSON.stringify(a) < JSON.stringify(b) ? -1 : JSON.stringify(a) > JSON.stringify(b) ? 1 : 0);
+
+    // CodeMirror's document has one `\n` for every line break (a `\r\n` is read as one), so its offsets are not the text's where the text has
+    // `\r\n`. The iPad's text view keeps the `\r`, so the Swift model reads the raw text, and what the desktop says is mapped back to it:
+    // an offset at the end of a line is the one before the `\r`, which is where the line's text ends.
+    const rawOffsets = (raw: string): number[] => {
+      const map: number[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "\r" && raw[i + 1] === "\n") continue;
+        map.push(raw[i] === "\n" && raw[i - 1] === "\r" ? i - 1 : i);
+      }
+      map.push(raw.length);
+      return map;
+    };
+
+    function decorate(raw: string, from: number, to: number) {
+      const text = raw.replace(/\r\n?/g, "\n");
+      let state = EditorState.create({ doc: text, selection: EditorSelection.range(from, to), extensions: [markdown({ base: markdownLanguage })] });
+      // The state holds only the first screenful of a long text's tree; `ensureSyntaxTree` parses the rest, and an update moves it into the state.
+      ensureSyntaxTree(state, state.doc.length, 60_000);
+      state = state.update({}).state;
+      const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
+      const out = {
+        frontmatterLines: [] as number[],
+        headings: [] as Pair[],
+        rules: [] as number[],
+        styles: [] as [string, number, number][],
+        hidden: [] as Pair[],
+        shown: [] as Pair[],
+        pictures: [] as [number | null, number, string, string, string, string][],
+        tints: [] as [number, number, string][],
+      };
+      set.between(0, state.doc.length, (start, end, value) => {
+        const spec = value.spec as { class?: string; widget?: ImageWidget; attributes?: Record<string, string> };
+        const cls = spec.class ?? "";
+        if (spec.widget instanceof ImageWidget) {
+          const { src, alt, title, width } = spec.widget.spec;
+          // A picture drawn beside its text is a widget at the end of it; one drawn in place of it replaces the text.
+          out.pictures.push([start === end ? null : start, end, src, alt, title, width]);
+        } else if (cls.startsWith("cm-live-heading")) out.headings.push([start, Number(/cm-live-h([1-6])/.exec(cls)![1])]);
+        else if (cls === "cm-live-rule") out.rules.push(start);
+        else if (cls === "cm-live-frontmatter") out.frontmatterLines.push(start);
+        else if (cls === "cm-live-syntax") out.shown.push([start, end]);
+        else if (STYLES[cls]) out.styles.push([STYLES[cls], start, end]);
+        else if (cls === "md-mark") out.tints.push([start, end, spec.attributes!["data-color"]]);
+        else if (cls.startsWith("md-")) return; // the plain editor's colours (code, links, tags): the Markdown tab's, not part of this model
+        else if (value.point && start !== end) out.hidden.push([start, end]);
+      });
+      // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
+      const at = rawOffsets(raw);
+      out.frontmatterLines = out.frontmatterLines.map((n) => at[n]);
+      out.rules = out.rules.map((n) => at[n]);
+      out.headings = out.headings.map(([n, level]) => [at[n], level]);
+      out.hidden = out.hidden.map(([a, b]) => [at[a], at[b]]);
+      out.shown = out.shown.map(([a, b]) => [at[a], at[b]]);
+      out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
+      out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
+      out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
+      for (const list of Object.values(out)) (list as unknown[]).sort(byValue);
+      return out;
+    }
+
+    const states: { t: number; from: number; to: number }[] = [];
+    const expected: ReturnType<typeof decorate>[] = [];
+    texts.forEach(({ text }, t) => {
+      const at = rawOffsets(text);
+      for (const [from, to] of selectionsFor(text.replace(/\r\n?/g, "\n"))) {
+        states.push({ t, from: at[from], to: at[to] });
+        expected.push(decorate(text, from, to));
+      }
+    });
+    fs.writeFileSync(
+      path.join(outDir!, "live-expected.json"),
+      JSON.stringify({ limit: LIMIT, texts: texts.map(({ group, text }) => ({ group, text })), states, expected }),
+    );
+    expect(expected.length).toBeGreaterThan(5000);
+    // The check has teeth only if the desktop does something to the texts: bold is styled, headings drawn, a picture drawn, a tint put on.
+    const seen = (pick: (e: ReturnType<typeof decorate>) => unknown[]) => expected.some((e) => pick(e).length > 0);
+    expect(seen((e) => e.styles)).toBe(true);
+    expect(seen((e) => e.headings)).toBe(true);
+    expect(seen((e) => e.rules)).toBe(true);
+    expect(seen((e) => e.pictures)).toBe(true);
+    expect(seen((e) => e.tints)).toBe(true);
+    expect(seen((e) => e.frontmatterLines)).toBe(true);
+  }, 600_000);
 
   it("writes the colour schemes, <Mark> tints, fonts and chart colours the real globals.css, themes.ts, editorFonts.ts, previewFonts.ts and Chart.tsx hold", async () => {
     fs.mkdirSync(outDir!, { recursive: true });

@@ -49,6 +49,12 @@ struct Look: Equatable {
     var uiForeground: UIColor { theme.foreground.uiColor }
     var uiBrand: UIColor { theme.brand.uiColor }
     var uiMutedFill: UIColor { theme.foreground.uiColor(alpha: Theme.Share.muted) }
+    /// What a `<Mark color="…">` is tinted in this scheme (the five hues, at the strength the scheme gives them), behind its words.
+    func uiMarkTint(_ name: String?) -> UIColor { theme.markTint(name).uiColor }
+    /// A horizontal rule: the text colour at 35%, as the desktop's Live tab draws it (a hairline, `--border`, would be too faint to read as a rule).
+    var uiRule: UIColor { theme.foreground.uiColor(alpha: 0.35) }
+    /// The grey text of `mutedText`, for what the Live tab dims (the marks that show while the selection is in their construct).
+    var uiMutedText: UIColor { theme.foreground.uiColor(alpha: increasedContrast ? max(theme.mutedShare, 0.85) : theme.mutedShare) }
 }
 
 extension EnvironmentValues {
