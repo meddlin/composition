@@ -1,0 +1,92 @@
+{
+  "annotations": [
+    {
+      "name": "a highlight keeps its rectangles in order, rounded to a thousandth",
+      "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[100.12345, 50, 10, 70.9999]], "quote": "a line" },
+      "stored": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[10, 50, 100.123, 71]], "quote": "a line", "comment": "", "body": null, "groupUuid": null }
+    },
+    {
+      "name": "a comment becomes one line",
+      "input": { "page": 4, "kind": "underline", "color": "green", "rects": [[0, 0, 5, 5]], "comment": "  first \n second  " },
+      "stored": { "page": 4, "kind": "underline", "color": "green", "rects": [[0, 0, 5, 5]], "quote": "", "comment": "first second", "body": null, "groupUuid": null }
+    },
+    {
+      "name": "a strikethrough can have a rectangle per line, and is part of a selection when it has a group",
+      "input": { "page": 2, "kind": "strikethrough", "color": "pink", "rects": [[0, 0, 5, 5], [0, 6, 5, 11]], "groupUuid": "0123456789abcdef0123456789abcdef" },
+      "stored": { "page": 2, "kind": "strikethrough", "color": "pink", "rects": [[0, 0, 5, 5], [0, 6, 5, 11]], "quote": "", "comment": "", "body": null, "groupUuid": "0123456789abcdef0123456789abcdef" }
+    },
+    {
+      "name": "a rectangle may lie outside the page",
+      "input": { "page": 0, "kind": "highlight", "color": "blue", "rects": [[-50, -50, 900, 1200]] },
+      "stored": { "page": 0, "kind": "highlight", "color": "blue", "rects": [[-50, -50, 900, 1200]], "quote": "", "comment": "", "body": null, "groupUuid": null }
+    },
+    {
+      "name": "a text note has a box and text, and any lowercase color name",
+      "input": { "page": 1, "kind": "text", "color": "orange", "body": { "rect": [400, 160, 200, 100], "text": "Spike note", "fontSize": 12.0004 } },
+      "stored": { "page": 1, "kind": "text", "color": "orange", "rects": null, "quote": "", "comment": "", "body": { "rect": [200, 100, 400, 160], "text": "Spike note", "fontSize": 12 }, "groupUuid": null }
+    },
+    {
+      "name": "a text note needs no font size",
+      "input": { "page": 1, "kind": "text", "color": "yellow", "body": { "rect": [0, 0, 10, 10], "text": "" } },
+      "stored": { "page": 1, "kind": "text", "color": "yellow", "rects": null, "quote": "", "comment": "", "body": { "rect": [0, 0, 10, 10], "text": "" }, "groupUuid": null }
+    },
+    {
+      "name": "ink keeps its strokes exactly as given, whatever their shape",
+      "input": { "page": 3, "kind": "ink", "color": "ink-blue", "body": { "strokes": [[[1, 2], [3.5, 4]]], "extra": true } },
+      "stored": { "page": 3, "kind": "ink", "color": "ink-blue", "rects": null, "quote": "", "comment": "", "body": { "strokes": [[[1, 2], [3.5, 4]]], "extra": true }, "groupUuid": null }
+    },
+    {
+      "name": "ink may be an array",
+      "input": { "page": 3, "kind": "ink", "color": "black", "body": [[1, 2], [3, 4]] },
+      "stored": { "page": 3, "kind": "ink", "color": "black", "rects": null, "quote": "", "comment": "", "body": [[1, 2], [3, 4]], "groupUuid": null }
+    },
+    { "name": "a page is not negative", "input": { "page": -1, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]] }, "invalid": true },
+    { "name": "a page is a whole number", "input": { "page": 1.5, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]] }, "invalid": true },
+    { "name": "a kind is one of five", "input": { "page": 0, "kind": "squiggle", "color": "yellow", "rects": [[0, 0, 1, 1]] }, "invalid": true },
+    { "name": "a highlight is one of the five mark colors", "input": { "page": 0, "kind": "highlight", "color": "red", "rects": [[0, 0, 1, 1]] }, "invalid": true },
+    { "name": "a highlight needs rectangles", "input": { "page": 0, "kind": "highlight", "color": "yellow" }, "invalid": true },
+    { "name": "a highlight needs at least one rectangle", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [] }, "invalid": true },
+    { "name": "a rectangle is four numbers", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1]] }, "invalid": true },
+    { "name": "a rectangle's numbers are numbers", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, "1"]] }, "invalid": true },
+    { "name": "a rectangle has an area", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 0, 5]] }, "invalid": true },
+    { "name": "a rectangle has an area once rounded", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 0.0004, 5]] }, "invalid": true },
+    { "name": "a coordinate is not absurd", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 100000000, 5]] }, "invalid": true },
+    { "name": "a highlight has no body", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "body": {} }, "invalid": true },
+    { "name": "a group is a 32-character lowercase hex uuid", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "groupUuid": "ABC" }, "invalid": true },
+    { "name": "a comment is at most 500 characters", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "comment": { "$repeat": ["a", 501] } }, "invalid": true },
+    {
+      "name": "a comment of exactly 500 characters is fine",
+      "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "comment": { "$repeat": ["a", 500] } },
+      "stored": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "quote": "", "comment": { "$repeat": ["a", 500] }, "body": null, "groupUuid": null }
+    },
+    { "name": "a quote is text", "input": { "page": 0, "kind": "highlight", "color": "yellow", "rects": [[0, 0, 1, 1]], "quote": 5 }, "invalid": true },
+    { "name": "a text note needs a body", "input": { "page": 0, "kind": "text", "color": "yellow" }, "invalid": true },
+    { "name": "a text note has no rectangles", "input": { "page": 0, "kind": "text", "color": "yellow", "rects": [[0, 0, 1, 1]], "body": { "rect": [0, 0, 1, 1], "text": "x" } }, "invalid": true },
+    { "name": "a text note's body has its text", "input": { "page": 0, "kind": "text", "color": "yellow", "body": { "rect": [0, 0, 1, 1] } }, "invalid": true },
+    { "name": "a text note's body has its box", "input": { "page": 0, "kind": "text", "color": "yellow", "body": { "text": "x" } }, "invalid": true },
+    { "name": "a text note's font size is at least 1", "input": { "page": 0, "kind": "text", "color": "yellow", "body": { "rect": [0, 0, 1, 1], "text": "x", "fontSize": 0 } }, "invalid": true },
+    { "name": "a text note's font size is at most 200", "input": { "page": 0, "kind": "text", "color": "yellow", "body": { "rect": [0, 0, 1, 1], "text": "x", "fontSize": 201 } }, "invalid": true },
+    { "name": "a text note has no quote", "input": { "page": 0, "kind": "text", "color": "yellow", "quote": "q", "body": { "rect": [0, 0, 1, 1], "text": "x" } }, "invalid": true },
+    { "name": "ink needs strokes", "input": { "page": 0, "kind": "ink", "color": "black" }, "invalid": true },
+    { "name": "ink's strokes are not a bare value", "input": { "page": 0, "kind": "ink", "color": "black", "body": "strokes" }, "invalid": true },
+    { "name": "ink has no rectangles", "input": { "page": 0, "kind": "ink", "color": "black", "rects": [[0, 0, 1, 1]], "body": {} }, "invalid": true },
+    { "name": "ink has no quote", "input": { "page": 0, "kind": "ink", "color": "black", "quote": "q", "body": {} }, "invalid": true },
+    { "name": "ink is not part of a selection that crossed pages", "input": { "page": 0, "kind": "ink", "color": "black", "body": {}, "groupUuid": "0123456789abcdef0123456789abcdef" }, "invalid": true },
+    { "name": "ink's color is a lowercase name", "input": { "page": 0, "kind": "ink", "color": "Black", "body": {} }, "invalid": true }
+  ],
+  "bookmarkLabels": [
+    { "input": "", "stored": "" },
+    { "input": "  Chapter\n 2 ", "stored": "Chapter 2" },
+    { "input": { "$repeat": ["b", 200] }, "stored": { "$repeat": ["b", 200] } },
+    { "input": { "$repeat": ["b", 201] }, "invalid": true },
+    { "input": 5, "invalid": true }
+  ],
+  "viewStates": [
+    { "input": { "page": 12, "zoom": 1.25, "darkPages": true }, "stored": { "page": 12, "zoom": 1.25, "darkPages": true } },
+    { "input": { "page": 12.5, "zoom": 0.05, "darkPages": "yes", "scrollTop": 99 }, "stored": {} },
+    { "input": { "page": -1, "zoom": 9.9996 }, "stored": { "zoom": 10 } },
+    { "input": { "zoom": 10.01 }, "stored": {} },
+    { "input": null, "stored": {} },
+    { "input": "text", "stored": {} }
+  ]
+}

@@ -25,7 +25,9 @@ that database. Images pasted into a note in the web and desktop apps are the exc
 files in an `app_data/` folder beside the database, and the note's Markdown refers to them by path
 (see [images.md](images.md)). Files attached to a note in the desktop app are files in an
 `attachments/` folder, described by rows of an `attachments` table (see
-[attachments.md](attachments.md)). The Meilisearch data directory (`meili_data/`) and its
+[attachments.md](attachments.md)). A PDF a note owns is a file in a `documents/` folder, described
+by a `documents` row, with its marks and bookmarks in two more tables (see
+[the PDF tables](#the-pdf-tables)). The Meilisearch data directory (`meili_data/`) and its
 log and master-key files live alongside it. The search index is derived data, not a second source of
 truth for the notes.
 
@@ -54,6 +56,7 @@ managed artifact to the new folder, saves the new location, and reopens everythi
 | The search index, its log and its master key | `meili_data/`, `meili.log`, `meili_master_key` |
 | Pasted images | `app_data/` |
 | Attached files | `attachments/` |
+| PDFs | `documents/` |
 
 (The folder names come from the web app's own constants, and a test pins them, because a pasted
 image left behind is a broken link in every note that uses it.) If the destination already holds any
@@ -101,8 +104,8 @@ intact.
 
 ### Identity: the `uuid` column
 
-`notes`, `groups`, `notebooks`, `trashed_notes`, `trashed_groups` and `attachments` each carry a
-`uuid TEXT`: 128 random bits as 32 lowercase hex characters, the same for the life of the row. It is
+`notes`, `groups`, `notebooks`, `trashed_notes`, `trashed_groups`, `attachments`, `documents`,
+`pdf_annotations` and `pdf_bookmarks` each carry a `uuid TEXT`: 128 random bits as 32 lowercase hex characters, the same for the life of the row. It is
 the name a second device (the iPad app, a sync server) will know the row by; a per-device
 `AUTOINCREMENT` id would collide there. It was added ahead of both, as the one change the others need
 from the shared schema (the iPad app's design and the cross-device sync design, both still being
@@ -206,6 +209,76 @@ are separate tables rather than a flag on `notes` and `groups` so that an app th
 the Trash Can never lists a deleted note. The terminal app now has the Trash Can too, like web and
 desktop. It still never shows or adds **attachments**, but it leaves them alone: a note in the Trash
 Can keeps its attachments until it is permanently deleted.
+
+### The PDF tables
+
+A note can own one PDF (the [PDF reader plan](../pdf-markup-plan.md)). Three tables, created like
+every other table (`CREATE TABLE IF NOT EXISTS`, so an older build that opens the file ignores
+them), each with a `uuid`, its fill trigger and its unique index:
+
+```sql
+CREATE TABLE documents (          -- the PDF, one per owner note
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,     -- the owner note, live or in the Trash Can (unique index)
+    file_name TEXT NOT NULL,      -- the name it was imported as
+    stored_name TEXT NOT NULL,    -- the file's name in documents/
+    sha256 TEXT NOT NULL,         -- of the bytes: a second import of the same file is spotted by it
+    size INTEGER NOT NULL,
+    page_count INTEGER NOT NULL,  -- 0 until the reader has counted them
+    view_state TEXT,              -- JSON: reading position, zoom, dark pages
+    created_at TEXT NOT NULL,
+    uuid TEXT
+);
+CREATE TABLE pdf_annotations (    -- one mark on one page
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,        -- 0-based
+    kind TEXT NOT NULL,           -- highlight | underline | strikethrough | text | ink
+    color TEXT NOT NULL,          -- one of the five <Mark> names for a text mark
+    rects TEXT,                   -- JSON: the marked lines, in raw PDF user space
+    quote TEXT NOT NULL DEFAULT '',
+    comment TEXT NOT NULL DEFAULT '',
+    body TEXT,                    -- JSON: a text note's box and text; an ink page's strokes
+    group_uuid TEXT,              -- ties the per-page records of one selection that crossed pages
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    uuid TEXT
+);
+CREATE TABLE pdf_bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    uuid TEXT
+);
+```
+
+(Each table's `uuid TEXT` is added by `ALTER TABLE`, like every other table's, so the stored SQL
+ends with it; the conformance fixture holds the text exactly.) What the rows mean, in the code:
+
+- **Ownership.** `documents.note_id` points at a note in `notes` or `trashed_notes`, so a PDF follows
+  its note through the Trash Can the way an attachment does. A PDF is given only to a live note, and
+  a note owns at most one (`documentsRepo.addDocument`). Deleting a PDF deletes its marks and
+  bookmarks in one transaction; no foreign key is declared, for the reason the attachments table
+  gives. `documents.removeOrphans`, run beside the attachments' one after a permanent delete and
+  after the Trash Can's expiry sweep, deletes the PDFs, marks, bookmarks and stored files of notes
+  that are gone for good, and any marks whose PDF row is already gone.
+- **Marks** are checked before they are stored (`pdfMarkup.ts`): the kind and color, rectangles that
+  are four finite numbers with an area (put in order and rounded to a thousandth of a point), a
+  one-line comment of at most 500 characters, a text note's box and text, ink's strokes as JSON, and a
+  page that exists once the PDF's pages are counted. Every rectangle is in raw PDF user space (the
+  numbers a PDF's own `/Rect` uses), which pdf.js and PDFKit draw in the same place on rotated and
+  cropped pages. A selection across pages is one record per page sharing a `group_uuid`, and deleting
+  one deletes them all.
+- **Shared with the Swift core.** The tables and the rules above are pinned by the conformance
+  fixtures in [`fixtures/conformance/pdf`](../../fixtures/conformance/README.md), which the iPad's
+  core replays.
+
+Source: [`documentsRepo.ts`](../../apps/web/src/lib/composition/documentsRepo.ts),
+[`pdfMarkupRepo.ts`](../../apps/web/src/lib/composition/pdfMarkupRepo.ts),
+[`documents.ts`](../../apps/web/src/lib/composition/documents.ts),
+[`pdfMarkup.ts`](../../apps/web/src/lib/composition/pdfMarkup.ts).
 
 Favorites are not in the database. They are a list in the settings file, so a new column could not
 break an app that builds its models straight from `SELECT *` (see [groups.md](groups.md)).

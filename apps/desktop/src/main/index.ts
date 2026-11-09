@@ -1,11 +1,15 @@
 import dns from "node:dns/promises";
 import fs from "node:fs";
 import path from "node:path";
-import { app, BrowserWindow, dialog, ipcMain, screen, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, screen, session, shell, utilityProcess } from "electron";
 import { broadcastAppearance, notifyAppearanceChanges, notifyTranslucencyChange, type AppearanceMessage } from "./appearance";
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
+import { createDocumentsApi } from "./documents";
+import { runExport, workerPath } from "./exportProcess";
 import { installCliToolMenuItem } from "./cliToolMenu";
+import { requestImportPdf } from "./importPdfRequest";
+import { installImportPdfMenuItem } from "./importPdfMenu";
 import { installContextMenu } from "./contextMenu";
 import { installEmbedReferer } from "./embedReferer";
 import { closeDb, contactsService, defaultSharedLocationPath, feedsService, indexReportNotes, listNotes, loadWebSettings, panelsService, readingListService, runTodoCycle, searchIndex, service, todosService, type CompositionApi, type ThemeName } from "./backend";
@@ -112,6 +116,33 @@ const attachments = createAttachmentsApi(service, {
     return canceled || !filePath ? null : filePath;
   },
   reveal: (file) => shell.showItemInFolder(file),
+});
+
+// A PDF to import is chosen in a native dialog too; the page is only told which note and PDF came of it. Exporting one asks
+// for the file to save in a native dialog, and writes it in a utility process (exportProcess.ts).
+const documents = createDocumentsApi(service, {
+  async pickExportPath(defaultName) {
+    const options = { defaultPath: defaultName, filters: [{ name: "PDF", extensions: ["pdf"] }] };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePath } = parent
+      ? await dialog.showSaveDialog(parent, options)
+      : await dialog.showSaveDialog(options);
+    return canceled || !filePath ? null : filePath;
+  },
+  exportPdf: (job) =>
+    runExport(() => utilityProcess.fork(workerPath(__dirname), [], { serviceName: "Composition PDF export", stdio: "ignore" }), job),
+  dataFolder: () => loadWebSettings().appDataDir,
+  async pickPdf() {
+    const options = {
+      properties: ["openFile"] as "openFile"[],
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { canceled, filePaths } = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+    return canceled || filePaths.length === 0 ? null : filePaths[0];
+  },
 });
 
 // Where a backup is saved, and which one is restored, are also chosen in native dialogs.
@@ -234,8 +265,11 @@ const popouts = createPopoutManager({
   installReadingListGuard: attachReadingListGuard,
 });
 
+/** The window the app opened first: the one whose page holds the workspace, and answers File > Import PDF…. */
+let mainWindow: BrowserWindow | null = null;
+
 function openMainWindow(): BrowserWindow {
-  return createMainWindow({
+  const opened = createMainWindow({
     preloadPath: path.join(__dirname, "preload.js"),
     entryUrl: devUrl ?? `${APP_ORIGIN}/`,
     allowedOrigins,
@@ -244,6 +278,11 @@ function openMainWindow(): BrowserWindow {
     popouts,
     installReadingListGuard: attachReadingListGuard,
   });
+  mainWindow = opened;
+  opened.on("closed", () => {
+    if (mainWindow === opened) mainWindow = null;
+  });
+  return opened;
 }
 
 async function main(): Promise<void> {
@@ -263,7 +302,7 @@ async function main(): Promise<void> {
 
   // Built, the editor is part of the renderer export; under `pnpm dev` there is none, so it is read from where it was fetched.
   const builtEditor = path.join(__dirname, "renderer", "drawio");
-  registerAppProtocol(path.join(__dirname, "renderer"), service.readImage, {
+  registerAppProtocol(path.join(__dirname, "renderer"), service.readImage, (id) => service.findDocumentFile(id)?.path ?? null, {
     root: fs.existsSync(builtEditor) ? builtEditor : path.resolve(__dirname, "..", "..", "web", "public", "drawio"),
     parentOrigins: [APP_ORIGIN, ...(devOrigin ? [devOrigin] : [])],
   });
@@ -272,6 +311,7 @@ async function main(): Promise<void> {
     ipcMain,
     api,
     attachments,
+    documents,
     backup,
     panels: panelsService,
     todos: notifyTodoReports(todosService, announceTodos),
@@ -301,6 +341,7 @@ async function main(): Promise<void> {
   });
   updates.installMenuItem();
   installCliToolMenuItem({ packaged: app.isPackaged, resourcesPath: process.resourcesPath });
+  installImportPdfMenuItem(() => requestImportPdf({ mainWindow: () => mainWindow, openMainWindow: () => void openMainWindow() }));
   updates.manager.start();
 
   app.on("activate", () => {

@@ -7,6 +7,7 @@ export function panelTitle(panel: PanelRecord | undefined, notes: readonly Note[
   if (!panel) return "Composition";
   if (panel.kind === "notes-browser") return "Notes browser";
   if (panel.kind === "ai") return "AI helper";
+  if (panel.kind === "pdf") return "PDF";
   if (panel.kind === "todo") return "To-do";
   if (panel.kind === "reading-list") return "Reading List";
   if (panel.kind === "rss") return "RSS Reader";

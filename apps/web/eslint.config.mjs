@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     ".next-desktop/**",
     // draw.io, vendored by `pnpm fetch:drawio`: minified third-party code.
     "public/drawio/**",
+    // pdf.js's worker and assets, copied from node_modules by `pnpm copy:pdfjs`: minified third-party code.
+    "public/pdfjs/**",
   ]),
 ]);
 

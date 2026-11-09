@@ -3,8 +3,8 @@ import type { PluginSettings } from "@/lib/composition/plugins";
 import { KINDS } from "./kinds";
 import type { KindId } from "./panelsState";
 
-/** The kinds that can be opened without first making an empty panel: every kind but those two. */
-export type LauncherKind = Exclude<KindId, "empty" | "note">;
+/** The kinds that can be opened without first making an empty panel: every kind but those three (a PDF is opened from its row in the sidebar). */
+export type LauncherKind = Exclude<KindId, "empty" | "note" | "pdf">;
 
 export type Launcher = {
   kind: LauncherKind;

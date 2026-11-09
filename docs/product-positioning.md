@@ -32,7 +32,7 @@ mandatory subscription. This is my core study case.
 | MDX               | Component-based documents with a usable editing experience            | No native full MDX support; community plugins offer editing or preview                   |
 | Attachments       | Easy paste/drop, local storage, previews, and linking                 | Local attachments and embeds for supported media; no local storage-plan quota            |
 | Search            | Meilisearch-powered typo tolerance and relevance ranking              | Precise text queries, regex, and filters; core results sort by filename or dates         |
-| Attachment search | Potential PDF text extraction and OCR feeding Meilisearch             | Requires additional plugins for vault-wide attachment-content search                     |
+| Attachment search | Marks, comments and bookmarks of a PDF are searched now; PDF text extraction and OCR feeding Meilisearch are potential | Requires additional plugins for vault-wide attachment-content search                     |
 | Sync              | Optional, ideally self-hosted without a subscription                  | Paid official Sync or alternatives such as community LiveSync                            |
 | Maintenance       | You control and maintain the entire application                       | Obsidian maintains the core; you maintain your selected plugins and self-hosted services |
 

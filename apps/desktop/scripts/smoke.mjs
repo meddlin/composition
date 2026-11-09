@@ -44,6 +44,7 @@ const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../w
 const { TODO_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/todosApi.ts"));
 const { READING_LIST_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/readingListApi.ts"));
 const { CONTACTS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/contactsApi.ts"));
+const { DOCUMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/documentsApi.ts"));
 const { FEED_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/feedsApi.ts"));
 const { UPDATE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/updatesApi.ts"));
 const { ASSISTANT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/assistantApi.ts"));
@@ -56,6 +57,7 @@ const expectedBridge = [
   ...TODO_METHODS,
   ...READING_LIST_METHODS,
   ...CONTACTS_METHODS,
+  ...DOCUMENT_METHODS,
   ...FEED_METHODS,
   ...UPDATE_METHODS,
   ...WINDOW_METHODS,
@@ -63,6 +65,7 @@ const expectedBridge = [
   "onUpdateState",
   "onAppearance",
   "onTodosChanged",
+  "onImportPdfRequest",
   "onPopoutClosed",
   "onAssistantEvent",
   "initial",
@@ -208,6 +211,14 @@ try {
       : `${posture.methods.length} members: ${posture.methods.join(",")}`,
   );
   check("the initial theme is applied before paint", posture.theme === "dark", posture.theme);
+
+  // The PDF export runs in a utility process, which is started from a real file: in a packaged app, the copy of its script
+  // that electron-builder unpacks from the archive (asarUnpack in electron-builder.yml).
+  if (packaged) {
+    const resources = await app.evaluate(() => process.resourcesPath);
+    const worker = path.join(resources, "app.asar.unpacked", "dist", "export-worker.js");
+    check("the PDF export worker is unpacked from the app archive, where a child process can start it", fs.existsSync(worker) && fs.statSync(worker).size > 1_000_000, worker);
+  }
 
   // ---- Navigation: desktop has no Docs viewer
   check("no Docs link in the sidebar", (await page.getByRole("link", { name: "Docs" }).count()) === 0);

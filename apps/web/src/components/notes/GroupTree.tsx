@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRightIcon, StarIcon, XIcon } from "lucide-react";
+import { ChevronRightIcon, FileTextIcon, StarIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -10,10 +10,12 @@ import { canMoveGroup, canPlaceGroup } from "@/lib/composition/groupMove";
 import { cn } from "@/lib/utils";
 import { dropEdge, type DropEdge } from "./dropEdge";
 import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE } from "./dragTypes";
+import { dragMayBePdf, droppedPdfs } from "./pdfFiles";
 import { FolderIcon } from "./FolderIcon";
 import { GroupMenu } from "./GroupMenu";
 import { relativeTime } from "./homeListing";
 import { noteDateLine, useNoteDatePrefs } from "./noteDatePrefs";
+import { usePdfNoteIds } from "./pdfNotes";
 import { NoteMenu } from "./NoteMenu";
 import { sortNotes, useNoteSort } from "./noteSort";
 import { noteTitle, type Group, type Note, type Notebook } from "./types";
@@ -71,6 +73,8 @@ type TreeProps = {
   onSelectGroup: (id: number) => void;
   onDeleteNote: (id: number) => void;
   onCreateNote: (groupId: number) => void;
+  /** A PDF file dropped on a group, or on "Ungrouped" (null): imports it into a new note there. Absent where there are no PDFs. */
+  onDropPdf?: (files: File[], groupId: number | null) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
@@ -101,6 +105,7 @@ export function GroupTree({
   onSelectGroup,
   onDeleteNote,
   onCreateNote,
+  onDropPdf,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
@@ -198,6 +203,7 @@ export function GroupTree({
     canDeleteNotes: true,
     onDeleteNote,
     onCreateNote,
+    onDropPdf,
     onCreateGroup,
     onRenameGroup,
     onDeleteGroup,
@@ -232,7 +238,7 @@ export function GroupTree({
         />
       ))}
 
-      <DropZone onDropNote={(noteId) => onMoveNoteToGroup(noteId, null)}>
+      <DropZone onDropNote={(noteId) => onMoveNoteToGroup(noteId, null)} onDropPdfs={onDropPdf && ((files) => onDropPdf(files, null))}>
         <div
           style={{ paddingLeft: "8px" }}
           className="rounded-md py-1.5 text-sm font-bold text-muted-foreground"
@@ -357,6 +363,7 @@ type SharedProps = {
   canDeleteNotes: boolean;
   onDeleteNote: (id: number) => void;
   onCreateNote: (groupId: number) => void;
+  onDropPdf?: (files: File[], groupId: number | null) => void;
   onCreateGroup: (name: string, parentId: number | null) => void;
   onRenameGroup: (id: number, name: string) => void;
   onDeleteGroup: (id: number) => void;
@@ -394,6 +401,7 @@ function GroupNode({
   canDeleteNotes,
   onDeleteNote,
   onCreateNote,
+  onDropPdf,
   onCreateGroup,
   onRenameGroup,
   onDeleteGroup,
@@ -459,6 +467,7 @@ function GroupNode({
       ) : (
         <DropZone
           onDropNote={(noteId) => onMoveNoteToGroup(noteId, group.id)}
+          onDropPdfs={onDropPdf && ((files) => onDropPdf(files, group.id))}
           groupEdges={groupEdges}
           onDropGroup={(groupId, edge) => {
             if (edge === "into") onDropGroup(groupId, group.id);
@@ -604,6 +613,7 @@ function GroupNode({
             canDeleteNotes={canDeleteNotes}
             onDeleteNote={onDeleteNote}
             onCreateNote={onCreateNote}
+            onDropPdf={onDropPdf}
             onCreateGroup={onCreateGroup}
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
@@ -672,6 +682,7 @@ function NoteRow({
   onToggleFavorite: () => void;
 }) {
   const dateLine = noteDateLine(note, useNoteDatePrefs(), relativeTime);
+  const ownsPdf = usePdfNoteIds().has(note.id);
   const rowRef = useRef<HTMLDivElement>(null);
   const revealNonce = reveal?.nonce;
   useEffect(() => {
@@ -698,7 +709,10 @@ function NoteRow({
         )}
       >
         <span className="flex min-w-0 flex-col items-start">
-          <span className="max-w-full truncate">{noteTitle(note)}</span>
+          <span className="flex max-w-full items-center gap-1.5">
+            {ownsPdf && <FileTextIcon aria-label="PDF" role="img" className="size-3.5 shrink-0 text-muted-foreground" />}
+            <span className="truncate">{noteTitle(note)}</span>
+          </span>
           {dateLine && (
             <span className="max-w-full truncate text-xs font-normal text-muted-foreground">{dateLine}</span>
           )}
@@ -743,6 +757,9 @@ const INTO_ONLY: readonly DropEdge[] = ["into"];
  * `onDropGroup` is given, a dragged group. Omitting it leaves group drags
  * unhandled, so the browser shows its "not allowed" cursor.
  *
+ * `onDropPdfs`, when given, also takes PDF files dragged in from the operating system, dropped "into" the zone. The
+ * zone marks itself `data-pdf-drop-zone` so the window's own PDF drop (usePdfDrop) leaves drops on it alone.
+ *
  * `noteEdges`/`groupEdges` say which parts of the zone the drag may use: dropped
  * "into" it (highlighted), or above or below it (a line at that edge). A drag that
  * may use none of them where the pointer is isn't accepted there, and the drop
@@ -751,20 +768,23 @@ const INTO_ONLY: readonly DropEdge[] = ["into"];
 function DropZone({
   onDropNote,
   onDropGroup,
+  onDropPdfs,
   noteEdges = INTO_ONLY,
   groupEdges = INTO_ONLY,
   children,
 }: {
   onDropNote?: (noteId: number, edge: DropEdge) => void;
   onDropGroup?: (groupId: number, edge: DropEdge) => void;
+  onDropPdfs?: (files: File[]) => void;
   noteEdges?: readonly DropEdge[];
   groupEdges?: readonly DropEdge[];
   children: ReactNode;
 }) {
   const [hover, setHover] = useState<DropEdge | null>(null);
 
-  function targetOf(e: DragEvent<HTMLDivElement>): { kind: "note" | "group"; edge: DropEdge } | null {
+  function targetOf(e: DragEvent<HTMLDivElement>): { kind: "note" | "group" | "pdf"; edge: DropEdge } | null {
     const types = Array.from(e.dataTransfer.types);
+    if (onDropPdfs && dragMayBePdf(e.dataTransfer)) return { kind: "pdf", edge: "into" };
     const kind =
       onDropNote && types.includes(NOTE_DRAG_TYPE)
         ? "note"
@@ -783,6 +803,7 @@ function DropZone({
 
   return (
     <div
+      data-pdf-drop-zone={onDropPdfs ? "" : undefined}
       onDragOver={(e) => {
         const target = targetOf(e);
         if (!target) {
@@ -790,6 +811,7 @@ function DropZone({
           return;
         }
         e.preventDefault();
+        if (target.kind === "pdf") e.dataTransfer.dropEffect = "copy";
         setHover(target.edge);
       }}
       onDragLeave={(e) => {
@@ -801,6 +823,15 @@ function DropZone({
         setHover(null);
         const target = targetOf(e);
         if (!target) return;
+        if (target.kind === "pdf") {
+          const files = droppedPdfs(e.dataTransfer);
+          // Left alone when it is files but no PDF at all, for whatever else is listening.
+          if (files.length === 0) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onDropPdfs?.(files);
+          return;
+        }
         e.preventDefault();
         const id = Number(
           e.dataTransfer.getData(target.kind === "note" ? NOTE_DRAG_TYPE : GROUP_DRAG_TYPE),

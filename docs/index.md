@@ -57,6 +57,10 @@ See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for h
 
 See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.
 
+See [ui/pdf.md](ui/pdf.md) for reading a PDF with your notes beside it (desktop app): a PDF as a note that owns it, marks kept beside the file (highlights, underlines, strikethroughs and text notes; Apple Pencil ink comes with the iPad app), Quote and `pdf:` citations that lead back to the page, and **Export annotated PDF**; [architecture/pdf.md](architecture/pdf.md) for how it works inside, [manual-tests/pdf.md](manual-tests/pdf.md) to check it by hand, and [pdf-markup-plan.md](pdf-markup-plan.md) for the design, the spikes and what is still to build.
+
+See [manual-tests/stress-databases.md](manual-tests/stress-databases.md) for the generated 1,000-, 10,000- and 50,000-note databases (and the harness that measures the web app on them), and [stress-test-findings.md](stress-test-findings.md) for what they showed: a note over 1,000,000 characters that cannot be saved, a sidebar that re-renders on every keystroke, and a first page and an autosave that carry every note's text.
+
 ## Features
 
 - [x] Create note
@@ -159,4 +163,4 @@ See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows
 
 See [windows-native-app-design.md](windows-native-app-design.md) for the design of a native Windows app (C#/.NET, WinUI 3, the note preview in a WebView2): what carries over from the Electron Windows plan, a tracker of which features port, the compromises, the decisions made and open, the spikes (run on a Mac, and the one that needs Windows) and the gates. Design and spikes only; the Electron app stays the shipping Windows plan.
 
-See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Design only; nothing is built.
+See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Built so far: the data layer, backup, Trash Can and search as a Swift package (`apps/ios/CompositionCore`), checked against the desktop's own code (plus the Markdown and MDX layer and a highlighter for the editor), and a prototype app (`apps/ios/Composition`) that draws notes and their components, runs on an iPad, and has an editor lab; [ipad-build-plan.md](ipad-build-plan.md) is the order of work for the first milestone, [ipad-live-view-plan.md](ipad-live-view-plan.md) is the plan for the Live view that follows it, and [manual-tests/ipad.md](manual-tests/ipad.md) is how to install the prototype on an iPad and what to try.

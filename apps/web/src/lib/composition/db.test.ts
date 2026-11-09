@@ -61,7 +61,17 @@ function writeOldDatabase(missing: readonly (typeof NOTE_COLUMNS)[number][]): vo
 const columnsOf = (db: Database.Database, table: string) =>
   (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).map((c) => c.name);
 
-const UUID_TABLES = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"] as const;
+const UUID_TABLES = [
+  "notes",
+  "groups",
+  "notebooks",
+  "trashed_notes",
+  "trashed_groups",
+  "attachments",
+  "documents",
+  "pdf_annotations",
+  "pdf_bookmarks",
+] as const;
 /** 128 random bits, as lowercase hex: what `lower(hex(randomblob(16)))` makes. */
 const UUID_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -87,7 +97,7 @@ function dropUuids(file: string): void {
 
 /**
  * A little of everything in the current schema: two notebooks, a group with a note in it, a trashed note and a trashed
- * group, and an attachment. Returns the ids of the live note and group.
+ * group, an attachment, and a PDF with a mark and a bookmark. Returns the ids of the live note and group.
  */
 async function seedEverything() {
   const notebooks = await import("./notebooksRepo");
@@ -95,6 +105,8 @@ async function seedEverything() {
   const notes = await import("./notesRepo");
   const trash = await import("./trashRepo");
   const attachments = await import("./attachmentsRepo");
+  const documents = await import("./documentsRepo");
+  const marks = await import("./pdfMarkupRepo");
 
   const second = notebooks.createNotebook("Second");
   const group = groups.createGroup("Projects", null, second.id);
@@ -103,6 +115,9 @@ async function seedEverything() {
   const doomedNote = notes.createNote("Doomed", "", null, second.id);
   const doomedGroup = groups.createGroup("Doomed group", null, second.id);
   attachments.addAttachment(note.id, "report.pdf", "abc-report.pdf", 12);
+  const pdf = documents.addDocument({ noteId: loose.id, fileName: "book.pdf", storedName: "abc-book.pdf", sha256: "0".repeat(64), size: 99, pageCount: 3 });
+  marks.addAnnotation(pdf.id, { page: 1, kind: "highlight", color: "yellow", rects: [[10, 10, 100, 30]], quote: "a line" });
+  marks.addBookmark(pdf.id, 2, "Chapter 2");
   trash.trashNote(doomedNote.id);
   trash.trashGroup(doomedGroup.id);
   return { notebook: second, group, note, loose, doomedNote, doomedGroup };
@@ -119,11 +134,14 @@ describe("opening the database", () => {
     expect(tables.sort()).toEqual([
       "attachments",
       "contacts",
+      "documents",
       "feed_items",
       "feeds",
       "groups",
       "notebooks",
       "notes",
+      "pdf_annotations",
+      "pdf_bookmarks",
       "reading_list",
       "todo_closed",
       "todo_events",
@@ -138,6 +156,65 @@ describe("opening the database", () => {
     );
     const indexes = db.prepare("PRAGMA index_list(attachments)").all() as { name: string }[];
     expect(indexes.map((i) => i.name)).toContain("idx_attachments_note_id");
+  });
+
+  describe("the PDF tables", () => {
+    it("gives a new database the three tables with their columns", async () => {
+      const { getDb } = await import("./db");
+      const db = getDb();
+
+      expect(columnsOf(db, "documents").sort()).toEqual(
+        ["created_at", "file_name", "id", "note_id", "page_count", "sha256", "size", "stored_name", "uuid", "view_state"].sort(),
+      );
+      expect(columnsOf(db, "pdf_annotations").sort()).toEqual(
+        ["body", "color", "comment", "created_at", "document_id", "group_uuid", "id", "kind", "page", "quote", "rects", "updated_at", "uuid"].sort(),
+      );
+      expect(columnsOf(db, "pdf_bookmarks").sort()).toEqual(["created_at", "document_id", "id", "label", "page", "uuid"].sort());
+    });
+
+    it("allows one PDF per note, and finds PDFs by hash, marks by page and bookmarks by PDF with indexes", async () => {
+      const { getDb } = await import("./db");
+      const db = getDb();
+      const indexes = (table: string) =>
+        (db.prepare(`PRAGMA index_list(${table})`).all() as { name: string; unique: number }[]).map((i) => [i.name, i.unique]);
+
+      expect(indexes("documents")).toEqual(expect.arrayContaining([["idx_documents_note_id", 1], ["idx_documents_sha256", 0]]));
+      expect(indexes("pdf_annotations")).toContainEqual(["idx_pdf_annotations_page", 0]);
+      expect(indexes("pdf_bookmarks")).toContainEqual(["idx_pdf_bookmarks_document", 0]);
+      const insert = db.prepare(
+        "INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, created_at) VALUES (7, 'a.pdf', 'x-a.pdf', 'h', 1, 1, 'x')",
+      );
+      insert.run();
+      expect(() => insert.run()).toThrow(/UNIQUE/);
+    });
+
+    it("adds the tables to a database that predates them, keeping its notes", async () => {
+      writeOldDatabase([...NOTE_COLUMNS]);
+      const { getDb } = await import("./db");
+      const db = getDb();
+
+      expect(db.prepare("SELECT COUNT(*) AS n FROM documents").get()).toEqual({ n: 0 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM pdf_annotations").get()).toEqual({ n: 0 });
+      expect(db.prepare("SELECT COUNT(*) AS n FROM pdf_bookmarks").get()).toEqual({ n: 0 });
+      expect(db.prepare("SELECT title FROM notes").get()).toEqual({ title: "Legacy note" });
+    });
+
+    it("lets an older build write to the tables and still gives the row a uuid", async () => {
+      const first = await import("./db");
+      first.getDb();
+      first.closeDb();
+
+      const older = new Database(dbFile);
+      older.exec(`
+        INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, created_at) VALUES (1, 'a.pdf', 'x-a.pdf', 'h', 1, 1, 'x');
+        INSERT INTO pdf_annotations (document_id, page, kind, color, created_at, updated_at) VALUES (1, 0, 'ink', 'black', 'x', 'x');
+        INSERT INTO pdf_bookmarks (document_id, page, created_at) VALUES (1, 0, 'x');
+      `);
+      for (const table of ["documents", "pdf_annotations", "pdf_bookmarks"]) {
+        expect((older.prepare(`SELECT uuid FROM ${table}`).get() as { uuid: string }).uuid, table).toMatch(UUID_PATTERN);
+      }
+      older.close();
+    });
   });
 
   describe("the to-do weekly cycle", () => {
