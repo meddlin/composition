@@ -19,8 +19,16 @@ struct ThemedRoot: View {
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.colorSchemeContrast) private var contrast
 
+    /// The system's Increase Contrast. (`-increaseContrast 1` is the UI tests' stand-in for Settings, Accessibility, Display & Text Size, Increase Contrast.)
+    private var effectiveContrast: ColorSchemeContrast {
+        #if DEBUG || EDITOR_TEST_HOOKS
+        if UserDefaults.standard.bool(forKey: "increaseContrast") { return .increased }
+        #endif
+        return contrast
+    }
+
     var body: some View {
-        let look = model.appearance.look(system: systemScheme, contrast: contrast)
+        let look = model.appearance.look(system: systemScheme, contrast: effectiveContrast)
         RootView(model: model)
             .environment(\.look, look)
             .tint(look.brand)

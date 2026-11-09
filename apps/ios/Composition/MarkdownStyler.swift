@@ -21,9 +21,17 @@ final class MarkdownStyler {
         var corrections = 0
         var fullReadMilliseconds = 0.0
         var worstStepMilliseconds = 0.0
+        /// What the speed checks (`-liveBench`) read: what each selection change cost (the constructs it left and entered drawn again), the main thread's time putting a full pass's
+        /// colours on, and how long the last full pass took from its start to its end.
+        var selectionMilliseconds: [Double] = []
+        var putOnMilliseconds = 0.0
+        var lastPassMilliseconds = 0.0
     }
 
     private(set) var measurements = Measurements()
+
+    /// Starts the measurements again (what the speed checks do between one thing they measure and the next).
+    func resetMeasurements() { measurements = Measurements() }
     /// How many full passes have started, and whether nothing is reading, putting colours on, waiting or due and the colours come from a model: what the UI tests look at to see
     /// that the colouring settles on a long note.
     private(set) var passesStarted = 0
@@ -57,6 +65,7 @@ final class MarkdownStyler {
     /// A full pass is under way, reading off the main thread or putting colours on, and only one is at a time: a pass that began putting colours on while another still was
     /// stopped it, and the one it stopped started another, which stopped it in turn, for ever, on a note long enough for a pass to take more than the pause.
     private var passRunning = false
+    private var passStarted: ContinuousClock.Instant?
     /// A pass was asked for while one was running; it starts when that one is over.
     private var passDue = false
     private nonisolated(unsafe) var observer: NSObjectProtocol?
@@ -64,7 +73,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -134,6 +143,7 @@ final class MarkdownStyler {
     func setLive(_ on: Bool) {
         guard on != isLive else { return }
         isLive = on
+        (textView as? NoteTextView)?.isLive = on
         live = nil
         drawnSelection = nil
         restyleAll()
@@ -160,6 +170,10 @@ final class MarkdownStyler {
     /// The text view's selection moved. In the Live tab, the constructs it left and the ones it entered change how they look: their marks show or hide.
     func selectionChanged() {
         guard isLive, let textView else { return }
+        #if DEBUG || EDITOR_TEST_HOOKS
+        let started = clock.now
+        defer { measurements.selectionMilliseconds.append(Self.milliseconds(clock.now - started)) }
+        #endif
         let now = textView.selectedRange
         let storage = textView.textStorage
         // Not during a composition, and not while the colours are behind the text (an edit was typed and `textDidChange` has not come yet, or the first
@@ -240,6 +254,8 @@ final class MarkdownStyler {
         guard textView.markedTextRange == nil else { return scheduleFullPass(after: Self.pause) }  // a composition is under way
         guard !passRunning else { passDue = true; return }
         passRunning = true
+        passStarted = clock.now
+        measurements.putOnMilliseconds = 0
         passesStarted += 1
         pendingEdits = EditAccumulator()
         let snapshot = textView.nativeText
@@ -249,7 +265,9 @@ final class MarkdownStyler {
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let started = ContinuousClock.now
             let fresh = HighlightModel(text: snapshot)
-            let freshLive = wantsLive ? LiveModel(text: snapshot) : nil
+            // No length limit (decision V5, docs/ipad-live-view-plan.md): the desktop reads highlights and `<Image />` tags only up to 100,000 characters; the numbers of step L7 say
+            // that here neither they nor the rest of the look need it.
+            let freshLive = wantsLive ? LiveModel(text: snapshot, extrasLimit: nil) : nil
             let dirty = known.map { fresh.differences(from: $0) } ?? [NSRange(location: 0, length: fresh.length)]
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
@@ -304,12 +322,15 @@ final class MarkdownStyler {
         let started = clock.now
         applyColours(to: steps[index], using: fresh)
         measurements.worstStepMilliseconds = max(measurements.worstStepMilliseconds, Self.milliseconds(clock.now - started))
+        measurements.putOnMilliseconds += Self.milliseconds(clock.now - started)
         DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.putOn(steps, from: index + 1, using: fresh, generation: generation) } }
     }
 
     /// The pass that was running is over, however it ended; the one that was asked for meanwhile, if there is one and nothing is waiting to start already, starts now.
     private func endPass() {
         passRunning = false
+        if let passStarted { measurements.lastPassMilliseconds = Self.milliseconds(clock.now - passStarted) }
+        passStarted = nil
         guard passDue else { return }
         passDue = false
         if idlePass == nil { scheduleFullPass(after: 0) }
@@ -344,7 +365,9 @@ final class MarkdownStyler {
             let code = FontFamily.mono.uiFont(size: 16)
             let syntax = look.theme.syntax
             base = [.font: regular, .foregroundColor: look.uiForeground]
-            frontmatter = [.foregroundColor: syntax.comment.uiColor]
+            // In the Live tab the frontmatter is set apart: smaller, in a font made for it (as every font is, with Dynamic Type; one made from another with `withSize` is not, and
+            // Xcode's accessibility audit says the text view's text will not all grow) and muted by `LiveOverlay`.
+            frontmatter = live ? [.font: family.uiFont(size: 16 * 0.85), .foregroundColor: syntax.comment.uiColor] : [.foregroundColor: syntax.comment.uiColor]
             // The Live tab draws headings, bold, italic and strikethrough as such, and does not colour them as well (the desktop's Live tab does the same: its
             // colours are for code, links, tags and list and quote marks); `LiveOverlay` sets their fonts, from the font the text has.
             heading = live ? [:] : [.foregroundColor: syntax.function.uiColor, .font: bold]
