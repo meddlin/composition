@@ -4,16 +4,17 @@
 #   2. the Rust core is tested against them (cargo test);
 #   3. the desktop's own code opens and restores what Rust wrote (tools/rust-fixtures.test.ts).
 #
-# The shared corpus and the generator are not on `main` yet: they are `apps/ios/conformance/` and
-# `apps/web/scripts/ios-conformance-fixtures.test.ts` on branch claude/ipad-app-design-build-683ed8 (PR #247). Point IPAD_TREE at a
-# checkout of that branch (a `git archive` unpacked in a scratch folder is enough; nothing in it is modified):
+# The shared corpus and the generator are `apps/ios/conformance/` and `apps/web/scripts/ios-conformance-fixtures.test.ts` (on `main` since
+# PR #247). Run this from a checkout of this repository: IPAD_TREE defaults to the repository root. Point it at another checkout, or a
+# `git archive` unpacked in a scratch folder, to run against a different tree (nothing in it is modified; the verifier is copied into
+# apps/web/scripts for the run and removed after):
 #
-#   IPAD_TREE=/path/to/checkout ./run.sh [--system-sqlite]
+#   [IPAD_TREE=/path/to/checkout] ./run.sh [--system-sqlite]
 #
 # The generator's last two cases ("reads what the Swift core wrote") fail in step 1 because no Swift core ran; that is expected.
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-tree="${IPAD_TREE:?set IPAD_TREE to a checkout of claude/ipad-app-design-build-683ed8}"
+tree="${IPAD_TREE:-$(cd "$here/../../../.." && pwd)}"
 out="${OUT:-$(mktemp -d)}"
 features=()
 [ "${1:-}" = "--system-sqlite" ] && features=(--no-default-features --features system-sqlite)

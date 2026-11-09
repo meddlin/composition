@@ -55,11 +55,14 @@ decided, proposed, or needs you).
 - **The costs that matter most:** the notes rules now exist three times in code (TypeScript, Swift, Rust) and the sync engine will be written
   again ([C2](#compromise-register)); a web view and a 121 MB search sidecar stay in a "native" app ([C3](#compromise-register),
   [C4](#compromise-register)); WebKitGTK's sandbox is untested on a real Ubuntu 24.04 ([R1](#risks-and-unknowns)).
-- **The conformance corpus is not on `main`.** It is `apps/ios/conformance/` on the open iPad PR (#247), not the proposed
-  `fixtures/conformance/`. The Rust core reads it through `COMPOSITION_CONFORMANCE_DIR`, as the Swift tests do, and passes the parts it
-  covers. Nothing was copied or invented ([Conformance](#keeping-the-implementations-honest)).
-- **Needs you:** which of two ways to land the corpus ([D12](#decisions)), a real **Ubuntu 24.04 VM** for Gate B (decided; yours to
-  provide), and Gate A. [D19](#decisions) is a question for later, not for now.
+- **The conformance corpus is on `main` now, in two places, and it caught the Rust core falling behind.** The iPad PR (#247) landed
+  `apps/ios/conformance/` and its generator; the PDF PR (#267) landed `fixtures/conformance/` with the PDF tables. When `main` then gained the
+  PDF tables, three more `uuid` tables and a `documents/` folder in backups, the Rust schema test failed and the desktop's own `db.ts`
+  found work to do in a Rust-made file; the core was brought level (13 of 13 tests on macOS, the desktop accepts everything Rust writes).
+  Nothing was copied or invented ([Conformance](#keeping-the-implementations-honest)).
+- **Needs you:** whether the Linux Live tab follows the iPad's into v1 ([D18](#decisions); S8 recommends not), which of two homes the corpus
+  keeps ([D12](#decisions)), a real **Ubuntu 24.04 VM** for Gate B (decided; yours to provide), and Gate A. [D19](#decisions) is a question
+  for later.
 
 ## Goals and non-goals
 
@@ -230,7 +233,7 @@ is fine for a spike and not for 5,000-line notes or a backup restore.
   `fts5vocab`, the trigram tokenizer and `unicode61 remove_diacritics 2` with prefix indexes. **Recommendation: `bundled`**, so the app does
   not depend on what a distribution built. Fedora's SQLite is **unverified**. With Meilisearch decided, FTS5 is only the fallback
   ([Search](#search)).
-- **Three platforms.** 12 of 12 core tests on macOS arm64, Ubuntu 24.04 arm64 and Ubuntu 24.04 x86-64 (emulated).
+- **Three platforms.** 13 of 13 core tests on macOS arm64 and Ubuntu 24.04 arm64 (bundled and system SQLite), rerun on 2026-11-09 against `main`'s current files; 12 of 12 on Ubuntu 24.04 x86-64 (emulated) before `main`'s PDF tables, **not rerun** since.
 - **Other writers.** The Electron app and the CLI write the same file. WAL and a 5-second busy timeout (what `better-sqlite3` waits) cover
   that; the app polls `PRAGMA data_version` to notice another writer's edits, as the sync design proposes for the CLI.
 - **Location and settings.** The app opens `~/.composition` unless `~/.composition-location.json` says otherwise, writing that file only
@@ -242,34 +245,36 @@ is fine for a spike and not for 5,000-line notes or a backup restore.
 The rules (ordering, Trash Can, notebook invariants, frontmatter, backup, search parsing, typing aids, and later sync) now exist in
 TypeScript, Swift and Rust, and in C# on Windows. The guard is the shared corpus proposed in the iPad doc.
 
-**What exists, on this branch's base: nothing.** `fixtures/conformance/` is not on `main`. Two unmerged branches hold the two halves of what
-the iPad doc proposed, in two different places:
+**What exists (2026-11-09, on `main`):** two homes, from two PRs that both merged after this branch was cut.
 
-- **The iPad's corpus** is `apps/ios/conformance/` on branch `claude/ipad-app-design-build-683ed8` (PR #247, open, mergeable): 13 JSON files
-  (about 1.1 MB) and a showcase note with two images, plus the generator `apps/web/scripts/ios-conformance-fixtures.test.ts`, which runs the
-  desktop's real code over those cases and writes the databases, backups and expected results the Swift tests read.
-- **`fixtures/conformance/`** itself was created later the same day by the PDF-markup branch `claude/pdf-markup-notes-bd2eeb` (PR #267,
-  commit 5734532), with a README and `pdf/` fixtures only (the PDF tables), read by the TypeScript and Swift cores. Its README says the rest of
-  the proposed corpus "is not here yet". It was not on this branch's base and I only read it.
+- **The iPad's corpus** is `apps/ios/conformance/` (PR #247): 13 JSON files (about 1.1 MB) and a showcase note with two images, plus the
+  generator `apps/web/scripts/ios-conformance-fixtures.test.ts`, which runs the desktop's real code over those cases and writes the databases,
+  backups and expected results the Swift tests read.
+- **`fixtures/conformance/`** (PR #267) has a README and `pdf/` fixtures only (the PDF tables). Its README says the rest of the proposed
+  corpus "is not here yet".
 
 **I did not copy anything, fork it, or write a corpus of my own.** The Rust tests read the iPad's files through the same variable the Swift
-tests use, `COMPOSITION_CONFORMANCE_DIR`, and [`s1-core/run.sh`](../apps/linux/spikes/s1-core/run.sh) runs the generator from a checkout of
-that branch. The PDF fixtures are not needed by the Linux app until a PDF reader is (a Later row below).
+tests use, `COMPOSITION_CONFORMANCE_DIR`, and [`s1-core/run.sh`](../apps/linux/spikes/s1-core/run.sh) runs the generator from this repository.
+
+**The corpus did its job.** Merging `main` into this branch brought in `DOCUMENTS_SCHEMA` (three tables), three more `uuid` tables
+(`documents`, `pdf_annotations`, `pdf_bookmarks`) and a `documents/` folder in backups. Rerunning S1 against it: the Rust schema test failed
+(the schema was no longer the desktop's), and the desktop's real `db.ts` found work to do in the databases Rust had made (4 of 5 checks
+failed). The core was updated in three places (the table text copied from `db.ts`, the `uuid` list, `documents/` in `create`, `stage` and
+`apply` with a `documents` count) and passes again: **13 of 13 Rust tests, 6 of 6 desktop-side checks**. A desktop backup that holds a PDF
+would have been refused by the old Rust (`documents/...` is an unknown file); that is the kind of drift the corpus exists to find.
 
 | Corpus part | Covered by the Rust spike | |
 |---|---|---|
 | `desktop-empty.db`, `desktop-populated.db` (schema, the pass is a no-op) | Yes | S1 |
-| `desktop-backup*.tar.gz` and its expected files, both directions | Yes (the other direction is `tools/rust-fixtures.test.ts`, the desktop's real `stageBackup`) | S1 |
+| `desktop-backup*.tar.gz` and its expected files, both directions | Yes (the other direction is `tools/rust-fixtures.test.ts`, the desktop's real `stageBackup`). **Neither backup holds a PDF**, so a PDF-bearing backup is tested with one built in the Rust tests, not from the corpus | S1 |
+| `fixtures/conformance/pdf/` (the PDF tables, validation, scripts) | **No**: not needed until the Linux app has a PDF reader (a Later row) | |
 | `search-queries.json`, `search-parse-expected.json`, `search-expected.json`, the two corpus databases | Yes (272 queries, parser identical; the iPad's acceptance bar met) | S2 |
 | `trash-script.json`, `store-script.json` (every operation, every row after each step) | **No**: build step 2 | |
 | `frontmatter-cases.json`, `settings-cases.json`, `images-cases.json`, `organization-cases.json` | **No** | |
 | `editing-cases.json` (completions, props, snippets, indent, emphasis, note links) | **No**: the native editor must port these (M2) | |
 | `mdx-notes.json`, `component-cases.json`, `appearance-expected.json` | **Not needed for the Preview**, which runs the web code. Needed only for the colour schemes' tokens, which the Rust side re-expresses | |
 
-**Gaps to report, not filled:** (1) the corpus is split across two unmerged branches, with the iPad's under an iPad-specific path and generator name and `fixtures/conformance/` holding only the PDF tables; (2) the generator's
-"reads what the Swift core wrote" half has no Linux twin except my `tools/rust-fixtures.test.ts`, a second TypeScript file that should be
-one generalised file once the corpus has a home; (3) there is no corpus for the capture triggers, the outbox or sync yet; (4) nothing in it
-is Linux-specific (XDG paths, the Flatpak home permission). Deciding where the corpus lives is [D12](#decisions).
+**Gaps to report, not filled:** (1) the corpus has two homes, the iPad's under an iPad-specific path with `IOS_` variable names and `fixtures/conformance/` holding only the PDF tables; (2) the generator's "reads what the Swift core wrote" half has no Linux twin except my `tools/rust-fixtures.test.ts`, a second TypeScript file that should be one generalised file once the corpus has one home; (3) **no backup in the corpus holds a PDF**, so the `documents/` folder is untested by it; (4) there is no corpus for the capture triggers, the outbox or sync yet; (5) nothing in it is Linux-specific (XDG paths, the Flatpak home permission). Choosing the one home is [D12](#decisions).
 
 ### Editor and preview
 
@@ -538,8 +543,8 @@ same pull request that changes it.**
 | AI helper: Ollama | 🔁 | Later | ⬜ | HTTP streaming |
 | AI helper: ChatGPT sign-in | ⚠️ | Later | ⬜ | The loopback redirect works on desktop Linux as in Electron (no iOS limit); opens the system browser |
 | Terminal app (CLI) | ❌ | Never | ⛔ | A separate download ([D20](#decisions)) |
-| PDF reader and markup (`docs/pdf-markup-plan.md` on PR #267, not on `main`; desktop first) | 🔁 | Later | ⬜ | A web view of pdf.js is the natural fit on Linux; its three tables and fixtures are in `fixtures/conformance/pdf` |
-| `<Sheet>` (`docs/sheet-component-plan.md` on PR #269, not on `main`) | ♻️ | When it lands | ⬜ | Comes with the preview bundle, as every new MDX component does; editing it from the preview needs the bridge below |
+| PDF reader and markup ([pdf-markup-plan.md](pdf-markup-plan.md), PR #267, merged; desktop first) | 🔁 | Later | ⬜ | A web view of pdf.js is the natural fit on Linux. The Rust core already carries its tables, the `documents/` folder in backups and their `uuid`s (S1, 2026-11-09); its fixtures are in `fixtures/conformance/pdf` |
+| `<Sheet>` (`docs/sheet-component-plan.md` on PR #269, open on 2026-11-09) | ♻️ | When it lands | ⬜ | Comes with the preview bundle, as every new MDX component does; editing it from the preview needs the bridge below |
 
 ### Sync and portability
 
@@ -567,7 +572,7 @@ What we give up. Ids are permanent once this page is agreed. **Status:** *Propos
 | **C7** | **A floor of libadwaita 1.5 and GTK 4.14** (Ubuntu 24.04): no system accent colour, none of the 1.6+ widgets; Ubuntu 22.04 and older are out. | Low | Checked in the headers. | Raise the floor when 24.04 ages out; newer widgets behind feature checks. | Proposed |
 | **C8** | **No panel grid or pop-out windows;** one note per window, new windows on request. | Med | The panels are a React store across windows. | Tabs (`AdwTabView`) or side-by-side later. | Proposed |
 | **C9** | **The plugins wait:** To-do and its cycle, RSS, Contacts, AI helper (the Reading List first, since a web view is easy). | Med | Each needs its own port. | One at a time after v1. | Proposed |
-| **C10** | **The Live tab may arrive after v1.** | Med | S8 showed the mechanism, copy, undo and an input method working and cheap; what is left is parity work (cursor movement at a construct's edge, pictures and rules that stay put in a long note, range-based re-reading, the mouse, a real parser). | Not in v1 (D18); a build step after M3 once Gate B has checked Orca and Wayland input. | Deferred |
+| **C10** | **The Live tab arrives after v1 (the iPad has it in v1: D18 asks).** | Med | S8 showed the mechanism, copy, undo and an input method working and cheap; what is left is parity work (cursor movement at a construct's edge, pictures and rules that stay put in a long note, range-based re-reading, the mouse, a real parser). | Not in v1 unless D18 says so; a build step after M3 once Gate B has checked Orca and Wayland input. | Deferred |
 | **C11** | **No in-app updater.** The `.deb` is updated by hand until an apt repository exists; a Flatpak updates itself. | Low | Platform norms; a signed apt repository is its own project. | Build the repository when there are users. | Proposed |
 | **C12** | **The CLI is not bundled.** The Electron `.deb` carries it. | Low | The native app should not need Node. | A separate download; the database is shared. | Proposed |
 | **C13** | **Two Linux apps on one database:** each has its own Meilisearch index and settings; a Flatpak needs a home-folder permission. | Low | Shared data, per-product state ([product-builds.md](product-builds.md)). | WAL covers the writes; the drift is documented. | Proposed |
@@ -594,13 +599,13 @@ Recommendations are proposals until the status says *Decided*. **Needs you:** [D
 | D9 | Storage. | **The same SQLite file and schema** (decided in the brief); `rusqlite` with `bundled`. | Schema: **Decided**; `bundled`: proposed, settled at Gate A |
 | D10 | The core is its own crate, apart from the GTK UI. | Yes. | **Decided** (brief) |
 | D11 | The editor widget. | GtkSourceView 5. | Proposed, settled at Gate B |
-| D12 | **Where the conformance corpus lives.** | Make `fixtures/conformance/` the one home, which the PDF branch (PR #267) has already started: land PR #247 and move `apps/ios/conformance/` there (renaming the generator and its `IOS_` variables) before build step 1. Until then the Rust harness reads the iPad's files through `COMPOSITION_CONFORMANCE_DIR`. | **Needs you** |
+| D12 | **Which home the conformance corpus keeps.** | **`fixtures/conformance/`** (the PDF PR started it): move `apps/ios/conformance/` there and rename the generator and its `IOS_` variables, in one change that updates the Swift tests and the Rust harness together. Until then the Rust harness reads the iPad's files through `COMPOSITION_CONFORMANCE_DIR`. Both are on `main` already, so this is tidiness, not a blocker. | **Needs you** |
 | D13 | The platform floor. | Ubuntu 24.04: libadwaita 1.5, GTK 4.14, WebKitGTK 2.42 and later; checked on 26.04 and Fedora 45. | Proposed |
 | D14 | Identity. | `com.rushinglabs.Composition`, executable `composition-gtk`; settled before the first build. | Proposed |
 | D15 | Settings. | The app's own JSON file in the `parseWebSettings` format, under the XDG config directory, so a backup carries it. | Proposed |
 | D16 | Data location. | `~/.composition`, honouring `~/.composition-location.json` as the desktop does. | Proposed |
 | D17 | Sync. | v1 backup and restore, built sync-ready; the engine later, in-process in Rust, from [cross-device-sync-design.md](cross-device-sync-design.md). | Proposed |
-| D18 | Panels, plugins and the Live tab stay out of v1. | See C8 to C10. S8 supports it for the Live tab: viable, but its parity work is a project of its own. | Proposed |
+| D18 | Panels and plugins stay out of v1. **The Live tab: does Linux follow the iPad into v1?** | Panels and plugins: see C8 and C9. **Live: the iPad decided it is in v1 (you, 2026-11-08).** S8 says GTK can do it but its parity work is a project of its own (six items in the S8 note), so I recommend Linux ships it after v1. If you want parity with the iPad, it becomes a milestone of its own before M3. | Panels and plugins: Proposed. **Live: needs you** |
 | D19 | **Should the Rust core become the shared core for the Windows and macOS apps** (a stable C interface, so C# and Swift call it instead of each keeping its own rules)? | **No, not now.** The iPad already has a Swift core and Windows is being designed in C#. Keeping the core free of GTK with a small surface keeps the option cheap; decide at Gate A, when the Windows design exists. | Open (not blocking) |
 | D20 | The CLI is not bundled. | A separate download. | Proposed |
 | D21 | Coexistence with Electron. | Ships beside it as a native preview with its own app id until you say otherwise. | Proposed |
@@ -621,7 +626,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R6 | Orca with `GtkTextView` and with the web view's content (unverified; only the AT-SPI tree was read). | Medium, high | Gate B with Orca on; N6. |
 | R7 | The Live tab's remaining work is parity, not feasibility: `End` and Left at a construct's edge differ from the web, overlay pictures and rules were misplaced in a long note (cause not found), `Enter` re-reads the whole note, the mouse and a real parser are untried. | Low-medium, medium | S8 results; C10 lets v1 ship without it; the VM checks Orca and Wayland input. |
 | R8 | The gtk-rs bindings lag a GTK feature or lack a library (a binding for `libspelling` was not checked; `GtkSourceCompletion` use was not tried). | Medium, medium | Check at the start of M2; raw FFI for a small gap. |
-| R9 | The corpus is split across two unmerged branches, the iPad's under iPad-specific names; if PR #247 or #267 changes, the harness breaks. | Medium, medium | D12. |
+| R9 | The corpus has two homes and the iPad's carries iPad-specific names; moving it breaks the Swift and Rust harnesses together unless the move updates both. | Low, medium | D12. |
 | R10 | The sync engine is a third copy of the sync rules. | High, high | The server contract suite and the corpus; D19. |
 | R11 | arm64: the Meilisearch pin, GitHub arm64 runners (unverified), real arm64 hardware for the release gate (none named). | Medium, low | Name the arm64 test route at Gate C. |
 | R12 | The home-folder permission a Flatpak needs for `~/.composition` is refused by Flathub (unverified). | Medium, low | A self-hosted Flatpak repository; or the app's own data folder with an import. |
@@ -635,7 +640,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 
 | # | Spike | Answers | Result |
 |---|---|---|---|
-| **S1** | **Core and store:** schema pass, `uuid` pass, backup, FTS5, against the desktop's own files | R4; D9, D10 | **Done.** 12 of 12 tests on macOS arm64, Ubuntu 24.04 arm64 and x86-64 (emulated); the desktop opens and restores what Rust wrote; FTS5 in the bundled and the system SQLite. The Trash Can, store scripts and capture triggers not covered ([RESULT](../apps/linux/spikes/s1-core/RESULT.md)) |
+| **S1** | **Core and store:** schema pass, `uuid` pass, backup, FTS5, against the desktop's own files | R4; D9, D10 | **Done.** 13 of 13 tests on macOS arm64 and Ubuntu 24.04 arm64 (12 of 12 on emulated x86-64 before `main`'s PDF tables); the corpus caught the core falling behind `main` on 2026-11-09 and it was fixed; the desktop opens and restores what Rust wrote; FTS5 in the bundled and the system SQLite. The Trash Can, store scripts and capture triggers not covered ([RESULT](../apps/linux/spikes/s1-core/RESULT.md)) |
 | **S2** | **Search:** FTS5 plus the typo layer against Meilisearch's answers | D5 | **Done; not chosen.** The iPad's bar met on the first run; the parser exact on 272 queries ([RESULT](../apps/linux/spikes/s1-core/RESULT-search.md)) |
 | **S3** | **The shell:** libadwaita over the core, on Ubuntu 24.04, X11 and Wayland | N1 | **Done in a container.** Builds with `v1_5`; X11 (GL on llvmpipe), Weston Wayland at scale 2, dark and light ([RESULT](../apps/linux/spikes/s3-shell/RESULT.md)) |
 | **S4** | **The editor widget:** accessibility and input method | D11; R5, R6 | **Done in a container.** `GtkAccessibleText`; the AT-SPI tree; IBus Hangul composes. Orca, Wayland and Fcitx unverified |
@@ -717,7 +722,7 @@ Every item here is **unverified**; none should be read as working.
 
 Reported, not filled:
 
-1. **The conformance corpus is not on `main`.** The iPad's is under `apps/ios/conformance/` with an iPad-specific generator (PR #247); `fixtures/conformance/` exists only on the PDF-markup branch (PR #267), with the PDF tables alone ([D12](#decisions)).
+1. **The conformance corpus has two homes on `main`:** the iPad's `apps/ios/conformance/` with an iPad-specific generator, and `fixtures/conformance/` with only the PDF tables ([D12](#decisions)). No backup in it holds a PDF.
 2. **`meilisearch.lock.json` has no Linux arm64 asset.** Upstream v1.53.1 does (`meilisearch-linux-aarch64`, 121 MB, community). The native app needs its own lock; `apps/desktop` was not touched.
 3. **The capture triggers, `sync_outbox` and `sync_*` tables are not on `main`**, so the data layer has no sync tables to reproduce.
 4. **The sync design places the engine in "the desktop app's main process and the iPad app"** only; the native Linux (and Windows) apps each add one.
@@ -756,6 +761,8 @@ Reported, not filled:
 
 - 2026-11-08: **S8 run (the Live tab proper)**, in the container: construct-level reveal, headings, copy, undo, IBus Hangul, a 5,000-line note, driven by real key events. Viable and cheap; not in v1. Found: `End` and Left at a construct's edge differ from the web; overlay pictures and rules are unreliable in a long note (cause not found); naive overlays cost about 90 MB and grew memory to 662 MB over 20 re-reads. R7 lowered; C10 and D18 updated.
 
+- 2026-11-09: **`main` caught up with this branch's assumptions** (PRs #247, #267 and others merged; `main` merged into this branch). The corpus is on `main` in two homes; main's PDF tables, three more `uuid` tables and `documents/` in backups made the Rust schema test and the desktop-side checks fail, and the core was updated to match (13 of 13 Rust tests, 6 of 6 desktop-side). D12 reworded (tidiness, not a blocker); D18 asks whether the Linux Live tab follows the iPad's into v1.
+
 ## Sources
 
 - In this repository: [ipad-app-design.md](ipad-app-design.md) (the template), [architecture/data-model.md](architecture/data-model.md),
@@ -763,8 +770,8 @@ Reported, not filled:
   [panel-system-plan.md](panel-system-plan.md), [product-builds.md](product-builds.md), [desktop-build-and-release.md](desktop-build-and-release.md),
   [architecture/backup-restore.md](architecture/backup-restore.md), [architecture/search.md](architecture/search.md),
   [meili.ts](../apps/desktop/src/main/meili.ts), [electron-builder.yml](../apps/desktop/electron-builder.yml).
-- On branch `claude/ipad-app-design-build-683ed8` (PR #247): `apps/ios/conformance/` (the corpus), `apps/web/scripts/ios-conformance-fixtures.test.ts`
-  (its generator), `apps/ios/CompositionCore/` (the Swift reference the Rust was ported from).
+- On `main` (PR #247, merged after this branch was cut): `apps/ios/conformance/` (the corpus), `apps/web/scripts/ios-conformance-fixtures.test.ts`
+  (its generator), `apps/ios/CompositionCore/` (the Swift reference the Rust was ported from); and `fixtures/conformance/` (PR #267).
 - The spikes' own result notes: [S1](../apps/linux/spikes/s1-core/RESULT.md), [S2](../apps/linux/spikes/s1-core/RESULT-search.md),
   [S3 to S4b](../apps/linux/spikes/s3-shell/RESULT.md), [S5](../apps/linux/spikes/s5-preview/RESULT.md), [S6](../apps/linux/spikes/container/RESULT.md), [S9](../apps/linux/spikes/s9-meili/RESULT.md).
 - Package versions: `apt-cache policy` in `ubuntu:24.04` and `ubuntu:26.04`, `dnf repoquery` in `fedora:latest` (45); crate versions from crates.io;

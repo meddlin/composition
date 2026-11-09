@@ -7,6 +7,7 @@
 //! composition.db            a consistent snapshot of the database (VACUUM INTO)
 //! app_data/<image>          every pasted image
 //! attachments/<file>        every attached file
+//! documents/<file>          every PDF a note owns
 //! ```
 //!
 //! Restoring is two steps so nothing is touched until the file is known to be good: `stage` unpacks and checks it in a
@@ -33,6 +34,7 @@ const SETTINGS: &str = "settings.json";
 const DATABASE: &str = "composition.db";
 const IMAGE_DIR: &str = "app_data";
 const ATTACHMENT_DIR: &str = "attachments";
+const DOCUMENT_DIR: &str = "documents";
 /// Manifest and settings are small; anything bigger is not one.
 const MAX_JSON_BYTES: u64 = 1024 * 1024;
 
@@ -89,6 +91,9 @@ impl DataLocation {
     pub fn attachments(&self) -> PathBuf {
         self.directory.join(ATTACHMENT_DIR)
     }
+    pub fn documents(&self) -> PathBuf {
+        self.directory.join(DOCUMENT_DIR)
+    }
 }
 
 /// How many of each thing a backup holds, under the names the desktop's manifest uses.
@@ -100,6 +105,7 @@ pub struct BackupCounts {
     pub trashed_notes: u64,
     pub trashed_groups: u64,
     pub attachments: u64,
+    pub documents: u64,
     pub todos: u64,
     pub archived_todos: u64,
     pub contacts: u64,
@@ -132,6 +138,7 @@ pub struct StagedBackup {
     pub settings: Option<Vec<u8>>,
     pub has_images: bool,
     pub has_attachments: bool,
+    pub has_documents: bool,
 }
 
 fn is_alnum(b: u8) -> bool {
@@ -171,6 +178,7 @@ pub fn create(conn: &Connection, location: &DataLocation, file: &Path, settings:
         let mut counts = count_rows(&snapshot)?;
         let images: Vec<String> = stored_files(&location.images())?.into_iter().filter(|n| is_image_name(n)).collect();
         let attachments: Vec<String> = stored_files(&location.attachments())?.into_iter().filter(|n| is_stored_name(n)).collect();
+        let documents: Vec<String> = stored_files(&location.documents())?.into_iter().filter(|n| is_stored_name(n)).collect();
         counts.images = images.len() as u64;
         let created_at = now_iso();
         let mut manifest = serde_json::to_vec_pretty(&Manifest { format: FORMAT, version: FORMAT_VERSION, created_at: &created_at, counts: &counts })
@@ -197,6 +205,9 @@ pub fn create(conn: &Connection, location: &DataLocation, file: &Path, settings:
             }
             for name in &attachments {
                 add_file(&mut tar, &format!("{ATTACHMENT_DIR}/{name}"), &location.attachments().join(name))?;
+            }
+            for name in &documents {
+                add_file(&mut tar, &format!("{DOCUMENT_DIR}/{name}"), &location.documents().join(name))?;
             }
             tar.into_inner()?.finish()?.sync_all()?;
             Ok(())
@@ -299,6 +310,7 @@ fn count_rows(path: &Path) -> rusqlite::Result<BackupCounts> {
         trashed_notes: count("trashed_notes", "1"),
         trashed_groups: count("trashed_groups", "1"),
         attachments: count("attachments", "1"),
+        documents: count("documents", "1"),
         archived_todos: archived,
         todos: count("todos", "1").saturating_sub(archived),
         contacts: count("contacts", "1"),
@@ -350,7 +362,7 @@ fn stage_into(input: File, directory: &Path) -> Result<StagedBackup> {
     let mut archive = tar::Archive::new(GzDecoder::new(input));
     let mut seen = HashSet::new();
     let (mut manifest_created, mut settings, mut has_database) = (None::<String>, None::<Vec<u8>>, false);
-    let (mut images, mut attachments) = (0u64, 0u64);
+    let (mut images, mut attachments, mut documents) = (0u64, 0u64, 0u64);
 
     for entry in archive.entries().map_err(damaged)? {
         let mut entry = entry.map_err(damaged)?;
@@ -397,12 +409,16 @@ fn stage_into(input: File, directory: &Path) -> Result<StagedBackup> {
         } else {
             let parts: Vec<&str> = name.split('/').collect();
             let ok = parts.len() == 2
-                && ((parts[0] == IMAGE_DIR && is_image_name(parts[1])) || (parts[0] == ATTACHMENT_DIR && is_stored_name(parts[1])));
+                && ((parts[0] == IMAGE_DIR && is_image_name(parts[1]))
+                    || (parts[0] == ATTACHMENT_DIR && is_stored_name(parts[1]))
+                    || (parts[0] == DOCUMENT_DIR && is_stored_name(parts[1])));
             if !ok {
                 return Err(BackupError::UnknownFile(name));
             }
             if parts[0] == IMAGE_DIR {
                 images += 1;
+            } else if parts[0] == DOCUMENT_DIR {
+                documents += 1;
             } else {
                 attachments += 1;
             }
@@ -423,7 +439,7 @@ fn stage_into(input: File, directory: &Path) -> Result<StagedBackup> {
     assert_usable_database(&staged_db)?;
     let mut counts = count_rows(&staged_db)?;
     counts.images = images;
-    Ok(StagedBackup { directory: directory.to_path_buf(), created_at, counts, settings, has_images: images > 0, has_attachments: attachments > 0 })
+    Ok(StagedBackup { directory: directory.to_path_buf(), created_at, counts, settings, has_images: images > 0, has_attachments: attachments > 0, has_documents: documents > 0 })
 }
 
 pub fn discard(staged: &StagedBackup) {
@@ -450,6 +466,7 @@ pub fn apply(staged: &StagedBackup, location: &DataLocation, settings_file: Opti
     }
     swaps.push((location.images(), staged.has_images.then(|| staged.directory.join(IMAGE_DIR))));
     swaps.push((location.attachments(), staged.has_attachments.then(|| staged.directory.join(ATTACHMENT_DIR))));
+    swaps.push((location.documents(), staged.has_documents.then(|| staged.directory.join(DOCUMENT_DIR))));
 
     let mut set_aside: Vec<(PathBuf, PathBuf)> = vec![];
     let mut placed: Vec<PathBuf> = vec![];

@@ -77,7 +77,7 @@ describe.skipIf(!dir)("the desktop opens and restores what the Rust core wrote",
     expect(rust.schema).toEqual(desktop.schema);
   });
 
-  it.each(["rust-backup", "rust-backup-large"])(
+  it.each(["rust-backup", "rust-backup-large", "rust-backup-pdf"])(
     "the real stageBackup and applyStagedBackup restore %s",
     async (name) => {
       const file = path.join(dir!, `${name}.tar.gz`);
@@ -111,7 +111,7 @@ describe.skipIf(!dir)("the desktop opens and restores what the Rust core wrote",
         expect(rows("notes")).toEqual(expected.notes);
         expect(rows("trashed_notes")).toEqual(expected.trashedNotes);
         const files: Record<string, string> = {};
-        for (const folder of ["app_data", "attachments"]) {
+        for (const folder of ["app_data", "attachments", "documents"]) {
           const sub = path.join(dataDir, folder);
           if (!fs.existsSync(sub)) continue;
           for (const entry of fs.readdirSync(sub).sort()) files[`${folder}/${entry}`] = sha256(path.join(sub, entry));

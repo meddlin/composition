@@ -46,9 +46,9 @@ package wants it.
 
 | Platform | How | Result |
 |---|---|---|
-| macOS arm64 (the author's Mac) | native, Rust 1.97.1 | 12 of 12 tests |
-| Ubuntu 24.04 arm64 | container, native speed | 12 of 12, bundled; 12 of 12, system SQLite |
-| Ubuntu 24.04 x86-64 | the same container image's x86-64 variant, **emulated** on the Mac | 12 of 12, bundled |
+| macOS arm64 (the author's Mac) | native, Rust 1.97.1 | 13 of 13 tests (12 when first written; 13 after the PDF-backup test, 2026-11-09) |
+| Ubuntu 24.04 arm64 | container, native speed | 13 of 13, bundled; 13 of 13, system SQLite (rerun 2026-11-09 against `main`'s regenerated files) |
+| Ubuntu 24.04 x86-64 | the same container image's x86-64 variant, **emulated** on the Mac | 12 of 12, bundled (2026-11-07; **not rerun** since `main`'s PDF tables) |
 
 Emulation proves the code and the C it compiles are correct on x86-64; it says nothing about speed there.
 
@@ -58,6 +58,18 @@ About **1,800 lines** of Rust in `src/` (schema text 210, schema and uuid pass 1
 790 more in tests and the TypeScript verifier. The iPad's Swift for `Schema`, `Backup/`, `Trash/` and `Search/` is about 2,050 lines, of
 which the Trash Can (220) is not ported here yet. The Swift was the reference for the port; the desktop's TypeScript remains the
 specification. Rust took roughly the same number of lines as Swift for the same work; this is a count, not a productivity claim.
+
+## Drift found and fixed, 2026-11-09
+
+After this spike was first written, `main` gained the PDF tables (`documents`, `pdf_annotations`, `pdf_bookmarks`, with `uuid`s) and a
+`documents/` folder in backups, and `main` was merged into this branch. Rerunning `run.sh`: the Rust schema test failed (the made-from-nothing
+schema was no longer the desktop's), and the desktop's real `db.ts` found work to do in the databases Rust had made (4 of 5 desktop-side checks
+failed). The old Rust would also have refused a desktop backup with a PDF in it (`documents/...` is an unknown file). Fixed in three places:
+the table text copied from `db.ts` (`schema.rs`, run before the to-do tables as `db.ts` does), the three names added to the `uuid` list, and
+`documents/` handled in `create`, `stage` and `apply` with a `documents` count. Now **13 of 13 Rust tests and 6 of 6 desktop-side checks** on
+macOS, with a new test that builds a backup holding a PDF (the corpus has none) and has the desktop's real `stageBackup` restore it. The
+container runs were repeated for arm64 (below); x86-64 was not repeated. This is the corpus doing what it is for, and a reminder that the
+Rust schema text is a third copy to keep by hand.
 
 ## What is not covered
 
@@ -70,11 +82,11 @@ specification. Rust took roughly the same number of lines as Swift for the same 
 
 ## Findings to act on
 
-1. **The shared corpus is not on this branch's base.** `fixtures/conformance/` does not exist on `main`. The iPad's corpus is
-   `apps/ios/conformance/` (about 1.1 MB, 13 files and a showcase folder) with its generator, on the iPad branch (PR #247). Later the same
-   day the PDF-markup branch (PR #267, commit 5734532) created `fixtures/conformance/` with a README and `pdf/` fixtures only, saying the rest
-   "is not here yet". The Rust harness reads the iPad's layout through one environment variable, `COMPOSITION_CONFORMANCE_DIR`, exactly as
-   the Swift tests do. Nothing was copied into this branch. Choosing the one home is the user's call and gates the real harness.
+1. **The shared corpus is on `main` in two homes** (it was on two unmerged branches when this spike was written). The iPad's is
+   `apps/ios/conformance/` with its generator (PR #247, merged); `fixtures/conformance/` has a README and `pdf/` fixtures only (PR #267,
+   merged). The Rust harness reads the iPad's layout through one environment variable, `COMPOSITION_CONFORMANCE_DIR`, exactly as the Swift
+   tests do. Nothing was copied. Choosing the one home is the user's call (D12) and no longer blocks anything. **No backup in the corpus
+   holds a PDF.**
 2. **The Meilisearch lock has no Linux arm64 asset.** `apps/desktop/meilisearch.lock.json` pins `linux-x64` only. Upstream v1.53.1 has
    `meilisearch-linux-aarch64` (121 MB, community build), so the native app needs its own pin (not edited here).
 3. A third copy of the schema text now exists (TypeScript, Swift, Rust). Each is kept identical on purpose and guarded by the corpus; there

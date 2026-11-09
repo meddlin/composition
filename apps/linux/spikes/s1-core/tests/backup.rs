@@ -53,7 +53,7 @@ fn describe(dir: &Path, counts: BackupCounts) -> Expected {
         stmt.query_map([], |r| Ok(Row { id: r.get(0)?, uuid: r.get(1)?, title: r.get(2)? })).unwrap().map(|r| r.unwrap()).collect()
     };
     let mut files = BTreeMap::new();
-    for folder in ["app_data", "attachments"] {
+    for folder in ["app_data", "attachments", "documents"] {
         if let Ok(entries) = fs::read_dir(dir.join(folder)) {
             for e in entries {
                 let e = e.unwrap();
@@ -76,6 +76,7 @@ fn restore(archive: &Path, dir: &Path) -> (Expected, backup::StagedBackup) {
         settings: staged.settings.clone(),
         has_images: staged.has_images,
         has_attachments: staged.has_attachments,
+        has_documents: staged.has_documents,
     };
     backup::apply(&staged, &location, Some(&dir.join("settings.json"))).unwrap();
     (describe(dir, counts), summary)
@@ -100,9 +101,25 @@ fn restores_a_backup_the_desktop_made_and_loses_nothing() {
 /// Writes `rust-backup.tar.gz` (and its `.expected.json`, in the same shape the desktop's generator reads) from what the
 /// desktop's backup restored to, for `tools/rust-fixtures.test.ts` to restore with the desktop's own `stageBackup`.
 fn write_backup_from(corpus: &Path, source_archive: &str, out_name: &str) -> (PathBuf, std::time::Duration) {
+    write_backup_with(corpus, source_archive, out_name, false)
+}
+
+/// `with_pdf` adds what the corpus's backups do not have: a PDF a note owns, as a `documents` row and a file in `documents/`.
+fn write_backup_with(corpus: &Path, source_archive: &str, out_name: &str, with_pdf: bool) -> (PathBuf, std::time::Duration) {
     let dir = tempfile::tempdir().unwrap();
-    let (before, _) = restore(&corpus.join(source_archive), dir.path());
+    let (mut before, _) = restore(&corpus.join(source_archive), dir.path());
     let conn = pass::open(&dir.path().join("composition.db")).unwrap();
+    if with_pdf {
+        let bytes = b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+        fs::create_dir_all(dir.path().join("documents")).unwrap();
+        fs::write(dir.path().join("documents/3f9c2a71b0de-paper.pdf"), bytes).unwrap();
+        conn.execute(
+            "INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, created_at) VALUES (1, 'paper.pdf', '3f9c2a71b0de-paper.pdf', 'x', ?1, 1, '2026-11-09T00:00:00.000Z')",
+            [bytes.len() as i64],
+        )
+        .unwrap();
+        before.files.insert("documents/3f9c2a71b0de-paper.pdf".to_string(), sha256_of(&dir.path().join("documents/3f9c2a71b0de-paper.pdf")));
+    }
     let location = DataLocation::new(dir.path());
     let settings = fs::read(dir.path().join("settings.json")).ok();
     let out = corpus.join(format!("{out_name}.tar.gz"));
@@ -111,6 +128,9 @@ fn write_backup_from(corpus: &Path, source_archive: &str, out_name: &str) -> (Pa
     let elapsed = started.elapsed();
     let mut expected = before;
     expected.counts = summary.counts.clone();
+    if with_pdf {
+        assert_eq!(summary.counts.documents, 1, "the PDF is counted");
+    }
     fs::write(corpus.join(format!("{out_name}.expected.json")), serde_json::to_vec_pretty(&expected).unwrap()).unwrap();
     if let Some(s) = settings {
         fs::write(corpus.join(format!("{out_name}.settings.json")), s).unwrap();
@@ -134,6 +154,21 @@ fn writes_a_backup_that_plain_tar_lists_and_the_core_restores() {
     let mut expected = desktop_expected(&corpus, "desktop-backup");
     expected.counts = restored.counts.clone();
     assert_eq!(restored, expected);
+}
+
+#[test]
+fn a_backup_with_a_pdf_round_trips_and_plain_tar_lists_it() {
+    // The corpus's backups hold no PDF (a gap, reported in the design), so this one is built here, from the corpus's desktop backup.
+    let corpus = need_corpus!();
+    let (out, _) = write_backup_with(&corpus, "desktop-backup.tar.gz", "rust-backup-pdf", true);
+    let listing = std::process::Command::new("tar").arg("tzf").arg(&out).output().unwrap();
+    let names = String::from_utf8_lossy(&listing.stdout).to_string();
+    assert!(names.lines().any(|n| n == "documents/3f9c2a71b0de-paper.pdf"), "{names}");
+    let dir = tempfile::tempdir().unwrap();
+    let (restored, staged) = restore(&out, dir.path());
+    assert!(staged.has_documents);
+    assert_eq!(restored.counts.documents, 1);
+    assert!(restored.files.contains_key("documents/3f9c2a71b0de-paper.pdf"), "the PDF came back");
 }
 
 #[test]

@@ -68,6 +68,47 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
 ";
 
+/// PDFs a note owns, and their marks and bookmarks (docs/pdf-markup-plan.md). Added to db.ts after this spike was first written; the
+/// corpus (`desktop-empty.db`) is what showed the Rust schema had fallen behind.
+pub const DOCUMENTS: &str = "
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    page_count INTEGER NOT NULL,
+    view_state TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_note_id ON documents (note_id);
+CREATE INDEX IF NOT EXISTS idx_documents_sha256 ON documents (sha256);
+CREATE TABLE IF NOT EXISTS pdf_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    color TEXT NOT NULL,
+    rects TEXT,
+    quote TEXT NOT NULL DEFAULT '',
+    comment TEXT NOT NULL DEFAULT '',
+    body TEXT,
+    group_uuid TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pdf_annotations_page ON pdf_annotations (document_id, page);
+CREATE TABLE IF NOT EXISTS pdf_bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page);
+";
+
 pub const TODOS: &str = "
 CREATE TABLE IF NOT EXISTS todos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -189,7 +230,7 @@ CREATE INDEX IF NOT EXISTS idx_feed_items_feed_published ON feed_items (feed_id,
 ";
 
 /// Every row of these tables carries a `uuid` (docs/architecture/data-model.md, "Identity").
-pub const UUID_TABLES: &[&str] = &["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"];
+pub const UUID_TABLES: &[&str] = &["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments", "documents", "pdf_annotations", "pdf_bookmarks"];
 
 /// Built-in SQL only: an older build opening the file has no user-defined functions, and its inserts must still work.
 pub const NEW_UUID: &str = "lower(hex(randomblob(16)))";

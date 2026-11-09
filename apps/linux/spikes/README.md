@@ -6,7 +6,7 @@ passes Gate A. Dates are 2026-11-07. Rust 1.97.1.
 
 | Spike | Question | Folder | Result |
 |---|---|---|---|
-| **S1** | Does a GTK-free Rust core share the desktop's schema, uuid pass and backup, and does its SQLite have FTS5? | [`s1-core/`](s1-core/) | [RESULT.md](s1-core/RESULT.md): yes, 12 of 12 tests on three platforms; capture triggers, Trash Can and store scripts not covered |
+| **S1** | Does a GTK-free Rust core share the desktop's schema, uuid pass and backup, and does its SQLite have FTS5? | [`s1-core/`](s1-core/) | [RESULT.md](s1-core/RESULT.md): yes, 13 of 13 tests on macOS and Ubuntu arm64 (12 of 12 on emulated x86-64 before `main`'s PDF tables); capture triggers, Trash Can and store scripts not covered |
 | **S2** | Can FTS5 plus a typo layer meet the iPad's bar against Meilisearch? | [`s1-core/src/search/`](s1-core/src/search/) | [RESULT-search.md](s1-core/RESULT-search.md): yes. **Not chosen**: the user chose to bundle Meilisearch |
 | **S3** | Does a libadwaita app over the core build and run on Ubuntu 24.04? | [`s3-shell/`](s3-shell/) | [RESULT.md](s3-shell/RESULT.md): yes, in a container |
 | **S4** | The editor widget: IME, accessibility | `s3-shell/` | same note: GtkSourceView; AT-SPI text interface present; IBus Hangul composes (X11) |
@@ -27,7 +27,7 @@ Everything needs Docker for the GTK parts and nothing else for the core.
 docker build --platform linux/arm64 -t composition-linux-spike:24.04 apps/linux/spikes/container
 ```
 
-- **S1, S2** (needs a checkout of the iPad branch for the shared corpus; see `s1-core/run.sh`): `IPAD_TREE=<checkout> apps/linux/spikes/s1-core/run.sh`
+- **S1, S2** (the corpus and its generator are on `main`; `run.sh` runs the generator, the Rust tests and the desktop-side checks from this repository): `apps/linux/spikes/s1-core/run.sh`
 - **S9**: `MEILISEARCH_BIN=<the pinned v1.53.1 binary for your platform> COMPOSITION_CONFORMANCE_DIR=<the generator's output, as for S1> cargo test --release -- --test-threads=1 --nocapture` in `s9-meili/`; on Linux run it in the container with `docker run --init` (a zombie otherwise looks alive to the kill tests)
 - **S8**: build `s8-live` in the container, then `container/xvfb-run.sh python3 container/live_drive.py [arrows|selection|edits|ime|visuals|big|bigshot]` (needs `composition-linux-spike:24.04`, a data folder with `app_data/demo-photo-0123456789ab.png` at `/data`, and `/shots` to write to)
 - **S5**: `apps/linux/spikes/s5-preview/build.sh` (needs `pnpm --dir apps/web install` first), then `verify.sh <note.md>`

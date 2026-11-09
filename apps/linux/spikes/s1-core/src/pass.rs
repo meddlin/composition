@@ -27,7 +27,7 @@ pub fn open(path: &Path) -> rusqlite::Result<Connection> {
 }
 
 pub fn run(conn: &mut Connection) -> rusqlite::Result<()> {
-    for sql in [s::NOTES, s::GROUPS, s::NOTEBOOKS, s::TRASH, s::ATTACHMENTS, s::TODOS, s::READING_LIST, s::FEEDS, s::CONTACTS] {
+    for sql in [s::NOTES, s::GROUPS, s::NOTEBOOKS, s::TRASH, s::ATTACHMENTS, s::DOCUMENTS, s::TODOS, s::READING_LIST, s::FEEDS, s::CONTACTS] {
         conn.execute_batch(sql)?;
     }
     // A database from before statuses: the items already ticked off are "done", the rest keep the default "todo".
