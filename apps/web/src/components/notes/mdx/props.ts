@@ -1,6 +1,5 @@
-import { insideFence, type MdxCompletion } from "./completions";
+import { insideFence, type MdxCompletion, type OfferedComponent } from "./completions";
 import { CHART_TYPES } from "./chartData";
-import type { mdxComponents } from "./components";
 import { HIGHLIGHT_COLORS } from "./highlightColors";
 
 export type PropValue = { value: string; description: string };
@@ -37,7 +36,7 @@ const IMAGE_PROPS: PropSpec[] = [
  * The props each component takes, for the editor to offer inside an open tag. Typed against
  * `mdxComponents` so a new component can't ship without saying what it takes (even if that is nothing).
  */
-const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
+const catalog: Record<OfferedComponent, PropSpec[]> = {
   Info: [],
   Warning: [],
   Image: IMAGE_PROPS,

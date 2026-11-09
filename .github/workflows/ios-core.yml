@@ -10,9 +10,16 @@ on:
   pull_request:
     paths:
       - "apps/ios/**"
+      # The shared corpus (and the PDF tables in it) that the Swift core is checked against.
+      - "fixtures/conformance/**"
       - "apps/web/src/lib/composition/**"
       - "apps/web/src/components/notes/mdx/**"
-      - "apps/web/scripts/ios-conformance-fixtures.test.ts"
+      # What the Live view's model is checked against (liveDecorations and what it reads: the highlight tags, `<Image />`, where code is).
+      - "apps/web/src/components/notes/liveMarkdown.ts"
+      - "apps/web/src/components/notes/liveImages.ts"
+      - "apps/web/src/components/notes/markTints.ts"
+      - "apps/web/src/components/notes/markdownTokens.ts"
+      - "apps/web/scripts/conformance-fixtures.test.ts"
       - "apps/cli/src/tools/dummyNotes.ts"
       - "apps/web/package.json"
       - "apps/web/pnpm-lock.yaml"

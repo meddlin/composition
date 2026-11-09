@@ -15,9 +15,41 @@ enum HideMode: String, CaseIterable, Identifiable {
     case attributes = "Hide: tiny and clear"
     /// The text content storage hands TextKit a paragraph with the syntax left out (the characters then differ from the store's).
     case substitute = "Hide: substitute"
+    /// Step L1 of the Live view plan: as "tiny and clear", and the rest of what the Live view draws without changing the text (docs/ipad-live-view-plan.md):
+    /// headings large, a rule as a line, a picture in place of its Markdown.
+    case live = "Live look (spike L1)"
 
     var id: String { rawValue }
 }
+
+/// Spike L5 (docs/ipad-live-view-plan.md): how far the marks that stay showing reach, in the Live look. The lab always did "caret's line"; the plan (V1) is "the
+/// construct the caret or selection touches, ends included", as the desktop; "never" keeps every mark hidden, caret or not, to see what the text view does next to
+/// invisible characters when nothing reveals them.
+enum RevealMode: String, CaseIterable, Identifiable {
+    case line = "Reveal: caret's line"
+    case construct = "Reveal: construct the caret touches"
+    case never = "Reveal: never"
+
+    var id: String { rawValue }
+}
+
+extension NSAttributedString.Key {
+    /// On a paragraph the Live look draws something on: a `LabDrawing`'s raw value.
+    static let labDraw = NSAttributedString.Key("labDraw")
+}
+
+/// What a paragraph is drawn as, in place of its text.
+enum LabDrawing: String {
+    /// `---` hidden, a line across the page.
+    case rule
+    /// `![alt](src)` hidden, the picture in its place.
+    case picture
+    /// The caret is in `![alt](src)`: the text shows, and the picture is drawn after it.
+    case pictureAfter
+}
+
+/// The height the picture takes (in the spike every picture is the same gradient).
+private let labPictureHeight: CGFloat = 160
 
 struct EditorStats: Equatable {
     var characters = 0
@@ -44,13 +76,15 @@ struct EditorStats: Equatable {
     /// Edits coloured by reading the blocks around them, and edits that could not be (the pause that follows reads the whole note).
     var incrementalEdits = 0
     var fallbackEdits = 0
+    /// Where the selection is and what is around it (`-labSelectionHud 1`; for the UI tests of spike L5 to read).
+    var selection = ""
 }
 
 @MainActor
 @Observable
-final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentStorageDelegate {
-    let textView: UITextView = {
-        let view = UITextView(usingTextLayoutManager: true)  // TextKit 2. Never touch `layoutManager`: that falls back to TextKit 1.
+final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentStorageDelegate, @MainActor NSTextLayoutManagerDelegate {
+    let textView: LabTextView = {
+        let view = LabTextView(usingTextLayoutManager: true)  // TextKit 2. Never touch `layoutManager`: that falls back to TextKit 1.
         view.isFindInteractionEnabled = true
         view.alwaysBounceVertical = true
         view.textContainerInset = UIEdgeInsets(top: 16, left: 12, bottom: 16, right: 12)
@@ -58,7 +92,9 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         view.autocapitalizationType = .none
         view.smartDashesType = .no
         view.smartQuotesType = .no
+        view.smartInsertDeleteType = .no  // as the editor proper has it: Smart Delete would take a space along with the character a forward delete removes
         view.adjustsFontForContentSizeCategory = true
+        view.accessibilityIdentifier = "lab-editor"
         return view
     }()
 
@@ -69,10 +105,40 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             configureHiding()
             restyle(force: true)
             // `restyle` leaves no model: read the note again, so that the marks can follow the caret from here on.
-            if hideMode == .attributes { scheduleFullPass(after: 0) }
+            if hidesMarks { scheduleFullPass(after: 0) }
         }
     }
+    var revealMode = RevealMode.line {
+        didSet {
+            guard revealMode != oldValue, hidesMarks else { return }
+            restyle(force: true)
+            scheduleFullPass(after: 0)
+        }
+    }
+    /// The constructs the selection touched when the marks were last coloured (`RevealMode.construct`).
+    private var lastTouched: [NSRange] = []
+    /// Writes the selection and its surroundings to `stats.selection` on every change (a launch switch: it redraws the readout, which the speed test must not do).
+    var tracksSelection = UserDefaults.standard.bool(forKey: "labSelectionHud") || UserDefaults.standard.string(forKey: "labSelectionLog") != nil
+    /// `-labSelectionLog <file>`: every selection and text change is appended there (for driving the lab by hand and reading what happened without a screenshot).
+    private let selectionLog = UserDefaults.standard.string(forKey: "labSelectionLog")
+    var axMode: LiveAccessibility.Mode {
+        get { textView.axMode }
+        set { textView.axMode = newValue; axModeChanges += 1 }
+    }
+    /// Only so that the `@Observable` menu redraws when the VoiceOver mode changes.
+    private(set) var axModeChanges = 0
     var completionItems: [String] = []
+    /// The ways of hiding that keep the characters and only change how they look.
+    private var hidesMarks: Bool { hideMode == .attributes || hideMode == .live }
+
+    /// Spike L7: what the speed test of the Live look reads. Samples are kept only while it runs.
+    private var recordsSamples = false
+    private var selectionSamples: [Double] = []
+    /// How many times the putting-on of a full read has run to its end.
+    private(set) var finishedPasses = 0
+    /// How many full passes have started, and how many of them were stopped while putting colours on (the long-note check reads both).
+    private(set) var passesStarted = 0
+    private(set) var passesInterrupted = 0
 
     private var restylePending = false
     private var lastCaretParagraph = NSRange(location: 0, length: 0)
@@ -81,8 +147,13 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     private var model: HighlightModel?
     private var pendingEdits = EditAccumulator()
     private var version = 0
+    /// The pause's pass, while it is waiting to start (nil once it has started).
     private var idlePass: DispatchWorkItem?
     private var sliceGeneration = 0
+    /// A full pass is under way, and only one is at a time (see `MarkdownStyler.passRunning`): one that began putting colours on while another still was stopped it, and the one
+    /// it stopped started another, for ever, on a note of about 400,000 characters.
+    private var passRunning = false
+    private var passDue = false
     /// What the speed test (and anything else that wants numbers) can read: how long each keystroke's own work took, in milliseconds.
     private(set) var editSamples: [Double] = []
     /// Developer switch for comparing: `-labLegacyColouring 1` colours the whole note after every edit, as the lab did before Step 5.
@@ -93,6 +164,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     override init() {
         super.init()
         textView.delegate = self
+        textView.textLayoutManager?.delegate = self
         NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
             MainActor.assumeIsolated { self?.storageProcessedEditing() }
         }
@@ -108,10 +180,16 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     private static var boldFont: UIFont { UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: 15, weight: .bold)) }
     private static let hiddenFont = UIFont.systemFont(ofSize: 0.5)
 
+    /// A heading as the desktop's Live tab draws it: H1 twice the text, H2 one and a half times, H3 one and a quarter, the rest the size of the text, all bold.
+    private static func headingFont(level: Int) -> UIFont {
+        let size: CGFloat = switch level { case 1: 30; case 2: 22.5; case 3: 18.75; default: 15 }
+        return UIFontMetrics(forTextStyle: .body).scaledFont(for: .monospacedSystemFont(ofSize: size, weight: .bold))
+    }
+
     private func attributes(for kind: HighlightKind) -> [NSAttributedString.Key: Any] {
         switch kind {
         case .frontmatter: [.foregroundColor: UIColor.secondaryLabel]
-        case .heading: [.foregroundColor: UIColor.systemBlue, .font: Self.boldFont]
+        case .heading(let level): [.foregroundColor: UIColor.systemBlue, .font: hideMode == .live ? Self.headingFont(level: level) : Self.boldFont]
         case .strong: [.font: Self.boldFont]
         case .emphasis: [.foregroundColor: UIColor.systemIndigo]
         case .strikethrough: [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: UIColor.secondaryLabel]
@@ -126,7 +204,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         }
     }
 
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .paragraphStyle, .obliqueness, .labDraw]
 
     /// Colours the whole text, at once, on the main thread: what every edit used to do, and what the experimental `substitute` way of hiding
     /// still does. The editor proper colours what was typed (`recolourAfterEdit`) and the rest in a pause (`runFullPass`).
@@ -144,16 +222,19 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         // The caret's line, or the whole code block it is in (both fences show, so it is plain you are inside one).
         let caret = LiveReveal.range(forLine: paragraphRange(around: textView.selectedRange), spans: spans)
         lastCaretParagraph = caret
+        lastTouched = touchedConstructs(in: spans)
         storage.beginEditing()
         for key in Self.managedKeys { storage.removeAttribute(key, range: full) }
         storage.addAttributes([.font: Self.baseFont, .foregroundColor: UIColor.label], range: full)
         for span in spans where span.range.upperBound <= storage.length {
             var attrs = attributes(for: span.kind)
-            if hideMode == .attributes, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0, !(span.range.length == 0) {
+            if hidesMarks, span.kind == .mark, !(span.range.length == 0), markIsHidden(span.range, spans: spans, line: caret) {
                 attrs = [.font: Self.hiddenFont, .foregroundColor: UIColor.clear]
             }
             storage.addAttributes(attrs, range: span.range)
         }
+        applyItalics(spans.filter { $0.kind == .emphasis }.map(\.range), storage: storage)
+        applyDrawing(in: full, rules: spans.filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
         let applied = clock.now
 
@@ -203,6 +284,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         model = nil
         pendingEdits = EditAccumulator()
         version += 1
+        sliceGeneration += 1  // a pass that is putting colours on stops: the text it was made for is gone
         refreshCounts()
         if hideMode == .substitute { restyle(force: true) } else { scheduleFullPass(after: 0) }
     }
@@ -240,6 +322,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             scheduleFullPass(after: 0.3)
         }
         updateCompletion()
+        if tracksSelection { stats.selection = selectionSummary(); log("text") }
         let elapsed = ms(clock.now - start)
         stats.lastEditMilliseconds = elapsed
         stats.worstEditMilliseconds = max(stats.worstEditMilliseconds, elapsed)
@@ -247,9 +330,18 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     }
 
     func textViewDidChangeSelection(_ textView: UITextView) {
+        let started = clock.now
+        followSelection()
+        if recordsSamples { selectionSamples.append(ms(clock.now - started)) }
+        // After the marks have been shown or hidden, so that the caret's position read here is where it is drawn.
+        if tracksSelection { stats.selection = selectionSummary(); log("selection") }
+    }
+
+    private func followSelection() {
         if restylePending, textView.markedTextRange == nil { restyle() }
         // Hiding follows the caret: only the paragraph it left and the one it entered change.
-        guard hideMode == .attributes else { return }
+        guard hidesMarks, revealMode != .never else { return }
+        if revealMode == .construct { return followSelectionByConstruct() }
         let line = paragraphRange(around: textView.selectedRange)
         // A code block is shown whole while the caret is in it (see `LiveReveal`).
         let paragraph = model.map { LiveReveal.range(forLine: line, spans: $0.spans(in: line)) } ?? line
@@ -260,6 +352,105 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         guard let model, textView.markedTextRange == nil else { return }
         applyColours(to: left, using: model)
         applyColours(to: paragraph, using: model)
+    }
+
+    // MARK: Spike L5: which marks are hidden
+
+    /// Whether a mark stays hidden under the reveal rule in force. `spans` are the highlight spans around it (whole blocks, so the construct that owns the mark is among
+    /// them); `line` is what the line rule reveals.
+    private func markIsHidden(_ mark: NSRange, spans: [HighlightSpan], line: NSRange) -> Bool {
+        switch revealMode {
+        case .never: return true
+        case .line: return NSIntersectionRange(mark, line).length == 0
+        case .construct:
+            // The smallest construct that holds the mark owns it; one with no owner (a link's brackets) falls back to the line.
+            guard let owner = Self.owner(of: mark, in: spans) else { return NSIntersectionRange(mark, line).length == 0 }
+            return !Self.touches(owner, textView.selectedRange)
+        }
+    }
+
+    /// A scan of every span for each mark: fine for the lab, but quadratic (a whole-note restyle of 100,000 characters took 1.9 s in Debug with this rule, 0.1 s with the
+    /// line rule); the real `LiveModel` has to find a mark's construct from its blocks.
+    private static func owner(of mark: NSRange, in spans: [HighlightSpan]) -> NSRange? {
+        var best: NSRange?
+        for span in spans {
+            switch span.kind {
+            case .strong, .emphasis, .strikethrough, .inlineCode, .heading, .codeBlock, .quote: break
+            default: continue
+            }
+            guard span.range.location <= mark.location, span.range.upperBound >= mark.upperBound else { continue }
+            if best == nil || span.range.length < best!.length { best = span.range }
+        }
+        return best
+    }
+
+    /// The desktop's rule (`touches` in liveMarkdown.ts): the selection reaches the construct, ends included.
+    private static func touches(_ construct: NSRange, _ selection: NSRange) -> Bool {
+        construct.location <= selection.upperBound && selection.location <= construct.upperBound
+    }
+
+    /// The constructs that hold marks and are touched by the selection now.
+    private func touchedConstructs(in spans: [HighlightSpan]) -> [NSRange] {
+        guard revealMode == .construct else { return [] }
+        let selection = textView.selectedRange
+        var found: [NSRange] = []
+        for span in spans {
+            switch span.kind {
+            case .strong, .emphasis, .strikethrough, .inlineCode, .heading, .codeBlock, .quote: break
+            default: continue
+            }
+            if Self.touches(span.range, selection) { found.append(span.range) }
+        }
+        return found
+    }
+
+    private func refreshTouched(using model: HighlightModel) {
+        guard revealMode == .construct else { return }
+        let selection = textView.selectedRange
+        let around = NSUnionRange(paragraphRange(around: selection), paragraphRange(around: NSRange(location: selection.upperBound, length: 0)))
+        lastTouched = touchedConstructs(in: model.spans(in: around))
+    }
+
+    /// `RevealMode.construct`: when the set of constructs the selection touches changes, the paragraphs of those it left and entered are coloured again.
+    private func followSelectionByConstruct() {
+        guard let model, model.length == textView.textStorage.length, textView.markedTextRange == nil else { return scheduleFullPass(after: 0.3) }
+        let selection = textView.selectedRange
+        let around = NSUnionRange(paragraphRange(around: selection), paragraphRange(around: NSRange(location: selection.upperBound, length: 0)))
+        let now = touchedConstructs(in: model.spans(in: around))
+        guard now != lastTouched else { return }
+        let before = lastTouched
+        lastTouched = now
+        lastCaretParagraph = paragraphRange(around: selection)
+        let ns = textView.textStorage.mutableString
+        for range in before + now {
+            applyColours(to: ns.paragraphRange(for: range), using: model)
+        }
+    }
+
+    private func log(_ why: String) {
+        guard let selectionLog else { return }
+        let line = "\(why)\t\(stats.selection)\t\((textView.text ?? "").replacingOccurrences(of: "\n", with: "⏎"))\n"
+        if let handle = FileHandle(forWritingAtPath: selectionLog) {
+            handle.seekToEndOfFile()
+            handle.write(Data(line.utf8))
+            try? handle.close()
+        } else {
+            try? line.write(toFile: selectionLog, atomically: false, encoding: .utf8)
+        }
+    }
+
+    /// `12+0 «text before⟦selected⟧text after»`: where the selection is and what surrounds it, line breaks shown as ⏎.
+    private func selectionSummary() -> String {
+        let ns = (textView.text ?? "") as NSString
+        let range = textView.selectedRange
+        guard range.upperBound <= ns.length else { return "\(range.location)+\(range.length)" }
+        let before = ns.substring(with: NSRange(location: max(range.location - 14, 0), length: range.location - max(range.location - 14, 0)))
+        let selected = ns.substring(with: range)
+        let after = ns.substring(with: NSRange(location: range.upperBound, length: min(14, ns.length - range.upperBound)))
+        let marker = range.length == 0 ? "|" : "⟦\(selected)⟧"
+        // Where the caret (the selection's moving end) is drawn: a press that leaves x where it was moved the caret across something invisible.
+        let rect = textView.selectedTextRange.map { textView.caretRect(for: $0.end) } ?? .zero
+        return String(format: "%d+%d x=%.1f y=%.0f «%@%@%@»", range.location, range.length, rect.minX, rect.minY, before, marker, after).replacingOccurrences(of: "\n", with: "⏎")
     }
 
     // MARK: Speed test
@@ -316,6 +507,280 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         return String(format: "%d keystrokes: ours median %.2f ms, 95%% %.2f, worst %.2f · whole median %.2f, worst %.2f", count, ours["median"] ?? 0, ours["p95"] ?? 0, ours["max"] ?? 0, summary(whole)["median"] ?? 0, summary(whole)["max"] ?? 0)
     }
 
+    // MARK: Spike L7: the Live look's speed
+
+    private static func summary(_ values: [Double]) -> [String: Double] {
+        let sorted = values.sorted()
+        guard !sorted.isEmpty else { return [:] }
+        return [
+            "median": sorted[sorted.count / 2], "p95": sorted[min(sorted.count - 1, sorted.count * 95 / 100)], "p99": sorted[min(sorted.count - 1, sorted.count * 99 / 100)],
+            "max": sorted[sorted.count - 1], "samples": Double(sorted.count), "over16": Double(sorted.filter { $0 > 16 }.count),
+        ]
+    }
+
+    @ObservationIgnored private lazy var benchmarkRenderer: UIGraphicsImageRenderer = {
+        let format = UIGraphicsImageRendererFormat.preferred()
+        format.opaque = true
+        return UIGraphicsImageRenderer(size: textView.bounds.size, format: format)
+    }()
+
+    /// Runs `operation`, then the layout of what is on screen, then draws the text view into a bitmap, and says how long each took in milliseconds, each
+    /// including the one before: `op` is the call returning (our colouring happens inside it, from the delegate), `layout` adds laying out the visible lines
+    /// (TextKit 2 does that lazily), `draw` adds the CPU drawing of what changed (`layer.render`: an upper bound for the main thread's share of a frame, and none of the
+    /// compositor's).
+    private func timed(_ operation: () -> Void) -> (op: Double, layout: Double, draw: Double) {
+        let started = clock.now
+        operation()
+        let done = clock.now
+        textView.setNeedsLayout()
+        textView.layoutIfNeeded()
+        let laidOut = clock.now
+        _ = benchmarkRenderer.image { textView.layer.render(in: $0.cgContext) }
+        return (ms(done - started), ms(laidOut - started), ms(clock.now - started))
+    }
+
+    /// The speed test of the Live look (plan step L7): a note of `lines` lines, in three variants, in one process so that they are comparable: Markdown colours alone (what
+    /// the Markdown tab does), the Live look with the caret's line revealed, and the Live look with the construct revealed. Measures a full pass, a keystroke in plain text,
+    /// a keystroke in a bold word, the caret stepping across a bold word, the caret moving to another paragraph, a whole synchronous restyle, and the whole layout.
+    /// The numbers go to `lab-live-benchmark.json` in the app's tmp folder.
+    func runLiveBenchmark(lines: Int) async -> String {
+        let text = LabText.big(lines: lines)
+        benchmarkNote = (lines, (text as NSString).length)
+        benchmarkDone = []
+        let variants: [(String, HideMode, RevealMode)] = [
+            ("Markdown colours only", .off, .line),
+            ("Live look, caret's line revealed", .live, .line),
+            ("Live look, construct revealed", .live, .construct),
+        ]
+        var all: [[String: Any]] = []
+        // Two rounds of the three variants, so that a variant is not charged for being first (the first round warms everything up); the second is the one to read.
+        // `-labLiveVariant 0|1|2` and `-labLiveRounds n` run one variant, for the notes so long that switching between variants in one process makes the passes
+        // interrupt each other (a launch per variant then).
+        let only = UserDefaults.standard.string(forKey: "labLiveVariant").flatMap { Int($0) }  // launch arguments arrive as text, so `object(forKey:) as? Int` is nil
+        let rounds = UserDefaults.standard.string(forKey: "labLiveRounds").flatMap { Int($0) } ?? 2
+        for round in 1...rounds {
+            for (index, (name, hide, reveal)) in variants.enumerated() where only == nil || only == index {
+                var result = await liveVariant(name, hide, reveal, text)
+                result["round"] = rounds == 1 ? 2 : round
+                all.append(result)
+                benchmarkDone = all
+            }
+        }
+        let output: [String: Any] = [
+            "build": _isDebugAssertConfiguration() ? "Debug" : "Release", "lines": lines, "characters": (text as NSString).length, "variants": all,
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lab-live-benchmark.json"))
+        return "Live benchmark done (\(lines) lines): lab-live-benchmark.json"
+    }
+
+    /// The variants finished so far, and the note being measured: written out after every step, so that a note on which the main thread starves later (see L7) still leaves
+    /// what was measured before.
+    @ObservationIgnored private var benchmarkDone: [[String: Any]] = []
+    @ObservationIgnored private var benchmarkNote = (lines: 0, characters: 0)
+
+    private func checkpoint(_ current: [String: Any]) {
+        let output: [String: Any] = [
+            "build": _isDebugAssertConfiguration() ? "Debug" : "Release", "lines": benchmarkNote.lines, "characters": benchmarkNote.characters,
+            "variants": benchmarkDone + [current],
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: output, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lab-live-benchmark-partial.json"))
+    }
+
+    private func liveVariant(_ name: String, _ hide: HideMode, _ reveal: RevealMode, _ text: String) async -> [String: Any] {
+        revealMode = reveal
+        hideMode = hide
+        textView.becomeFirstResponder()
+        try? await Task.sleep(for: .seconds(2))  // the pass that changing the look schedules finishes, on the note that was open
+        recordsSamples = true
+        defer { recordsSamples = false }
+
+        // 1. A full pass over a note just opened: set the text, then the read off the main thread and the putting on in steps.
+        let passes = finishedPasses
+        let opened = clock.now
+        load(text)
+        let setText = ms(clock.now - opened)
+        // Done when a pass has put its colours on and the note has a model to follow edits with (a pass interrupted by `load` leaves none, and the next one makes it).
+        while finishedPasses == passes || model == nil, ms(clock.now - opened) < 180_000 { try? await Task.sleep(for: .milliseconds(10)) }
+        let wall = ms(clock.now - opened)
+        let fullPass: [String: Any] = [
+            "setTextMs": setText, "wallToFinishedMs": wall, "readOffMainMs": stats.fullReadMilliseconds,
+            "putOnTotalMs": stats.sliceTotalMilliseconds, "worstStepOnMainMs": stats.worstSliceMilliseconds, "blocks": stats.spans,
+            "modelReady": model != nil,
+        ]
+        try? await Task.sleep(for: .milliseconds(500))
+        textView.layoutIfNeeded()
+        var report: [String: Any] = ["variant": name, "fullPass": fullPass]
+        checkpoint(report)
+
+        // 2. A keystroke in plain text, in a paragraph that has marks, with the caret in view; one letter at a time as a keyboard sends them. The three paragraphs
+        // are found before anything is typed (the later ones then move by what was typed before them).
+        let ns = (textView.text ?? "") as NSString
+        var from = ns.length / 2
+        func nextBoldParagraph() -> NSRange {
+            let found = ns.range(of: "Some **bold** text", options: [], range: NSRange(location: from, length: ns.length - from))
+            from = found.upperBound
+            return found
+        }
+        let plain = nextBoldParagraph(), boldFound = nextBoldParagraph(), thirdFound = nextBoldParagraph()
+        func scrollTo(_ position: Int) {
+            textView.selectedRange = NSRange(location: position, length: 0)
+            textView.scrollRangeToVisible(NSRange(location: position, length: 0))
+            textView.layoutIfNeeded()
+        }
+        let letters = Array("abcdefghijklmnopqrstuvwxyz")
+        func typeLetters(at position: Int, count: Int) async -> (ours: [Double], insert: [Double], layout: [Double], draw: [Double]) {
+            scrollTo(position)
+            try? await Task.sleep(for: .milliseconds(400))
+            editSamples = []
+            var inserts: [Double] = [], layouts: [Double] = [], draws: [Double] = []
+            for index in 0..<count {
+                let measured = timed { textView.insertText(String(letters[index % letters.count])) }
+                inserts.append(measured.op)
+                layouts.append(measured.layout)
+                draws.append(measured.draw)
+                try? await Task.sleep(for: .milliseconds(16))
+            }
+            try? await Task.sleep(for: .seconds(1.5))  // the pause, and the full read after it
+            return (editSamples, inserts, layouts, draws)
+        }
+        let plainTyping = await typeLetters(at: plain.location + 19, count: 200)  // after `Some **bold** text,`
+        let bold = NSRange(location: boldFound.location + 200, length: boldFound.length)
+        let boldTyping = await typeLetters(at: bold.location + 9, count: 40)  // inside the word `bold`
+        let third = NSRange(location: thirdFound.location + 240, length: thirdFound.length)
+        func typingResult(_ typed: (ours: [Double], insert: [Double], layout: [Double], draw: [Double])) -> [String: Any] {
+            ["ours": Self.summary(typed.ours), "insert": Self.summary(typed.insert), "insertAndLayout": Self.summary(typed.layout), "insertLayoutDraw": Self.summary(typed.draw)]
+        }
+
+        report["keystrokePlain"] = typingResult(plainTyping)
+        report["keystrokeInBold"] = typingResult(boldTyping)
+        checkpoint(report)
+
+        // 3. The caret stepping across a bold word (`Some **bold** text`: 13 steps forward and back), then to another paragraph and back.
+        scrollTo(third.location + 3)
+        try? await Task.sleep(for: .milliseconds(400))
+        selectionSamples = []
+        var across: [Double] = [], acrossLayout: [Double] = [], acrossDraw: [Double] = []
+        let steps = Array((third.location + 3)...(third.location + 16))
+        for position in Array((0..<4).map { _ in steps + steps.reversed() }.joined()) {
+            let measured = timed { textView.selectedRange = NSRange(location: position, length: 0) }
+            across.append(measured.op)
+            acrossLayout.append(measured.layout)
+            acrossDraw.append(measured.draw)
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        let acrossOurs = selectionSamples
+        let paragraphEnd = (textView.text as NSString).paragraphRange(for: NSRange(location: third.location, length: 0)).upperBound
+        let other = paragraphEnd + 2  // two paragraphs on: `- item one`
+        selectionSamples = []
+        var between: [Double] = [], betweenLayout: [Double] = [], betweenDraw: [Double] = []
+        for round in 0..<60 {
+            let measured = timed { textView.selectedRange = NSRange(location: round % 2 == 0 ? other : third.location + 3, length: 0) }
+            between.append(measured.op)
+            betweenLayout.append(measured.layout)
+            betweenDraw.append(measured.draw)
+            try? await Task.sleep(for: .milliseconds(30))
+        }
+        let betweenOurs = selectionSamples
+
+        report["caretAcrossBold"] = ["ours": Self.summary(acrossOurs), "op": Self.summary(across), "opAndLayout": Self.summary(acrossLayout), "opLayoutDraw": Self.summary(acrossDraw)]
+        report["caretToOtherParagraph"] = ["ours": Self.summary(betweenOurs), "op": Self.summary(between), "opAndLayout": Self.summary(betweenLayout), "opLayoutDraw": Self.summary(betweenDraw)]
+        report["incrementalEdits"] = stats.incrementalEdits
+        report["fallbackEdits"] = stats.fallbackEdits
+        checkpoint(report)
+
+        // 4. A whole synchronous restyle (what a change of look does), and the layout of the whole note.
+        let restyled = timed { restyle(force: true) }
+        let parse = stats.parseMilliseconds, apply = stats.applyMilliseconds
+        // No full pass is scheduled after this one, so that the whole layout below is measured on its own. (On a note of about 400,000 characters the passes used to
+        // interrupt each other for good once one started while another was putting colours on: see `runSettleCheck` and docs/ipad-live-view-plan.md, L7.)
+        let wholeLayoutStart = clock.now
+        textView.textLayoutManager.map { $0.ensureLayout(for: $0.documentRange) }
+        let wholeLayout = ms(clock.now - wholeLayoutStart)
+        try? await Task.sleep(for: .seconds(1))
+
+        return [
+            "variant": name, "fullPass": fullPass,
+            "keystrokePlain": typingResult(plainTyping), "keystrokeInBold": typingResult(boldTyping),
+            "caretAcrossBold": ["ours": Self.summary(acrossOurs), "op": Self.summary(across), "opAndLayout": Self.summary(acrossLayout), "opLayoutDraw": Self.summary(acrossDraw)],
+            "caretToOtherParagraph": ["ours": Self.summary(betweenOurs), "op": Self.summary(between), "opAndLayout": Self.summary(betweenLayout), "opLayoutDraw": Self.summary(betweenDraw)],
+            "synchronousRestyle": ["totalMs": restyled.op, "parseMs": parse, "applyMs": apply],
+            "wholeLayoutMs": wholeLayout, "fallbackEdits": stats.fallbackEdits, "incrementalEdits": stats.incrementalEdits,
+        ]
+    }
+
+    // MARK: Long notes: does the colouring settle?
+
+    /// Nothing is reading or putting colours on, no pass is waiting to start or due, and the colours on the text come from a model.
+    var coloursAreSettled: Bool { model != nil && !passRunning && !passDue && idlePass == nil }
+
+    /// Waits until the colouring has been settled for `quiet`, or `limit` has passed; true when it settled.
+    private func waitForSettle(quiet: Duration = .milliseconds(700), limit: Duration) async -> Bool {
+        let started = clock.now
+        var since: ContinuousClock.Instant?
+        while clock.now - started < limit {
+            if coloursAreSettled {
+                since = since ?? clock.now
+                if clock.now - since! >= quiet { return true }
+            } else {
+                since = nil
+            }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return false
+    }
+
+    /// The check that the background colouring settles on a long note (docs/ipad-live-view-plan.md, L7). The note is opened, and as soon as the first colours go on a second pass
+    /// is asked for, as a look change, a caret move or another window's edit does: it must wait, the colours of the first must go on to the end, and nothing may be stopped
+    /// (nothing was typed, so nothing has a reason to stop). Then 60 letters are typed, and every one must be coloured as an edit, not by reading the whole note again. On a
+    /// 20,000-line note (404,540 characters) the passes used to stop each other for ever. The result is the HUD's text (and `lab-settle.json` in the app's tmp folder).
+    func runSettleCheck(lines: Int, limit: Duration = .seconds(12)) async -> String {
+        let text = LabText.big(lines: lines)
+        let begun = clock.now
+        let passesBefore = passesStarted, interruptedBefore = passesInterrupted
+        load(text)
+        stats.sliceTotalMilliseconds = 0
+        while stats.sliceTotalMilliseconds == 0, clock.now - begun < .seconds(10) { try? await Task.sleep(for: .milliseconds(2)) }  // the first colours are going on
+        // Another pass is asked for, five times over (the lab asks for one at every caret move while it has no model): a pass that read the note meanwhile must not start
+        // putting colours on until the first has done.
+        for _ in 0..<5 {
+            scheduleFullPass(after: 0)
+            try? await Task.sleep(for: .milliseconds(100))
+        }
+        let opened = await waitForSettle(limit: limit)
+        let openedMs = ms(clock.now - begun)
+        let stopped = passesInterrupted - interruptedBefore
+        var typed = false
+        var quick = 0, fallback = 0
+        if opened {
+            textView.becomeFirstResponder()
+            let whole = (textView.text ?? "") as NSString
+            textView.selectedRange = NSRange(location: whole.paragraphRange(for: NSRange(location: whole.length / 2, length: 0)).location, length: 0)
+            let quickBefore = stats.incrementalEdits, fallbackBefore = stats.fallbackEdits
+            let phrase = Array("Typing in the middle of a long note.")
+            for index in 0..<60 {
+                textView.insertText(String(phrase[index % phrase.count]))
+                try? await Task.sleep(for: .milliseconds(30))
+            }
+            typed = await waitForSettle(limit: limit)
+            quick = stats.incrementalEdits - quickBefore
+            fallback = stats.fallbackEdits - fallbackBefore
+        }
+        let passes = passesStarted - passesBefore
+        let settled = opened && typed && stopped == 0
+        let report = settled
+            ? String(format: "Settle check (%d lines, %d characters): SETTLED after %.0f ms · %d passes, %d stopped · typing: %d quick edits, %d not", lines, stats.characters, openedMs, passes, stopped, quick, fallback)
+            : String(format: "Settle check (%d lines, %d characters): DID NOT SETTLE (%@) · %d passes, %d stopped · typing: %d quick edits, %d not", lines, stats.characters, !opened ? "the colouring did not come to rest after the note was opened" : stopped > 0 ? "a pass stopped another" : "the colouring did not come to rest after typing", passes, stopped, quick, fallback)
+        let result: [String: Any] = [
+            "settled": settled, "lines": lines, "characters": stats.characters, "openedMs": openedMs, "passes": passes, "stopped": stopped,
+            "typingQuickEdits": quick, "typingFallbackEdits": fallback, "modelReady": model != nil, "build": _isDebugAssertConfiguration() ? "Debug" : "Release",
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys])) ?? Data()
+        try? data.write(to: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("lab-settle.json"))
+        return report
+    }
+
     // MARK: Colouring only what was typed
 
     /// For a change nobody described (views put in by the lab): forget what is known and read it all in the background.
@@ -350,6 +815,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         stats.rereadCharacters = window.length
         let line = paragraphRange(around: textView.selectedRange)
         lastCaretParagraph = LiveReveal.range(forLine: line, spans: model!.spans(in: line))
+        refreshTouched(using: model!)
     }
 
     /// Puts the colours of `model` on `range` of the text, and nothing else: it clears what a colour put there before, and sets what the
@@ -360,18 +826,21 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         let range = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
         guard range.length > 0 else { return }
         let caret = lastCaretParagraph
+        let inRange = model.spans(in: range)
         storage.beginEditing()
         for key in Self.managedKeys { storage.removeAttribute(key, range: range) }
         storage.addAttributes([.font: Self.baseFont, .foregroundColor: UIColor.label], range: range)
-        for span in model.spans(in: range) {
+        for span in inRange {
             let clipped = NSIntersectionRange(span.range, range)
             guard clipped.length > 0 else { continue }
             var attrs = attributes(for: span.kind)
-            if hideMode == .attributes, span.kind == .mark, NSIntersectionRange(span.range, caret).length == 0 {
+            if hidesMarks, span.kind == .mark, markIsHidden(span.range, spans: inRange, line: caret) {
                 attrs = [.font: Self.hiddenFont, .foregroundColor: UIColor.clear]
             }
             storage.addAttributes(attrs, range: clipped)
         }
+        applyItalics(inRange.filter { $0.kind == .emphasis }.compactMap { NSIntersectionRange($0.range, range).length > 0 ? NSIntersectionRange($0.range, range) : nil }, storage: storage)
+        applyDrawing(in: range, rules: inRange.filter { $0.kind == .rule }.map(\.range), caret: caret, storage: storage)
         storage.endEditing()
     }
 
@@ -379,13 +848,16 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     /// differs (all of it, when the note has just been loaded).
     private func scheduleFullPass(after delay: TimeInterval) {
         idlePass?.cancel()
-        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.runFullPass() } }
+        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.idlePass = nil; self?.runFullPass() } }
         idlePass = item
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     private func runFullPass() {
         guard textView.markedTextRange == nil else { return scheduleFullPass(after: 0.3) }  // a composition is under way
+        guard !passRunning else { passDue = true; return }
+        passRunning = true
+        passesStarted += 1
         pendingEdits = EditAccumulator()
         let snapshot = textView.text ?? ""
         let seen = version
@@ -397,7 +869,8 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, self.version == seen else { return }  // typed again meanwhile: the next pause reads it again
+                    guard let self else { return }
+                    guard self.version == seen else { return self.endPass() }  // typed again meanwhile: the next pause reads it again
                     self.stats.fullReadMilliseconds = self.ms(spent)
                     self.beginPuttingOn(fresh, dirty: dirty, hadModel: known != nil)
                 }
@@ -408,7 +881,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     /// Puts the colours on in small steps, so that the main thread is never held for more than a fraction of a frame; typing stops it.
     private func beginPuttingOn(_ fresh: HighlightModel, dirty: [NSRange], hadModel: Bool) {
         let storage = textView.textStorage
-        guard fresh.length == storage.length else { return scheduleFullPass(after: 0.3) }
+        guard fresh.length == storage.length else { endPass(); return scheduleFullPass(after: 0.3) }
         let ns = storage.mutableString
         var pieces: [NSRange] = []
         for range in dirty {
@@ -428,6 +901,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         model = fresh
         let line = paragraphRange(around: textView.selectedRange)
         lastCaretParagraph = LiveReveal.range(forLine: line, spans: fresh.spans(in: line))
+        refreshTouched(using: fresh)
         sliceGeneration += 1
         stats.sliceTotalMilliseconds = 0
         refreshCounts()
@@ -436,11 +910,21 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
 
     private static let sliceLength = 3_000
 
+    /// The pass that was running is over, however it ended; the one that was asked for meanwhile, if there is one and nothing is waiting to start already, starts now.
+    private func endPass() {
+        passRunning = false
+        guard passDue else { return }
+        passDue = false
+        if idlePass == nil { scheduleFullPass(after: 0) }
+    }
+
     private func putOn(_ pieces: [NSRange], from index: Int, using fresh: HighlightModel, generation: Int) {
-        guard index < pieces.count else { return }
+        guard index < pieces.count else { finishedPasses += 1; return endPass() }
         guard generation == sliceGeneration, textView.markedTextRange == nil else {
+            passesInterrupted += 1
             // Interrupted: what is on the text is now partly the old colours, so the next full pass starts from nothing.
             model = nil
+            endPass()
             return scheduleFullPass(after: 0.3)
         }
         let started = clock.now
@@ -449,6 +933,77 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
         stats.sliceTotalMilliseconds += spent
         stats.worstSliceMilliseconds = max(stats.worstSliceMilliseconds, spent)
         DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.putOn(pieces, from: index + 1, using: fresh, generation: generation) } }
+    }
+
+    // MARK: The Live look (step L1)
+
+    /// Draws `*emphasis*` in italics, as the desktop's Live tab does (`.cm-live-emphasis`); the Markdown look only tints it. Done after every span's
+    /// attributes are on, to the font each character already has, so that bold inside italic (`***both***`) keeps both.
+    private func applyItalics(_ ranges: [NSRange], storage: NSTextStorage) {
+        guard hideMode == .live else { return }
+        for range in ranges where range.upperBound <= storage.length {
+            storage.enumerateAttribute(.font, in: range) { value, run, _ in
+                guard let font = value as? UIFont, font.pointSize > 1 else { return }  // the marks' tiny font stays as it is
+                let (italic, slanted) = Self.italic(of: font)
+                storage.addAttribute(.font, value: italic, range: run)
+                if slanted { storage.addAttribute(.obliqueness, value: 0.2, range: run) }
+            }
+        }
+    }
+
+    /// The italic of `font`, at its size and weight. The system's monospaced face may have no italic of its own, and then the same font is returned, to be
+    /// slanted with `.obliqueness` (the second value says so).
+    private static func italic(of font: UIFont) -> (UIFont, slanted: Bool) {
+        let traits = font.fontDescriptor.symbolicTraits.union(.traitItalic)
+        if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) {
+            let italic = UIFont(descriptor: descriptor, size: font.pointSize)
+            let name = italic.fontName.lowercased()
+            if name.contains("italic") || name.contains("oblique") { return (italic, false) }
+        }
+        return (font, true)
+    }
+
+    /// Paragraphs the Live look draws something on in place of their text: a rule (`---`) and a picture (a line that is only `![alt](src)`). The text
+    /// stays where it is, hidden like the marks are (a tiny, clear font), and the paragraph is made as tall as what is drawn, with the attribute
+    /// `labDraw` for `LabDrawingFragment` to read. While the caret is in the paragraph the text shows, and a picture is drawn after it.
+    private func applyDrawing(in range: NSRange, rules: [NSRange], caret: NSRange, storage: NSTextStorage) {
+        guard hideMode == .live else { return }
+        let ns = storage.mutableString
+        let picture = try! NSRegularExpression(pattern: "^!\\[[^\\]]*\\]\\([^)]*\\)[ \\t]*$")
+        var drawn: [(NSRange, LabDrawing)] = []
+        for rule in rules where NSIntersectionRange(rule, range).length > 0 || rule.location == range.upperBound {
+            drawn.append((ns.paragraphRange(for: NSRange(location: rule.location, length: 0)), .rule))
+        }
+        ns.enumerateSubstrings(in: range, options: [.byParagraphs]) { text, _, enclosing, _ in
+            guard let text, picture.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil else { return }
+            drawn.append((enclosing, .picture))
+        }
+        for (paragraph, kind) in drawn {
+            let revealed = NSIntersectionRange(paragraph, caret).length > 0
+            let style = NSMutableParagraphStyle()
+            switch (kind, revealed) {
+            case (.rule, false):
+                style.minimumLineHeight = 28
+                storage.addAttributes([.font: Self.hiddenFont, .foregroundColor: UIColor.clear, .paragraphStyle: style, .labDraw: LabDrawing.rule.rawValue], range: paragraph)
+            case (.picture, false):
+                style.minimumLineHeight = labPictureHeight
+                storage.addAttributes([.font: Self.hiddenFont, .foregroundColor: UIColor.clear, .paragraphStyle: style, .labDraw: LabDrawing.picture.rawValue], range: paragraph)
+            case (.picture, true):
+                style.paragraphSpacing = labPictureHeight + 8
+                storage.addAttributes([.paragraphStyle: style, .labDraw: LabDrawing.pictureAfter.rawValue], range: paragraph)
+            default: break  // a rule the caret is on shows as its three dashes, and nothing is drawn
+            }
+        }
+    }
+
+    /// TextKit asks for the fragment that lays out and draws each paragraph; those marked for drawing get one that also draws a rule or a picture.
+    func textLayoutManager(_ textLayoutManager: NSTextLayoutManager, textLayoutFragmentFor location: any NSTextLocation, in textElement: NSTextElement) -> NSTextLayoutFragment {
+        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0,
+            let raw = paragraph.attributedString.attribute(.labDraw, at: 0, effectiveRange: nil) as? String, let kind = LabDrawing(rawValue: raw)
+        {
+            return LabDrawingFragment(textElement: textElement, range: textElement.elementRange, kind: kind)
+        }
+        return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 
     // MARK: Hiding the syntax, second way
@@ -661,6 +1216,63 @@ private final class LabCanvasView: PKCanvasView, PKCanvasViewDelegate {
     }
 }
 
+/// A paragraph's layout fragment that also draws a rule across the page or a picture, in the space the paragraph was made tall enough for.
+private final class LabDrawingFragment: NSTextLayoutFragment {
+    let kind: LabDrawing
+
+    init(textElement: NSTextElement, range: NSTextRange?, kind: LabDrawing) {
+        self.kind = kind
+        super.init(textElement: textElement, range: range)
+    }
+
+    required init?(coder: NSCoder) { fatalError("not used") }
+
+    /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to
+    /// a sliver: it is widened to the lines of text, and, for a picture shown after the revealed text, lengthened to take the paragraph's spacing too.
+    override var renderingSurfaceBounds: CGRect {
+        let base = super.renderingSurfaceBounds
+        let container = textLayoutManager?.textContainer
+        let padding = container?.lineFragmentPadding ?? 0
+        let width = max((container?.size.width ?? base.width) - 2 * padding, base.width)
+        let height = max(base.height, layoutFragmentFrame.height) + (kind == .pictureAfter ? labPictureHeight + 8 : 0)
+        return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
+    }
+
+    override func draw(at point: CGPoint, in context: CGContext) {
+        super.draw(at: point, in: context)  // the text itself (hidden, except while the caret is in it)
+        let frame = layoutFragmentFrame
+        // The fragment is only as wide as its (tiny, hidden) text, so what is drawn takes the width of the lines of text: the container's, less its padding.
+        let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
+        let width = max((textLayoutManager?.textContainer?.size.width ?? frame.width) - 2 * padding, frame.width)
+        let left = point.x + padding
+        switch kind {
+        case .rule:
+            context.setStrokeColor(UIColor.label.withAlphaComponent(0.35).cgColor)
+            context.setLineWidth(1)
+            context.move(to: CGPoint(x: left, y: point.y + frame.height / 2))
+            context.addLine(to: CGPoint(x: left + width, y: point.y + frame.height / 2))
+            context.strokePath()
+        case .picture:
+            drawPicture(in: CGRect(x: left, y: point.y, width: min(width, 560), height: frame.height).insetBy(dx: 0, dy: 4), context: context)
+        case .pictureAfter:
+            // After the text's own lines: the fragment's frame is taller than they are, because it includes the paragraph's spacing, which is where this goes.
+            let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
+            drawPicture(in: CGRect(x: left, y: point.y + textBottom + 4, width: min(width, 560), height: labPictureHeight), context: context)
+        }
+    }
+
+    private func drawPicture(in rect: CGRect, context: CGContext) {
+        UIGraphicsPushContext(context)
+        defer { UIGraphicsPopContext() }
+        let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: [UIColor.systemTeal.cgColor, UIColor.systemIndigo.cgColor] as CFArray, locations: [0, 1])!
+        let path = UIBezierPath(roundedRect: rect, cornerRadius: 8)
+        context.saveGState()
+        path.addClip()
+        context.drawLinearGradient(gradient, start: rect.origin, end: CGPoint(x: rect.maxX, y: rect.maxY), options: [])
+        context.restoreGState()
+    }
+}
+
 private struct LabPanel: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -670,6 +1282,77 @@ private struct LabPanel: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - The lab's text view
+
+/// The lab's text view: a place for what the spikes of the Live view (docs/ipad-live-view-plan.md) try on the text view itself.
+final class LabTextView: UITextView {
+    /// What the text view tells VoiceOver (spike L6): the way the Live tab uses too (`LiveAccessibility`), set by the lab's *VoiceOver* switch.
+    var axMode: LiveAccessibility.Mode {
+        get { LiveAccessibility.mode }
+        set { LiveAccessibility.mode = newValue }
+    }
+
+    override var accessibilityAttributedValue: NSAttributedString? {
+        get {
+            // The lab's Live look sizes headings but does not mark them: a heading is the run whose font is bold and larger than the text's.
+            LiveAccessibility.value(of: textStorage, mode: axMode) { _, attributes in
+                guard let font = attributes[.font] as? UIFont, font.pointSize >= 18 else { return nil }
+                return font.pointSize >= 30 ? 1 : font.pointSize >= 22 ? 2 : 3
+            } ?? super.accessibilityAttributedValue
+        }
+        set { super.accessibilityAttributedValue = newValue }
+    }
+
+    override var accessibilityValue: String? {
+        get { axMode == .asItIs ? super.accessibilityValue : accessibilityAttributedValue?.string }
+        set { super.accessibilityValue = newValue }
+    }
+
+    /// What the text view says about itself to the accessibility tree, as a dictionary to write out: the value, its attributes, the traits, and what a line-by-line
+    /// reading (`UIAccessibilityReadingContent`) would use, if the text view answers to it.
+    func accessibilityProbe() -> [String: Any] {
+        var report: [String: Any] = ["axMode": axMode.title]
+        let value = accessibilityValue ?? ""
+        report["isAccessibilityElement"] = isAccessibilityElement
+        report["accessibilityLabel"] = accessibilityLabel ?? "nil"
+        report["accessibilityHint"] = accessibilityHint ?? "nil"
+        report["traitsRaw"] = accessibilityTraits.rawValue
+        report["valueLength"] = (value as NSString).length
+        report["textViewLength"] = textStorage.length
+        report["valueFirstLine"] = value.components(separatedBy: "\n").first ?? ""
+        report["valueContainsAsterisks"] = value.contains("**")
+        report["valueContainsHeadingHash"] = value.contains("# ")
+        if let attributed = accessibilityAttributedValue {
+            var keys = Set<String>()
+            var silenced = 0, headings = 0
+            attributed.enumerateAttributes(in: NSRange(location: 0, length: attributed.length)) { attributes, range, _ in
+                keys.formUnion(attributes.keys.map(\.rawValue))
+                if attributes[.accessibilitySpeechPunctuation] as? Bool == false { silenced += range.length }
+                if attributes[.accessibilityTextHeadingLevel] != nil { headings += 1 }
+            }
+            report["attributedValueAttributeKeys"] = keys.sorted()
+            report["charactersMarkedNoPunctuation"] = silenced
+            report["headingRuns"] = headings
+        } else {
+            report["attributedValueAttributeKeys"] = "nil"
+        }
+        // The line-by-line reading UITextView may answer to.
+        let selectors = ["accessibilityContentForLineNumber:", "accessibilityPageContent", "accessibilityLineNumberForPoint:", "accessibilityAttributedPageContent", "accessibilityAttributedContentForLineNumber:", "accessibilityFrameForLineNumber:"]
+        report["answersTo"] = Dictionary(uniqueKeysWithValues: selectors.map { ($0, responds(to: NSSelectorFromString($0))) })
+        let content = NSSelectorFromString("accessibilityContentForLineNumber:")
+        if responds(to: content), let implementation = method(for: content) {
+            typealias Call = @convention(c) (AnyObject, Selector, Int) -> Unmanaged<NSString>?
+            let call = unsafeBitCast(implementation, to: Call.self)
+            report["lines"] = (0..<14).map { call(self, content, $0)?.takeUnretainedValue() as String? ?? "nil" }
+        }
+        let page = NSSelectorFromString("accessibilityPageContent")
+        if responds(to: page) { report["pageContent"] = (perform(page)?.takeUnretainedValue() as? String) ?? "nil" }
+        report["accessibilityElementCount"] = accessibilityElementCount()
+        report["accessibilityTextualContext"] = String(describing: accessibilityTextualContext)
+        return report
     }
 }
 
@@ -713,6 +1396,8 @@ enum LabText {
         ---
         # Editor lab
 
+        ![A picture, drawn in place of this line](lab-picture.png)
+
         Type here. Text with **bold**, *emphasis*, ~~strikethrough~~, `inline code` and a [link](https://example.com).
         Staging resets <Mark color="green">every night</Mark>.
 
@@ -742,6 +1427,18 @@ enum LabText {
 
         Things to try: type a `<` at the start of a line to open the completion list; write with the Pencil right in the text (Scribble: it must be on in Settings, Apple Pencil); and choose Insert a view, then Ink canvas, and draw in the grey box that appears.
 
+        """
+
+    /// Spike L5: lines to move through with the keyboard, with the marks next to each other, at the start and end of lines, and a heading.
+    static let editing = """
+        Plain line before.
+        # Heading one
+        A **bold** word and *italic* too.
+        **Bold start** and more text
+        text ending in **bold**
+        ## Second heading
+        Use `code` here and ~~struck~~ there.
+        Last line.
         """
 
     /// A note of about `lines` lines made of the sample's kinds of text.

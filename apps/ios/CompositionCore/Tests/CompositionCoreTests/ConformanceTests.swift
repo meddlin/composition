@@ -8,7 +8,7 @@ import Testing
 // implementations honest"). The fixtures are generated, not committed (`*.db` is gitignored, and a binary in the repo
 // would go stale silently):
 //
-//   cd apps/web && IOS_FIXTURE_DIR=/some/dir node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts
+//   cd apps/web && COMPOSITION_FIXTURE_DIR=/some/dir node node_modules/vitest/vitest.mjs run scripts/conformance-fixtures.test.ts
 //   cd apps/ios/CompositionCore && COMPOSITION_CONFORMANCE_DIR=/some/dir swift test
 //
 // Without the variable these tests are reported as skipped, never as passed.

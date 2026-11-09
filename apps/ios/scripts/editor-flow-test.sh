@@ -4,7 +4,7 @@
 # In the iPad Simulator, from a restored desktop backup, the Debug build is made to do what the buttons do: make a note (the + button), type into
 # the editor (`-autotype`, the keyboard's `insertText` path), go to the background (which saves), move the note to the Trash Can, restore it. Then
 # the desktop's real `service.ts` is given the same operations on a copy of the starting database, with the clock set to the moments the app's rows
-# record, and every row of notes, groups, notebooks, trashed_notes and trashed_groups must be equal (apps/web/scripts/ios-conformance-fixtures.test.ts,
+# record, and every row of notes, groups, notebooks, trashed_notes and trashed_groups must be equal (apps/web/scripts/conformance-fixtures.test.ts,
 # "replays the operations the iPad's editor made").
 #
 # Usage: apps/ios/scripts/editor-flow-test.sh <simulator UDID> <path to the Debug Composition.app> <backup.tar.gz>
@@ -75,5 +75,5 @@ PY
 echo "  recorded in $run"
 
 echo "== the desktop's service does the same operations on the starting database"
-(cd "$root/apps/web" && IOS_UI_RUN_DIR="$run" node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts -t "replays the operations")
+(cd "$root/apps/web" && COMPOSITION_UI_RUN_DIR="$run" node node_modules/vitest/vitest.mjs run scripts/conformance-fixtures.test.ts -t "replays the operations")
 echo "== the rows match the desktop's"

@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Spike S2, the acceptance test (docs/ipad-app-design.md, "Search"): the Swift search against a real Meilisearch, over the
-// notes of `pnpm search:playground` and the queries in apps/ios/conformance/search-queries.json. Meilisearch's answers are
+// notes of `pnpm search:playground` and the queries in fixtures/conformance/search-queries.json. Meilisearch's answers are
 // committed (search-expected.json) and were produced through the desktop's own searchIndex.ts; see ConformanceTests.swift for
 // how to run this. Set SEARCH_REPORT=1 to print every query that differs.
 //

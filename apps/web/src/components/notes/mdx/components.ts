@@ -5,6 +5,7 @@ import { Drawio } from "./Drawio";
 import { Footnotes } from "./Footnotes";
 import { Image } from "./Image";
 import { Info } from "./Info";
+import { Ink } from "./Ink";
 import { Mark } from "./Mark";
 import { Repo } from "./Repo";
 import { renderKey } from "./remarkRestrictMdx";
@@ -37,7 +38,7 @@ export const mdxComponents: Record<
     y?: string;
     height?: string;
   }>
-> = { Info, Warning, Image, Drawio, Toc, Mark, Footnotes, YouTube, Repo, Chart, Sheet };
+> = { Info, Warning, Image, Drawio, Ink, Toc, Mark, Footnotes, YouTube, Repo, Chart, Sheet };
 
 const names = Object.keys(mdxComponents);
 

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SPIKE S5 (Windows only). WRITTEN ON macOS, NEVER BUILT OR RUN ON WINDOWS: every claim about this project is "unverified" until
+    someone runs shell/README.md on a Windows machine. What was checked on the Mac: `dotnet restore` resolves Microsoft.WindowsAppSDK 2.6.5
+    for net9.0-windows10.0.19041.0 (win-x64 and win-arm64), and its managed assets are net6.0-windows10.0.17763.0, which a net10.0-windows
+    project can consume. Not checked: the XAML compiler, any API call below, .NET 10 with this Windows App SDK.
+    Unpackaged and self-contained, as decided (D4): no MSIX, the Windows App SDK runtime is copied beside the exe.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Composition.Shell.Spike</RootNamespace>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
+  </ItemGroup>
+
+  <!-- The preview page from spikes/preview (build it first with preview/build.sh), copied beside the exe. -->
+  <ItemGroup Condition="Exists('..\preview\dist\index.html')">
+    <Content Include="..\preview\dist\**" Link="preview\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

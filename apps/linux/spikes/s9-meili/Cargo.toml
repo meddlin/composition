@@ -1,0 +1,17 @@
+# Spike S9: Meilisearch as a bundled sidecar, driven from Rust the way the desktop's meili.ts and searchIndex.ts drive it.
+# Not part of any workspace and not built by CI (see ../README.md).
+[package]
+name = "composition-meili-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+composition-core-spike = { path = "../s1-core" }
+libc = "0.2"
+serde_json = "=1.0.154"
+ureq = { version = "=3.5.1", features = ["json"] }
+
+[dev-dependencies]
+tempfile = "3"
+serde = { version = "1", features = ["derive"] }

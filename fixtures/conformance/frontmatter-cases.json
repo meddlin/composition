@@ -1,0 +1,1215 @@
+{
+ "comment": "Build plan Step 3: frontmatter. What the desktop's frontmatter.ts (js-yaml) makes of each case; the Swift NoteFrontmatter must agree (frontmatter-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
+ "parse": [
+  "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
+  "---\r\ntitle: Alpha\r\ndescription: ''\r\ntags:\r\n- x\r\n- y\r\ncreatedAt: 2026-11-06\r\nupdatedAt: 2026-11-06\r\n---\r\n# Body\r\n",
+  "# No block\n\nsome text\n---\nnot: frontmatter\n---\n",
+  "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n",
+  "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---",
+  "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---   \nafter",
+  "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---x\nmore\n---\nbody",
+  "---\n---\nbody",
+  "---\n\n---\nbody",
+  "--- \ntitle: a\n---\nbody",
+  "\n---\ntitle: a\n---\nbody",
+  " ---\ntitle: a\n---\nbody",
+  "---\ntitle: a\n---\n---\ntitle: b\n---\n",
+  "---\ntitle: Hello\n---\n# Body\n",
+  "---\ntitle: \"Hello: world\"\n---\n# Body\n",
+  "---\ntitle: 'It''s'\n---\n# Body\n",
+  "---\ntitle: Hello: world\n---\n# Body\n",
+  "---\ntitle: Hello # not part\n---\n# Body\n",
+  "---\ntitle: Hello#part\n---\n# Body\n",
+  "---\ntitle: \"tab\\there\"\n---\n# Body\n",
+  "---\ntitle: \"line\\nbreak\"\n---\n# Body\n",
+  "---\ntitle: ' spaced '\n---\n# Body\n",
+  "---\ntitle: 日本語 😀\n---\n# Body\n",
+  "---\ntitle:\n---\n# Body\n",
+  "---\ntitle: ~\n---\n# Body\n",
+  "---\ntitle: null\n---\n# Body\n",
+  "---\ntitle: Null\n---\n# Body\n",
+  "---\ntitle: 123\n---\n# Body\n",
+  "---\ntitle: 1.50\n---\n# Body\n",
+  "---\ntitle: true\n---\n# Body\n",
+  "---\ntitle: True\n---\n# Body\n",
+  "---\ntitle: yes\n---\n# Body\n",
+  "---\ntitle: 0x1F\n---\n# Body\n",
+  "---\ntitle: 1e3\n---\n# Body\n",
+  "---\ntitle: 1_000\n---\n# Body\n",
+  "---\ntitle: .5\n---\n# Body\n",
+  "---\ntitle: -7\n---\n# Body\n",
+  "---\ntitle: +7\n---\n# Body\n",
+  "---\ntitle: 0o17\n---\n# Body\n",
+  "---\ntitle: 0b101\n---\n# Body\n",
+  "---\ntitle: .inf\n---\n# Body\n",
+  "---\ntitle: 2026-11-06\n---\n# Body\n",
+  "---\ntitle: 2026-11-06T09:30:00Z\n---\n# Body\n",
+  "---\ntitle: |\n  literal\n  text\ndescription: x\n---\n# Body\n",
+  "---\ntitle: >-\n  folded\n  text\ndescription: x\n---\n# Body\n",
+  "---\ntitle: |-\n  a\n\n  b\ndescription: x\n---\n# Body\n",
+  "---\ntitle: first\n  second\n  third\n---\n# Body\n",
+  "---\ntitle: \"multi\n  line\"\n---\n# Body\n",
+  "---\ntags: [a, b]\n---\n# Body\n",
+  "---\ntags: [a, 'b c', \"d\"]\n---\n# Body\n",
+  "---\ntags: []\n---\n# Body\n",
+  "---\ntags:\n---\n# Body\n",
+  "---\ntags: a, b\n---\n# Body\n",
+  "---\ntags: a\n---\n# Body\n",
+  "---\ntags:\n  - a\n  - b\n---\n# Body\n",
+  "---\ntags:\n- a\n- b\n---\n# Body\n",
+  "---\ntags:\n- 1\n- true\n- null\n- x\n---\n# Body\n",
+  "---\ntags:\n  - ' a '\n  - ''\n  - b\n---\n# Body\n",
+  "---\ntags: 5\n---\n# Body\n",
+  "---\ntags: {a: 1}\n---\n# Body\n",
+  "---\ntags:\n- [a, b]\n- c\n---\n# Body\n",
+  "---\ncreatedAt: 2026-11-06\n---\n# Body\n",
+  "---\ncreatedAt: 2026-11-06T09:30:00Z\n---\n# Body\n",
+  "---\ncreatedAt: 2026-11-06 09:30:00\n---\n# Body\n",
+  "---\ncreatedAt: 2026-11-06T09:30:00.123+02:00\n---\n# Body\n",
+  "---\ncreatedAt: '2026-11-06'\n---\n# Body\n",
+  "---\ncreatedAt: \"2026-11-06T09:30:00.000Z\"\n---\n# Body\n",
+  "---\ncreatedAt: yesterday\n---\n# Body\n",
+  "---\ncreatedAt: 20261106\n---\n# Body\n",
+  "---\ncreatedAt:\n---\n# Body\n",
+  "---\nupdatedAt: 2026-02-30\n---\n# Body\n",
+  "---\ncreatedAt: 2026-1-6\n---\n# Body\n",
+  "---\ndescription: Something: else\n---\n# Body\n",
+  "---\ndescription: |\n  line one\n  line two\ntitle: T\n---\n# Body\n",
+  "---\ndescription: >\n  folded\n  text\ntitle: T\n---\n# Body\n",
+  "---\ndescription: ''\n---\n# Body\n",
+  "---\ndescription: \"\"\n---\n# Body\n",
+  "---\ndescription:\n---\n# Body\n",
+  "---\nheaderImage: app_data/x.png\n---\n# Body\n",
+  "---\nheaderImage: app_data/x.png\nheaderImageLayout: centered\n---\n# Body\n",
+  "---\nheaderImage: app_data/x.png\nheaderImageLayout: FULL\n---\n# Body\n",
+  "---\nheaderImage: app_data/x.png\nheaderImageLayout: weird\n---\n# Body\n",
+  "---\nheaderImage: ''\n---\n# Body\n",
+  "---\nheaderImage: '   '\n---\n# Body\n",
+  "---\nheaderImage: https://example.com/a.png\nheaderImageLayout: Centered\n---\n# Body\n",
+  "---\nheaderImageLayout: centered\n---\n# Body\n",
+  "---\njust some words\n---\n# Body\n",
+  "---\n- a\n- b\n---\n# Body\n",
+  "---\n\"quoted\"\n---\n# Body\n",
+  "---\n42\n---\n# Body\n",
+  "---\ntitle: [unclosed\n---\n# Body\n",
+  "---\ntitle: a\n\ttags: b\n---\n# Body\n",
+  "---\ntitle: a\ntitle: b\n---\n# Body\n",
+  "---\n: bad\n---\n# Body\n",
+  "---\n# only a comment\n---\n# Body\n",
+  "---\n# comment\ntitle: a\n---\n# Body\n",
+  "---\ntitle: a # trailing comment\ntags: x\n---\n# Body\n",
+  "---\ntitle: a\nunknown:\n  nested:\n    deep: 1\n  list:\n  - 1\n  - 2\ntags: z\n---\n# Body\n",
+  "---\na: &x 1\nb: *x\ntitle: t\n---\n# Body\n",
+  "---\ntitle: !!str 123\n---\n# Body\n",
+  "---\ntitle: a\nlist: [1, 2,\n  3]\ntags: q\n---\n# Body\n",
+  "---\ntitle: a\n---\ntitle: b\n---\n# Body\n",
+  "---\nbase: &b\n  x: 1\nother:\n  <<: *b\ntitle: t\n---\n# Body\n",
+  "---\ntitle: 'unterminated\n---\n# Body\n",
+  "---\ntitle: \"bad \\q escape\"\n---\n# Body\n",
+  "---\ntitle: a\n  bad indent: b\n---\n# Body\n",
+  "---\ntitle: a\n invalid\n---\n# Body\n",
+  "---\nkey with spaces: value\ntitle: t\n---\n# Body\n",
+  "---\n? complex\n: value\ntitle: t\n---\n# Body\n",
+  "---\ntitle: a\r\ntags:\r\n- x\r\n- y\r\ncreatedAt: 2026-11-06\r\n\n---\n",
+  "---\r\ntitle: a\r\n---\r\nbody\r\n"
+ ],
+ "generate": [
+  {
+   "title": "Alpha",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Hello world",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Notes on Rust",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Hello: world",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "key: value",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Hello #1",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "x#y",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "- item",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "-item",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "- ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "? what",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ": x",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "@at",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "`tick",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "%pct",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "!bang",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "&anchor",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "*star",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "[brackets]",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "{braces}",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "|pipe",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ">gt",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "'single'",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "\"double\"",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "it's",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "say \"hi\"",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "back\\slash",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "~",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "~tilde",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "true",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "True",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "TRUE",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "false",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "null",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Null",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "NULL",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "yes",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "no",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "on",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "off",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "y",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "n",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "123",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "1.5",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ".5",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "5.",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "1e3",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "1E3",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "0x10",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "0o7",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "0b1",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "+1",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "-1",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "1_0",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ".inf",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "-.inf",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ".NaN",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": ".nan",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "<<",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "=",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "2026-11-06",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "2026-11-06T09:30:00Z",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "2026-11-06 09:30:00",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "2026-1-6",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "12:30",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "1:2:3",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": " leading",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "trailing ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "  both  ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": " ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "日本語",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "😀 emoji",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "café",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "tab\there",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "line\nbreak",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "two\nlines\nhere",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "ends newline\n",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "\nstarts newline",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "word word word word word word word word word word word word word word word word word word word word ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "longer longer longer longer longer longer longer longer longer longer longer longer longer longer longer",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "colon at end:",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a:b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a: ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a :b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "#",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "# lead",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a #b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": " ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "ctrl\u0001char",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "bell\u0007",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "del",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "nbsp ",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "﻿bom",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "end?",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a,b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "[a,b]",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a, b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a - b",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "a\tb",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "a",
+    "b"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "a b",
+    "c-d"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "1",
+    "true",
+    "null",
+    "x:y",
+    "#h",
+    "- d"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "日本",
+    "😀"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    ""
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "a"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [
+    "Tag With Caps",
+    "snake_case",
+    "kebab-case",
+    "with.dot",
+    "with/slash"
+   ],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "A description"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "With: colon"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "multi\nline"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "'quoted'"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "true"
+  },
+  {
+   "title": "T",
+   "createdAt": "2026-11-06T09:30:00.000Z",
+   "updatedAt": "2026-11-06T09:30:00.000Z",
+   "tags": [],
+   "description": "123"
+  },
+  {
+   "title": "Dates",
+   "createdAt": "2026-11-06T00:00:00.000Z",
+   "updatedAt": "2026-12-31T23:59:59.999Z",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Odd dates",
+   "createdAt": "not a date",
+   "updatedAt": "2026-11-06",
+   "tags": [],
+   "description": ""
+  },
+  {
+   "title": "Odd dates 2",
+   "createdAt": "2026-11-06 09:30",
+   "updatedAt": "",
+   "tags": [],
+   "description": ""
+  }
+ ],
+ "header": [
+  {
+   "content": "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
+   "header": null,
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "# No frontmatter\n\ntext\n",
+   "header": null,
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: a\nheaderImage: app_data/old.png\nheaderImageLayout: centered\n---\nbody\n",
+   "header": null,
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\njust words\n---\nbody",
+   "header": null,
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "# No frontmatter\n\ntext\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: a\nheaderImage: app_data/old.png\nheaderImageLayout: centered\n---\nbody\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\njust words\n---\nbody",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "centered"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "# No frontmatter\n\ntext\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "centered"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: a\nheaderImage: app_data/old.png\nheaderImageLayout: centered\n---\nbody\n",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "centered"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\njust words\n---\nbody",
+   "header": {
+    "image": "app_data/x.png",
+    "layout": "centered"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
+   "header": {
+    "image": "https://example.com/a b.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "# No frontmatter\n\ntext\n",
+   "header": {
+    "image": "https://example.com/a b.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\ntitle: a\nheaderImage: app_data/old.png\nheaderImageLayout: centered\n---\nbody\n",
+   "header": {
+    "image": "https://example.com/a b.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  },
+  {
+   "content": "---\njust words\n---\nbody",
+   "header": {
+    "image": "https://example.com/a b.png",
+    "layout": "full"
+   },
+   "fallback": {
+    "title": "Fallback title",
+    "createdAt": "2026-11-05T01:02:03.000Z",
+    "updatedAt": "2026-11-06T04:05:06.000Z"
+   }
+  }
+ ],
+ "tags": {
+  "toString": [
+   [
+    "a",
+    "b"
+   ],
+   [
+    " a ",
+    "",
+    "b "
+   ],
+   [],
+   [
+    "x"
+   ],
+   [
+    "a,b"
+   ]
+  ],
+  "fromString": [
+   "a,b",
+   " a , b ,, c ",
+   "",
+   ",,,",
+   "one",
+   "a, b,c ,"
+  ]
+ }
+}

@@ -3,6 +3,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { ImageWidget } from "./liveImages";
+import { InkWidget } from "./liveInk";
 import { bodyStart, scanOf, liveDecorations } from "./liveMarkdown";
 
 type Found = { from: number; to: number; kind: string };
@@ -372,7 +373,7 @@ describe("syntax colours", () => {
 
 describe("images", () => {
   /** The pictures drawn for `text` with the caret at `caret`: where, whether in place of the text or beside it, and what. */
-  function pictures(text: string, caret: number | [number, number]) {
+  function pictures(text: string, caret: number | [number, number], Widget: typeof ImageWidget | typeof InkWidget = ImageWidget) {
     const [from, to] = typeof caret === "number" ? [caret, caret] : caret;
     const state = EditorState.create({
       doc: text,
@@ -384,7 +385,7 @@ describe("images", () => {
     const found: { from: number; to: number; beside: boolean; spec: ImageWidget["spec"] }[] = [];
     set.between(0, state.doc.length, (start, end, value) => {
       const widget = value.spec.widget;
-      if (widget instanceof ImageWidget) found.push({ from: start, to: end, beside: widget.beside, spec: widget.spec });
+      if (widget instanceof Widget) found.push({ from: start, to: end, beside: widget.beside, spec: widget.spec });
     });
     return found;
   }
@@ -460,6 +461,34 @@ describe("images", () => {
     it("leaves a tag in code alone", () => {
       expect(pictures(`\`${tag}\``, 0)).toEqual([]);
       expect(pictures(`\`\`\`\n${tag}\n\`\`\``, 0)).toEqual([]);
+    });
+  });
+
+  describe("<Ink />", () => {
+    const tag = '<Ink src="app_data/sketch-0123456789ab.png" alt="the sketch" width="80%" />';
+    const inks = (text: string, caret: number | [number, number]) => pictures(text, caret, InkWidget);
+
+    it("is drawn from its strokes in place of the tag, with its alt text and width, and not as an image", () => {
+      const text = `see\n\n${tag}\n\nafter`;
+      expect(inks(text, 0)).toEqual([
+        { from: 5, to: 5 + tag.length, beside: false, spec: { src: "app_data/sketch-0123456789ab.png", alt: "the sketch", title: "", width: "80%" } },
+      ]);
+      expect(pictures(text, 0)).toEqual([]);
+    });
+
+    it("keeps the tag, and draws the drawing after it, while the caret is on it", () => {
+      expect(inks(tag, 10)).toMatchObject([{ from: tag.length, to: tag.length, beside: true }]);
+    });
+
+    it("waits for a src, and for the tag to be closed", () => {
+      expect(inks('<Ink alt="x" />', 0)).toEqual([]);
+      expect(inks('<Ink src="app_data/x.png"', 0)).toEqual([]);
+    });
+
+    it("leaves a tag in code alone, and a tag that only starts like it", () => {
+      expect(inks(`\`${tag}\``, 0)).toEqual([]);
+      expect(inks(`\`\`\`\n${tag}\n\`\`\``, 0)).toEqual([]);
+      expect(inks('<Inkwell src="app_data/x.png" />', 0)).toEqual([]);
     });
   });
 });

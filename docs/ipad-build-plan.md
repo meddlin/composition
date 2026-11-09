@@ -9,7 +9,7 @@ Pencil) and M3 (the first release) get their own plans when M1 is in hand. Dates
 search; images; the MDX components other than `<Ink>` and `<YouTube>`'s player; the six colour schemes and a System scheme; backup and
 restore both ways; installed on your iPad from Xcode.
 **Out of scope:** `<Ink>` and the Pencil canvas (M2), the release polish and TestFlight (M3), sync, the plugins, **any AI helper
-([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)): **it is in v1** (you, 2026-11-08) but not in M1: it is built right after M1 closes, before M2 (see [After M1: the Live view](#after-m1-the-live-view)).
+([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)): **it is in v1** (you, 2026-11-08) but not in M1: it is built right after M1 closes, before M2 (see [After M1: the Live view](#after-m1-the-live-view)); **it is built and checked in the Simulator (2026-11-09), and Gate L, the author's iPad, is what is left.**
 
 ## Where M1 starts
 
@@ -67,7 +67,7 @@ Recommendations are mine. **G1 and G2 were decided on 2026-11-06 (Gate A is pass
 ## Build order
 
 Each step ends in something checkable. Steps 1 to 3 touch different Swift files and different fixtures, so they can run as **separate
-sessions at the same time**; give each its own `ios-conformance-<name>.test.ts` in `apps/web/scripts`, because the one shared fixtures file would
+sessions at the same time**; give each its own `conformance-<name>.test.ts` in `apps/web/scripts`, because the one shared fixtures file would
 conflict. Steps 4 and 5 are app-side and independent of 1 to 3. Step 6 needs 2 to 5. A cold `xcodebuild` took over ten minutes here, so
 the core is developed with `swift test` and the app is built only to look at it.
 
@@ -85,7 +85,7 @@ has to add the system's other window sizes. Steps 1 to 6 have been checked that 
 2. **Store operations.** Ports of `notesRepo`, `groupsRepo` and `notebooksRepo`: the same SQL, errors (`GroupNotEmptyError`,
    `InvalidGroupMoveError`, `LastNotebookError`…), ordering (`placeNote`, `placeGroup`, `placeNotebook`), `updated_at`, and the `uuid` left to
    the trigger. Every write also keeps `search.db` in step (`upsert` and `remove`, then `markCurrent`). A script like the Trash Can's
-   (`apps/ios/conformance/store-script.json`) is run through the desktop's real repos, every table dumped after each step; Swift runs the
+   (`fixtures/conformance/store-script.json`) is run through the desktop's real repos, every table dumped after each step; Swift runs the
    same script and compares. Check: the script passes, and a copy of your own database opens, takes a hundred operations and still restores on the desktop.
    **Done 2026-11-06 (the core; no screens yet):** `Store/` has the three repositories (`NotebooksStore`, `GroupsStore`, `NotesStore`: the desktop's SQL, errors and
    ordering) and `NoteStore`, the data operations of `service.ts` with the search index kept in step. The 98 steps of `store-script.json` (every create, save, move,
@@ -185,13 +185,17 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 ## After M1: the Live view
 
-**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). A short note on how; it is planned in step form when M1 is done.
+**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). The step-by-step plan is [ipad-live-view-plan.md](ipad-live-view-plan.md) (written 2026-11-08; its six decisions were taken as proposed); a short note on how follows.
 
 - **The spec** is the desktop's Live tab (CodeMirror 6, PRs #223, #234 and #235): the note drawn as it will read, with the syntax shown only where the caret is, headings and rules drawn large, images inline.
 - **The starting point** is in the lab: *Hide: tiny and clear* (a tiny, clear font on the marks outside the caret's line), which "works well" on the iPad (item 17), with `HighlightModel` for the marks and `LiveReveal` for what stays showing (the caret's line, or the whole of a code block, so both fences show).
 - **To build:** a fourth tab beside Markdown, Preview and Split; headings, rules and images drawn as they will read; the rule for what stays showing, for the other multi-line things (lists, quotes, tables) as well as code; the arrow keys and selection handles across hidden marks; undo and the Pencil (Scribble) with marks hidden; VoiceOver, which reads marks that are only invisible (an accessibility label for the text, or hiding them from VoiceOver too, to be tried on the iPad).
 - **Checked by:** unit tests of the reveal rules, UI tests that move the caret through a note, and new items on the manual test page.
 - **If it does not come out well,** it ships reduced (the Markdown tab is the fallback, [C12](ipad-app-design.md#compromise-register)).
+- **Built (2026-11-08 and 2026-11-09, Simulator): steps L0 to L8 of [the plan](ipad-live-view-plan.md).** The fourth tab, the model checked against the desktop's own `liveDecorations`, headings, bold, italic, strikethrough and code drawn as such, marks hidden away from the caret and shown by construct, rules, pictures, `<Mark>` tints, the frontmatter; **the arrow keys, selection, Backspace and forward delete, undo, paste, ⌘B, ⌘I, Tab and the list after `<` across hidden marks are checked at every press in UI tests** (no hidden character is ever beside the caret), and a composition (Scribble, dictation) leaves the look alone until it ends; VoiceOver is given the text with the hidden marks silenced and headings marked, the other value (without the marks) staying behind the lab's switch; Dynamic Type, Increase Contrast, the dimmed syntax's contrast in every scheme and Xcode's audit are done; **no length limit** (a keystroke is 5 ms at 100,000 characters and 13 ms at 404,609 in a Release Simulator build). **What differs from the desktop's Live tab:** fences hidden outside a block, highlights and pictures at any length, a picture in the middle of a sentence left as text.
+- **What is left is the author's iPad (Gate L):** [manual-test](manual-tests/ipad.md) items 91 to 105, 116 to 124 and 125 to 136: how the keys and a finger feel across hidden marks, the Pencil and dictation, **VoiceOver (not decided)**, speed on the iPad, and L4's pictures, tints, rule and frontmatter, which have not been tried there yet.
+
+**M1 is done (the author, 2026-11-08).** The code is merged ([#247](https://github.com/meddlin/composition/pull/247)), every M1 row is built, Gate B was answered on the iPad (typing speed, Scribble and the Pencil in a text view, hidden marks, VoiceOver), and the author has run the manual test page's checks on a Release build and calls it done. What was **not** re-checked by anyone but the author, and so is not in any test: the real Split View, Slide Over and Stage Manager as a person would use them, and the export-and-restore round trip by hand. The next piece of work is [the Live view](ipad-live-view-plan.md).
 
 ## Risks
 
@@ -203,7 +207,7 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 | Frontmatter YAML differs between `js-yaml` and the iPad's parser | Medium / medium | [G6](#decisions-to-make); the corpus; the desktop's "not a mapping, so no frontmatter" rule. |
 | Restoring an iPad backup changes the desktop's settings | Medium / medium | [G5](#decisions-to-make); Step 1 tests it through the real restore first. |
 | The Pencil or Scribble misbehaves in the editor (a composition is cut, a stroke is lost) | Unknown / high | The colouring skips compositions by design; items 14 to 16 of the manual test; Gate B. |
-| Hiding marks reads badly to VoiceOver, or the arrow keys and selection handles misbehave across them | Medium / medium: the Live tab is in v1 | [G7](#decisions-to-make), reversed: it is in v1, built right after M1. Item 17 of the manual test says how bad it is; the Live tab can ship reduced, with the Markdown tab as the fallback. |
-| Parallel sessions collide on the shared fixtures file | High if ignored | One `ios-conformance-<name>.test.ts` per port. |
+| Hiding marks reads badly to VoiceOver, or the arrow keys and selection handles misbehave across them | Medium / medium: the Live tab is in v1 | [G7](#decisions-to-make), reversed: it is in v1, built right after M1. **Built: the keys are checked across hidden marks at every press in the Simulator and do not misbehave; VoiceOver is the open part** (the marks are silenced and headings marked in the value it is given; whether it honours that is items 100 to 103 and 131). The Live tab can ship reduced, with the Markdown tab as the fallback. |
+| Parallel sessions collide on the shared fixtures file | High if ignored | One `conformance-<name>.test.ts` per port. |
 | Your notes differ from the synthetic ones (long notes, odd frontmatter, many images) | Medium / medium | Your own backup in every step's check; the manual test asks for notes that look wrong. |
 | The CI job runs on a preview Xcode image | Low / low | The fallback is written into [ios-core.yml](../.github/workflows/ios-core.yml). |

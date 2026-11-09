@@ -3,6 +3,7 @@ import type { EditorState, Extension, Range } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
 import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
+import { InkWidget } from "./liveInk";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
 import { tokenizeMarkdown, type TokenKind } from "./markdownTokens";
 import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
@@ -76,9 +77,11 @@ export type NoteScan = {
   tokens: readonly Token[];
   /** Each `<Image … />`, to draw (Markdown's `![alt](src)` is found in the syntax tree instead). */
   images: readonly ImageElement[];
+  /** Each `<Ink … />`, to draw from its strokes. */
+  inks: readonly ImageElement[];
 };
 
-const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [], images: [] };
+const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [], images: [], inks: [] };
 
 /**
  * Reads the note the way the plain editor does to colour it: its runs (`tokenizeMarkdown`), the text between each
@@ -96,8 +99,9 @@ export function scanOf(text: string): NoteScan {
     at += run.length;
   }
   const images = imageElements(text, segments);
-  if (!text.includes("<Mark")) return { tints: [], elements: [], tokens, images };
-  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens, images };
+  const inks = imageElements(text, segments, "Ink");
+  if (!text.includes("<Mark")) return { tints: [], elements: [], tokens, images, inks };
+  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens, images, inks };
 }
 
 /** What a Markdown `![alt](src "title")` shows, or null when it has no address of its own (`![alt][ref]`). */
@@ -117,9 +121,9 @@ function markdownImage(state: EditorState, image: SyntaxNode): NoteImageSpec | n
  * Draws a picture in place of the text that writes it. While the caret is on that text it stays, as the syntax of
  * anything does, and the picture is drawn after it, so what is being typed or edited is the text and is still seen.
  */
-function drawImage(decorations: Range<Decoration>[], image: NoteImageSpec, from: number, to: number, active: boolean) {
-  if (active) decorations.push(Decoration.widget({ widget: new ImageWidget(image, true), side: 1 }).range(to));
-  else decorations.push(Decoration.replace({ widget: new ImageWidget(image, false) }).range(from, to));
+function drawImage(decorations: Range<Decoration>[], image: NoteImageSpec, from: number, to: number, active: boolean, Widget: typeof ImageWidget | typeof InkWidget = ImageWidget) {
+  if (active) decorations.push(Decoration.widget({ widget: new Widget(image, true), side: 1 }).range(to));
+  else decorations.push(Decoration.replace({ widget: new Widget(image, false) }).range(from, to));
 }
 
 /**
@@ -196,6 +200,9 @@ export function liveDecorations(
   }
   for (const { start, end, ...image } of scan.images) {
     if (end <= doc.length) drawImage(decorations, image, start, end, touches(state, start, end));
+  }
+  for (const { start, end, ...drawing } of scan.inks) {
+    if (end <= doc.length) drawImage(decorations, drawing, start, end, touches(state, start, end), InkWidget);
   }
   for (const { open, close } of scan.elements) {
     if (close.end > doc.length) continue;
@@ -277,6 +284,8 @@ const liveTheme = EditorView.baseTheme({
   // A picture drawn in the text: never wider than the note, and sitting on the line like a word.
   ".cm-live-image": { display: "inline-block", maxWidth: "100%", verticalAlign: "bottom" },
   ".cm-live-image img": { display: "block", maxWidth: "100%", height: "auto" },
+  // A drawing is an SVG; its colours are the page's tokens (`--foreground`), so a scheme restyles it.
+  ".cm-live-image svg": { display: "block", maxWidth: "100%", height: "auto" },
   ".cm-live-image-missing": { color: "var(--muted-foreground)", fontStyle: "italic" },
   ".cm-live-frontmatter": {
     fontFamily: "var(--editor-font, var(--font-mono))",

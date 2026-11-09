@@ -2,7 +2,7 @@
  * What the preview draws for a note.
  *
  * A note stays Markdown, but may use the same few JSX tags as in the web and desktop apps
- * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`, `<Sheet>`), and may hold images and
+ * (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Ink>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`), and may hold images and
  * footnotes. The terminal can't render those as React or as HTML, so this turns the note into a
  * list of blocks the preview draws: stretches of plain Markdown (still drawn by OpenTUI's
  * `<markdown>`, exactly as before), panels around other blocks, a table of contents, a list of
@@ -25,7 +25,7 @@ import { HEADINGS_PROP, calculate, imageNameFromRef, isTotalsRow, parseChart, pa
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart", "Sheet"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Ink", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart", "Sheet"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -199,9 +199,11 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "panel", tone: "info", blocks: blocksOf(element.children ?? [], source) }];
     case "Warning":
       return [{ kind: "panel", tone: "warning", blocks: blocksOf(element.children ?? [], source) }];
-    // A diagram is a stored picture to the terminal, which has no editor to draw it in.
+    // A diagram is a stored picture to the terminal, which has no editor to draw it in; so is a drawing, whose PNG
+    // already shows what the strokes inside it draw (in the colours of the scheme it was saved in).
     case "Image":
-    case "Drawio": {
+    case "Drawio":
+    case "Ink": {
       const src = attribute(element, "src");
       const name = src ? imageNameFromRef(src) : null;
       if (name) {
@@ -268,6 +270,7 @@ function replacement(element: Node, source: string): string {
   switch (componentOf(element)) {
     case "Image":
     case "Drawio":
+    case "Ink":
       return imageMarkdown(element);
     case "YouTube":
       return youtubeMarkdown(element);

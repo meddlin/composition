@@ -178,6 +178,21 @@ describe("images in the preview", () => {
     expect(backgroundAt(app, picture.row + 2, picture.column + 2)).toBe("#0000FF");
   });
 
+  it("draws an <Ink> drawing's PNG: the pixels its strokes were drawn as, with its private chunks left unread", async () => {
+    // The corpus's own sample (fixtures/conformance/ink): a PNG with the stroke JSON in an `inKJ` chunk, which a decoder skips.
+    const sample = new Uint8Array(fs.readFileSync(path.join(__dirname, "../../../fixtures/conformance/ink/sample.png")));
+    const app = await open(async (id) => `Before.\n\n<Ink src="${await store(id, sample)}" alt="Sketch" width="80%" />\n\nAfter.`);
+
+    const [picture] = pictures(app);
+    expect(picture).toBeDefined();
+    expect(frame(app)).toContain("Before.");
+    expect(frame(app)).toContain("After.");
+    expect(frame(app)).not.toContain("<Ink");
+    expect(frame(app)).not.toContain("Unknown component");
+    expect(frame(app)).not.toContain("Sketch"); // the alt text is for when there is no picture
+    expect(picture.rows).toBeGreaterThan(2);
+  });
+
   it("draws one inside an <Info> panel, within its border", async () => {
     const app = await open(async (id) => `<Info>\n\nCaption.\n\n![Green](${await store(id, makePng(300, 100, [0, 200, 0]))})\n\n</Info>`);
 

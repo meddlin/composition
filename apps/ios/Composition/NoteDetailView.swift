@@ -3,11 +3,12 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// One note, with the three tabs of the design: **Markdown** (the editor), **Preview** (Markdown and the components, drawn from what is typed, not
-/// only from what is saved) and **Split** (both, side by side, or one above the other in a narrow window, with a divider that can be dragged). The Live tab is the next tab to come (C12, in v1).
+/// One note, with the four tabs of the design: **Markdown** (the editor), **Live** (the editor with the syntax hidden away from the caret: the note drawn
+/// as it will read), **Preview** (Markdown and the components, drawn from what is typed, not only from what is saved) and **Split** (Markdown and Preview, side
+/// by side, or one above the other in a narrow window, with a divider that can be dragged).
 /// The note's `NoteSession` is open for as long as the note is on screen, so that every tab shows the same text and saving is one thing.
 struct NoteDetailView: View {
-    enum Mode: String, CaseIterable { case markdown = "Markdown", preview = "Preview", split = "Split" }
+    enum Mode: String, CaseIterable { case markdown = "Markdown", live = "Live", preview = "Preview", split = "Split" }
 
     let model: AppModel
     let noteID: Int64
@@ -36,7 +37,9 @@ struct NoteDetailView: View {
         Group {
             if let session {
                 switch mode {
-                case .markdown: editor(session)
+                // One branch for both writing tabs, so that going from one to the other does not rebuild the text view: the caret, the keyboard and the
+                // scroll stay where they are.
+                case .markdown, .live: editor(session, live: mode == .live)
                 case .preview: NoteReader(model: model, session: session)
                 case .split:
                     SplitLayout {
@@ -69,7 +72,7 @@ struct NoteDetailView: View {
             }
             if sizeClass != .compact {
                 ToolbarItem(placement: .principal) {
-                    Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented).frame(minWidth: 210, maxWidth: 300)
+                    Picker("View", selection: $mode) { ForEach(Mode.allCases, id: \.self) { Text($0.rawValue) } }.pickerStyle(.segmented).frame(minWidth: 270, maxWidth: 380)
                 }
             }
             ToolbarItemGroup(placement: .primaryAction) {
@@ -135,9 +138,9 @@ struct NoteDetailView: View {
             .keyboardShortcut("x", modifiers: [.command, .shift])
     }
 
-    private func editor(_ session: NoteSession) -> some View {
+    private func editor(_ session: NoteSession, live: Bool = false) -> some View {
         // A note that was just made opens with the caret at the end, after its frontmatter; one that was open before the app was ended, where it was.
-        NoteEditorView(session: session, handle: handle, initialCaret: focusOnOpen ? .max : (caretNote == Int(noteID) ? caret : 0), focusOnOpen: focusOnOpen) { offset in
+        NoteEditorView(session: session, handle: handle, initialCaret: focusOnOpen ? .max : (caretNote == Int(noteID) ? caret : 0), focusOnOpen: focusOnOpen, live: live) { offset in
             caret = offset
             caretNote = Int(noteID)
         }
@@ -148,7 +151,7 @@ struct NoteDetailView: View {
     private func open() async {
         close()
         #if DEBUG || EDITOR_TEST_HOOKS
-        // Developer shortcut: `-openMode Markdown` (or Preview, Split) at launch.
+        // Developer shortcut: `-openMode Markdown` (or Live, Preview, Split) at launch.
         if let name = UserDefaults.standard.string(forKey: "openMode"), let forced = Mode(rawValue: name) { mode = forced }
         #endif
         // A note that was just made opens in the editor, with the keyboard up.

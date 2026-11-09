@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Build plan Step 8: the desktop's `images.ts`, `imageRefs.ts` and `imageToMdx.ts`, against the real functions. The inputs are
-// apps/ios/conformance/images-cases.json (75 byte strings to sniff, 160 names, 24 real stores into a folder, alt text, Markdown and tags for 19
+// fixtures/conformance/images-cases.json (75 byte strings to sniff, 160 names, 24 real stores into a folder, alt text, Markdown and tags for 19
 // names, 11 notes' image references, and 1,504 cursors and selections over texts for the conversion to `<Image />` tags); what the desktop
 // made of each is images-expected.json (see ConformanceTests.swift for how to run this).
 
