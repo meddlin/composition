@@ -21,6 +21,8 @@ struct NoteDetailView: View {
     @SceneStorage("caretOffset") private var caret = 0
     @SceneStorage("caretNote") private var caretNote = 0
     @State private var session: NoteSession?
+    /// The PDF this note owns, if it owns one (M2).
+    @State private var pdf: PdfSource?
     @State private var handle = EditorHandle()
     @State private var focusOnOpen = false
     @State private var confirmingTrash = false
@@ -39,17 +41,12 @@ struct NoteDetailView: View {
     var body: some View {
         Group {
             if let session {
-                switch mode {
-                // One branch for both writing tabs, so that going from one to the other does not rebuild the text view: the caret, the keyboard and the
-                // scroll stay where they are.
-                case .markdown, .live: editor(session, live: mode == .live)
-                case .preview: NoteReader(model: model, session: session)
-                case .split:
-                    SplitLayout {
-                        editor(session)
-                    } trailing: {
-                        NoteReader(model: model, session: session)
-                    }
+                if let pdf {
+                    // A note that owns a PDF: the PDF beside it where there is room, and a switch between them where there is not.
+                    PdfWithNote(model: model, source: pdf) { noteContent(session) }
+                        .id(pdf.document.id)
+                } else {
+                    noteContent(session)
                 }
             } else {
                 ProgressView()
@@ -134,7 +131,7 @@ struct NoteDetailView: View {
         .confirmationDialog("Move this note to the Trash Can?", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Move to Trash Can", role: .destructive) { Task { await model.moveToTrash(noteID) } }
         } message: {
-            Text("It stays there for 60 days and can be restored.")
+            Text("It stays there for 60 days and can be restored." + (pdf.map { " Its PDF (\(DocumentNames.formatBytes($0.document.size))) stays with it, and goes when the note is deleted for good." } ?? ""))
         }
     }
 
@@ -149,6 +146,22 @@ struct NoteDetailView: View {
         Divider()
         Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
             .keyboardShortcut("x", modifiers: [.command, .shift])
+    }
+
+    /// The note itself, in the tab chosen.
+    @ViewBuilder private func noteContent(_ session: NoteSession) -> some View {
+        switch mode {
+        // One branch for both writing tabs, so that going from one to the other does not rebuild the text view: the caret, the keyboard and the
+        // scroll stay where they are.
+        case .markdown, .live: editor(session, live: mode == .live)
+        case .preview: NoteReader(model: model, session: session)
+        case .split:
+            SplitLayout {
+                editor(session)
+            } trailing: {
+                NoteReader(model: model, session: session)
+            }
+        }
     }
 
     private func editor(_ session: NoteSession, live: Bool = false) -> some View {
@@ -170,6 +183,11 @@ struct NoteDetailView: View {
         // A note that was just made opens in the editor, with the keyboard up.
         focusOnOpen = model.takeFreshNote(noteID)
         if focusOnOpen { mode = .markdown }
+        pdf = nil
+        let owned = await model.pdfSource(forNote: noteID)
+        // Another note was chosen while this one was being read: that one opens, not this.
+        guard !Task.isCancelled else { return }
+        pdf = owned
         session = await model.openSession(noteID)
         // What the editor needs to store a picture for this note.
         handle.location = model.location
@@ -226,15 +244,33 @@ struct NoteDetailView: View {
     }
 }
 
+/// What a split's divider is called (for VoiceOver), and which place it keeps: the editor and the preview have one, a PDF and its note another.
+struct SplitLabels {
+    let between: String
+    let first: String
+    let key: String
+    static let editorPreview = SplitLabels(between: "the editor and the preview", first: "editor", key: "")
+    static let pdfAndNote = SplitLabels(between: "the PDF and the note", first: "PDF", key: "Pdf")
+}
+
 /// The editor and the preview together: side by side when there is room, one above the other when there is not. The same views either way,
 /// so turning the iPad does not rebuild the text view. The divider between them can be dragged (or moved with VoiceOver's adjust gesture) to give
 /// either one more room, and a double tap puts it back in the middle; where it was left is kept, one place for side by side and one for stacked.
 struct SplitLayout<Leading: View, Trailing: View>: View {
-    @ViewBuilder let leading: Leading
-    @ViewBuilder let trailing: Trailing
-    @AppStorage("splitFractionSideBySide") private var sideBySide = 0.5
-    @AppStorage("splitFractionStacked") private var stacked = 0.5
+    let leading: Leading
+    let trailing: Trailing
+    private let labels: SplitLabels
+    @AppStorage private var sideBySide: Double
+    @AppStorage private var stacked: Double
     @Environment(\.look) private var look
+
+    init(labels: SplitLabels = .editorPreview, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
+        self.labels = labels
+        self.leading = leading()
+        self.trailing = trailing()
+        _sideBySide = AppStorage(wrappedValue: 0.5, "splitFractionSideBySide\(labels.key)")
+        _stacked = AppStorage(wrappedValue: 0.5, "splitFractionStacked\(labels.key)")
+    }
 
     /// How thick the strip with the divider is: wide enough to take hold of with a finger.
     private static var grip: CGFloat { 20 }
@@ -282,8 +318,8 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
         )
         .onTapGesture(count: 2) { set(0.5, wide: wide) }
         .accessibilityElement()
-        .accessibilityLabel("Divider between the editor and the preview")
-        .accessibilityValue("\(Int((fraction * 100).rounded())) percent editor")
+        .accessibilityLabel("Divider between \(labels.between)")
+        .accessibilityValue("\(Int((fraction * 100).rounded())) percent \(labels.first)")
         .accessibilityHint("Swipe up or down to move it. Double tap to put it in the middle.")
         .accessibilityAdjustableAction { direction in
             let step = 0.1
