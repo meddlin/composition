@@ -353,6 +353,20 @@ struct NoteEditorView: UIViewRepresentable {
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
                 }
             }
+            // `-colourState 1`: an element that says how many full passes the colouring has started and whether it is settled, for the UI tests to see that it comes to rest on a long note.
+            if UserDefaults.standard.bool(forKey: "colourState") {
+                let label = UILabel(frame: CGRect(x: 0, y: 2, width: 2, height: 2))
+                label.isAccessibilityElement = true
+                label.accessibilityIdentifier = "colour-state"
+                label.alpha = 0.02
+                view.addSubview(label)
+                Task { @MainActor [weak styler, weak label] in
+                    while let styler, let label {
+                        label.accessibilityLabel = "passes=\(styler.passesStarted) settled=\(styler.isSettled ? "yes" : "no")"
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                }
+            }
             #endif
             // Hears every edit of this note, this window's too, which it recognises by the text being the same.
             observation = session.observe { [weak self] text in

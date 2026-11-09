@@ -24,6 +24,10 @@ final class MarkdownStyler {
     }
 
     private(set) var measurements = Measurements()
+    /// How many full passes have started, and whether nothing is reading, putting colours on, waiting or due and the colours come from a model: what the UI tests look at to see
+    /// that the colouring settles on a long note.
+    private(set) var passesStarted = 0
+    var isSettled: Bool { model != nil && !passRunning && !passDue && idlePass == nil }
 
     private weak var textView: UITextView?
     private var look: Look
@@ -47,8 +51,14 @@ final class MarkdownStyler {
     private var widthPass: DispatchWorkItem?
     private var pendingEdits = EditAccumulator()
     private var version = 0
+    /// The pause's pass, while it is waiting to start (nil once it has started).
     private var idlePass: DispatchWorkItem?
     private var stepGeneration = 0
+    /// A full pass is under way, reading off the main thread or putting colours on, and only one is at a time: a pass that began putting colours on while another still was
+    /// stopped it, and the one it stopped started another, which stopped it in turn, for ever, on a note long enough for a pass to take more than the pause.
+    private var passRunning = false
+    /// A pass was asked for while one was running; it starts when that one is over.
+    private var passDue = false
     private nonisolated(unsafe) var observer: NSObjectProtocol?
     private let clock = ContinuousClock()
 
@@ -220,7 +230,7 @@ final class MarkdownStyler {
 
     private func scheduleFullPass(after delay: TimeInterval) {
         idlePass?.cancel()
-        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.runFullPass() } }
+        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.idlePass = nil; self?.runFullPass() } }
         idlePass = item
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: item)
     }
@@ -228,6 +238,9 @@ final class MarkdownStyler {
     private func runFullPass() {
         guard let textView else { return }
         guard textView.markedTextRange == nil else { return scheduleFullPass(after: Self.pause) }  // a composition is under way
+        guard !passRunning else { passDue = true; return }
+        passRunning = true
+        passesStarted += 1
         pendingEdits = EditAccumulator()
         let snapshot = textView.nativeText
         let seen = version
@@ -241,7 +254,8 @@ final class MarkdownStyler {
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
-                    guard let self, self.version == seen else { return }  // typed again meanwhile: the next pause reads it again
+                    guard let self else { return }
+                    guard self.version == seen else { return self.endPass() }  // typed again meanwhile: the next pause reads it again
                     self.measurements.fullReadMilliseconds = Self.milliseconds(spent)
                     var dirty = dirty
                     // Highlights, `<Image />` tags and the frontmatter pair across blocks: what the quick reads had moved and what the full read says differ there.
@@ -255,9 +269,9 @@ final class MarkdownStyler {
 
     /// Puts the colours on in small steps, so that the main thread is never held for more than a fraction of a frame; typing stops it.
     private func beginPuttingOn(_ fresh: HighlightModel, live freshLive: LiveModel?, dirty: [NSRange]) {
-        guard let storage = textView?.textStorage else { return }
-        guard isLive == (freshLive != nil) else { return scheduleFullPass(after: 0) }  // the tab changed while it was being read
-        guard fresh.length == storage.length else { return scheduleFullPass(after: Self.pause) }
+        guard let storage = textView?.textStorage else { return endPass() }
+        guard isLive == (freshLive != nil) else { endPass(); return scheduleFullPass(after: 0) }  // the tab changed while it was being read
+        guard fresh.length == storage.length else { endPass(); return scheduleFullPass(after: Self.pause) }
         let text = storage.mutableString
         var steps: [NSRange] = []
         for range in dirty {
@@ -279,17 +293,26 @@ final class MarkdownStyler {
     }
 
     private func putOn(_ steps: [NSRange], from index: Int, using fresh: HighlightModel, generation: Int) {
-        guard index < steps.count else { return }
+        guard index < steps.count else { return endPass() }
         guard generation == stepGeneration, textView?.markedTextRange == nil else {
             // Interrupted: what is on the text is now partly the old colours, so the next full pass starts from nothing.
             model = nil
             live = nil
+            endPass()
             return scheduleFullPass(after: Self.pause)
         }
         let started = clock.now
         applyColours(to: steps[index], using: fresh)
         measurements.worstStepMilliseconds = max(measurements.worstStepMilliseconds, Self.milliseconds(clock.now - started))
         DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.putOn(steps, from: index + 1, using: fresh, generation: generation) } }
+    }
+
+    /// The pass that was running is over, however it ended; the one that was asked for meanwhile, if there is one and nothing is waiting to start already, starts now.
+    private func endPass() {
+        passRunning = false
+        guard passDue else { return }
+        passDue = false
+        if idlePass == nil { scheduleFullPass(after: 0) }
     }
 
     /// In order, with ranges that overlap or touch made into one.
