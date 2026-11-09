@@ -11,10 +11,17 @@ export type MdxCompletion = {
 };
 
 /**
- * What the editor offers after a `<`, one entry per allowed component. Typed
+ * The components the editor offers: every allowed one but `<Ink>`. A drawing is made on the iPad and only shown here (view only,
+ * docs/architecture/ink.md), and the iPad's catalogue has no `Ink` either; the conformance suite compares the two, so `Ink` goes
+ * into both together (here and in `MdxCompletions.swift` / `MdxProps.swift`) or into neither.
+ */
+export type OfferedComponent = Exclude<keyof typeof mdxComponents, "Ink">;
+
+/**
+ * What the editor offers after a `<`, one entry per offered component. Typed
  * against `mdxComponents` so a new component can't ship without one.
  */
-const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> = {
+const catalog: Record<OfferedComponent, Omit<MdxCompletion, "name">> = {
   Info: {
     description: "Callout for background a reader should notice",
     // Blank lines around the content are what make Markdown inside render (see Info).
@@ -31,10 +38,6 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
   Drawio: {
     description: "A draw.io diagram you can edit from the preview (Ctrl/Cmd+Shift+D draws a new one)",
     template: '<Drawio src="$0" alt="" />',
-  },
-  Ink: {
-    description: "A handwritten drawing from the iPad, shown from its strokes (view only)",
-    template: '<Ink src="$0" alt="" />',
   },
   Toc: {
     description: "Table of contents that follows the note's headings",

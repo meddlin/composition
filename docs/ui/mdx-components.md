@@ -370,6 +370,8 @@ ArrowUp/ArrowDown and Enter or Tab, or with the mouse; Escape dismisses it until
 one inserts a ready-to-fill tag and puts the caret where you'd type next (between the blank lines of a
 callout, inside `src=""` for an image).
 
+`<Ink>` is not in the menu: a drawing is made on the iPad and only shown here, and the iPad's catalogue has none either (the two are compared by the conformance suite, so `Ink` would be added to both together).
+
 **Props.** Inside a component's open tag, a space opens a menu of the props the tag doesn't have
 yet, each with a one-line description. Typing narrows it (`<Image wi` leaves `width`). Picking
 one writes `width=""` with the caret between the quotes, and that opens the next menu: the values
@@ -377,8 +379,8 @@ worth trying for that prop.
 
 | Component | Prop | Values offered |
 |---|---|---|
-| `<Image>`, `<Drawio>`, `<Ink>` | `src`, `alt`, `title` | none (free text) |
-| `<Image>`, `<Drawio>`, `<Ink>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
+| `<Image>`, `<Drawio>` | `src`, `alt`, `title` | none (free text) |
+| `<Image>`, `<Drawio>` | `width` | `25%` `50%` `75%` `100%` `200` `400` `600` `800` |
 | `<Mark>` | `color` | the five highlight colors |
 | `<Toc>` | `maxDepth` | `1` to `6` |
 | `<YouTube>` | `url`, `title` | none (free text) |

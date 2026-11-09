@@ -20,7 +20,6 @@ describeParity("MarkdownEditor component completion", (scenario) => {
       expect.stringContaining("<Warning>"),
       expect.stringContaining("<Image>"),
       expect.stringContaining("<Drawio>"),
-      expect.stringContaining("<Ink>"),
       expect.stringContaining("<Toc>"),
       expect.stringContaining("<Mark>"),
       expect.stringContaining("<Footnotes>"),

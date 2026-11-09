@@ -117,7 +117,7 @@ is as dense as these. In a debug build the same measures are about five times sl
 - **Tap a drawing in the preview** opens the canvas on its strokes (PencilKit's blob when it is current, else rebuilt from the strokes). Done stores the new PNG under its new
   name and names it in the note in place of the old; the old file is left for the orphan sweep, as for any image the note no longer names.
 - `NoteScanner.components` has `Ink`, so a note with an `<Ink>` shows it on the iPad, and, now that the web side knows the tag ([Desktop and CLI](#desktop-and-cli)), shows no "Unknown
-  component" notice on the desktop. The iPad has no completions or snippets for `<Ink` yet.
+  component" notice on the desktop. Neither the iPad nor the desktop offers completions, props or a snippet for `<Ink` yet: the conformance suite compares the two catalogues (`MdxCompletions.swift`, `MdxProps.swift` against `completions.ts`, `props.ts`), so `Ink` goes into both together or into neither.
 
 ## Desktop and CLI
 
