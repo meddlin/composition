@@ -166,6 +166,7 @@ struct BrowserView: View {
     private var schemeName: String {
         switch model.appearance.scheme {
         case .system: "System"
+        case .sun: "Follow the sun"
         case .theme(let name): Theme.named(name).map { $0.label.components(separatedBy: " (").first ?? $0.label } ?? name
         }
     }
