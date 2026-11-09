@@ -245,6 +245,48 @@ final class PolishUITests: XCTestCase {
         XCTAssertTrue(eventually { !card().exists }, "the picture is gone from the list")
     }
 
+    // MARK: Under Follow the sun
+
+    /// The sun scheme with its fade held at the middle (`-theme auto -sunLevel 0.5`, a Debug launch shortcut of the Appearance tests): the new screens are drawn from the scheme's
+    /// tokens, so they take whatever blend the page is at. Landscape first, then portrait; the screenshots are for the eye (the colours are the Appearance tests' to check).
+    private let sun = ["-theme", "auto", "-sunLevel", "0.5"]
+
+    func testTheHomePageWearsTheSunScheme() throws {
+        try launch(sun)
+        XCTAssertTrue(element("home-page").waitForExistence(timeout: 30), "the home page")
+        XCTAssertTrue(element("home-notebook-1").waitForExistence(timeout: 10))
+        XCTAssertTrue(eventually { element(startingWith: "home-recent-").exists })
+        shot("sun-home-1-landscape")
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(element("home-page").waitForExistence(timeout: 10))
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        shot("sun-home-2-portrait")
+    }
+
+    func testTheOutlineAndTheImagesPageWearTheSunScheme() throws {
+        try launch(["-importText", try longNote(), "-openMode", "Preview"] + sun)
+        XCTAssertTrue(app.buttons["outline-button"].waitForExistence(timeout: 30))
+        app.buttons["outline-button"].tap()
+        XCTAssertTrue(element("outline-heading-3").waitForExistence(timeout: 10), "the outline lists the headings")
+        shot("sun-outline-1-landscape")
+        element("outline-heading-3").tap()
+        XCTAssertTrue(element("outline").waitForNonExistence(timeout: 10))
+
+        openImagesPage()
+        XCTAssertTrue(eventually { element(startingWith: "image-card-").exists }, "the stored pictures are listed")
+        shot("sun-images-1-landscape")
+        XCUIDevice.shared.orientation = .portrait
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        XCTAssertTrue(element("images-page").exists, "the page is still open after turning")
+        shot("sun-images-2-portrait")
+        app.buttons["images-done"].tap()
+        XCTAssertTrue(element("images-page").waitForNonExistence(timeout: 10))
+
+        app.buttons["outline-button"].tap()
+        XCTAssertTrue(element("outline-heading-3").waitForExistence(timeout: 10), "the outline opens in portrait too")
+        shot("sun-outline-2-portrait")
+    }
+
     // MARK: Home page
 
     func testHomePageShowsNotebooksAndRecentNotesAndPinnedOnesAndLeadsToThem() throws {
