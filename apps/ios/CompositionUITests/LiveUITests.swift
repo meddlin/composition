@@ -63,8 +63,12 @@ final class LiveUITests: XCTestCase {
     /// The ranges the report gives, written as offsets in what `write` typed: `at(0...2, 14...16)` is `origin+0 to origin+2, origin+14 to origin+16`.
     private func at(_ pairs: (Int, Int)...) -> String { pairs.map { "\($0.0 + origin)-\($0.1 + origin)" }.joined(separator: ",") }
 
+    /// Presses a key `times` over, a moment apart: sent in a burst while the machine is busy (the suite runs on several Simulators at once) some are lost.
     private func press(_ key: XCUIKeyboardKey, _ times: Int = 1, modifiers: XCUIElement.KeyModifierFlags = []) {
-        for _ in 0..<times { app.typeKey(key, modifierFlags: modifiers) }
+        for _ in 0..<times {
+            app.typeKey(key, modifierFlags: modifiers)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.04))
+        }
     }
 
     /// 0 to 2 for "# Title" (the `# `), 14 to 16 and 20 to 22 for the `**` round "bold", and 27 and 30 for the `*` round "it": the offsets of this text.
@@ -187,7 +191,7 @@ final class LiveUITests: XCTestCase {
         press(.upArrow, 1, modifiers: .command)
         press(.rightArrow, max(0, start - 10))
         var more = 0
-        while drawn()["draw-picture"] != nil, more < 40 { press(.rightArrow); more += 1 }
+        while drawn()["draw-picture"] != nil, more < 200 { press(.rightArrow); more += 1 }
         XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn())")
     }
 
