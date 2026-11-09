@@ -7,6 +7,10 @@ import UIKit
 /// full read off the main thread, and only the blocks it finds the quick reads got wrong are coloured again, in small steps that typing interrupts.
 /// Only attributes change, never the characters, so the selection and the undo stack are untouched, and nothing is done while a composition
 /// (Scribble, dictation, an input method) is under way. The measurements and the reasoning are in docs/ipad-app-design.md ("Step 5").
+///
+/// In the Live tab (`setLive`) it does the same and then puts the Live look on what it has coloured (`LiveOverlay`, from a `LiveModel` that follows the
+/// same edits and the same corrections), and follows the selection: moving it into or out of a construct changes how that construct looks, and only
+/// the constructs it left and the ones it entered are drawn again.
 @MainActor
 final class MarkdownStyler {
     /// What the styler measured of itself; the Debug speed test reads it.
@@ -27,6 +31,14 @@ final class MarkdownStyler {
     /// What the colours on the text were made from; nil when that is not known (just loaded, or something changed the text unseen), and the
     /// next full pass then colours all of it.
     private var model: HighlightModel?
+    /// The Live tab is the one showing: the text is drawn as it will read, the marks hidden away from the selection.
+    private(set) var isLive = false
+    /// What the Live look is made from, kept in step with `model` (nil in the other tabs, and until the first full read in this one).
+    private var live: LiveModel?
+    /// Where the selection was when the text was last drawn: what it has left is what has to be drawn again.
+    private var drawnSelection: NSRange?
+    /// Called after text has been coloured (the UI tests' view of what the screen shows).
+    var didApply: (() -> Void)?
     private var pendingEdits = EditAccumulator()
     private var version = 0
     private var idlePass: DispatchWorkItem?
@@ -36,12 +48,12 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
         self.look = look
-        palette = Palette(look: look)
+        palette = Palette(look: look, live: false)
         // Every change to the characters, from anywhere: typing, a paste, an undo, a change made in code. (The delegate's `shouldChangeTextIn`
         // is not called for `insertText` or for changes made in code.) A change to attributes only, which is all the colouring does, is not an edit.
         observer = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
@@ -66,8 +78,17 @@ final class MarkdownStyler {
 
     /// The text size changed: the fonts in the colours are stale.
     func restyleAll() {
-        palette = Palette(look: look)
+        palette = Palette(look: look, live: isLive)
         reload()
+    }
+
+    /// The Live tab came to the front, or went: the text is drawn again, all of it, in the new look.
+    func setLive(_ on: Bool) {
+        guard on != isLive else { return }
+        isLive = on
+        live = nil
+        drawnSelection = nil
+        restyleAll()
     }
 
     /// The colour scheme or the editor's font changed: every colour is made again.
@@ -83,8 +104,29 @@ final class MarkdownStyler {
         version += 1
         stepGeneration += 1  // a full pass that is putting colours on stops: the text moved under it
         recolourAfterEdit()
+        drawnSelection = textView?.selectedRange
         scheduleFullPass(after: Self.pause)
         measurements.editMilliseconds.append(Self.milliseconds(clock.now - started))
+    }
+
+    /// The text view's selection moved. In the Live tab, the constructs it left and the ones it entered change how they look: their marks show or hide.
+    func selectionChanged() {
+        guard isLive, let textView else { return }
+        let now = textView.selectedRange
+        let storage = textView.textStorage
+        // Not during a composition, and not while the colours are behind the text (an edit was typed and `textDidChange` has not come yet, or the first
+        // read is not in): what is drawn then follows from the selection when it is.
+        guard textView.markedTextRange == nil, let model, let live, model.length == storage.length, live.length == storage.length else { return }
+        defer { drawnSelection = now }
+        guard let before = drawnSelection, before != now else { return }
+        let left = Set(live.constructRanges(touching: before)), entered = Set(live.constructRanges(touching: now))
+        let changed = left.symmetricDifference(entered).sorted { $0.location < $1.location }
+        // Nested constructs overlap: draw their union once.
+        var ranges: [NSRange] = []
+        for range in changed {
+            if let last = ranges.last, range.location <= NSMaxRange(last) { ranges[ranges.count - 1] = NSUnionRange(last, range) } else { ranges.append(range) }
+        }
+        for range in ranges { applyColours(to: range, using: model) }
     }
 
     // MARK: Quick reads
@@ -103,12 +145,14 @@ final class MarkdownStyler {
             // An edit nobody described: the pause that follows reads it all.
             pendingEdits = EditAccumulator()
             model = nil
+            live = nil
             measurements.fallbackEdits += 1
             return
         }
         pendingEdits = EditAccumulator()
         measurements.quickEdits += 1
         let window = model!.edited(replacing: merged.range, withLength: merged.newLength, in: storage.mutableString)
+        live?.edited(replacing: merged.range, withLength: merged.newLength, rereading: window, in: storage.mutableString)
         applyColours(to: window, using: model!)
     }
 
@@ -124,7 +168,12 @@ final class MarkdownStyler {
             let clipped = NSIntersectionRange(span.range, range)
             if clipped.length > 0 { storage.addAttributes(palette.attributes(for: span.kind), range: clipped) }
         }
+        if isLive, let live, live.length == storage.length {
+            let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
+            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, look: look)
+        }
         storage.endEditing()
+        didApply?()
     }
 
     // MARK: Corrections after a pause
@@ -143,9 +192,11 @@ final class MarkdownStyler {
         let snapshot = textView.nativeText
         let seen = version
         let known = model
+        let wantsLive = isLive
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let started = ContinuousClock.now
             let fresh = HighlightModel(text: snapshot)
+            let freshLive = wantsLive ? LiveModel(text: snapshot) : nil
             let dirty = known.map { fresh.differences(from: $0) } ?? [NSRange(location: 0, length: fresh.length)]
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
@@ -153,15 +204,16 @@ final class MarkdownStyler {
                     guard let self, self.version == seen else { return }  // typed again meanwhile: the next pause reads it again
                     self.measurements.fullReadMilliseconds = Self.milliseconds(spent)
                     if known != nil, !dirty.isEmpty { self.measurements.corrections += 1 }
-                    self.beginPuttingOn(fresh, dirty: dirty)
+                    self.beginPuttingOn(fresh, live: freshLive, dirty: dirty)
                 }
             }
         }
     }
 
     /// Puts the colours on in small steps, so that the main thread is never held for more than a fraction of a frame; typing stops it.
-    private func beginPuttingOn(_ fresh: HighlightModel, dirty: [NSRange]) {
+    private func beginPuttingOn(_ fresh: HighlightModel, live freshLive: LiveModel?, dirty: [NSRange]) {
         guard let storage = textView?.textStorage else { return }
+        guard isLive == (freshLive != nil) else { return scheduleFullPass(after: 0) }  // the tab changed while it was being read
         guard fresh.length == storage.length else { return scheduleFullPass(after: Self.pause) }
         let text = storage.mutableString
         var steps: [NSRange] = []
@@ -177,6 +229,8 @@ final class MarkdownStyler {
             }
         }
         model = fresh
+        live = freshLive
+        drawnSelection = textView?.selectedRange
         stepGeneration += 1
         putOn(steps, from: 0, using: fresh, generation: stepGeneration)
     }
@@ -186,6 +240,7 @@ final class MarkdownStyler {
         guard generation == stepGeneration, textView?.markedTextRange == nil else {
             // Interrupted: what is on the text is now partly the old colours, so the next full pass starts from nothing.
             model = nil
+            live = nil
             return scheduleFullPass(after: Self.pause)
         }
         let started = clock.now
@@ -207,7 +262,7 @@ final class MarkdownStyler {
 
         /// The editor's colours are the desktop's (`.md-heading` is `--syntax-function`, `.md-code` is `--syntax-string`, `.md-marker` is `--syntax-number`, and so on in
         /// `globals.css`), in the scheme in force; the fonts are the family chosen, with code kept monospaced.
-        init(look: Look) {
+        init(look: Look, live: Bool = false) {
             let family = look.editorFont
             let regular = family.uiFont(size: 16)
             let bold = family.uiFont(size: 16, weight: .bold)
@@ -215,10 +270,12 @@ final class MarkdownStyler {
             let syntax = look.theme.syntax
             base = [.font: regular, .foregroundColor: look.uiForeground]
             frontmatter = [.foregroundColor: syntax.comment.uiColor]
-            heading = [.foregroundColor: syntax.function.uiColor, .font: bold]
-            strong = [.font: bold, .foregroundColor: syntax.type.uiColor]
-            emphasis = [.foregroundColor: syntax.attr.uiColor]
-            strikethrough = [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: syntax.comment.uiColor]
+            // The Live tab draws headings, bold, italic and strikethrough as such, and does not colour them as well (the desktop's Live tab does the same: its
+            // colours are for code, links, tags and list and quote marks); `LiveOverlay` sets their fonts, from the font the text has.
+            heading = live ? [:] : [.foregroundColor: syntax.function.uiColor, .font: bold]
+            strong = live ? [:] : [.font: bold, .foregroundColor: syntax.type.uiColor]
+            emphasis = live ? [:] : [.foregroundColor: syntax.attr.uiColor]
+            strikethrough = live ? [.strikethroughStyle: NSUnderlineStyle.single.rawValue] : [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: syntax.comment.uiColor]
             inlineCode = [.foregroundColor: syntax.string.uiColor, .backgroundColor: look.uiMutedFill, .font: code]
             codeBlock = [.foregroundColor: syntax.string.uiColor, .font: code]
             linkText = [.foregroundColor: look.theme.link.uiColor]

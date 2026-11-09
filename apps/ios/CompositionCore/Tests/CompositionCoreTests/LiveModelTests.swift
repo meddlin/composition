@@ -32,7 +32,7 @@ struct LiveModelTests {
     func heading() {
         let text = "# Title\n\ntext"
         let away = decorations(text, at: 12)
-        #expect(away.headings == [.init(line: 0, level: 1)])
+        #expect(away.headings.map { [$0.line, $0.level] } == [[0, 1]])
         #expect(ranges(away.hidden) == [[0, 2]])
         #expect(ranges(decorations(text, at: 3).shown) == [[0, 1]])
     }
@@ -96,6 +96,119 @@ struct LiveModelTests {
         let text = "😀 **bold**\r\n\r\n# Head"
         let away = decorations(text, at: 0, to: 0)
         #expect(ranges(away.hidden).sorted { $0[0] < $1[0] } == [[3, 5], [9, 11], [15, 17]])
-        #expect(away.headings == [.init(line: 15, level: 1)])
+        #expect(away.headings.map { [$0.line, $0.level] } == [[15, 1]])
+    }
+}
+
+// MARK: Following edits and the selection (step L3)
+
+/// Every fact the model gives for a window, one line each, so that two answers compare.
+private func facts(_ decorations: LiveDecorations, within window: NSRange? = nil) -> [String] {
+    func shown(_ range: NSRange) -> Bool { window.map { range.location < NSMaxRange($0) && NSMaxRange(range) > $0.location } ?? true }
+    var out: [String] = []
+    out += decorations.headings.filter { shown($0.range) }.map { "heading \($0.line) \($0.level) \($0.range.location)-\(NSMaxRange($0.range))" }
+    out += decorations.rules.map { "rule \($0)" }.filter { _ in window == nil }
+    out += decorations.styles.filter { shown($0.range) }.map { "\($0.style.rawValue) \($0.range.location)-\(NSMaxRange($0.range))" }
+    out += decorations.hidden.filter(shown).map { "hidden \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.shown.filter(shown).map { "shown \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.pictures.filter { shown($0.range) }.map { "picture \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.src)" }
+    out += decorations.fencesHidden.filter(shown).map { "fence hidden \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.fencesShown.filter(shown).map { "fence shown \($0.location)-\(NSMaxRange($0))" }
+    return out.sorted()
+}
+
+@Suite("The Live model follows edits and the selection")
+struct LiveModelFollowingTests {
+    private static let sample = """
+        # Notes on the Live view
+
+        Some **bold** words, some *italic* ones and `code` too, with a [link](https://x.test).
+
+        - one **two**
+        - three *four*
+
+        ## Second heading ##
+
+        > a quote with ~~strike~~ and **bold**
+
+        ```swift
+        let x = **not bold**
+        ```
+
+        ---
+
+        The end ![alt](pic.png "t") of it.
+        """
+
+    /// Edits as typing makes them (a character, a mark, a line break, a deletion), at places in the middle of the note.
+    @Test("after edits, what the model says is what a fresh read says, wherever the selection is")
+    func editsMatchAFreshRead() throws {
+        var seed: UInt64 = 0x2545F4914F6CDD1D
+        func next(_ below: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return Int((seed >> 33) % UInt64(below))
+        }
+        let pieces = ["a", " ", "b", "**", "*", "~~", "# ", "- ", "\n", "\n\n", "x y", "_", "`", "> "]
+        var text = Self.sample
+        var highlights = HighlightModel(text: text)
+        var live = LiveModel(text: text)
+        var compared = 0
+        for step in 0..<300 {
+            let ns = text as NSString
+            let location = next(ns.length + 1)
+            let deleting = next(4) == 0 && ns.length > 0
+            let range = deleting ? NSRange(location: min(location, ns.length - 1), length: min(1 + next(3), ns.length - min(location, ns.length - 1))) : NSRange(location: location, length: 0)
+            let insertion = deleting ? "" : pieces[next(pieces.count)]
+            text = ns.replacingCharacters(in: range, with: insertion)
+            let now = text as NSString
+            let window = highlights.edited(replacing: range, withLength: (insertion as NSString).length, in: now)
+            live.edited(replacing: range, withLength: (insertion as NSString).length, rereading: window, in: now)
+            // The quick read of a piece can differ from the whole's (a fence typed on a line swallows what is below it): the colours put that right a pause
+            // later, and so do these. Only where the colours agree with a fresh read is the model held to it.
+            guard HighlightModel(text: text).differences(from: highlights).isEmpty else {
+                highlights = HighlightModel(text: text)
+                live = LiveModel(text: text)
+                continue
+            }
+            let fresh = LiveModel(text: text)
+            #expect(live.length == fresh.length)
+            for selection in [NSRange(location: 0, length: 0), NSRange(location: next(now.length + 1), length: 0), NSRange(location: next(now.length + 1), length: next(8))]
+            where NSMaxRange(selection) <= now.length {
+                let want = facts(fresh.decorations(selection: selection)), got = facts(live.decorations(selection: selection))
+                #expect(want == got, "after edit \(step) (\(String(reflecting: insertion)) over \(range)), selection \(selection)")
+                compared += 1
+                // And the part of the note a window shows, which is what the editor asks for after an edit and when the selection moves.
+                let start = next(now.length + 1)
+                let window = NSRange(location: start, length: min(next(120), now.length - start))
+                #expect(facts(live.decorations(in: window, selection: selection), within: window) == facts(fresh.decorations(in: window, selection: selection), within: window),
+                    "after edit \(step), window \(window), selection \(selection)")
+            }
+        }
+        #expect(compared > 300)
+    }
+
+    @Test("a window is given everything that touches it, and nothing else")
+    func windows() {
+        let live = LiveModel(text: Self.sample)
+        let length = (Self.sample as NSString).length
+        for selection in [NSRange(location: 0, length: 0), NSRange(location: 60, length: 0), NSRange(location: 150, length: 4)] {
+            let whole = live.decorations(selection: selection)
+            for start in stride(from: 0, to: length, by: 37) {
+                let window = NSRange(location: start, length: min(50, length - start))
+                #expect(facts(live.decorations(in: window, selection: selection), within: window) == facts(whole, within: window), "window \(window), selection \(selection)")
+            }
+        }
+    }
+
+    @Test("the constructs a selection touches are the ones whose look changes when it moves")
+    func touching() {
+        let text = "**bold** and *it* and `code` and # not heading"
+        let live = LiveModel(text: text)
+        #expect(live.constructRanges(touching: NSRange(location: 3, length: 0)) == [NSRange(location: 0, length: 8)])
+        #expect(live.constructRanges(touching: NSRange(location: 8, length: 0)) == [NSRange(location: 0, length: 8)])
+        #expect(live.constructRanges(touching: NSRange(location: 9, length: 0)).isEmpty)
+        #expect(live.constructRanges(touching: NSRange(location: 0, length: 20)).count == 2)
+        let nested = LiveModel(text: "**bold *both* bold**")
+        #expect(nested.constructRanges(touching: NSRange(location: 9, length: 0)).count == 2)
     }
 }

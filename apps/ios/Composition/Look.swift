@@ -49,6 +49,8 @@ struct Look: Equatable {
     var uiForeground: UIColor { theme.foreground.uiColor }
     var uiBrand: UIColor { theme.brand.uiColor }
     var uiMutedFill: UIColor { theme.foreground.uiColor(alpha: Theme.Share.muted) }
+    /// The grey text of `mutedText`, for what the Live tab dims (the marks that show while the selection is in their construct).
+    var uiMutedText: UIColor { theme.foreground.uiColor(alpha: increasedContrast ? max(theme.mutedShare, 0.85) : theme.mutedShare) }
 }
 
 extension EnvironmentValues {

@@ -238,6 +238,8 @@ struct NoteEditorView: UIViewRepresentable {
     let initialCaret: Int
     /// A note that was just made: the keyboard comes up at once.
     let focusOnOpen: Bool
+    /// The Live tab: the same text view, drawn as the note will read, with the marks hidden away from the selection (`MarkdownStyler.setLive`).
+    var live = false
     let caretMoved: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, caretMoved: caretMoved) }
@@ -274,7 +276,7 @@ struct NoteEditorView: UIViewRepresentable {
         assist.handle = handle
         view.assist = assist
         context.coordinator.assist = assist
-        context.coordinator.attach(view, look: look)
+        context.coordinator.attach(view, look: look, live: live)
         // The size of the text changed (Settings, Control Centre): the fonts in the colours are stale.
         view.registerForTraitChanges([UITraitPreferredContentSizeCategory.self]) { [weak coordinator = context.coordinator] (_: UITextView, _: UITraitCollection) in
             coordinator?.styler?.restyleAll()
@@ -295,6 +297,8 @@ struct NoteEditorView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.caretMoved = caretMoved
+        // The Live tab came to the front, or left it: the same text view, drawn the other way (the caret, the keyboard and the text stay).
+        context.coordinator.styler?.setLive(live)
         // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
         let look = context.environment.look
         if let editor = view as? NoteTextView, editor.look != look {
@@ -321,11 +325,26 @@ struct NoteEditorView: UIViewRepresentable {
             self.caretMoved = caretMoved
         }
 
-        func attach(_ view: UITextView, look: Look) {
+        func attach(_ view: UITextView, look: Look, live: Bool) {
             textView = view
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
-            styler.reload()
+            if live { styler.setLive(true) } else { styler.reload() }
+            #if DEBUG || EDITOR_TEST_HOOKS
+            // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
+            if UserDefaults.standard.bool(forKey: "liveReport") {
+                let label = UILabel(frame: CGRect(x: 0, y: 0, width: 2, height: 2))
+                label.isAccessibilityElement = true
+                label.accessibilityIdentifier = "live-report"
+                label.alpha = 0.02
+                view.addSubview(label)
+                reportLabel = label
+                styler.didApply = { [weak self, weak styler, weak view] in
+                    guard let self, let styler, let view else { return }
+                    self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
+                }
+            }
+            #endif
             // Hears every edit of this note, this window's too, which it recognises by the text being the same.
             observation = session.observe { [weak self] text in
                 if Thread.isMainThread {
@@ -405,6 +424,7 @@ struct NoteEditorView: UIViewRepresentable {
         }
 
         #if DEBUG || EDITOR_TEST_HOOKS
+        fileprivate var reportLabel: UILabel?
         /// How long the whole `textViewDidChange` took each time (the session's part and the colouring's), for the speed test.
         private var delegateMilliseconds: [Double] = []
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
@@ -413,6 +433,7 @@ struct NoteEditorView: UIViewRepresentable {
         func textViewDidChangeSelection(_ textView: UITextView) {
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
+            styler?.selectionChanged()
         }
 
         /// Leaving the field is a good moment to write: it is cheap, and the keyboard going away often means the app is too.

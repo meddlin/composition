@@ -24,6 +24,8 @@ public struct LiveDecorations: Equatable, Sendable {
         /// The start of the heading's line.
         public var line: Int
         public var level: Int
+        /// The whole line, from its start to the end of its text: what is drawn large.
+        public var range: NSRange
     }
 
     public struct Style: Equatable, Sendable {
@@ -100,95 +102,244 @@ public struct LiveModel: Sendable {
         var fences: [NSRange]
     }
 
+    /// Everything in the note that the selection can reveal, in one list ordered by where it starts.
+    enum Construct: Sendable {
+        case heading(HeadingNode)
+        case rule(RuleNode)
+        case style(StyleNode)
+        case picture(PictureNode)
+        case fenced(FenceNode)
+
+        var node: NSRange {
+            switch self {
+            case .heading(let value): value.node
+            case .rule(let value): value.node
+            case .style(let value): value.node
+            case .picture(let value): value.node
+            case .fenced(let value): value.node
+            }
+        }
+
+        /// The same construct `delta` units further on in the text.
+        func shifted(by delta: Int) -> Construct {
+            func move(_ range: NSRange) -> NSRange { NSRange(location: range.location + delta, length: range.length) }
+            switch self {
+            case .heading(var value):
+                value.line += delta
+                value.node = move(value.node)
+                value.marks = value.marks.map { (move($0.shown), move($0.hidden)) }
+                return .heading(value)
+            case .rule(var value):
+                value.line += delta
+                value.node = move(value.node)
+                return .rule(value)
+            case .style(var value):
+                value.node = move(value.node)
+                value.marks = value.marks.map(move)
+                return .style(value)
+            case .picture(var value):
+                value.node = move(value.node)
+                return .picture(value)
+            case .fenced(var value):
+                value.node = move(value.node)
+                value.fences = value.fences.map(move)
+                return .fenced(value)
+            }
+        }
+    }
+
     /// The length of the text, in UTF-16 units.
-    public let length: Int
-    private let chars: [UInt16]
-    private let frontmatterLines: [Int]
-    private let headings: [HeadingNode]
-    private let rules: [RuleNode]
-    private let styles: [StyleNode]
-    private let pictures: [PictureNode]
-    private let fenced: [FenceNode]
-    private let scan: LiveScan.Result
+    public private(set) var length: Int
+    private var chars: [UInt16]
+    private var constructs: [Construct]
+    /// `reach[i]` is how far any of the first `i + 1` constructs reaches: it never goes down, so the first construct that reaches a place is found by search.
+    private var reach: [Int]
+    private var frontmatterLines: [Int]
+    private var scan: LiveScan.Result
+    /// The highlights' and images' places were read before the last edit, so they are not where the text now has them. They are left out until the note is read again.
+    private var scanIsStale = false
+    private let extrasLimit: Int?
 
     /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read, as on the desktop; nil reads them in any note.
     public init(text: String, extrasLimit: Int? = LiveModel.desktopExtrasLimit) {
         chars = Array(text.utf16)
         length = chars.count
-        let lines = LineIndex(chars)
-
-        // The frontmatter is YAML, not Markdown: it is left out of the read (its text blanked, its line breaks kept) and drawn set apart.
-        let body = NoteFrontmatter.split(text).body
-        let frontmatterEnd = length - body.utf16.count
-        if frontmatterEnd > 0 {
-            let last = lines.line(containing: min(frontmatterEnd - 1, length))
-            frontmatterLines = Array(lines.starts[0...last])
-        } else {
-            frontmatterLines = []
-        }
-
-        var source = text
-        if frontmatterEnd > 0 {
-            let head = String(decoding: chars[0..<frontmatterEnd], as: UTF16.self)
-            source = String(head.unicodeScalars.map { $0 == "\n" || $0 == "\r" ? Character($0) : " " }) + body
-        }
-        var reader = LiveReader(map: SourceMap(text: text), lines: lines)
-        reader.visit(Document(parsing: source))
-        headings = reader.headings
-        rules = reader.rules
-        styles = reader.styles
-        pictures = reader.pictures
-        fenced = reader.fenced
-
+        self.extrasLimit = extrasLimit
+        let read = Self.read(text, frontmatter: true)
+        constructs = read.constructs
+        reach = Self.reach(of: read.constructs)
+        frontmatterLines = read.frontmatterLines
         let count = chars.count
         scan = (extrasLimit.map { count <= $0 } ?? true) ? LiveScan.read(text) : LiveScan.Result()
     }
 
-    /// What the Live view does to the note while `selection` (a caret is a range of length 0) is where it is.
+    /// The constructs of `text`, with positions in it, and the lines of its frontmatter. `frontmatter` says whether a `---` block at the very start is
+    /// frontmatter: it is not when `text` is only a piece taken from the middle of a note.
+    private static func read(_ text: String, frontmatter: Bool) -> (constructs: [Construct], frontmatterLines: [Int]) {
+        let chars = Array(text.utf16)
+        let lines = LineIndex(chars)
+
+        // The frontmatter is YAML, not Markdown: it is left out of the read (its text blanked, its line breaks kept) and drawn set apart.
+        let body = frontmatter ? NoteFrontmatter.split(text).body : text
+        let frontmatterEnd = chars.count - body.utf16.count
+        var frontmatterLines: [Int] = []
+        var source = text
+        if frontmatterEnd > 0 {
+            let last = lines.line(containing: min(frontmatterEnd - 1, chars.count))
+            frontmatterLines = Array(lines.starts[0...last])
+            let head = String(decoding: chars[0..<frontmatterEnd], as: UTF16.self)
+            source = String(head.unicodeScalars.map { $0 == "\n" || $0 == "\r" ? Character($0) : " " }) + body
+        }
+
+        var reader = LiveReader(map: SourceMap(text: text), lines: lines)
+        reader.visit(Document(parsing: source))
+        var constructs: [Construct] = []
+        constructs += reader.headings.map { .heading($0) }
+        constructs += reader.rules.map { .rule($0) }
+        constructs += reader.styles.map { .style($0) }
+        constructs += reader.pictures.map { .picture($0) }
+        constructs += reader.fenced.map { .fenced($0) }
+        constructs.sort { $0.node.location < $1.node.location }
+        return (constructs, frontmatterLines)
+    }
+
+    private static func reach(of constructs: [Construct]) -> [Int] {
+        var farthest = 0
+        return constructs.map {
+            farthest = max(farthest, NSMaxRange($0.node))
+            return farthest
+        }
+    }
+
+    // MARK: After an edit
+
+    /// Brings the model up to date with an edit: `range` of the old text became `newLength` units, `text` is the text now, and `window` (in the new text) is
+    /// the part of it to read again, which must hold the edit and whole top-level blocks (it is what `HighlightModel.edited` gives back). Everything after
+    /// the window moves with the edit; what the window holds is read again. The places of highlights and `<Image />` tags are left out until `LiveModel`
+    /// is made again from the whole text (the full read a pause after typing), because they pair across blocks.
+    public mutating func edited(replacing range: NSRange, withLength newLength: Int, rereading window: NSRange, in text: NSString) {
+        let delta = newLength - range.length
+        let oldWindow = NSRange(location: window.location, length: window.length - delta)
+        guard range.location >= 0, NSMaxRange(range) <= length, oldWindow.length >= 0, NSMaxRange(window) <= text.length else {
+            self = LiveModel(text: text as String, extrasLimit: extrasLimit)
+            return
+        }
+        chars.replaceSubrange(range.location..<NSMaxRange(range), with: (0..<newLength).map { text.character(at: range.location + $0) })
+        length += delta
+        scanIsStale = true
+
+        // What starts in the old window is dropped, and what starts after it moves; what starts before it stays (and should end before it).
+        let low = firstIndex(startingAtOrAfter: oldWindow.location)
+        let high = firstIndex(startingAtOrAfter: NSMaxRange(oldWindow))
+        for index in high..<constructs.count { constructs[index] = constructs[index].shifted(by: delta) }
+        let fresh = Self.read(text.substring(with: window), frontmatter: window.location == 0)
+        constructs.replaceSubrange(low..<high, with: fresh.constructs.map { $0.shifted(by: window.location) })
+        reach = Self.reach(of: constructs)
+        if window.location == 0 { frontmatterLines = fresh.frontmatterLines }
+    }
+
+    /// The index of the first construct that starts at or after `position`.
+    private func firstIndex(startingAtOrAfter position: Int) -> Int {
+        var low = 0, high = constructs.count
+        while low < high {
+            let middle = (low + high) / 2
+            if constructs[middle].node.location >= position { high = middle } else { low = middle + 1 }
+        }
+        return low
+    }
+
+    /// Calls `body` for each construct that starts at or before `start` and reaches at least `reaching`, in order.
+    private func forEachConstruct(startingAtOrBefore start: Int, reaching: Int, _ body: (Construct) -> Void) {
+        var low = 0, high = reach.count
+        while low < high {
+            let middle = (low + high) / 2
+            if reach[middle] >= reaching { high = middle } else { low = middle + 1 }
+        }
+        var index = low
+        while index < constructs.count, constructs[index].node.location <= start {
+            if NSMaxRange(constructs[index].node) >= reaching { body(constructs[index]) }
+            index += 1
+        }
+    }
+
+    // MARK: Reading
+
+    /// What the Live view does to the whole note while `selection` (a caret is a range of length 0) is where it is.
     public func decorations(selection: NSRange) -> LiveDecorations {
+        decorations(in: NSRange(location: 0, length: length), selection: selection, wholeNote: true)
+    }
+
+    /// What the Live view does to the part of the note in `window` (everything that touches it), while `selection` is where it is. A construct that is only
+    /// partly in the window is given whole: clip it to what is being drawn.
+    public func decorations(in window: NSRange, selection: NSRange) -> LiveDecorations {
+        decorations(in: window, selection: selection, wholeNote: false)
+    }
+
+    private func decorations(in window: NSRange, selection: NSRange, wholeNote: Bool) -> LiveDecorations {
         let low = selection.location, high = NSMaxRange(selection)
         /// Whether the selection reaches `from`...`to`, ends included: `**bold**|` still shows its marks, `**bold** |` does not.
         func touches(_ range: NSRange) -> Bool { low <= NSMaxRange(range) && high >= range.location }
+        func inWindow(_ range: NSRange) -> Bool { wholeNote || (range.location < NSMaxRange(window) && NSMaxRange(range) > window.location) }
 
         var out = LiveDecorations()
-        out.frontmatterLines = frontmatterLines
+        out.frontmatterLines = frontmatterLines.filter { wholeNote || ($0 >= window.location && $0 < NSMaxRange(window)) }
 
-        for heading in headings {
-            out.headings.append(.init(line: heading.line, level: heading.level))
-            let active = touches(heading.node)
-            for mark in heading.marks {
-                if active { out.shown.append(mark.shown) } else { out.hidden.append(mark.hidden) }
+        forEachConstruct(startingAtOrBefore: NSMaxRange(window) - 1, reaching: window.location + 1) { construct in
+            switch construct {
+            case .heading(let heading):
+                let lineRange = NSRange(location: heading.line, length: NSMaxRange(heading.node) - heading.line)
+                out.headings.append(.init(line: heading.line, level: heading.level, range: lineRange))
+                let active = touches(heading.node)
+                for mark in heading.marks {
+                    if active { out.shown.append(mark.shown) } else { out.hidden.append(mark.hidden) }
+                }
+            case .rule(let rule):
+                if !touches(rule.node) {
+                    out.rules.append(rule.line)
+                    out.hidden.append(rule.node)
+                }
+            case .style(let style):
+                out.styles.append(.init(style: style.style, range: style.node))
+                let active = touches(style.node)
+                for mark in style.marks where mark.length > 0 {
+                    if active { out.shown.append(mark) } else { out.hidden.append(mark) }
+                }
+            case .picture(let picture):
+                out.pictures.append(.init(range: picture.node, active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
+            case .fenced(let block):
+                if touches(block.node) { out.fencesShown += block.fences } else { out.fencesHidden += block.fences }
             }
         }
-        for rule in rules where !touches(rule.node) {
-            out.rules.append(rule.line)
-            out.hidden.append(rule.node)
-        }
-        for style in styles {
-            out.styles.append(.init(style: style.style, range: style.node))
-            let active = touches(style.node)
-            for mark in style.marks where mark.length > 0 {
-                if active { out.shown.append(mark) } else { out.hidden.append(mark) }
-            }
-        }
-        for picture in pictures {
-            out.pictures.append(.init(range: picture.node, active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
-        }
-        for image in scan.images {
+
+        guard !scanIsStale else { return out }
+        for image in scan.images where inWindow(image.range) {
             out.pictures.append(.init(range: image.range, active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width))
         }
-        out.tints = scan.tints.map { .init(range: $0.range, color: $0.color) }
+        out.tints += scan.tints.filter { inWindow($0.range) }.map { .init(range: $0.range, color: $0.color) }
         for element in scan.elements {
-            let active = touches(NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location))
+            let whole = NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location)
+            guard inWindow(whole) else { continue }
+            let active = touches(whole)
             for tag in [element.open, element.close] {
                 // A tag that runs over a line break cannot be hidden, so it is left showing, dimmed like the rest.
                 if active || containsLineBreak(tag) { out.shown.append(tag) } else { out.hidden.append(tag) }
             }
         }
-        for block in fenced {
-            if touches(block.node) { out.fencesShown += block.fences } else { out.fencesHidden += block.fences }
-        }
         return out
+    }
+
+    /// The places of the constructs `selection` touches (ends included): the text whose look changes when the selection moves in or out of them.
+    public func constructRanges(touching selection: NSRange) -> [NSRange] {
+        var found: [NSRange] = []
+        forEachConstruct(startingAtOrBefore: NSMaxRange(selection), reaching: selection.location) { found.append($0.node) }
+        if !scanIsStale {
+            for element in scan.elements {
+                let whole = NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location)
+                if whole.location <= NSMaxRange(selection), NSMaxRange(whole) >= selection.location { found.append(whole) }
+            }
+            for image in scan.images where image.range.location <= NSMaxRange(selection) && NSMaxRange(image.range) >= selection.location { found.append(image.range) }
+        }
+        return found
     }
 
     private func containsLineBreak(_ range: NSRange) -> Bool {
