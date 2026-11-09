@@ -186,10 +186,14 @@ final class LiveUITests: XCTestCase {
         let start = whole.range(of: "![").location
         let end = NSMaxRange(whole.range(of: ")", range: NSRange(location: start, length: whole.length - start)))
         XCTAssertEqual(drawn()["hidden"], "\(start)-\(end)", "the Markdown that writes it is hidden")
-        // A tap on the drawn picture puts the caret in the Markdown that writes it. (The picture sits under the frontmatter, which is the same eight small lines
-        // in either orientation: its top is a little over 250 points down and it is 300 or more tall, so a point 350 down is in it.)
-        editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 250, dy: 350)).tap()
-        XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn())")
+        // A tap on the drawn picture puts the caret in the Markdown that writes it. Where the picture is on the screen depends on the editor's height and on how far it has scrolled
+        // (the on-screen keyboard, which a Simulator that does not use the Mac's keyboard shows, makes the editor 320 points tall and scrolls the caret into view), so the editor is tapped
+        // from the top down until the Markdown shows; a tap that lands in the note's text instead only moves the caret there.
+        for tapY in stride(from: 40.0, to: editor.frame.height - 10, by: 30.0) {
+            editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 250, dy: tapY)).tap()
+            if eventually(2, { drawn()["draw-pictureAfter"] != nil }) { break }
+        }
+        XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn()), the selection \(selectionLabel.label), the editor \(editor.frame), the picture's text \(start)-\(end)")
     }
 
     // MARK: Editing across hidden marks (step L5)

@@ -62,7 +62,6 @@ enum LiveBench {
 
         // Typing into a paragraph with marks in the middle of the note.
         view.becomeFirstResponder()
-        let whole = view.nativeText as NSString
         // `-liveBenchAt 0.1`: how far into the note to type (a share of its length; the middle by default).
         let share = UserDefaults.standard.object(forKey: "liveBenchAt") == nil ? 0.5 : UserDefaults.standard.double(forKey: "liveBenchAt")
         result["typedAt"] = share
@@ -77,7 +76,7 @@ enum LiveBench {
         await settleAfterMove(styler)
         styler.resetMeasurements()
         let passesBeforeTyping = styler.passesStarted
-        var whole1: [Double] = [], insert: [Double] = [], layout: [Double] = []
+        var keystrokes: [Double] = [], insert: [Double] = [], layout: [Double] = []
         let phrase = Array("Typing in the middle of a long note, with **bold** and `code` and a [link](https://x.test).\n")
         let count = 200
         for index in 0..<count {
@@ -88,13 +87,13 @@ enum LiveBench {
             let laid = clock.now
             insert.append(milliseconds(inserted - started))
             layout.append(milliseconds(laid - inserted))
-            whole1.append(milliseconds(laid - started))
+            keystrokes.append(milliseconds(laid - started))
             try? await Task.sleep(for: .milliseconds(16))
         }
         let typing = styler.measurements
         result["typing"] = [
-            "keystrokes": count, "styler": summary(typing.editMilliseconds), "insert": summary(insert), "layout": summary(layout), "whole": summary(whole1),
-            "overBudget": whole1.filter { $0 > 16 }.count, "quickEdits": typing.quickEdits, "fallbackEdits": typing.fallbackEdits,
+            "keystrokes": count, "styler": summary(typing.editMilliseconds), "insert": summary(insert), "layout": summary(layout), "whole": summary(keystrokes),
+            "overBudget": keystrokes.filter { $0 > 16 }.count, "quickEdits": typing.quickEdits, "fallbackEdits": typing.fallbackEdits,
         ] as [String: Any]
 
         // The pause's pass after typing.
@@ -128,7 +127,6 @@ enum LiveBench {
         result["caretAcrossAConstruct"] = ["styler": summary(across.styler), "whole": summary(across.whole)] as [String: Any]
         let toOther = await moves([inside, far], times: 100)
         result["caretToAnotherParagraph"] = ["styler": summary(toOther.styler), "whole": summary(toOther.whole)] as [String: Any]
-        _ = whole
         getloadavg(&load, 3)
         result["loadAverageAtEnd"] = load.map { (($0 * 10).rounded()) / 10 }
         let data = (try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys])) ?? Data()
