@@ -185,10 +185,19 @@ final class LiveUITests: XCTestCase {
         let start = whole.range(of: "![").location
         let end = NSMaxRange(whole.range(of: ")", range: NSRange(location: start, length: whole.length - start)))
         XCTAssertEqual(drawn()["hidden"], "\(start)-\(end)", "the Markdown that writes it is hidden")
-        // A tap on the drawn picture puts the caret in the Markdown that writes it. (The picture sits under the frontmatter, which is the same eight small lines
-        // in either orientation: its top is a little over 250 points down and it is 300 or more tall, so a point 350 down is in it.)
-        editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 250, dy: 350)).tap()
-        XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn())")
+        // A tap on the drawn picture puts the caret in the Markdown that writes it. Where the picture is in the editor is not known to the test: it depends on how far the
+        // paste scrolled the note to put the caret in view, and that depends on how tall the editor is (the on-screen keyboard, which a Simulator without a hardware keyboard
+        // shows, leaves it about 320 points; a point picked from an editor that has all the screen missed the picture and landed on the keyboard). So the test taps down the
+        // middle of the editor, in steps smaller than the picture is tall, until one tap is on it.
+        let shows = { [self] in let now = drawn(); return now["draw-pictureAfter"] != nil && now["draw-picture"] == nil && now["hidden"] == nil }
+        let frame = editor.frame
+        var down: CGFloat = 40
+        while !shows(), down < frame.height - 10 {
+            editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.width / 2, dy: down)).tap()
+            _ = eventually(2) { shows() }
+            down += 60
+        }
+        XCTAssertTrue(shows(), "the Markdown shows and the picture is drawn after it: \(drawn())")
     }
 
     // MARK: What the screen shows, in each colour scheme (pixels)
