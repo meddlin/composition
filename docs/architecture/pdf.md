@@ -11,7 +11,7 @@ Source: [`documentsApi.ts`](../../apps/web/src/lib/composition/documentsApi.ts) 
 and the reader in [`components/pdf/`](../../apps/web/src/components/pdf/). What you see and do: [ui/pdf.md](../ui/pdf.md). The design,
 the spikes that decided it, and the risks: [pdf-markup-plan.md](../pdf-markup-plan.md).
 
-**Desktop only.** The reader, the import, the marks and the export are the desktop app's. The shared data layer (tables, repositories,
+**The reader, the import, the marks and the export described below are the desktop app's;** the iPad's are in [On the iPad](#on-the-ipad) at the end. The shared data layer (tables, repositories,
 validation, citations, the writer) is plain TypeScript in `apps/web/src/lib/composition`, so the iPad's Swift core can reproduce the
 tables and rules from the conformance fixtures in [`fixtures/conformance/pdf`](../../fixtures/conformance/README.md).
 
@@ -206,3 +206,20 @@ been checked. The reader needs the whole app (a web build has none); undo histor
 takes a quote in the later editor; export is checked against pdf.js (not yet Acrobat or PDFKit's reading of this writer), has not been measured near the
 1 GB limit, and has not been started from a packaged app in CI (only that its file is unpacked). Ink, handwritten notes, the full text of a PDF and
 scans are not built ([the plan](../pdf-markup-plan.md#not-in-scope)).
+
+## On the iPad
+
+The iPad app (`apps/ios`) reads and marks PDFs with PDFKit. **Built and checked in the iPad Simulator and with `swift test` on a Mac only; not yet tried on an iPad.** The data layer is shared in shape and checked against the same fixtures.
+
+- **The Swift package `apps/ios/CompositionCore`** (Foundation and GRDB only) holds the three tables' repositories and rules (`PDF/DocumentsStore.swift`, `PdfMarkupStore.swift`, `PdfMarkup.swift`, replaying [`fixtures/conformance/pdf`](../../fixtures/conformance/README.md)),
+  the file layer (`DocumentLibrary`), `PdfRefs` (the link format, a port of `pdfRefs.ts` replaying `pdf-refs.json`, which `apps/ios/scripts/pdf-refs-oracle.mjs` writes from the desktop's code), `restoreAnnotations`, `marksSearchText` (the words kept in the owner note's FTS5 entry by `NoteStore`
+  whenever a mark or bookmark changes), `notesForPdf`, `PdfMarkPaint` and `PdfMarkGeometry`, and `PdfMarkEditor` (an actor: a serial queue and 200 steps of undo and redo, in memory).
+- **The package target `CompositionPDF`** (PDFKit, tested under `swift test` against the nine page geometries of spike C in `fixtures/conformance/pdf-geometry.pdf`): `SelectionMarks` turns a `PDFSelection` into marks (one per page, a rectangle per line from `selectionsByLine()`, raw user space),
+  `MarkAnnotations` and `MarkLayer` draw marks as Highlight, Underline, StrikeOut and FreeText annotations named by the mark's uuid (`/NM`), and `AnnotatedExport` writes the copy. The annotations are added to the open `PDFDocument` in memory only; **the file in `documents/` is never written**.
+  A highlight's quad points are relative to its bounds in PDFKit (spike C).
+- **The app** (`apps/ios/Composition`): `PdfReader` (an `@Observable` over the `PDFDocument`, with `PdfReader+Marks.swift`), `PdfReaderPane` and `PdfKitView` (the strip, the tap recogniser, the selection bar and the card, which are SwiftUI over the `PDFView`), `PdfMarksUI.swift` (bar, card, the typed note's box, the Highlights and Notes tabs),
+  `PdfExportSheet.swift`, `AppModel+Pdf.swift` (the PDF a note owns, a PDF shown beside a note that cites it, a link's request to go to a page and mark). A note's `pdf:` links are followed by the preview's `openURL` handler; whether a link's PDF is here comes from the model's `pdfsByUuid` and whether its note is live.
+- **Export.** Native: the marks are added to a fresh `PDFDocument` of the file and written with `write(to:withOptions:)` to `.<name>.part`, then renamed; PDFKit writes an appearance stream for each. Flattened: the same with `burnInAnnotationsOption`. A protected PDF is unlocked with the password the reader opened it with (kept in memory only) and
+  written with `userPasswordOption` (the same) and a made-up owner password. The author written into each annotation is "Composition", not the device owner's name.
+- **Spike B's lab** (`PdfInkLab.swift`): a `PKCanvasView` per page from `PDFPageOverlayViewProvider`, Pencil only, with counters (canvases, strokes, touches, frames, memory). See [the plan](../pdf-markup-plan.md#spike-b-the-lab-2026-11-09).
+- **Checked by:** `swift test` in `apps/ios/CompositionCore` (the corpus, `PdfRefsConformanceTests`, `PdfMarkupStoreTests`, `PdfMarkEditorTests`, `PdfMarkGeometryTests`, and the `CompositionPDF` tests: `MarkAnnotationTests`, `AnnotatedExportTests`, `LinksInTheCopyTests`), and the UI tests `PdfUITests`, `PdfMarksUITests` and `PdfInkLabUITests` in the iPad Simulator.

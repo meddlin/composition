@@ -7,7 +7,7 @@ Source: [`PdfReader.tsx`](../../apps/web/src/components/pdf/PdfReader.tsx) (the 
 [`selectionMarks.ts`](../../apps/web/src/components/pdf/selectionMarks.ts) (making and changing marks),
 [`ExportPdfDialog.tsx`](../../apps/web/src/components/pdf/ExportPdfDialog.tsx),
 [`pdfRefs.ts`](../../apps/web/src/lib/composition/pdfRefs.ts) (citations),
-[`pdfExport.ts`](../../apps/web/src/lib/composition/pdfExport.ts) (export) — **desktop app only**. How it works inside:
+[`pdfExport.ts`](../../apps/web/src/lib/composition/pdfExport.ts) (export) — **the desktop app** (the iPad app has its own reader, [below](#on-the-ipad)). How it works inside:
 [architecture/pdf.md](../architecture/pdf.md). The design and the reasons behind it: [pdf-markup-plan.md](../pdf-markup-plan.md).
 To check it by hand: [manual-tests/pdf.md](../manual-tests/pdf.md).
 
@@ -209,7 +209,24 @@ is inside:
 The Trash Can row shows the same counts. Restoring the note brings the PDF and its marks back with it; when the note is deleted for
 good, so are the file and its marks.
 
+## On the iPad
+
+The iPad app (milestone M2, [apps/ios](../../apps/ios)) has its own reader, drawn by PDFKit, beside the note that owns the PDF. **Built and checked in the iPad Simulator and with `swift test` only; not yet tried on an iPad**
+(Gate P2, [manual-tests/ipad.md](../manual-tests/ipad.md#pdf-markup-notes-search-export-and-the-ink-lab-m2-gate-p2)). The data is the same (the same tables, `pdf:` links, raw PDF coordinates), so a backup carries a PDF and its marks both ways.
+
+- **Layout.** Side by side with a draggable divider where the pane is 900 points wide (landscape with the lists hidden), one at a time with a *PDF / Note* switch where it is not.
+- **Marking.** Press and hold a word and drag to take more; a bar of the five colours and *Highlight*, *Underline*, *Strikethrough* floats over the pages. The colour you chose last is the next one. *Add a typed note* (speech bubble), then tap
+  where it goes. Tap a mark for its **card**: colours, a one-line comment, *Quote in the note*, delete (and *Edit the note* for a typed one). *Undo* and *Redo* are in the strip (⌘Z and ⇧⌘Z). A typed note cannot yet be moved or resized.
+- **The list button** (left of the strip) opens **Contents**, **Bookmarks**, **Highlights** and **Notes**. Highlights: every mark by page with its words and comment, a filter, a swipe to delete, a quote button, a quote icon on a mark a note
+  already quotes; a tap goes to the page and a frame flashes round the mark. Notes: the PDF's own note, then every note that links to the PDF; choosing one shows it beside the PDF; **New note for this PDF** makes "Notes on <title>".
+- **Quote** and **Cite this page** (the link button) write the same Markdown as the desktop into the note beside the PDF, at its caret, or at the end of the note when its Preview tab is showing. **A `pdf:` link** in the Preview tab opens the PDF at the page and
+  flashes the mark; from a note that does not own the PDF, the PDF opens beside that note. A link whose PDF is not here is struck through with "(PDF not on this device)". The Markdown and Live tabs draw the link and do not follow it.
+- **Search** finds a PDF's note by the words of its highlights, comments, typed notes and bookmark labels.
+- **Export annotated PDF** (the share button in the strip): *Flatten markup* off (standard annotations) or on (burned into the pages), then the share sheet. A protected PDF's copy asks for the same password. Differences from the desktop's:
+  typed notes in any script are written (the system's fonts), a flattened copy loses the PDF's own links, and the original's limits on printing and copying are not carried.
+- **Spike B's lab** (*More, PDF ink lab*) is where the Pencil over a PDF is being tried. Pencil ink on a PDF and handwritten notes beside it are **not built**.
+
 ## Not built yet
 
-Ink and handwritten notes (the iPad app, milestone M2); the
+Ink and handwritten notes (the iPad app, milestone M2; the iPad's lab for them is built, the ink is not); the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

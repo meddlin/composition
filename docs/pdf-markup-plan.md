@@ -1,9 +1,9 @@
 # PDF reading, markup and notes: design and build plan
 
 Import a PDF, mark it up (on the iPad, with the Apple Pencil), keep bookmarks, and read it with your notes beside it. On the
-desktop the same PDF opens next to a note you type while you read. Status (2026-11-07): **the desktop side is built, Steps 1 to 6
-of the [build order](#build-order)**, and checked by tests and by driving the real app; **nothing has been tried on the iPad, or on a
-real textbook by hand** (Gate P1 is the owner's). The design was decided with the owner in a question-by-question session (the
+desktop the same PDF opens next to a note you type while you read. Status (2026-11-09): **the desktop side is built, Steps 1 to 6
+of the [build order](#build-order)**, and checked by tests and by driving the real app (Gate P1 was the owner's, passed 2026-11-08); **the iPad side is built up to the ink**
+(import, the reader, typed marks, the sidebar's Highlights and Notes tabs, Quote, Cite this page, `pdf:` links, search by marks, export annotated, and spike B's lab), **checked in the iPad Simulator and by `swift test` on a Mac only, never on an iPad**; Pencil ink on a PDF and handwritten notes beside it wait on spike B (the owner's iPad) and Gate C. Gate P2 is the owner's: [manual-tests/ipad.md](manual-tests/ipad.md#pdf-markup-notes-search-export-and-the-ink-lab-m2-gate-p2), items 180 to 214. The design was decided with the owner in a question-by-question session (the
 decisions are in [What is decided](#what-is-decided)); read the sections below as the design, and the build order and change log
 for what was found when it was built. Anything marked **my pick** is a judgment the owner has not made; **Inference** is
 reasoning from a fact, not a measurement; **unverified** means no source or test confirmed it.
@@ -500,7 +500,12 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
 9. **M2, in order:** the Swift core's three tables against the shared fixtures; the PDFKit reader and the split; typed markup,
    bookmarks, the Notes tab and import from Files; spike B; **Gate C** (the ink stroke format, including one ink record per
    page); Pencil ink on PDFs; handwritten notes beside the PDF; export on the iPad; then standalone `<Ink>` pages.
-10. **Gate P2 (yours):** the iPad manual test, extending `docs/manual-tests/ipad.md`.
+   **Status 2026-11-09, in the Simulator only (see [The iPad's build, 2026-11-09](#the-ipads-build-2026-11-09)):** the tables and files
+   (PRs #276 and #279), import and the PDFKit reader, **typed markup, the Highlights and Notes tabs, Quote, Cite this page, `pdf:` links, search
+   by marks and export annotated are built**, and **spike B's lab is built** (not run on an iPad). **Not built, waiting on the iPad and Gate C:**
+   Pencil ink on a PDF, the Pencil's highlighter snapping to text lines, handwritten notes beside the PDF, and standalone `<Ink>` pages.
+10. **Gate P2 (yours):** the iPad manual test, extending `docs/manual-tests/ipad.md` (items 180 to 214; the earlier 140 to 157 are the reader).
+    The checklist is written; nothing in it is ticked.
 
 ## Spike A findings (2026-11-07)
 
@@ -600,13 +605,82 @@ part is on the iPad, which writes with PDFKit); opening the result in Acrobat (P
 should match, but it was not opened there); a hostile or damaged PDF; more than four real files; and the utility process
 itself in Electron.
 
+## The iPad's build, 2026-11-09
+
+Built on `claude/gate-p2-pdf-markup-fe640d` (from `claude/ipad-app-next-eeff80`, which has the import and the reader), by a session working for Gate P2, **in the iPad
+Simulator and with `swift test` on a Mac; none of it has been on an iPad**. The picks below are mine, the owner's to change.
+
+- **Where the code is.** The Swift package `apps/ios/CompositionCore` gained `PdfRefs` (the `pdf:` link format, escaping and quote blocks: a port of `pdfRefs.ts`
+  replaying `fixtures/conformance/pdf-refs.json`, which `apps/ios/scripts/pdf-refs-oracle.mjs` writes from the desktop's own code and `conformance.sh` checks), `restoreAnnotations` (undo of a delete),
+  `marksSearchText` and the `NoteStore` methods that put a PDF's owner note back in the search index when its marks change (its words follow the note's text, as the
+  desktop's `noteToDocument` does), `notesForPdf`, `PdfMarkPaint` and `PdfMarkGeometry` (the five colours, a tap's mark, a new note's box) and `PdfMarkEditor` (the marks of one PDF with a serial queue and
+  undo and redo, 200 deep, in memory). A **second package target, `CompositionPDF`** (PDFKit; the Xcode project links it): a selection turned into marks, marks drawn as annotations
+  (`MarkAnnotations`, `MarkLayer`), and `AnnotatedExport`. It is a target of its own because the core promises to be Foundation and GRDB only; PDFKit is the same framework on a Mac, so
+  its tests run under `swift test` against the nine page geometries of spike C (`fixtures/conformance/pdf-geometry.pdf`).
+- **Typed markup** (Step 1). A long press selects words (PDFKit's own selection); a bar of the five colours and highlight, underline and strikethrough floats over the pages;
+  each mark is stored in raw PDF user space, one per page with a rectangle per line (`SelectionMarks`, from `PDFSelection.selectionsByLine()`), and drawn as a PDFKit
+  Highlight, Underline or StrikeOut annotation named by the mark's uuid (`/NM`). Checked on all nine geometries: a mark made from a selection of "ANCHOR TEXT" lands on the text on
+  every page, rotated and cropped included. A typed note: the speech-bubble button, a tap on a page (its top-left corner), a box to type in, a FreeText annotation in a 200 by 56 point box at 12 points.
+  A tap on a mark opens its card (recolour, a one-line comment, Quote, delete; a typed note can be retyped). Undo and redo are in the strip.
+  **My picks:** the system's edit menu is not extended (a bar of our own is easier to test and to find); a mark's card is a **panel over the pages** (at the bottom of the pane, or the top when the mark is low) and not a popover, because a popover's buttons could not be tapped in the Simulator's UI tests and its arrow covers the page; a typed note cannot be moved, resized or given another font size yet; the colour last chosen
+  is remembered (as on the desktop, but it is not shared with the editor's highlight menu); the card's comment is saved when the field is left.
+- **The sidebar, quoting, citing and links** (Step 2). The reader's list button opens a popover with **Contents, Bookmarks, Highlights and Notes**. Highlights: every mark by page with its words and
+  comment, a filter, a swipe to delete, a quote button, a quote icon on a mark a note already quotes (read from the notes' text), and a tap goes to the page and flashes a frame
+  round the mark for 1.6 seconds. Notes: the PDF's own note first, then every note whose text contains `pdf:<uuid>`, with how many pages each cites, and **New note for this PDF**.
+  Quote and Cite this page write into the note beside the PDF at its caret (the Markdown and Live tabs), or at the end of the note in the Preview tab. The preview follows a `pdf:` link:
+  the PDF opens at the page and flashes the mark; from a note that does not own the PDF it opens **beside that note** and the note stays where it is. A link whose PDF is not here (a backup
+  without it, or its note in the Trash Can) is struck through with "(PDF not on this device)" after it and is not tappable. **My picks:** the desktop's "paired note" (a PDF panel pinned to a note
+  or following one) is, on the iPad, *the note shown beside the PDF*: choosing a note in the Notes tab, or following a link from one, shows the PDF beside it (kept while the app is open, not
+  saved), so Quote goes to the note in view; the Live and Markdown tabs draw a `pdf:` link as any link and do not follow it (the desktop's preview-only rule).
+- **Search by marks** (Step 3). The words of a PDF's marks (quotes, comments, typed notes' words) and bookmark labels are in its owner note's entry in the FTS5 index after the note's own
+  text, never shown; any change to a mark or a bookmark, an undo, and the Trash Can and a restore keep it right; a rebuild includes them.
+- **Export annotated PDF** (Step 4). The strip's share button opens a sheet: *Flatten markup* (off), the number of marks, *Export…*, then the share sheet (Save to Files, AirDrop). Native:
+  PDFKit writes each mark as an annotation **with an appearance stream** (checked in the written file) carrying the mark's uuid, comment and bounds; flattened: PDFKit's own
+  burn-in option. The copy is written next to its final name and renamed into place; the library's file is never written and a copy cannot be put over it. A protected PDF's copy is protected with the same
+  password. **Not the desktop's behaviour:** text notes in any script work (PDFKit uses the system's fonts; the desktop stops at CJK and emoji); the original's limits on printing and copying are not carried; a flattened copy loses the PDF's own links (PDFKit's
+  burn-in takes every annotation into the page; a test pins it); a typed note's border is drawn a little heavier once written. Ink is left out and counted, and when it exists textured strokes are simplified to paths (C21).
+  **Not measured:** memory and time on a 300 MB book on the iPad (PDFKit holds a copy of the book while it writes it).
+
+### Spike B: the lab (2026-11-09)
+
+**More, PDF ink lab (spike B)** is a lab, not the reader: its own 12-page and 500-page PDFs, a `PKCanvasView` over each page on screen (PDFKit's `PDFPageOverlayViewProvider`), switches for *Pencil only*,
+*Canvas over each page* and *A stroke on every page*, a **Scroll through the book** button, and a report of the canvases on screen, made and dropped, strokes, touches by finger and Pencil, how long a touch waited before
+the app saw it, slow frames, memory (`phys_footprint`), and the size and transform PDFKit gave a canvas. `PdfInkLabUITests` drive it in the Simulator.
+
+**Simulator findings (a Mac, no Pencil):** (`PdfInkLabUITests`, run on the iPad Pro 11-inch Simulator, iOS 26.4, a Debug build, so the memory and the slow frames are not the iPad's)
+
+| Question | Answer |
+|---|---|
+| Does PDFKit give a canvas for each page on screen, and is it where the page is? | **Yes.** Each canvas's own coordinates are the page's points (612 by 792 for a letter page; the last line of the lab reports it) and PDFKit scales them with the page: a canvas at the page's place in the view (x 8, y 9, 1,194 by 1,546 on a 1,210-point-wide view at fit-width), its transform scale 1.00 and the view scale 1.00 as first reported (the zoom is applied to the view above it). Strokes drawn on a canvas are therefore in **raw page points**, which is the unit the marks are stored in. |
+| Does a canvas exist only for the pages on screen? | **Yes.** A 500-page book gone through every other page (250 stops, 35 s): 11 canvases made, 11 put on a page, 12 taken off, **at most 3 on screen at once**. PDFKit asks for a canvas only for a page it has drawn: stops too short for it to draw a page gave none (jumping from page to page at 30 ms gave none at all), and a second pass over the same book, straight after the first, put none on a page (**not understood**; PDFKit reuses the canvases it has, and the lab cannot say why it did not ask again). The first pass is the reliable measure. |
+| What does it cost in memory? | **Flat.** Over five runs, a 500-page book gone through: about 75 MB before, 80 to 82 MB at the end, 80 to 86 MB at most, with no ink. With a stroke of 150 points kept for every one of the 500 pages (as data; only the canvases on screen hold a live drawing): 88 MB before, 84 to 85 MB at the end, 88 MB at most (the first number is higher because the run before it was in the same process). **Not the iPad's number**, a Debug build, and a drawing of real handwriting is far bigger than 150 points: the iPad run (item 210) is the one to read. |
+| Does a finger still scroll and select text with Pencil-only canvases over the pages? | **Yes, in the Simulator.** A finger's swipes scroll the book and a long press selects words (the lab reports the characters selected) with canvases over the pages, and the strokes stay at 0. |
+| **Can a touch reach a canvas that PDFKit has put over a page?** | **Not in the Simulator, and this is a risk, not an answer.** Asked directly (a hit test of a point inside the page's canvas, with the canvases Pencil-only and again with *any input*) the view that comes back is **PDFKit's `PDFDocumentView`, not the canvas**. So the Simulator's finger cannot draw on PDFKit's overlay canvas in either mode. Whether the **Pencil** reaches it on the iPad is exactly item 206. **If it does not**, the fallback is our own canvas: a `PKCanvasView` per visible page placed over the `PDFView` by the app (page frames from `PDFView.convert(_:from:)`, moved on every scroll and zoom), which is more work and has to share the touch with PDFKit's selection. |
+| Latency; Pencil; palm rejection; Pencil with a finger | **Not answerable in the Simulator** (no Pencil). The lab measures how long a touch waits before the app sees it, and counts slow frames; the ink's own latency is the system's and is a person's to judge (item 208). |
+
+
+**What the iPad has to say** (the manual test's items 206 to 211): that the Pencil draws on the canvas while a finger scrolls and selects; Pencil and finger at once; palm rejection; the ink's latency (the lab
+measures only how long a touch waits for the app, not the ink's own, which is drawn by the system); pinch and rotate with ink on the page; the 500-page run with a stroke on every page (memory, and whether
+the system ends the app); and the size and transform PDFKit gives a canvas on a rotated or cropped page.
+
+**What the ink steps still need, in order** (nothing of this is built, and the ink stroke format belongs to Gate C, which another session is building: this does not decide it):
+
+1. **The iPad's answers** to the lab, and the owner's go on Pencil-only canvases over PDFKit (or the fallback: a full-screen canvas for one page, which is worse for reading).
+2. **Gate C** (the stroke format, and one `ink` record per page, [data model](#the-data-model)), then the stroke body of an `ink` mark; the Swift side already stores any JSON object or array in an `ink` mark's body.
+3. **The ink layer in the reader:** a `PKCanvasView` per page from the overlay provider, Pencil only, a tool picker (pen, marker, eraser, colour, thickness), the drawing kept as data when its page leaves
+   the screen and written when the page changes or the app leaves the foreground, one record per page; undo through `PdfMarkEditor` (a step per stroke change); `MarkLayer` already leaves ink to its own layer.
+4. **The Pencil's highlighter, underline and strikethrough** snapping to the text lines under the stroke (`PDFPage.selection(for:)` over the stroke's bounds, then the same `SelectionMarks` path as a long press).
+5. **Export:** ink as `Ink` annotations (textured strokes simplified to paths, C21) and burned in exactly as drawn when flattened; `AnnotatedExport` already counts the ink it leaves out.
+6. **Handwritten notes beside the PDF** (P5): a canvas under a typed strip of citations that Quote and Cite this page write into; recognition of the handwriting on the device for search (C11); the desktop shows the canvas view-only.
+7. **The desktop's** view-only ink (the other session's work) and the round trip (Gate P2, item 213).
+
 ## Risks and unknowns
 
 | # | Risk | Mitigation |
 |---|---|---|
 | X1 | pdf.js is slow or heavy on a 300 MB, 600-page file. **Mostly answered by spike A:** it works under the CSP and opens in about 0.1 s reading about 10 MB, but memory trends toward the file's size over a long session (it keeps what it has read until the document closes). | Range transport, 16 KB chunks, render only visible pages; closing the panel frees it. Still untested: scrolling in a real window, a cold disk. |
 | X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). **Answered by spike C** for stored rectangles: raw user space agrees on all nine test geometries. Open: real multi-line selections, and PDFKit on the iPad. | Raw user-space convention; the spike C checks in `spikes/pdf-reader/coords` as a regression test when the code exists. |
-| X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. | Spike B; Pencil-only input; overlays only on visible pages. |
+| X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. **Partly answered by spike B's lab, in the Simulator only** ([findings](#spike-b-the-lab-2026-11-09)): with Pencil-only canvases over the pages a finger still scrolls and selects, a canvas exists only for the pages on screen, and a 500-page book is gone through in a flat amount of memory. **Open, and the iPad's to answer:** the Pencil itself, palm rejection, Pencil and finger together, the ink's latency. | Spike B; Pencil-only input; overlays only on visible pages. Items 206 to 211 of the iPad manual test. |
 | X4 | Quoted text comes out jumbled on multi-column or odd PDFs (selection order), or a highlight's rectangles merge badly. | Keep the rectangles per line; test on a two-column paper and a scanned-then-OCR file; the user can correct the quote in the note. |
 | X5 | A hostile PDF attacks the reader. | Pinned recent pdf.js (this version has no eval to turn off), no scripting, no form widgets, no WebAssembly, the file served only to our own pages. |
 | X6 | A backup grows large and slow with textbooks; a Trash Can holds a large file for 60 days. | Counts in the Backup card and the Trash Can row; no cap beyond 1 GB per file. |
@@ -715,3 +789,8 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   the password box is emptied as soon as it is sent; a wrong password is asked for again with no limit; a PDF opened with an *owner* password exports with that as the copy's
   password and keeps the original's limits. **With this, the four gaps Steps 1 to 6 left are built**; `docs/ui/pdf.md` no longer lists them as not built.
 - 2026-11-09: **M2 on the iPad, third and fourth steps: import and the reader** (in the order of P19: the Swift core's tables and files, then the PDFKit reader and the split). *Import PDF* and a drag from Files make the owner note and copy the file in through `DocumentLibrary`; the reader is a PDFKit `PDFView` beside the note (side by side from 900 points, a switch below), with the system's find bar, the PDF's contents, bookmarks, go-to-page, a password prompt and the page and zoom kept per PDF; the Trash Can, deleting a group for good and the sweep at launch take a purged note's file with it. Run in the iPad Simulator only (seven UI tests, `scripts/pdf-flow-test.sh`); the status and what is not built are in the [iPad design's tracker](ipad-app-design.md#pdfs-new). Marks, the Notes tab, quoting, Pencil ink (spike B first) and export are the next steps.
+- 2026-11-09: **The iPad's PDF work up to the ink, for Gate P2** ([details](#the-ipads-build-2026-11-09)). Typed markup (highlight, underline, strikethrough in the five colours from a selection, typed notes, a card to recolour, comment on, quote and
+  delete a mark, undo and redo), the Highlights and Notes tabs, Quote, Cite this page, `pdf:` links followed from the preview (the PDF opens beside the note, the mark flashes) and drawn struck through when the PDF is not here, search finding a PDF's note
+  by its marks, and Export annotated PDF (native with appearance streams, or flattened; share sheet), in the Swift packages (`PdfRefs` replaying `fixtures/conformance/pdf-refs.json`; the new `CompositionPDF` target tested on the nine page geometries) and the app.
+  **Spike B's lab is built** (`More, PDF ink lab (spike B)`, `PdfInkLabUITests`) and run in the Simulator; the Pencil is not. **Checked in the Simulator and under `swift test` only; nothing was tried on an iPad and nothing in Gate P2 is ticked.** Not built: Pencil ink on a
+  PDF, the Pencil's highlighter snapping to lines, handwritten notes beside the PDF, `<Ink>` pages, dark pages, moving a typed note. The checklist is items 180 to 214 of [manual-tests/ipad.md](manual-tests/ipad.md).
