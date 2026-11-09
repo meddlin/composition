@@ -4,7 +4,7 @@ import Foundation
 // Images in notes (build plan Step 8): the Swift twins of the desktop's `images.ts` (sniffImage, imageFileName, storeImage) and the
 // parts of `imageRefs.ts` that write and read a note's image paths (imageAlt, imageMarkdown, imageTag, findImageRefs). Pure and
 // platform-free: turning a photo into JPEG bytes is the app's job. They are checked against the real functions over
-// apps/ios/conformance/images-cases.json (see ImagesConformanceTests).
+// fixtures/conformance/images-cases.json (see ImagesConformanceTests).
 
 /// What the desktop stores: only these four, whatever a file claims to be. SVG is left out on purpose (it can carry script).
 public enum StoredImageType: String, Sendable, CaseIterable {

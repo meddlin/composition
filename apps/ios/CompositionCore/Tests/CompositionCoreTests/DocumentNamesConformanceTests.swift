@@ -4,19 +4,18 @@ import Testing
 @testable import CompositionCore
 
 // The names and checks around a PDF's file against the desktop's own `attachmentNames.ts` and `documentNames.ts`, run over the inputs in
-// apps/ios/scripts/document-names-oracle.mjs. The result is committed (apps/ios/conformance/document-names.json), so a plain `swift test`
+// apps/ios/scripts/document-names-oracle.mjs. The result is committed (fixtures/conformance/document-names.json), so a plain `swift test`
 // replays it; `apps/ios/scripts/conformance.sh` first checks that it is what the desktop makes now.
 
 @Suite("PDF file names against the desktop")
 struct DocumentNamesConformanceTests {
     private static let corpus: JSONValue? = {
-        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("conformance/document-names.json")
-        return (try? String(contentsOf: file, encoding: .utf8)).flatMap { try? JSONValue(parsing: $0) }
+        let file = corpusDirectory?.appendingPathComponent("document-names.json")
+        return file.flatMap { try? String(contentsOf: $0, encoding: .utf8) }.flatMap { try? JSONValue(parsing: $0) }
     }()
 
     private func cases(_ name: String) throws -> [JSONObject] {
-        let corpus = try #require(Self.corpus, "apps/ios/conformance/document-names.json is missing or is not JSON")
+        let corpus = try #require(Self.corpus, "fixtures/conformance/document-names.json is missing or is not JSON")
         return try #require(corpus.objectValue?[name]?.arrayValue).compactMap(\.objectValue)
     }
 

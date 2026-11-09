@@ -5,7 +5,7 @@ import Testing
 @testable import CompositionCore
 
 // The Swift store against the desktop's real `service.ts` (and the repos under it). Both run the steps in
-// apps/ios/conformance/store-script.json against the same starting database (store-start.db, built by the TypeScript with the real
+// fixtures/conformance/store-script.json against the same starting database (store-start.db, built by the TypeScript with the real
 // repos). After every step the TypeScript recorded the result and every row of notes, groups, notebooks, trashed_notes,
 // trashed_groups and sqlite_sequence (store-script.expected.json); Swift records the same and the two must be equal. See
 // ConformanceTests.swift for how to run.
