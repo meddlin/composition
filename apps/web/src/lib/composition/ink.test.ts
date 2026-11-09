@@ -59,7 +59,8 @@ describe("parseInkText", () => {
     expect(() => parseInk({ ...base, strokes: new Array(INK_LIMITS.strokes + 1).fill({ points: [] }) })).toThrow("too many strokes");
     const stroke = { points: new Array(INK_LIMITS.points / 2 + 1).fill([1, 1]) };
     expect(() => parseInk({ ...base, strokes: [stroke, stroke] })).toThrow("too many points");
-  });
+    // The reader counts a stroke's points only after reading it, so this reads 5,000,002 of them (a second here, several on a busy CI runner).
+  }, 60_000);
 
   it("keeps a member called __proto__ as a member, and reads a colour name like `constructor` as a name", () => {
     const text =

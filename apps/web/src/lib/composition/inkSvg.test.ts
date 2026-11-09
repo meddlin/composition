@@ -139,5 +139,6 @@ describe("inkPicture", () => {
     const { shapes } = inkPicture(dense);
     const corners = shapes.reduce((total, shape) => total + (shape.d.match(/M/g)?.length ?? 0), 0);
     expect(corners).toBeLessThanOrEqual(MAX_SAMPLES);
-  });
+    // 800,000 points: about half a second here, several times that on a busy CI runner, so it gets more than vitest's 5 s.
+  }, 60_000);
 });
