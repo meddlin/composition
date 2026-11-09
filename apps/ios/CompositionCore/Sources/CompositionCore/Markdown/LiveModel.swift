@@ -36,6 +36,9 @@ public struct LiveDecorations: Equatable, Sendable {
     public struct Picture: Equatable, Sendable {
         /// The text that writes the picture: `![alt](src "title")` or `<Image … />`.
         public var range: NSRange
+        /// Nothing but space is on its line with it: such a picture is drawn in place of its text. One in the middle of a sentence (the desktop draws it inline) is
+        /// left as its text, because drawing it in the line would need something in the text that is not its characters.
+        public var ownLine = false
         /// The selection is on that text. It stays showing, and the picture is drawn after it; otherwise the picture is drawn in its place.
         public var active: Bool
         public var src: String
@@ -52,6 +55,8 @@ public struct LiveDecorations: Equatable, Sendable {
 
     /// The start of each line of the frontmatter (it is drawn set apart, and never hidden).
     public var frontmatterLines: [Int] = []
+    /// The whole frontmatter, from its first character to the end of its last line, when the note has one.
+    public var frontmatterRange: NSRange?
     public var headings: [Heading] = []
     /// The start of the line of each rule that is drawn as a line (a rule the selection is on shows its dashes and is not drawn).
     public var rules: [Int] = []
@@ -156,8 +161,6 @@ public struct LiveModel: Sendable {
     private var reach: [Int]
     private var frontmatterLines: [Int]
     private var scan: LiveScan.Result
-    /// The highlights' and images' places were read before the last edit, so they are not where the text now has them. They are left out until the note is read again.
-    private var scanIsStale = false
     private let extrasLimit: Int?
 
     /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read, as on the desktop; nil reads them in any note.
@@ -215,8 +218,9 @@ public struct LiveModel: Sendable {
 
     /// Brings the model up to date with an edit: `range` of the old text became `newLength` units, `text` is the text now, and `window` (in the new text) is
     /// the part of it to read again, which must hold the edit and whole top-level blocks (it is what `HighlightModel.edited` gives back). Everything after
-    /// the window moves with the edit; what the window holds is read again. The places of highlights and `<Image />` tags are left out until `LiveModel`
-    /// is made again from the whole text (the full read a pause after typing), because they pair across blocks.
+    /// the window moves with the edit; what the window holds is read again. The places of highlights and `<Image />` tags are moved with the edit (see
+    /// `LiveScan.Result.shifted`) and made right again when `LiveModel` is made again from the whole text (the full read a pause after typing, and
+    /// `differences(from:)` says what that changed), because they pair across blocks.
     public mutating func edited(replacing range: NSRange, withLength newLength: Int, rereading window: NSRange, in text: NSString) {
         let delta = newLength - range.length
         let oldWindow = NSRange(location: window.location, length: window.length - delta)
@@ -226,7 +230,7 @@ public struct LiveModel: Sendable {
         }
         chars.replaceSubrange(range.location..<NSMaxRange(range), with: (0..<newLength).map { text.character(at: range.location + $0) })
         length += delta
-        scanIsStale = true
+        scan = scan.shifted(replacing: range, by: delta)
 
         // What starts in the old window is dropped, and what starts after it moves; what starts before it stays (and should end before it).
         let low = firstIndex(startingAtOrAfter: oldWindow.location)
@@ -283,6 +287,7 @@ public struct LiveModel: Sendable {
 
         var out = LiveDecorations()
         out.frontmatterLines = frontmatterLines.filter { wholeNote || ($0 >= window.location && $0 < NSMaxRange(window)) }
+        out.frontmatterRange = frontmatterRange
 
         forEachConstruct(startingAtOrBefore: NSMaxRange(window) - 1, reaching: window.location + 1) { construct in
             switch construct {
@@ -305,15 +310,14 @@ public struct LiveModel: Sendable {
                     if active { out.shown.append(mark) } else { out.hidden.append(mark) }
                 }
             case .picture(let picture):
-                out.pictures.append(.init(range: picture.node, active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
+                out.pictures.append(.init(range: picture.node, ownLine: isOwnLine(picture.node), active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
             case .fenced(let block):
                 if touches(block.node) { out.fencesShown += block.fences } else { out.fencesHidden += block.fences }
             }
         }
 
-        guard !scanIsStale else { return out }
         for image in scan.images where inWindow(image.range) {
-            out.pictures.append(.init(range: image.range, active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width))
+            out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width))
         }
         out.tints += scan.tints.filter { inWindow($0.range) }.map { .init(range: $0.range, color: $0.color) }
         for element in scan.elements {
@@ -332,14 +336,52 @@ public struct LiveModel: Sendable {
     public func constructRanges(touching selection: NSRange) -> [NSRange] {
         var found: [NSRange] = []
         forEachConstruct(startingAtOrBefore: NSMaxRange(selection), reaching: selection.location) { found.append($0.node) }
-        if !scanIsStale {
-            for element in scan.elements {
-                let whole = NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location)
-                if whole.location <= NSMaxRange(selection), NSMaxRange(whole) >= selection.location { found.append(whole) }
-            }
-            for image in scan.images where image.range.location <= NSMaxRange(selection) && NSMaxRange(image.range) >= selection.location { found.append(image.range) }
+        for element in scan.elements {
+            let whole = NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location)
+            if whole.location <= NSMaxRange(selection), NSMaxRange(whole) >= selection.location { found.append(whole) }
         }
+        for image in scan.images where image.range.location <= NSMaxRange(selection) && NSMaxRange(image.range) >= selection.location { found.append(image.range) }
         return found
+    }
+
+    /// Where the pictures drawn in place of their text are: those with nothing but space on their line. They are what has to be laid out again when the
+    /// width of the text changes, because a picture is as tall as its width allows.
+    public var drawnPictureRanges: [NSRange] {
+        var found: [NSRange] = []
+        for case .picture(let picture) in constructs where isOwnLine(picture.node) { found.append(picture.node) }
+        for image in scan.images where isOwnLine(image.range) { found.append(image.range) }
+        return found.sorted { $0.location < $1.location }
+    }
+
+    /// The places where this model and `older` (what is on the text) differ in what the Live look draws beyond the Markdown: highlights, `<Image />` tags and the
+    /// frontmatter. The Markdown's own constructs are what `HighlightModel.differences(from:)` compares.
+    public func differences(from older: LiveModel) -> [NSRange] {
+        var found = scan.differences(from: older.scan)
+        if frontmatterRange != older.frontmatterRange { found += [frontmatterRange, older.frontmatterRange].compactMap { $0 } }
+        return found
+    }
+
+    /// The whole frontmatter, from its first character to the end of its last line.
+    private var frontmatterRange: NSRange? {
+        guard let first = frontmatterLines.first, let last = frontmatterLines.last else { return nil }
+        var end = last
+        while end < chars.count, chars[end] != 0x0A, chars[end] != 0x0D { end += 1 }
+        return NSRange(location: first, length: end - first)
+    }
+
+    /// Nothing but space and tabs is on the line with `range`.
+    private func isOwnLine(_ range: NSRange) -> Bool {
+        var before = range.location
+        while before > 0, chars[before - 1] != 0x0A, chars[before - 1] != 0x0D {
+            guard chars[before - 1] == 0x20 || chars[before - 1] == 0x09 else { return false }
+            before -= 1
+        }
+        var after = NSMaxRange(range)
+        while after < chars.count, chars[after] != 0x0A, chars[after] != 0x0D {
+            guard chars[after] == 0x20 || chars[after] == 0x09 else { return false }
+            after += 1
+        }
+        return true
     }
 
     private func containsLineBreak(_ range: NSRange) -> Bool {

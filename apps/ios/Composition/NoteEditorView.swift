@@ -128,6 +128,9 @@ final class NoteTextView: UITextView {
     weak var assist: EditorAssist?
     /// The colour scheme and font in force, which the list at the caret is drawn in too.
     var look = Look.standard
+    /// The width of the view changed (the Live tab lays its pictures out again).
+    var onWidthChange: (() -> Void)?
+    private var lastWidth: CGFloat = 0
 
     /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
     func apply(_ edit: LineEdit) {
@@ -224,6 +227,10 @@ final class NoteTextView: UITextView {
             textContainerInset = UIEdgeInsets(top: 16, left: side, bottom: 16, right: side)
         }
         super.layoutSubviews()
+        if abs(bounds.width - lastWidth) > 0.5 {
+            lastWidth = bounds.width
+            onWidthChange?()
+        }
     }
 }
 
@@ -329,6 +336,8 @@ struct NoteEditorView: UIViewRepresentable {
             textView = view
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
+            styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
+            (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
             if live { styler.setLive(true) } else { styler.reload() }
             #if DEBUG || EDITOR_TEST_HOOKS
             // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
