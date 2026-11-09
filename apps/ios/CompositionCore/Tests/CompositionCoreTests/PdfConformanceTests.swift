@@ -145,7 +145,7 @@ struct PdfConformanceTests {
     // MARK: schema.json
 
     private func collapsed(_ sql: String) -> String {
-        sql.unicodeScalars.split(whereSeparator: PdfMarkup.isWhitespace).map { String(String.UnicodeScalarView($0)) }.joined(separator: " ")
+        sql.unicodeScalars.split(whereSeparator: JavaScriptText.isWhitespace).map { String(String.UnicodeScalarView($0)) }.joined(separator: " ")
     }
 
     @Test("the three tables, their indexes and their uuid triggers are the desktop's")

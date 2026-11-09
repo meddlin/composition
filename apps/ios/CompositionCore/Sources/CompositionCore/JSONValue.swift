@@ -2,7 +2,7 @@ import Foundation
 
 // JSON that keeps what it was given. A PDF mark stores JSON in three columns (`rects`, `body`, `view_state`), and an ink mark's
 // body is whatever strokes the drawing code made: it must come back as it went in, members in their order and numbers written
-// the way JavaScript's `JSON.stringify` writes them, so the same mark is the same text on the desktop and on the iPad.
+// the way JavaScript's `JSON.stringify` writes them (`JavaScriptText.numberString`), so the same mark is the same text on the desktop and on the iPad.
 // `JSONSerialization` loses the order of an object's members and formats numbers its own way, which is why this exists.
 
 public enum JSONValue: Equatable, Sendable {
@@ -290,7 +290,7 @@ extension JSONValue {
         switch self {
         case .null: out += "null"
         case .bool(let value): out += value ? "true" : "false"
-        case .number(let value): out += Self.javaScriptNumber(value)
+        case .number(let value): out += value.isFinite ? JavaScriptText.numberString(value) : "null"
         case .string(let value): Self.write(value, to: &out)
         case .array(let items):
             out += "["
@@ -327,32 +327,5 @@ extension JSONValue {
             }
         }
         out += "\""
-    }
-
-    /// ECMAScript's Number::toString. Swift's own text has the same shortest digits ("12.5", "1e-05", "1.2345e+20") but switches
-    /// to an exponent at other sizes and writes "12.0" for a whole number, so the digits are taken from it and laid out again.
-    static func javaScriptNumber(_ value: Double) -> String {
-        if !value.isFinite { return "null" }
-        if value == 0 { return "0" }
-        let text = "\(abs(value))"
-        let parts = text.split(separator: "e", maxSplits: 1)
-        let mantissa = parts[0].split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
-        var digits = Array(mantissa[0] + (mantissa.count > 1 ? mantissa[1] : ""))
-        // `n`: where the decimal point sits, so that the value is 0.<digits> x 10^n
-        var n = mantissa[0].count + (parts.count > 1 ? Int(parts[1]) ?? 0 : 0)
-        while digits.first == "0" {
-            digits.removeFirst()
-            n -= 1
-        }
-        while digits.last == "0" { digits.removeLast() }
-        let k = digits.count
-        let sign = value < 0 ? "-" : ""
-        let all = String(digits)
-        if k <= n && n <= 21 { return sign + all + String(repeating: "0", count: n - k) }
-        if 0 < n && n <= 21 { return sign + String(digits[..<n]) + "." + String(digits[n...]) }
-        if -6 < n && n <= 0 { return sign + "0." + String(repeating: "0", count: -n) + all }
-        let exponent = n - 1
-        let tail = "e" + (exponent < 0 ? "-" : "+") + String(abs(exponent))
-        return sign + (k == 1 ? all : String(digits[0]) + "." + String(digits[1...])) + tail
     }
 }
