@@ -7,7 +7,7 @@ import { parseInkText } from "@/lib/composition/ink";
 import { loadInkDrawing } from "@/lib/composition/inkDrawings";
 import { NoteMarkdown } from "./NoteMarkdown";
 
-vi.mock("@/lib/composition/inkDrawings", () => ({ loadInkDrawing: vi.fn() }));
+vi.mock("@/lib/composition/inkDrawings", () => ({ loadInkDrawing: vi.fn(), loadInkDensity: vi.fn(() => Promise.resolve(2)) }));
 
 // jsdom's `import.meta.url` is not a file URL, so the corpus is found by path.
 const page = parseInkText(fs.readFileSync(path.join(__dirname, "../../../../../fixtures/conformance/ink/drawing.json"), "utf8"));

@@ -41,6 +41,16 @@
       "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "points": [] }] },
       "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "ink", "points": [] }] }
     },
+    {
+      "name": "a null in a known column of a point is that column's default, and a null in a column this version does not know is kept",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "width", "tag"], "strokes": [{ "points": [[1, 2, null, null], [3, 4, 5, "kept"]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity", "tag"], "strokes": [{ "ink": "pen", "color": "ink", "points": [[1, 2, 0, 1, 1.571, 0, 3, 3, 1, null], [3, 4, 0, 1, 1.571, 0, 5, 3, 1, "kept"]] }] }
+    },
+    {
+      "name": "colour names: lower case letters, digits and dashes, up to 32 characters",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "dark-blue-2", "points": [[1, 1]] }, { "color": "abcdefghijklmnopqrstuvwxyz012345", "points": [[2, 2]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "dark-blue-2", "points": [[1, 1, 0, 1, 1.571, 0, 3, 3, 1]] }, { "ink": "pen", "color": "abcdefghijklmnopqrstuvwxyz012345", "points": [[2, 2, 0, 1, 1.571, 0, 3, 3, 1]] }] }
+    },
     { "name": "not an object", "input": [], "invalid": true },
     { "name": "another format", "input": { "format": "drawio", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
     { "name": "no format", "input": { "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
@@ -65,6 +75,12 @@
     { "name": "a colour in capitals that is not a hex colour", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "Red", "points": [[1, 1]] }] }, "invalid": true },
     { "name": "a hex colour of five digits", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "#12345", "points": [[1, 1]] }] }, "invalid": true },
     { "name": "a colour that is a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": 5, "points": [[1, 1]] }] }, "invalid": true },
-    { "name": "an ink that is a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "ink": 5, "points": [[1, 1]] }] }, "invalid": true }
+    { "name": "an ink that is a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "ink": 5, "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "an ink that is null: only a member that is absent takes the default", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "ink": null, "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a colour that is null: only a member that is absent takes the default", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": null, "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "fields that are null: only a member that is absent takes the default", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": null, "strokes": [{ "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a colour name of 33 characters", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "abcdefghijklmnopqrstuvwxyz0123456", "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a colour name that is empty", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "", "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a colour name with an underscore", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "dark_blue", "points": [[1, 1]] }] }, "invalid": true }
   ]
 }

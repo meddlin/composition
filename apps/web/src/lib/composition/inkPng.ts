@@ -1,4 +1,4 @@
-import { INK_LIMITS, InkError, parseInkText, type InkDrawing } from "./ink";
+import { INK_DENSITY, INK_LIMITS, InkError, parseInkText, type InkDrawing } from "./ink";
 
 /**
  * The PNG that carries its own strokes (docs/architecture/ink.md, "The container"): the drawing's pixels as any PNG, plus
@@ -72,6 +72,26 @@ export async function readInkChunk(png: Uint8Array): Promise<InkChunk> {
     result.json = text;
   }
   return result;
+}
+
+/**
+ * How many pixels the PNG has to a point of its drawing's canvas: its `pHYs` chunk (pixels to a metre, where 72 dots to an inch is a pixel to a point), to a
+ * hundredth. 2 when it has no usable one (not in metres, not square, none) or its structure is broken: every drawing before the chunk was written is 2x, and 2
+ * is what the iPad draws at. A drawing too big for 2 pixels to a point (over 4,096 points on a side) is stored at less, and says so here.
+ */
+export function pixelsPerPoint(png: Uint8Array): number {
+  try {
+    const view = new DataView(png.buffer, png.byteOffset, png.byteLength);
+    const phys = walk(png, view).find((chunk) => chunk.type === "pHYs");
+    if (!phys || phys.end - phys.start !== 12 + 9) return INK_DENSITY;
+    const x = view.getUint32(phys.start + 8);
+    const y = view.getUint32(phys.start + 12);
+    if (png[phys.start + 16] !== 1 || x !== y || x === 0) return INK_DENSITY;
+    const density = Math.round(((x * 0.0254) / 72) * 100) / 100;
+    return density > 0 ? density : INK_DENSITY;
+  } catch {
+    return INK_DENSITY;
+  }
 }
 
 type Chunk = { type: string; /** Offsets in the file of the length field, and of the end of the CRC. */ start: number; end: number };

@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { conformancePath } from "./__fixtures__/conformance";
 import { parseInk, parseInkText, type InkDrawing } from "./ink";
-import { CSS_INK_PALETTE, INK_MARK_HUES, MAX_SAMPLES, inkColor, inkPicture } from "./inkSvg";
+import { CSS_INK_PALETTE, INK_MARK_HUES, MAX_SAMPLES, darkStyleOf, inkColor, inkPicture, styleOf } from "./inkSvg";
 
 const page = parseInkText(fs.readFileSync(conformancePath("ink/drawing.json"), "utf8"));
 
@@ -26,12 +26,53 @@ function bounds(d: string) {
   return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), corners: corners.length };
 }
 
+describe("the tables the renderers share", () => {
+  const corpus = JSON.parse(fs.readFileSync(conformancePath("ink/renderer.json"), "utf8")) as {
+    inks: Record<string, { alpha: number; oneWidth: boolean }>;
+    marks: Record<string, string>;
+    unknownColourName: string;
+    darkStyle: { pairs: [string, string][] };
+  };
+
+  it("show each ink at the corpus's share of its colour, and draw the same inks one width", () => {
+    expect(Object.keys(corpus.inks).length).toBeGreaterThanOrEqual(8);
+    for (const [ink, { alpha, oneWidth }] of Object.entries(corpus.inks)) expect(styleOf(ink), ink).toEqual({ alpha, constantWidth: oneWidth });
+  });
+
+  it("have the corpus's hues for the <Mark> colours, and draw a name nobody knows as ink", () => {
+    expect(INK_MARK_HUES).toEqual(corpus.marks);
+    expect(corpus.unknownColourName).toBe("ink");
+    expect(inkColor("teal")).toBe(CSS_INK_PALETTE.ink);
+  });
+});
+
+describe("a fixed colour on a dark scheme", () => {
+  const { darkStyle } = JSON.parse(fs.readFileSync(conformancePath("ink/renderer.json"), "utf8")) as { darkStyle: { pairs: [string, string][] } };
+
+  it("is the colour PencilKit shows in a dark interface style: the lightness of HSL reversed (pairs measured on the iPad Simulator)", () => {
+    expect(darkStyle.pairs.length).toBeGreaterThanOrEqual(12);
+    for (const [stored, shown] of darkStyle.pairs) expect(darkStyleOf(stored), stored).toBe(shown);
+  });
+
+  it("is drawn by `light-dark()`, which the page's `color-scheme` decides; a colour that does not change is plain", () => {
+    expect(inkColor("#c81e1e")).toBe(`light-dark(#c81e1e, ${darkStyleOf("#c81e1e")})`);
+    expect(inkColor("#0d2680")).toBe("light-dark(#0d2680, #7f98f2)");
+    expect(inkColor("#ff0000")).toBe("#ff0000");
+    expect(inkColor("#ffcc00")).toBe("#ffcc00");
+  });
+
+  it("leaves a name where the scheme puts it: ink, accent and a mark hue are the same on every scheme but through their own variables", () => {
+    expect(inkColor("blue")).toBe(INK_MARK_HUES.blue);
+    expect(inkColor("ink")).toBe("var(--foreground)");
+  });
+});
+
 describe("inkColor", () => {
   it("resolves the names against the palette", () => {
     expect(inkColor("ink")).toBe("var(--foreground)");
     expect(inkColor("accent")).toBe("var(--brand)");
     for (const [name, hue] of Object.entries(INK_MARK_HUES)) expect(inkColor(name)).toBe(hue);
-    expect(inkColor("#c81e1e")).toBe("#c81e1e");
+    expect(inkColor("#c81e1e", { ...CSS_INK_PALETTE, fixed: undefined })).toBe("#c81e1e");
   });
 
   it("draws a name it does not know as ink, even one that is a property of every object", () => {
@@ -63,7 +104,7 @@ describe("inkPicture", () => {
     expect(shapes.map(({ fill, opacity }) => [fill, opacity])).toEqual([
       ["var(--foreground)", 1],
       [INK_MARK_HUES.yellow, 0.225], // a marker (0.45) of points at 0.5
-      ["#c81e1e", 1],
+      [`light-dark(#c81e1e, ${darkStyleOf("#c81e1e")})`, 1],
       ["var(--brand)", 1],
     ]);
     for (const { d } of shapes) expect(d).toMatch(/^M-?[\d.]+ -?[\d.]+(L-?[\d.]+ -?[\d.]+)+Z/);

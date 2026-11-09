@@ -4,18 +4,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parseInkText, type InkDrawing } from "@/lib/composition/ink";
-import { loadInkDrawing } from "@/lib/composition/inkDrawings";
+import { loadInkDensity, loadInkDrawing } from "@/lib/composition/inkDrawings";
 import { Ink } from "./Ink";
 
-vi.mock("@/lib/composition/inkDrawings", () => ({ loadInkDrawing: vi.fn() }));
+vi.mock("@/lib/composition/inkDrawings", () => ({ loadInkDrawing: vi.fn(), loadInkDensity: vi.fn(() => Promise.resolve(2)) }));
 
 // jsdom's `import.meta.url` is not a file URL, so the corpus is found by path, as markContrast.test.ts finds the stylesheet.
 const page = parseInkText(fs.readFileSync(path.join(__dirname, "../../../../../../fixtures/conformance/ink/drawing.json"), "utf8"));
 const load = vi.mocked(loadInkDrawing);
+const density = vi.mocked(loadInkDensity);
 
 // Braces: a function a hook returns is run after the test as its teardown, and the mock must not be.
 beforeEach(() => {
   load.mockReset();
+  density.mockReset().mockResolvedValue(2);
 });
 afterEach(cleanup);
 
@@ -38,7 +40,7 @@ describe("Ink", () => {
     expect(paths.map((path) => [path.style.fill, path.getAttribute("fill-opacity")])).toEqual([
       ["var(--foreground)", "1"],
       ["rgb(245, 197, 24)", "0.225"],
-      ["rgb(200, 30, 30)", "1"],
+      ["light-dark(rgb(200, 30, 30), rgb(225, 55, 55))", "1"],
       ["var(--brand)", "1"],
     ]);
     expect(paths.every((path) => (path.getAttribute("d") ?? "").length > 20)).toBe(true);
@@ -76,6 +78,18 @@ describe("Ink", () => {
     Object.defineProperty(image, "naturalWidth", { value: 400 });
     fireEvent.load(image);
     expect(image.style.width).toBe("200px");
+  });
+
+  it("draws that picture at the density its PNG states, for a drawing too big to be stored at 2 pixels to a point", async () => {
+    load.mockResolvedValue(null);
+    density.mockResolvedValue(1.64);
+    render(<Ink src={stored} alt="A sketch" />);
+
+    const image = (await screen.findByRole("img", { name: "A sketch" })) as HTMLImageElement;
+    await vi.waitFor(() => expect(density).toHaveBeenCalledExactlyOnceWith("sketch-0123456789ab.png"));
+    Object.defineProperty(image, "naturalWidth", { value: 8192 });
+    fireEvent.load(image);
+    await vi.waitFor(() => expect(image.style.width).toBe("4995.121951219512px"));
   });
 
   it("says so when the file is gone", async () => {

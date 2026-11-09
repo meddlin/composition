@@ -3,7 +3,7 @@ import zlib from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { conformancePath } from "./__fixtures__/conformance";
 import { InkError, parseInkText } from "./ink";
-import { crc32, readInkChunk, readInkPng } from "./inkPng";
+import { crc32, pixelsPerPoint, readInkChunk, readInkPng } from "./inkPng";
 
 const sample = new Uint8Array(fs.readFileSync(conformancePath("ink/sample.png")));
 const drawingText = fs.readFileSync(conformancePath("ink/drawing.json"));
@@ -57,6 +57,51 @@ describe("crc32", () => {
   it("is the CRC PNG chunks use", () => {
     expect(crc32(Buffer.from("IEND"))).toBe(0xae426082);
     expect(crc32(new Uint8Array())).toBe(0);
+  });
+});
+
+describe("the container corpus", () => {
+  type Case = { file: string; name: string; width: number; problems: string[]; pixelsPerPoint: number };
+  const { cases } = JSON.parse(fs.readFileSync(conformancePath("ink/containers.json"), "utf8")) as { cases: Case[] };
+
+  it("has the cases the Swift side counts on", () => {
+    expect(cases.length).toBeGreaterThanOrEqual(4);
+  });
+
+  for (const entry of cases) {
+    it(entry.name, async () => {
+      const png = new Uint8Array(fs.readFileSync(conformancePath(`ink/${entry.file}`)));
+      const { drawing, problems } = await readInkPng(png);
+      expect(problems).toEqual(entry.problems);
+      expect(drawing?.width).toBe(entry.width);
+      expect(pixelsPerPoint(png)).toBe(entry.pixelsPerPoint);
+    });
+  }
+});
+
+describe("pixelsPerPoint", () => {
+  /** `sample.png` with a pHYs chunk of these pixels to a metre (or none), put before the pixels as a writer does. */
+  const withPhys = (physics?: { x: number; y: number; unit: number }) => {
+    const chunks = split(sample).filter((chunk) => chunk.type !== "pHYs");
+    if (physics) {
+      const be = (value: number) => [(value >>> 24) & 0xff, (value >>> 16) & 0xff, (value >>> 8) & 0xff, value & 0xff];
+      chunks.splice(1, 0, { type: "pHYs", data: Uint8Array.from([...be(physics.x), ...be(physics.y), physics.unit]) });
+    }
+    return assemble(chunks);
+  };
+
+  it("is two when the PNG says nothing, or says it in a way that is no use", () => {
+    expect(pixelsPerPoint(withPhys())).toBe(2);
+    expect(pixelsPerPoint(withPhys({ x: 5669, y: 5669, unit: 0 }))).toBe(2);
+    expect(pixelsPerPoint(withPhys({ x: 5669, y: 2835, unit: 1 }))).toBe(2);
+    expect(pixelsPerPoint(withPhys({ x: 0, y: 0, unit: 1 }))).toBe(2);
+    expect(pixelsPerPoint(new Uint8Array(40))).toBe(2);
+  });
+
+  it("is the density a PNG states, to a hundredth: 72 dots to an inch is one to a point", () => {
+    expect(pixelsPerPoint(withPhys({ x: 2835, y: 2835, unit: 1 }))).toBe(1);
+    expect(pixelsPerPoint(withPhys({ x: 5669, y: 5669, unit: 1 }))).toBe(2);
+    expect(pixelsPerPoint(withPhys({ x: 4645, y: 4645, unit: 1 }))).toBe(1.64);
   });
 });
 

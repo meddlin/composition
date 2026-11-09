@@ -127,15 +127,15 @@ A drawing made with the Pencil on the iPad, shown in the note from its strokes. 
 (the terminal shows the picture).
 
 ```mdx
-<Ink src="app_data/trip-plan-drawing-3f9c2a71b0de.png" alt="Drawing" width="80%" />
+<Ink src="app_data/trip-plan-drawing-3f9c2a71b0de.png" alt="Drawing" />
 ```
 
 - **What it shows.** The drawing is a stored PNG that carries its own strokes ([ink.md](../architecture/ink.md)), and the preview and the
   [Live tab](live-editor.md) draw those strokes as an SVG made when the note is drawn, in the **colour scheme in force**: black ink is the
-  scheme's text colour (white on a dark scheme), the accent is its brand colour, a `<Mark>` colour name is that hue, and a fixed colour is as chosen.
-  Changing the scheme restyles a drawing already on screen. It is drawn as large as its canvas, or at `width`.
+  scheme's text colour (white on a dark scheme), the accent is its brand colour, a `<Mark>` colour name is that hue, and a fixed colour is as chosen on a light scheme and, on a dark one, as PencilKit shows it in a dark style (its lightness reversed).
+  Changing the scheme restyles a drawing already on screen. It is drawn as large as its canvas (the iPad cuts a new drawing to what was drawn, so a sketch is a small picture), or at `width`.
 - **When it is just a picture.** A PNG with no strokes in it, or with strokes this version cannot read (a damaged chunk, or a drawing from a newer version of Composition),
-  is drawn as the picture it is, at half its pixels. So is one whose `src` is a web address. A drawing whose file has gone shows "Image not found: alt".
+  is drawn as the picture it is, at the pixel density the PNG states (2 pixels to a point unless it says otherwise). So is one whose `src` is a web address. A drawing whose file has gone shows "Image not found: alt".
 - `src`, `alt`, `title` and `width` are as for [`<Image>`](#image), and so is the editor's completion for them.
 - The file is an ordinary stored image, so it is also on the Images page and in backups. The strokes are drawn simplified: each is one smoothed outline at one opacity,
   and the textured inks (marker, pencil, watercolour, crayon) are approximated by opacity alone, so it is not PencilKit's own picture of them.

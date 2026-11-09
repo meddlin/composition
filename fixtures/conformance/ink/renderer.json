@@ -1,0 +1,24 @@
+{
+  "about": "What the renderers of a drawing must agree on (docs/architecture/ink.md, The renderer). No renderer is normative: the data is the strokes, and the Swift one (CoreGraphics) and the web one (SVG) differ in antialiasing and in how many samples they take along a stroke. These tables are the part a viewer would notice: how much of its colour each kind of ink shows, which inks draw one width, which colour a name has, and what a name nobody knows is. `inks` maps an ink to its share of the colour (`alpha`, multiplied by each point's own opacity) and whether the stroke is drawn one width, the mean of its points'; an ink not listed, such as `airbrush`, is drawn like a pen. `marks` are the `<Mark>` hues, the same in every scheme. `ink` is the scheme's text colour, `accent` its brand colour, and a name that is not listed is drawn as ink.",
+  "inks": {
+    "pen": { "alpha": 1, "oneWidth": false },
+    "fountainPen": { "alpha": 1, "oneWidth": false },
+    "monoline": { "alpha": 1, "oneWidth": true },
+    "pencil": { "alpha": 0.8, "oneWidth": false },
+    "marker": { "alpha": 0.45, "oneWidth": false },
+    "watercolor": { "alpha": 0.4, "oneWidth": false },
+    "crayon": { "alpha": 0.9, "oneWidth": false },
+    "airbrush": { "alpha": 1, "oneWidth": false }
+  },
+  "marks": { "yellow": "#f5c518", "green": "#3fb876", "blue": "#3b9eff", "pink": "#ff6fae", "orange": "#ff8a2b" },
+  "unknownColourName": "ink",
+  "darkStyle": {
+    "about": "How a fixed #rrggbb colour is drawn on a dark scheme: as PencilKit shows it in a dark interface style, the lightness of HSL reversed (1 - L) with hue and saturation kept, each channel rounded to the nearest of 255. Measured on the iPadOS 26.4 Simulator by drawing a stroke in a dark trait collection and reading its pixels; it matched this formula in every channel for 40 random colours and all seven inks. On a light scheme a fixed colour is as stored. [stored, shown on a dark scheme]",
+    "pairs": [
+      ["#000000", "#ffffff"], ["#ffffff", "#000000"],
+      ["#ff0000", "#ff0000"], ["#0000ff", "#0000ff"], ["#ffcc00", "#ffcc00"],
+      ["#1c43e2", "#1d44e3"], ["#d5538f", "#ac2a66"], ["#cb64d0", "#962f9b"], ["#30fdfb", "#02cfcd"],
+      ["#29d37a", "#2cd67d"], ["#615c07", "#f8f39e"], ["#16388a", "#7597e9"], ["#414b74", "#8b95be"], ["#e7c348", "#b79318"]
+    ]
+  }
+}

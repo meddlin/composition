@@ -91,14 +91,17 @@ Reading the files:
 ## `ink/`
 
 The stroke format of a drawing ([architecture/ink.md](../../docs/architecture/ink.md); the iPad's design decision D9, proposed until Gate C). **This corpus was
-written on the Swift side first**; the TypeScript reader (`apps/web/src/lib/composition/ink.ts` and `inkPng.ts`, run against these files by `ink.test.ts`, `inkPng.test.ts` and `inkSvg.test.ts`) was built against it.
+written on the Swift side first**; the TypeScript reader (`apps/web/src/lib/composition/ink.ts` and `inkPng.ts`, run against these files by `ink.test.ts`, `inkPng.test.ts`, `inkSvg.test.ts` and `inkBackup.test.ts`) was built against it.
 
 | File | What it pins | How a reader uses it |
 |---|---|---|
-| `validation.json` | What makes the stroke JSON readable, what a writer writes back after reading it, and what must be refused. Written by hand. | Run every `input` through the reader. `stored` is what writing the drawing again must give (compared as a value, so member order does not matter); `invalid: true` means it must be refused (the message is not compared). |
+| `validation.json` | What makes the stroke JSON readable, what a writer writes back after reading it, and what must be refused (41 cases: `null` is not absent, colour-name spelling, limits, structure). Written by hand. | Run every `input` through the reader. `stored` is what writing the drawing again must give (compared as a value, so member order does not matter); `invalid: true` means it must be refused (the message is not compared). |
 | `drawing.json` | The stroke JSON of a small page (a pen wave, a marker in a `<Mark>` colour, a fixed-colour monoline, an accent dot) as the Swift code writes it. | Read it and draw it: the shapes are in `InkSamples.page()` in the Swift tests. |
-| `sample.png` | The same page rendered by the Swift renderer in the default scheme's ink colour, with `drawing.json` byte for byte in its `inKJ` chunk (the container is described in the format page). | Find the `inKJ` chunk, check its CRC, unpack the zlib stream after the version byte and the four-byte length, and compare with `drawing.json`. |
+| `sample.png` | The same page rendered by the Swift renderer in the default scheme's ink colour, with `drawing.json` byte for byte in its `inKJ` chunk and its density (2 pixels to a point) in `pHYs` (the container is described in the format page). | Find the `inKJ` chunk, check its CRC, unpack the zlib stream after the version byte and the four-byte length, and compare with `drawing.json`. |
+| `containers.json` | What a reader must find in `sample.png`, `two-chunks.png` (two `inKJ` chunks: the last wins), `second-chunk-damaged.png` (the last has a wrong CRC: the first is used and the damage is reported) and `wide.png` (a drawing 5,000 points wide, stored at 1.64 pixels to a point): the drawing's width, the problems reported, the density. Written by hand. | Read each PNG; compare the three. |
+| `renderer.json` | What the renderers must agree on: each ink's share of its colour and whether it is one width, the `<Mark>` hues, what a name nobody knows is, and how a fixed colour is shown on a dark scheme (PencilKit's dark style reverses the HSL lightness; the pairs were measured in the iPad Simulator). Written by hand. | Check the renderer's own tables and colour function against it. |
+| `backup.tar.gz` | A real backup the Swift code made: one note, "Trip plan", with an `<Ink>` tag and the drawing's PNG in `app_data/`. | Restore it with the real restore code; the note has its tag, the PNG is among the images, its strokes are `drawing.json`'s. |
 
-The Swift side is `InkConformanceTests` in `apps/ios/CompositionCore/Tests/CompositionInkTests/`, run by `swift test` there. `drawing.json` and `sample.png` are
-rewritten by `UPDATE_FIXTURES=1 swift test --filter InkConformance`; `validation.json` is only ever edited by hand. Rounding is half away from zero on the
+The Swift side is `InkConformanceTests` and `InkBackupTests` in `apps/ios/CompositionCore/Tests/CompositionInkTests/`, run by `swift test` there. `drawing.json`, the PNGs and `backup.tar.gz` are
+rewritten by `UPDATE_FIXTURES=1 swift test --filter Ink`; `validation.json`, `containers.json` and `renderer.json` are only ever edited by hand. Rounding is half away from zero on the
 scaled number (`Math.round` rounds negative halves the other way, so the cases avoid them).
