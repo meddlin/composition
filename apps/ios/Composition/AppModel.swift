@@ -338,6 +338,30 @@ final class AppModel {
         return try? await Self.perform { try StoredImages.library(in: location) { try database.noteTexts() } }
     }
 
+    /// A stored image the Images page wants put in the open note (its *Insert in Open Note*): the note's screen puts it in and clears this.
+    var imageToInsert: String?
+
+    /// Deletes a stored image if nothing refers to it now (the Images page's *Delete*). What was typed is written first, and the notes (and the Trash Can's) are
+    /// read again here, so a picture put into a note a moment ago is never deleted from under it.
+    func deleteStoredImage(_ name: String) async -> StoredImages.RemoveOutcome {
+        guard let database else { return .failed("The notes are not open.") }
+        flushEditing()
+        let location = location
+        do {
+            return try await Self.perform {
+                StoredImages.remove(named: name, in: location, liveNotes: try database.noteTexts(), trashedTexts: try database.trashedNoteTexts())
+            }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// A line of each of these notes' text, for the home page's cards.
+    func excerpts(of ids: [Int64]) async -> [Int64: String] {
+        guard let database else { return [:] }
+        return (try? await Self.perform { try database.excerpts(of: ids) }) ?? [:]
+    }
+
     /// Opens a note for editing, or joins the session another window already has for it.
     func openSession(_ id: Int64) async -> NoteSession? {
         guard let sessions else { return nil }
