@@ -2,7 +2,7 @@ import Foundation
 import GRDB
 
 // Notebooks: a port of `notebooksRepo.ts`. The SQL is the same text, and the conformance script
-// (apps/ios/conformance/store-script.json) runs both against one database. Each operation is one write transaction, and `now`
+// (fixtures/conformance/store-script.json) runs both against one database. Each operation is one write transaction, and `now`
 // is a parameter so a test can say when something happened.
 
 extension CompositionDatabase {

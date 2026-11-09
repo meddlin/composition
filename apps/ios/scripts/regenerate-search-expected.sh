@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Asks a real Meilisearch the queries in apps/ios/conformance/search-queries.json over the generated notes, through the
-# desktop's own searchIndex.ts, and rewrites apps/ios/conformance/search-expected.json (spike S2). Needs a Meilisearch binary:
+# Asks a real Meilisearch the queries in fixtures/conformance/search-queries.json over the generated notes, through the
+# desktop's own searchIndex.ts, and rewrites fixtures/conformance/search-expected.json (spike S2). Needs a Meilisearch binary:
 # `meilisearch` on the PATH, or COMPOSITION_MEILI_BIN. Commit the result with the change to the queries or the notes that needed it.
 #
 # Usage: apps/ios/scripts/regenerate-search-expected.sh
@@ -13,5 +13,5 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 }
 dir="$(mktemp -d "${TMPDIR:-/tmp}/composition-search-expected.XXXXXX")"
 trap 'rm -rf "$dir"' EXIT
-(cd "$root/apps/web" && IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR="$dir" node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts -t "regenerates the committed Meilisearch answers")
-echo "Rewrote apps/ios/conformance/search-expected.json"
+(cd "$root/apps/web" && COMPOSITION_REGENERATE_SEARCH=1 COMPOSITION_FIXTURE_DIR="$dir" node node_modules/vitest/vitest.mjs run scripts/conformance-fixtures.test.ts -t "regenerates the committed Meilisearch answers")
+echo "Rewrote fixtures/conformance/search-expected.json"

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Writes apps/ios/conformance/document-names.json: what the desktop's own `attachmentNames.ts` and `documentNames.ts` make of a list
+// Writes fixtures/conformance/document-names.json: what the desktop's own `attachmentNames.ts` and `documentNames.ts` make of a list
 // of inputs (the name a PDF is stored under, the name and title shown for it, a size in words, whether bytes look like a PDF).
 // The Swift core's DocumentNames is checked against that file (DocumentNamesConformanceTests), and the file is committed so a plain
 // `swift test` needs no Node.
@@ -59,10 +59,10 @@ const text = `{
 }
 `;
 
-const file = fileURLToPath(new URL("../conformance/document-names.json", import.meta.url));
+const file = fileURLToPath(new URL("../../../fixtures/conformance/document-names.json", import.meta.url));
 if (process.argv.includes("--check")) {
   if (!fs.existsSync(file) || fs.readFileSync(file, "utf8") !== text) {
-    console.error("apps/ios/conformance/document-names.json is not what the desktop makes now: run apps/ios/scripts/document-names-oracle.mjs and update the Swift side to match");
+    console.error("fixtures/conformance/document-names.json is not what the desktop makes now: run apps/ios/scripts/document-names-oracle.mjs and update the Swift side to match");
     process.exit(1);
   }
   console.log("document-names.json is what the desktop makes");

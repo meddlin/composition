@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Build plan Step 7: the desktop's `navHistory.ts`, `dropEdge.ts` and `groupListing.ts`, against the real functions. The inputs are
-// apps/ios/conformance/organization-cases.json (72 histories of up to 45 steps with places going missing, 552 drags over three row
+// fixtures/conformance/organization-cases.json (72 histories of up to 45 steps with places going missing, 552 drags over three row
 // heights and every set of allowed edges, 183 listings and 182 paths over random trees, loops and missing groups included); what the
 // desktop made of each is organization-expected.json (see ConformanceTests.swift for how to run this).
 

@@ -67,7 +67,7 @@ Recommendations are mine. **G1 and G2 were decided on 2026-11-06 (Gate A is pass
 ## Build order
 
 Each step ends in something checkable. Steps 1 to 3 touch different Swift files and different fixtures, so they can run as **separate
-sessions at the same time**; give each its own `ios-conformance-<name>.test.ts` in `apps/web/scripts`, because the one shared fixtures file would
+sessions at the same time**; give each its own `conformance-<name>.test.ts` in `apps/web/scripts`, because the one shared fixtures file would
 conflict. Steps 4 and 5 are app-side and independent of 1 to 3. Step 6 needs 2 to 5. A cold `xcodebuild` took over ten minutes here, so
 the core is developed with `swift test` and the app is built only to look at it.
 
@@ -85,7 +85,7 @@ has to add the system's other window sizes. Steps 1 to 6 have been checked that 
 2. **Store operations.** Ports of `notesRepo`, `groupsRepo` and `notebooksRepo`: the same SQL, errors (`GroupNotEmptyError`,
    `InvalidGroupMoveError`, `LastNotebookError`…), ordering (`placeNote`, `placeGroup`, `placeNotebook`), `updated_at`, and the `uuid` left to
    the trigger. Every write also keeps `search.db` in step (`upsert` and `remove`, then `markCurrent`). A script like the Trash Can's
-   (`apps/ios/conformance/store-script.json`) is run through the desktop's real repos, every table dumped after each step; Swift runs the
+   (`fixtures/conformance/store-script.json`) is run through the desktop's real repos, every table dumped after each step; Swift runs the
    same script and compares. Check: the script passes, and a copy of your own database opens, takes a hundred operations and still restores on the desktop.
    **Done 2026-11-06 (the core; no screens yet):** `Store/` has the three repositories (`NotebooksStore`, `GroupsStore`, `NotesStore`: the desktop's SQL, errors and
    ordering) and `NoteStore`, the data operations of `service.ts` with the search index kept in step. The 98 steps of `store-script.json` (every create, save, move,
@@ -206,6 +206,6 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 | Restoring an iPad backup changes the desktop's settings | Medium / medium | [G5](#decisions-to-make); Step 1 tests it through the real restore first. |
 | The Pencil or Scribble misbehaves in the editor (a composition is cut, a stroke is lost) | Unknown / high | The colouring skips compositions by design; items 14 to 16 of the manual test; Gate B. |
 | Hiding marks reads badly to VoiceOver, or the arrow keys and selection handles misbehave across them | Medium / medium: the Live tab is in v1 | [G7](#decisions-to-make), reversed: it is in v1, built right after M1. Item 17 of the manual test says how bad it is; the Live tab can ship reduced, with the Markdown tab as the fallback. |
-| Parallel sessions collide on the shared fixtures file | High if ignored | One `ios-conformance-<name>.test.ts` per port. |
+| Parallel sessions collide on the shared fixtures file | High if ignored | One `conformance-<name>.test.ts` per port. |
 | Your notes differ from the synthetic ones (long notes, odd frontmatter, many images) | Medium / medium | Your own backup in every step's check; the manual test asks for notes that look wrong. |
 | The CI job runs on a preview Xcode image | Low / low | The fallback is written into [ios-core.yml](../.github/workflows/ios-core.yml). |
