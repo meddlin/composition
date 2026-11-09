@@ -127,4 +127,64 @@ final class LongNoteUITests: XCTestCase {
         XCTAssertNotNil(switched, "the colouring did not come to rest after the tabs were switched: \(state.label)")
         if let typed, let switched { XCTAssertLessThanOrEqual(switched - typed, 20, "a runaway of passes after the tabs were switched") }
     }
+
+    /// The same in the Live tab (step L7), which keeps a `LiveModel` beside the highlighter's and draws the Live look in the same passes: opened there, typed in, the caret moved through the
+    /// note, and the tabs switched, the passes still come to rest. (The Live look limits what it reads for extras at the desktop's 100,000 characters; this note is four times that.)
+    func testTheLiveTabsColouringSettlesOnA404540CharacterNote() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("long-note-20000-live.md")
+        try bigNote(lines: 20_000).write(to: file, atomically: true, encoding: .utf8)
+        app.launchArguments = ["-importBackup", try backup(), "-importText", file.path, "-openMode", "Live", "-colourState", "1"]
+        app.launch()
+        let done = app.alerts["Done"].buttons["OK"]
+        XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
+        done.tap()
+        let editor = app.textViews["note-editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 60), "the long note did not open")
+
+        let opened = settled(timeout: 60)
+        XCTAssertNotNil(opened, "the colouring did not come to rest after the note was opened in the Live tab: \(state.exists ? state.label : "no colour-state element")")
+
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+        for word in ["first ", "**second** ", "third "] {
+            app.typeText(word)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+        }
+        // The caret through the note: the constructs it leaves and enters are drawn again, nothing else.
+        for _ in 0..<20 {
+            app.typeKey(.downArrow, modifierFlags: [])
+            app.typeKey(.rightArrow, modifierFlags: .option)
+        }
+        let typed = settled(timeout: 60)
+        XCTAssertNotNil(typed, "the colouring did not come to rest after typing and moving the caret: \(state.label)")
+
+        for _ in 0..<3 {
+            app.buttons["Markdown"].tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            app.buttons["Live"].tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        }
+        let switched = settled(timeout: 90)
+        XCTAssertNotNil(switched, "the colouring did not come to rest after the tabs were switched: \(state.label)")
+        if let typed, let switched { XCTAssertLessThanOrEqual(switched - typed, 20, "a runaway of passes after the tabs were switched") }
+        if let opened, let typed { XCTAssertLessThanOrEqual(typed - opened, 40, "a runaway of passes while typing and moving the caret") }
+    }
+
+    /// Highlights are tinted in a note over the desktop's limit (decision V5, step L7): the desktop reads highlights only up to 100,000 characters, the iPad's Live tab at any length. The
+    /// note is plain text of 112,000 characters with a highlight at its end.
+    func testAHighlightIsTintedInANoteOverTheDesktopsLimit() throws {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("long-note-with-a-highlight.md")
+        try (String(repeating: "plain text line\n\n", count: 7_000) + "a <Mark color=\"yellow\">tint</Mark> b\n").write(to: file, atomically: true, encoding: .utf8)
+        app.launchArguments = ["-importBackup", try backup(), "-importText", file.path, "-openMode", "Live", "-liveReport", "1"]
+        app.launch()
+        let done = app.alerts["Done"].buttons["OK"]
+        XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
+        done.tap()
+        let report = app.descendants(matching: .any)["live-report"]
+        XCTAssertTrue(report.waitForExistence(timeout: 60), "the note did not open")
+        XCTAssertTrue(eventually(60) { report.label.contains("fill:") && report.label.contains("hidden:") }, "the highlight is tinted, with its tags hidden, in a note of 112,000 characters: \(report.label.prefix(200))")
+    }
 }

@@ -85,6 +85,31 @@ public struct Theme: Equatable, Sendable {
         return 1
     }
 
+    /// With the system's Increase Contrast on, the grey text is made of at least this much of the foreground, and a rule (a hairline the editor's Live tab draws) is firmer.
+    public static let increasedMutedShare = 0.85
+    public static let ruleShare = 0.35
+    public static let increasedRuleShare = 0.7
+
+    /// `mutedShare`, or darker where the system's Increase Contrast is on. This is the colour of the grey text and of the Live tab's dimmed syntax (the marks that show while the
+    /// caret touches their construct).
+    public func mutedShare(increasedContrast: Bool) -> Double {
+        increasedContrast ? max(mutedShare, Self.increasedMutedShare) : mutedShare
+    }
+
+    /// The dimmed syntax where it sits on something other than the page, a `<Mark>`'s tint (a mark inside highlighted words): the grey text's share, raised in whole per cents until
+    /// the marks read at `readable` on that surface. (On the page and on the faint fill of code the grey text reads at `mutedTarget` or better as it is.)
+    public func dimmedShare(over surface: ThemeColor, increasedContrast: Bool) -> Double {
+        let least = mutedShare(increasedContrast: increasedContrast)
+        for percent in Int((least * 100).rounded())...100 {
+            let share = Double(percent) / 100
+            if ThemeColor.contrast(foreground.over(surface, alpha: share), surface) >= Self.readable { return share }
+        }
+        return 1
+    }
+
+    /// The share of the foreground a rule is drawn at.
+    public static func ruleShare(increasedContrast: Bool) -> Double { increasedContrast ? increasedRuleShare : ruleShare }
+
     // MARK: <Mark>
 
     /// The hue of each of the five highlight colours (`--mark-hue`), the same in every scheme; the scheme tints it to its own background.

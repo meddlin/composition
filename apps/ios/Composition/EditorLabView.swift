@@ -52,6 +52,7 @@ struct EditorLabView: View {
                 }
                 if UserDefaults.standard.string(forKey: "labText") == "editing" { await load(.editing) }
                 switch UserDefaults.standard.string(forKey: "labAX") {
+                case "off": lab.axMode = .asItIs
                 case "withoutMarks": lab.axMode = .withoutMarks
                 case "silentMarks": lab.axMode = .silentMarks
                 default: break
@@ -87,7 +88,7 @@ struct EditorLabView: View {
                     ForEach(RevealMode.allCases) { Text($0.rawValue).tag($0) }
                 }
                 Picker("VoiceOver", selection: Binding(get: { lab.axMode }, set: { lab.axMode = $0 })) {
-                    ForEach(LabAXMode.allCases) { Text($0.rawValue).tag($0) }
+                    ForEach(LiveAccessibility.Mode.allCases) { Text($0.title).tag($0) }
                 }
             } label: { Label("Hide syntax", systemImage: "eye.slash") }
 
