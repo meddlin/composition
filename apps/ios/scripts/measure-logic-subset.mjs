@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Measures how much of the web app's data layer (apps/web/src/lib/composition) the iPad's Swift core has to carry:
 // spike S1's "measure the v1 logic subset" (docs/ipad-app-design.md, R3). The classification of every file is in
-// apps/ios/conformance/logic-subset.json and is a judgement; this script only counts, and fails if a file is missing from
+// fixtures/conformance/logic-subset.json and is a judgement; this script only counts, and fails if a file is missing from
 // the classification (or the classification names one that is gone), so the numbers cannot quietly go stale.
 //
 // "lines" is every line; "code" is the lines that are not blank and not only a comment. Tests are counted apart: they
@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const folder = join(root, "apps/web/src/lib/composition");
-const { categories, files: classification } = JSON.parse(readFileSync(join(root, "apps/ios/conformance/logic-subset.json"), "utf8"));
+const { categories, files: classification } = JSON.parse(readFileSync(join(root, "fixtures/conformance/logic-subset.json"), "utf8"));
 
 function walk(dir) {
   return readdirSync(dir).flatMap((name) => {
@@ -44,8 +44,8 @@ const code = sources.filter((rel) => !isTest(rel));
 const unclassified = code.filter((rel) => !categoryOf(rel));
 const stale = Object.keys(classification).filter((key) => (key.endsWith("/") ? !code.some((rel) => rel.startsWith(key)) : !code.includes(key)));
 if (unclassified.length || stale.length) {
-  if (unclassified.length) console.error(`Not in conformance/logic-subset.json:\n  ${unclassified.join("\n  ")}`);
-  if (stale.length) console.error(`In conformance/logic-subset.json but not on disk:\n  ${stale.join("\n  ")}`);
+  if (unclassified.length) console.error(`Not in fixtures/conformance/logic-subset.json:\n  ${unclassified.join("\n  ")}`);
+  if (stale.length) console.error(`In fixtures/conformance/logic-subset.json but not on disk:\n  ${stale.join("\n  ")}`);
   process.exit(1);
 }
 

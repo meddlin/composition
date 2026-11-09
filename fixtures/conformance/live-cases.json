@@ -1,5 +1,5 @@
 {
- "comment": "The Live view's model, checked against the desktop's real liveDecorations (apps/web/src/components/notes/liveMarkdown.ts). Every text is read with the caret at every position and some selections, by the desktop's code, written to live-expected.json by apps/web/scripts/ios-conformance-fixtures.test.ts, and by the Swift LiveModel, which must give the same hidden, shown, styled, drawn and tinted ranges (build plan: docs/ipad-live-view-plan.md, step L2). The notes of mdx-notes.json and the preview showcase are read as well, with a seeded sample of selections.",
+ "comment": "The Live view's model, checked against the desktop's real liveDecorations (apps/web/src/components/notes/liveMarkdown.ts). Every text is read with the caret at every position and some selections, by the desktop's code, written to live-expected.json by apps/web/scripts/conformance-fixtures.test.ts, and by the Swift LiveModel, which must give the same hidden, shown, styled, drawn and tinted ranges (build plan: docs/ipad-live-view-plan.md, step L2). The notes of mdx-notes.json and the preview showcase are read as well, with a seeded sample of selections.",
  "cases": [
   {
    "group": "inline",

@@ -12,27 +12,28 @@ import { ImageWidget } from "../src/components/notes/liveImages";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
 
 /**
- * The desktop's side of the iPad app's conformance checks (docs/ipad-app-design.md, "Keeping two implementations honest";
- * apps/ios/CompositionCore). Not a test of the web app: every case does nothing unless `IOS_FIXTURE_DIR` is set.
+ * The desktop's side of the conformance checks the native cores run (fixtures/conformance/README.md; for the iPad,
+ * docs/ipad-app-design.md, "Keeping two implementations honest", and apps/ios/CompositionCore). Not a test of the web app: every
+ * case does nothing unless `COMPOSITION_FIXTURE_DIR` is set.
  *
  * "writes ..." makes, with the real `db.ts`, repos and `createBackup`:
  *
  *   desktop-empty.db               a database `db.ts` created and nothing more (the Swift schema must match it exactly)
  *   desktop-populated.db           the same after real repo calls (the Swift schema pass must leave it unchanged)
  *   desktop-backup.tar.gz          a real backup of a populated data directory, and desktop-backup.expected.json
- *   desktop-backup-large.tar.gz    the same with one big attachment (IOS_FIXTURE_LARGE_MB megabytes, default 100)
+ *   desktop-backup-large.tar.gz    the same with one big attachment (COMPOSITION_FIXTURE_LARGE_MB megabytes, default 100)
  *   trash-start.db, trash-script.json, trash-script.expected.json
- *                                  the Trash Can: a starting database, the steps in apps/ios/conformance/trash-script.json,
+ *                                  the Trash Can: a starting database, the steps in fixtures/conformance/trash-script.json,
  *                                  and what the real trashRepo.ts did at every step (result and every row afterwards)
  *   store-start.db, store-script.json, store-script.expected.json
  *                                  build plan Step 2: notes, groups and notebooks: a starting database, the steps in
- *                                  apps/ios/conformance/store-script.json, and what the real service.ts (its search index
+ *                                  fixtures/conformance/store-script.json, and what the real service.ts (its search index
  *                                  stubbed) did at every step (result and every row afterwards)
  *   search-corpus-100.db, search-corpus-1000.db, search-queries.json, search-parse-expected.json, search-expected.json
  *                                  spike S2: generated notes, the queries, what the real parseSearchQuery made of each, and
  *                                  (committed, not regenerated here) what a real Meilisearch answered for each
  *   mdx-notes.json, mdx-expected.json
- *                                  spike S4: the notes in apps/ios/conformance/mdx-notes.json, and what the real preview
+ *                                  spike S4: the notes in fixtures/conformance/mdx-notes.json, and what the real preview
  *                                  pipeline (remark-mdx and the desktop's own plugins) makes of each: valid or not, the
  *                                  components with their props, the headings and the footnotes
  *   component-cases.json, component-expected.json
@@ -57,7 +58,7 @@ import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/live
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
  *                                  imagesToMdx (imageToMdx.ts), and for the picker of stored images listImages (images.ts, over real
  *                                  folders), imageUsage (imageRefs.ts) and matchImages, usageLabel and formatSize (imagePicker.ts)
- *   live-expected.json             docs/ipad-live-view-plan.md, step L2: the texts of apps/ios/conformance/live-cases.json, the notes of
+ *   live-expected.json             docs/ipad-live-view-plan.md, step L2: the texts of fixtures/conformance/live-cases.json, the notes of
  *                                  mdx-notes.json and the preview showcase, each with the caret and selections tried on it, and what the
  *                                  real liveDecorations (liveMarkdown.ts, on a real CodeMirror state with the Markdown language) hid,
  *                                  showed, styled, drew and tinted for each: the Live view's model must agree
@@ -71,7 +72,7 @@ import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/live
  * had put in. The Swift tests make those files, so the order matters; apps/ios/scripts/conformance.sh runs all three steps.
  */
 
-const outDir = process.env.IOS_FIXTURE_DIR;
+const outDir = process.env.COMPOSITION_FIXTURE_DIR;
 const lib = path.resolve(__dirname, "../src/lib/composition");
 
 type Repos = {
@@ -382,8 +383,8 @@ async function runStoreStep(step: StoreStep): Promise<unknown> {
 /** The clock the generated notes are made against, so a corpus is the same on every machine and every day. */
 const SEARCH_NOW = Date.parse("2026-11-05T12:00:00.000Z");
 const SEARCH_CORPUS_SIZES = [100, 1000] as const;
-const searchQueriesFile = path.resolve(__dirname, "../../ios/conformance/search-queries.json");
-const searchExpectedFile = path.resolve(__dirname, "../../ios/conformance/search-expected.json");
+const searchQueriesFile = path.resolve(__dirname, "../../../fixtures/conformance/search-queries.json");
+const searchExpectedFile = path.resolve(__dirname, "../../../fixtures/conformance/search-expected.json");
 
 function searchQueries(): string[] {
   const { groups } = JSON.parse(fs.readFileSync(searchQueriesFile, "utf8")) as { groups: { queries: string[] }[] };
@@ -468,7 +469,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe.skipIf(!outDir)("iPad conformance fixtures", () => {
+describe.skipIf(!outDir)("conformance fixtures", () => {
   it("writes the databases and the desktop backups", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
 
@@ -480,7 +481,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
     for (const [name, megabytes] of [
       ["desktop-backup", 0],
-      ["desktop-backup-large", Number(process.env.IOS_FIXTURE_LARGE_MB ?? 100)],
+      ["desktop-backup-large", Number(process.env.COMPOSITION_FIXTURE_LARGE_MB ?? 100)],
     ] as const) {
       await withDesktop(async (context) => {
         populate(context, megabytes);
@@ -513,7 +514,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the Trash Can script and what the desktop did with it", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const scriptFile = path.resolve(__dirname, "../../ios/conformance/trash-script.json");
+    const scriptFile = path.resolve(__dirname, "../../../fixtures/conformance/trash-script.json");
     const script = JSON.parse(fs.readFileSync(scriptFile, "utf8")) as { steps: ScriptStep[] };
 
     await withDesktop(async (context) => {
@@ -538,7 +539,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the store script and what the desktop's service did with it", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const scriptFile = path.resolve(__dirname, "../../ios/conformance/store-script.json");
+    const scriptFile = path.resolve(__dirname, "../../../fixtures/conformance/store-script.json");
     const script = JSON.parse(fs.readFileSync(scriptFile, "utf8")) as { steps: StoreStep[] };
 
     await withDesktop(async (context) => {
@@ -595,7 +596,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
     if (fs.existsSync(searchExpectedFile)) {
       const expected = JSON.parse(fs.readFileSync(searchExpectedFile, "utf8")) as { corpora: Record<string, { hash: string; results: { query: string }[] }> };
       for (const count of SEARCH_CORPUS_SIZES) {
-        expect(expected.corpora[count].hash, `the ${count}-note corpus changed: regenerate apps/ios/conformance/search-expected.json`).toBe(hashes[count]);
+        expect(expected.corpora[count].hash, `the ${count}-note corpus changed: regenerate fixtures/conformance/search-expected.json`).toBe(hashes[count]);
         expect(expected.corpora[count].results.map((r) => r.query), "the queries changed: regenerate search-expected.json").toEqual(queries);
       }
       fs.copyFileSync(searchExpectedFile, path.join(outDir!, "search-expected.json"));
@@ -604,7 +605,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the MDX notes and what the real preview pipeline makes of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/mdx-notes.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/mdx-notes.json");
     const { notes } = JSON.parse(fs.readFileSync(file, "utf8")) as { notes: { name: string; body: string }[] };
     expect(new Set(notes.map((n) => n.name)).size).toBe(notes.length);
 
@@ -668,7 +669,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the component helper cases and what the real functions answer", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/component-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/component-cases.json");
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
       chart: { type?: string; x?: string; y?: string; csv: string }[];
       repo: string[];
@@ -707,7 +708,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the settings cases and what the real parseWebSettings makes of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/settings-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/settings-cases.json");
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { favorites: unknown[]; theme: unknown[]; location: unknown[] };
     const { parseWebSettings } = await import(path.join(lib, "webSettings"));
     const expected = {
@@ -722,7 +723,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the frontmatter cases and what the real frontmatter.ts makes of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/frontmatter-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/frontmatter-cases.json");
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
       parse: string[];
       generate: { title: string; createdAt: string; updatedAt: string; tags: string[]; description: string }[];
@@ -746,7 +747,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the organization cases and what the real navHistory, dropEdge and groupListing make of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/organization-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/organization-cases.json");
     type Loc = { kind: "note" | "group"; id: number } | { kind: "home" };
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
       navHistory: { steps: ({ op: "record"; location: Loc } | { op: "back" } | { op: "forward" } | { op: "gone"; locations: Loc[] })[] }[];
@@ -801,7 +802,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the image cases and what the real images.ts, imageRefs.ts and imageToMdx.ts make of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/images-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/images-cases.json");
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
       sniff: { hex: string }[];
       fileName: { title: string; file: string; hex: string; ext: "png" | "jpg" | "gif" | "webp" }[];
@@ -894,7 +895,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the typing-aid cases and what the real completions, props, snippets, indentLines, emphasis and noteLinks make of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const file = path.resolve(__dirname, "../../ios/conformance/editing-cases.json");
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/editing-cases.json");
     type Carets = { text: string; carets: number[] };
     const cases = JSON.parse(fs.readFileSync(file, "utf8")) as {
       tags: Carets[];
@@ -966,7 +967,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
   it("writes the Live view cases and what the real liveDecorations make of each", () => {
     fs.mkdirSync(outDir!, { recursive: true });
-    const conformance = path.resolve(__dirname, "../../ios/conformance");
+    const conformance = path.resolve(__dirname, "../../../fixtures/conformance");
     const committed = JSON.parse(fs.readFileSync(path.join(conformance, "live-cases.json"), "utf8")) as { cases: { group: string; text: string }[] };
     const mdx = JSON.parse(fs.readFileSync(path.join(conformance, "mdx-notes.json"), "utf8")) as { notes: { name: string; body: string }[] };
     const showcase = fs.readFileSync(path.join(conformance, "preview-showcase/note.md"), "utf8");
@@ -1182,8 +1183,8 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
   }, 60_000);
 
   // Needs a Meilisearch binary (COMPOSITION_MEILI_BIN, or `meilisearch` on the PATH), so it only runs when asked:
-  //   IOS_REGENERATE_SEARCH=1 IOS_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)
-  it.skipIf(!process.env.IOS_REGENERATE_SEARCH)("regenerates the committed Meilisearch answers", async () => {
+  //   COMPOSITION_REGENERATE_SEARCH=1 COMPOSITION_FIXTURE_DIR=<dir> ... -t "regenerates"   (apps/ios/scripts/regenerate-search-expected.sh)
+  it.skipIf(!process.env.COMPOSITION_REGENERATE_SEARCH)("regenerates the committed Meilisearch answers", async () => {
     const queries = searchQueries();
     const corpora: Record<string, { hash: string; results: { query: string; ids: number[] }[] }> = {};
     let meilisearch = "";
@@ -1267,7 +1268,7 @@ describe.skipIf(!outDir)("iPad conformance fixtures", () => {
 
 // --- The iPad's editor flow (build plan, Step 6) ------------------------------------------------------------------------------
 
-const uiRunDir = process.env.IOS_UI_RUN_DIR;
+const uiRunDir = process.env.COMPOSITION_UI_RUN_DIR;
 
 /** Every row of the tables the editor flow touches, with the uuid of anything the starting database did not have replaced by "new". */
 function flowRows(db: import("better-sqlite3").Database, startUuids: Set<string>): Record<string, unknown[]> {
@@ -1283,7 +1284,7 @@ function flowRows(db: import("better-sqlite3").Database, startUuids: Set<string>
 
 describe.skipIf(!uiRunDir)("iPad editor flow", () => {
   // apps/ios/scripts/editor-flow-test.sh runs the iPad app in the Simulator, makes a note, types into it, trashes it and restores it, and leaves
-  // start.db, end.db and ui-run.json (the moments its rows record) in IOS_UI_RUN_DIR. This gives the real service the same operations.
+  // start.db, end.db and ui-run.json (the moments its rows record) in COMPOSITION_UI_RUN_DIR. This gives the real service the same operations.
   it("replays the operations the iPad's editor made, and every row is the same", async () => {
     const run = JSON.parse(fs.readFileSync(path.join(uiRunDir!, "ui-run.json"), "utf8")) as {
       noteId: number;

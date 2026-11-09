@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Build plan, Step 3: the desktop's `frontmatter.ts` (and the js-yaml it stands on), against the real functions. The inputs are
-// apps/ios/conformance/frontmatter-cases.json: 111 blocks to read (the odd ones too: tabs, anchors, block scalars, bad escapes,
+// fixtures/conformance/frontmatter-cases.json: 111 blocks to read (the odd ones too: tabs, anchors, block scalars, bad escapes,
 // dates), 123 titles, descriptions and tag lists to write, the header-image edits and the tag helpers. What the desktop made of
 // each is frontmatter-expected.json (see ConformanceTests.swift for how to run this).
 

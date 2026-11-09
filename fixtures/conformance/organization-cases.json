@@ -1,5 +1,5 @@
 {
- "comment": "Build plan Step 7: the pure rules behind the sidebar. Navigation history (navHistory.ts), where a drag lands on a row (dropEdge.ts), and the tree of a group (groupListing.ts). The Swift NavigationHistory, DropEdge and GroupListing must agree with what the desktop's real code answers (organization-expected.json is written by apps/web/scripts/ios-conformance-fixtures.test.ts).",
+ "comment": "Build plan Step 7: the pure rules behind the sidebar. Navigation history (navHistory.ts), where a drag lands on a row (dropEdge.ts), and the tree of a group (groupListing.ts). The Swift NavigationHistory, DropEdge and GroupListing must agree with what the desktop's real code answers (organization-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
  "navHistory": [
   {
    "steps": [

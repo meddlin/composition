@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Docs/ipad-live-view-plan.md, step L2: the Live view's model against the desktop's real `liveDecorations` (liveMarkdown.ts), run on a real CodeMirror
-// state with the Markdown language. live-expected.json holds the texts (the hand-made ones of apps/ios/conformance/live-cases.json, the MDX notes and
+// state with the Markdown language. live-expected.json holds the texts (the hand-made ones of fixtures/conformance/live-cases.json, the MDX notes and
 // the preview showcase), the selections tried on each (every caret position of a short text, a seeded sample of a long one) and what the desktop hid,
 // showed, styled, drew and tinted for each. See ConformanceTests.swift for how to run this.
 

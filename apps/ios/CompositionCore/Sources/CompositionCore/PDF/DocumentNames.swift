@@ -2,7 +2,7 @@ import Foundation
 
 // The names and checks around a PDF's file: the Swift twins of `documentNames.ts` and of the parts of `attachmentNames.ts` that a PDF
 // uses (the name it is stored under, the name shown for it, a size in words). The desktop's own functions were run over the inputs in
-// apps/ios/conformance/document-names.json, and DocumentNamesConformanceTests replays them.
+// fixtures/conformance/document-names.json, and DocumentNamesConformanceTests replays them.
 
 public enum DocumentNames {
     /// Largest PDF the app imports: the same limit as an attachment. The bytes sit on disk, so this is a sanity limit.

@@ -10,13 +10,12 @@ import Testing
 struct HighlightModelTests {
     /// The notes the MDX conformance uses: real-looking Markdown with every component in it.
     private static let notes: [String] = {
-        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().appendingPathComponent("conformance/mdx-notes.json")
+        let file = corpusDirectory?.appendingPathComponent("mdx-notes.json")
         struct Corpus: Decodable {
             struct Note: Decodable { let body: String }
             let notes: [Note]
         }
-        return ((try? JSONDecoder().decode(Corpus.self, from: Data(contentsOf: file)))?.notes ?? []).map(\.body)
+        return (file.flatMap { try? JSONDecoder().decode(Corpus.self, from: Data(contentsOf: $0)) }?.notes ?? []).map(\.body)
     }()
 
     /// Replaces `range` of `text` with `replacement`, and brings `model` up to date; returns the new text and what was re-read.

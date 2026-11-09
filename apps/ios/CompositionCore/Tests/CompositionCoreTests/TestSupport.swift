@@ -147,3 +147,13 @@ func run(_ tool: String, _ arguments: [String], input: Data? = nil, environment:
 /// Where the desktop-made fixtures are (see ConformanceTests.swift), or nil when the conformance tests should skip.
 let conformanceDirectory: URL? = ProcessInfo.processInfo.environment["COMPOSITION_CONFORMANCE_DIR"]
     .map { URL(fileURLWithPath: $0, isDirectory: true) }
+
+/// `fixtures/conformance` of this checkout: the shared corpus the TypeScript and Swift cores both read. Unlike the files in
+/// `conformanceDirectory` it is committed, so a test that reads only from it needs no variable. Nil when the tests run somewhere
+/// the source tree is not.
+let corpusDirectory: URL? = {
+    var url = URL(fileURLWithPath: #filePath)
+    for _ in 0..<6 { url.deleteLastPathComponent() }
+    url.appendPathComponent("fixtures/conformance", isDirectory: true)
+    return FileManager.default.fileExists(atPath: url.path) ? url : nil
+}()
