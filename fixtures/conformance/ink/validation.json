@@ -1,0 +1,70 @@
+{
+  "about": "What makes a drawing's stroke JSON readable, and what each one is written back as (docs/architecture/ink.md). Every case has an input (a drawing as read) and either `stored` (what a writer writes after reading it) or `invalid: true` (a reader must refuse it; the message is not compared). `stored` is compared as a value, so the order of an object's members does not matter. Numbers are rounded to the steps in the format: x, y, width, height and the canvas to a hundredth, t to a millisecond, force, altitude, azimuth and opacity to a thousandth. A column a point leaves out takes its default: t 0, force 1, altitude 1.571, azimuth 0, width 3, height 3, opacity 1.",
+  "cases": [
+    {
+      "name": "an empty drawing",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 100, "height": 200 }, "strokes": [] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 100, "height": 200 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [] }
+    },
+    {
+      "name": "a stroke with the fields left out, a short row and the default ink and colour",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 100, "height": 200 }, "strokes": [{ "points": [[1, 2], [3, 4, 5]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 100, "height": 200 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "ink", "points": [[1, 2, 0, 1, 1.571, 0, 3, 3, 1], [3, 4, 5, 1, 1.571, 0, 3, 3, 1]] }] }
+    },
+    {
+      "name": "numbers are rounded to the format's steps",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 100.126, "height": 200 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "marker", "color": "yellow", "points": [[10.123456, 20.987654, 12.6, 0.12345, 0.7854, 3.14159, 2.006, 2.004, 0.4999]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 100.13, "height": 200 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "marker", "color": "yellow", "points": [[10.12, 20.99, 13, 0.123, 0.785, 3.142, 2.01, 2, 0.5]] }] }
+    },
+    {
+      "name": "columns in another order, and a column left out of the fields",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "fields": ["y", "x", "width"], "strokes": [{ "ink": "pen", "color": "ink", "points": [[2, 1, 4]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "ink", "points": [[1, 2, 0, 1, 1.571, 0, 4, 3, 1]] }] }
+    },
+    {
+      "name": "colours: a name, a fixed colour in capitals, the accent",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "strokes": [{ "color": "accent", "points": [[1, 1]] }, { "color": "#FF0000", "points": [[2, 2]] }, { "color": "pink", "points": [[3, 3]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "accent", "points": [[1, 1, 0, 1, 1.571, 0, 3, 3, 1]] }, { "ink": "pen", "color": "#ff0000", "points": [[2, 2, 0, 1, 1.571, 0, 3, 3, 1]] }, { "ink": "pen", "color": "pink", "points": [[3, 3, 0, 1, 1.571, 0, 3, 3, 1]] }] }
+    },
+    {
+      "name": "an ink this version does not know is kept",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "strokes": [{ "ink": "airbrush", "color": "ink", "points": [[1, 1]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 50, "height": 50 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "airbrush", "color": "ink", "points": [[1, 1, 0, 1, 1.571, 0, 3, 3, 1]] }] }
+    },
+    {
+      "name": "members of the drawing and of a stroke, and a column of the points, that this version does not know are kept",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "tiltX"], "note": "kept", "strokes": [{ "ink": "pen", "color": "ink", "tag": 3, "points": [[1, 2, 0.5], [3, 4, 0.25]] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity", "tiltX"], "note": "kept", "strokes": [{ "ink": "pen", "color": "ink", "tag": 3, "points": [[1, 2, 0, 1, 1.571, 0, 3, 3, 1, 0.5], [3, 4, 0, 1, 1.571, 0, 3, 3, 1, 0.25]] }] }
+    },
+    {
+      "name": "a stroke with no points is a stroke",
+      "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "points": [] }] },
+      "stored": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "t", "force", "altitude", "azimuth", "width", "height", "opacity"], "strokes": [{ "ink": "pen", "color": "ink", "points": [] }] }
+    },
+    { "name": "not an object", "input": [], "invalid": true },
+    { "name": "another format", "input": { "format": "drawio", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "no format", "input": { "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "version 0", "input": { "format": "composition-ink", "version": 0, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "a newer version", "input": { "format": "composition-ink", "version": 2, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "a version that is not a whole number", "input": { "format": "composition-ink", "version": 1.5, "canvas": { "width": 10, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "no canvas", "input": { "format": "composition-ink", "version": 1, "strokes": [] }, "invalid": true },
+    { "name": "a canvas of no width", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 0, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "a canvas of negative height", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": -5 }, "strokes": [] }, "invalid": true },
+    { "name": "a canvas over 100,000 points", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 100001, "height": 10 }, "strokes": [] }, "invalid": true },
+    { "name": "no strokes", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 } }, "invalid": true },
+    { "name": "strokes that are not a list", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": {} }, "invalid": true },
+    { "name": "a stroke that is not an object", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [3] }, "invalid": true },
+    { "name": "a stroke with no points", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "ink": "pen" }] }, "invalid": true },
+    { "name": "fields without y", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x"], "strokes": [] }, "invalid": true },
+    { "name": "the same field twice", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", "x"], "strokes": [] }, "invalid": true },
+    { "name": "a field that is not a name", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y", 3], "strokes": [] }, "invalid": true },
+    { "name": "a point that is not a list", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "points": [{ "x": 1, "y": 2 }] }] }, "invalid": true },
+    { "name": "a point with more cells than fields", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "fields": ["x", "y"], "strokes": [{ "points": [[1, 2, 3]] }] }, "invalid": true },
+    { "name": "a point with a text for a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "points": [[1, "2"]] }] }, "invalid": true },
+    { "name": "a point a million points from the origin", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "points": [[1000001, 2]] }] }, "invalid": true },
+    { "name": "a colour in capitals that is not a hex colour", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "Red", "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a hex colour of five digits", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": "#12345", "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "a colour that is a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "color": 5, "points": [[1, 1]] }] }, "invalid": true },
+    { "name": "an ink that is a number", "input": { "format": "composition-ink", "version": 1, "canvas": { "width": 10, "height": 10 }, "strokes": [{ "ink": 5, "points": [[1, 1]] }] }, "invalid": true }
+  ]
+}
