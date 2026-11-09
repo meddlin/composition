@@ -85,7 +85,7 @@ Rust schema text is a third copy to keep by hand.
 1. **The shared corpus is on `main` in two homes** (it was on two unmerged branches when this spike was written). The iPad's is
    `apps/ios/conformance/` with its generator (PR #247, merged); `fixtures/conformance/` has a README and `pdf/` fixtures only (PR #267,
    merged). The Rust harness reads the iPad's layout through one environment variable, `COMPOSITION_CONFORMANCE_DIR`, exactly as the Swift
-   tests do. Nothing was copied. Choosing the one home is the user's call (D12) and no longer blocks anything. **No backup in the corpus
+   tests do. Nothing was copied. The user chose `fixtures/conformance/` as the one home (D12, 2026-11-09); the move is not made yet and is not this branch's to make. **No backup in the corpus
    holds a PDF.**
 2. **The Meilisearch lock has no Linux arm64 asset.** `apps/desktop/meilisearch.lock.json` pins `linux-x64` only. Upstream v1.53.1 has
    `meilisearch-linux-aarch64` (121 MB, community build), so the native app needs its own pin (not edited here).

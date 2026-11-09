@@ -61,7 +61,8 @@ decided, proposed, or needs you).
   found work to do in a Rust-made file; the core was brought level (13 of 13 tests on macOS, the desktop accepts everything Rust writes).
   Nothing was copied or invented ([Conformance](#keeping-the-implementations-honest)).
 - **The Live tab is in v1 on Linux too (you, 2026-11-09), as on the iPad.** S8's six open items are now schedule, not a question ([D24](#decisions), [C10](#compromise-register), [R7](#risks-and-unknowns)). **S11 answered the first of them in a container:** pictures and rules drawn by a small draw-time layer over the text view stay put through scrolling, paging and a resize in a 5,000-line note, with no widgets and flat memory (about 210 MB, against 567 MB for S8's overlays); the S8 overlays stay out ([S11](../apps/linux/spikes/s8-live/RESULT-S11.md)).
-- **Needs you:** which of two homes the corpus keeps ([D12](#decisions)), a real **Ubuntu 24.04 VM** for Gate B (decided; yours to provide), and
+- **Corpus home decided (you, 2026-11-09): `fixtures/conformance/`** ([D12](#decisions)); the move itself is a separate change, after the iPad's open PR merges.
+- **Needs you:** a real **Ubuntu 24.04 VM** for Gate B (decided; yours to provide), and
   Gate A. [D19](#decisions) is a question for later.
 
 ## Goals and non-goals
@@ -274,7 +275,7 @@ would have been refused by the old Rust (`documents/...` is an unknown file); th
 | `editing-cases.json` (completions, props, snippets, indent, emphasis, note links) | **No**: the native editor must port these (M2) | |
 | `mdx-notes.json`, `component-cases.json`, `appearance-expected.json` | **Not needed for the Preview**, which runs the web code. Needed only for the colour schemes' tokens, which the Rust side re-expresses | |
 
-**Gaps to report, not filled:** (1) the corpus has two homes, the iPad's under an iPad-specific path with `IOS_` variable names and `fixtures/conformance/` holding only the PDF tables; (2) the generator's "reads what the Swift core wrote" half has no Linux twin except my `tools/rust-fixtures.test.ts`, a second TypeScript file that should be one generalised file once the corpus has one home; (3) **no backup in the corpus holds a PDF**, so the `documents/` folder is untested by it; (4) there is no corpus for the capture triggers, the outbox or sync yet; (5) nothing in it is Linux-specific (XDG paths, the Flatpak home permission). Choosing the one home is [D12](#decisions).
+**Gaps to report, not filled:** (1) the corpus has two homes, the iPad's under an iPad-specific path with `IOS_` variable names and `fixtures/conformance/` holding only the PDF tables; (2) the generator's "reads what the Swift core wrote" half has no Linux twin except my `tools/rust-fixtures.test.ts`, a second TypeScript file that should be one generalised file once the corpus has one home; (3) **no backup in the corpus holds a PDF**, so the `documents/` folder is untested by it; (4) there is no corpus for the capture triggers, the outbox or sync yet; (5) nothing in it is Linux-specific (XDG paths, the Flatpak home permission). The one home is chosen ([D12](#decisions): `fixtures/conformance/`); the move is not done.
 
 ### Editor and preview
 
@@ -585,7 +586,7 @@ What we give up. Ids are permanent once this page is agreed. **Status:** *Propos
 
 ## Decisions
 
-Recommendations are proposals until the status says *Decided*. **Needs you:** [D12](#decisions) (which corpus home), the VM for Gate B
+Recommendations are proposals until the status says *Decided*. **Needs you:** the VM for Gate B
 (decided, yours to provide), and Gate A. [D19](#decisions) is a question for later.
 
 | Id | Decision | Recommendation | Status |
@@ -602,7 +603,7 @@ Recommendations are proposals until the status says *Decided*. **Needs you:** [D
 | D9 | Storage. | **The same SQLite file and schema** (decided in the brief); `rusqlite` with `bundled`. | Schema: **Decided**; `bundled`: proposed, settled at Gate A |
 | D10 | The core is its own crate, apart from the GTK UI. | Yes. | **Decided** (brief) |
 | D11 | The editor widget. | GtkSourceView 5. | Proposed, settled at Gate B |
-| D12 | **Which home the conformance corpus keeps.** | **`fixtures/conformance/`** (the PDF PR started it): move `apps/ios/conformance/` there and rename the generator and its `IOS_` variables, in one change that updates the Swift tests and the Rust harness together. Until then the Rust harness reads the iPad's files through `COMPOSITION_CONFORMANCE_DIR`. Both are on `main` already, so this is tidiness, not a blocker. | **Needs you** |
+| D12 | **Which home the conformance corpus keeps.** | **`fixtures/conformance/`.** Move `apps/ios/conformance/` there and rename the generator and its `IOS_` variables, in one change that updates the Swift tests, the web generator and the Rust harness together, **made after the iPad's open PR (#279) merges and by whoever owns that side, not from this branch** (it touches about 25 files under `apps/ios` and `apps/web`). Until then the Rust harness reads the iPad's files through `COMPOSITION_CONFORMANCE_DIR`, so Linux and Windows code should name that variable and never the path. | **Decided** (you, 2026-11-09); the move is not done |
 | D13 | The platform floor. | Ubuntu 24.04: libadwaita 1.5, GTK 4.14, WebKitGTK 2.42 and later; checked on 26.04 and Fedora 45. | Proposed |
 | D14 | Identity. | `com.rushinglabs.Composition`, executable `composition-gtk`; settled before the first build. | Proposed |
 | D15 | Settings. | The app's own JSON file in the `parseWebSettings` format, under the XDG config directory, so a backup carries it. | Proposed |
@@ -630,7 +631,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R6 | Orca with `GtkTextView` and with the web view's content (unverified; only the AT-SPI tree was read). | Medium, high | Gate B with Orca on; N6. |
 | R7 | The Live tab is in v1, so its parity work is on the schedule: `End` and Left at a construct's edge differ from the web, `Enter` re-reads the whole note (about 40 ms), the mouse and a real parser are untried, and Orca and Wayland input are unchecked. Overlay pictures and rules misplaced in a long note are **no longer a risk** (S11's layer; the cause of the misplacement was never found, and the layer's behaviour on a GPU, with a mouse and with many distinct large images is unverified). | Medium, medium | The remaining S8 items as build step 5, with S11's layer; ships reduced if needed (C10); Gate L on the VM. |
 | R8 | The gtk-rs bindings lag a GTK feature or lack a library (a binding for `libspelling` was not checked; `GtkSourceCompletion` use was not tried). | Medium, medium | Check at the start of M2; raw FFI for a small gap. |
-| R9 | The corpus has two homes and the iPad's carries iPad-specific names; moving it breaks the Swift and Rust harnesses together unless the move updates both. | Low, medium | D12. |
+| R9 | The corpus has two homes until the move D12 decided is made, and the iPad's carries iPad-specific names; moving it breaks the Swift, web and Rust harnesses together unless the move updates all three. | Low, medium | D12: one change, after the iPad's open PR merges. |
 | R10 | The sync engine is a third copy of the sync rules. | High, high | The server contract suite and the corpus; D19. |
 | R11 | arm64: the Meilisearch pin, GitHub arm64 runners (unverified), real arm64 hardware for the release gate (none named). | Medium, low | Name the arm64 test route at Gate C. |
 | R12 | The home-folder permission a Flatpak needs for `~/.composition` is refused by Flathub (unverified). | Medium, low | A self-hosted Flatpak repository; or the app's own data folder with an import. |
@@ -662,7 +663,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | **S7** | **The real desktop:** the shell and preview on an Ubuntu 24.04 VM, GNOME on Wayland and Xorg, the WebKitGTK sandbox **on**, Orca, IBus and Fcitx, scales 100 to 200 %, system dark mode, memory | R1, R5, R6, R14; N2 to N10 | **Gate B** |
 | **S10** | **Packaging dry runs:** a `.deb` on a clean VM, a Flatpak manifest, the AppArmor profile if R1 needs one | D6, R1, R12 | Gate C |
 
-**Gate A** (yours, before any production code): accept the shape, [D12](#decisions) settled, the VM named, the floor ([D13](#decisions)) and
+**Gate A** (yours, before any production code): accept the shape, the VM named, the floor ([D13](#decisions)) and
 `bundled` SQLite ([D9](#decisions)) confirmed, [D19](#decisions) looked at once the Windows design exists. **Gate B** (the VM): the shell
 and preview on real GNOME, the sandbox on. **Gate L** (the VM, after step 5): the Live tab on real GNOME, with Orca and Wayland input, and your look. **Gate C** (the physical x86-64 machine): the native bar audit, the numbers, packaging.
 **Gate D** (yours): only then, whether this app becomes the Linux default in place of Electron. Nothing before it changes that plan.
@@ -728,7 +729,7 @@ Every item here is **unverified**; none should be read as working.
 
 Reported, not filled:
 
-1. **The conformance corpus has two homes on `main`:** the iPad's `apps/ios/conformance/` with an iPad-specific generator, and `fixtures/conformance/` with only the PDF tables ([D12](#decisions)). No backup in it holds a PDF.
+1. **The conformance corpus has two homes on `main`:** the iPad's `apps/ios/conformance/` with an iPad-specific generator, and `fixtures/conformance/` with only the PDF tables. **Decided (D12): `fixtures/conformance/` is the one home; the move waits for the iPad's open PR.** No backup in it holds a PDF.
 2. **`meilisearch.lock.json` has no Linux arm64 asset.** Upstream v1.53.1 does (`meilisearch-linux-aarch64`, 121 MB, community). The native app needs its own lock; `apps/desktop` was not touched.
 3. **The capture triggers, `sync_outbox` and `sync_*` tables are not on `main`**, so the data layer has no sync tables to reproduce.
 4. **The sync design places the engine in "the desktop app's main process and the iPad app"** only; the native Linux (and Windows) apps each add one.
@@ -772,6 +773,8 @@ Reported, not filled:
 - 2026-11-09 (later): **D24 decided (you): the Linux Live tab is in v1, as on the iPad**, over S8's recommendation. A milestone ML between M1 and M2 (build step 5, spike S11, Gate L); C10 now Accepted with a reduced-ship fallback; R7 is a schedule risk; D18 narrowed to panels and plugins.
 
 - 2026-11-09 (later still): **S11 run (pictures and rules in a long Live-tab note)**, in the container. A draw-time layer over the text view draws both correctly in a 5,000-line note through paging and a resize, with no widgets and flat memory; S8's overlay widgets stay wrong in the middle of the note and cost 100 MB more, growing to 567 MB; a tag-drawn rule is a thick bar and is dropped. A first version of the layer crashed GTK (`Byte index ... is off the end of the line`); its cause was not pinned and the rewrite, which asks the layout only for line heights, ran clean twice. C10, R7, the spikes tables and build step 5 updated.
+
+- 2026-11-09 (later still): **D12 decided (you): the corpus lives in `fixtures/conformance/`.** Not moved: it touches about 25 files under `apps/ios` and `apps/web`, and the iPad has a PR open, so it is its own change by that side. Gate A no longer waits on it.
 
 ## Sources
 
