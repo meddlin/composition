@@ -323,7 +323,7 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
 135. **Typing in a long note.** In a Release build, paste the lab's 5,000-line note (item 104) into a note, choose Live, and type in the middle of it, then the same in Markdown: it should feel the same, and the letters must not lag. The Simulator's numbers are in the plan's L7 result.
 136. **A very long note.** Item 105 in the Live tab: about 400,000 characters, type a few words in the middle and stop. The iPad should not get warm or stutter afterwards. The Live tab has **no length limit** (the plan's decision V5): headings, bold, tints and pictures are drawn in a note of any length, so a highlight past the first 100,000 characters is tinted, which the desktop's Live tab does not do. Tell me if typing is slower than in the Markdown tab on the same note, and where in the note you typed. Delete the note afterwards.
 
-**Gate L is yours:** items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter, which you have not tried yet) and 125 to 136 above, on the iPad. None of them is ticked here.
+**Gate L passed (you, 2026-11-09):** you tried the Live tab on the iPad and it works well. Items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter) and 125 to 136 above were not recorded one by one, so none of them is ticked here.
 
 ## PDFs: import and the reader (M2, first step)
 
