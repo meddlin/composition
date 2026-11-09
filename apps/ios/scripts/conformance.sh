@@ -14,6 +14,10 @@
 # generated: step 1 also checks that the desktop still writes them (pdfConformance.test.ts, pdfMarkup.test.ts,
 # scripts/document-names-oracle.mjs), and step 2 replays them (PdfConformanceTests, DocumentNamesConformanceTests).
 #
+# Follow the sun (fixtures/conformance/sun.json) and reflow (fixtures/conformance/reflow.json) are committed the same way: the TypeScript
+# test that writes each (sunConformance.test.ts, reflowConformance.test.ts) fails when it no longer makes the committed file, and step 2
+# replays them (SunConformanceTests, ReflowConformanceTests).
+#
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile) and Xcode's Swift.
 # Usage: apps/ios/scripts/conformance.sh [directory-for-the-fixtures]   (a temporary one by default)
 #        COMPOSITION_FIXTURE_LARGE_MB=20 apps/ios/scripts/conformance.sh        (a smaller large backup, for a quicker run)
@@ -32,14 +36,15 @@ vitest() { (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run scrip
 pdf_corpus() {
   (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/pdfConformance.test.ts src/lib/composition/pdfMarkup.test.ts)
   node --no-warnings "$root/apps/ios/scripts/document-names-oracle.mjs" --check
+  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/sunConformance.test.ts src/components/notes/reflowConformance.test.ts)
 }
 
 echo "== fixtures in $dir"
 echo "== 1/3 desktop writes databases, backups, the Trash Can script and the search notes"
 vitest -t "writes "
-echo "== 1/3 desktop still makes the committed PDF corpus and file names"
+echo "== 1/3 desktop still makes the committed PDF corpus, file names, Follow the sun and reflow fixtures"
 pdf_corpus
-echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays the PDF corpus, and writes its own backups"
+echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays the PDF corpus and the committed fixtures, and writes its own backups"
 (cd "$root/apps/ios/CompositionCore" && swift test)
 echo "== 3/3 desktop restores what Swift wrote"
 vitest -t "reads what the Swift core wrote"

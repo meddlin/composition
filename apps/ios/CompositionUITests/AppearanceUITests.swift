@@ -184,4 +184,173 @@ final class AppearanceUITests: XCTestCase {
         let named = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'Forest'"), object: app.buttons["sidebar-appearance"])
         XCTAssertEqual(XCTWaiter().wait(for: [named], timeout: 10), .completed, "and the button names the scheme just chosen: \(app.buttons["sidebar-appearance"].label)")
     }
+
+    // MARK: Follow the sun
+
+    /// The classic pair's surfaces at the ends of the fade, from the desktop's stylesheet; the blend is `color-mix(in srgb, day <level>, night)`.
+    private static let sunDay = (background: "#f7f7f4", surface: "#edede8"), sunNight = (background: "#121212", surface: "#1e1e1e")
+
+    private func blend(_ day: String, _ night: String, _ level: Double) -> String {
+        let (d, n) = (hex(day), hex(night))
+        func channel(_ top: Int, _ under: Int) -> Int { Int((Double(top) * level + Double(under) * (1 - level) + 0.5).rounded(.down)) }
+        return String(format: "#%02x%02x%02x", channel(d.r, n.r), channel(d.g, n.g), channel(d.b, n.b))
+    }
+
+    private func scrollSheet(until element: XCUIElement, file: StaticString = #filePath, line: UInt = #line) {
+        for _ in 0..<8 where !(element.exists && element.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(element.exists && element.isHittable, "\(element) is on the sheet", file: file, line: line)
+    }
+
+    /// `-theme auto` with `-sunLevel` holds the fade at a point; the page and the list beside it are the pair's colours blended there.
+    func testFollowTheSunIsPaintedAtEveryPointOfTheFade() throws {
+        var first = true
+        for level in [1.0, 0.5, 0.0] {
+            try launch(["-theme", "auto", "-sunLevel", String(level)], importing: first)
+            first = false
+            let screen = try window()
+            expect(try pixel(screen, x: screen.width - 300, y: screen.height - 40), blend(Self.sunDay.background, Self.sunNight.background, level), "level \(level): the editor's page")
+            expect(try pixel(screen, x: 400, y: screen.height - 4), blend(Self.sunDay.surface, Self.sunNight.surface, level), "level \(level): the list beside the note")
+            keepScreenshot("follow the sun, level \(level)")
+            app.terminate()
+        }
+    }
+
+    func testTheAppearanceSheetChoosesFollowTheSunAndItsPair() throws {
+        try launch(["-sunLevel", "1"])
+        openAppearance()
+        let sun = app.buttons["scheme-sun"]
+        scrollSheet(until: sun)
+        sun.tap()
+        XCTAssertTrue(sun.isSelected, "the choice is marked")
+        // Its own settings appear: the five pairs and the city.
+        let sky = app.buttons["sun-pair-sky-midnight"]
+        scrollSheet(until: sky)
+        for pair in ["classic", "cream-amber", "mint-forest", "blush-wine", "sky-midnight"] { XCTAssertTrue(app.buttons["sun-pair-\(pair)"].exists, "the pair \(pair) is listed") }
+        XCTAssertTrue(app.buttons["sun-pair-classic"].isSelected, "the classic pair is the one chosen at first")
+        keepScreenshot("appearance sheet, Follow the sun chosen")
+        sky.tap()
+        XCTAssertTrue(sky.isSelected)
+        scrollSheet(until: app.textFields["sun-city"])
+        let status = app.staticTexts["sun-city-status"]
+        scrollSheet(until: status)
+        XCTAssertTrue(status.label.hasPrefix("No city saved yet"), "no city is saved, and it says what it uses instead: \(status.label)")
+        keepScreenshot("appearance sheet, the city")
+        app.buttons["Done"].tap()
+        var screen = try window()
+        expect(try pixel(screen, x: screen.width - 300, y: screen.height - 40), "#eef5fb", "sky and midnight, by day: the page")
+        // Kept: a second launch of the same data says nothing about the scheme or the pair.
+        app.terminate()
+        try launch(["-sunLevel", "1"], importing: false)
+        screen = try window()
+        expect(try pixel(screen, x: screen.width - 300, y: screen.height - 40), "#eef5fb", "sky and midnight, kept")
+        // The button at the foot of the first column names it.
+        let named = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS 'Follow the sun'"), object: app.buttons["sidebar-appearance"])
+        XCTAssertEqual(XCTWaiter().wait(for: [named], timeout: 10), .completed, "the Appearance button names the scheme: \(app.buttons["sidebar-appearance"].label)")
+    }
+
+    /// An empty city is forgotten without asking the network anything, so this needs none.
+    func testSavingAnEmptyCityForgetsIt() throws {
+        try launch(["-theme", "auto", "-sunLevel", "1"])
+        openAppearance()
+        let save = app.buttons["sun-city-save"]
+        scrollSheet(until: save)
+        save.tap()
+        let status = app.staticTexts["sun-city-status"]
+        XCTAssertTrue(status.waitForExistence(timeout: 10))
+        XCTAssertTrue(status.label.hasPrefix("City forgotten"), status.label)
+    }
+
+    func testFollowTheSunSettingsFitPortraitToo() throws {
+        try launch(["-theme", "auto", "-sunLevel", "0.5"])
+        XCUIDevice.shared.orientation = .portrait
+        // In portrait the note has the whole screen: bring the lists back, and the way in is where it always is.
+        app.buttons["focus-toggle"].tap()
+        openAppearance()
+        let city = app.textFields["sun-city"]
+        scrollSheet(until: city)
+        keepScreenshot("appearance sheet, Follow the sun, portrait")
+        scrollSheet(until: app.buttons["sun-city-save"])
+        XCUIDevice.shared.orientation = .landscapeLeft
+    }
+
+    // MARK: Writing aids: the ruler and reflow
+
+    private var editor: XCUIElement { app.textViews["note-editor"] }
+
+    /// The lines `-autotype` has typed at the end of the note (it types where the note ends, on the line after its last), once the last word has arrived.
+    private func typedLines() throws -> [Substring] {
+        let arrived = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value ENDSWITH %@", "dog"), object: editor)
+        XCTAssertEqual(XCTWaiter().wait(for: [arrived], timeout: 60), .completed, "the typing arrived")
+        let lines = try XCTUnwrap(editor.value as? String).split(separator: "\n", omittingEmptySubsequences: false)
+        let first = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("the quick") }, "what was typed is in the note")
+        return Array(lines[first...])
+    }
+
+    func testReflowBreaksALineThatTypingPushesPastTheColumn() throws {
+        try launch(["-reflow", "1", "-reflowColumn", "24", "-autotype", "the quick brown fox jumps over the lazy dog", "-autotypeInterval", "0.03"])
+        let lines = try typedLines()
+        XCTAssertGreaterThanOrEqual(lines.count, 2, "the sentence was broken: \(lines)")
+        XCTAssertTrue(lines.allSatisfy { $0.count <= 24 }, "no line is past the column: \(lines)")
+        XCTAssertEqual(lines.joined(separator: " "), "the quick brown fox jumps over the lazy dog", "nothing was lost or added but the breaks")
+        keepScreenshot("reflow at column 24")
+    }
+
+    func testNothingIsBrokenUnlessReflowIsOn() throws {
+        try launch(["-autotype", "the quick brown fox jumps over the lazy dog", "-autotypeInterval", "0.03"])
+        let lines = try typedLines()
+        XCTAssertEqual(lines, ["the quick brown fox jumps over the lazy dog"], "reflow is off until it is switched on")
+    }
+
+    func testTheRulerSitsAtTheColumnAndMovesWithIt() throws {
+        func rulerX(column: Int, importing: Bool) throws -> Double {
+            try launch(["-ruler", "1", "-rulerColumn", "\(column)"], importing: importing)
+            let ruler = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'ruler x='")).firstMatch
+            XCTAssertTrue(ruler.waitForExistence(timeout: 20), "the ruler is drawn at column \(column)")
+            let label = ruler.label
+            keepScreenshot("ruler at column \(column)")
+            app.terminate()
+            return try XCTUnwrap(Double(label.dropFirst("ruler x=".count).split(separator: " ").first ?? ""))
+        }
+        let forty = try rulerX(column: 40, importing: true)
+        let eighty = try rulerX(column: 80, importing: false)
+        // A column is the width of a "0" in the editor's face (16 points of monospace is about 9.6).
+        let perColumn = (eighty - forty) / 40
+        XCTAssertTrue((8.5...11).contains(perColumn), "a column is \(perColumn) points wide")
+        // Nothing is drawn when it is off.
+        try launch([], importing: false)
+        XCTAssertFalse(app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'ruler x='")).firstMatch.exists, "no ruler by default")
+    }
+
+    /// A switch in a form row is turned by its own control at the trailing edge; a tap in the middle of the row's label does nothing.
+    private func flip(_ toggle: XCUIElement) {
+        let before = toggle.value as? String
+        toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let changed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", before ?? ""), object: toggle)
+        XCTAssertEqual(XCTWaiter().wait(for: [changed], timeout: 5), .completed, "the switch turned")
+    }
+
+    func testTheWritingAidsAreSwitchedOnInTheAppearanceSheet() throws {
+        try launch()
+        openAppearance()
+        let ruler = app.switches["ruler-toggle"]
+        scrollSheet(until: ruler)
+        XCTAssertEqual(ruler.value as? String, "0", "off at first")
+        XCTAssertFalse(app.steppers["ruler-column"].exists, "the column waits until the ruler is on")
+        flip(ruler)
+        XCTAssertEqual(ruler.value as? String, "1")
+        XCTAssertTrue(app.steppers["ruler-column"].waitForExistence(timeout: 5), "the ruler's column appears")
+        let reflow = app.switches["reflow-toggle"]
+        scrollSheet(until: reflow)
+        flip(reflow)
+        XCTAssertTrue(app.steppers["reflow-column"].waitForExistence(timeout: 5))
+        scrollSheet(until: app.switches["reflow-tables"])
+        keepScreenshot("appearance sheet, writing aids on")
+        app.buttons["Done"].tap()
+        // Kept: the ruler is drawn in the editor, and a second launch with nothing said still has it.
+        let drawn = app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'ruler x='")).firstMatch
+        XCTAssertTrue(drawn.waitForExistence(timeout: 10), "the ruler is drawn at once")
+        app.terminate()
+        try launch([], importing: false)
+        XCTAssertTrue(app.otherElements.matching(NSPredicate(format: "label BEGINSWITH 'ruler x='")).firstMatch.waitForExistence(timeout: 20), "and kept")
+    }
 }

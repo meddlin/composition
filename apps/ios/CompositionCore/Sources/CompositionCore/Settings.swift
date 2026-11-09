@@ -58,6 +58,9 @@ public final class SettingsStore: @unchecked Sendable {
 
     public func location() -> SavedLocation? { locked { Self.parseLocation($0["location"]) } }
 
+    /// The light and dark colours Follow the sun moves between; the classic pair for anything the file does not name.
+    public func sunPair() -> SunPairName { locked { SunPairName(settingsValue: $0["sunPair"]) } }
+
     // MARK: Writing
 
     public func setFavorites(_ favorites: [Favorite]) throws {
