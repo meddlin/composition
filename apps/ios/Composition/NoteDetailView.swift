@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionInk
 import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -32,6 +33,8 @@ struct NoteDetailView: View {
     @State private var showingStored = false
     @State private var storedWords = ""
     @State private var pickedStored: StoredImageInfo?
+    /// The drawing canvas, open on a blank page (Image menu, *Drawing…*).
+    @State private var drawing: InkEditing?
 
     var body: some View {
         Group {
@@ -120,6 +123,14 @@ struct NoteDetailView: View {
             }
             .ignoresSafeArea()
         }
+        .fullScreenCover(item: $drawing) { editing in
+            InkCanvasScreen(editing: editing, look: look) { png in
+                drawing = nil
+                handle.insertInk(png: png)
+            } cancelled: {
+                drawing = nil
+            }
+        }
         .confirmationDialog("Move this note to the Trash Can?", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Move to Trash Can", role: .destructive) { Task { await model.moveToTrash(noteID) } }
         } message: {
@@ -133,6 +144,8 @@ struct NoteDetailView: View {
         if CameraView.isAvailable { Button("Take Photo…", systemImage: "camera") { showingCamera = true } }
         Button("Choose File…", systemImage: "folder") { showingFiles = true }
         Button("Stored Image…", systemImage: "photo.stack") { handle.openStoredImages() }
+        Button("Drawing…", systemImage: "pencil.tip.crop.circle") { drawing = .blank }
+            .accessibilityIdentifier("new-drawing")
         Divider()
         Button("Turn Images into Image Tags", systemImage: "arrow.left.arrow.right") { handle.convertImagesToTags() }
             .keyboardShortcut("x", modifiers: [.command, .shift])
@@ -284,13 +297,32 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
 /// after the last change.
 struct NoteReader: View {
     let model: AppModel
+    let session: NoteSession
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.look) private var look
     @State private var live: LivePreview
+    /// A stored drawing opened on the canvas by a tap in the preview.
+    @State private var editingInk: InkEditing?
 
     init(model: AppModel, session: NoteSession) {
         self.model = model
+        self.session = session
         _live = State(initialValue: LivePreview(session: session))
+    }
+
+    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old.
+    private func saveEdited(_ editing: InkEditing, png: Data) {
+        editingInk = nil
+        guard let old = editing.stored else { return }
+        let location = model.location
+        let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: png, in: location) }.value
+            switch outcome {
+            case .stored(let name): session.edit(InkTag.replacing(old, with: name, in: session.text))
+            case .failed(let message): model.errorMessage = message
+            }
+        }
     }
 
     @ViewBuilder private var header: some View {
@@ -329,6 +361,10 @@ struct NoteReader: View {
             })
             .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             .environment(\.imageFolder, model.location.imagesURL)
+            .environment(\.editInk, { name in editingInk = InkEditing.load(named: name, from: model.location.imagesURL) })
+            .fullScreenCover(item: $editingInk) { editing in
+                InkCanvasScreen(editing: editing, look: look) { png in saveEdited(editing, png: png) } cancelled: { editingInk = nil }
+            }
         }
     }
 }

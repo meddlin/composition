@@ -68,7 +68,7 @@ public indirect enum PreviewBlock: Equatable, Sendable {
     case panel(PanelTone, [PreviewBlock])
     case toc([TocEntry])
     case footnotes([FootnoteEntry])
-    /// `<Image>` and `<Drawio>` (a diagram is a stored picture).
+    /// `<Image>`, `<Drawio>` (a diagram is a stored picture) and `<Ink>` (so is a drawing; the app draws it from its strokes when the picture carries them).
     case image(source: PreviewImageSource, alt: String, title: String?, width: ImageWidth?, isDiagram: Bool)
     case chart(ChartSpec, title: String?, height: Double)
     case repo(RepoRef, description: String?)
@@ -131,7 +131,7 @@ public struct NotePreview: Sendable {
             case "Info": return [.panel(.info, build(children))]
             case "Warning": return [.panel(.warning, build(children))]
             case "Mark": return [.highlight(color: text(props, "color"), build(children))]
-            case "Image", "Drawio":
+            case "Image", "Drawio", "Ink":
                 guard let src = text(props, "src")?.trimmingCharacters(in: .whitespaces), !src.isEmpty else { return [] }
                 let source: PreviewImageSource = NoteImage.name(fromRef: src).map { .stored($0) } ?? .remote(src)
                 return [.image(source: source, alt: text(props, "alt") ?? "", title: text(props, "title"), width: NoteImage.parseWidth(text(props, "width")), isDiagram: name == "Drawio")]

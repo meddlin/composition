@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionInk
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
@@ -49,6 +50,19 @@ final class EditorHandle {
             }
             write(paragraphs: markdown)
             if !problems.isEmpty { problem(problems.joined(separator: "\n")) }
+        }
+    }
+
+    /// Stores a drawing's PNG and writes the `<Ink>` tag that shows it at the caret, as a paragraph of its own.
+    func insertInk(png: Data) {
+        guard let location, textView != nil else { return }
+        let title = noteTitle()
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: png, in: location) }.value
+            switch outcome {
+            case .stored(let name): write(paragraphs: [InkTag.markdown(forName: name)])
+            case .failed(let message): problem(message)
+            }
         }
     }
 
