@@ -47,6 +47,14 @@ final class AppModel {
     private(set) var trashedGroups: [TrashedGroup] = []
     /// The size of the PDF each note owns (live or in the Trash Can), by the note's id: what marks a row as a PDF's and what the Trash Can says it takes.
     private(set) var pdfSizes: [Int64: Int64] = [:]
+    /// The PDFs by the uuid a `pdf:` link names them by: the PDF's id and the note that owns it. A link is followed only while that note is not in the Trash Can.
+    private(set) var pdfsByUuid: [String: PdfEntry] = [:]
+    /// A PDF shown beside a note that does not own it: a note that cites the PDF, opened from the PDF's Notes tab or after following a link in it (the
+    /// note's id, then the PDF's). It lasts while the app is open, as the desktop's panel pairing does until the layout is saved.
+    var pdfBeside: [Int64: Int64] = [:]
+    /// A link's request to show a page of a PDF and flash a mark; the reader takes it when it has the PDF open.
+    var pdfGoTo: PdfGoTo?
+    var pdfGoToCount = 0
     /// A PDF just picked or dropped that the library already holds, waiting for the answer (open it, import it again, or neither).
     var duplicatePdf: DuplicatePdf?
     private(set) var noteCount = 0
@@ -86,7 +94,7 @@ final class AppModel {
         let favorites: [Favorite]
         let trashedNotes: [TrashedNote]
         let trashedGroups: [TrashedGroup]
-        let pdfSizes: [Int64: Int64]
+        let documents: [StoredDocument]
         let sqliteVersion: String
     }
 
@@ -229,7 +237,7 @@ final class AppModel {
                 return Snapshot(
                     all: try database.listNotes(), ordered: try database.notesInDisplayOrder(), notebooks: try database.listNotebooks(), groups: try database.listGroups(),
                     favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups,
-                    pdfSizes: Dictionary(try database.listDocuments().map { ($0.noteId, $0.size) }, uniquingKeysWith: { first, _ in first }), sqliteVersion: try database.sqliteVersion())
+                    documents: try database.listDocuments(), sqliteVersion: try database.sqliteVersion())
             }
             orderedNotes = snapshot.ordered
             linkCandidates = snapshot.all.map { NoteLinks.Candidate(id: $0.id, title: $0.title) }
@@ -241,7 +249,8 @@ final class AppModel {
             loads += 1
             trashedNotes = snapshot.trashedNotes
             trashedGroups = snapshot.trashedGroups
-            pdfSizes = snapshot.pdfSizes
+            pdfSizes = Dictionary(snapshot.documents.map { ($0.noteId, $0.size) }, uniquingKeysWith: { first, _ in first })
+            pdfsByUuid = Dictionary(snapshot.documents.map { ($0.uuid, PdfEntry(documentId: $0.id, noteId: $0.noteId)) }, uniquingKeysWith: { first, _ in first })
             noteCount = snapshot.all.count
             sqliteVersion = snapshot.sqliteVersion
             if trimmedQuery.isEmpty {

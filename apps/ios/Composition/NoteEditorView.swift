@@ -52,6 +52,26 @@ final class EditorHandle {
         }
     }
 
+    /// A block of Markdown (a quote from a PDF) as a paragraph of its own at the caret, never in the frontmatter. False when the note's editor is not
+    /// showing (the Preview tab), so that the caller can put it at the end of the note instead.
+    func insertBlock(_ markdown: String) -> Bool {
+        // A text view that is not on screen (the note is behind the PDF, or in the Preview tab) takes nothing: the caller puts the Markdown at the end of the note.
+        guard let view = textView, view.window != nil else { return false }
+        write(paragraphs: [markdown])
+        return true
+    }
+
+    /// A short piece of Markdown (a link to a page of a PDF) in the words around the caret; False when the editor is not showing.
+    func insertInline(_ markdown: String) -> Bool {
+        guard let view = textView, view.window != nil else { return false }
+        view.becomeFirstResponder()
+        let whole = view.nativeText as NSString
+        let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
+        if view.selectedRange.location < frontmatterEnd { view.selectedRange = NSRange(location: frontmatterEnd, length: 0) }
+        view.insertText(markdown)
+        return true
+    }
+
     /// Writes each Markdown line at the caret (in place of the selection) as a paragraph of its own.
     private func write(paragraphs markdown: [String]) {
         guard let view = textView, !markdown.isEmpty else { return }

@@ -39,8 +39,9 @@ struct NoteDetailView: View {
         Group {
             if let session {
                 if let pdf {
-                    // A note that owns a PDF: the PDF beside it where there is room, and a switch between them where there is not.
-                    PdfWithNote(model: model, source: pdf) { noteContent(session) }
+                    // A note that owns a PDF, or cites one that was opened beside it: the PDF beside it where there is room, and a switch between them
+                    // where there is not.
+                    PdfWithNote(model: model, source: pdf, insertion: insertion(for: session)) { noteContent(session) }
                         .id(pdf.document.id)
                 } else {
                     noteContent(session)
@@ -54,6 +55,8 @@ struct NoteDetailView: View {
         // The note's own text colour; the lists beside it keep the system's, so that a selected row still turns its text to white.
         .foregroundStyle(look.foreground)
         .task(id: noteID) { await open() }
+        // A link in this note's preview opened a PDF beside it, or the PDF was dropped from beside it.
+        .onChange(of: model.pdfBeside[noteID]) { Task { await refreshPdf() } }
         .onDisappear { close() }
         .toolbar {
             // Three words side by side where there is room. In a narrow window (a third of the screen, Slide Over) there is no room for them, and a
@@ -120,8 +123,25 @@ struct NoteDetailView: View {
         .confirmationDialog("Move this note to the Trash Can?", isPresented: $confirmingTrash, titleVisibility: .visible) {
             Button("Move to Trash Can", role: .destructive) { Task { await model.moveToTrash(noteID) } }
         } message: {
-            Text("It stays there for 60 days and can be restored." + (pdf.map { " Its PDF (\(DocumentNames.formatBytes($0.document.size))) stays with it, and goes when the note is deleted for good." } ?? ""))
+            Text("It stays there for 60 days and can be restored." + (ownedPdf.map { " Its PDF (\(DocumentNames.formatBytes($0.document.size))) stays with it, and goes when the note is deleted for good." } ?? ""))
         }
+    }
+
+    /// The PDF this note owns (not one shown beside it because the note cites it).
+    private var ownedPdf: PdfSource? { pdf.flatMap { $0.document.noteId == noteID ? $0 : nil } }
+
+    /// How a quote or a page citation from the PDF reaches this note: at the caret of its editor, or at the end of the note when the editor is not
+    /// showing (the Preview tab).
+    private func insertion(for session: NoteSession) -> PdfInsertion {
+        PdfInsertion(
+            block: { [handle] in handle.insertBlock($0) },
+            inline: { [handle] in handle.insertInline($0) },
+            append: { [weak session] markdown in
+                guard let session else { return }
+                let text = session.text
+                let gap = text.hasSuffix("\n\n") ? "" : text.hasSuffix("\n") ? "\n" : "\n\n"
+                session.edit(text + gap + markdown + "\n")
+            })
     }
 
     /// What the Image menu holds (the same in the wide toolbar and in the narrow one).
@@ -171,10 +191,9 @@ struct NoteDetailView: View {
         focusOnOpen = model.takeFreshNote(noteID)
         if focusOnOpen { mode = .markdown }
         pdf = nil
-        let owned = await model.pdfSource(forNote: noteID)
+        await refreshPdf()
         // Another note was chosen while this one was being read: that one opens, not this.
         guard !Task.isCancelled else { return }
-        pdf = owned
         session = await model.openSession(noteID)
         // What the editor needs to store a picture for this note.
         handle.location = model.location
@@ -186,6 +205,19 @@ struct NoteDetailView: View {
         handle.openStoredImages = { [weak handle] in
             words.wrappedValue = handle?.selectedWords ?? ""
             showing.wrappedValue = true
+        }
+    }
+
+    /// The PDF shown beside this note: the one it owns, or one opened beside it (a note that cites a PDF, chosen in the PDF's Notes tab or reached by
+    /// following a link in it).
+    private func refreshPdf() async {
+        let owned = await model.pdfSource(forNote: noteID)
+        if let owned {
+            pdf = owned
+        } else if let beside = model.pdfBeside[noteID] {
+            pdf = await model.pdfSource(forDocument: beside)
+        } else {
+            pdf = nil
         }
     }
 
@@ -320,12 +352,15 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
 /// after the last change.
 struct NoteReader: View {
     let model: AppModel
+    /// The note whose text this draws (a link to a PDF opens the PDF beside it).
+    let noteId: Int64
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.look) private var look
     @State private var live: LivePreview
 
     init(model: AppModel, session: NoteSession) {
         self.model = model
+        noteId = session.noteId
         _live = State(initialValue: LivePreview(session: session))
     }
 
@@ -359,10 +394,15 @@ struct NoteReader: View {
             .tint(look.link)
             // A link to another note (`[title](note:12)`) opens that note.
             .environment(\.openURL, OpenURLAction { url in
+                if url.scheme == "pdf", let ref = PdfRefs.parse(url.absoluteString) {
+                    model.followPdfLink(ref, from: noteId)
+                    return .handled
+                }
                 guard url.scheme == "note", let id = NoteLinks.id(fromRef: url.absoluteString) else { return .systemAction }
                 model.followNoteLink(id)
                 return .handled
             })
+            .environment(\.pdfLinks, PdfLinks { model.isPdfHere(uuid: $0) })
             .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             .environment(\.imageFolder, model.location.imagesURL)
         }
