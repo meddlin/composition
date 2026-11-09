@@ -67,7 +67,9 @@ public struct ScannedNote: Sendable {
 
 public enum NoteScanner {
     /// The tags a note may use: the keys of the desktop's `mdxComponents`.
-    public static let components = ["Info", "Warning", "Image", "Drawio", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"]
+    /// `Ink` is the iPad's own so far (M2, docs/architecture/ink.md): the desktop's catalogue has no handwriting yet, so a note with an `<Ink>` shows it
+    /// here and an error there until the web side is wired.
+    public static let components = ["Info", "Warning", "Image", "Drawio", "Ink", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"]
 
     /// Reads a note's body (its text without the frontmatter).
     public static func scan(_ body: String) -> ScannedNote {

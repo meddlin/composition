@@ -331,10 +331,30 @@ Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyb
 the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; settings other than the colour scheme and fonts; the Pencil; sync. Selecting text
 across blocks of the preview, and the video player of `<YouTube>`, are not there either.
 
+## Drawings (M2, S5: the stroke format and the canvas)
+
+Built 2026-11-09 and tried only in the Simulator, with a finger standing in for the Pencil (four UI tests: a drawing is stored, written into the note and shown, a blank page is a cancel, a tap on the
+drawing edits it). Everything about the **Pencil itself** is yours to try, and these are what Gate C needs ([architecture/ink.md](../architecture/ink.md#what-gate-c-still-needs)).
+These start at 160 because the Live items end at 136 and the PDF reader's start at 140 and run to 157.
+
+160. **A new drawing.** In Markdown or Split, the Image menu's *Drawing…* opens a full-screen page with PencilKit's tool picker. Draw with the Pencil: the line follows the tip with the latency you know from Notes (say if it does not), the palm resting on the glass leaves no marks, and a finger scrolls the page when *Only draw with Apple Pencil* is on in Settings.
+161. **Done.** *Done* puts `<Ink src="app_data/…" alt="Drawing" width="80%" />` in the note as a paragraph of its own (after the frontmatter, never inside it), and the preview shows the drawing. *Cancel*, and *Done* on a blank page, change nothing.
+162. **Edit it.** In the preview, tap the drawing: the page opens again on the same strokes (all the strokes, with their tools and colours). Add some, *Done*: the note names a new file in place of the old, and the preview shows the new drawing. Undo in the note brings the old name back.
+163. **Every ink.** Draw one stroke with each of the pen, monoline, fountain pen, pencil, marker, crayon and watercolour, in one colour, then *Done*. The preview is a simplified picture (no grain or bleed on pencil, crayon and watercolour; the marker is a flat translucent band). **Tell me which ones look wrong or too different from the canvas.**
+164. **Dark schemes (R12).** Draw black ink on a light scheme, then pick a dark one: the preview shows the ink white, and so does the page when you tap to edit. In a dark scheme, draw a red, a blue and a yellow stroke as well, *Done*, and look at the preview in that scheme and then in a light one. **Tell me whether the colours in the preview are the ones on the canvas, and whether the canvas shows them as you chose them.**
+165. **The eraser.** Erase the middle of a long stroke with the pixel eraser and the end of another with the stroke eraser, *Done*: the preview shows the stroke cut where you erased, and the page reopened shows the same gap.
+166. **Moving things.** Select some strokes with the lasso, move and resize them, *Done*: they are where you put them in the preview.
+167. **A dense page.** Fill a page with handwriting, as you would in a lecture, and *Done*. Say how long *Done* takes, whether the preview comes in at once, how long the page takes to open again, and the size of the PNG (the Files app, or a backup's `app_data`). The measurements in the format page say a dense page is about 4 MB.
+168. **The page's size.** A new page is as big as the screen it opened on. Draw in portrait, then open the same drawing in landscape: the page keeps its size and scrolls; pinch zooms it.
+169. **A backup.** Export a backup and restore it (or restore the same one): the drawing is there, shows, and can be edited. Take the PNG out of the backup and open it in any image viewer: it shows the drawing in the colours of the scheme it was saved in.
+170. **VoiceOver.** On the drawing in the preview, VoiceOver says *Drawing, image, button* and a double tap opens the page.
+171. **Elsewhere.** A note with an `<Ink>` shows an *Unknown component* notice on the desktop and in the CLI until their side is built: this is expected, so just confirm nothing else in the note changes.
+
 ## What is not yet verified
 
 - **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not
   tried in the Simulator; you used a backup of your real notes on the iPad, which I take to mean that route worked there.)
+- **Drawing on a real iPad with the Pencil** (items 160 to 171): latency, palm rejection, the textured inks and how the dark schemes treat colours; only the Simulator, with a finger, has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 

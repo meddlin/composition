@@ -8,6 +8,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "CompositionCore", targets: ["CompositionCore"]),
+        .library(name: "CompositionInk", targets: ["CompositionInk"]),
     ],
     dependencies: [
         // Pinned to an exact version, as the design requires of every dependency (docs/ipad-app-design.md, Dependencies).
@@ -25,6 +26,16 @@ let package = Package(
         .testTarget(
             name: "CompositionCoreTests",
             dependencies: ["CompositionCore"]
+        ),
+        // CompositionInk: strokes, their JSON, the PNG that carries them, and the CoreGraphics renderer (docs/architecture/ink.md).
+        // Foundation, CoreGraphics, ImageIO and zlib only; the PencilKit bridge is compiled where PencilKit exists, so it tests on a Mac.
+        .target(
+            name: "CompositionInk",
+            dependencies: ["CompositionCore"]
+        ),
+        .testTarget(
+            name: "CompositionInkTests",
+            dependencies: ["CompositionInk", "CompositionCore"]
         ),
     ]
 )

@@ -1,5 +1,6 @@
 import Charts
 import CompositionCore
+import CompositionInk
 import SwiftUI
 
 // A note's preview: Markdown and the ten components, drawn natively (spike S4, docs/ipad-app-design.md). The decisions
@@ -168,22 +169,35 @@ struct PreviewImageView: View {
     let width: ImageWidth?
     let isDiagram: Bool
     @Environment(\.imageFolder) private var folder
+    /// The strokes of a stored PNG that carries some (a drawing): it is drawn from them, in the scheme in force, instead of from its pixels.
+    @State private var strokes: InkDocument?
+
+    private var storedName: String? {
+        if case .stored(let name) = source { name } else { nil }
+    }
 
     var body: some View {
-        switch source {
-        case .stored(let name):
-            if let folder, let image = UIImage(contentsOfFile: folder.appendingPathComponent(name).path) {
-                drawn(image)
-            } else {
-                NoticeView(text: "Image not found: \(name)", tone: .warning)
+        Group {
+            switch source {
+            case .stored(let name):
+                if let folder, let image = UIImage(contentsOfFile: folder.appendingPathComponent(name).path) {
+                    if let strokes { InkPictureView(name: name, alt: alt, width: width, strokes: strokes) } else { drawn(image) }
+                } else {
+                    NoticeView(text: "Image not found: \(name)", tone: .warning)
+                }
+            case .remote(let address):
+                // Nothing is fetched from the network: the picture's words, and where it is.
+                if let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased()) {
+                    Link(destination: url) { Label(alt.isEmpty ? address : alt, systemImage: "photo") }
+                } else {
+                    NoticeView(text: "Image not shown: \(address)", tone: .warning)
+                }
             }
-        case .remote(let address):
-            // Nothing is fetched from the network: the picture's words, and where it is.
-            if let url = URL(string: address), ["http", "https"].contains(url.scheme?.lowercased()) {
-                Link(destination: url) { Label(alt.isEmpty ? address : alt, systemImage: "photo") }
-            } else {
-                NoticeView(text: "Image not shown: \(address)", tone: .warning)
-            }
+        }
+        .task(id: storedName) {
+            guard let folder, let name = storedName else { return strokes = nil }
+            let url = folder.appendingPathComponent(name)
+            strokes = await Task.detached { InkTag.contents(ofFileAt: url).flatMap { try? $0.drawing() } }.value
         }
     }
 
@@ -204,7 +218,7 @@ struct PreviewImageView: View {
 }
 
 /// Gives its one child a share of the width it is offered: the column the note is in, not the window.
-private struct FractionalWidth: Layout {
+struct FractionalWidth: Layout {
     var fraction: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
