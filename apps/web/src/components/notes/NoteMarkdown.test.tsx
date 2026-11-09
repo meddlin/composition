@@ -8,6 +8,22 @@ const renderNote = (body: string) => render(<NoteMarkdown body={body} rehypePlug
 describe("NoteMarkdown", () => {
   afterEach(cleanup);
 
+  it("parses the note again only when its text changes, not when the editor around it re-renders", () => {
+    // A plugin's transform runs once per parse; the list is created once, as the editor's hook gives it.
+    let parses = 0;
+    const rehypePlugins = [() => () => void (parses += 1)];
+    const { container, rerender } = render(<NoteMarkdown body="Some **text**." rehypePlugins={rehypePlugins} />);
+    expect(parses).toBe(1);
+    expect(container.textContent).toBe("Some text.");
+
+    rerender(<NoteMarkdown body="Some **text**." rehypePlugins={rehypePlugins} />);
+    expect(parses).toBe(1);
+
+    rerender(<NoteMarkdown body="Other **text**." rehypePlugins={rehypePlugins} />);
+    expect(parses).toBe(2);
+    expect(container.textContent).toBe("Other text.");
+  });
+
   it("renders <Info> as an info panel with Markdown inside", () => {
     renderNote("# Title\n\n<Info>\n\nSome **bold** advice and a [link](https://example.com).\n\n- one\n- two\n\n</Info>\n\nAfter.");
 
