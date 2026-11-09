@@ -32,6 +32,10 @@ const catalog: Record<keyof typeof mdxComponents, Omit<MdxCompletion, "name">> =
     description: "A draw.io diagram you can edit from the preview (Ctrl/Cmd+Shift+D draws a new one)",
     template: '<Drawio src="$0" alt="" />',
   },
+  Ink: {
+    description: "A handwritten drawing from the iPad, shown from its strokes (view only)",
+    template: '<Ink src="$0" alt="" />',
+  },
   Toc: {
     description: "Table of contents that follows the note's headings",
     template: "<Toc />$0",

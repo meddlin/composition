@@ -45,6 +45,10 @@ const catalog: Record<keyof typeof mdxComponents, PropSpec[]> = {
     { name: "src", description: "The stored diagram: app_data/…" },
     ...IMAGE_PROPS.filter(({ name }) => name !== "src"),
   ],
+  Ink: [
+    { name: "src", description: "The stored drawing: app_data/…" },
+    ...IMAGE_PROPS.filter(({ name }) => name !== "src"),
+  ],
   Toc: [
     {
       name: "maxDepth",
