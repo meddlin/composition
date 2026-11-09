@@ -252,6 +252,64 @@ describe("parsePreview", () => {
     });
   });
 
+  describe("<Sheet>", () => {
+    const sheet = (props: string, ...fences: string[]) => `<Sheet${props}>\n\n${fences.join("\n\n")}\n\n</Sheet>`;
+    const csv = (text: string) => `\`\`\`csv\n${text}\n\`\`\``;
+
+    it("is a code block of the grid under its title", () => {
+      const [block] = parsePreview(sheet(' title="Q3"', csv("Region,Units\nWest,120"))).blocks;
+      expect(block).toEqual({ kind: "markdown", source: `**Q3**\n\n\`\`\`\n  A${" ".repeat(11)}B\n1 Region  Units\n2 West${" ".repeat(6)}120\n\`\`\`` });
+    });
+
+    it("reads the csv block, and a formulas block beside it is calculated, not drawn as cells", () => {
+      const [block] = parsePreview(sheet("", csv("a,b\n1,2"), "```formulas\nB2 =A2+10\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A   B\n1 a   b\n2 1  11\n```" });
+    });
+
+    it("calculates each formula in its cell, and a formula can use another", () => {
+      const [block] = parsePreview(sheet("", csv("u,p,r\n2,3,\n5,7,\n,,"), "```formulas\nC2 =A2*B2\nC3 =A3*B3\nC4 =SUM(C2:C3)\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A  B   C\n1 u  p   r\n2 2  3   6\n3 5  7  35\n4       41\n```" });
+    });
+
+    it("lists a formula it could not calculate under the grid, since a terminal cannot be pointed at a cell", () => {
+      const [block] = parsePreview(sheet("", csv("a,b\n1,"), "```formulas\nB2 =FILTER(A2,TRUE)\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A  B\n1 a  b\n2 1  #NAME?\n```\n\nNot calculated: B2 (the function FILTER)." });
+    });
+
+    it("shows a carried formula's value, which is Excel's, and does not list it as not calculated", () => {
+      const [block] = parsePreview(sheet("", csv("a,b\n1,99"), "```formulas\nB2 carried =XLOOKUP(A2,F:F,G:G)\n```")).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A   B\n1 a   b\n2 1  99\n```" });
+    });
+
+    it("calculates a column named in a formula, and leaves the last row out of it when the tag says totals, bare or with a value", () => {
+      const body = ["```csv\nRegion,Units\nWest,120\nEast,80\nTotal,\n```", "```formulas\nB4 =SUM([Units])\n```"];
+      const text = (props: string) => (parsePreview(sheet(props, ...body)).blocks[0] as { source: string }).source;
+      expect(text(" totals")).toMatch(/4 Total\s+200/);
+      expect(text(' totals="true"')).toMatch(/4 Total\s+200/);
+      expect(text("")).toContain("#NAME?");
+      expect(text(' totals="false"')).toContain("#NAME?");
+    });
+
+    it("says where an imported sheet came from, under it", () => {
+      const [block] = parsePreview(sheet(' source="budget.xlsx" sheet="Q3" range="A1:F40" imported="0123456789ab"', csv("a\n1"))).blocks;
+      expect(block).toEqual({ kind: "markdown", source: "```\n  A\n1 a\n2 1\n```\n\nImported from budget.xlsx, sheet Q3, A1:F40." });
+    });
+
+    it("lists no more than five, and counts the rest", () => {
+      const lines = Array.from({ length: 7 }, (_, i) => `A${i + 2} =FILTER(B${i + 2},TRUE)`).join("\n");
+      const [block] = parsePreview(sheet("", csv(`a\n${"1\n".repeat(7)}`.trimEnd()), `\`\`\`formulas\n${lines}\n\`\`\``)).blocks;
+      expect((block as { source: string }).source).toMatch(/Not calculated: A2 \(the function FILTER\); A3 .*; A6 \(the function FILTER\); and 2 more\.$/);
+    });
+
+    it("says so when the table can't be drawn", () => {
+      expect(parsePreview("<Sheet />").blocks).toEqual([{ kind: "markdown", source: "Sheet: add a \\`\\`\\`csv block with a header row and the data." }]);
+    });
+
+    it("is dropped from inside a sentence", () => {
+      expect(parsePreview("See <Sheet /> now.").blocks).toEqual([{ kind: "markdown", source: "See  now." }]);
+    });
+  });
+
   describe("indented code", () => {
     it("is left as the note's own text, not read as a paragraph that could hold a tag", () => {
       const body = "<Info>\n\nhi\n\n</Info>\n\n    <Info>\n    not a panel\n    </Info>\n\nafter";
@@ -506,7 +564,7 @@ describe("parsePreview", () => {
 
     it("rejects a tag that isn't in the allowlist, once the note uses a component", () => {
       const { error } = parsePreview("<Info>\n\nfine\n\n</Info>\n\n<Banner />");
-      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Ink>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>.");
+      expect(error).toBe("Unknown component <Banner>. Available: <Info>, <Warning>, <Image>, <Drawio>, <Ink>, <Toc>, <Mark>, <Footnotes>, <YouTube>, <Repo>, <Chart>, <Sheet>.");
     });
 
     it("rejects {expressions}, import and export, and fragments: nothing is evaluated", () => {

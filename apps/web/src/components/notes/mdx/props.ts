@@ -91,6 +91,19 @@ const catalog: Record<OfferedComponent, PropSpec[]> = {
       values: ["200", "280", "400", "600"].map((value) => ({ value, description: `${value} pixels tall` })),
     },
   ],
+  Sheet: [
+    { name: "title", description: "Caption shown above the sheet" },
+    {
+      name: "totals",
+      description: "The last row is a totals row, which a column named in a formula (such as [Revenue]) leaves out",
+      values: [{ value: "true", description: "The last row is the table's totals row" }],
+    },
+    {
+      name: "height",
+      description: "How tall it may grow before it scrolls, in pixels (360 when left out)",
+      values: ["240", "360", "500", "700"].map((value) => ({ value, description: `${value} pixels tall` })),
+    },
+  ],
 };
 
 const componentNames = Object.keys(catalog);

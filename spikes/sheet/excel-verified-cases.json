@@ -1,0 +1,6787 @@
+{
+  "about": "Formula behaviours, each run in real Microsoft Excel by run-in-excel.mjs. A case's formula uses {NAME} for a range from `ranges`; `cells` is the data; `excel` is what Excel returned (an error as { error }). These are the formula engine's test cases.",
+  "excelVersion": "16.114.4 (Microsoft Excel for Mac, run 2026-11-08)",
+  "cells": {
+    "A1": "Apple",
+    "A2": "apple",
+    "A3": "Banana",
+    "A4": "Cherry",
+    "A5": "Avocado",
+    "B1": 10,
+    "B2": 20,
+    "B3": 30,
+    "B4": 40,
+    "B5": 50,
+    "C1": 1,
+    "C2": {
+      "text": "1"
+    },
+    "C3": 2,
+    "C4": {
+      "text": "2"
+    },
+    "D1": "a*b",
+    "D2": "aXb",
+    "D3": "ab",
+    "E1": 10,
+    "E2": {
+      "text": "20"
+    },
+    "E3": 30,
+    "F1": "a",
+    "F2": "a",
+    "F3": "a",
+    "G1": "West",
+    "H1": 1140,
+    "G2": "East",
+    "H2": 760,
+    "G3": "North",
+    "H3": 500,
+    "J1": 5,
+    "J3": 15,
+    "J4": true,
+    "J5": "x",
+    "J6": 25,
+    "L1": {
+      "formula": "=1/0"
+    },
+    "L2": 3,
+    "L3": {
+      "formula": "=NA()"
+    },
+    "L4": 7,
+    "P1": 10,
+    "P2": 20,
+    "P3": 30,
+    "P4": 40,
+    "P5": 50,
+    "Q1": "ten",
+    "Q2": "twenty",
+    "Q3": "thirty",
+    "Q4": "forty",
+    "Q5": "fifty",
+    "R1": 50,
+    "R2": 40,
+    "R3": 30,
+    "R4": 20,
+    "R5": 10,
+    "S1": "a",
+    "T1": "b",
+    "U1": "c",
+    "V1": "d",
+    "S2": 1,
+    "T2": 2,
+    "U2": 3,
+    "V2": 4,
+    "X1": "  Hello World  ",
+    "X2": "Hello",
+    "X3": "World",
+    "X4": "abc-123-xyz",
+    "X5": {
+      "formula": "=\"\""
+    },
+    "X6": 1234.5,
+    "AA1": 1,
+    "AA2": {
+      "formula": "=AA1+1"
+    },
+    "AA3": {
+      "formula": "=AA2*2"
+    },
+    "AB1": {
+      "formula": "=0.1+0.2-0.3"
+    },
+    "AB2": {
+      "formula": "=(0.1+0.2-0.3)"
+    },
+    "AB3": {
+      "formula": "=SUM(0.1,0.2,-0.3)"
+    },
+    "AD1": "Region",
+    "AE1": "Product",
+    "AF1": "Units",
+    "AG1": "Price",
+    "AH1": "Revenue",
+    "AI1": "Date",
+    "AJ1": "Running",
+    "AD2": "West",
+    "AE2": "Widget",
+    "AF2": 120,
+    "AG2": 9.5,
+    "AI2": 46023,
+    "AH2": {
+      "formula": "=AF2*AG2"
+    },
+    "AJ2": {
+      "formula": "=AH2"
+    },
+    "AD3": "East",
+    "AE3": "Widget",
+    "AF3": 80,
+    "AG3": 9.5,
+    "AI3": 46040,
+    "AH3": {
+      "formula": "=AF3*AG3"
+    },
+    "AJ3": {
+      "formula": "=AJ2+AH3"
+    },
+    "AD4": "West",
+    "AE4": "Gadget",
+    "AF4": 45,
+    "AG4": 20,
+    "AI4": 46068,
+    "AH4": {
+      "formula": "=AF4*AG4"
+    },
+    "AJ4": {
+      "formula": "=AJ3+AH4"
+    },
+    "AD5": "East",
+    "AE5": "Gadget",
+    "AF5": 60,
+    "AG5": 20,
+    "AI5": 46085,
+    "AH5": {
+      "formula": "=AF5*AG5"
+    },
+    "AJ5": {
+      "formula": "=AJ4+AH5"
+    },
+    "AD6": "North",
+    "AE6": "Widget",
+    "AF6": 200,
+    "AG6": 9,
+    "AI6": 46112,
+    "AH6": {
+      "formula": "=AF6*AG6"
+    },
+    "AJ6": {
+      "formula": "=AJ5+AH6"
+    },
+    "AD7": "North",
+    "AE7": "Gadget",
+    "AF7": 10,
+    "AG7": 21.5,
+    "AI7": 46150,
+    "AH7": {
+      "formula": "=AF7*AG7"
+    },
+    "AJ7": {
+      "formula": "=AJ6+AH7"
+    },
+    "AD8": "South",
+    "AE8": "Widget",
+    "AF8": 0,
+    "AG8": 9.5,
+    "AI8": 46200,
+    "AH8": {
+      "formula": "=AF8*AG8"
+    },
+    "AJ8": {
+      "formula": "=AJ7+AH8"
+    },
+    "AD9": "South",
+    "AE9": "Gadget",
+    "AF9": "n/a",
+    "AG9": 20,
+    "AI9": 46231,
+    "AH9": {
+      "formula": "=IFERROR(AF9*AG9,0)"
+    },
+    "AJ9": {
+      "formula": "=AJ8+AH9"
+    },
+    "AK1": {
+      "formula": "=SUM(AH2:AH9)"
+    },
+    "AK2": {
+      "formula": "=AK1*0.1"
+    },
+    "AK3": {
+      "formula": "=AK1+AK2"
+    },
+    "AK4": {
+      "formula": "=AK3/AF2"
+    },
+    "AM1": "2026-03-04",
+    "AM2": "2026-02-30",
+    "AM3": "2026-3-4",
+    "AN1": "1900-02-29",
+    "AN2": "1899-12-31",
+    "AN3": 30
+  },
+  "ranges": {
+    "DATES": "$AM$1:$AM$3",
+    "A": "$A$1:$A$5",
+    "B": "$B$1:$B$5",
+    "C": "$C$1:$C$4",
+    "WILD": "$D$1:$D$3",
+    "TXT": "$E$1:$E$3",
+    "SAME": "$F$1:$F$3",
+    "T": "$G$1:$H$3",
+    "TA": "$G$1:$G$3",
+    "TB": "$H$1:$H$3",
+    "MIX": "$J$1:$J$6",
+    "ERR": "$L$1:$L$4",
+    "KV": "$P$1:$Q$5",
+    "KEYS": "$P$1:$P$5",
+    "DESC": "$R$1:$R$5",
+    "HT": "$S$1:$V$2",
+    "HROW": "$S$2:$V$2",
+    "BC": "$B$1:$C$3"
+  },
+  "cases": [
+    {
+      "label": "SUMIFS text, case-insensitive",
+      "formula": "SUMIFS({B},{A},\"apple\")",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS wildcard *",
+      "formula": "SUMIFS({B},{A},\"A*\")",
+      "excel": 80
+    },
+    {
+      "label": "SUMIFS wildcard ?",
+      "formula": "SUMIFS({B},{A},\"?pple\")",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS <> text",
+      "formula": "SUMIFS({B},{A},\"<>apple\")",
+      "excel": 120
+    },
+    {
+      "label": "SUMIFS >25",
+      "formula": "SUMIFS({B},{B},\">25\")",
+      "excel": 120
+    },
+    {
+      "label": "SUMIFS two numeric criteria",
+      "formula": "SUMIFS({B},{B},\">=20\",{B},\"<50\")",
+      "excel": 90
+    },
+    {
+      "label": "SUMIFS criteria is a number",
+      "formula": "SUMIFS({B},{B},30)",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS ignores text in sum range",
+      "formula": "SUMIFS({TXT},{SAME},\"a\")",
+      "excel": 40
+    },
+    {
+      "label": "SUMIFS mismatched range sizes",
+      "formula": "SUMIFS({B},{SAME},\"a\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "SUMIF arg order (range,crit,sum)",
+      "formula": "SUMIF({A},\"A*\",{B})",
+      "excel": 80
+    },
+    {
+      "label": "COUNTIF number matches text '1' too",
+      "formula": "COUNTIF({C},1)",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF >1 ignores text '2'",
+      "formula": "COUNTIF({C},\">1\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF ~* escapes wildcard",
+      "formula": "COUNTIF({WILD},\"a~*b\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIFS two criteria",
+      "formula": "COUNTIFS({A},\"A*\",{B},\">10\")",
+      "excel": 2
+    },
+    {
+      "label": "AVERAGEIFS",
+      "formula": "AVERAGEIFS({B},{A},\"A*\")",
+      "excel": 26.6666666666667
+    },
+    {
+      "label": "AVERAGEIFS no match",
+      "formula": "AVERAGEIFS({B},{A},\"zzz\")",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "MAXIFS",
+      "formula": "MAXIFS({B},{A},\"A*\")",
+      "excel": 50
+    },
+    {
+      "label": "VLOOKUP exact",
+      "formula": "VLOOKUP(\"East\",{T},2,FALSE)",
+      "excel": 760
+    },
+    {
+      "label": "VLOOKUP exact, missing",
+      "formula": "VLOOKUP(\"South\",{T},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "XLOOKUP",
+      "formula": "XLOOKUP(\"East\",{TA},{TB})",
+      "excel": 760
+    },
+    {
+      "label": "XLOOKUP not found + default",
+      "formula": "XLOOKUP(\"South\",{TA},{TB},\"none\")",
+      "excel": "none"
+    },
+    {
+      "label": "XLOOKUP wildcard mode",
+      "formula": "XLOOKUP(\"N*\",{TA},{TB},,2)",
+      "excel": 500
+    },
+    {
+      "label": "INDEX/MATCH",
+      "formula": "INDEX({TB},MATCH(\"North\",{TA},0))",
+      "excel": 500
+    },
+    {
+      "label": "IFERROR around #N/A",
+      "formula": "IFERROR(VLOOKUP(\"zz\",{T},2,FALSE),\"x\")",
+      "excel": "x"
+    },
+    {
+      "label": "ROUND half away from zero",
+      "formula": "ROUND(2.5,0)",
+      "excel": 3
+    },
+    {
+      "label": "ROUND negative half",
+      "formula": "ROUND(-2.5,0)",
+      "excel": -3
+    },
+    {
+      "label": "ROUND(1.005,2) -> 1.01 in Excel",
+      "formula": "ROUND(1.005,2)",
+      "excel": 1.01
+    },
+    {
+      "label": "ROUND(2.675,2) -> 2.68 in Excel",
+      "formula": "ROUND(2.675,2)",
+      "excel": 2.68
+    },
+    {
+      "label": "SUM ignores text in a range",
+      "formula": "SUM({TXT})",
+      "excel": 40
+    },
+    {
+      "label": "AVERAGE ignores text in a range",
+      "formula": "AVERAGE({TXT})",
+      "excel": 20
+    },
+    {
+      "label": "COUNT counts numbers only",
+      "formula": "COUNT({C})",
+      "excel": 2
+    },
+    {
+      "label": "TEXT(0.256,\"0.0%\")",
+      "formula": "TEXT(0.256,\"0.0%\")",
+      "excel": "25.6%"
+    },
+    {
+      "label": "DATE(2026,3,4) serial",
+      "formula": "DATE(2026,3,4)",
+      "excel": 46085
+    },
+    {
+      "label": "EOMONTH serial",
+      "formula": "EOMONTH(DATE(2026,2,10),0)",
+      "excel": 46081
+    },
+    {
+      "label": "Precedence: * before +",
+      "formula": "1+2*3",
+      "excel": 7
+    },
+    {
+      "label": "Negation binds tighter than ^",
+      "formula": "-2^2",
+      "excel": 4
+    },
+    {
+      "label": "^ is left-associative",
+      "formula": "2^3^2",
+      "excel": 64
+    },
+    {
+      "label": "Negative exponent",
+      "formula": "2^-2",
+      "excel": 0.25
+    },
+    {
+      "label": "Percent after a number",
+      "formula": "200*10%",
+      "excel": 20
+    },
+    {
+      "label": "Percent then ^",
+      "formula": "2^50%",
+      "excel": 1.4142135623731
+    },
+    {
+      "label": "Division",
+      "formula": "10/4",
+      "excel": 2.5
+    },
+    {
+      "label": "Divide by zero",
+      "formula": "1/0",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Text that is a number in arithmetic",
+      "formula": "\"5\"+3",
+      "excel": 8
+    },
+    {
+      "label": "Text that is not a number in arithmetic",
+      "formula": "\"a\"+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "TRUE in arithmetic",
+      "formula": "TRUE+1",
+      "excel": 2
+    },
+    {
+      "label": "Empty text in arithmetic",
+      "formula": "\"\"+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Blank cell in arithmetic",
+      "formula": "J2+1",
+      "excel": 1
+    },
+    {
+      "label": "Text with spaces is a number",
+      "formula": "\" 5 \"+1",
+      "excel": 6
+    },
+    {
+      "label": "Text with a thousands comma is a number",
+      "formula": "\"1,234\"+1",
+      "excel": 1235
+    },
+    {
+      "label": "Text with a percent is a number",
+      "formula": "\"5%\"+1",
+      "excel": 1.05
+    },
+    {
+      "label": "Text with a currency sign is a number",
+      "formula": "\"$5\"+1",
+      "excel": 6
+    },
+    {
+      "label": "Scientific text is a number",
+      "formula": "\"1e3\"+0",
+      "excel": 1000
+    },
+    {
+      "label": "Unary minus on text number",
+      "formula": "-\"5\"",
+      "excel": -5
+    },
+    {
+      "label": "Concatenate two texts",
+      "formula": "\"a\"&\"b\"",
+      "excel": "ab"
+    },
+    {
+      "label": "Concatenate numbers",
+      "formula": "1&2",
+      "excel": "12"
+    },
+    {
+      "label": "Concatenate a blank",
+      "formula": "J2&\"x\"",
+      "excel": "x"
+    },
+    {
+      "label": "Concatenate TRUE",
+      "formula": "TRUE&\"\"",
+      "excel": "TRUE"
+    },
+    {
+      "label": "Number to text keeps 15 digits",
+      "formula": "1/3&\"\"",
+      "excel": "0.333333333333333"
+    },
+    {
+      "label": "Large number to text",
+      "formula": "1E+21&\"\"",
+      "excel": "1E+21"
+    },
+    {
+      "label": "Small number to text",
+      "formula": "0.0000001&\"\"",
+      "excel": "0.0000001"
+    },
+    {
+      "label": "Tiny number to text",
+      "formula": "1E-10&\"\"",
+      "excel": "0.0000000001"
+    },
+    {
+      "label": "Integer-valued large number to text",
+      "formula": "123456789012345678&\"\"",
+      "excel": "123456789012345000"
+    },
+    {
+      "label": "Negative zero text",
+      "formula": "-0&\"\"",
+      "excel": "0"
+    },
+    {
+      "label": "Last-operation snap to zero",
+      "formula": "0.1+0.2-0.3",
+      "excel": 0
+    },
+    {
+      "label": "No snap inside parentheses",
+      "formula": "\"\"&((0.1+0.2)-0.3)",
+      "excel": "5.55111512312578E-17"
+    },
+    {
+      "label": "Snap just over the threshold",
+      "formula": "\"\"&(1.000000000000001-1)&\"|\"&(1.000000000000001-1+0)",
+      "excel": "0|0"
+    },
+    {
+      "label": "Float equality",
+      "formula": "0.1+0.2=0.3",
+      "excel": true
+    },
+    {
+      "label": "Compare numbers",
+      "formula": "1<2",
+      "excel": true
+    },
+    {
+      "label": "Compare texts, case-insensitive",
+      "formula": "\"a\"<\"B\"",
+      "excel": true
+    },
+    {
+      "label": "Text equality ignores case",
+      "formula": "\"a\"=\"A\"",
+      "excel": true
+    },
+    {
+      "label": "Number is not equal to its text",
+      "formula": "1=\"1\"",
+      "excel": false
+    },
+    {
+      "label": "Logical is greater than a number",
+      "formula": "TRUE>5",
+      "excel": true
+    },
+    {
+      "label": "Text is greater than a number",
+      "formula": "\"a\">5",
+      "excel": true
+    },
+    {
+      "label": "Blank equals zero",
+      "formula": "J2=0",
+      "excel": true
+    },
+    {
+      "label": "Blank equals empty text",
+      "formula": "J2=\"\"",
+      "excel": true
+    },
+    {
+      "label": "Not equal",
+      "formula": "5<>5",
+      "excel": false
+    },
+    {
+      "label": "Text order, upper before lower",
+      "formula": "\"Z\"<\"a\"",
+      "excel": false
+    },
+    {
+      "label": "Text order, prefix",
+      "formula": "\"abc\"<\"abcd\"",
+      "excel": true
+    },
+    {
+      "label": "Text order, punctuation",
+      "formula": "\"a-b\"<\"ab\"",
+      "excel": true
+    },
+    {
+      "label": "Text order, digits before letters",
+      "formula": "\"1\"<\"a\"",
+      "excel": true
+    },
+    {
+      "label": "Error propagates through +",
+      "formula": "1+L1",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Error propagates through &",
+      "formula": "L3&\"x\"",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "Error compared",
+      "formula": "L1=1",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "SUM of arguments",
+      "formula": "SUM(1,2,3)",
+      "excel": 6
+    },
+    {
+      "label": "SUM over a mixed range ignores text, logical, blank",
+      "formula": "SUM({MIX})",
+      "excel": 45
+    },
+    {
+      "label": "SUM of a reference to a logical",
+      "formula": "SUM(J4)",
+      "excel": 0
+    },
+    {
+      "label": "SUM of direct logical and number",
+      "formula": "SUM(TRUE,1)",
+      "excel": 2
+    },
+    {
+      "label": "SUM of direct numeric text",
+      "formula": "SUM(\"3\",1)",
+      "excel": 4
+    },
+    {
+      "label": "SUM of direct non-numeric text",
+      "formula": "SUM(\"a\",1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "SUM over a range with an error",
+      "formula": "SUM({ERR})",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "SUM over a range with another error",
+      "formula": "SUM(L2:L4)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "SUM of a whole column",
+      "formula": "SUM(B:B)",
+      "excel": 150
+    },
+    {
+      "label": "SUM of a reversed range",
+      "formula": "SUM(B5:B1)",
+      "excel": 150
+    },
+    {
+      "label": "SUM with lower-case names",
+      "formula": "sum(b1:b5)",
+      "excel": 150
+    },
+    {
+      "label": "SUM of an array expression",
+      "formula": "SUM(B1:B5*2)",
+      "excel": 300
+    },
+    {
+      "label": "SUM of a blank only",
+      "formula": "SUM(J2)",
+      "excel": 0
+    },
+    {
+      "label": "COUNT over a mixed range",
+      "formula": "COUNT({MIX})",
+      "excel": 3
+    },
+    {
+      "label": "COUNT of direct arguments",
+      "formula": "COUNT(1,TRUE,\"3\",\"a\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNT skips errors",
+      "formula": "COUNT({ERR})",
+      "excel": 2
+    },
+    {
+      "label": "COUNTA over a mixed range",
+      "formula": "COUNTA({MIX})",
+      "excel": 5
+    },
+    {
+      "label": "COUNTA counts errors",
+      "formula": "COUNTA({ERR})",
+      "excel": 4
+    },
+    {
+      "label": "COUNTA counts empty text",
+      "formula": "COUNTA(X5)",
+      "excel": 1
+    },
+    {
+      "label": "COUNTBLANK over a range",
+      "formula": "COUNTBLANK({MIX})",
+      "excel": 1
+    },
+    {
+      "label": "COUNTBLANK counts empty text",
+      "formula": "COUNTBLANK(X5)",
+      "excel": 1
+    },
+    {
+      "label": "AVERAGE over a mixed range",
+      "formula": "AVERAGE({MIX})",
+      "excel": 15
+    },
+    {
+      "label": "AVERAGE of blank only",
+      "formula": "AVERAGE(J2)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "AVERAGE of direct arguments",
+      "formula": "AVERAGE(1,TRUE,\"3\")",
+      "excel": 1.66666666666667
+    },
+    {
+      "label": "MIN over a mixed range",
+      "formula": "MIN({MIX})",
+      "excel": 5
+    },
+    {
+      "label": "MAX over a mixed range",
+      "formula": "MAX({MIX})",
+      "excel": 25
+    },
+    {
+      "label": "MIN of nothing numeric",
+      "formula": "MIN(J2)",
+      "excel": 0
+    },
+    {
+      "label": "MAX of text only",
+      "formula": "MAX(J5)",
+      "excel": 0
+    },
+    {
+      "label": "MAX of direct logical",
+      "formula": "MAX(TRUE,-1)",
+      "excel": 1
+    },
+    {
+      "label": "PRODUCT of arguments",
+      "formula": "PRODUCT(2,3,4)",
+      "excel": 24
+    },
+    {
+      "label": "PRODUCT over a mixed range",
+      "formula": "PRODUCT({MIX})",
+      "excel": 1875
+    },
+    {
+      "label": "ROUND to tens",
+      "formula": "ROUND(1234.5678,-2)",
+      "excel": 1200
+    },
+    {
+      "label": "ROUND negative half",
+      "formula": "ROUND(-1.5,0)",
+      "excel": -2
+    },
+    {
+      "label": "ROUND half",
+      "formula": "ROUND(0.5,0)",
+      "excel": 1
+    },
+    {
+      "label": "ROUND 1.45",
+      "formula": "ROUND(1.45,1)",
+      "excel": 1.5
+    },
+    {
+      "label": "ROUND 8.345",
+      "formula": "ROUND(8.345,2)",
+      "excel": 8.35
+    },
+    {
+      "label": "ROUND 5.015",
+      "formula": "ROUND(5.015,2)",
+      "excel": 5.02
+    },
+    {
+      "label": "ROUND with fractional digits",
+      "formula": "ROUND(2.567,1.9)",
+      "excel": 2.6
+    },
+    {
+      "label": "ROUND of text number",
+      "formula": "ROUND(\"2.5\",0)",
+      "excel": 3
+    },
+    {
+      "label": "ROUNDUP",
+      "formula": "ROUNDUP(2.1,0)",
+      "excel": 3
+    },
+    {
+      "label": "ROUNDUP negative",
+      "formula": "ROUNDUP(-2.1,0)",
+      "excel": -3
+    },
+    {
+      "label": "ROUNDUP decimals",
+      "formula": "ROUNDUP(1.001,2)",
+      "excel": 1.01
+    },
+    {
+      "label": "ROUNDDOWN",
+      "formula": "ROUNDDOWN(2.9,0)",
+      "excel": 2
+    },
+    {
+      "label": "ROUNDDOWN negative",
+      "formula": "ROUNDDOWN(-2.9,0)",
+      "excel": -2
+    },
+    {
+      "label": "ROUNDDOWN decimals",
+      "formula": "ROUNDDOWN(1.239,2)",
+      "excel": 1.23
+    },
+    {
+      "label": "INT of a negative",
+      "formula": "INT(-1.5)",
+      "excel": -2
+    },
+    {
+      "label": "INT",
+      "formula": "INT(2.9)",
+      "excel": 2
+    },
+    {
+      "label": "TRUNC of a negative",
+      "formula": "TRUNC(-1.5)",
+      "excel": -1
+    },
+    {
+      "label": "TRUNC with digits",
+      "formula": "TRUNC(3.14159,2)",
+      "excel": 3.14
+    },
+    {
+      "label": "ABS",
+      "formula": "ABS(-3)",
+      "excel": 3
+    },
+    {
+      "label": "MOD",
+      "formula": "MOD(10,3)",
+      "excel": 1
+    },
+    {
+      "label": "MOD negative dividend",
+      "formula": "MOD(-10,3)",
+      "excel": 2
+    },
+    {
+      "label": "MOD negative divisor",
+      "formula": "MOD(10,-3)",
+      "excel": -2
+    },
+    {
+      "label": "MOD by zero",
+      "formula": "MOD(5,0)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "MOD of decimals",
+      "formula": "MOD(5.5,2)",
+      "excel": 1.5
+    },
+    {
+      "label": "POWER",
+      "formula": "POWER(2,10)",
+      "excel": 1024
+    },
+    {
+      "label": "POWER 0^0",
+      "formula": "POWER(0,0)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "0^0 operator",
+      "formula": "0^0",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Negative base, fractional exponent",
+      "formula": "(-8)^(1/3)",
+      "excel": -2
+    },
+    {
+      "label": "SQRT",
+      "formula": "SQRT(16)",
+      "excel": 4
+    },
+    {
+      "label": "SQRT negative",
+      "formula": "SQRT(-1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "SIGN",
+      "formula": "SIGN(-5)",
+      "excel": -1
+    },
+    {
+      "label": "CEILING",
+      "formula": "CEILING(2.1,1)",
+      "excel": 3
+    },
+    {
+      "label": "CEILING to 0.5",
+      "formula": "CEILING(2.1,0.5)",
+      "excel": 2.5
+    },
+    {
+      "label": "FLOOR",
+      "formula": "FLOOR(2.9,1)",
+      "excel": 2
+    },
+    {
+      "label": "FLOOR negative number, positive significance",
+      "formula": "FLOOR(-2.1,1)",
+      "excel": -3
+    },
+    {
+      "label": "CEILING negative number, positive significance",
+      "formula": "CEILING(-2.1,1)",
+      "excel": -2
+    },
+    {
+      "label": "SUMPRODUCT of two ranges",
+      "formula": "SUMPRODUCT(B1:B5,B1:B5)",
+      "excel": 5500
+    },
+    {
+      "label": "SUMPRODUCT of a condition",
+      "formula": "(SUMPRODUCT((A1:A5=\"apple\")*(B1:B5)))",
+      "excel": 30
+    },
+    {
+      "label": "SUMPRODUCT with double negation",
+      "formula": "SUMPRODUCT(--(A1:A5=\"apple\"),B1:B5)",
+      "excel": 30
+    },
+    {
+      "label": "SUMPRODUCT of mismatched sizes",
+      "formula": "SUMPRODUCT(B1:B5,C1:C4)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "SUMPRODUCT treats text as zero",
+      "formula": "SUMPRODUCT({TXT},{TXT})",
+      "excel": 1000
+    },
+    {
+      "label": "SUMPRODUCT of one range",
+      "formula": "SUMPRODUCT(B1:B5)",
+      "excel": 150
+    },
+    {
+      "label": "IF true",
+      "formula": "IF(TRUE,1,2)",
+      "excel": 1
+    },
+    {
+      "label": "IF zero is false",
+      "formula": "IF(0,1,2)",
+      "excel": 2
+    },
+    {
+      "label": "IF with non-numeric text",
+      "formula": "IF(\"a\",1,2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "IF with TRUE text",
+      "formula": "IF(\"TRUE\",1,2)",
+      "excel": 1
+    },
+    {
+      "label": "IF without else",
+      "formula": "IF(1,\"y\")",
+      "excel": "y"
+    },
+    {
+      "label": "IF false without else",
+      "formula": "IF(0,\"y\")",
+      "excel": false
+    },
+    {
+      "label": "IF with an error condition",
+      "formula": "IF(1/0,1,2)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "IF does not evaluate the branch not taken",
+      "formula": "IF(TRUE,1,1/0)",
+      "excel": 1
+    },
+    {
+      "label": "IF with a blank condition",
+      "formula": "IF(J2,1,2)",
+      "excel": 2
+    },
+    {
+      "label": "AND of true values",
+      "formula": "AND(TRUE,1)",
+      "excel": true
+    },
+    {
+      "label": "AND with text",
+      "formula": "AND(TRUE,\"a\")",
+      "excel": true
+    },
+    {
+      "label": "AND over a mixed range",
+      "formula": "AND({MIX})",
+      "excel": true
+    },
+    {
+      "label": "AND with only text in the range",
+      "formula": "AND(J5)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "OR of false values",
+      "formula": "OR(0,0)",
+      "excel": false
+    },
+    {
+      "label": "OR over a mixed range",
+      "formula": "OR({MIX})",
+      "excel": true
+    },
+    {
+      "label": "NOT",
+      "formula": "NOT(0)",
+      "excel": true
+    },
+    {
+      "label": "NOT of text",
+      "formula": "NOT(\"a\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "IFERROR on an error",
+      "formula": "IFERROR(1/0,\"x\")",
+      "excel": "x"
+    },
+    {
+      "label": "IFERROR on a value",
+      "formula": "IFERROR(5,\"x\")",
+      "excel": 5
+    },
+    {
+      "label": "IFNA on #N/A",
+      "formula": "IFNA(NA(),\"y\")",
+      "excel": "y"
+    },
+    {
+      "label": "IFNA on another error",
+      "formula": "IFNA(1/0,\"y\")",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "ISBLANK of a blank",
+      "formula": "ISBLANK(J2)",
+      "excel": true
+    },
+    {
+      "label": "ISBLANK of empty text",
+      "formula": "ISBLANK(X5)",
+      "excel": false
+    },
+    {
+      "label": "ISNUMBER",
+      "formula": "ISNUMBER(J1)",
+      "excel": true
+    },
+    {
+      "label": "ISNUMBER of numeric text",
+      "formula": "ISNUMBER(\"1\")",
+      "excel": false
+    },
+    {
+      "label": "ISTEXT",
+      "formula": "ISTEXT(J5)",
+      "excel": true
+    },
+    {
+      "label": "ISERROR",
+      "formula": "ISERROR(L1)",
+      "excel": true
+    },
+    {
+      "label": "ISNA of #N/A",
+      "formula": "ISNA(L3)",
+      "excel": true
+    },
+    {
+      "label": "ISNA of another error",
+      "formula": "ISNA(L1)",
+      "excel": false
+    },
+    {
+      "label": "ISLOGICAL",
+      "formula": "ISLOGICAL(J4)",
+      "excel": true
+    },
+    {
+      "label": "IFS picks the first true",
+      "formula": "IFS(FALSE,1,TRUE,2)",
+      "excel": 2
+    },
+    {
+      "label": "IFS with nothing true",
+      "formula": "IFS(FALSE,1,FALSE,2)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "SWITCH match",
+      "formula": "SWITCH(\"b\",\"a\",1,\"b\",2,3)",
+      "excel": 2
+    },
+    {
+      "label": "SWITCH default",
+      "formula": "SWITCH(\"z\",\"a\",1,\"b\",2,3)",
+      "excel": 3
+    },
+    {
+      "label": "SWITCH without default",
+      "formula": "SWITCH(\"z\",\"a\",1)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "CHOOSE",
+      "formula": "CHOOSE(2,\"a\",\"b\",\"c\")",
+      "excel": "b"
+    },
+    {
+      "label": "CHOOSE out of range",
+      "formula": "CHOOSE(4,\"a\",\"b\",\"c\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "TRUE as a function",
+      "formula": "TRUE()",
+      "excel": true
+    },
+    {
+      "label": "LEN",
+      "formula": "LEN(\"hello\")",
+      "excel": 5
+    },
+    {
+      "label": "LEN with spaces",
+      "formula": "LEN(X1)",
+      "excel": 15
+    },
+    {
+      "label": "LEN of a number",
+      "formula": "LEN(X6)",
+      "excel": 6
+    },
+    {
+      "label": "LEN of a blank",
+      "formula": "LEN(J2)",
+      "excel": 0
+    },
+    {
+      "label": "LEFT",
+      "formula": "LEFT(\"hello\",2)",
+      "excel": "he"
+    },
+    {
+      "label": "LEFT default",
+      "formula": "LEFT(\"hello\")",
+      "excel": "h"
+    },
+    {
+      "label": "LEFT zero",
+      "formula": "LEFT(\"hello\",0)",
+      "excel": ""
+    },
+    {
+      "label": "LEFT negative",
+      "formula": "LEFT(\"hello\",-1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "LEFT beyond the length",
+      "formula": "LEFT(\"hi\",10)",
+      "excel": "hi"
+    },
+    {
+      "label": "RIGHT",
+      "formula": "RIGHT(\"hello\",3)",
+      "excel": "llo"
+    },
+    {
+      "label": "MID",
+      "formula": "MID(\"hello\",2,3)",
+      "excel": "ell"
+    },
+    {
+      "label": "MID start zero",
+      "formula": "MID(\"hello\",0,1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "MID beyond the end",
+      "formula": "MID(\"hello\",10,2)",
+      "excel": ""
+    },
+    {
+      "label": "MID past the end of the length",
+      "formula": "MID(\"hello\",4,10)",
+      "excel": "lo"
+    },
+    {
+      "label": "UPPER",
+      "formula": "UPPER(\"aBc\")",
+      "excel": "ABC"
+    },
+    {
+      "label": "LOWER",
+      "formula": "LOWER(\"aBc\")",
+      "excel": "abc"
+    },
+    {
+      "label": "PROPER",
+      "formula": "PROPER(\"hello wORLD-foo bar2baz\")",
+      "excel": "Hello World-Foo Bar2Baz"
+    },
+    {
+      "label": "TRIM",
+      "formula": "TRIM(X1)",
+      "excel": "Hello World"
+    },
+    {
+      "label": "TRIM inner spaces",
+      "formula": "TRIM(\"a   b\")",
+      "excel": "a b"
+    },
+    {
+      "label": "SUBSTITUTE all",
+      "formula": "SUBSTITUTE(\"a-b-c\",\"-\",\"+\")",
+      "excel": "a+b+c"
+    },
+    {
+      "label": "SUBSTITUTE second",
+      "formula": "SUBSTITUTE(\"a-b-c\",\"-\",\"+\",2)",
+      "excel": "a-b+c"
+    },
+    {
+      "label": "SUBSTITUTE is case-sensitive",
+      "formula": "SUBSTITUTE(\"aAa\",\"a\",\"x\")",
+      "excel": "xAx"
+    },
+    {
+      "label": "FIND",
+      "formula": "FIND(\"b\",\"abcb\")",
+      "excel": 2
+    },
+    {
+      "label": "FIND from a start",
+      "formula": "FIND(\"b\",\"abcb\",3)",
+      "excel": 4
+    },
+    {
+      "label": "FIND is case-sensitive",
+      "formula": "FIND(\"B\",\"abc\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "FIND takes no wildcards",
+      "formula": "FIND(\"b?\",\"abcb\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "SEARCH ignores case",
+      "formula": "SEARCH(\"B\",\"abc\")",
+      "excel": 2
+    },
+    {
+      "label": "SEARCH wildcard",
+      "formula": "SEARCH(\"b?d\",\"abcd\")",
+      "excel": 2
+    },
+    {
+      "label": "SEARCH not found",
+      "formula": "SEARCH(\"z\",\"abc\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "EXACT",
+      "formula": "EXACT(\"a\",\"A\")",
+      "excel": false
+    },
+    {
+      "label": "REPT",
+      "formula": "REPT(\"ab\",3)",
+      "excel": "ababab"
+    },
+    {
+      "label": "CONCATENATE",
+      "formula": "CONCATENATE(\"a\",1,TRUE)",
+      "excel": "a1TRUE"
+    },
+    {
+      "label": "CONCAT over a range",
+      "formula": "CONCAT(A1:A3)",
+      "excel": "AppleappleBanana"
+    },
+    {
+      "label": "TEXTJOIN skipping empties",
+      "formula": "TEXTJOIN(\",\",TRUE,A1:A3)",
+      "excel": "Apple,apple,Banana"
+    },
+    {
+      "label": "TEXTJOIN keeping empties",
+      "formula": "TEXTJOIN(\", \",FALSE,J1:J3)",
+      "excel": "5, , 15"
+    },
+    {
+      "label": "VALUE",
+      "formula": "VALUE(\"12\")",
+      "excel": 12
+    },
+    {
+      "label": "VALUE with a comma",
+      "formula": "VALUE(\"1,234\")",
+      "excel": 1234
+    },
+    {
+      "label": "VALUE with a percent",
+      "formula": "VALUE(\"12%\")",
+      "excel": 0.12
+    },
+    {
+      "label": "VALUE of text",
+      "formula": "VALUE(\"abc\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "VALUE of empty text",
+      "formula": "VALUE(\"\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "TEXT rounds half up",
+      "formula": "TEXT(1234.5,\"0\")",
+      "excel": "1235"
+    },
+    {
+      "label": "TEXT with thousands and decimals",
+      "formula": "TEXT(1234.5,\"#,##0.00\")",
+      "excel": "1,234.50"
+    },
+    {
+      "label": "TEXT percent",
+      "formula": "TEXT(0.5,\"0%\")",
+      "excel": "50%"
+    },
+    {
+      "label": "TEXT one decimal",
+      "formula": "TEXT(1234.5,\"0.0\")",
+      "excel": "1234.5"
+    },
+    {
+      "label": "TEXT leading zeros",
+      "formula": "TEXT(5,\"000\")",
+      "excel": "005"
+    },
+    {
+      "label": "TEXT negative",
+      "formula": "TEXT(-5,\"0.0\")",
+      "excel": "-5.0"
+    },
+    {
+      "label": "TEXT thousands",
+      "formula": "TEXT(1234567,\"#,##0\")",
+      "excel": "1,234,567"
+    },
+    {
+      "label": "TEXT with a currency sign",
+      "formula": "TEXT(1.5,\"$0.00\")",
+      "excel": "$1.50"
+    },
+    {
+      "label": "TEXT zero",
+      "formula": "TEXT(0,\"0.00\")",
+      "excel": "0.00"
+    },
+    {
+      "label": "TEXT of text",
+      "formula": "TEXT(\"abc\",\"0\")",
+      "excel": "abc"
+    },
+    {
+      "label": "TEXT rounding",
+      "formula": "TEXT(12.3456,\"0.00\")",
+      "excel": "12.35"
+    },
+    {
+      "label": "TEXT General",
+      "formula": "TEXT(5.5,\"General\")",
+      "excel": "5.5"
+    },
+    {
+      "label": "TEXT negative section",
+      "formula": "TEXT(-1234.5,\"#,##0.00;(#,##0.00)\")",
+      "excel": "(1,234.50)"
+    },
+    {
+      "label": "TEXT optional digits",
+      "formula": "TEXT(0.5,\"#.##\")",
+      "excel": ".5"
+    },
+    {
+      "label": "TEXT optional digits, whole",
+      "formula": "TEXT(5,\"#.##\")",
+      "excel": "5."
+    },
+    {
+      "label": "TEXT date ISO",
+      "formula": "TEXT(46085,\"yyyy-mm-dd\")",
+      "excel": "2026-03-04"
+    },
+    {
+      "label": "TEXT date words",
+      "formula": "TEXT(46085,\"mmm d, yyyy\")",
+      "excel": "Mar 4, 2026"
+    },
+    {
+      "label": "TEXT weekday",
+      "formula": "TEXT(46085,\"dddd\")",
+      "excel": "Wednesday"
+    },
+    {
+      "label": "TEXT short date",
+      "formula": "TEXT(46085,\"mm/dd/yy\")",
+      "excel": "03/04/26"
+    },
+    {
+      "label": "TEXT month name",
+      "formula": "TEXT(46085,\"mmmm\")",
+      "excel": "March"
+    },
+    {
+      "label": "TEXT of a logical",
+      "formula": "TEXT(TRUE,\"0\")",
+      "excel": "TRUE"
+    },
+    {
+      "label": "DATE month overflow",
+      "formula": "DATE(2026,14,1)",
+      "excel": 46419
+    },
+    {
+      "label": "DATE month zero",
+      "formula": "DATE(2026,0,1)",
+      "excel": 45992
+    },
+    {
+      "label": "DATE day zero",
+      "formula": "DATE(2026,3,0)",
+      "excel": 46081
+    },
+    {
+      "label": "DATE first serial",
+      "formula": "DATE(1900,1,1)",
+      "excel": 1
+    },
+    {
+      "label": "DATE after the 1900 leap bug",
+      "formula": "DATE(1900,3,1)",
+      "excel": 61
+    },
+    {
+      "label": "DATE of the bug day",
+      "formula": "DATE(1900,2,29)",
+      "excel": 60
+    },
+    {
+      "label": "DATE two-digit year",
+      "formula": "DATE(99,1,1)",
+      "excel": 36161
+    },
+    {
+      "label": "DATE fractional day",
+      "formula": "DATE(2026,3,4.9)",
+      "excel": 46085
+    },
+    {
+      "label": "DATE negative year",
+      "formula": "DATE(-1,1,1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "DATE day overflow",
+      "formula": "DATE(2026,1,45)",
+      "excel": 46067
+    },
+    {
+      "label": "DATE with text number",
+      "formula": "DATE(\"2026\",3,4)",
+      "excel": 46085
+    },
+    {
+      "label": "YEAR",
+      "formula": "YEAR(46085)",
+      "excel": 2026
+    },
+    {
+      "label": "MONTH",
+      "formula": "MONTH(46085)",
+      "excel": 3
+    },
+    {
+      "label": "DAY",
+      "formula": "DAY(46085)",
+      "excel": 4
+    },
+    {
+      "label": "YEAR of serial 60",
+      "formula": "YEAR(60)",
+      "excel": 1900
+    },
+    {
+      "label": "MONTH of serial 60",
+      "formula": "MONTH(60)",
+      "excel": 2
+    },
+    {
+      "label": "DAY of serial 60",
+      "formula": "DAY(60)",
+      "excel": 29
+    },
+    {
+      "label": "YEAR of serial 1",
+      "formula": "YEAR(1)",
+      "excel": 1900
+    },
+    {
+      "label": "DAY of serial 0",
+      "formula": "DAY(0)",
+      "excel": 0
+    },
+    {
+      "label": "YEAR of a negative serial",
+      "formula": "YEAR(-1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "DAY of a fractional serial",
+      "formula": "DAY(46085.9)",
+      "excel": 4
+    },
+    {
+      "label": "EOMONTH",
+      "formula": "EOMONTH(46085,0)",
+      "excel": 46112
+    },
+    {
+      "label": "EOMONTH forward",
+      "formula": "EOMONTH(DATE(2026,1,31),1)",
+      "excel": 46081
+    },
+    {
+      "label": "EOMONTH back",
+      "formula": "EOMONTH(DATE(2026,3,4),-1)",
+      "excel": 46081
+    },
+    {
+      "label": "EOMONTH over a year",
+      "formula": "EOMONTH(DATE(2026,11,15),3)",
+      "excel": 46446
+    },
+    {
+      "label": "EDATE clamps the day",
+      "formula": "EDATE(DATE(2026,1,31),1)",
+      "excel": 46081
+    },
+    {
+      "label": "EDATE a year",
+      "formula": "EDATE(46085,12)",
+      "excel": 46450
+    },
+    {
+      "label": "WEEKDAY",
+      "formula": "WEEKDAY(46085)",
+      "excel": 4
+    },
+    {
+      "label": "WEEKDAY type 2",
+      "formula": "WEEKDAY(46085,2)",
+      "excel": 3
+    },
+    {
+      "label": "WEEKDAY type 3",
+      "formula": "WEEKDAY(46085,3)",
+      "excel": 2
+    },
+    {
+      "label": "Date arithmetic",
+      "formula": "DATE(2026,3,4)+30",
+      "excel": 46115
+    },
+    {
+      "label": "Date difference",
+      "formula": "DATE(2026,3,4)-DATE(2026,1,1)",
+      "excel": 62
+    },
+    {
+      "label": "COUNTIF text, case-insensitive",
+      "formula": "COUNTIF(A1:A5,\"apple\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF <> text",
+      "formula": "COUNTIF(A1:A5,\"<>apple\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF prefix wildcard",
+      "formula": "COUNTIF(A1:A5,\"A*\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF contains wildcard",
+      "formula": "COUNTIF(A1:A5,\"*an*\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF ? wildcard",
+      "formula": "COUNTIF(A1:A5,\"?????\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF >= number",
+      "formula": "COUNTIF(B1:B5,\">=30\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF < number",
+      "formula": "COUNTIF(B1:B5,\"<30\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF = number text",
+      "formula": "COUNTIF(B1:B5,\"=30\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF number",
+      "formula": "COUNTIF(B1:B5,30)",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF number as text",
+      "formula": "COUNTIF(B1:B5,\"30\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF <> number",
+      "formula": "COUNTIF(B1:B5,\"<>30\")",
+      "excel": 4
+    },
+    {
+      "label": "COUNTIF '=1' also matches text 1",
+      "formula": "COUNTIF({C},\"=1\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF text '1' matches both",
+      "formula": "COUNTIF({C},\"1\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF empty criteria",
+      "formula": "COUNTIF({MIX},\"\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF <> alone",
+      "formula": "COUNTIF({MIX},\"<>\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF = alone",
+      "formula": "COUNTIF({MIX},\"=\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF logical",
+      "formula": "COUNTIF({MIX},TRUE)",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF text in mixed",
+      "formula": "COUNTIF({MIX},\"x\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF >0 on mixed",
+      "formula": "COUNTIF({MIX},\">0\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF zero does not match blank",
+      "formula": "COUNTIF({MIX},0)",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF counts empty text",
+      "formula": "COUNTIF(X1:X5,\"\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF an error",
+      "formula": "COUNTIF({ERR},\"#N/A\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF another error",
+      "formula": "COUNTIF({ERR},\"#DIV/0!\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF >0 skips errors",
+      "formula": "COUNTIF({ERR},\">0\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF ? wildcard on a*b",
+      "formula": "COUNTIF({WILD},\"a?b\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF * wildcard",
+      "formula": "COUNTIF({WILD},\"a*b\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF ~? escape",
+      "formula": "COUNTIF({WILD},\"a~?b\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF = text",
+      "formula": "COUNTIF(A1:A5,\"=apple\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF > text",
+      "formula": "COUNTIF(A1:A5,\">b\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF < text",
+      "formula": "COUNTIF(A1:A5,\"<b\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF with a cell as criteria",
+      "formula": "COUNTIF(A1:A5,A1)",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF with an expression as criteria",
+      "formula": "COUNTIF(B1:B5,\">\"&B2)",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF whitespace in criteria",
+      "formula": "COUNTIF(B1:B5,\" >30\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF >= text number against numbers",
+      "formula": "COUNTIF(B1:B5,\">=30.0\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF percent criteria",
+      "formula": "COUNTIF(B1:B5,\"<50%\")",
+      "excel": 0
+    },
+    {
+      "label": "SUMIF",
+      "formula": "SUMIF(A1:A5,\"apple\",B1:B5)",
+      "excel": 30
+    },
+    {
+      "label": "SUMIF without sum range",
+      "formula": "SUMIF(B1:B5,\">25\")",
+      "excel": 120
+    },
+    {
+      "label": "SUMIF with a short sum range",
+      "formula": "SUMIF(A1:A5,\"A*\",B1:B3)",
+      "excel": 80
+    },
+    {
+      "label": "SUMIF no match",
+      "formula": "SUMIF(A1:A5,\"x\",B1:B5)",
+      "excel": 0
+    },
+    {
+      "label": "SUMIF with a number criterion",
+      "formula": "SUMIF(B1:B5,30)",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS two conditions",
+      "formula": "SUMIFS(B1:B5,A1:A5,\"A*\",B1:B5,\">10\")",
+      "excel": 70
+    },
+    {
+      "label": "SUMIFS criteria from a cell",
+      "formula": "SUMIFS(B1:B5,A1:A5,A1)",
+      "excel": 30
+    },
+    {
+      "label": "SUMIFS empty criteria",
+      "formula": "SUMIFS(B1:B5,A1:A5,\"\")",
+      "excel": 0
+    },
+    {
+      "label": "SUMIFS text in sum range",
+      "formula": "SUMIFS({TXT},{TXT},\">5\")",
+      "excel": 40
+    },
+    {
+      "label": "SUMIFS error in the sum range",
+      "formula": "SUMIFS({ERR},{ERR},\">0\")",
+      "excel": 10
+    },
+    {
+      "label": "SUMIFS an error in sum range that matches",
+      "formula": "SUMIFS(L1:L4,L1:L4,\"#DIV/0!\")",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "AVERAGEIF",
+      "formula": "AVERAGEIF(A1:A5,\"A*\",B1:B5)",
+      "excel": 26.6666666666667
+    },
+    {
+      "label": "AVERAGEIF no match",
+      "formula": "AVERAGEIF(A1:A5,\"zzz\",B1:B5)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "AVERAGEIF without average range",
+      "formula": "AVERAGEIF(B1:B5,\">25\")",
+      "excel": 40
+    },
+    {
+      "label": "AVERAGEIFS two conditions",
+      "formula": "AVERAGEIFS(B1:B5,A1:A5,\"A*\",B1:B5,\">10\")",
+      "excel": 35
+    },
+    {
+      "label": "MAXIFS none",
+      "formula": "MAXIFS(B1:B5,A1:A5,\"zzz\")",
+      "excel": 0
+    },
+    {
+      "label": "MINIFS",
+      "formula": "MINIFS(B1:B5,A1:A5,\"A*\")",
+      "excel": 10
+    },
+    {
+      "label": "MINIFS none",
+      "formula": "MINIFS(B1:B5,A1:A5,\"zzz\")",
+      "excel": 0
+    },
+    {
+      "label": "MAXIFS number condition",
+      "formula": "MAXIFS(B1:B5,B1:B5,\"<35\")",
+      "excel": 30
+    },
+    {
+      "label": "COUNTIFS one pair",
+      "formula": "COUNTIFS(A1:A5,\"A*\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIFS mismatched sizes",
+      "formula": "COUNTIFS(A1:A5,\"A*\",B1:B4,\">10\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "COUNTIFS with the same cell twice",
+      "formula": "COUNTIFS(B1:B5,\">10\",B1:B5,\"<50\")",
+      "excel": 3
+    },
+    {
+      "label": "VLOOKUP is case-insensitive",
+      "formula": "VLOOKUP(\"east\",{T},2,FALSE)",
+      "excel": 760
+    },
+    {
+      "label": "VLOOKUP with a wildcard",
+      "formula": "VLOOKUP(\"N*\",{T},2,FALSE)",
+      "excel": 500
+    },
+    {
+      "label": "VLOOKUP column too far",
+      "formula": "VLOOKUP(\"East\",{T},3,FALSE)",
+      "excel": {
+        "error": "#REF!"
+      }
+    },
+    {
+      "label": "VLOOKUP column zero",
+      "formula": "VLOOKUP(\"East\",{T},0,FALSE)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "VLOOKUP approximate",
+      "formula": "VLOOKUP(25,{KV},2)",
+      "excel": "twenty"
+    },
+    {
+      "label": "VLOOKUP approximate below the first",
+      "formula": "VLOOKUP(5,{KV},2)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "VLOOKUP approximate above the last",
+      "formula": "VLOOKUP(99,{KV},2)",
+      "excel": "fifty"
+    },
+    {
+      "label": "VLOOKUP exact number",
+      "formula": "VLOOKUP(20,{KV},2,0)",
+      "excel": "twenty"
+    },
+    {
+      "label": "VLOOKUP exact number missing",
+      "formula": "VLOOKUP(25,{KV},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "VLOOKUP number against numeric text",
+      "formula": "VLOOKUP(\"10\",{KV},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "VLOOKUP approximate, exact hit",
+      "formula": "VLOOKUP(30,{KV},2,TRUE)",
+      "excel": "thirty"
+    },
+    {
+      "label": "VLOOKUP returning a blank cell",
+      "formula": "VLOOKUP(\"a\",{HT},2,FALSE)",
+      "excel": "b"
+    },
+    {
+      "label": "VLOOKUP lookup is blank",
+      "formula": "VLOOKUP(J2,{KV},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "HLOOKUP",
+      "formula": "HLOOKUP(\"c\",{HT},2,FALSE)",
+      "excel": 3
+    },
+    {
+      "label": "HLOOKUP missing",
+      "formula": "HLOOKUP(\"z\",{HT},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH exact",
+      "formula": "MATCH(30,B1:B5,0)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH ascending",
+      "formula": "MATCH(35,B1:B5,1)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH ascending default",
+      "formula": "MATCH(35,B1:B5)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH descending on ascending data",
+      "formula": "MATCH(35,B1:B5,-1)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH descending",
+      "formula": "MATCH(35,{DESC},-1)",
+      "excel": 2
+    },
+    {
+      "label": "MATCH below the first",
+      "formula": "MATCH(5,B1:B5,1)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH wildcard",
+      "formula": "MATCH(\"a*\",A1:A5,0)",
+      "excel": 1
+    },
+    {
+      "label": "MATCH is case-insensitive",
+      "formula": "MATCH(\"avocado\",A1:A5,0)",
+      "excel": 5
+    },
+    {
+      "label": "MATCH not found",
+      "formula": "MATCH(\"x\",A1:A5,0)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH in two dimensions",
+      "formula": "MATCH(1,B1:C3,0)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH text against numbers",
+      "formula": "MATCH(\"30\",B1:B5,0)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "INDEX in a column",
+      "formula": "INDEX(B1:B5,3)",
+      "excel": 30
+    },
+    {
+      "label": "INDEX row and column",
+      "formula": "INDEX({BC},2,1)",
+      "excel": 20
+    },
+    {
+      "label": "INDEX zero row sums the column",
+      "formula": "SUM(INDEX(B1:B5,0))",
+      "excel": 150
+    },
+    {
+      "label": "INDEX beyond the range",
+      "formula": "INDEX(B1:B5,6)",
+      "excel": {
+        "error": "#REF!"
+      }
+    },
+    {
+      "label": "INDEX in a row",
+      "formula": "INDEX({HROW},3)",
+      "excel": 3
+    },
+    {
+      "label": "INDEX of a column of a table",
+      "formula": "SUM(INDEX({BC},0,2))",
+      "excel": 3
+    },
+    {
+      "label": "INDEX with MATCH",
+      "formula": "INDEX(B1:B5,MATCH(\"Cherry\",A1:A5,0))",
+      "excel": 40
+    },
+    {
+      "label": "INDEX into a blank",
+      "formula": "INDEX(J1:J6,2)",
+      "excel": 0
+    },
+    {
+      "label": "XLOOKUP is case-insensitive",
+      "formula": "XLOOKUP(\"east\",{TA},{TB})",
+      "excel": 760
+    },
+    {
+      "label": "XLOOKUP number",
+      "formula": "XLOOKUP(30,B1:B5,A1:A5)",
+      "excel": "Banana"
+    },
+    {
+      "label": "XLOOKUP exact or next smaller",
+      "formula": "XLOOKUP(35,B1:B5,A1:A5,\"none\",-1)",
+      "excel": "Banana"
+    },
+    {
+      "label": "XLOOKUP exact or next larger",
+      "formula": "XLOOKUP(35,B1:B5,A1:A5,\"none\",1)",
+      "excel": "Cherry"
+    },
+    {
+      "label": "XLOOKUP wildcard, first",
+      "formula": "XLOOKUP(\"a*\",A1:A5,B1:B5,,2)",
+      "excel": 10
+    },
+    {
+      "label": "XLOOKUP wildcard, last",
+      "formula": "XLOOKUP(\"a*\",A1:A5,B1:B5,,2,-1)",
+      "excel": 50
+    },
+    {
+      "label": "XLOOKUP missing",
+      "formula": "XLOOKUP(\"x\",A1:A5,B1:B5)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "XLOOKUP last match",
+      "formula": "XLOOKUP(\"Apple\",A1:A5,B1:B5,,0,-1)",
+      "excel": 20
+    },
+    {
+      "label": "XLOOKUP mismatched sizes",
+      "formula": "XLOOKUP(1,B1:B5,A1:A4)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "XLOOKUP wildcard in default mode",
+      "formula": "XLOOKUP(\"N*\",{TA},{TB},\"none\")",
+      "excel": "none"
+    },
+    {
+      "label": "A formula chain",
+      "formula": "AA3",
+      "excel": 4
+    },
+    {
+      "label": "A range of one cell",
+      "formula": "SUM(B3:B3)",
+      "excel": 30
+    },
+    {
+      "label": "Absolute and mixed references",
+      "formula": "SUM($B$1:B$5)",
+      "excel": 150
+    },
+    {
+      "label": "Number to text: 1E+14",
+      "formula": "1E+14&\"\"",
+      "excel": "100000000000000"
+    },
+    {
+      "label": "Number to text: 1E+15",
+      "formula": "1E+15&\"\"",
+      "excel": "1000000000000000"
+    },
+    {
+      "label": "Number to text: 1E+16",
+      "formula": "1E+16&\"\"",
+      "excel": "10000000000000000"
+    },
+    {
+      "label": "Number to text: 1E+19",
+      "formula": "1E+19&\"\"",
+      "excel": "10000000000000000000"
+    },
+    {
+      "label": "Number to text: 1E+20",
+      "formula": "1E+20&\"\"",
+      "excel": "1E+20"
+    },
+    {
+      "label": "Number to text: 1.5E+20",
+      "formula": "1.5E+20&\"\"",
+      "excel": "1.5E+20"
+    },
+    {
+      "label": "Number to text: 1.5E+21",
+      "formula": "1.5E+21&\"\"",
+      "excel": "1.5E+21"
+    },
+    {
+      "label": "Number to text: 12345678901234567890",
+      "formula": "12345678901234567890&\"\"",
+      "excel": "12345678901234500000"
+    },
+    {
+      "label": "Number to text: 123456789012345678901234",
+      "formula": "123456789012345678901234&\"\"",
+      "excel": "1.23456789012345E+23"
+    },
+    {
+      "label": "Number to text: -1E+21",
+      "formula": "-1E+21&\"\"",
+      "excel": "-1E+21"
+    },
+    {
+      "label": "Number to text: 1E+300",
+      "formula": "1E+300&\"\"",
+      "excel": "1E+300"
+    },
+    {
+      "label": "Number to text: 1E-5",
+      "formula": "1E-5&\"\"",
+      "excel": "0.00001"
+    },
+    {
+      "label": "Number to text: 1E-9",
+      "formula": "1E-9&\"\"",
+      "excel": "0.000000001"
+    },
+    {
+      "label": "Number to text: 1E-11",
+      "formula": "1E-11&\"\"",
+      "excel": "0.00000000001"
+    },
+    {
+      "label": "Number to text: 1E-15",
+      "formula": "1E-15&\"\"",
+      "excel": "0.000000000000001"
+    },
+    {
+      "label": "Number to text: 1E-19",
+      "formula": "1E-19&\"\"",
+      "excel": "1E-19"
+    },
+    {
+      "label": "Number to text: 1E-20",
+      "formula": "1E-20&\"\"",
+      "excel": "1E-20"
+    },
+    {
+      "label": "Number to text: 1.5E-20",
+      "formula": "1.5E-20&\"\"",
+      "excel": "1.5E-20"
+    },
+    {
+      "label": "Number to text: 1E-30",
+      "formula": "1E-30&\"\"",
+      "excel": "1E-30"
+    },
+    {
+      "label": "Number to text: 0.000123456789012345678",
+      "formula": "0.000123456789012345678&\"\"",
+      "excel": "0.000123456789012345"
+    },
+    {
+      "label": "Number to text: -1E-20",
+      "formula": "-1E-20&\"\"",
+      "excel": "-1E-20"
+    },
+    {
+      "label": "Number to text: 1/7",
+      "formula": "1/7&\"\"",
+      "excel": "0.142857142857143"
+    },
+    {
+      "label": "Number to text: 2/3",
+      "formula": "2/3&\"\"",
+      "excel": "0.666666666666667"
+    },
+    {
+      "label": "Number to text: 100",
+      "formula": "100&\"\"",
+      "excel": "100"
+    },
+    {
+      "label": "Number to text: -1.5",
+      "formula": "-1.5&\"\"",
+      "excel": "-1.5"
+    },
+    {
+      "label": "Number to text: 1234567.891",
+      "formula": "1234567.891&\"\"",
+      "excel": "1234567.891"
+    },
+    {
+      "label": "Number to text: sum of 0.1 and 0.2",
+      "formula": "\"\"&(0.1+0.2)",
+      "excel": "0.3"
+    },
+    {
+      "label": "Number to text: 15 digits then more",
+      "formula": "123456789.123456789&\"\"",
+      "excel": "123456789.123456"
+    },
+    {
+      "label": "Number to text: a 16-digit integer",
+      "formula": "1234567890123456&\"\"",
+      "excel": "1234567890123450"
+    },
+    {
+      "label": "Number to text: 15-digit integer",
+      "formula": "123456789012345&\"\"",
+      "excel": "123456789012345"
+    },
+    {
+      "label": "Snap: 0.3-0.1-0.2",
+      "formula": "0.3-0.1-0.2",
+      "excel": 0
+    },
+    {
+      "label": "Snap: parenthesized first part",
+      "formula": "(0.3-0.1)-0.2",
+      "excel": 0
+    },
+    {
+      "label": "Snap: 0.5-0.4-0.1",
+      "formula": "0.5-0.4-0.1",
+      "excel": 0
+    },
+    {
+      "label": "Snap: parenthesized whole",
+      "formula": "\"\"&(0.5-0.4-0.1)",
+      "excel": "-2.77555756156289E-17"
+    },
+    {
+      "label": "Snap: 1.00000000000001-1",
+      "formula": "1.00000000000001-1",
+      "excel": 9.99200722162641e-15
+    },
+    {
+      "label": "Snap: 1.0000000000001-1",
+      "formula": "1.0000000000001-1",
+      "excel": 9.99200722162641e-14
+    },
+    {
+      "label": "Snap: in a text",
+      "formula": "\"\"&(1.00000000000001-1)",
+      "excel": "9.99200722162641E-15"
+    },
+    {
+      "label": "Snap: 1-0.9-0.1",
+      "formula": "1-0.9-0.1",
+      "excel": 0
+    },
+    {
+      "label": "Snap: 0.7+0.1-0.8",
+      "formula": "0.7+0.1-0.8",
+      "excel": 0
+    },
+    {
+      "label": "Snap: adding zero afterwards",
+      "formula": "(0.1+0.2-0.3)+0",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "Snap: multiplying afterwards",
+      "formula": "(0.1+0.2-0.3)*1",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "Snap: SUM of 0.1, 0.2 and -0.3",
+      "formula": "SUM(0.1,0.2,-0.3)",
+      "excel": 0
+    },
+    {
+      "label": "Snap: SUM minus",
+      "formula": "SUM(0.1,0.2)-0.3",
+      "excel": 0
+    },
+    {
+      "label": "Snap: result is a cell",
+      "formula": "AA2-AA1-1",
+      "excel": 0
+    },
+    {
+      "label": "Snap: large operands",
+      "formula": "1E+20+1-1E+20",
+      "excel": 0
+    },
+    {
+      "label": "Snap: larger difference",
+      "formula": "100.1-100",
+      "excel": 0.0999999999999943
+    },
+    {
+      "label": "Literal cut to 15 digits",
+      "formula": "\"\"&1.000000000000001",
+      "excel": "1"
+    },
+    {
+      "label": "Literal 16 digits equals 1",
+      "formula": "1.000000000000001=1",
+      "excel": true
+    },
+    {
+      "label": "Literal 17 digits",
+      "formula": "\"\"&0.1234567890123456789",
+      "excel": "0.123456789012345"
+    },
+    {
+      "label": "Literal integers cut",
+      "formula": "123456789012345678=123456789012345600",
+      "excel": true
+    },
+    {
+      "label": "Literal 15 digits kept",
+      "formula": "\"\"&1.00000000000001",
+      "excel": "1.00000000000001"
+    },
+    {
+      "label": "Comparison at 15 digits",
+      "formula": "1.00000000000001=1",
+      "excel": false
+    },
+    {
+      "label": "Comparison of computed values at 15 digits",
+      "formula": "(1+1E-15)=1",
+      "excel": true
+    },
+    {
+      "label": "Comparison just apart",
+      "formula": "(1+1E-14)=1",
+      "excel": false
+    },
+    {
+      "label": "Odd root of a negative",
+      "formula": "(-27)^(1/3)",
+      "excel": -3
+    },
+    {
+      "label": "Two thirds of a negative",
+      "formula": "(-8)^(2/3)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Square root of a negative by power",
+      "formula": "(-8)^0.5",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Fourth root of a negative",
+      "formula": "(-16)^(1/4)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Fifth root of a negative",
+      "formula": "(-32)^(1/5)",
+      "excel": -2
+    },
+    {
+      "label": "POWER odd root",
+      "formula": "POWER(-8,1/3)",
+      "excel": -2
+    },
+    {
+      "label": "Near-third exponent",
+      "formula": "(-8)^0.333333333333333",
+      "excel": -2
+    },
+    {
+      "label": "Negative base, integer exponent",
+      "formula": "(-2)^3",
+      "excel": -8
+    },
+    {
+      "label": "Negative base, negative exponent",
+      "formula": "(-2)^-3",
+      "excel": -0.125
+    },
+    {
+      "label": "Zero to a negative power",
+      "formula": "0^-1",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Zero to a half",
+      "formula": "0^0.5",
+      "excel": 0
+    },
+    {
+      "label": "Overflow in power",
+      "formula": "2^1024",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Underflow",
+      "formula": "1E-300*1E-300",
+      "excel": 0
+    },
+    {
+      "label": "Unary minus before percent",
+      "formula": "-50%",
+      "excel": -0.5
+    },
+    {
+      "label": "Percent of percent",
+      "formula": "50%%",
+      "excel": 0.005
+    },
+    {
+      "label": "Plus before text",
+      "formula": "+\"5\"",
+      "excel": "5"
+    },
+    {
+      "label": "Unary minus on TRUE",
+      "formula": "-TRUE",
+      "excel": -1
+    },
+    {
+      "label": "Double minus on TRUE",
+      "formula": "--TRUE",
+      "excel": 1
+    },
+    {
+      "label": "Multiplying numeric texts",
+      "formula": "\"5\"*\"2\"",
+      "excel": 10
+    },
+    {
+      "label": "Text starting with a dot",
+      "formula": "\".5\"+0",
+      "excel": 0.5
+    },
+    {
+      "label": "Text ending in a dot",
+      "formula": "\"5.\"+0",
+      "excel": 5
+    },
+    {
+      "label": "Text with a plus",
+      "formula": "\"+5\"+0",
+      "excel": 5
+    },
+    {
+      "label": "Text with a space after the minus",
+      "formula": "\"- 5\"+0",
+      "excel": -5
+    },
+    {
+      "label": "Text with an inner space",
+      "formula": "\"1 2\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Hexadecimal text",
+      "formula": "\"0x10\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text in parentheses",
+      "formula": "\"(5)\"+0",
+      "excel": -5
+    },
+    {
+      "label": "Text with a minus and a currency sign",
+      "formula": "\"-$5\"+0",
+      "excel": -5
+    },
+    {
+      "label": "Text with a currency sign and a minus",
+      "formula": "\"$-5\"+0",
+      "excel": -5
+    },
+    {
+      "label": "Text with a space before the percent",
+      "formula": "\"5 %\"+0",
+      "excel": 0.05
+    },
+    {
+      "label": "Text with two percents",
+      "formula": "\"5%%\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text with a comma in the wrong place",
+      "formula": "\"1,23\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text with a long thousands group",
+      "formula": "\"1,2345\"+0",
+      "excel": 12345
+    },
+    {
+      "label": "Text TRUE in arithmetic",
+      "formula": "\"TRUE\"+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text with a trailing e",
+      "formula": "\"1e\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text with a negative exponent",
+      "formula": "\"1e-2\"+0",
+      "excel": 0.01
+    },
+    {
+      "label": "Text with a capital E",
+      "formula": "\"1E3\"+0",
+      "excel": 1000
+    },
+    {
+      "label": "Text with a trailing minus",
+      "formula": "\"5-\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Euro sign in text number",
+      "formula": "\"€5\"+0",
+      "excel": 5
+    },
+    {
+      "label": "Text with a leading zero",
+      "formula": "\"007\"+0",
+      "excel": 7
+    },
+    {
+      "label": "Text with a newline",
+      "formula": "\"5\"&CHAR(10)&\"+0\"",
+      "excel": "5\n+0"
+    },
+    {
+      "label": "Compare lower with upper",
+      "formula": "\"a\"<\"A\"",
+      "excel": false
+    },
+    {
+      "label": "Compare B with a",
+      "formula": "\"B\"<\"a\"",
+      "excel": false
+    },
+    {
+      "label": "Accents are significant in equality",
+      "formula": "\"é\"=\"e\"",
+      "excel": false
+    },
+    {
+      "label": "Accent order",
+      "formula": "\"é\">\"e\"",
+      "excel": true
+    },
+    {
+      "label": "Brace sorts before a letter",
+      "formula": "\"{\"<\"a\"",
+      "excel": true
+    },
+    {
+      "label": "Tilde sorts before a digit",
+      "formula": "\"~\"<\"1\"",
+      "excel": true
+    },
+    {
+      "label": "Underscore sorts before a digit",
+      "formula": "\"_\"<\"1\"",
+      "excel": true
+    },
+    {
+      "label": "Underscore against hyphen",
+      "formula": "\"_\"<\"-\"",
+      "excel": true
+    },
+    {
+      "label": "Letter against a brace",
+      "formula": "\"a\"<\"{\"",
+      "excel": false
+    },
+    {
+      "label": "Upper A against underscore",
+      "formula": "\"A\"<\"_\"",
+      "excel": false
+    },
+    {
+      "label": "Text numbers compare as text",
+      "formula": "\"10\"<\"9\"",
+      "excel": true
+    },
+    {
+      "label": "Logical against text",
+      "formula": "TRUE>\"a\"",
+      "excel": true
+    },
+    {
+      "label": "FALSE against zero",
+      "formula": "FALSE<0",
+      "excel": false
+    },
+    {
+      "label": "Empty text against a letter",
+      "formula": "\"\"<\"a\"",
+      "excel": true
+    },
+    {
+      "label": "Empty text against zero",
+      "formula": "\"\"<0",
+      "excel": false
+    },
+    {
+      "label": "Blank against one",
+      "formula": "J2<1",
+      "excel": true
+    },
+    {
+      "label": "Blank against text",
+      "formula": "J2<\"a\"",
+      "excel": true
+    },
+    {
+      "label": "Case-insensitive equality",
+      "formula": "\"ab\"=\"AB\"",
+      "excel": true
+    },
+    {
+      "label": "Eszett",
+      "formula": "\"straße\"=\"STRASSE\"",
+      "excel": true
+    },
+    {
+      "label": "Dollar against a letter",
+      "formula": "\"$\"<\"a\"",
+      "excel": true
+    },
+    {
+      "label": "Dollar against a digit",
+      "formula": "\"$\"<\"1\"",
+      "excel": true
+    },
+    {
+      "label": "Space before everything",
+      "formula": "\" \"<\"!\"",
+      "excel": true
+    },
+    {
+      "label": "Hyphen against a digit",
+      "formula": "\"-\"<\"1\"",
+      "excel": true
+    },
+    {
+      "label": "Hyphen against an apostrophe",
+      "formula": "\"-\"<\"'\"",
+      "excel": true
+    },
+    {
+      "label": "Punctuation inside words",
+      "formula": "\"co-op\"<\"coop\"",
+      "excel": true
+    },
+    {
+      "label": "Apostrophe inside words",
+      "formula": "\"o'neil\"<\"oneil\"",
+      "excel": true
+    },
+    {
+      "label": "Compare longer with shorter",
+      "formula": "\"ab\"<\"a\"",
+      "excel": false
+    },
+    {
+      "label": "Mixed digits and letters",
+      "formula": "\"a1\"<\"a10\"",
+      "excel": true
+    },
+    {
+      "label": "Mixed digits and letters, second",
+      "formula": "\"a2\"<\"a10\"",
+      "excel": false
+    },
+    {
+      "label": "AND with numeric text that is TRUE",
+      "formula": "AND(\"TRUE\",FALSE)",
+      "excel": false
+    },
+    {
+      "label": "AND of only text",
+      "formula": "AND(\"a\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "AND of TRUE text",
+      "formula": "AND(\"TRUE\")",
+      "excel": true
+    },
+    {
+      "label": "OR with text",
+      "formula": "OR(\"a\",TRUE)",
+      "excel": true
+    },
+    {
+      "label": "AND with empty text",
+      "formula": "AND(1,\"\")",
+      "excel": true
+    },
+    {
+      "label": "AND of a blank only",
+      "formula": "AND(J2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "AND with zero and text",
+      "formula": "AND(0,\"a\")",
+      "excel": false
+    },
+    {
+      "label": "IF with FALSE text",
+      "formula": "IF(\"FALSE\",1,2)",
+      "excel": 2
+    },
+    {
+      "label": "IF with lower-case true",
+      "formula": "IF(\"true\",1,2)",
+      "excel": 1
+    },
+    {
+      "label": "IF with a number as text",
+      "formula": "IF(\"1\",1,2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "IF with a text cell",
+      "formula": "IF(J5,1,2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "NOT of TRUE text",
+      "formula": "NOT(\"TRUE\")",
+      "excel": false
+    },
+    {
+      "label": "NOT of a number",
+      "formula": "NOT(2)",
+      "excel": false
+    },
+    {
+      "label": "IF picks over an array",
+      "formula": "SUM(IF(B1:B5>25,1,0))",
+      "excel": 3
+    },
+    {
+      "label": "MAX of IF over an array",
+      "formula": "MAX(IF(A1:A5=\"apple\",B1:B5))",
+      "excel": 20
+    },
+    {
+      "label": "ISERR of #N/A",
+      "formula": "ISERR(L3)",
+      "excel": false
+    },
+    {
+      "label": "ISERR of another error",
+      "formula": "ISERR(L1)",
+      "excel": true
+    },
+    {
+      "label": "ISERR of a value",
+      "formula": "ISERR(5)",
+      "excel": false
+    },
+    {
+      "label": "ERROR.TYPE",
+      "formula": "ERROR.TYPE(L1)",
+      "excel": 2
+    },
+    {
+      "label": "NA",
+      "formula": "NA()",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "ISBLANK of a text number",
+      "formula": "ISBLANK(\"\")",
+      "excel": false
+    },
+    {
+      "label": "ISTEXT of empty text",
+      "formula": "ISTEXT(\"\")",
+      "excel": true
+    },
+    {
+      "label": "ISNUMBER of a date",
+      "formula": "ISNUMBER(DATE(2026,1,1))",
+      "excel": true
+    },
+    {
+      "label": "IFERROR with an array",
+      "formula": "SUM(IFERROR(1/(B1:B5-30),0))",
+      "excel": 0
+    },
+    {
+      "label": "CHOOSE with a fraction",
+      "formula": "CHOOSE(1.9,\"a\",\"b\")",
+      "excel": "a"
+    },
+    {
+      "label": "CHOOSE zero",
+      "formula": "CHOOSE(0,\"a\",\"b\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "CHOOSE with text index",
+      "formula": "CHOOSE(\"2\",\"a\",\"b\")",
+      "excel": "b"
+    },
+    {
+      "label": "IFS with an error condition",
+      "formula": "IFS(1/0,1,TRUE,2)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "IFS skipping a later error",
+      "formula": "IFS(TRUE,1,1/0,2)",
+      "excel": 1
+    },
+    {
+      "label": "SWITCH compares case-insensitively",
+      "formula": "SWITCH(\"B\",\"a\",1,\"b\",2)",
+      "excel": 2
+    },
+    {
+      "label": "SWITCH with numbers",
+      "formula": "SWITCH(2,1,\"one\",2,\"two\")",
+      "excel": "two"
+    },
+    {
+      "label": "SWITCH number against text",
+      "formula": "SWITCH(\"2\",2,\"two\",\"x\")",
+      "excel": "x"
+    },
+    {
+      "label": "ROW of a cell",
+      "formula": "ROW(B3)",
+      "excel": 3
+    },
+    {
+      "label": "COLUMN of a cell",
+      "formula": "COLUMN(C1)",
+      "excel": 3
+    },
+    {
+      "label": "ROWS",
+      "formula": "ROWS(B1:B5)",
+      "excel": 5
+    },
+    {
+      "label": "COLUMNS",
+      "formula": "COLUMNS({BC})",
+      "excel": 2
+    },
+    {
+      "label": "SUM of ROW over a range",
+      "formula": "SUM(ROW(B3:B5))",
+      "excel": 12
+    },
+    {
+      "label": "SUM of an empty argument",
+      "formula": "SUM(1,,2)",
+      "excel": 3
+    },
+    {
+      "label": "LEN over an array",
+      "formula": "SUM(LEN(A1:A5))",
+      "excel": 29
+    },
+    {
+      "label": "Comparison of LEN over an array",
+      "formula": "SUM(--(LEN(A1:A5)>5))",
+      "excel": 3
+    },
+    {
+      "label": "LEFT over an array",
+      "formula": "SUMPRODUCT(--(LEFT(A1:A5,1)=\"A\"))",
+      "excel": 3
+    },
+    {
+      "label": "SUMPRODUCT of a count",
+      "formula": "SUMPRODUCT(--(B1:B5>25))",
+      "excel": 3
+    },
+    {
+      "label": "SUMPRODUCT of an or",
+      "formula": "SUMPRODUCT((A1:A5=\"Apple\")+(A1:A5=\"Banana\"))",
+      "excel": 3
+    },
+    {
+      "label": "SUMPRODUCT with a not-equal",
+      "formula": "SUMPRODUCT(B1:B5*(A1:A5<>\"apple\"))",
+      "excel": 120
+    },
+    {
+      "label": "SUMPRODUCT with two conditions",
+      "formula": "SUMPRODUCT((B1:B5>10)*(B1:B5<50))",
+      "excel": 3
+    },
+    {
+      "label": "Array times scalar then sum",
+      "formula": "SUM(B1:B5*B1:B5)",
+      "excel": 5500
+    },
+    {
+      "label": "Array arithmetic with a blank",
+      "formula": "SUM(J1:J6+1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Array with text in arithmetic",
+      "formula": "SUM(E1:E3+1)",
+      "excel": 63
+    },
+    {
+      "label": "Array comparison",
+      "formula": "SUM(--(B1:B5=30))",
+      "excel": 1
+    },
+    {
+      "label": "Array of different sizes",
+      "formula": "SUM(B1:B5*C1:C3)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "Array of a row and a column",
+      "formula": "SUM(B1:B3*S2:V2)",
+      "excel": 600
+    },
+    {
+      "label": "COUNT over an array expression",
+      "formula": "COUNT(B1:B5/(B1:B5>25))",
+      "excel": 3
+    },
+    {
+      "label": "MAX over an array expression",
+      "formula": "MAX(B1:B5*(A1:A5=\"apple\"))",
+      "excel": 20
+    },
+    {
+      "label": "AVERAGE of an array expression",
+      "formula": "AVERAGE(B1:B5*2)",
+      "excel": 60
+    },
+    {
+      "label": "Array and error",
+      "formula": "SUM(B1:B5/(B1:B5-30))",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "COUNTIF star counts text only",
+      "formula": "COUNTIF(A1:A5,\"*\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF star over a mixed range",
+      "formula": "COUNTIF({MIX},\"*\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF question and star",
+      "formula": "COUNTIF(A1:A5,\"?*\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF empty over text",
+      "formula": "COUNTIF(A1:A5,\"\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF <> over text",
+      "formula": "COUNTIF(A1:A5,\"<>\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF not text",
+      "formula": "COUNTIF({MIX},\"<>*\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF not x",
+      "formula": "COUNTIF({MIX},\"<>x\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF >=5",
+      "formula": "COUNTIF({MIX},\">=5\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF = over numbers",
+      "formula": "COUNTIF(B1:B5,\"=\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF <> over numbers",
+      "formula": "COUNTIF(B1:B5,\"<>\")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF operand with a trailing space",
+      "formula": "COUNTIF(B1:B5,\">3 \")",
+      "excel": 5
+    },
+    {
+      "label": "COUNTIF = with a trailing space",
+      "formula": "COUNTIF(B1:B5,\"=30 \")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF 30.0",
+      "formula": "COUNTIF(B1:B5,\"30.0\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF 3E1",
+      "formula": "COUNTIF(B1:B5,\"3E1\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF +30",
+      "formula": "COUNTIF(B1:B5,\"+30\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF currency",
+      "formula": "COUNTIF(B1:B5,\"$30\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF TRUE text",
+      "formula": "COUNTIF({MIX},\"TRUE\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF =TRUE text",
+      "formula": "COUNTIF({MIX},\"=TRUE\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF 1 against TRUE",
+      "formula": "COUNTIF({MIX},1)",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF a*e",
+      "formula": "COUNTIF(A1:A5,\"a*e\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF A followed by five",
+      "formula": "COUNTIF(A1:A5,\"A?????\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF ~*",
+      "formula": "COUNTIF({WILD},\"~*\")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF a*",
+      "formula": "COUNTIF({WILD},\"a*\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF with a blank criteria cell",
+      "formula": "COUNTIF(B1:B5,J2)",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF blank criteria over a mixed range",
+      "formula": "COUNTIF({MIX},J2)",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIF with a trailing space in text",
+      "formula": "COUNTIF(A1:A5,\"apple \")",
+      "excel": 0
+    },
+    {
+      "label": "COUNTIFS empty criteria",
+      "formula": "COUNTIFS(A1:A5,\"A*\",B1:B5,\"\")",
+      "excel": 0
+    },
+    {
+      "label": "SUMIF text criteria against numbers",
+      "formula": "SUMIF(A1:A5,\">5\",B1:B5)",
+      "excel": 0
+    },
+    {
+      "label": "SUMIFS with concatenated criteria",
+      "formula": "SUMIFS(B1:B5,B1:B5,\">=\"&20,B1:B5,\"<=\"&40)",
+      "excel": 90
+    },
+    {
+      "label": "SUMIFS contains",
+      "formula": "SUMIFS(B1:B5,A1:A5,\"*a*\")",
+      "excel": 110
+    },
+    {
+      "label": "SUMIFS over a mixed range",
+      "formula": "SUMIFS({MIX},{MIX},\">5\")",
+      "excel": 40
+    },
+    {
+      "label": "AVERAGEIFS over a mixed range",
+      "formula": "AVERAGEIFS({MIX},{MIX},\"<>\")",
+      "excel": 15
+    },
+    {
+      "label": "MAXIFS over a mixed range",
+      "formula": "MAXIFS({MIX},{MIX},\">0\")",
+      "excel": 25
+    },
+    {
+      "label": "MINIFS mismatched",
+      "formula": "MINIFS(B1:B5,A1:A4,\"A*\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "COUNTIF above the average",
+      "formula": "COUNTIF(B1:B5,\">\"&AVERAGE(B1:B5))",
+      "excel": 2
+    },
+    {
+      "label": "SUMIF criteria is a date number",
+      "formula": "SUMIF(B1:B5,\">=\"&DATE(1900,1,30),B1:B5)",
+      "excel": 120
+    },
+    {
+      "label": "SUMIF criteria is a logical",
+      "formula": "SUMIF({MIX},TRUE,B1:B6)",
+      "excel": 40
+    },
+    {
+      "label": "COUNTIF criteria is an error value",
+      "formula": "COUNTIF({ERR},L1)",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF with an empty-text criteria cell",
+      "formula": "COUNTIF(X1:X5,X5)",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF with a number cell as criteria",
+      "formula": "COUNTIF(B1:B5,B3)",
+      "excel": 1
+    },
+    {
+      "label": "VLOOKUP approximate on unsorted text",
+      "formula": "VLOOKUP(\"East\",{T},2)",
+      "excel": 760
+    },
+    {
+      "label": "VLOOKUP approximate, last",
+      "formula": "VLOOKUP(\"North\",{T},2)",
+      "excel": 500
+    },
+    {
+      "label": "VLOOKUP approximate, first",
+      "formula": "VLOOKUP(\"West\",{T},2)",
+      "excel": 500
+    },
+    {
+      "label": "VLOOKUP approximate, beyond",
+      "formula": "VLOOKUP(\"Zed\",{T},2)",
+      "excel": 500
+    },
+    {
+      "label": "MATCH ascending on unsorted text",
+      "formula": "MATCH(\"East\",{TA},1)",
+      "excel": 2
+    },
+    {
+      "label": "MATCH ascending default on unsorted text",
+      "formula": "MATCH(\"North\",{TA})",
+      "excel": 3
+    },
+    {
+      "label": "VLOOKUP with a missing fourth argument",
+      "formula": "VLOOKUP(30,{KV},2,)",
+      "excel": "thirty"
+    },
+    {
+      "label": "VLOOKUP with an empty-text key",
+      "formula": "VLOOKUP(\"\",{KV},2,FALSE)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "VLOOKUP with a logical range_lookup text",
+      "formula": "VLOOKUP(30,{KV},2,\"FALSE\")",
+      "excel": "thirty"
+    },
+    {
+      "label": "VLOOKUP with a zero range_lookup",
+      "formula": "VLOOKUP(30,{KV},2,0)",
+      "excel": "thirty"
+    },
+    {
+      "label": "VLOOKUP with a table of one column",
+      "formula": "VLOOKUP(30,P1:P5,1,FALSE)",
+      "excel": 30
+    },
+    {
+      "label": "VLOOKUP with a fractional column",
+      "formula": "VLOOKUP(30,{KV},2.9,FALSE)",
+      "excel": "thirty"
+    },
+    {
+      "label": "VLOOKUP over a mixed range",
+      "formula": "VLOOKUP(TRUE,J1:J6,1,FALSE)",
+      "excel": true
+    },
+    {
+      "label": "VLOOKUP with an error key",
+      "formula": "VLOOKUP(L1,{KV},2,FALSE)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "HLOOKUP approximate",
+      "formula": "HLOOKUP(\"b\",{HT},2)",
+      "excel": 2
+    },
+    {
+      "label": "MATCH a logical",
+      "formula": "MATCH(TRUE,{MIX},0)",
+      "excel": 4
+    },
+    {
+      "label": "MATCH wildcard question",
+      "formula": "MATCH(\"?pple\",A1:A5,0)",
+      "excel": 1
+    },
+    {
+      "label": "MATCH type 2",
+      "formula": "MATCH(30,B1:B5,2)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH with a fractional type",
+      "formula": "MATCH(30,B1:B5,0.5)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH ascending with equal values",
+      "formula": "MATCH(30,{SAME},1)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "MATCH approximate on text",
+      "formula": "MATCH(\"b\",A1:A5,1)",
+      "excel": 2
+    },
+    {
+      "label": "INDEX row and column of text",
+      "formula": "INDEX({BC},2,2)",
+      "excel": "1"
+    },
+    {
+      "label": "INDEX row beyond",
+      "formula": "INDEX({BC},4,1)",
+      "excel": {
+        "error": "#REF!"
+      }
+    },
+    {
+      "label": "INDEX the whole range",
+      "formula": "SUM(INDEX({BC},0,0))",
+      "excel": 63
+    },
+    {
+      "label": "INDEX with both on a column",
+      "formula": "INDEX(B1:B5,1,1)",
+      "excel": 10
+    },
+    {
+      "label": "INDEX with a column on a column",
+      "formula": "INDEX(B1:B5,1,2)",
+      "excel": {
+        "error": "#REF!"
+      }
+    },
+    {
+      "label": "INDEX of a row with two arguments",
+      "formula": "INDEX({HROW},1,3)",
+      "excel": 3
+    },
+    {
+      "label": "INDEX of a row with a zero row",
+      "formula": "SUM(INDEX({HROW},0,3))",
+      "excel": 3
+    },
+    {
+      "label": "INDEX negative",
+      "formula": "INDEX(B1:B5,-1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "INDEX with a fraction",
+      "formula": "INDEX(B1:B5,2.9)",
+      "excel": 20
+    },
+    {
+      "label": "INDEX with text index",
+      "formula": "INDEX(B1:B5,\"2\")",
+      "excel": 20
+    },
+    {
+      "label": "INDEX with an error index",
+      "formula": "INDEX(B1:B5,L1)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "XLOOKUP without wildcard",
+      "formula": "XLOOKUP(\"a*\",A1:A5,B1:B5,,0)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "XLOOKUP binary search mode",
+      "formula": "XLOOKUP(30,B1:B5,A1:A5,,0,2)",
+      "excel": "Banana"
+    },
+    {
+      "label": "XLOOKUP in a row",
+      "formula": "XLOOKUP(\"c\",S1:V1,S2:V2)",
+      "excel": 3
+    },
+    {
+      "label": "XLOOKUP not found with an empty message",
+      "formula": "XLOOKUP(\"x\",A1:A5,B1:B5,\"\")",
+      "excel": ""
+    },
+    {
+      "label": "XLOOKUP exact or next smaller on text",
+      "formula": "XLOOKUP(\"Bz\",A1:A5,B1:B5,\"none\",-1)",
+      "excel": 30
+    },
+    {
+      "label": "XLOOKUP exact or next larger on text",
+      "formula": "XLOOKUP(\"Bz\",A1:A5,B1:B5,\"none\",1)",
+      "excel": 40
+    },
+    {
+      "label": "XLOOKUP a number against numeric text",
+      "formula": "XLOOKUP(\"30\",B1:B5,A1:A5,\"none\")",
+      "excel": "none"
+    },
+    {
+      "label": "XLOOKUP with a blank lookup",
+      "formula": "XLOOKUP(J2,J1:J6,J1:J6,\"none\")",
+      "excel": 0
+    },
+    {
+      "label": "XLOOKUP with an error lookup",
+      "formula": "XLOOKUP(L1,B1:B5,A1:A5)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "XLOOKUP with an invalid mode",
+      "formula": "XLOOKUP(30,B1:B5,A1:A5,,5)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "XLOOKUP first of duplicates",
+      "formula": "XLOOKUP(\"a\",{SAME},B1:B3)",
+      "excel": 10
+    },
+    {
+      "label": "XLOOKUP last of duplicates",
+      "formula": "XLOOKUP(\"a\",{SAME},B1:B3,,0,-1)",
+      "excel": 30
+    },
+    {
+      "label": "LARGE",
+      "formula": "LARGE(B1:B5,2)",
+      "excel": 40
+    },
+    {
+      "label": "SMALL",
+      "formula": "SMALL(B1:B5,2)",
+      "excel": 20
+    },
+    {
+      "label": "LARGE beyond",
+      "formula": "LARGE(B1:B5,6)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "LARGE zero",
+      "formula": "LARGE(B1:B5,0)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "LARGE over a mixed range",
+      "formula": "LARGE({MIX},1)",
+      "excel": 25
+    },
+    {
+      "label": "MEDIAN odd",
+      "formula": "MEDIAN(B1:B5)",
+      "excel": 30
+    },
+    {
+      "label": "MEDIAN even",
+      "formula": "MEDIAN(1,2,3,4)",
+      "excel": 2.5
+    },
+    {
+      "label": "MEDIAN over a mixed range",
+      "formula": "MEDIAN({MIX})",
+      "excel": 15
+    },
+    {
+      "label": "MEDIAN of nothing",
+      "formula": "MEDIAN(J2)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "RANK",
+      "formula": "RANK(30,B1:B5)",
+      "excel": 3
+    },
+    {
+      "label": "RANK ascending",
+      "formula": "RANK(30,B1:B5,1)",
+      "excel": 3
+    },
+    {
+      "label": "RANK of a missing value",
+      "formula": "RANK(35,B1:B5)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "RANK with ties",
+      "formula": "RANK(1,C1:C4)",
+      "excel": 2
+    },
+    {
+      "label": "ROUND small negative",
+      "formula": "ROUND(-0.4,0)",
+      "excel": 0
+    },
+    {
+      "label": "ROUND 0.285",
+      "formula": "ROUND(0.285,2)",
+      "excel": 0.29
+    },
+    {
+      "label": "ROUND 1.255",
+      "formula": "ROUND(1.255,2)",
+      "excel": 1.26
+    },
+    {
+      "label": "ROUND to thousands",
+      "formula": "ROUND(1234567.891,-3)",
+      "excel": 1235000
+    },
+    {
+      "label": "ROUND 5 to tens",
+      "formula": "ROUND(5,-1)",
+      "excel": 10
+    },
+    {
+      "label": "ROUND -5 to tens",
+      "formula": "ROUND(-5,-1)",
+      "excel": -10
+    },
+    {
+      "label": "ROUND 15 to tens",
+      "formula": "ROUND(15,-1)",
+      "excel": 20
+    },
+    {
+      "label": "ROUND with a missing digits",
+      "formula": "ROUND(2.5,)",
+      "excel": 3
+    },
+    {
+      "label": "ROUND with an error",
+      "formula": "ROUND(L1,0)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "ROUND with huge digits",
+      "formula": "ROUND(1.5,400)",
+      "excel": 1.5
+    },
+    {
+      "label": "ROUND with large negative digits",
+      "formula": "ROUND(1234,-400)",
+      "excel": 0
+    },
+    {
+      "label": "ROUNDDOWN small negative",
+      "formula": "ROUNDDOWN(-0.5,0)",
+      "excel": 0
+    },
+    {
+      "label": "ROUNDUP tiny",
+      "formula": "ROUNDUP(0.0001,2)",
+      "excel": 0.01
+    },
+    {
+      "label": "INT of a small negative",
+      "formula": "INT(-0.5)",
+      "excel": -1
+    },
+    {
+      "label": "MOD small negative",
+      "formula": "MOD(-1,3)",
+      "excel": 2
+    },
+    {
+      "label": "MOD by a fraction",
+      "formula": "MOD(3,1.5)",
+      "excel": 0
+    },
+    {
+      "label": "MOD big",
+      "formula": "MOD(1E+10,3)",
+      "excel": 1
+    },
+    {
+      "label": "MOD floating",
+      "formula": "MOD(1,0.1)",
+      "excel": 0.1
+    },
+    {
+      "label": "SQRT of numeric text",
+      "formula": "SQRT(\"4\")",
+      "excel": 2
+    },
+    {
+      "label": "SIGN of zero",
+      "formula": "SIGN(0)",
+      "excel": 0
+    },
+    {
+      "label": "ABS of a blank",
+      "formula": "ABS(J2)",
+      "excel": 0
+    },
+    {
+      "label": "CEILING to zero",
+      "formula": "CEILING(2.1,0)",
+      "excel": 0
+    },
+    {
+      "label": "FLOOR to zero",
+      "formula": "FLOOR(2.1,0)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "CEILING negative both",
+      "formula": "CEILING(-2.1,-1)",
+      "excel": -3
+    },
+    {
+      "label": "FLOOR negative both",
+      "formula": "FLOOR(-2.1,-1)",
+      "excel": -2
+    },
+    {
+      "label": "CEILING positive over negative",
+      "formula": "CEILING(2.1,-1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "CEILING with a fraction",
+      "formula": "CEILING(2.5,0.3)",
+      "excel": 2.7
+    },
+    {
+      "label": "FLOOR with a fraction",
+      "formula": "FLOOR(0.5,0.1)",
+      "excel": 0.5
+    },
+    {
+      "label": "FLOOR of zero",
+      "formula": "FLOOR(0,2)",
+      "excel": 0
+    },
+    {
+      "label": "EXP",
+      "formula": "EXP(1)",
+      "excel": 2.71828182845905
+    },
+    {
+      "label": "LN",
+      "formula": "LN(10)",
+      "excel": 2.30258509299405
+    },
+    {
+      "label": "LN of zero",
+      "formula": "LN(0)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "LOG10",
+      "formula": "LOG10(1000)",
+      "excel": 3
+    },
+    {
+      "label": "LOG with a base",
+      "formula": "LOG(8,2)",
+      "excel": 3
+    },
+    {
+      "label": "LOG default base",
+      "formula": "LOG(100)",
+      "excel": 2
+    },
+    {
+      "label": "PI",
+      "formula": "PI()",
+      "excel": 3.14159265358979
+    },
+    {
+      "label": "PRODUCT with text argument",
+      "formula": "PRODUCT(\"2\",3)",
+      "excel": 6
+    },
+    {
+      "label": "PRODUCT of nothing",
+      "formula": "PRODUCT(J2)",
+      "excel": 0
+    },
+    {
+      "label": "AVERAGE with an error",
+      "formula": "AVERAGE({ERR})",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "MIN with a direct text number",
+      "formula": "MIN(\"5\",10)",
+      "excel": 5
+    },
+    {
+      "label": "MAX with a direct non-number text",
+      "formula": "MAX(\"a\",10)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "COUNT with a date-like text",
+      "formula": "COUNT(\"1/2/2026\")",
+      "excel": 1
+    },
+    {
+      "label": "SUM of nothing numeric",
+      "formula": "SUM(A1:A5)",
+      "excel": 0
+    },
+    {
+      "label": "AVERAGE of text only",
+      "formula": "AVERAGE(A1:A5)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "LEFT of a number",
+      "formula": "LEFT(X6,2)",
+      "excel": "12"
+    },
+    {
+      "label": "UPPER of a number",
+      "formula": "UPPER(1)",
+      "excel": "1"
+    },
+    {
+      "label": "LEN of TRUE",
+      "formula": "LEN(TRUE)",
+      "excel": 4
+    },
+    {
+      "label": "CHAR",
+      "formula": "CHAR(65)",
+      "excel": "A"
+    },
+    {
+      "label": "CODE",
+      "formula": "CODE(\"A\")",
+      "excel": 65
+    },
+    {
+      "label": "CHAR out of range",
+      "formula": "CHAR(0)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "LEFT with accents",
+      "formula": "LEFT(\"héllo\",2)",
+      "excel": "hé"
+    },
+    {
+      "label": "FIND an empty string",
+      "formula": "FIND(\"\",\"abc\")",
+      "excel": 1
+    },
+    {
+      "label": "FIND in an empty string",
+      "formula": "FIND(\"a\",\"\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "FIND beyond the start",
+      "formula": "FIND(\"a\",\"abc\",5)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "FIND with a zero start",
+      "formula": "FIND(\"a\",\"abc\",0)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "SUBSTITUTE with an empty find",
+      "formula": "SUBSTITUTE(\"abc\",\"\",\"x\")",
+      "excel": "abc"
+    },
+    {
+      "label": "SUBSTITUTE with a high instance",
+      "formula": "SUBSTITUTE(\"aaa\",\"a\",\"b\",5)",
+      "excel": "aaa"
+    },
+    {
+      "label": "SUBSTITUTE removing",
+      "formula": "SUBSTITUTE(\"a-b\",\"-\",\"\")",
+      "excel": "ab"
+    },
+    {
+      "label": "SUBSTITUTE with zero instance",
+      "formula": "SUBSTITUTE(\"aaa\",\"a\",\"b\",0)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "REPT negative",
+      "formula": "REPT(\"a\",-1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "REPT of empty text",
+      "formula": "REPT(\"\",5)",
+      "excel": ""
+    },
+    {
+      "label": "MID with a negative length",
+      "formula": "MID(\"hello\",2,-1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "LEFT with a fraction",
+      "formula": "LEFT(\"hello\",2.9)",
+      "excel": "he"
+    },
+    {
+      "label": "RIGHT zero",
+      "formula": "RIGHT(\"hello\",0)",
+      "excel": ""
+    },
+    {
+      "label": "RIGHT of a number",
+      "formula": "RIGHT(12345,2)",
+      "excel": "45"
+    },
+    {
+      "label": "TEXTJOIN with several arguments",
+      "formula": "TEXTJOIN(\"-\",TRUE,\"a\",\"\",\"b\")",
+      "excel": "a-b"
+    },
+    {
+      "label": "CONCAT of several",
+      "formula": "CONCAT(\"a\",1,TRUE)",
+      "excel": "a1TRUE"
+    },
+    {
+      "label": "EXACT of a number and its text",
+      "formula": "EXACT(1,\"1\")",
+      "excel": true
+    },
+    {
+      "label": "PROPER with an apostrophe",
+      "formula": "PROPER(\"o'neil mcdonald\")",
+      "excel": "O'Neil Mcdonald"
+    },
+    {
+      "label": "LOWER of an error",
+      "formula": "LOWER(L1)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "LEN of an error",
+      "formula": "LEN(L3)",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "VALUE of TRUE",
+      "formula": "VALUE(TRUE)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "VALUE of a number",
+      "formula": "VALUE(1.5)",
+      "excel": 1.5
+    },
+    {
+      "label": "VALUE with spaces",
+      "formula": "VALUE(\" 12 \")",
+      "excel": 12
+    },
+    {
+      "label": "VALUE with currency",
+      "formula": "VALUE(\"$1,234.50\")",
+      "excel": 1234.5
+    },
+    {
+      "label": "VALUE in parentheses",
+      "formula": "VALUE(\"(5)\")",
+      "excel": -5
+    },
+    {
+      "label": "VALUE negative percent",
+      "formula": "VALUE(\"-12%\")",
+      "excel": -0.12
+    },
+    {
+      "label": "VALUE scientific",
+      "formula": "VALUE(\"1e3\")",
+      "excel": 1000
+    },
+    {
+      "label": "UPPER of a blank",
+      "formula": "UPPER(J2)",
+      "excel": ""
+    },
+    {
+      "label": "TRIM of a number",
+      "formula": "TRIM(12)",
+      "excel": "12"
+    },
+    {
+      "label": "TRIM of tabs",
+      "formula": "TRIM(CHAR(9)&\"a\"&CHAR(9))",
+      "excel": "\ta\t"
+    },
+    {
+      "label": "SEARCH with a start",
+      "formula": "SEARCH(\"b\",\"abcb\",3)",
+      "excel": 4
+    },
+    {
+      "label": "SEARCH with a tilde",
+      "formula": "SEARCH(\"~?\",\"a?b\")",
+      "excel": 2
+    },
+    {
+      "label": "SEARCH star",
+      "formula": "SEARCH(\"a*c\",\"xabcx\")",
+      "excel": 2
+    },
+    {
+      "label": "TEXT rounds negative half away",
+      "formula": "TEXT(-0.5,\"0\")",
+      "excel": "-1"
+    },
+    {
+      "label": "TEXT rounds a small number to zero",
+      "formula": "TEXT(0.4,\"0\")",
+      "excel": "0"
+    },
+    {
+      "label": "TEXT negative zero",
+      "formula": "TEXT(-0.4,\"0\")",
+      "excel": "0"
+    },
+    {
+      "label": "TEXT scaled by a trailing comma",
+      "formula": "TEXT(1000000,\"#,##0,\")",
+      "excel": "1,000"
+    },
+    {
+      "label": "TEXT optional decimals",
+      "formula": "TEXT(5,\"0.0##\")",
+      "excel": "5.0"
+    },
+    {
+      "label": "TEXT optional decimals, more digits",
+      "formula": "TEXT(1.23456,\"0.0##\")",
+      "excel": "1.235"
+    },
+    {
+      "label": "TEXT hash only for zero",
+      "formula": "TEXT(0,\"#\")",
+      "excel": ""
+    },
+    {
+      "label": "TEXT thousands for zero",
+      "formula": "TEXT(0,\"#,##0\")",
+      "excel": "0"
+    },
+    {
+      "label": "TEXT 0.005",
+      "formula": "TEXT(0.005,\"0.00\")",
+      "excel": "0.01"
+    },
+    {
+      "label": "TEXT 1.005",
+      "formula": "TEXT(1.005,\"0.00\")",
+      "excel": "1.01"
+    },
+    {
+      "label": "TEXT 2.675",
+      "formula": "TEXT(2.675,\"0.00\")",
+      "excel": "2.68"
+    },
+    {
+      "label": "TEXT quoted literal",
+      "formula": "TEXT(5,\"0 \"\"units\"\"\")",
+      "excel": "5 units"
+    },
+    {
+      "label": "TEXT two integer digits",
+      "formula": "TEXT(5,\"00.00\")",
+      "excel": "05.00"
+    },
+    {
+      "label": "TEXT many zeros",
+      "formula": "TEXT(12345,\"00000000\")",
+      "excel": "00012345"
+    },
+    {
+      "label": "TEXT percent with a decimal",
+      "formula": "TEXT(0.123,\"0.0%\")",
+      "excel": "12.3%"
+    },
+    {
+      "label": "TEXT percent over a hundred",
+      "formula": "TEXT(1.5,\"0%\")",
+      "excel": "150%"
+    },
+    {
+      "label": "TEXT negative percent",
+      "formula": "TEXT(-0.256,\"0.0%\")",
+      "excel": "-25.6%"
+    },
+    {
+      "label": "TEXT at sign",
+      "formula": "TEXT(1234.5,\"@\")",
+      "excel": "1234.5"
+    },
+    {
+      "label": "TEXT at sign with text",
+      "formula": "TEXT(\"abc\",\"@\")",
+      "excel": "abc"
+    },
+    {
+      "label": "TEXT General for a long number",
+      "formula": "TEXT(1234.5,\"General\")",
+      "excel": "1234.5"
+    },
+    {
+      "label": "TEXT empty format",
+      "formula": "TEXT(1234.5,\"\")",
+      "excel": ""
+    },
+    {
+      "label": "TEXT hash",
+      "formula": "TEXT(5,\"#\")",
+      "excel": "5"
+    },
+    {
+      "label": "TEXT hash of a negative",
+      "formula": "TEXT(-5,\"#\")",
+      "excel": "-5"
+    },
+    {
+      "label": "TEXT hash rounding up",
+      "formula": "TEXT(0.5,\"#\")",
+      "excel": "1"
+    },
+    {
+      "label": "TEXT hash rounding down",
+      "formula": "TEXT(0.4,\"#\")",
+      "excel": ""
+    },
+    {
+      "label": "TEXT two-digit year",
+      "formula": "TEXT(46085,\"yy\")",
+      "excel": "26"
+    },
+    {
+      "label": "TEXT day",
+      "formula": "TEXT(46085,\"d\")",
+      "excel": "4"
+    },
+    {
+      "label": "TEXT two-digit day",
+      "formula": "TEXT(46085,\"dd\")",
+      "excel": "04"
+    },
+    {
+      "label": "TEXT short weekday",
+      "formula": "TEXT(46085,\"ddd\")",
+      "excel": "Wed"
+    },
+    {
+      "label": "TEXT month number",
+      "formula": "TEXT(46085,\"m\")",
+      "excel": "3"
+    },
+    {
+      "label": "TEXT short month",
+      "formula": "TEXT(46085,\"mmm\")",
+      "excel": "Mar"
+    },
+    {
+      "label": "TEXT day first",
+      "formula": "TEXT(46085,\"d/m/yyyy\")",
+      "excel": "4/3/2026"
+    },
+    {
+      "label": "TEXT with a quoted separator",
+      "formula": "TEXT(46085,\"yyyy\"\"-\"\"mm\")",
+      "excel": "2026-03"
+    },
+    {
+      "label": "TEXT of a fractional date",
+      "formula": "TEXT(46085.5,\"yyyy-mm-dd\")",
+      "excel": "2026-03-04"
+    },
+    {
+      "label": "TEXT of zero as a date",
+      "formula": "TEXT(0,\"yyyy-mm-dd\")",
+      "excel": "1900-01-00"
+    },
+    {
+      "label": "TEXT of serial 60 as a date",
+      "formula": "TEXT(60,\"yyyy-mm-dd\")",
+      "excel": "1900-02-29"
+    },
+    {
+      "label": "TEXT of a negative date",
+      "formula": "TEXT(-1,\"yyyy-mm-dd\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "TEXT month initial",
+      "formula": "TEXT(46085,\"mmmmm\")",
+      "excel": "M"
+    },
+    {
+      "label": "TEXT of an error",
+      "formula": "TEXT(L1,\"0\")",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "TEXT with a literal letter",
+      "formula": "TEXT(5,\"0 \\a\")",
+      "excel": "5 a"
+    },
+    {
+      "label": "TEXT with a backslash literal",
+      "formula": "TEXT(5,\"\\$0\")",
+      "excel": "$5"
+    },
+    {
+      "label": "TEXT with a plus sign",
+      "formula": "TEXT(5,\"+0\")",
+      "excel": "+5"
+    },
+    {
+      "label": "TEXT with a negative section and text",
+      "formula": "TEXT(-5,\"0;(0)\")",
+      "excel": "(5)"
+    },
+    {
+      "label": "TEXT with a zero section",
+      "formula": "TEXT(0,\"0;-0;\"\"zero\"\"\")",
+      "excel": "zero"
+    },
+    {
+      "label": "TEXT with three sections, positive",
+      "formula": "TEXT(5,\"0;-0;\"\"zero\"\"\")",
+      "excel": "5"
+    },
+    {
+      "label": "TEXT with a fraction",
+      "formula": "TEXT(0.5,\"# ?/?\")",
+      "excel": " 1/2"
+    },
+    {
+      "label": "TEXT with a colour",
+      "formula": "TEXT(5,\"[Red]0\")",
+      "excel": "5"
+    },
+    {
+      "label": "TEXT with a condition",
+      "formula": "TEXT(5,\"[>3]0;0\")",
+      "excel": "5"
+    },
+    {
+      "label": "TEXT with a time",
+      "formula": "TEXT(0.5,\"hh:mm\")",
+      "excel": "12:00"
+    },
+    {
+      "label": "TEXT with scientific",
+      "formula": "TEXT(12345,\"0.00E+00\")",
+      "excel": "1.23E+04"
+    },
+    {
+      "label": "EOMONTH with a fractional months",
+      "formula": "EOMONTH(46085,0.9)",
+      "excel": 46112
+    },
+    {
+      "label": "EOMONTH of serial 1",
+      "formula": "EOMONTH(1,0)",
+      "excel": 31
+    },
+    {
+      "label": "EDATE back",
+      "formula": "EDATE(46085,-3)",
+      "excel": 45995
+    },
+    {
+      "label": "WEEKDAY of serial 1",
+      "formula": "WEEKDAY(1)",
+      "excel": 1
+    },
+    {
+      "label": "WEEKDAY of serial 0",
+      "formula": "WEEKDAY(0)",
+      "excel": 7
+    },
+    {
+      "label": "WEEKDAY of serial 60",
+      "formula": "WEEKDAY(60)",
+      "excel": 4
+    },
+    {
+      "label": "WEEKDAY type 11",
+      "formula": "WEEKDAY(46085,11)",
+      "excel": 3
+    },
+    {
+      "label": "WEEKDAY type 12",
+      "formula": "WEEKDAY(46085,12)",
+      "excel": 2
+    },
+    {
+      "label": "WEEKDAY type 1",
+      "formula": "WEEKDAY(46085,1)",
+      "excel": 4
+    },
+    {
+      "label": "WEEKDAY type 0",
+      "formula": "WEEKDAY(46085,0)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "WEEKDAY of a text number",
+      "formula": "WEEKDAY(\"46085\")",
+      "excel": 4
+    },
+    {
+      "label": "DATE 29 February in a common year",
+      "formula": "DATE(2026,2,29)",
+      "excel": 46082
+    },
+    {
+      "label": "DATE 29 February in a leap year",
+      "formula": "DATE(2024,2,29)",
+      "excel": 45351
+    },
+    {
+      "label": "DATE month 13",
+      "formula": "DATE(2026,13,1)",
+      "excel": 46388
+    },
+    {
+      "label": "DATE negative month",
+      "formula": "DATE(2026,-1,1)",
+      "excel": 45962
+    },
+    {
+      "label": "DATE year 10000",
+      "formula": "DATE(10000,1,1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "DATE last day",
+      "formula": "DATE(9999,12,31)",
+      "excel": 2958465
+    },
+    {
+      "label": "DATE year 1899",
+      "formula": "DATE(1899,12,31)",
+      "excel": 693962
+    },
+    {
+      "label": "DATE year zero",
+      "formula": "DATE(0,1,1)",
+      "excel": 1
+    },
+    {
+      "label": "DATE 1900 month zero day zero",
+      "formula": "DATE(1900,0,0)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "DATE 1900 day zero",
+      "formula": "DATE(1900,1,0)",
+      "excel": 0
+    },
+    {
+      "label": "DATE 1900 day negative",
+      "formula": "DATE(1900,1,-1)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "DATE with a negative day",
+      "formula": "DATE(2026,3,-1)",
+      "excel": 46080
+    },
+    {
+      "label": "DATE with a blank",
+      "formula": "DATE(2026,J2,1)",
+      "excel": 45992
+    },
+    {
+      "label": "DATE with TRUE",
+      "formula": "DATE(2026,TRUE,1)",
+      "excel": 46023
+    },
+    {
+      "label": "DATE with a non-numeric text",
+      "formula": "DATE(\"x\",1,1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "YEAR of the last serial",
+      "formula": "YEAR(2958465)",
+      "excel": 9999
+    },
+    {
+      "label": "YEAR beyond",
+      "formula": "YEAR(2958466)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "MONTH of zero",
+      "formula": "MONTH(0)",
+      "excel": 1
+    },
+    {
+      "label": "DAY of 61",
+      "formula": "DAY(61)",
+      "excel": 1
+    },
+    {
+      "label": "MONTH of 61",
+      "formula": "MONTH(61)",
+      "excel": 3
+    },
+    {
+      "label": "YEAR of a text number",
+      "formula": "YEAR(\"46085\")",
+      "excel": 2026
+    },
+    {
+      "label": "DAY of an error",
+      "formula": "DAY(L1)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "DAY of TRUE",
+      "formula": "DAY(TRUE)",
+      "excel": 1
+    },
+    {
+      "label": "DAY of a blank",
+      "formula": "DAY(J2)",
+      "excel": 0
+    },
+    {
+      "label": "Date plus a fraction",
+      "formula": "DATE(2026,3,4)+0.5",
+      "excel": 46085.5
+    },
+    {
+      "label": "EOMONTH of a text",
+      "formula": "EOMONTH(\"46085\",0)",
+      "excel": 46112
+    },
+    {
+      "label": "EDATE with a day overflow",
+      "formula": "EDATE(DATE(2026,3,31),1)",
+      "excel": 46142
+    },
+    {
+      "label": "EDATE in a leap year",
+      "formula": "EDATE(DATE(2024,1,31),1)",
+      "excel": 45351
+    },
+    {
+      "label": "EOMONTH leap February",
+      "formula": "EOMONTH(DATE(2024,2,1),0)",
+      "excel": 45351
+    },
+    {
+      "label": "Number to text: 1E-16",
+      "formula": "1E-16&\"\"",
+      "excel": "0.0000000000000001"
+    },
+    {
+      "label": "Number to text: 1E-17",
+      "formula": "1E-17&\"\"",
+      "excel": "0.00000000000000001"
+    },
+    {
+      "label": "Number to text: 1E-18",
+      "formula": "1E-18&\"\"",
+      "excel": "0.000000000000000001"
+    },
+    {
+      "label": "Number to text: -1E+19",
+      "formula": "-1E+19&\"\"",
+      "excel": "-10000000000000000000"
+    },
+    {
+      "label": "Number to text: -1E+20",
+      "formula": "-1E+20&\"\"",
+      "excel": "-1E+20"
+    },
+    {
+      "label": "Number to text: -1E-18",
+      "formula": "-1E-18&\"\"",
+      "excel": "-0.000000000000000001"
+    },
+    {
+      "label": "Number to text: -1E-19",
+      "formula": "-1E-19&\"\"",
+      "excel": "-1E-19"
+    },
+    {
+      "label": "Number to text: 99999999999999900000",
+      "formula": "99999999999999900000&\"\"",
+      "excel": "99999999999999900000"
+    },
+    {
+      "label": "Number to text: 1.5E+19",
+      "formula": "1.5E+19&\"\"",
+      "excel": "15000000000000000000"
+    },
+    {
+      "label": "Number to text: 123456789012345.5",
+      "formula": "123456789012345.5&\"\"",
+      "excel": "123456789012345"
+    },
+    {
+      "label": "Number to text: 1.23456789012345E-5",
+      "formula": "1.23456789012345E-5&\"\"",
+      "excel": "1.23456789012345E-05"
+    },
+    {
+      "label": "Number to text: 0.00001234",
+      "formula": "0.00001234&\"\"",
+      "excel": "0.00001234"
+    },
+    {
+      "label": "Number to text: 1E+18",
+      "formula": "1E+18&\"\"",
+      "excel": "1000000000000000000"
+    },
+    {
+      "label": "Number to text: 1.234E+19",
+      "formula": "1.234E+19&\"\"",
+      "excel": "12340000000000000000"
+    },
+    {
+      "label": "Snap threshold: (1+2^-46)-1",
+      "formula": "(1+2^-46)-1",
+      "excel": 1.4210854715202e-14
+    },
+    {
+      "label": "Snap threshold: (1+2^-47)-1",
+      "formula": "(1+2^-47)-1",
+      "excel": 7.105427357601e-15
+    },
+    {
+      "label": "Snap threshold: (1+2^-48)-1",
+      "formula": "(1+2^-48)-1",
+      "excel": 3.5527136788005e-15
+    },
+    {
+      "label": "Snap threshold: (1+2^-49)-1",
+      "formula": "(1+2^-49)-1",
+      "excel": 1.77635683940025e-15
+    },
+    {
+      "label": "Snap threshold: (1+2^-50)-1",
+      "formula": "(1+2^-50)-1",
+      "excel": 0
+    },
+    {
+      "label": "Snap threshold: (1+2^-51)-1",
+      "formula": "(1+2^-51)-1",
+      "excel": 0
+    },
+    {
+      "label": "Snap threshold: (1+2^-52)-1",
+      "formula": "(1+2^-52)-1",
+      "excel": 0
+    },
+    {
+      "label": "Snap threshold: (1000+2^-43)-1000",
+      "formula": "(1000+2^-43)-1000",
+      "excel": 0
+    },
+    {
+      "label": "Snap threshold: (1000+2^-41)-1000",
+      "formula": "(1000+2^-41)-1000",
+      "excel": 0
+    },
+    {
+      "label": "Snap threshold: (0.001+2^-62)-0.001",
+      "formula": "(0.001+2^-62)-0.001",
+      "excel": 0
+    },
+    {
+      "label": "Snap in an addition",
+      "formula": "1+(-1+2^-50)",
+      "excel": 0
+    },
+    {
+      "label": "Snap with a unary minus",
+      "formula": "-(1+2^-50)+1",
+      "excel": 0
+    },
+    {
+      "label": "Snap through a cell",
+      "formula": "AA3-(AA2*2)+2^-50",
+      "excel": 8.88178419700125e-16
+    },
+    {
+      "label": "Odd root tolerance: (-8)^0.3333333",
+      "formula": "(-8)^0.3333333",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Odd root tolerance: (-8)^0.33333333333",
+      "formula": "(-8)^0.33333333333",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Odd root tolerance: (-8)^0.3333333333333",
+      "formula": "(-8)^0.3333333333333",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Odd root tolerance: (-8)^0.33333333333333",
+      "formula": "(-8)^0.33333333333333",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Odd root tolerance: (-8)^0.2",
+      "formula": "(-8)^0.2",
+      "excel": -1.5157165665104
+    },
+    {
+      "label": "Odd root of -1",
+      "formula": "(-1)^(1/3)",
+      "excel": -1
+    },
+    {
+      "label": "Negative reciprocal odd root",
+      "formula": "(-8)^(-1/3)",
+      "excel": -0.5
+    },
+    {
+      "label": "Computed third",
+      "formula": "(-8)^(3/9)",
+      "excel": -2
+    },
+    {
+      "label": "Root of a near integer",
+      "formula": "(-8)^(1/3.0000001)",
+      "excel": {
+        "error": "#NUM!"
+      }
+    },
+    {
+      "label": "Greater than at 15 digits",
+      "formula": "(1+1E-15)>1",
+      "excel": false
+    },
+    {
+      "label": "Greater or equal at 15 digits",
+      "formula": "(1+1E-15)>=1",
+      "excel": true
+    },
+    {
+      "label": "Less or equal at 15 digits",
+      "formula": "(1+1E-15)<=1",
+      "excel": true
+    },
+    {
+      "label": "Not equal at 15 digits",
+      "formula": "(1+1E-15)<>1",
+      "excel": false
+    },
+    {
+      "label": "Less than at 15 digits",
+      "formula": "(1+1E-15)<1",
+      "excel": false
+    },
+    {
+      "label": "Greater than one digit further",
+      "formula": "(1+2E-14)>1",
+      "excel": true
+    },
+    {
+      "label": "Text number: 1234,567",
+      "formula": "\"1234,567\"+0",
+      "excel": 1234567
+    },
+    {
+      "label": "Text number: 12,34,567",
+      "formula": "\"12,34,567\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1,234,56",
+      "formula": "\"1,234,56\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: ,5",
+      "formula": "\",5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 5,",
+      "formula": "\"5,\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1,000.5",
+      "formula": "\"1,000.5\"+0",
+      "excel": 1000.5
+    },
+    {
+      "label": "Text number: 1,000,000",
+      "formula": "\"1,000,000\"+0",
+      "excel": 1000000
+    },
+    {
+      "label": "Text number: 1,000e2",
+      "formula": "\"1,000e2\"+0",
+      "excel": 100000
+    },
+    {
+      "label": "Text number: 1,,000",
+      "formula": "\"1,,000\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1.000,5",
+      "formula": "\"1.000,5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1 000",
+      "formula": "\"1 000\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1_000",
+      "formula": "\"1_000\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1d3",
+      "formula": "\"1d3\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: Infinity",
+      "formula": "\"Infinity\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: NaN",
+      "formula": "\"NaN\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1e400",
+      "formula": "\"1e400\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number:   ",
+      "formula": "\"  \"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1e+3",
+      "formula": "\"1e+3\"+0",
+      "excel": 1000
+    },
+    {
+      "label": "Text number: .e3",
+      "formula": "\".e3\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: .",
+      "formula": "\".\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: -",
+      "formula": "\"-\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: +-5",
+      "formula": "\"+-5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: --5",
+      "formula": "\"--5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 5e3.5",
+      "formula": "\"5e3.5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 0.1.2",
+      "formula": "\"0.1.2\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: $5.00",
+      "formula": "\"$5.00\"+0",
+      "excel": 5
+    },
+    {
+      "label": "Text number: $ 5",
+      "formula": "\"$ 5\"+0",
+      "excel": 5
+    },
+    {
+      "label": "Text number: 5$",
+      "formula": "\"5$\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: %5",
+      "formula": "\"%5\"+0",
+      "excel": 0.05
+    },
+    {
+      "label": "Text number: 1,5",
+      "formula": "\"1,5\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: 1,000$",
+      "formula": "\"1,000$\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number: -1,234",
+      "formula": "\"-1,234\"+0",
+      "excel": -1234
+    },
+    {
+      "label": "Text number: (1,234)",
+      "formula": "\"(1,234)\"+0",
+      "excel": -1234
+    },
+    {
+      "label": "Text number: 1,234.5%",
+      "formula": "\"1,234.5%\"+0",
+      "excel": 12.345
+    },
+    {
+      "label": "Text number: 5E",
+      "formula": "\"5E\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Text number:  -5",
+      "formula": "\" -5\"+0",
+      "excel": -5
+    },
+    {
+      "label": "Text number: 5 -",
+      "formula": "\"5 -\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "MATCH with a half type on a missing value",
+      "formula": "MATCH(35,B1:B5,0.5)",
+      "excel": 3
+    },
+    {
+      "label": "MATCH with a negative half type",
+      "formula": "MATCH(35,{DESC},-0.5)",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF lower-case TRUE",
+      "formula": "COUNTIF({MIX},\"true\")",
+      "excel": 1
+    },
+    {
+      "label": "COUNTIF text <=",
+      "formula": "COUNTIF(A1:A5,\"<=b\")",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF text >=",
+      "formula": "COUNTIF(A1:A5,\">=Banana\")",
+      "excel": 2
+    },
+    {
+      "label": "AVERAGE with a direct non-numeric text",
+      "formula": "AVERAGE(\"a\",1)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "LEN of a computed number",
+      "formula": "LEN(1/3)",
+      "excel": 17
+    },
+    {
+      "label": "LEFT of a computed number",
+      "formula": "LEFT(1/3,5)",
+      "excel": "0.333"
+    },
+    {
+      "label": "LEN of a sum",
+      "formula": "LEN(0.1+0.2)",
+      "excel": 3
+    },
+    {
+      "label": "LEN of a large number",
+      "formula": "LEN(1E+21)",
+      "excel": 5
+    },
+    {
+      "label": "SUM of scientific text",
+      "formula": "SUM(\"1E3\")",
+      "excel": 1000
+    },
+    {
+      "label": "SUM of thousands text",
+      "formula": "SUM(\"1,000\")",
+      "excel": 1000
+    },
+    {
+      "label": "A blank reference",
+      "formula": "J2",
+      "excel": 0
+    },
+    {
+      "label": "An empty-text formula cell",
+      "formula": "X5",
+      "excel": ""
+    },
+    {
+      "label": "A text cell",
+      "formula": "J5",
+      "excel": "x"
+    },
+    {
+      "label": "A logical cell",
+      "formula": "J4",
+      "excel": true
+    },
+    {
+      "label": "A reference to a text number",
+      "formula": "C2",
+      "excel": "1"
+    },
+    {
+      "label": "A reference to an error",
+      "formula": "L1",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Concatenating a reference to a text number",
+      "formula": "C2&\"\"",
+      "excel": "1"
+    },
+    {
+      "label": "Adding a text number cell",
+      "formula": "C2+1",
+      "excel": 2
+    },
+    {
+      "label": "Comparing a text number cell to a number",
+      "formula": "C2=1",
+      "excel": false
+    },
+    {
+      "label": "Comparing a text number cell to its text",
+      "formula": "C2=\"1\"",
+      "excel": true
+    },
+    {
+      "label": "SUM over a range including a text number",
+      "formula": "SUM(C1:C4)",
+      "excel": 3
+    },
+    {
+      "label": "SUMPRODUCT of text numbers",
+      "formula": "SUMPRODUCT(C1:C4)",
+      "excel": 3
+    },
+    {
+      "label": "VLOOKUP with a text number key",
+      "formula": "VLOOKUP(1,C1:C4,1,FALSE)",
+      "excel": 1
+    },
+    {
+      "label": "MATCH of a number among text numbers",
+      "formula": "MATCH(2,C1:C4,0)",
+      "excel": 3
+    },
+    {
+      "label": "COUNTIF of a number among text numbers",
+      "formula": "COUNTIF(C1:C4,2)",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF of text number among numbers and text numbers",
+      "formula": "COUNTIF(C1:C4,\"2\")",
+      "excel": 2
+    },
+    {
+      "label": "COUNTIF with >= among text numbers",
+      "formula": "COUNTIF(C1:C4,\">=1\")",
+      "excel": 2
+    },
+    {
+      "label": "MAX over text numbers",
+      "formula": "MAX(C1:C4)",
+      "excel": 2
+    },
+    {
+      "label": "Array with a text number",
+      "formula": "SUM(C1:C4*1)",
+      "excel": 6
+    },
+    {
+      "label": "IF over a text number cell",
+      "formula": "IF(C2,1,2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "XLOOKUP of a number among text numbers",
+      "formula": "XLOOKUP(1,C1:C4,C1:C4)",
+      "excel": 1
+    },
+    {
+      "label": "EXACT of a number cell and text number cell",
+      "formula": "EXACT(C1,C2)",
+      "excel": true
+    },
+    {
+      "label": "TEXT of a text number cell",
+      "formula": "TEXT(C2,\"0.00\")",
+      "excel": "1.00"
+    },
+    {
+      "label": "ROUND of a text number cell",
+      "formula": "ROUND(C2,0)",
+      "excel": 1
+    },
+    {
+      "label": "LEFT of a text number",
+      "formula": "LEFT(C2,1)",
+      "excel": "1"
+    },
+    {
+      "label": "Concatenating a number cell",
+      "formula": "C1&C3",
+      "excel": "12"
+    },
+    {
+      "label": "Concatenating a date serial",
+      "formula": "DATE(2026,3,4)&\"\"",
+      "excel": "46085"
+    },
+    {
+      "label": "TEXT of a date serial with locale-free format",
+      "formula": "TEXT(DATE(2026,3,4),\"yyyy-mm-dd\")",
+      "excel": "2026-03-04"
+    },
+    {
+      "label": "A cell that snapped to zero",
+      "formula": "AB1",
+      "excel": 0
+    },
+    {
+      "label": "A parenthesized cell does not snap",
+      "formula": "AB2",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "A SUM cell snapped",
+      "formula": "AB3",
+      "excel": 0
+    },
+    {
+      "label": "Using a snapped cell",
+      "formula": "AB1+1-1",
+      "excel": 0
+    },
+    {
+      "label": "Parenthesized whole formula",
+      "formula": "(0.5-0.4-0.1)",
+      "excel": -2.77555756156289e-17
+    },
+    {
+      "label": "Negated parenthesized",
+      "formula": "-(0.5-0.4-0.1)",
+      "excel": 2.77555756156289e-17
+    },
+    {
+      "label": "SUM inside a text",
+      "formula": "\"\"&SUM(0.1,0.2,-0.3)",
+      "excel": "0"
+    },
+    {
+      "label": "SUM then adding zero",
+      "formula": "SUM(0.1,0.2,-0.3)+0",
+      "excel": 0
+    },
+    {
+      "label": "AVERAGE times three",
+      "formula": "AVERAGE(0.1,0.2,-0.3)*3",
+      "excel": 0
+    },
+    {
+      "label": "SUM with a trailing zero",
+      "formula": "SUM(0.1,0.2,-0.3,0)",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "IF returning a difference",
+      "formula": "IF(TRUE,0.1+0.2-0.3,0)",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "ABS of a difference",
+      "formula": "ABS(0.1+0.2-0.3)",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "A difference compared to zero",
+      "formula": "0.1+0.2-0.3=0",
+      "excel": false
+    },
+    {
+      "label": "Snap then add zero",
+      "formula": "1-0.9-0.1+0",
+      "excel": -2.77555756156289e-17
+    },
+    {
+      "label": "SUM of three cells",
+      "formula": "SUM(AB1,AB2,AB3)",
+      "excel": 5.55111512312578e-17
+    },
+    {
+      "label": "Product that cancels",
+      "formula": "0.1*3-0.3",
+      "excel": 0
+    },
+    {
+      "label": "Division that cancels",
+      "formula": "1/3*3-1",
+      "excel": 0
+    },
+    {
+      "label": "Sum over a range of fractions",
+      "formula": "SUM(0.1,0.2,0.3,-0.6)",
+      "excel": 0
+    },
+    {
+      "label": "Held out: Total revenue",
+      "formula": "SUM(AH2:AH9)",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: Revenue for West",
+      "formula": "SUMIFS(AH2:AH9,AD2:AD9,\"West\")",
+      "excel": 2040
+    },
+    {
+      "label": "Held out: Units for West widgets",
+      "formula": "SUMIFS(AF2:AF9,AD2:AD9,\"West\",AE2:AE9,\"Widget\")",
+      "excel": 120
+    },
+    {
+      "label": "Held out: Whole-column SUMIFS",
+      "formula": "SUMIFS(AH:AH,AD:AD,\"East\")",
+      "excel": 1960
+    },
+    {
+      "label": "Held out: Count of big West sales",
+      "formula": "COUNTIFS(AD2:AD9,\"West\",AF2:AF9,\">50\")",
+      "excel": 1
+    },
+    {
+      "label": "Held out: Average widget price",
+      "formula": "AVERAGEIFS(AG2:AG9,AE2:AE9,\"Widget\")",
+      "excel": 9.375
+    },
+    {
+      "label": "Held out: Everything but West",
+      "formula": "SUMIF(AD2:AD9,\"<>West\",AH2:AH9)",
+      "excel": 3975
+    },
+    {
+      "label": "Held out: Largest gadget order",
+      "formula": "MAXIFS(AF2:AF9,AE2:AE9,\"Gadget\")",
+      "excel": 60
+    },
+    {
+      "label": "Held out: Revenue over a threshold",
+      "formula": "SUMIF(AH2:AH9,\">500\")",
+      "excel": 5800
+    },
+    {
+      "label": "Held out: Count of regions starting with S",
+      "formula": "COUNTIF(AD2:AD9,\"S*\")",
+      "excel": 2
+    },
+    {
+      "label": "Held out: Units text is ignored",
+      "formula": "SUMIFS(AF2:AF9,AD2:AD9,\"South\")",
+      "excel": 0
+    },
+    {
+      "label": "Held out: SUMIFS over a formula column with text input",
+      "formula": "SUMIFS(AH2:AH9,AF2:AF9,\">=60\")",
+      "excel": 4900
+    },
+    {
+      "label": "Held out: Share of the total",
+      "formula": "AH2/SUM(AH$2:AH$9)",
+      "excel": 0.189526184538653
+    },
+    {
+      "label": "Held out: Share as text",
+      "formula": "TEXT(AH2/SUM(AH2:AH9),\"0.0%\")",
+      "excel": "19.0%"
+    },
+    {
+      "label": "Held out: Rounded share",
+      "formula": "ROUND(AH2/SUM(AH2:AH9)*100,1)",
+      "excel": 19
+    },
+    {
+      "label": "Held out: Running total",
+      "formula": "AJ9",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: Running total at row 5",
+      "formula": "AJ5",
+      "excel": 4000
+    },
+    {
+      "label": "Held out: Total minus running",
+      "formula": "AJ9-AK1",
+      "excel": 0
+    },
+    {
+      "label": "Held out: A chain through formula cells",
+      "formula": "AK4",
+      "excel": 55.1375
+    },
+    {
+      "label": "Held out: Tax on the total",
+      "formula": "ROUND(AK1*0.0825,2)",
+      "excel": 496.24
+    },
+    {
+      "label": "Held out: Tier by units",
+      "formula": "IF(AF2>100,\"high\",IF(AF2>50,\"mid\",\"low\"))",
+      "excel": "high"
+    },
+    {
+      "label": "Held out: Guarded division",
+      "formula": "IF(AF8=0,\"none\",AH8/AF8)",
+      "excel": "none"
+    },
+    {
+      "label": "Held out: Division by zero",
+      "formula": "AH8/AF8",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Held out: IFERROR around a division",
+      "formula": "IFERROR(AH8/AF8,0)",
+      "excel": 0
+    },
+    {
+      "label": "Held out: IFERROR around a missing lookup",
+      "formula": "IFERROR(VLOOKUP(\"Mars\",AD2:AH9,5,FALSE),\"missing\")",
+      "excel": "missing"
+    },
+    {
+      "label": "Held out: AND in an IF",
+      "formula": "IF(AND(AF2>100,AG2>9),\"A\",\"B\")",
+      "excel": "A"
+    },
+    {
+      "label": "Held out: OR in an IF",
+      "formula": "IF(OR(AD2=\"West\",AD2=\"East\"),1,0)",
+      "excel": 1
+    },
+    {
+      "label": "Held out: Text compared to a cell",
+      "formula": "IF(AD2=AD4,\"same\",\"different\")",
+      "excel": "same"
+    },
+    {
+      "label": "Held out: IF with a text unit",
+      "formula": "IF(ISNUMBER(AF9),AF9,0)",
+      "excel": 0
+    },
+    {
+      "label": "Held out: Nested IFERROR and VALUE",
+      "formula": "IFERROR(VALUE(AF9),-1)",
+      "excel": -1
+    },
+    {
+      "label": "Held out: VLOOKUP revenue",
+      "formula": "VLOOKUP(\"North\",AD2:AH9,5,FALSE)",
+      "excel": 1800
+    },
+    {
+      "label": "Held out: VLOOKUP units",
+      "formula": "VLOOKUP(\"North\",AD2:AH9,3,FALSE)",
+      "excel": 200
+    },
+    {
+      "label": "Held out: INDEX and MATCH",
+      "formula": "INDEX(AH2:AH9,MATCH(\"South\",AD2:AD9,0))",
+      "excel": 0
+    },
+    {
+      "label": "Held out: XLOOKUP units",
+      "formula": "XLOOKUP(\"North\",AD2:AD9,AF2:AF9)",
+      "excel": 200
+    },
+    {
+      "label": "Held out: XLOOKUP last",
+      "formula": "XLOOKUP(\"Gadget\",AE2:AE9,AH2:AH9,\"\",0,-1)",
+      "excel": 0
+    },
+    {
+      "label": "Held out: MATCH of the maximum",
+      "formula": "MATCH(MAX(AH2:AH9),AH2:AH9,0)",
+      "excel": 5
+    },
+    {
+      "label": "Held out: Region of the top revenue",
+      "formula": "INDEX(AD2:AD9,MATCH(MAX(AH2:AH9),AH2:AH9,0))",
+      "excel": "North"
+    },
+    {
+      "label": "Held out: INDEX with a computed row",
+      "formula": "INDEX(AH2:AH9,ROWS(AH2:AH9))",
+      "excel": 0
+    },
+    {
+      "label": "Held out: Two-way lookup",
+      "formula": "INDEX(AF2:AG9,MATCH(\"East\",AD2:AD9,0),2)",
+      "excel": 9.5
+    },
+    {
+      "label": "Held out: Joined text",
+      "formula": "AD2&\" - \"&AE2",
+      "excel": "West - Widget"
+    },
+    {
+      "label": "Held out: Capitalized",
+      "formula": "UPPER(LEFT(AD2,1))&LOWER(MID(AD2,2,10))",
+      "excel": "West"
+    },
+    {
+      "label": "Held out: CONCATENATE",
+      "formula": "CONCATENATE(AD2,\"/\",AE2)",
+      "excel": "West/Widget"
+    },
+    {
+      "label": "Held out: Price as currency text",
+      "formula": "TEXT(AG2,\"$0.00\")",
+      "excel": "$9.50"
+    },
+    {
+      "label": "Held out: Units with a label",
+      "formula": "TEXT(AF2,\"#,##0\")&\" units\"",
+      "excel": "120 units"
+    },
+    {
+      "label": "Held out: Length of two cells",
+      "formula": "LEN(AD2&AE2)",
+      "excel": 10
+    },
+    {
+      "label": "Held out: Replaced word",
+      "formula": "SUBSTITUTE(AE2,\"Widget\",\"Part\")",
+      "excel": "Part"
+    },
+    {
+      "label": "Held out: Padded and trimmed",
+      "formula": "TRIM(\"  \"&AD2&\"  \")",
+      "excel": "West"
+    },
+    {
+      "label": "Held out: All regions joined",
+      "formula": "TEXTJOIN(\", \",TRUE,AD2:AD9)",
+      "excel": "West, East, West, East, North, North, South, South"
+    },
+    {
+      "label": "Held out: Contains test",
+      "formula": "IF(ISNUMBER(SEARCH(\"get\",AE2)),\"yes\",\"no\")",
+      "excel": "yes"
+    },
+    {
+      "label": "Held out: Code from pieces",
+      "formula": "LEFT(AD2,3)&\"-\"&RIGHT(AE2,3)",
+      "excel": "Wes-get"
+    },
+    {
+      "label": "Held out: Text of a number cell",
+      "formula": "AD2&\": \"&AF2",
+      "excel": "West: 120"
+    },
+    {
+      "label": "Held out: Text of a computed number",
+      "formula": "AD2&\": \"&AH2",
+      "excel": "West: 1140"
+    },
+    {
+      "label": "Held out: Text of a price",
+      "formula": "AD2&\" @ \"&AG2",
+      "excel": "West @ 9.5"
+    },
+    {
+      "label": "Held out: Number as text in IF",
+      "formula": "IF(AF2>100,AF2&\" units\",\"few\")",
+      "excel": "120 units"
+    },
+    {
+      "label": "Held out: Date as text",
+      "formula": "TEXT(AI2,\"yyyy-mm-dd\")",
+      "excel": "2026-01-01"
+    },
+    {
+      "label": "Held out: End of the month",
+      "formula": "EOMONTH(AI2,0)",
+      "excel": 46053
+    },
+    {
+      "label": "Held out: Days between",
+      "formula": "AI3-AI2",
+      "excel": 17
+    },
+    {
+      "label": "Held out: Month of a date",
+      "formula": "MONTH(AI2)",
+      "excel": 1
+    },
+    {
+      "label": "Held out: Quarter label",
+      "formula": "YEAR(AI2)&\"-Q\"&ROUNDUP(MONTH(AI2)/3,0)",
+      "excel": "2026-Q1"
+    },
+    {
+      "label": "Held out: Weekday, Monday first",
+      "formula": "WEEKDAY(AI2,2)",
+      "excel": 4
+    },
+    {
+      "label": "Held out: Revenue of January",
+      "formula": "SUMPRODUCT((MONTH(AI2:AI9)=1)*AH2:AH9)",
+      "excel": 1900
+    },
+    {
+      "label": "Held out: Dates after the second",
+      "formula": "COUNTIFS(AI2:AI9,\">=\"&AI3)",
+      "excel": 7
+    },
+    {
+      "label": "Held out: Six months on",
+      "formula": "EDATE(AI2,6)",
+      "excel": 46204
+    },
+    {
+      "label": "Held out: Long date",
+      "formula": "TEXT(EOMONTH(AI2,0),\"mmmm d, yyyy\")",
+      "excel": "January 31, 2026"
+    },
+    {
+      "label": "Held out: First of next month",
+      "formula": "DATE(YEAR(AI2),MONTH(AI2)+1,1)",
+      "excel": 46054
+    },
+    {
+      "label": "Held out: Days in the month",
+      "formula": "DAY(EOMONTH(AI2,0))",
+      "excel": 31
+    },
+    {
+      "label": "Held out: Revenue in a date window",
+      "formula": "SUMIFS(AH2:AH9,AI2:AI9,\">=\"&AI3,AI2:AI9,\"<=\"&AI6)",
+      "excel": 4660
+    },
+    {
+      "label": "Held out: Average price",
+      "formula": "ROUND(AVERAGE(AG2:AG9),2)",
+      "excel": 14.88
+    },
+    {
+      "label": "Held out: Median units",
+      "formula": "MEDIAN(AF2:AF9)",
+      "excel": 60
+    },
+    {
+      "label": "Held out: Second largest revenue",
+      "formula": "LARGE(AH2:AH9,2)",
+      "excel": 1200
+    },
+    {
+      "label": "Held out: Second smallest unit count",
+      "formula": "SMALL(AF2:AF9,2)",
+      "excel": 10
+    },
+    {
+      "label": "Held out: Rank of a revenue",
+      "formula": "RANK(AH3,AH2:AH9)",
+      "excel": 5
+    },
+    {
+      "label": "Held out: Product of three",
+      "formula": "PRODUCT(AF2:AF4)",
+      "excel": 432000
+    },
+    {
+      "label": "Held out: Weighted revenue",
+      "formula": "SUMPRODUCT(AF2:AF9,AG2:AG9)",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: West units by SUMPRODUCT",
+      "formula": "SUMPRODUCT((AD2:AD9=\"West\")*(AF2:AF9))",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out: Share of big orders",
+      "formula": "COUNTIF(AF2:AF9,\">=100\")/COUNT(AF2:AF9)",
+      "excel": 0.285714285714286
+    },
+    {
+      "label": "Held out: Range of units",
+      "formula": "MAX(AF2:AF9)-MIN(AF2:AF9)",
+      "excel": 200
+    },
+    {
+      "label": "Held out: Standard deviation by hand",
+      "formula": "SQRT(SUMPRODUCT((AF2:AF8-AVERAGE(AF2:AF8))^2)/COUNT(AF2:AF8))",
+      "excel": 63.9594897300675
+    },
+    {
+      "label": "Held out: Average of one region",
+      "formula": "AVERAGE(IF(AD2:AD9=\"West\",AF2:AF9))",
+      "excel": 82.5
+    },
+    {
+      "label": "Held out: Remainder",
+      "formula": "MOD(AF2,7)",
+      "excel": 1
+    },
+    {
+      "label": "Held out: One decimal",
+      "formula": "INT(AG2*10)/10",
+      "excel": 9.5
+    },
+    {
+      "label": "Held out: Up to the hundred",
+      "formula": "CEILING(AH2,100)",
+      "excel": 1200
+    },
+    {
+      "label": "Held out: Rounded to hundreds",
+      "formula": "ROUND(AH2,-2)",
+      "excel": 1100
+    },
+    {
+      "label": "Held out: Difference",
+      "formula": "ABS(AF2-AF3)",
+      "excel": 40
+    },
+    {
+      "label": "Held out: Compound growth",
+      "formula": "POWER(1+0.05,10)",
+      "excel": 1.62889462677744
+    },
+    {
+      "label": "Held out: Compound growth by operator",
+      "formula": "1000*(1+0.05)^10",
+      "excel": 1628.89462677744
+    },
+    {
+      "label": "Held out: Monthly compounding",
+      "formula": "ROUND(1000*(1+0.05/12)^(12*10),2)",
+      "excel": 1647.01
+    },
+    {
+      "label": "Held out: Negated square",
+      "formula": "-AG2^2",
+      "excel": 90.25
+    },
+    {
+      "label": "Held out: Margin",
+      "formula": "(AH2-AF2*5)/AH2",
+      "excel": 0.473684210526316
+    },
+    {
+      "label": "Held out: Percent change",
+      "formula": "(AH3-AH2)/AH2",
+      "excel": -0.333333333333333
+    },
+    {
+      "label": "Held out: Percent change text",
+      "formula": "TEXT((AH3-AH2)/AH2,\"+0.0%;-0.0%\")",
+      "excel": "-33.3%"
+    },
+    {
+      "label": "Held out: Running average",
+      "formula": "AVERAGE(AH2:AH5)",
+      "excel": 1000
+    },
+    {
+      "label": "Held out: Count of numbers",
+      "formula": "COUNT(AF2:AF9)",
+      "excel": 7
+    },
+    {
+      "label": "Held out: Count of entries",
+      "formula": "COUNTA(AF2:AF9)",
+      "excel": 8
+    },
+    {
+      "label": "Held out: Average ignoring text",
+      "formula": "AVERAGE(AF2:AF9)",
+      "excel": 73.5714285714286
+    },
+    {
+      "label": "Held out: Count of the text entry",
+      "formula": "COUNTIF(AF2:AF9,\"n/a\")",
+      "excel": 1
+    },
+    {
+      "label": "Held out: Text plus number",
+      "formula": "AF9+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out: Text in a product",
+      "formula": "AF9*AG9",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out: Sum of a column with text",
+      "formula": "SUM(AF2:AF9)",
+      "excel": 515
+    },
+    {
+      "label": "Held out: Blank cell in arithmetic",
+      "formula": "AL1+1",
+      "excel": 1
+    },
+    {
+      "label": "Held out: Blank cell in text",
+      "formula": "AL1&\"x\"",
+      "excel": "x"
+    },
+    {
+      "label": "Held out: Blank cell compared",
+      "formula": "AL1=0",
+      "excel": true
+    },
+    {
+      "label": "Held out: Average of a blank range",
+      "formula": "AVERAGE(AL1:AL5)",
+      "excel": {
+        "error": "#DIV/0!"
+      }
+    },
+    {
+      "label": "Held out: Count of a blank range",
+      "formula": "COUNTBLANK(AL1:AL5)",
+      "excel": 5
+    },
+    {
+      "label": "Held out: Max of a blank range",
+      "formula": "MAX(AL1:AL5)",
+      "excel": 0
+    },
+    {
+      "label": "Held out: Percent literal",
+      "formula": "AF2*5%",
+      "excel": 6
+    },
+    {
+      "label": "Held out: Text number from a literal",
+      "formula": "\"12\"*\"2\"",
+      "excel": 24
+    },
+    {
+      "label": "Held out: Concatenated numbers keep digits",
+      "formula": "AG2&AF2",
+      "excel": "9.5120"
+    },
+    {
+      "label": "Held out: Large number text",
+      "formula": "AH2*1000000000000&\"\"",
+      "excel": "1140000000000000"
+    },
+    {
+      "label": "Held out: Tiny number text",
+      "formula": "AG2/10000000&\"\"",
+      "excel": "0.00000095"
+    },
+    {
+      "label": "Held out: Count distinct by SUMPRODUCT",
+      "formula": "SUMPRODUCT(1/COUNTIF(AD2:AD9,AD2:AD9))",
+      "excel": 4
+    },
+    {
+      "label": "Held out: Count of regions with units over 50",
+      "formula": "SUMPRODUCT((AF2:AF8>50)*1)",
+      "excel": 4
+    },
+    {
+      "label": "Held out: MAX of an IF array",
+      "formula": "MAX(IF(AD2:AD9=\"North\",AH2:AH9))",
+      "excel": 1800
+    },
+    {
+      "label": "Held out: MIN of an IF array",
+      "formula": "MIN(IF(AE2:AE9=\"Gadget\",AF2:AF8))",
+      "excel": {
+        "error": "#N/A"
+      }
+    },
+    {
+      "label": "Held out: Top two sum",
+      "formula": "LARGE(AH2:AH9,1)+LARGE(AH2:AH9,2)",
+      "excel": 3000
+    },
+    {
+      "label": "Held out: Sum of the top three",
+      "formula": "SUMPRODUCT(LARGE(AH2:AH9,{1,2,3}))",
+      "excel": 4140
+    },
+    {
+      "label": "Held out: Array constant lookup",
+      "formula": "SUM(INDEX(AH2:AH9,{1,3}))",
+      "excel": 2040
+    },
+    {
+      "label": "Held out: CHOOSE by a MATCH",
+      "formula": "CHOOSE(MATCH(AD4,{\"North\",\"West\",\"East\"},0),\"n\",\"w\",\"e\")",
+      "excel": "w"
+    },
+    {
+      "label": "Held out: SWITCH on a region",
+      "formula": "SWITCH(AD2,\"West\",\"W\",\"East\",\"E\",\"?\")",
+      "excel": "W"
+    },
+    {
+      "label": "Held out: IFS tiers",
+      "formula": "IFS(AF2>=200,\"A\",AF2>=100,\"B\",AF2>=50,\"C\",TRUE,\"D\")",
+      "excel": "B"
+    },
+    {
+      "label": "Held out: Nested text and numbers",
+      "formula": "\"Total: \"&TEXT(AK1,\"#,##0.00\")",
+      "excel": "Total: 6,015.00"
+    },
+    {
+      "label": "Held out: Negative formatted",
+      "formula": "TEXT(AH2-AK1,\"#,##0;(#,##0)\")",
+      "excel": "(4,875)"
+    },
+    {
+      "label": "Held out: Column range sum",
+      "formula": "SUM(AF:AG)",
+      "excel": 634
+    },
+    {
+      "label": "Held out: Reversed range",
+      "formula": "SUM(AH9:AH2)",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: Absolute references",
+      "formula": "SUM($AH$2:$AH$9)",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: Mixed references",
+      "formula": "SUM(AH$2:AH9)",
+      "excel": 6015
+    },
+    {
+      "label": "Held out: COUNTIF on a computed criterion",
+      "formula": "COUNTIF(AF2:AF9,\">\"&AVERAGE(AF2:AF8))",
+      "excel": 3
+    },
+    {
+      "label": "Held out: SUMIF with a cell criterion",
+      "formula": "SUMIF(AD2:AD9,AD2,AH2:AH9)",
+      "excel": 2040
+    },
+    {
+      "label": "Held out: SUMIF with a number criterion",
+      "formula": "SUMIF(AF2:AF9,80,AH2:AH9)",
+      "excel": 760
+    },
+    {
+      "label": "Held out: SUMIFS with an expression",
+      "formula": "SUMIFS(AH2:AH9,AF2:AF9,\">\"&AF3)",
+      "excel": 2940
+    },
+    {
+      "label": "Held out: Long IF chain",
+      "formula": "IF(AD2=\"North\",\"N\",IF(AD2=\"South\",\"S\",IF(AD2=\"East\",\"E\",IF(AD2=\"West\",\"W\",\"?\"))))",
+      "excel": "W"
+    },
+    {
+      "label": "Held out: ISERROR on a formula",
+      "formula": "ISERROR(AH8/AF8)",
+      "excel": true
+    },
+    {
+      "label": "Held out: ISNUMBER on a text unit",
+      "formula": "ISNUMBER(AF9)",
+      "excel": false
+    },
+    {
+      "label": "Held out: Nested function depth",
+      "formula": "ROUND(SQRT(ABS(MIN(AH2:AH9)-MAX(AH2:AH9))),1)",
+      "excel": 42.4
+    },
+    {
+      "label": "Held out 2: COUNTIF with an array of criteria, summed",
+      "formula": "SUM(COUNTIF(AD2:AD9,{\"West\",\"East\"}))",
+      "excel": 4
+    },
+    {
+      "label": "Held out 2: SUMIF with an array of criteria",
+      "formula": "SUM(SUMIF(AD2:AD9,{\"West\",\"East\"},AH2:AH9))",
+      "excel": 4000
+    },
+    {
+      "label": "Held out 2: SUMIFS with an array of criteria",
+      "formula": "SUMPRODUCT(SUMIFS(AH2:AH9,AD2:AD9,{\"West\",\"East\"}))",
+      "excel": 4000
+    },
+    {
+      "label": "Held out 2: COUNTIFS with an array and a text",
+      "formula": "SUM(COUNTIFS(AD2:AD9,{\"West\",\"East\"},AE2:AE9,\"Widget\"))",
+      "excel": 2
+    },
+    {
+      "label": "Held out 2: MATCH with an array of keys",
+      "formula": "SUM(MATCH({\"East\",\"North\"},AD2:AD9,0))",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: VLOOKUP with an array of keys",
+      "formula": "SUM(VLOOKUP({\"East\",\"North\"},AD2:AH9,5,FALSE))",
+      "excel": 2560
+    },
+    {
+      "label": "Held out 2: INDEX with MATCH over a condition",
+      "formula": "INDEX(AD2:AD9,MATCH(1,(AF2:AF8>100)*(AE2:AE8=\"Widget\"),0))",
+      "excel": "West"
+    },
+    {
+      "label": "Held out 2: Max over a masked array",
+      "formula": "MAX(INDEX((AD2:AD9=\"West\")*AH2:AH9,0))",
+      "excel": 1140
+    },
+    {
+      "label": "Held out 2: Max of a product of arrays",
+      "formula": "SUMPRODUCT(MAX((AD2:AD9=\"East\")*AH2:AH9))",
+      "excel": 1200
+    },
+    {
+      "label": "Held out 2: Count of numbers by ISNUMBER",
+      "formula": "SUMPRODUCT(--ISNUMBER(AF2:AF9))",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: Count with a times one",
+      "formula": "SUMPRODUCT(ISNUMBER(AF2:AF9)*1)",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: COUNT of an IF array",
+      "formula": "COUNT(IF(AF2:AF8>50,1))",
+      "excel": 4
+    },
+    {
+      "label": "Held out 2: SUM of an IFERROR array",
+      "formula": "SUM(IFERROR(AF2:AF9*2,0))",
+      "excel": 1030
+    },
+    {
+      "label": "Held out 2: SUM of IF ISNUMBER",
+      "formula": "SUM(IF(ISNUMBER(AF2:AF9),AF2:AF9,0))",
+      "excel": 515
+    },
+    {
+      "label": "Held out 2: AVERAGE of an IF array",
+      "formula": "AVERAGE(IF(AF2:AF8>0,AF2:AF8))",
+      "excel": 85.8333333333333
+    },
+    {
+      "label": "Held out 2: TEXTJOIN of an IF array",
+      "formula": "TEXTJOIN(\",\",TRUE,IF(AF2:AF8>50,AD2:AD8,\"\"))",
+      "excel": "West,East,East,North"
+    },
+    {
+      "label": "Held out 2: AND over an array",
+      "formula": "AND(AF2:AF8>0)",
+      "excel": false
+    },
+    {
+      "label": "Held out 2: OR over an array",
+      "formula": "OR(AD2:AD9=\"Mars\")",
+      "excel": false
+    },
+    {
+      "label": "Held out 2: Even units",
+      "formula": "SUMPRODUCT(--(MOD(AF2:AF8,2)=0))",
+      "excel": 6
+    },
+    {
+      "label": "Held out 2: Rounded prices",
+      "formula": "SUMPRODUCT(ROUND(AG2:AG9,0))",
+      "excel": 121
+    },
+    {
+      "label": "Held out 2: Rounded and divided",
+      "formula": "SUM(ROUND(AH2:AH9/7,1))",
+      "excel": 859.3
+    },
+    {
+      "label": "Held out 2: Count of letters o",
+      "formula": "SUMPRODUCT(LEN(AD2:AD9)-LEN(SUBSTITUTE(AD2:AD9,\"o\",\"\")))",
+      "excel": 4
+    },
+    {
+      "label": "Held out 2: First letter test",
+      "formula": "SUMPRODUCT(--(LEFT(AE2:AE9,1)=\"W\"))",
+      "excel": 4
+    },
+    {
+      "label": "Held out 2: Trimmed lengths",
+      "formula": "SUM(LEN(TRIM(AD2:AD9&\" \")))",
+      "excel": 36
+    },
+    {
+      "label": "Held out 2: Lengths of names",
+      "formula": "SUMPRODUCT(LEN(AD2:AD9))",
+      "excel": 36
+    },
+    {
+      "label": "Held out 2: Text in a product is an error",
+      "formula": "AF9*2",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out 2: Error through a SUM of an array",
+      "formula": "SUM(AF2:AF9*2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out 2: IFERROR around that",
+      "formula": "IFERROR(SUM(AF2:AF9*2),\"err\")",
+      "excel": "err"
+    },
+    {
+      "label": "Held out 2: COUNT skips errors in an array",
+      "formula": "COUNT(AF2:AF9*2)",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: SUMPRODUCT of a product with text",
+      "formula": "SUMPRODUCT(AF2:AF9*2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out 2: MAX with an error in the range",
+      "formula": "MAX(AH2:AH8,AF9*2)",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out 2: Error in the first argument of IF",
+      "formula": "IF(AF9*2>1,\"a\",\"b\")",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "Held out 2: Error in an unused branch",
+      "formula": "IF(TRUE,\"ok\",AF9*2)",
+      "excel": "ok"
+    },
+    {
+      "label": "Held out 2: Nested IFERROR",
+      "formula": "IFERROR(IFERROR(AF9*2,AF9*3),\"both\")",
+      "excel": "both"
+    },
+    {
+      "label": "Held out 2: IFERROR with a text fallback",
+      "formula": "IFERROR(AF9/2,\"n/a\")",
+      "excel": "n/a"
+    },
+    {
+      "label": "Held out 2: ISERROR over an array",
+      "formula": "SUMPRODUCT(--ISERROR(AF2:AF9*2))",
+      "excel": 1
+    },
+    {
+      "label": "Held out 2: IFERROR over an array",
+      "formula": "SUMPRODUCT(IFERROR(AF2:AF9*2,0))",
+      "excel": 1030
+    },
+    {
+      "label": "Held out 2: Wrapped text of an error",
+      "formula": "IFERROR(TEXT(AF9*2,\"0\"),\"x\")",
+      "excel": "x"
+    },
+    {
+      "label": "Held out 2: Text of a share",
+      "formula": "TEXT(AG2/100,\"0.0%\")",
+      "excel": "9.5%"
+    },
+    {
+      "label": "Held out 2: Text of a month",
+      "formula": "TEXT(AI2,\"mmm yyyy\")",
+      "excel": "Jan 2026"
+    },
+    {
+      "label": "Held out 2: Text of a weekday and day",
+      "formula": "TEXT(AI2,\"ddd d\")",
+      "excel": "Thu 1"
+    },
+    {
+      "label": "Held out 2: Text of a total",
+      "formula": "TEXT(AK1,\"#,##0\")",
+      "excel": "6,015"
+    },
+    {
+      "label": "Held out 2: Text of a decimal",
+      "formula": "TEXT(AH2,\"0.0\")",
+      "excel": "1140.0"
+    },
+    {
+      "label": "Held out 2: Text of a negative",
+      "formula": "TEXT(-AK1,\"#,##0.00\")",
+      "excel": "-6,015.00"
+    },
+    {
+      "label": "Held out 2: Text of zero with a dash",
+      "formula": "TEXT(0,\"#,##0;-#,##0;\\-\")",
+      "excel": "-"
+    },
+    {
+      "label": "Held out 2: Text with a literal",
+      "formula": "TEXT(AF2,\"0 \"\"pcs\"\"\")",
+      "excel": "120 pcs"
+    },
+    {
+      "label": "Held out 2: Text of a small number",
+      "formula": "TEXT(0.000123,\"0.00\")",
+      "excel": "0.00"
+    },
+    {
+      "label": "Held out 2: Text of a large number",
+      "formula": "TEXT(1234567890,\"#,##0\")",
+      "excel": "1,234,567,890"
+    },
+    {
+      "label": "Held out 2: Text rounds up at the half",
+      "formula": "TEXT(0.125,\"0.00\")",
+      "excel": "0.13"
+    },
+    {
+      "label": "Held out 2: Text rounds 2.5",
+      "formula": "TEXT(2.5,\"0\")",
+      "excel": "3"
+    },
+    {
+      "label": "Held out 2: Text rounds -2.5",
+      "formula": "TEXT(-2.5,\"0\")",
+      "excel": "-3"
+    },
+    {
+      "label": "Held out 2: Date from parts as text",
+      "formula": "TEXT(DATE(2026,12,25),\"dddd, mmmm d\")",
+      "excel": "Friday, December 25"
+    },
+    {
+      "label": "Held out 2: Whole column COUNTIF",
+      "formula": "COUNTIF(AD:AD,\"West\")",
+      "excel": 2
+    },
+    {
+      "label": "Held out 2: Whole column SUMIF with header text",
+      "formula": "SUMIF(AD:AD,\"West\",AF:AF)",
+      "excel": 165
+    },
+    {
+      "label": "Held out 2: Whole column COUNT",
+      "formula": "COUNT(AF:AF)",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: Whole column MAX",
+      "formula": "MAX(AH:AH)",
+      "excel": 1800
+    },
+    {
+      "label": "Held out 2: Whole column AVERAGE",
+      "formula": "AVERAGE(AG:AG)",
+      "excel": 14.875
+    },
+    {
+      "label": "Held out 2: Two columns of text criteria",
+      "formula": "SUMIFS(AH:AH,AD:AD,\"North\",AE:AE,\"Gadget\")",
+      "excel": 215
+    },
+    {
+      "label": "Held out 2: MATCH in a whole column",
+      "formula": "MATCH(\"South\",AD:AD,0)",
+      "excel": 8
+    },
+    {
+      "label": "Held out 2: VLOOKUP over whole columns",
+      "formula": "VLOOKUP(\"East\",AD:AH,5,FALSE)",
+      "excel": 760
+    },
+    {
+      "label": "Held out 2: INDEX over a whole column",
+      "formula": "INDEX(AH:AH,3)",
+      "excel": 760
+    },
+    {
+      "label": "Held out 2: Chain: running total vs SUM",
+      "formula": "AJ9=SUM(AH2:AH9)",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Chain: last of the chain",
+      "formula": "AJ9-AJ8",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Chain: a cell referring a cell referring a cell",
+      "formula": "AK4*2",
+      "excel": 110.275
+    },
+    {
+      "label": "Held out 2: Formula cell compared",
+      "formula": "AH2=AF2*AG2",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Formula cell with text unit",
+      "formula": "AH9",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Percent of a range total",
+      "formula": "AF2/SUM(AF2:AF8)",
+      "excel": 0.233009708737864
+    },
+    {
+      "label": "Held out 2: Percent text of a range total",
+      "formula": "TEXT(AF2/SUM(AF2:AF8),\"0%\")",
+      "excel": "23%"
+    },
+    {
+      "label": "Held out 2: Cumulative share",
+      "formula": "SUM(AH2:AH4)/SUM(AH2:AH9)",
+      "excel": 0.465502909393184
+    },
+    {
+      "label": "Held out 2: Weighted average",
+      "formula": "SUMPRODUCT(AF2:AF8,AG2:AG8)/SUM(AF2:AF8)",
+      "excel": 11.6796116504854
+    },
+    {
+      "label": "Held out 2: Average price by hand",
+      "formula": "SUM(AG2:AG9)/COUNT(AG2:AG9)",
+      "excel": 14.875
+    },
+    {
+      "label": "Held out 2: Difference of cumulative sums",
+      "formula": "SUM(AH2:AH9)-SUM(AH2:AH5)",
+      "excel": 2015
+    },
+    {
+      "label": "Held out 2: Round half cases",
+      "formula": "ROUND(AH2*0.15,0)",
+      "excel": 171
+    },
+    {
+      "label": "Held out 2: Round a computed half",
+      "formula": "ROUND(2.5*1.1,0)",
+      "excel": 3
+    },
+    {
+      "label": "Held out 2: Round of 0.1 plus 0.2",
+      "formula": "ROUND(0.1+0.2,1)",
+      "excel": 0.3
+    },
+    {
+      "label": "Held out 2: Subtraction near zero at the root",
+      "formula": "AH2-AF2*AG2",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Addition snapped near zero",
+      "formula": "AG2*3-28.5",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Not snapped under a function",
+      "formula": "ABS(AG2*3-28.5)",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Sum of fractions",
+      "formula": "SUM(0.1,0.7,0.2)-1",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Sum of fractions as text",
+      "formula": "SUM(0.1,0.7,0.2)-1&\"\"",
+      "excel": "0"
+    },
+    {
+      "label": "Held out 2: Multiplying decimals",
+      "formula": "0.1*3",
+      "excel": 0.3
+    },
+    {
+      "label": "Held out 2: Multiplying decimals as text",
+      "formula": "0.1*3&\"\"",
+      "excel": "0.3"
+    },
+    {
+      "label": "Held out 2: Comparing computed decimals",
+      "formula": "0.1*3=0.3",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Dividing",
+      "formula": "1/3+1/3+1/3=1",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Percent arithmetic",
+      "formula": "AG2*(1+10%)",
+      "excel": 10.45
+    },
+    {
+      "label": "Held out 2: Power of a sum",
+      "formula": "(AF2+AF3)^2",
+      "excel": 40000
+    },
+    {
+      "label": "Held out 2: Sequence of operators",
+      "formula": "2+3*4^2/8-1",
+      "excel": 7
+    },
+    {
+      "label": "Held out 2: Unary minus in a range",
+      "formula": "-SUM(AH2:AH3)",
+      "excel": -1900
+    },
+    {
+      "label": "Held out 2: Double unary",
+      "formula": "--AF2",
+      "excel": 120
+    },
+    {
+      "label": "Held out 2: Concatenation precedence",
+      "formula": "1+2&3+4",
+      "excel": "37"
+    },
+    {
+      "label": "Held out 2: Comparison chains",
+      "formula": "1<2=TRUE",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Text comparison of cells",
+      "formula": "AD2<AD3",
+      "excel": false
+    },
+    {
+      "label": "Held out 2: Text comparison with a number",
+      "formula": "AD2>5",
+      "excel": true
+    },
+    {
+      "label": "Held out 2: Blank comparisons",
+      "formula": "AL1<>\"\"",
+      "excel": false
+    },
+    {
+      "label": "Held out 2: Blank in IF",
+      "formula": "IF(AL1=\"\",\"empty\",\"full\")",
+      "excel": "empty"
+    },
+    {
+      "label": "Held out 2: Blank in SUMPRODUCT",
+      "formula": "SUMPRODUCT(AL1:AL3,AL1:AL3)",
+      "excel": 0
+    },
+    {
+      "label": "Held out 2: Blank in lookups",
+      "formula": "IFERROR(VLOOKUP(AL1,AD2:AH9,1,FALSE),\"none\")",
+      "excel": "none"
+    },
+    {
+      "label": "Number to text: 1.5E-18",
+      "formula": "1.5E-18&\"\"",
+      "excel": "1.5E-18"
+    },
+    {
+      "label": "Number to text: 1.25E+19",
+      "formula": "1.25E+19&\"\"",
+      "excel": "12500000000000000000"
+    },
+    {
+      "label": "Number to text: 1.234E-17",
+      "formula": "1.234E-17&\"\"",
+      "excel": "1.234E-17"
+    },
+    {
+      "label": "Number to text: 1.2345E-16",
+      "formula": "1.2345E-16&\"\"",
+      "excel": "1.2345E-16"
+    },
+    {
+      "label": "Number to text: 123456789012345.123456E+4",
+      "formula": "123456789012345.123456E+4&\"\"",
+      "excel": "1234567890123450000"
+    },
+    {
+      "label": "Number to text: 9.99999999999999E+19",
+      "formula": "9.99999999999999E+19&\"\"",
+      "excel": "99999999999999900000"
+    },
+    {
+      "label": "Number to text: 1.5E-19",
+      "formula": "1.5E-19&\"\"",
+      "excel": "1.5E-19"
+    },
+    {
+      "label": "Number to text: -1.5E-18",
+      "formula": "-1.5E-18&\"\"",
+      "excel": "-1.5E-18"
+    },
+    {
+      "label": "A date written in a cell is a number: +1",
+      "formula": "AM1+1",
+      "excel": 46086
+    },
+    {
+      "label": "A date written in a cell: plus a number",
+      "formula": "AM1+AN3",
+      "excel": 46115
+    },
+    {
+      "label": "A date written in a cell: YEAR",
+      "formula": "YEAR(AM1)",
+      "excel": 2026
+    },
+    {
+      "label": "A date written in a cell: MONTH",
+      "formula": "MONTH(AM1)",
+      "excel": 3
+    },
+    {
+      "label": "A date written in a cell: DAY",
+      "formula": "DAY(AM1)",
+      "excel": 4
+    },
+    {
+      "label": "A date written in a cell: equals DATE()",
+      "formula": "AM1=DATE(2026,3,4)",
+      "excel": true
+    },
+    {
+      "label": "A date written with one-digit month and day is the same date",
+      "formula": "AM3-AM1",
+      "excel": 0
+    },
+    {
+      "label": "A date written in a cell: ISNUMBER",
+      "formula": "ISNUMBER(AM1)",
+      "excel": true
+    },
+    {
+      "label": "A day the month does not have is text: ISNUMBER",
+      "formula": "ISNUMBER(AM2)",
+      "excel": false
+    },
+    {
+      "label": "A day the month does not have is text: +0",
+      "formula": "AM2+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "1900-02-29 is a date: serial 60",
+      "formula": "AN1+0",
+      "excel": 60
+    },
+    {
+      "label": "A year before 1900 is text: ISNUMBER",
+      "formula": "ISNUMBER(AN2)",
+      "excel": false
+    },
+    {
+      "label": "A date written in a cell: TEXT",
+      "formula": "TEXT(AM1,\"yyyy-mm-dd\")",
+      "excel": "2026-03-04"
+    },
+    {
+      "label": "A date written in a cell: COUNT",
+      "formula": "COUNT({DATES})",
+      "excel": 2
+    },
+    {
+      "label": "A date written in a cell: SUM",
+      "formula": "SUM({DATES})",
+      "excel": 92170
+    },
+    {
+      "label": "A date written in a cell: WEEKDAY",
+      "formula": "WEEKDAY(AM1)",
+      "excel": 4
+    },
+    {
+      "label": "A date written in a cell: EOMONTH",
+      "formula": "EOMONTH(AM1,0)-AM1",
+      "excel": 27
+    },
+    {
+      "label": "A date written in a cell: as text",
+      "formula": "AM1&\"\"",
+      "excel": "46085"
+    },
+    {
+      "label": "A date written in a cell: compared with a text",
+      "formula": "AM1>\"a\"",
+      "excel": false
+    },
+    {
+      "label": "A date written in a cell: MATCH by value",
+      "formula": "MATCH(46085,{DATES},0)",
+      "excel": 1
+    },
+    {
+      "label": "A date written in a cell: COUNTIF by serial",
+      "formula": "COUNTIF({DATES},46085)",
+      "excel": 2
+    },
+    {
+      "label": "A date written in a cell: COUNTIF by ISO text",
+      "formula": "COUNTIF({DATES},\"2026-03-04\")",
+      "excel": 2
+    },
+    {
+      "label": "A date written as text is a date in arithmetic",
+      "formula": "\"2026-03-04\"+1",
+      "excel": 46086
+    },
+    {
+      "label": "A date written as text with one-digit month and day",
+      "formula": "\"2026-3-4\"+0",
+      "excel": 46085
+    },
+    {
+      "label": "A day the month does not have, as text in arithmetic",
+      "formula": "\"2026-02-30\"+1",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    },
+    {
+      "label": "VALUE of a date written as text",
+      "formula": "VALUE(\"2026-03-04\")",
+      "excel": 46085
+    },
+    {
+      "label": "A date written as text: COUNTIF criteria with an operator",
+      "formula": "COUNTIF({DATES},\">=2026-03-04\")",
+      "excel": 2
+    },
+    {
+      "label": "A date written as text: 1900-02-29",
+      "formula": "\"1900-02-29\"+0",
+      "excel": 60
+    },
+    {
+      "label": "A year before 1900 as text in arithmetic",
+      "formula": "\"1899-12-31\"+0",
+      "excel": {
+        "error": "#VALUE!"
+      }
+    }
+  ]
+}

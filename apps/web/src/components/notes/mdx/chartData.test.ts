@@ -21,6 +21,16 @@ describe("parseCsv", () => {
   it("is empty for blank text", () => {
     expect(parseCsv("  \n\n")).toEqual([]);
   });
+
+  describe("keepBlankRows", () => {
+    it("keeps a row of empty cells and an empty line, which a sheet's row numbers count", () => {
+      expect(parseCsv("a,b\n,\n\n3,4", { keepBlankRows: true })).toEqual([["a", "b"], ["", ""], [""], ["3", "4"]]);
+    });
+
+    it("ends with the row after a final line break, for the caller to trim", () => {
+      expect(parseCsv("a\n1\n", { keepBlankRows: true })).toEqual([["a"], ["1"], [""]]);
+    });
+  });
 });
 
 describe("parseNumber", () => {

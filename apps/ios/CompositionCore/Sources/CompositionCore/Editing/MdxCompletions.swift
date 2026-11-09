@@ -29,6 +29,7 @@ public enum MdxCompletions {
         EditorCompletion(name: "YouTube", description: "A YouTube video you can watch in the preview", template: "<YouTube url=\"$0\" />"),
         EditorCompletion(name: "Repo", description: "A card linking to a git repository (GitHub, GitLab, …)", template: "<Repo url=\"$0\" />"),
         EditorCompletion(name: "Chart", description: "A bar, line, area or pie chart of a CSV table written inside the tag", template: "<Chart type=\"bar\">\n\n```csv\n$0\n```\n\n</Chart>"),
+        EditorCompletion(name: "Sheet", description: "A spreadsheet-style grid of a CSV table written inside the tag", template: "<Sheet>\n\n```csv\n$0\n```\n\n</Sheet>"),
     ]
 
     public struct Trigger: Equatable, Sendable {
