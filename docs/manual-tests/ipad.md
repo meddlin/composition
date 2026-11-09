@@ -325,16 +325,59 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
 
 **Gate L passed (you, 2026-11-09):** you tried the Live tab on the iPad and it works well. Items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter) and 125 to 136 above were not recorded one by one, so none of them is ticked here.
 
+## PDFs: import and the reader (M2, first step)
+
+The reader beside the note a PDF belongs to. **Tried in the Simulator only; this is its first time on the iPad.** You need a small PDF (a few pages, with a table of contents if you can), a book of a few hundred pages, and ideally a password-protected one. Marks (highlights, typed notes), the Notes tab, quoting and Pencil ink on a PDF are the next steps and are not here. (These items are numbered from 140 to leave room for the Live view's.)
+
+140. **Import from Files.** In a group, tap *Import PDF* (the page with a plus, next to *New Note* at the top of the notes list) and choose a PDF: a note named after the file appears in that group, with a small PDF icon in the list, and opens with the PDF at its first page.
+141. **Several at once.** Choose three PDFs in the picker: three notes, and the last one opens.
+142. **Drag from Files.** Put the Files app beside this one (Split View or Slide Over) and drag a PDF onto the notes list, then onto a group, and onto a notebook in the first column: each makes a note, in the group or notebook it was dropped on.
+143. **The same PDF twice.** Import a PDF you have already imported: the app asks. *Open It* shows the first note; *Import Another Copy* makes a second note; *Cancel* makes nothing. Tell me if the words are not clear.
+144. **Not a PDF.** Rename a text file to end in `.pdf` and import it: a message says it doesn't look like a PDF, and no note is left behind.
+145. **Reading.** A finger scrolls the pages; pinching zooms; a long press selects words, and Copy works. At first the pages fit the width. Turn the iPad: they still fit, until you have zoomed yourself, and then your zoom stays.
+146. **It comes back.** Read to a page, zoom in, open another note, and come back: the same page and zoom. End the app (swipe it away) and open it again: the same.
+147. **Contents.** The list button at the left of the strip opens *Contents*: the PDF's own table of contents, with sub-headings indented and page numbers at the right. Choosing a line goes there and closes the list. A PDF with no table of contents says so.
+148. **Bookmarks.** The bookmark button marks the page you are on (it is filled while you are on a bookmarked page; pressing it then takes the bookmark off). *Bookmarks* in the list shows them by page; swipe right (or press and hold) to rename one, swipe left to delete it; choosing one goes to its page.
+149. **Go to a page.** Tap *Page 12 of 340* at the right of the strip, type a number, and it goes there.
+150. **Find.** The magnifier opens the system's find bar over the PDF (⌘F with a keyboard does too): type a word, and the matches are marked, with next and previous.
+151. **Beside the note.** In landscape with the lists showing, the pane has a *PDF / Note* switch; choose *Note* and the note is there, and back on *PDF* the PDF is where you left it. Tap the arrows button at the top left to hide the lists: the PDF is on the left and the note on the right with a divider you can drag (double tap puts it in the middle). In portrait: the switch again.
+152. **A big book.** Import the book of a few hundred pages: it opens within a second or two, scrolling keeps up with a finger, and jumping through the contents is quick. Tell me the size and the pages, and anything slow.
+153. **A protected PDF.** It asks for a password instead of showing a blank page. A wrong one says so; the right one opens it, and its contents and page count then show.
+154. **The Trash Can.** Move a PDF's note to the Trash Can: the question says its PDF stays with it; the Trash Can lists it with *PDF* and its size. Restore it: it opens as before. Move it back and delete it for good: it is gone (the iPad's *Storage* in Settings would show the space come back).
+155. **Round trip with the desktop.** Restore a desktop backup that has PDFs: they open here, at the page the desktop was on. Make a backup here and restore it on the desktop: the PDFs and the bookmarks are there. (Highlights made on the desktop are in the backup and come back, but are not drawn here yet.)
+156. **Colour schemes and large text.** In each scheme the strip and the lists read clearly (the pages themselves are always white: dark pages are not built); at the largest text size nothing in the strip is cut off.
+157. **VoiceOver.** The strip's buttons are named (*Contents and bookmarks*, *Find in the PDF*, *Bookmark this page*), the page button says *Page 12 of 340* and offers to go to a page, and the lists read their lines. Tell me what the PDF itself reads as.
+
 ## What it leaves out
 
-Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+PDF marks (highlights, underline, typed notes), the Notes tab, quoting and citing a page, Pencil ink on a PDF and exporting one annotated, and the PDF's title from its own metadata. Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
 the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; settings other than the colour scheme and fonts; the Pencil; sync. Selecting text
 across blocks of the preview, and the video player of `<YouTube>`, are not there either.
+
+## Drawings (M2, S5: the stroke format and the canvas)
+
+Built 2026-11-09 and tried only in the Simulator, with a finger standing in for the Pencil (four UI tests: a drawing is stored, written into the note and shown, a blank page is a cancel, a tap on the
+drawing edits it). Everything about the **Pencil itself** is yours to try, and these are what Gate C needs ([architecture/ink.md](../architecture/ink.md#what-gate-c-still-needs)).
+These start at 160 because the Live items end at 136 and the PDF reader's start at 140 and run to 157.
+
+160. **A new drawing.** In Markdown or Split, the Image menu's *Drawing…* opens a full-screen page with PencilKit's tool picker. Draw with the Pencil: the line follows the tip with the latency you know from Notes (say if it does not), the palm resting on the glass leaves no marks, and a finger scrolls the page when *Only draw with Apple Pencil* is on in Settings.
+161. **Done.** *Done* puts `<Ink src="app_data/…" alt="Drawing" width="80%" />` in the note as a paragraph of its own (after the frontmatter, never inside it), and the preview shows the drawing. *Cancel*, and *Done* on a blank page, change nothing.
+162. **Edit it.** In the preview, tap the drawing: the page opens again on the same strokes (all the strokes, with their tools and colours). Add some, *Done*: the note names a new file in place of the old, and the preview shows the new drawing. Undo in the note brings the old name back.
+163. **Every ink.** Draw one stroke with each of the pen, monoline, fountain pen, pencil, marker, crayon and watercolour, in one colour, then *Done*. The preview is a simplified picture (no grain or bleed on pencil, crayon and watercolour; the marker is a flat translucent band). **Tell me which ones look wrong or too different from the canvas.**
+164. **Dark schemes (R12).** Draw black ink on a light scheme, then pick a dark one: the preview shows the ink white, and so does the page when you tap to edit. In a dark scheme, draw a red, a blue and a yellow stroke as well, *Done*, and look at the preview in that scheme and then in a light one. **Tell me whether the colours in the preview are the ones on the canvas, and whether the canvas shows them as you chose them.**
+165. **The eraser.** Erase the middle of a long stroke with the pixel eraser and the end of another with the stroke eraser, *Done*: the preview shows the stroke cut where you erased, and the page reopened shows the same gap.
+166. **Moving things.** Select some strokes with the lasso, move and resize them, *Done*: they are where you put them in the preview.
+167. **A dense page.** Fill a page with handwriting, as you would in a lecture, and *Done*. Say how long *Done* takes, whether the preview comes in at once, how long the page takes to open again, and the size of the PNG (the Files app, or a backup's `app_data`). The measurements in the format page say a dense page is about 4 MB.
+168. **The page's size.** A new page is as big as the screen it opened on. Draw in portrait, then open the same drawing in landscape: the page keeps its size and scrolls; pinch zooms it.
+169. **A backup.** Export a backup and restore it (or restore the same one): the drawing is there, shows, and can be edited. Take the PNG out of the backup and open it in any image viewer: it shows the drawing in the colours of the scheme it was saved in.
+170. **VoiceOver.** On the drawing in the preview, VoiceOver says *Drawing, image, button* and a double tap opens the page.
+171. **Elsewhere.** A note with an `<Ink>` shows an *Unknown component* notice on the desktop and in the CLI until their side is built: this is expected, so just confirm nothing else in the note changes.
 
 ## What is not yet verified
 
 - **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not
   tried in the Simulator; you used a backup of your real notes on the iPad, which I take to mean that route worked there.)
+- **Drawing on a real iPad with the Pencil** (items 160 to 171): latency, palm rejection, the textured inks and how the dark schemes treat colours; only the Simulator, with a finger, has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 

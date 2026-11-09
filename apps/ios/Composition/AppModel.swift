@@ -16,7 +16,8 @@ final class AppModel {
     enum Phase: Equatable { case starting, empty, ready }
 
     private(set) var phase: Phase = .starting
-    private(set) var busyMessage: String?
+    /// What the busy overlay says while slow work runs (set by the work itself, here and in the PDF import).
+    var busyMessage: String?
     var errorMessage: String?
     var notice: String?
 
@@ -44,6 +45,10 @@ final class AppModel {
     var dragging: DraggedItem?
     private(set) var trashedNotes: [TrashedNote] = []
     private(set) var trashedGroups: [TrashedGroup] = []
+    /// The size of the PDF each note owns (live or in the Trash Can), by the note's id: what marks a row as a PDF's and what the Trash Can says it takes.
+    private(set) var pdfSizes: [Int64: Int64] = [:]
+    /// A PDF just picked or dropped that the library already holds, waiting for the answer (open it, import it again, or neither).
+    var duplicatePdf: DuplicatePdf?
     private(set) var noteCount = 0
     private(set) var sqliteVersion = ""
     private(set) var lastSearchMilliseconds: Double?
@@ -81,6 +86,7 @@ final class AppModel {
         let favorites: [Favorite]
         let trashedNotes: [TrashedNote]
         let trashedGroups: [TrashedGroup]
+        let pdfSizes: [Int64: Int64]
         let sqliteVersion: String
     }
 
@@ -134,11 +140,14 @@ final class AppModel {
         do {
             let stores = try await Self.perform {
                 let database = try CompositionDatabase.open(in: location)
-                // As the desktop does when it opens: items past their 60 days are gone.
-                try database.purgeExpired()
                 let index = try SearchIndex.open(at: location.directory.appendingPathComponent("search.db"), tolerance: .forgiving)
+                let store = NoteStore(database: database, search: index)
+                // As the desktop does when it opens: items past their 60 days are gone, with the PDFs of any notes among them, and the PDFs of notes
+                // that are gone some other way (a group deleted for good) are swept.
+                let library = DocumentLibrary(store: store, location: location)
+                try library.purgeExpiredTrash()
                 let rebuilt = try index.rebuildIfStale(from: database)
-                let sessions = NoteSessions(store: NoteStore(database: database, search: index), drafts: NoteDrafts(location: location), timing: sessionTiming)
+                let sessions = NoteSessions(store: store, drafts: NoteDrafts(location: location), timing: sessionTiming)
                 // Text typed just before the app was last ended, and not yet in the database, goes in now.
                 let recovered = sessions.recoverDrafts().count
                 return Stores(database: database, index: index, rebuilt: rebuilt, sessions: sessions, recovered: recovered)
@@ -164,9 +173,16 @@ final class AppModel {
             if trash != 0 { await moveToTrash(Int64(trash)) }
             let restore = UserDefaults.standard.integer(forKey: "restoreNote")
             if restore != 0 { await restoreNote(Int64(restore)) }
+            // `-purgeNote 3` deletes a note in the Trash Can for good, as the swipe in the Trash Can screen does (and takes its PDF's file with it).
+            let purge = UserDefaults.standard.integer(forKey: "purgeNote")
+            if purge != 0 { await purgeNote(Int64(purge)) }
             // `-importText /path/file.md` does what dropping that file on the list does.
             if let path = UserDefaults.standard.string(forKey: "importText"), let data = FileManager.default.contents(atPath: path), let text = String(data: data, encoding: .utf8) {
                 await importTexts([DroppedText(name: URL(fileURLWithPath: path).lastPathComponent, text: text)], into: sidebar)
+            }
+            // `-importPdf /path/book.pdf` does what choosing that file in the Import PDF picker does (the picker is the system's, and is tried by hand).
+            if let path = UserDefaults.standard.string(forKey: "importPdf") {
+                await importPdfs([.local(URL(fileURLWithPath: path))], into: sidebar)
             }
             #endif
             await reload()
@@ -212,7 +228,8 @@ final class AppModel {
                 let trash = try database.listTrash()
                 return Snapshot(
                     all: try database.listNotes(), ordered: try database.notesInDisplayOrder(), notebooks: try database.listNotebooks(), groups: try database.listGroups(),
-                    favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups, sqliteVersion: try database.sqliteVersion())
+                    favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups,
+                    pdfSizes: Dictionary(try database.listDocuments().map { ($0.noteId, $0.size) }, uniquingKeysWith: { first, _ in first }), sqliteVersion: try database.sqliteVersion())
             }
             orderedNotes = snapshot.ordered
             linkCandidates = snapshot.all.map { NoteLinks.Candidate(id: $0.id, title: $0.title) }
@@ -224,6 +241,7 @@ final class AppModel {
             loads += 1
             trashedNotes = snapshot.trashedNotes
             trashedGroups = snapshot.trashedGroups
+            pdfSizes = snapshot.pdfSizes
             noteCount = snapshot.all.count
             sqliteVersion = snapshot.sqliteVersion
             if trimmedQuery.isEmpty {
@@ -396,18 +414,22 @@ final class AppModel {
         await changeTrash { database, _ in _ = try database.restoreGroup(id: id) }
     }
 
+    /// Deleting a note for good takes its PDF's file and marks with it (a PDF stays while its note is in the Trash Can, so that a restore finds it again).
     func purgeNote(_ id: Int64) async {
-        await changeTrash { database, _ in try database.purgeNote(id: id) }
+        await changeTrash { database, library in try library.permanentlyDeleteNote(id: id) }
     }
 
     func purgeGroup(_ id: Int64) async {
-        await changeTrash { database, _ in try database.purgeGroup(id: id) }
+        await changeTrash { database, library in
+            try database.purgeGroup(id: id)
+            try library.removeOrphans()
+        }
     }
 
-    private func changeTrash(_ work: @escaping @Sendable (CompositionDatabase, SearchIndex) throws -> Void) async {
-        guard let database, let index = searchIndex else { return }
+    private func changeTrash(_ work: @escaping @Sendable (CompositionDatabase, DocumentLibrary) throws -> Void) async {
+        guard let database, let library else { return }
         do {
-            try await Self.perform { try work(database, index) }
+            try await Self.perform { try work(database, library) }
             await reload()
         } catch {
             errorMessage = error.localizedDescription
