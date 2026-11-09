@@ -161,13 +161,27 @@ final class OrganizationUITests: XCTestCase {
         XCTAssertTrue(title("Favorites").waitForExistence(timeout: 5))
     }
 
+    /// Picks up the first note row and drops it on `target`, trying again while the row is still in the list. A drag made of a hold and then a move does not always take,
+    /// and how often depends on how busy the machine is: the app's own `dnd.log` (DEBUG, in its tmp folder) shows the failed ones logging the lift and never reaching a drop
+    /// target, and with a longer hold (0.8 s) the row's context menu opens instead and stays up (it is closed here). Once the row has left the list the drag took, wherever it
+    /// landed, and it is not tried again: a second one would move another note.
+    private func dragFirstNote(onto target: XCUIElement, attempts: Int = 4) -> Bool {
+        let before = noteRows().count
+        for _ in 0..<attempts {
+            firstNoteRow().press(forDuration: 0.6, thenDragTo: target, withVelocity: .slow, thenHoldForDuration: 1)
+            if eventually(10, { noteRows().count < before }) { return true }
+            if app.buttons["Move to…"].exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap() }
+        }
+        return false
+    }
+
     func testDraggingANoteOntoAGroupMovesIt() {
         openWork()
         app.buttons["Open Work"].tap()
         let ideas = sidebar("group:6")
         XCTAssertTrue(ideas.waitForExistence(timeout: 5))
         XCTAssertTrue(ideas.label.contains("3"))
-        firstNoteRow().press(forDuration: 0.8, thenDragTo: ideas)
+        XCTAssertTrue(dragFirstNote(onto: ideas), "the note was picked up and dropped: \(noteRows())")
         XCTAssertTrue(eventually { sidebar("group:6").label.contains("4") }, "Ideas now holds four notes: \(sidebar("group:6").label)")
         XCTAssertTrue(eventually { noteRows().count == 2 }, "Work's own notes went from three to two: \(noteRows())")
     }

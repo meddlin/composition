@@ -186,14 +186,19 @@ final class LiveUITests: XCTestCase {
         let start = whole.range(of: "![").location
         let end = NSMaxRange(whole.range(of: ")", range: NSRange(location: start, length: whole.length - start)))
         XCTAssertEqual(drawn()["hidden"], "\(start)-\(end)", "the Markdown that writes it is hidden")
-        // A tap on the drawn picture puts the caret in the Markdown that writes it. Where the picture is on the screen depends on the editor's height and on how far it has scrolled
-        // (the on-screen keyboard, which a Simulator that does not use the Mac's keyboard shows, makes the editor 320 points tall and scrolls the caret into view), so the editor is tapped
-        // from the top down until the Markdown shows; a tap that lands in the note's text instead only moves the caret there.
-        for tapY in stride(from: 40.0, to: editor.frame.height - 10, by: 30.0) {
-            editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 250, dy: tapY)).tap()
-            if eventually(2, { drawn()["draw-pictureAfter"] != nil }) { break }
+        // A tap on the drawn picture puts the caret in the Markdown that writes it. Where the picture is in the editor is not known to the test: it depends on how far the
+        // paste scrolled the note to put the caret in view, and that depends on how tall the editor is (the on-screen keyboard, which a Simulator without a hardware keyboard
+        // shows, leaves it about 320 points; a point picked from an editor that has all the screen missed the picture and landed on the keyboard). So the test taps down the
+        // middle of the editor, in steps smaller than the picture is tall, until one tap is on it.
+        let shows = { [self] in let now = drawn(); return now["draw-pictureAfter"] != nil && now["draw-picture"] == nil && now["hidden"] == nil }
+        let frame = editor.frame
+        var down: CGFloat = 40
+        while !shows(), down < frame.height - 10 {
+            editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.width / 2, dy: down)).tap()
+            _ = eventually(2) { shows() }
+            down += 60
         }
-        XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn()), the selection \(selectionLabel.label), the editor \(editor.frame), the picture's text \(start)-\(end)")
+        XCTAssertTrue(shows(), "the Markdown shows and the picture is drawn after it: \(drawn())")
     }
 
     // MARK: Editing across hidden marks (step L5)

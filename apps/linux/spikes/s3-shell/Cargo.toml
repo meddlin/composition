@@ -1,0 +1,19 @@
+# Spike S3 (shell), S4 (editor widget) and the host half of S5 (preview): a libadwaita window with a GtkSourceView editor and
+# a WebKitGTK preview, over the S1 core. Not part of any workspace and not built by CI (see ../README.md).
+[package]
+name = "composition-shell-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+gtk = { package = "gtk4", version = "0.11", features = ["v4_14"] }
+adw = { package = "libadwaita", version = "0.9", features = ["v1_5"] }
+webkit6 = { version = "0.6", features = ["v2_42"] }
+sourceview5 = "0.11"
+composition-core-spike = { path = "../s1-core" }
+serde_json = "1"
+
+[[bin]]
+name = "live_marks"
+path = "src/bin/live_marks.rs"
