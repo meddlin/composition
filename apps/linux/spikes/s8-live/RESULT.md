@@ -10,6 +10,8 @@ the web editor's rule (a construct shows its marks while the selection touches i
 drawn in place, and all of it surviving arrow keys, selection, copy, delete, undo, an input method and a 5,000-line note. Is the Live tab
 viable on GTK, and does it belong in v1?
 
+> **Decided 2026-11-09 (the user): the Live tab is in v1 on Linux, as on the iPad**, over the recommendation below. The six items under "For the decision" are now build step 5 and spike S11 in the design.
+
 **Answer: the mechanism is viable and cheap, the keyboard, copy, undo and input-method behaviour is mostly right, and a 5,000-line note is
 no problem for the text. Two things are not solved: pictures and rules drawn as overlay widgets were wrong or missing in the middle of the
 long note, and three cursor movements differ from the web editor. Recommendation: the Live tab stays out of v1 (D18); the work left is
@@ -81,7 +83,7 @@ Markdown".
 
 ## For the decision (Live tab in v1?)
 
-**Recommendation: no, keep it Later** (D18, C10). The mechanism is sound and cheaper than the iPad's TextKit 2 route, but a Live tab that
+**Recommendation at the time: no, keep it Later.** (The user then chose v1: D24.) The mechanism is sound and cheaper than the iPad's TextKit 2 route, but a Live tab that
 matches the web one still needs:
 
 1. **Cursor movement fixed:** `End`, `Home` and Left at a construct's right edge go through the `move-cursor` signal (or a key controller)

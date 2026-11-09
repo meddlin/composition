@@ -60,9 +60,9 @@ decided, proposed, or needs you).
   PDF tables, three more `uuid` tables and a `documents/` folder in backups, the Rust schema test failed and the desktop's own `db.ts`
   found work to do in a Rust-made file; the core was brought level (13 of 13 tests on macOS, the desktop accepts everything Rust writes).
   Nothing was copied or invented ([Conformance](#keeping-the-implementations-honest)).
-- **Needs you:** whether the Linux Live tab follows the iPad's into v1 ([D18](#decisions); S8 recommends not), which of two homes the corpus
-  keeps ([D12](#decisions)), a real **Ubuntu 24.04 VM** for Gate B (decided; yours to provide), and Gate A. [D19](#decisions) is a question
-  for later.
+- **The Live tab is in v1 on Linux too (you, 2026-11-09), as on the iPad.** S8's six open items are now schedule, not a question ([D24](#decisions), [C10](#compromise-register), [R7](#risks-and-unknowns)).
+- **Needs you:** which of two homes the corpus keeps ([D12](#decisions)), a real **Ubuntu 24.04 VM** for Gate B (decided; yours to provide), and
+  Gate A. [D19](#decisions) is a question for later.
 
 ## Goals and non-goals
 
@@ -80,7 +80,6 @@ decided, proposed, or needs you).
 
 - The sync engine, sign-in and server ([D17](#decisions): later, from [cross-device-sync-design.md](cross-device-sync-design.md)).
 - The To-do, RSS Reader, Contacts and AI helper plugins; the panel grid and pop-out windows ([C8](#compromise-register), [C9](#compromise-register)).
-- The Live tab ([C10](#compromise-register)).
 - KDE-specific polish, Qt, AppImage, an in-app updater ([C5](#compromise-register), [C6](#compromise-register), [C11](#compromise-register)).
 - Replacing the Electron Linux build.
 
@@ -97,6 +96,7 @@ decided, proposed, or needs you).
 | **Packaging: `.deb` first, Flatpak second, no AppImage** | 2026-11-07 ([D6](#decisions)). |
 | **Test hardware: an Ubuntu 24.04 VM on this Mac now, a physical x86-64 machine before release** | 2026-11-07 ([D7](#decisions)). |
 | One run with WebKitGTK's sandbox off, in a throwaway container | 2026-11-07, done ([D8](#decisions)). |
+| **The Live tab is in v1, as on the iPad** | 2026-11-09 ([D24](#decisions)), over S8's recommendation. A milestone between M1 and M2; it may ship reduced. |
 | The core is a crate of its own, apart from the GTK UI | Stated in the brief ([D10](#decisions)). |
 
 ## What the app is today
@@ -317,7 +317,7 @@ schemes and a completion framework. What the container showed ([S4](../apps/linu
 | Accessibility | `GtkTextView` and `GtkSourceView` implement `GtkAccessibleText`; over AT-SPI the editor is one editable, multi-line, focusable `text` node whose content, caret and count are readable; the sidebar is a `list` of named `list item`s. **Orca itself: unverified** |
 | Input method | IBus with `ibus-hangul` on X11 composed `gksrmf` into `한글 ` in the editor, read back through AT-SPI. **Wayland (text-input-v3), Fcitx 5 and other engines: unverified** |
 | Spelling | Not tried. 24.04 ships `libspelling` 0.2.0 and `gspell` 1.12.2; whether a Rust binding exists for either was **not checked** |
-| The Live tab | Hiding marks with `invisible` tags by construct works ([S8](../apps/linux/spikes/s8-live/RESULT.md)): copy gives the Markdown, undo restores it, IBus Hangul composes inside a revealed construct, a screen reader is given the visible text, and a caret move costs 0.05 ms in a 5,000-line note. `End` and Left at a construct's right edge land before the hidden marks, and overlay pictures and rules were misplaced in the middle of the long note ([C10](#compromise-register)) |
+| The Live tab (**in v1**, you, 2026-11-09) | Hiding marks with `invisible` tags by construct works ([S8](../apps/linux/spikes/s8-live/RESULT.md)): copy gives the Markdown, undo restores it, IBus Hangul composes inside a revealed construct, a screen reader is given the visible text, and a caret move costs 0.05 ms in a 5,000-line note. `End` and Left at a construct's right edge land before the hidden marks, and overlay pictures and rules were misplaced in the middle of the long note ([C10](#compromise-register)) |
 
 ### Search
 
@@ -416,14 +416,17 @@ Gate B (VM) and Gate C (a physical machine); the last column says whether a cont
 
 ## v1 scope and milestones
 
-**Proposed:** v1 is the full notes editor without plugins, in three milestones, as on the iPad. M1 and M2 are builds you install on the VM
+**Proposed:** v1 is the full notes editor without plugins, **with the Live tab** (you, 2026-11-09, as on the iPad), in four milestones. M1 and M2 are builds you install on the VM
 (Gate B) and the machine; M3 hardens and ships them. **It ships beside the Electron build as a "native preview"** ([D21](#decisions)).
 
 | Milestone | What | Installed as |
 |---|---|---|
 | **M1: usable notebook** | The sync-ready store; notebooks, groups, notes, Trash Can and favorites; the Markdown, Preview and Split tabs; Meilisearch search; images (paste, picker, files); the MDX components through the preview; the five schemes plus System; backup and restore; accessibility and IME basics | A `.deb` on the VM. **Pre-v1** |
+| **ML: the Live tab** | Construct-level reveal, headings drawn large, pictures and rules that stay put, the cursor keys fixed at a construct's edge, range-based re-reading, the mouse, a real line parser; the six open items of [S8](../apps/linux/spikes/s8-live/RESULT.md). **May ship reduced** (pictures and rules as dimmed text) | A `.deb` on the VM, checked at **Gate L**. **Pre-v1** |
 | **M2: writing parity** | Typing aids (`<` completions, `[[` picker, Tab indent), `<Mark>` highlighting in the editor and the preview, find in a note, spelling, attachments, the Images page, application data location, open in a new window, the draw.io editor (E2) once a spike shows the vendored editor works in WebKitGTK | A fast-follow `.deb`. **Pre-v1** |
 | **M3: first release** | M1 and M2 hardened: the † rows, the native-bar audit on the physical machine, the manual test page, `.deb` for x64 and arm64 in GitHub Releases, then a Flatpak | The first release, as a native preview |
+
+**If the schedule bites, the Live tab ships reduced before anything on the cut line goes:** pictures and rules as dimmed text (what the Markdown tab shows), and if that is still too much, the Markdown tab alone ([C10](#compromise-register)).
 
 **Never cut:** the store, the Trash Can, backup and restore, search, the Preview, images, accessibility and the input method.
 
@@ -431,7 +434,7 @@ Gate B (VM) and Gate C (a physical machine); the last column says whether a cont
 colours; (4) the Images page's browse view; (5) header image; (6) ruler and reflow; (7) the home page's extras; (8) the heading rail.
 
 **Exit criteria** (proposed): **M1:** installs and runs on the VM; create, edit, search, delete and restore from the Trash Can; a backup
-made on the desktop restores here and the reverse; Gates A and B passed. **M2:** every M2 row at least 🔨. **M3:** the † rows done or moved
+made on the desktop restores here and the reverse; Gates A and B passed. **ML:** the six S8 items done; keys, copy, undo, a Hangul and a Japanese composition and a 5,000-line note pass with real key events on the VM; pictures and rules stay put in the long note and memory is flat across re-reads; Orca and Wayland input checked; Gate L passed. **M2:** every M2 row at least 🔨. **M3:** the † rows done or moved
 to *Later*; N1 to N14 pass on the physical machine; `docs/manual-tests/linux-native.md` run by hand.
 
 **Distribution** ([D6](#decisions), decided).
@@ -504,7 +507,7 @@ same pull request that changes it.**
 | Markdown tab | ⭐ | M1 | 🔬 | GtkSourceView 5; colours from its Markdown language ([S3](../apps/linux/spikes/s3-shell/RESULT.md)) |
 | Preview tab | ♻️ | M1 | 🔬 | The preview bundle in WebKitGTK ([S5](../apps/linux/spikes/s5-preview/RESULT.md)) |
 | Split tab | 🔁 | M1 | 🔬 | `GtkPaned`; one pane at narrow widths |
-| Live tab | ⚠️ | Later | 🔬 | Works in a prototype: hidden marks by construct, headings, copy is the Markdown, undo, IBus Hangul, 0.05 ms per caret move on 5,000 lines. Open: End and Left at a construct's edge, pictures and rules in a long note, range-based re-reading, the mouse ([S8](../apps/linux/spikes/s8-live/RESULT.md), [C10](#compromise-register)) |
+| Live tab | ⚠️ | **v1** (after M1, before M2) | 🔬 | Works in a prototype: hidden marks by construct, headings, copy is the Markdown, undo, IBus Hangul, 0.05 ms per caret move on 5,000 lines. **In v1 (you, 2026-11-09).** Open: End and Left at a construct's edge, pictures and rules in a long note, range-based re-reading, the mouse ([S8](../apps/linux/spikes/s8-live/RESULT.md), [C10](#compromise-register)) |
 | IME, dead keys, emoji, spelling | ⭐ | M1 (spelling M2) | 🔬 | IBus Hangul composed on X11; Wayland and Fcitx unverified |
 | Tab and Shift+Tab indent | 🔁 | M2 | ⬜ | `indent-on-tab` plus the list-indent rules (`indentLines`) |
 | `<` completion, props, values | 🔁 | M2 | ⬜ | `GtkSourceCompletion`; the catalogues from `editing-cases.json` |
@@ -572,7 +575,7 @@ What we give up. Ids are permanent once this page is agreed. **Status:** *Propos
 | **C7** | **A floor of libadwaita 1.5 and GTK 4.14** (Ubuntu 24.04): no system accent colour, none of the 1.6+ widgets; Ubuntu 22.04 and older are out. | Low | Checked in the headers. | Raise the floor when 24.04 ages out; newer widgets behind feature checks. | Proposed |
 | **C8** | **No panel grid or pop-out windows;** one note per window, new windows on request. | Med | The panels are a React store across windows. | Tabs (`AdwTabView`) or side-by-side later. | Proposed |
 | **C9** | **The plugins wait:** To-do and its cycle, RSS, Contacts, AI helper (the Reading List first, since a web view is easy). | Med | Each needs its own port. | One at a time after v1. | Proposed |
-| **C10** | **The Live tab arrives after v1 (the iPad has it in v1: D18 asks).** | Med | S8 showed the mechanism, copy, undo and an input method working and cheap; what is left is parity work (cursor movement at a construct's edge, pictures and rules that stay put in a long note, range-based re-reading, the mouse, a real parser). | Not in v1 unless D18 says so; a build step after M3 once Gate B has checked Orca and Wayland input. | Deferred |
+| **C10** | **The Live tab is in v1 (you, 2026-11-09, as on the iPad), and may ship reduced:** the Markdown tab is the first writing surface and stays the fallback. | Med | S8 showed the mechanism, copy, undo and an input method working and cheap; what is left is parity work (cursor movement at a construct's edge, pictures and rules that stay put in a long note, range-based re-reading, the mouse, a real parser) and it is now on the schedule. | The six items in the S8 note become build step 5 and spike S11; if the schedule bites, pictures and rules ship as dimmed text, then the Markdown tab alone. | Accepted (you, 2026-11-09) |
 | **C11** | **No in-app updater.** The `.deb` is updated by hand until an apt repository exists; a Flatpak updates itself. | Low | Platform norms; a signed apt repository is its own project. | Build the repository when there are users. | Proposed |
 | **C12** | **The CLI is not bundled.** The Electron `.deb` carries it. | Low | The native app should not need Node. | A separate download; the database is shared. | Proposed |
 | **C13** | **Two Linux apps on one database:** each has its own Meilisearch index and settings; a Flatpak needs a home-folder permission. | Low | Shared data, per-product state ([product-builds.md](product-builds.md)). | WAL covers the writes; the drift is documented. | Proposed |
@@ -582,7 +585,7 @@ What we give up. Ids are permanent once this page is agreed. **Status:** *Propos
 
 ## Decisions
 
-Recommendations are proposals until the status says *Decided*. **Needs you:** [D12](#decisions) (where the corpus lives), the VM for Gate B
+Recommendations are proposals until the status says *Decided*. **Needs you:** [D12](#decisions) (which corpus home), the VM for Gate B
 (decided, yours to provide), and Gate A. [D19](#decisions) is a question for later.
 
 | Id | Decision | Recommendation | Status |
@@ -605,12 +608,13 @@ Recommendations are proposals until the status says *Decided*. **Needs you:** [D
 | D15 | Settings. | The app's own JSON file in the `parseWebSettings` format, under the XDG config directory, so a backup carries it. | Proposed |
 | D16 | Data location. | `~/.composition`, honouring `~/.composition-location.json` as the desktop does. | Proposed |
 | D17 | Sync. | v1 backup and restore, built sync-ready; the engine later, in-process in Rust, from [cross-device-sync-design.md](cross-device-sync-design.md). | Proposed |
-| D18 | Panels and plugins stay out of v1. **The Live tab: does Linux follow the iPad into v1?** | Panels and plugins: see C8 and C9. **Live: the iPad decided it is in v1 (you, 2026-11-08).** S8 says GTK can do it but its parity work is a project of its own (six items in the S8 note), so I recommend Linux ships it after v1. If you want parity with the iPad, it becomes a milestone of its own before M3. | Panels and plugins: Proposed. **Live: needs you** |
+| D18 | Panels and plugins stay out of v1. | See C8 and C9. | Proposed |
 | D19 | **Should the Rust core become the shared core for the Windows and macOS apps** (a stable C interface, so C# and Swift call it instead of each keeping its own rules)? | **No, not now.** The iPad already has a Swift core and Windows is being designed in C#. Keeping the core free of GTK with a small surface keeps the option cheap; decide at Gate A, when the Windows design exists. | Open (not blocking) |
 | D20 | The CLI is not bundled. | A separate download. | Proposed |
 | D21 | Coexistence with Electron. | Ships beside it as a native preview with its own app id until you say otherwise. | Proposed |
 | D22 | No in-app updater in v1. | The package manager or Flatpak. | Proposed |
 | D23 | **Where Meilisearch's state lives, and its lock.** | A `search/` folder under the XDG data directory, never the Electron app's; one binary per architecture in the package; the native app reuses `meilisearch.lock.json` with a `linux-arm64` entry (values in S9), added by whoever owns `apps/desktop`. | Proposed |
+| D24 | **The Live tab.** | **In v1, as on the iPad.** S8 recommended after v1 (the parity work is a project of its own); you chose in v1, so it is a milestone between M1 and M2 (build step 5), may ship reduced (C10), and has its own gate on the VM (Gate L). | **Decided** (you, 2026-11-09) |
 
 ## Risks and unknowns
 
@@ -624,7 +628,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | R4 | The Rust, Swift and TypeScript implementations drift, and Windows adds a fourth. | High, high | D7's corpus; run it in CI on every side; D12. |
 | R5 | Input methods other than IBus-on-X11 with one engine: Wayland's text-input, Fcitx 5, Japanese and Chinese engines (unverified). | Medium, high | The Gate B matrix (N7). |
 | R6 | Orca with `GtkTextView` and with the web view's content (unverified; only the AT-SPI tree was read). | Medium, high | Gate B with Orca on; N6. |
-| R7 | The Live tab's remaining work is parity, not feasibility: `End` and Left at a construct's edge differ from the web, overlay pictures and rules were misplaced in a long note (cause not found), `Enter` re-reads the whole note, the mouse and a real parser are untried. | Low-medium, medium | S8 results; C10 lets v1 ship without it; the VM checks Orca and Wayland input. |
+| R7 | The Live tab is in v1, so its parity work is on the schedule: `End` and Left at a construct's edge differ from the web, overlay pictures and rules were misplaced in a long note (cause not found), `Enter` re-reads the whole note, the mouse and a real parser are untried, and Orca and Wayland input are unchecked. | Medium, medium | The six S8 items as build step 5 and spike S11; ships reduced if needed (C10); Gate L on the VM. |
 | R8 | The gtk-rs bindings lag a GTK feature or lack a library (a binding for `libspelling` was not checked; `GtkSourceCompletion` use was not tried). | Medium, medium | Check at the start of M2; raw FFI for a small gap. |
 | R9 | The corpus has two homes and the iPad's carries iPad-specific names; moving it breaks the Swift and Rust harnesses together unless the move updates both. | Low, medium | D12. |
 | R10 | The sync engine is a third copy of the sync rules. | High, high | The server contract suite and the corpus; D19. |
@@ -645,7 +649,7 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | **S3** | **The shell:** libadwaita over the core, on Ubuntu 24.04, X11 and Wayland | N1 | **Done in a container.** Builds with `v1_5`; X11 (GL on llvmpipe), Weston Wayland at scale 2, dark and light ([RESULT](../apps/linux/spikes/s3-shell/RESULT.md)) |
 | **S4** | **The editor widget:** accessibility and input method | D11; R5, R6 | **Done in a container.** `GtkAccessibleText`; the AT-SPI tree; IBus Hangul composes. Orca, Wayland and Fcitx unverified |
 | **S4b** | **Hidden marks** for the Live tab | C10; R7 | **Done:** the mechanism works |
-| **S8** | **The Live tab proper:** construct-level reveal, headings, pictures and rules, real keystrokes, an input method, a 5,000-line note | C10, R7; D18 | **Done in a container:** keys, copy, undo and IBus Hangul work; a caret move costs 0.05 ms; overlay pictures and rules were wrong in the middle of the long note; End and Left differ from the web; recommend Live stays out of v1 ([RESULT](../apps/linux/spikes/s8-live/RESULT.md)) |
+| **S8** | **The Live tab proper:** construct-level reveal, headings, pictures and rules, real keystrokes, an input method, a 5,000-line note | C10, R7; D24 | **Done in a container:** keys, copy, undo and IBus Hangul work; a caret move costs 0.05 ms; overlay pictures and rules were wrong in the middle of the long note; End and Left differ from the web; I recommended after v1; **you decided in v1** (D24) ([RESULT](../apps/linux/spikes/s8-live/RESULT.md)) |
 | **S5** | **The preview bundle in WebKitGTK** | D4; R1 | **Done with the sandbox off, in a throwaway container:** renders every component; sandbox-on unverified ([RESULT](../apps/linux/spikes/s5-preview/RESULT.md)) |
 | **S6** | **Versions, closure, memory** | D6; R2 | **Done in a container:** 232 MB of libraries; 329 to 452 MB PSS with the preview on ([RESULT](../apps/linux/spikes/container/RESULT.md)) |
 | **S9** | **Meilisearch from Rust, like the desktop** | D5; R3 | **Done (Linux arm64, no network; macOS):** 274 of 274 answers identical on both corpora; hard kill and restart; the sidecar dies with the app; the Linux arm64 pin verified ([RESULT](../apps/linux/spikes/s9-meili/RESULT.md)) |
@@ -655,11 +659,12 @@ Everything marked ⚠️ in the tracker plus these. **Unverified** means no sour
 | # | Spike | Answers | Exit criteria |
 |---|---|---|---|
 | **S7** | **The real desktop:** the shell and preview on an Ubuntu 24.04 VM, GNOME on Wayland and Xorg, the WebKitGTK sandbox **on**, Orca, IBus and Fcitx, scales 100 to 200 %, system dark mode, memory | R1, R5, R6, R14; N2 to N10 | **Gate B** |
+| **S11** | **The Live tab's pictures and rules in a long note:** a tag-drawn rule (tiny font on a paragraph background), pictures drawn at draw time in a `GtkTextView` subclass's `snapshot_layer`, or pooled overlays for the visible lines only; why the overlays were misplaced | C10, R7; D24 | Pictures and rules stay put through scrolling, a re-read and a resize in a 5,000-line note; memory flat |
 | **S10** | **Packaging dry runs:** a `.deb` on a clean VM, a Flatpak manifest, the AppArmor profile if R1 needs one | D6, R1, R12 | Gate C |
 
 **Gate A** (yours, before any production code): accept the shape, [D12](#decisions) settled, the VM named, the floor ([D13](#decisions)) and
 `bundled` SQLite ([D9](#decisions)) confirmed, [D19](#decisions) looked at once the Windows design exists. **Gate B** (the VM): the shell
-and preview on real GNOME, the sandbox on. **Gate C** (the physical x86-64 machine): the native bar audit, the numbers, packaging.
+and preview on real GNOME, the sandbox on. **Gate L** (the VM, after step 5): the Live tab on real GNOME, with Orca and Wayland input, and your look. **Gate C** (the physical x86-64 machine): the native bar audit, the numbers, packaging.
 **Gate D** (yours): only then, whether this app becomes the Linux default in place of Electron. Nothing before it changes that plan.
 
 **Build steps** (none starts before Gate A):
@@ -670,9 +675,10 @@ and preview on real GNOME, the sandbox on. **Gate C** (the physical x86-64 machi
 | 2 | Core operations against the corpus: notes, groups, notebooks, Trash Can (`store-script.json`, `trash-script.json`), frontmatter, links, image rules, autosave sessions; the supervisor and index promoted from S9, fed in `DISPLAY_ORDER`, with the arm64 pin added to the lock | |
 | 3 | The shell: sidebar, note, Markdown, Preview and Split, search, System and dark mode, the preview bundle build wired into the app | **Gate B** (S7) |
 | 4 | M1: organization, images, backup and restore, the five schemes, accessibility and IME basics | M1 installed on the VM |
-| 5 | M2: typing aids, `<Mark>`, find, spelling, attachments, the Images page, windows | M2 installed |
-| 6 | Packaging and release: the `.deb` for x64 and arm64, the release workflow, then the Flatpak (S10) | **Gate C** |
-| 7 | M3: the † rows, the native-bar audit, `docs/manual-tests/linux-native.md`, the release | **Gate D** |
+| 5 | ML: the Live tab: S11 first (pictures and rules), then the six S8 items (cursor keys at a construct's edge, range-based re-reading, the mouse, a real parser, pooled visible-only overlays), a scenario driver like `live_drive.py` as a regression test | **Gate L** (VM) |
+| 6 | M2: typing aids, `<Mark>`, find, spelling, attachments, the Images page, windows | M2 installed |
+| 7 | Packaging and release: the `.deb` for x64 and arm64, the release workflow, then the Flatpak (S10) | **Gate C** |
+| 8 | M3: the † rows, the native-bar audit, `docs/manual-tests/linux-native.md`, the release | **Gate D** |
 
 ## Testing
 
@@ -762,6 +768,8 @@ Reported, not filled:
 - 2026-11-08: **S8 run (the Live tab proper)**, in the container: construct-level reveal, headings, copy, undo, IBus Hangul, a 5,000-line note, driven by real key events. Viable and cheap; not in v1. Found: `End` and Left at a construct's edge differ from the web; overlay pictures and rules are unreliable in a long note (cause not found); naive overlays cost about 90 MB and grew memory to 662 MB over 20 re-reads. R7 lowered; C10 and D18 updated.
 
 - 2026-11-09: **`main` caught up with this branch's assumptions** (PRs #247, #267 and others merged; `main` merged into this branch). The corpus is on `main` in two homes; main's PDF tables, three more `uuid` tables and `documents/` in backups made the Rust schema test and the desktop-side checks fail, and the core was updated to match (13 of 13 Rust tests, 6 of 6 desktop-side). D12 reworded (tidiness, not a blocker); D18 asks whether the Linux Live tab follows the iPad's into v1.
+
+- 2026-11-09 (later): **D24 decided (you): the Linux Live tab is in v1, as on the iPad**, over S8's recommendation. A milestone ML between M1 and M2 (build step 5, spike S11, Gate L); C10 now Accepted with a reduced-ship fallback; R7 is a schedule risk; D18 narrowed to panels and plugins.
 
 ## Sources
 
