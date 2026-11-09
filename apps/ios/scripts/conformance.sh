@@ -10,9 +10,10 @@
 #      (those answers are regenerated, with a real Meilisearch, by regenerate-search-expected.sh; this script needs none)
 #   3. the desktop restores the Swift backups with its real stageBackup/applyStagedBackup and opens them with db.ts
 #
-# The PDF corpus (fixtures/conformance/pdf) and the PDF file names (fixtures/conformance/document-names.json) are committed, not
-# generated: step 1 also checks that the desktop still writes them (pdfConformance.test.ts, pdfMarkup.test.ts,
-# scripts/document-names-oracle.mjs), and step 2 replays them (PdfConformanceTests, DocumentNamesConformanceTests).
+# The PDF corpus (fixtures/conformance/pdf), the PDF file names (fixtures/conformance/document-names.json) and the `pdf:` links
+# (fixtures/conformance/pdf-refs.json) are committed, not generated: step 1 also checks that the desktop still writes them
+# (pdfConformance.test.ts, pdfMarkup.test.ts, scripts/document-names-oracle.mjs, scripts/pdf-refs-oracle.mjs), and step 2 replays them
+# (PdfConformanceTests, DocumentNamesConformanceTests, PdfRefsConformanceTests).
 #
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile) and Xcode's Swift.
 # Usage: apps/ios/scripts/conformance.sh [directory-for-the-fixtures]   (a temporary one by default)
@@ -32,6 +33,7 @@ vitest() { (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run scrip
 pdf_corpus() {
   (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/pdfConformance.test.ts src/lib/composition/pdfMarkup.test.ts)
   node --no-warnings "$root/apps/ios/scripts/document-names-oracle.mjs" --check
+  node --no-warnings "$root/apps/ios/scripts/pdf-refs-oracle.mjs" --check
 }
 
 echo "== fixtures in $dir"

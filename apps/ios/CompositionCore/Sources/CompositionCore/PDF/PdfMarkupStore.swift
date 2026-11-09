@@ -6,8 +6,9 @@ import GRDB
 // against the PDF's page count (a PDF whose pages have not been counted yet, `page_count` 0, accepts any page), and every mark and
 // bookmark gets a uuid from the table's trigger. `pdf:` links name a PDF and a mark by those uuids.
 //
-// Not ported yet, as nothing in the corpus pins them: `restoreAnnotations` (undo of a delete), `marksSearchText` (the words that find
-// a PDF's note) and the citations of a PDF.
+// Not pinned by the corpus, so checked by PdfMarkupStoreTests against what the desktop's functions do: `restoreAnnotations` (undo of a
+// delete), `marksSearchText` (the words that find a PDF's note) and `notesForPdf` (the notes that cite a PDF, which the desktop reads
+// from the notes it already holds in memory).
 
 /// A mark on a PDF. (`PdfAnnotation` on the desktop; that name is too near PDFKit's `PDFAnnotation`.)
 public struct PdfMark: Equatable, Sendable, FetchableRecord {
@@ -165,6 +166,104 @@ extension CompositionDatabase {
             }
             for row in removed { try db.execute(sql: "DELETE FROM pdf_annotations WHERE id = ?", arguments: [row.id]) }
             return removed
+        }
+    }
+
+    /// Puts back marks that were deleted, exactly as they were: the same uuid (a note's citation of a mark names it by uuid), the same group, the
+    /// same times, and the same id when it is free (ids are never reused, so it is). This is what undoing a delete does. Each is checked as a new
+    /// mark would be. A mark whose uuid is already there is left alone, so asking twice, as a redo after an undo may, does no harm. All or none
+    /// are put back.
+    @discardableResult
+    public func restoreAnnotations(documentId: Int64, _ rows: [PdfMark]) throws -> [PdfMark] {
+        let checked = try rows.map { row -> (PdfMark, ValidPdfMark) in
+            guard PdfMarkup.isHexUuid(row.uuid) else { throw InvalidMarkError("A mark's uuid is 32 lowercase hex characters.") }
+            for time in [row.createdAt, row.updatedAt] where time.isEmpty || time.utf16.count > Self.timestampLength {
+                throw InvalidMarkError("A mark has the times it was made and changed.")
+            }
+            let mark = try PdfMarkup.validate(
+                PdfMarkInput(page: row.page, kind: row.kind, color: row.color, rects: row.rects, quote: row.quote, comment: row.comment, body: row.body, groupUuid: row.groupUuid))
+            return (row, mark)
+        }
+        return try pool.write { db in
+            var restored: [PdfMark] = []
+            for (row, mark) in checked {
+                try Self.assertPage(db, documentId, mark.page)
+                if let existing = try PdfMark.fetchOne(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE uuid = ?", arguments: [row.uuid]) {
+                    restored.append(existing)
+                    continue
+                }
+                let idFree = try Row.fetchOne(db, sql: "SELECT 1 FROM pdf_annotations WHERE id = ?", arguments: [row.id]) == nil
+                try db.execute(
+                    sql: """
+                        INSERT INTO pdf_annotations (id, uuid, document_id, page, kind, color, rects, quote, comment, body, group_uuid, created_at, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                    arguments: [idFree ? row.id : nil, row.uuid, documentId, mark.page, mark.kind.rawValue, mark.color, mark.rectsJSON, mark.quote, mark.comment, mark.bodyJSON, mark.groupUuid, row.createdAt, row.updatedAt])
+                guard let inserted = try PdfMark.fetchOne(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE uuid = ?", arguments: [row.uuid]) else {
+                    throw StoreError.notFound("The mark that was just restored")
+                }
+                restored.append(inserted)
+            }
+            return restored
+        }
+    }
+
+    private static let timestampLength = 40
+
+    // MARK: Search
+
+    /// The words a PDF's owner note is found by, besides its own text: the quotes and comments of its marks, what its text notes say, and its
+    /// bookmarks' labels, one per line, by page. Kept apart from the note's content (the search index holds both under the note's id), so
+    /// searching "B-tree" finds the textbook's note when a highlight in it says so. With `noteId`, only that note's; otherwise every owner
+    /// note's (the whole index is being rebuilt). A note with no words has no entry.
+    public func marksSearchText(noteId: Int64? = nil) throws -> [Int64: String] {
+        try pool.read { db in
+            let filter = noteId == nil ? "" : "WHERE d.note_id = ?"
+            let arguments: StatementArguments = noteId.map { [$0] } ?? []
+            let marks = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT d.note_id AS note_id, a.kind AS kind, a.quote AS quote, a.comment AS comment, a.body AS body
+                    FROM pdf_annotations a JOIN documents d ON d.id = a.document_id \(filter) ORDER BY d.note_id, a.page, a.id
+                    """,
+                arguments: arguments)
+            let labels = try Row.fetchAll(
+                db,
+                sql: "SELECT d.note_id AS note_id, b.label AS label FROM pdf_bookmarks b JOIN documents d ON d.id = b.document_id \(filter) ORDER BY d.note_id, b.page, b.id",
+                arguments: arguments)
+
+            var lines: [Int64: [String]] = [:]
+            func add(_ id: Int64, _ text: String?) {
+                guard let text else { return }
+                let line = JavaScriptText.trim(text)
+                if !line.isEmpty { lines[id, default: []].append(line) }
+            }
+            for mark in marks {
+                let id: Int64 = mark["note_id"]
+                if (mark["kind"] as String) == PdfMarkKind.text.rawValue {
+                    // A damaged body has no words to find.
+                    if let body = (mark["body"] as String?).flatMap({ try? JSONValue(parsing: $0) }) { add(id, body.objectValue?["text"]?.stringValue) }
+                } else {
+                    add(id, mark["quote"])
+                }
+                add(id, mark["comment"])
+            }
+            for label in labels { add(label["note_id"], label["label"]) }
+            return lines.mapValues { $0.joined(separator: "\n") }
+        }
+    }
+
+    // MARK: Citations
+
+    /// The notes that belong with a PDF, with their text: its owner (whether or not its text links to it) and every note whose text contains
+    /// `pdf:<uuid>`. `PdfRefs.citations(among:documentUuid:ownerNoteId:)` reads what each cites and puts them in order.
+    public func notesForPdf(uuid: String, ownerNoteId: Int64) throws -> [PdfNoteText] {
+        try pool.read { db in
+            try Row.fetchAll(
+                db,
+                sql: "SELECT id, title, content, updated_at FROM notes WHERE id = ? OR instr(content, ?) > 0",
+                arguments: [ownerNoteId, PdfRefs.scheme + uuid]
+            ).map { PdfNoteText(id: $0["id"], title: $0["title"], content: $0["content"], updatedAt: $0["updated_at"]) }
         }
     }
 
