@@ -185,12 +185,14 @@ public enum PdfMarkup {
     /// Far past any real page (a PDF's own limit is 14,400 units), near enough to catch garbage.
     static let coordinateLimit = 1e7
 
-    /// `Math.round(value * 1000) / 1000`. JavaScript rounds a half toward +infinity (-0.5 is -0), which `rounded()` does not.
-    static func round3(_ value: Double) -> Double {
-        let scaled = value * 1000
-        let floor = scaled.rounded(.down)
-        return (scaled - floor >= 0.5 ? floor + 1 : floor) / 1000
+    /// `Math.round`: a half goes toward +infinity (-0.5 is -0), which `rounded()` does not do.
+    static func javaScriptRound(_ value: Double) -> Double {
+        let floor = value.rounded(.down)
+        return value - floor >= 0.5 ? floor + 1 : floor
     }
+
+    /// `Math.round(value * 1000) / 1000`
+    static func round3(_ value: Double) -> Double { javaScriptRound(value * 1000) / 1000 }
 
     /// Checks a mark and returns it as it is stored. Throws `InvalidMarkError`.
     public static func validate(_ input: PdfMarkInput) throws -> ValidPdfMark {
@@ -264,15 +266,7 @@ public enum PdfMarkup {
         return bytes.count == 32 && bytes.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
     }
 
-    /// What JavaScript's `\s` and `trim()` call white space, which is not what Foundation does (it has U+0085 and lacks U+FEFF).
-    static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x09...0x0d, 0x20, 0xa0, 0x1680, 0x2000...0x200a, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff: true
-        default: false
-        }
-    }
-
-    /// `text.replace(/\s*[\r\n]+\s*/g, " ").trim()`: a run of white space with a line break in it becomes one space, then both ends are trimmed.
+    /// `text.replace(/\s*[\r\n]+\s*/g, " ").trim()`: a run of white space with a line break in it becomes one space, then both ends are trimmed (`JavaScriptText`'s white space, which is not Foundation's).
     static func oneLine(_ text: String) -> String {
         var joined: [Unicode.Scalar] = []
         var run: [Unicode.Scalar] = []
@@ -283,7 +277,7 @@ public enum PdfMarkup {
             runHasBreak = false
         }
         for scalar in text.unicodeScalars {
-            if isWhitespace(scalar) {
+            if JavaScriptText.isWhitespace(scalar) {
                 run.append(scalar)
                 if scalar == "\n" || scalar == "\r" { runHasBreak = true }
             } else {
@@ -292,12 +286,8 @@ public enum PdfMarkup {
             }
         }
         endRun()
-        var start = 0
-        var end = joined.count
-        while start < end, isWhitespace(joined[start]) { start += 1 }
-        while end > start, isWhitespace(joined[end - 1]) { end -= 1 }
         var result = String.UnicodeScalarView()
-        result.append(contentsOf: joined[start..<end])
-        return String(result)
+        result.append(contentsOf: joined)
+        return JavaScriptText.trim(String(result))
     }
 }

@@ -10,8 +10,9 @@
 #      (those answers are regenerated, with a real Meilisearch, by regenerate-search-expected.sh; this script needs none)
 #   3. the desktop restores the Swift backups with its real stageBackup/applyStagedBackup and opens them with db.ts
 #
-# The PDF corpus (fixtures/conformance/pdf) is committed, not generated: step 1 also checks that the desktop still writes it
-# (pdfConformance.test.ts, pdfMarkup.test.ts), and step 2 replays it (PdfConformanceTests).
+# The PDF corpus (fixtures/conformance/pdf) and the PDF file names (apps/ios/conformance/document-names.json) are committed, not
+# generated: step 1 also checks that the desktop still writes them (pdfConformance.test.ts, pdfMarkup.test.ts,
+# scripts/document-names-oracle.mjs), and step 2 replays them (PdfConformanceTests, DocumentNamesConformanceTests).
 #
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile) and Xcode's Swift.
 # Usage: apps/ios/scripts/conformance.sh [directory-for-the-fixtures]   (a temporary one by default)
@@ -28,12 +29,15 @@ export IOS_FIXTURE_DIR="$dir" COMPOSITION_CONFORMANCE_DIR="$dir"
   exit 1
 }
 vitest() { (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts "$@"); }
-pdf_corpus() { (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/pdfConformance.test.ts src/lib/composition/pdfMarkup.test.ts); }
+pdf_corpus() {
+  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/pdfConformance.test.ts src/lib/composition/pdfMarkup.test.ts)
+  node --no-warnings "$root/apps/ios/scripts/document-names-oracle.mjs" --check
+}
 
 echo "== fixtures in $dir"
 echo "== 1/3 desktop writes databases, backups, the Trash Can script and the search notes"
 vitest -t "writes "
-echo "== 1/3 desktop still makes the committed PDF corpus (fixtures/conformance/pdf)"
+echo "== 1/3 desktop still makes the committed PDF corpus and file names"
 pdf_corpus
 echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays the PDF corpus, and writes its own backups"
 (cd "$root/apps/ios/CompositionCore" && swift test)
