@@ -185,13 +185,9 @@ final class LiveUITests: XCTestCase {
         let start = whole.range(of: "![").location
         let end = NSMaxRange(whole.range(of: ")", range: NSRange(location: start, length: whole.length - start)))
         XCTAssertEqual(drawn()["hidden"], "\(start)-\(end)", "the Markdown that writes it is hidden")
-        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()  // the keys need the editor to have the keyboard
-        // Into the Markdown: the keys from the start of the note to just short of the picture's text, then one at a time until the caret touches it (a key sent
-        // while the machine is busy can be lost, so the number of them is not counted on).
-        press(.upArrow, 1, modifiers: .command)
-        press(.rightArrow, max(0, start - 10))
-        var more = 0
-        while drawn()["draw-picture"] != nil, more < 200 { press(.rightArrow); more += 1 }
+        // A tap on the drawn picture puts the caret in the Markdown that writes it. (The picture sits under the frontmatter, which is the same eight small lines
+        // in either orientation: its top is a little over 250 points down and it is 300 or more tall, so a point 350 down is in it.)
+        editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 250, dy: 350)).tap()
         XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn())")
     }
 
