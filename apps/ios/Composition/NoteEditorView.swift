@@ -147,6 +147,13 @@ final class NoteTextView: UITextView {
     var look = Look.standard
     /// The width of the view changed (the Live tab lays its pictures out again).
     var onWidthChange: (() -> Void)?
+    /// The ruler and reflow settings in force: a ruler is a faint vertical line at a column, drawn in the margin of the text (it scrolls with the text).
+    var writing = WritingSettings() {
+        didSet { if writing != oldValue { setNeedsLayout() } }
+    }
+    private var rulerView: UIView?
+    /// True while the system's paste runs, so that what it types is not taken for typing (reflow leaves a paste as it is).
+    private(set) var isPasting = false
     /// The Live tab is the one showing (set by `MarkdownStyler.setLive`): what the text view tells VoiceOver then leaves out what the look hides (`LiveAccessibility`).
     var isLive = false
 
@@ -263,6 +270,8 @@ final class NoteTextView: UITextView {
     }
 
     override func paste(_ sender: Any?) {
+        isPasting = true
+        defer { isPasting = false }
         if let pastePictures, let pictures = ImageImport.fromPasteboard() {
             pastePictures(pictures)
         } else {
@@ -285,6 +294,38 @@ final class NoteTextView: UITextView {
             lastWidth = bounds.width
             onWidthChange?()
         }
+        updateRuler()
+    }
+
+    /// The ruler (the desktop's `rulerColumn` characters from the text's left edge): the width of a "0" in the editor's face, as CSS's `ch` is, times the
+    /// column, from where the text starts. Off by default; when it is off there is no view at all.
+    private func updateRuler() {
+        guard writing.rulerEnabled else {
+            rulerView?.removeFromSuperview()
+            rulerView = nil
+            return
+        }
+        let line: UIView
+        if let existing = rulerView {
+            line = existing
+        } else {
+            line = UIView()
+            line.isUserInteractionEnabled = false
+            line.isAccessibilityElement = false
+            line.accessibilityIdentifier = "editor-ruler"
+            insertSubview(line, at: 0)
+            rulerView = line
+        }
+        let advance = ("0" as NSString).size(withAttributes: [.font: look.editorFont.uiFont(size: 16)]).width
+        let x = textContainerInset.left + textContainer.lineFragmentPadding + CGFloat(writing.rulerColumn) * advance
+        let thickness = 1 / max(traitCollection.displayScale, 1)
+        line.frame = CGRect(x: x, y: 0, width: thickness, height: max(contentSize.height, bounds.height))
+        line.backgroundColor = look.uiRulerGuide
+        #if DEBUG || EDITOR_TEST_HOOKS
+        // In a test build the line says where it is, for the UI tests; in a release build it is decoration and VoiceOver never sees it.
+        line.isAccessibilityElement = true
+        line.accessibilityLabel = String(format: "ruler x=%.1f column=%d", x, writing.rulerColumn)
+        #endif
     }
 }
 
@@ -362,6 +403,8 @@ struct NoteEditorView: UIViewRepresentable {
         context.coordinator.styler?.setLive(live)
         // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
         let look = context.environment.look
+        if let editor = view as? NoteTextView { editor.writing = context.environment.writing }
+        context.coordinator.writing = context.environment.writing
         if let editor = view as? NoteTextView, editor.look != look {
             editor.look = look
             view.backgroundColor = look.uiBackground
@@ -377,6 +420,12 @@ struct NoteEditorView: UIViewRepresentable {
         weak var handle: EditorHandle?
         var assist: EditorAssist?
         var caretMoved: (Int) -> Void
+        /// The ruler and reflow settings in force.
+        var writing = WritingSettings()
+        /// How long the text was after the last change, to tell what the next one added (reflow reads a keystroke from that); and set while the break itself is being
+        /// put in, which is not typing. (`UITextView.insertText` called from code does not ask `shouldChangeTextIn`, so what was typed is read after the change.)
+        private var lastLength = 0
+        private var breaking = false
         private(set) var styler: MarkdownStyler?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
@@ -388,6 +437,7 @@ struct NoteEditorView: UIViewRepresentable {
 
         func attach(_ view: UITextView, look: Look, live: Bool) {
             textView = view
+            lastLength = view.textStorage.length
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
             styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
@@ -456,11 +506,14 @@ struct NoteEditorView: UIViewRepresentable {
             guard let view = textView, view.nativeText != text else { return }
             let selection = view.selectedRange
             view.text = text
+            lastLength = view.textStorage.length
             view.selectedRange = NSRange(location: min(selection.location, (text as NSString).length), length: 0)
             styler?.reload()
         }
 
         func textViewDidChange(_ textView: UITextView) {
+            defer { lastLength = textView.textStorage.length }
+            if writing.reflowEnabled { breakTypedLine(textView) }
             #if DEBUG || EDITOR_TEST_HOOKS
             let started = ContinuousClock.now
             defer { delegateMilliseconds.append(Double((ContinuousClock.now - started).components.attoseconds) / 1e15) }
@@ -488,6 +541,28 @@ struct NoteEditorView: UIViewRepresentable {
         /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             !(text == "\n" && assist?.accept() == true)
+        }
+
+        /// A line the keystroke pushed past the column is broken at the last space before it (`LiveReflow`, the desktop's `reflowAtCaret` behind it), and the caret
+        /// stays after what was typed. Typing is a change that added a few characters ending at the caret, with no line break among them: not a deletion, a return, a
+        /// paste, an undo or a redo, or the text of a drop or of dictation (a paragraph, which is long); and not while an input method is composing (a Japanese keyboard's
+        /// marked text), where the text is left alone until it ends. The break goes in as typing goes in, a moment after the character, in the same turn of the run loop,
+        /// which should make one undo take the character and the break back together (not verified: manual-test item 180).
+        private func breakTypedLine(_ view: UITextView) {
+            let added = view.textStorage.length - lastLength
+            let caret = view.selectedRange.location
+            guard !breaking, added > 0, added <= 64, caret >= added, view.selectedRange.length == 0, view.markedTextRange == nil, assist?.isOpen != true else { return }
+            if (view as? NoteTextView)?.isPasting == true { return }
+            if let undo = view.undoManager, undo.isUndoing || undo.isRedoing { return }
+            let text = view.nativeText
+            let typed = (text as NSString).substring(with: NSRange(location: caret - added, length: added))
+            guard let edit = LiveReflow.edit(typed: typed, into: text, caret: caret, event: .typing, options: writing.reflowOptions) else { return }
+            let span = ReflowText.changedSpan(before: text, after: edit.text)
+            breaking = true
+            defer { breaking = false }
+            view.selectedRange = NSRange(location: span.start, length: span.end - span.start)
+            view.insertText(span.insert)
+            view.selectedRange = NSRange(location: edit.caret, length: 0)
         }
 
         /// A Highlight submenu in the edit menu over a selection, or inside a highlight.

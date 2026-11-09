@@ -19,6 +19,12 @@ on:
       - "apps/web/src/components/notes/liveImages.ts"
       - "apps/web/src/components/notes/markTints.ts"
       - "apps/web/src/components/notes/markdownTokens.ts"
+      # Reflow, which the Swift core ports and replays (fixtures/conformance/reflow.json).
+      - "apps/web/src/components/notes/reflowText.ts"
+      - "apps/web/src/components/notes/liveReflow.ts"
+      - "apps/web/src/components/notes/reflowConformance.test.ts"
+      # Follow the sun's themes, which the Swift core's palettes are read from.
+      - "apps/web/src/app/globals.css"
       - "apps/web/scripts/conformance-fixtures.test.ts"
       - "apps/cli/src/tools/dummyNotes.ts"
       - "apps/web/package.json"

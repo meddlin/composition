@@ -217,10 +217,30 @@ A hardware keyboard (the Smart Keyboard Folio or a Magic Keyboard) is needed for
 69. **The selected row.** The selected note in the list has light text on the scheme's accent colour in all five (Cream's is terracotta, Forest's green).
 70. **Fonts.** In *Appearance…* set the Editor to Serif, Sans serif and Monospaced, and the Preview likewise: the text changes at once. Code in the editor stays monospaced; typing and the caret are not disturbed.
 71. **Kept.** Close the app (swipe it away) and open it again: the same scheme and fonts. Make a backup and restore it in the desktop app: it wears the same scheme (not for System, which the desktop does not have: it keeps its own).
-72. **From the desktop.** Choose a scheme on the desktop, make a backup, restore it on the iPad: the iPad wears that scheme. If the desktop's was "Follow the sun", the iPad shows System.
+72. **From the desktop.** Choose a scheme on the desktop, make a backup, restore it on the iPad: the iPad wears that scheme. If the desktop's was "Follow the sun", so is the iPad's, with the same pair of colours and city (items 172 to 177).
 73. **Your eyes.** In daylight and at night, at your usual brightness: say which schemes are too faint or too bright on this screen, and where.
 
-**Not built, so do not expect it:** "Follow the sun", and the desktop's own font families (Geist, Lora …): the iPad has the system's three. The footer under the list, and the system's own pickers, are not in the scheme.
+**Not built, so do not expect it:** the desktop's own font families (Geist, Lora …): the iPad has the system's three. ("Follow the sun" is built: see items 172 to 177.) The footer under the list, and the system's own pickers, are not in the scheme.
+
+## Follow the sun, the ruler and reflow (M3†)
+
+Built 2026-11-09 and tried only in the Simulator (the pixels of the page at the ends and the middle of the fade; the sheet; reflow by typing into a note; the ruler). What follows is
+what only your iPad and a real sunset can answer. These continue from 171; others have been added in the same stretch, so expect to renumber on merge.
+How it works is in [architecture/appearance.md](../architecture/appearance.md).
+
+172. **Choosing it.** Appearance ▸ **Follow the sun**: the row has a swatch (the pair's day, dusk and night), the page changes, and below the schemes two sections appear: *Light and dark colours* (five strips, each running from full day to full night with a tick on the one chosen) and *Your city*. Choose each pair in turn: the page and the sheet take its colours at once. Choose another scheme, then Follow the sun again: the pair you chose is still chosen.
+173. **The city.** Type `Austin, TX` and Save city (the iPad needs a network): it says *Using Austin, Texas, United States: sunrise …, sunset …* and the times are today's there. Try `Paris`, a name that matches nothing (it says *Couldn't find a city matching …*), and then Save city with the network off (it says it couldn't reach the lookup, and keeps the city you had). Empty the field and save: it says the city is forgotten and that 6:30 AM and 6:30 PM are used.
+174. **The fade, at dusk.** With Follow the sun chosen and a city saved, watch the page for the hour around the real sunset: it starts to darken 45 minutes before, is half way at the sunset, and has finished 45 minutes after. The text should change between its dark and light colour once, about half way (the pair's own point). **Tell me whether the stretch where the text is hard to read (about 14 minutes around the middle, 3 to 4.5:1) bothers you at your usual brightness;** it is the desktop's own design, carried over.
+175. **Opening it in the dark.** At night, swipe the app away and open it with the network off (Airplane Mode): it opens already dark (the last launch's times are kept), with no flash of light. Then open it where nothing was ever saved (a fresh install, with a backup restored): it opens in the 6:30 and 6:30 stand-ins and fetches the real times a moment after a city is saved.
+176. **Both ways with the desktop.** On the desktop choose Follow the sun, a pair other than the first, and a city; make a backup; restore it on the iPad: the iPad follows the sun with that pair and city (Appearance shows them). Then change the pair on the iPad, make a backup, restore it on the desktop: the desktop shows the new pair.
+177. **Away.** Fly or travel, or just change the city to one on the other side of the world and save: the page jumps to what that city's sun is doing now and fades as it does. The iPad's own time zone is not used for the sun, only for the stand-ins.
+
+178. **The ruler.** Appearance ▸ Writing ▸ **Ruler**: a faint line appears at column 80 in the Markdown tab and the Live tab, and the stepper moves it (20 to 200). It scrolls with the text, is behind the words, and is firmer with Increase Contrast. With the editor font set to Sans serif or Serif the column is that many "0"s wide, as on the desktop. Say if it is where you expect in portrait and in landscape (the text keeps to about 85 characters across a wide landscape iPad, so a ruler at 100 may sit past the text).
+179. **Reflow.** Switch on **Break lines as you type** and set the column to 40. Type a long sentence with the keyboard (software and hardware): the line breaks at the last space before the column, the caret stays after what you typed, and the next word starts the new line. In a list item the next line lines up under the text, after a `>` quote it keeps the `>`, and in a task it lines up under the words, not the box. Typing into a heading, a code block, the frontmatter, an HTML tag or a table row never breaks it (a table row does break with *Keep tables whole* off).
+180. **Undo.** After a break, undo once (⌘Z or shake): **tell me whether the character and the break go back together or in two steps.** (On the desktop's Live tab they go together; its plain editor takes two.)
+181. **What reflow leaves alone.** With reflow on at 40, none of these break a line: pasting a long paragraph, undoing, deleting words so a line is long again, Return, dictating a long phrase, a drop of text. Typing one more character on that same long line afterwards does break it. With a Japanese or Chinese keyboard, the text is left alone while a word is still being composed and the line breaks when you finish it and type on.
+182. **Scribble and autocorrect.** Write a long line with Scribble: it is broken once each word is turned into text. Accept an autocorrection or a predictive word on the keyboard: the line breaks after it, not in the middle of it.
+183. **In the Live tab.** Do items 179 and 181 on the Live tab, with marks hiding and showing as the caret moves (a bold or a link in the line): the break and the caret are right, nothing garbled, and VoiceOver reads the line as before. Keys that Gate L tested (arrows, Backspace, Tab, ⌘B) behave as before with reflow on.
 
 ## Accessibility and window sizes (build plan Step 11)
 
@@ -375,53 +395,53 @@ These start at 160 because the Live items end at 136 and the PDF reader's start 
 
 ## Release polish screens (M3†: header image, outline, Images page, home page)
 
-Built 2026-11-09 and tried only in the Simulator (`PolishUITests`: the header image is chosen, changed and removed; the outline lists the headings and moves the preview and the editor; the Images page browses, filters, inserts and deletes; the home page lists notebooks, recent notes and pinned ones and leads to them), in landscape first and then portrait. What is yours is how they feel on the iPad, with a hand, and with your own notes and pictures. These continue after 171, and are numbered from 172.
+Built 2026-11-09 and tried only in the Simulator (`PolishUITests`: the header image is chosen, changed and removed; the outline lists the headings and moves the preview and the editor; the Images page browses, filters, inserts and deletes; the home page lists notebooks, recent notes and pinned ones and leads to them), in landscape first and then portrait. What is yours is how they feel on the iPad, with a hand, and with your own notes and pictures. These continue after 183 (the follow-the-sun, ruler and reflow items above), and are numbered from 184.
 
 **Header image** (the picture-in-a-frame button in a note's toolbar)
 
-172. **Choose one.** The button opens a sheet with *Full width* and *Centered* and a grid of every stored picture. Tap one: the preview behind it shows the picture above the note's title at once, fading out at its lower edge. In the Markdown tab the frontmatter says `headerImage: app_data/…` and `headerImageLayout: full`.
-173. **The two layouts.** *Full width* is a banner as wide as the note, cropped to fit (taller in a wide window); *Centered* is the whole picture at its own size, shrunk to the note and never taller than 288 points. Changing it in the sheet changes the preview behind it.
-174. **Add one.** *Add Image* offers *Photo Library…* and *Choose File…*: the picture is stored as a pasted one is (named for the note, never twice) and becomes the header. Try a HEIC photo.
-175. **Remove it.** *Remove Header Image* takes both lines out of the frontmatter and the banner goes; the rest of the frontmatter stays.
-176. **A web address.** Type `headerImage: https://example.com/a.png` into the frontmatter by hand: nothing is drawn (the iPad fetches nothing from the network), and the sheet says that the address is kept and not loaded.
-177. **Both ways.** Set one here, make a backup, restore it on the desktop: the banner is there in the same layout. Set one on the desktop and restore that backup here.
-178. **Schemes and VoiceOver.** In each colour scheme the fade into the page has no hard edge or coloured band. VoiceOver passes over the banner (it is decoration, as on the desktop); in the sheet each picture reads as the words of its file name and says *selected* for the chosen one.
+184. **Choose one.** The button opens a sheet with *Full width* and *Centered* and a grid of every stored picture. Tap one: the preview behind it shows the picture above the note's title at once, fading out at its lower edge. In the Markdown tab the frontmatter says `headerImage: app_data/…` and `headerImageLayout: full`.
+185. **The two layouts.** *Full width* is a banner as wide as the note, cropped to fit (taller in a wide window); *Centered* is the whole picture at its own size, shrunk to the note and never taller than 288 points. Changing it in the sheet changes the preview behind it.
+186. **Add one.** *Add Image* offers *Photo Library…* and *Choose File…*: the picture is stored as a pasted one is (named for the note, never twice) and becomes the header. Try a HEIC photo.
+187. **Remove it.** *Remove Header Image* takes both lines out of the frontmatter and the banner goes; the rest of the frontmatter stays.
+188. **A web address.** Type `headerImage: https://example.com/a.png` into the frontmatter by hand: nothing is drawn (the iPad fetches nothing from the network), and the sheet says that the address is kept and not loaded.
+189. **Both ways.** Set one here, make a backup, restore it on the desktop: the banner is there in the same layout. Set one on the desktop and restore that backup here.
+190. **Schemes and VoiceOver.** In each colour scheme the fade into the page has no hard edge or coloured band. VoiceOver passes over the banner (it is decoration, as on the desktop); in the sheet each picture reads as the words of its file name and says *selected* for the chosen one.
 
 **Outline** (the list-with-indent button; the desktop's heading rail)
 
-179. **Open it.** The button opens a popover of the note's headings, indented by level. A note with none says *No headings yet*.
-180. **Preview.** Tap a heading: the popover closes and the preview scrolls so the heading is at the top. In Split the editor goes there too, with the caret at the start of the heading's line.
-181. **Markdown and Live.** The same in those tabs: the text scrolls so the heading's line is at the top, the caret is on it, and the keyboard need not be up. Open the outline again: the heading the caret is in is marked with a small arrow.
-182. **A long note.** In a note of a few thousand lines the popover opens at once and a tap lands on the heading. (The editor's lines are measured as they are reached, so in a very long note it may land a few lines off: tell me.)
-183. **Narrow.** In Slide Over, or a third of the screen, the outline opens as a sheet instead of a popover, and works the same.
-184. **VoiceOver.** Each heading reads as its words and *heading level 2*, and the one the caret is in as selected.
-185. **Components.** In a note with a panel (`<Info>`) that holds a heading, tap that heading in the outline: the preview goes to it. The editor reads some of those differently (a heading straight after an opening tag with no blank line is HTML to it), so a heading may have no place in the editor: tell me if a tap does nothing or goes to the wrong one.
+191. **Open it.** The button opens a popover of the note's headings, indented by level. A note with none says *No headings yet*.
+192. **Preview.** Tap a heading: the popover closes and the preview scrolls so the heading is at the top. In Split the editor goes there too, with the caret at the start of the heading's line.
+193. **Markdown and Live.** The same in those tabs: the text scrolls so the heading's line is at the top, the caret is on it, and the keyboard need not be up. Open the outline again: the heading the caret is in is marked with a small arrow.
+194. **A long note.** In a note of a few thousand lines the popover opens at once and a tap lands on the heading. (The editor's lines are measured as they are reached, so in a very long note it may land a few lines off: tell me.)
+195. **Narrow.** In Slide Over, or a third of the screen, the outline opens as a sheet instead of a popover, and works the same.
+196. **VoiceOver.** Each heading reads as its words and *heading level 2*, and the one the caret is in as selected.
+197. **Components.** In a note with a panel (`<Info>`) that holds a heading, tap that heading in the outline: the preview goes to it. The editor reads some of those differently (a heading straight after an opening tag with no blank line is HTML to it), so a heading may have no place in the editor: tell me if a tap does nothing or goes to the wrong one.
 
 **Images page** (More menu, *Images…*)
 
-186. **The page.** Every stored picture is a card with its name and *Used in 2 notes* or *Not used*. The line above says how many there are, how big they are together and how much the unused ones could free.
-187. **Filter.** *Not used* lists the pictures no note points at; the field narrows the list by words of the name.
-188. **A picture.** Tap a card: the picture, its size and date, the Markdown and component that put it in a note (*Copy* each, then paste in a note and the picture shows), and the notes that use it (tap one: the page closes and the note opens).
-189. **Insert in Open Note.** From the Markdown, Live or Split tab, the picture goes in at the caret; from the Preview tab the Markdown tab opens first. With no note open the button is off and says so.
-190. **Delete.** On a picture no note uses, *Delete Image…* asks, says its size and that it cannot be brought back, and *Delete Image* takes it from the page and from the picker (and the space from the iPad). A picture a note uses has no delete button and says why. A picture only a note in the Trash Can uses is kept, with a message: restore that note afterwards and its picture still shows.
-191. **A backup after deleting.** Make a backup and restore it: the deleted picture is not in it, and the others are.
-192. **Many pictures.** With hundreds of photos the grid scrolls smoothly and the thumbnails fill in as you go (they are made as each card appears); tell me if it stutters.
+198. **The page.** Every stored picture is a card with its name and *Used in 2 notes* or *Not used*. The line above says how many there are, how big they are together and how much the unused ones could free.
+199. **Filter.** *Not used* lists the pictures no note points at; the field narrows the list by words of the name.
+200. **A picture.** Tap a card: the picture, its size and date, the Markdown and component that put it in a note (*Copy* each, then paste in a note and the picture shows), and the notes that use it (tap one: the page closes and the note opens).
+201. **Insert in Open Note.** From the Markdown, Live or Split tab, the picture goes in at the caret; from the Preview tab the Markdown tab opens first. With no note open the button is off and says so.
+202. **Delete.** On a picture no note uses, *Delete Image…* asks, says its size and that it cannot be brought back, and *Delete Image* takes it from the page and from the picker (and the space from the iPad). A picture a note uses has no delete button and says why. A picture only a note in the Trash Can uses is kept, with a message: restore that note afterwards and its picture still shows.
+203. **A backup after deleting.** Make a backup and restore it: the deleted picture is not in it, and the others are.
+204. **Many pictures.** With hundreds of photos the grid scrolls smoothly and the thumbnails fill in as you go (they are made as each card appears); tell me if it stutters.
 
 **Home page** (the detail column with no note open; the house button at the top of the first column brings it back)
 
-193. **The page.** After launch with no note remembered, or the house button, the right-hand column is *Home*: *Pinned* (only when you have favorites), *Notebooks* with their counts, and *Recent* (the twelve notes edited last, each with a line of its text, its notebook and when).
-194. **Leading on.** A notebook card shows that notebook's notes in the list; a recent or pinned note opens that note, in the list that holds it; a pinned group opens the group.
-195. **Pinning.** Favorite a note or a group (swipe, or press and hold): it is under *Pinned*, in the order pinned, and goes when unfavorited.
-196. **Width.** In a wide pane (landscape with the lists hidden) the cards run several to a row; in a narrow one, a single column.
-197. **Text size and VoiceOver.** A card reads as one thing (title, line, notebook, time); at the largest text size nothing is cut off.
-198. **What is not here.** The desktop lets you choose which sections show and in what order, how dense the cards are, which notebook *Recent* draws from, and a colour for each notebook; the iPad shows the default page, and colours the notebooks from the scheme in the order they are listed. *Recent* is by last edit (the iPad does not record when a note was opened).
+205. **The page.** After launch with no note remembered, or the house button, the right-hand column is *Home*: *Pinned* (only when you have favorites), *Notebooks* with their counts, and *Recent* (the twelve notes edited last, each with a line of its text, its notebook and when).
+206. **Leading on.** A notebook card shows that notebook's notes in the list; a recent or pinned note opens that note, in the list that holds it; a pinned group opens the group.
+207. **Pinning.** Favorite a note or a group (swipe, or press and hold): it is under *Pinned*, in the order pinned, and goes when unfavorited.
+208. **Width.** In a wide pane (landscape with the lists hidden) the cards run several to a row; in a narrow one, a single column.
+209. **Text size and VoiceOver.** A card reads as one thing (title, line, notebook, time); at the largest text size nothing is cut off.
+210. **What is not here.** The desktop lets you choose which sections show and in what order, how dense the cards are, which notebook *Recent* draws from, and a colour for each notebook; the iPad shows the default page, and colours the notebooks from the scheme in the order they are listed. *Recent* is by last edit (the iPad does not record when a note was opened).
 
 ## What is not yet verified
 
 - **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not
   tried in the Simulator; you used a backup of your real notes on the iPad, which I take to mean that route worked there.)
 - **Drawing on a real iPad with the Pencil** (items 160 to 171): latency, palm rejection, the textured inks and how the dark schemes treat colours; only the Simulator, with a finger, has been used.
-- **The release polish screens on a real iPad** (items 172 to 198): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
+- **The release polish screens on a real iPad** (items 184 to 210): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 
