@@ -15,3 +15,6 @@ apps/desktop/.DS_Store
 
 # Opengrep rules, fetched by scripts/opengrep.mjs
 .opengrep-rules/
+
+# Output of `pnpm manual:stress` (docs/manual-tests/stress-databases.md)
+/stress-results/

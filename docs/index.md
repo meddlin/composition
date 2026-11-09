@@ -57,6 +57,10 @@ See [architecture/todo-weekly-cycle.md](architecture/todo-weekly-cycle.md) for h
 
 See [ui/live-editor.md](ui/live-editor.md) for the Live tab, which draws a note's Markdown as it will read and shows the syntax only under the caret, [manual-tests/live-editor.md](manual-tests/live-editor.md) for checking it by hand, and [live-editor-parity-plan.md](live-editor-parity-plan.md) for how every writing feature of the Markdown editor (image paste, MDX completion, the note-link picker, the highlight menu, the ruler and reflow) was brought into it.
 
+See [ui/pdf.md](ui/pdf.md) for reading a PDF with your notes beside it (desktop app): a PDF as a note that owns it, marks kept beside the file (highlights, underlines, strikethroughs and text notes; Apple Pencil ink comes with the iPad app), Quote and `pdf:` citations that lead back to the page, and **Export annotated PDF**; [architecture/pdf.md](architecture/pdf.md) for how it works inside, [manual-tests/pdf.md](manual-tests/pdf.md) to check it by hand, and [pdf-markup-plan.md](pdf-markup-plan.md) for the design, the spikes and what is still to build.
+
+See [manual-tests/stress-databases.md](manual-tests/stress-databases.md) for the generated 1,000-, 10,000- and 50,000-note databases (and the harness that measures the web app on them), and [stress-test-findings.md](stress-test-findings.md) for what they showed: a note over 1,000,000 characters that cannot be saved, a sidebar that re-renders on every keystroke, and a first page and an autosave that carry every note's text.
+
 ## Features
 
 - [x] Create note
@@ -157,6 +161,6 @@ and [panel-system-research.md](panel-system-research.md) for the pop-out spike a
 
 See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
 
-See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Design only; nothing is built.
+See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Built so far: the data layer, backup, Trash Can and search as a Swift package (`apps/ios/CompositionCore`), checked against the desktop's own code (plus the Markdown and MDX layer and a highlighter for the editor), and a prototype app (`apps/ios/Composition`) that draws notes and their components, runs on an iPad, and has an editor lab; [ipad-build-plan.md](ipad-build-plan.md) is the order of work for the first milestone, [ipad-live-view-plan.md](ipad-live-view-plan.md) is the plan for the Live view that follows it, and [manual-tests/ipad.md](manual-tests/ipad.md) is how to install the prototype on an iPad and what to try.
 
 See [linux-native-app-design.md](linux-native-app-design.md) for the design of a native Linux app (Rust, GTK 4 and libadwaita, GNOME first): the architecture, a tracker of which features port, the compromises, the decisions made and still open, what the spikes in `apps/linux/spikes/` showed, and what could not be verified without a real GNOME desktop. Design and spikes only; no production code.

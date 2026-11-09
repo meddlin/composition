@@ -1,12 +1,22 @@
 import { createContext, useContext, type ComponentPropsWithoutRef, type MouseEvent } from "react";
 import { defaultUrlTransform, type ExtraProps, type Options } from "react-markdown";
 import { noteIdFromRef } from "@/lib/composition/noteRefs";
+import { parsePdfRef, type PdfRef } from "@/lib/composition/pdfRefs";
+
+/** What a note's `pdf:` links need: only the desktop app has PDFs, so elsewhere every such link is shown as dead. */
+export type PdfLinks = {
+  /** Whether the PDF is on this device and its note is not in the Trash Can. */
+  exists: (uuid: string) => boolean;
+  /** Shows the page, and the mark, the link names, opening the PDF beside the note if it is not showing. */
+  open: (ref: PdfRef) => void;
+};
 
 export type NoteLinks = {
   /** Whether the note still exists; a link to one that was deleted for good is shown as dead. */
   exists: (noteId: number) => boolean;
   /** Opens the note; `beside` asks for it next to the one being read rather than in its place. */
   open: (noteId: number, beside: boolean) => void;
+  pdf?: PdfLinks;
 };
 
 const NoteLinksContext = createContext<NoteLinks>({ exists: () => true, open: () => {} });
@@ -16,10 +26,11 @@ export const NoteLinksProvider = NoteLinksContext.Provider;
 
 /**
  * react-markdown drops the target of any link whose scheme it doesn't know,
- * which would turn `note:42` into an empty link; note links are let through.
+ * which would turn `note:42` into an empty link; note links, and the `pdf:` links
+ * that cite a PDF, are let through.
  */
 export const noteUrlTransform: NonNullable<Options["urlTransform"]> = (url) =>
-  noteIdFromRef(url) === null ? defaultUrlTransform(url) : url;
+  noteIdFromRef(url) === null && parsePdfRef(url) === null ? defaultUrlTransform(url) : url;
 
 function withoutNode({ node, ...attributes }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
   void node;
@@ -37,14 +48,39 @@ function scrollToFragment(event: MouseEvent, id: string) {
  * react-markdown's `components` map (see `markdownComponents`).
  *
  * A `note:<id>` target opens that note in the app, or beside this one with
- * Cmd/Ctrl held; one whose note is gone is shown as dead text. Any other link
+ * Cmd/Ctrl held; one whose note is gone is shown as dead text. A `pdf:<uuid>`
+ * target shows the page or mark it names in the PDF's panel; one whose PDF is
+ * not on this device is dead text too, and the words in the note still read. Any other link
  * is left as written, except that one to a place in the note itself (`#id`, which
  * is what footnotes use) scrolls there rather than changing the address.
  */
 export function NoteAnchor({ href, title, children, ...props }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
   const links = useContext(NoteLinksContext);
   const noteId = href ? noteIdFromRef(href) : null;
+  const pdf = href ? parsePdfRef(href) : null;
 
+  if (pdf) {
+    if (!links.pdf?.exists(pdf.uuid)) {
+      return (
+        <span title="PDF not on this device" className="text-muted-foreground line-through">
+          {children}
+        </span>
+      );
+    }
+    return (
+      // A fragment target rather than `pdf:…`, so opening it in a new tab or window lands on this page.
+      <a
+        href={`#pdf-${pdf.uuid}`}
+        title={title}
+        onClick={(event) => {
+          event.preventDefault();
+          links.pdf?.open(pdf);
+        }}
+      >
+        {children}
+      </a>
+    );
+  }
   if (noteId === null) {
     return (
       // What react-markdown adds to a link besides these (a footnote's id, say) is kept; its `node` is not an attribute.

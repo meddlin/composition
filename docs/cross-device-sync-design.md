@@ -33,7 +33,7 @@ account-based, record-level sync service**, and it changes the schema the iPad's
   hosted service signs users in with **Clerk, behind our server**, and the self-hosted server will have its own
   sign-in on an adopted library, as **separate products** whose accounts do not move between them (D5); the sync
   server is **hosted first and self-hostable later** (D6); note links are **migrated once** to `note:<uuid>` (D7); the
-  desktop app **syncs the CLI's edits** (D9); and **attachments, to-do, Reading List and RSS are a fast follow that
+  desktop app **syncs the CLI's edits** (D9); and **attachments, PDFs, to-do, Reading List and RSS are a fast follow that
   must be syncing before release to other users** (D10). See [Using Clerk](#using-clerk),
   [End-to-end encryption](#end-to-end-encryption), [Hosted now, self-hosted later](#hosted-now-self-hosted-later) and
   [Fast follow](#fast-follow-attachments-and-plugin-data).
@@ -141,13 +141,14 @@ Facts that drive the design, checked against `main`.
 | The Trash Can | **Yes** | Delete on one device, restore on the other. |
 | Images in notes (`app_data/`) | **Yes** | A note without its pictures is broken. |
 | Attachments (files attached to a note) | **Fast follow** | Desktop only today; up to 1 GB each, so they need quotas, chunked upload and download on demand. |
+| PDFs: the file, its marks and its bookmarks | **Fast follow** | Desktop and iPad (M2) both read them. Files up to 1 GB, so the same plan as attachments; the marks are small records with a `uuid` each; see [Fast follow](#fast-follow-attachments-and-plugin-data). |
 | To-do (with its weekly cycle), Reading List, RSS Reader | **Fast follow** | The iPad has none of the plugins in v1, but desktops share them. The weekly cycle needs rules so two devices don't both close a week. |
 | Settings: colour scheme, fonts, city, window layout | **No** | Per device on purpose. |
 | Favorites | Later | They hold device-local integer ids today. |
 | AI helper keys and sign-in tokens | **Never** | Secrets stay on the device. |
 | The search index | **Never** | Derived data; each device rebuilds its own. |
 
-**The fast follow is a release gate.** Attachments, to-do, Reading List and RSS are not in the first build, but the
+**The fast follow is a release gate.** Attachments, PDFs, to-do, Reading List and RSS are not in the first build, but the
 capability is not released to other users until they sync too. The first build must not make them harder: every table
 that will sync gets its `uuid` in the same schema step (P1). What I found in the code, and the hazards, are in
 [Fast follow](#fast-follow-attachments-and-plugin-data).
@@ -1115,6 +1116,8 @@ around. The schema step is done once, in P1: every table below gets its `uuid` t
 | Data | Record | Merge rule | Hazards |
 |---|---|---|---|
 | **Attachments** (`attachments` table and `attachments/` files, up to **1 GB each**) | `attachment {noteUuid, fileName, blobId, size, createdAt}`; the bytes are an encrypted, chunked blob | Union; delete is a tombstone | Size: a per-account quota, resumable chunked upload, and **download on demand** (a "stored in the cloud" state, not eager download to every device). `stored_name` is device-local, so each device picks its own. Orphan cleanup must not delete a blob another device still references. |
+| **PDFs** (`documents` table and `documents/` files, up to **1 GB each**; [pdf-markup-plan.md](pdf-markup-plan.md)) | `document {noteUuid, fileName, blobId, sha256, size, pageCount}`; the bytes are an encrypted, chunked blob, found by their SHA-256 | Union by `sha256` and owner note; delete follows the owner note's Trash Can | The same size hazards as attachments (quota, resumable upload, **download on demand**: a device with a PDF's marks but not its file must show the marks' words and say "PDF not on this device"). `view_state` (reading position, zoom, dark pages) is per device and does not sync. A PDF's file is never written after import, so a blob never changes. |
+| **PDF marks and bookmarks** (`pdf_annotations`, `pdf_bookmarks`) | `mark {documentUuid, uuid, page, kind, color, rects, quote, comment, body, groupUuid}`; `bookmark {documentUuid, uuid, page, label}` | One record per mark, last writer wins per mark; delete is a tombstone; a cross-page selection is its records tied by `groupUuid` | Rectangles are in raw PDF user space, so the two devices' viewers agree. **Ink** is one record per page, so two devices' strokes on one page conflict: Gate C decides the stroke format and the grain. A citation (`pdf:<uuid>#p=…&a=<mark uuid>`) names the document and mark by `uuid`, so no note is rewritten, and a deleted mark's citation falls back to its page. |
 | **To-do items** (`todos`) | `todo {parent uuid, title, status, done, archive and roll fields, position, priority}`; the tree by uuid | Last writer wins per item (rebase), as for placement | Deleting an item deletes its sub-items and its log rows: each becomes a tombstone. |
 | **To-do activity log** (`todo_events`) | One append-only record per event | Union; never edited | The log is replayed (`statusAsOf`), so a union of two devices' events replays to the same state. |
 | **Weekly cycle state** (`todo_closed`, `todo_reports`, `todo_places`) | Keyed by natural keys: `(kind, period_start)`, `place` | Union; on a natural-key clash the first to the server wins and the other adopts | The cycle runs **on every device** (before the first window opens, then hourly). See below. |

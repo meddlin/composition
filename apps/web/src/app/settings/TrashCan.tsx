@@ -11,9 +11,10 @@ import {
   restoreNote,
   type RestoreResult,
 } from "@/lib/composition/client";
+import { describeContents } from "@/lib/composition/pdfContents";
 import { daysLeft, TRASH_RETENTION_DAYS, type Trash } from "@/lib/composition/trash";
 
-type Item = { kind: "note" | "group"; id: number; name: string; expiresAt: string };
+type Item = { kind: "note" | "group"; id: number; name: string; expiresAt: string; /** What a PDF note holds, for the row to say. */ holds?: string };
 
 /** What the page said about the last thing the user did. */
 type Message = { tone: "success" | "error"; text: string };
@@ -53,7 +54,7 @@ export function TrashCan({ initialTrash }: { initialTrash: Trash }) {
   const [pending, startTransition] = useTransition();
 
   const items: Item[] = [
-    ...trash.notes.map((n) => ({ kind: "note" as const, id: n.id, name: untitled(n.title), expiresAt: n.expiresAt })),
+    ...trash.notes.map((n) => ({ kind: "note" as const, id: n.id, name: untitled(n.title), expiresAt: n.expiresAt, holds: n.pdf ? describeContents(n.pdf) : undefined })),
     ...trash.groups.map((g) => ({ kind: "group" as const, id: g.id, name: g.name, expiresAt: g.expiresAt })),
   ];
 
@@ -153,6 +154,7 @@ function TrashList({
               <div suppressHydrationWarning className="text-xs text-muted-foreground">
                 {expiryLabel(item.expiresAt)}
               </div>
+              {item.holds && <div className="text-xs text-muted-foreground">With {item.holds}</div>}
             </div>
             <Button variant="outline" size="sm" disabled={busy} onClick={() => onRestore(item)} aria-label={`Restore ${item.name}`}>
               Restore

@@ -1,3 +1,5 @@
+import type { PdfContents } from "./documentsApi";
+
 /**
  * What the Trash Can holds and how long it holds it. Pure data and arithmetic,
  * so the UI and the data layer share one definition of the retention window.
@@ -14,6 +16,8 @@ export type TrashedNote = {
   deletedAt: string;
   /** When the Trash Can will delete it for good. */
   expiresAt: string;
+  /** What the note's PDF holds, when it owns one: it is deleted for good with the note. */
+  pdf?: PdfContents;
 };
 
 export type TrashedGroup = {

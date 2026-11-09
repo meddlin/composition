@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NoteSidebar } from "../notes/NoteSidebar";
+import { PdfNoteIdsProvider } from "../notes/pdfNotes";
 import type { WorkspaceSnapshot, WorkspaceStore } from "../notes/workspaceStore";
 import type { PanelHost } from "./host";
 import type { NotesBrowserState } from "./kinds";
@@ -68,34 +69,38 @@ export function NotesBrowserPanel({ store, panelId, state, snapshot, host }: Pro
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <NoteSidebar
-        notes={notes.filter((n) => n.notebookId === notebook.id)}
-        groups={groups.filter((g) => g.notebookId === notebook.id)}
-        notebooks={notebooks}
-        notebookId={notebook.id}
-        onExpandNotebooks={() => {}}
-        activeId={focusedNoteId}
-        viewedGroupId={null}
-        reveal={null}
-        onRevealed={() => {}}
-        width="fill"
-        groupError={sidebar.groupError}
-        favorites={favorites}
-        onToggleFavorite={sidebar.onToggleFavorite}
-        onSelect={(noteId) => store.openNote(noteId, windowId)}
-        onOpenBeside={host.onOpenNoteBeside}
-        onSelectGroup={sidebar.onSelectGroup}
-        onCreate={(groupId) => sidebar.onCreate(groupId, notebook.id)}
-        onDelete={sidebar.onDelete}
-        onCreateGroup={(name, parentId) => sidebar.onCreateGroup(name, parentId, notebook.id)}
-        onRenameGroup={sidebar.onRenameGroup}
-        onDeleteGroup={sidebar.onDeleteGroup}
-        onMoveGroup={sidebar.onMoveGroup}
-        onPlaceNote={sidebar.onPlaceNote}
-        onPlaceGroup={sidebar.onPlaceGroup}
-        onMoveNoteToGroup={sidebar.onMoveNoteToGroup}
-        onMoveGroupToNotebook={sidebar.onMoveGroupToNotebook}
-      />
+      <PdfNoteIdsProvider store={store}>
+        <NoteSidebar
+          notes={notes.filter((n) => n.notebookId === notebook.id)}
+          groups={groups.filter((g) => g.notebookId === notebook.id)}
+          notebooks={notebooks}
+          notebookId={notebook.id}
+          onExpandNotebooks={() => {}}
+          activeId={focusedNoteId}
+          viewedGroupId={null}
+          reveal={null}
+          onRevealed={() => {}}
+          width="fill"
+          groupError={sidebar.groupError}
+          favorites={favorites}
+          onToggleFavorite={sidebar.onToggleFavorite}
+          onSelect={(noteId) => store.openNote(noteId, windowId)}
+          onOpenBeside={host.onOpenNoteBeside}
+          onSelectGroup={sidebar.onSelectGroup}
+          onCreate={(groupId) => sidebar.onCreate(groupId, notebook.id)}
+          onImportPdf={sidebar.onImportPdf && ((groupId) => sidebar.onImportPdf?.(groupId, notebook.id))}
+          onDropPdf={sidebar.onDropPdf && ((files, groupId) => sidebar.onDropPdf?.(files, groupId, notebook.id))}
+          onDelete={sidebar.onDelete}
+          onCreateGroup={(name, parentId) => sidebar.onCreateGroup(name, parentId, notebook.id)}
+          onRenameGroup={sidebar.onRenameGroup}
+          onDeleteGroup={sidebar.onDeleteGroup}
+          onMoveGroup={sidebar.onMoveGroup}
+          onPlaceNote={sidebar.onPlaceNote}
+          onPlaceGroup={sidebar.onPlaceGroup}
+          onMoveNoteToGroup={sidebar.onMoveNoteToGroup}
+          onMoveGroupToNotebook={sidebar.onMoveGroupToNotebook}
+        />
+      </PdfNoteIdsProvider>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import { getDb } from "./db";
+import { documentContents } from "./documentsRepo";
 import { fromRow as noteFromRow, type Note, type NoteRow } from "./notesRepo";
 import { defaultNotebookId } from "./notebooksRepo";
 import { GroupNotEmptyError, groupIsEmpty } from "./groupsRepo";
@@ -63,12 +64,16 @@ export function listTrash(): Trash {
     .prepare("SELECT id, name, deleted_at FROM trashed_groups ORDER BY deleted_at DESC, id DESC")
     .all() as TrashedGroupRow[];
   return {
-    notes: notes.map((n) => ({
-      id: n.id,
-      title: n.title,
-      deletedAt: n.deleted_at,
-      expiresAt: expiryOf(n.deleted_at),
-    })),
+    notes: notes.map((n) => {
+      const pdf = documentContents(n.id);
+      return {
+        id: n.id,
+        title: n.title,
+        deletedAt: n.deleted_at,
+        expiresAt: expiryOf(n.deleted_at),
+        ...(pdf ? { pdf } : {}),
+      };
+    }),
     groups: groups.map((g) => ({
       id: g.id,
       name: g.name,

@@ -105,9 +105,24 @@ const PANEL_GROUP: ShortcutGroup = {
   ],
 };
 
-/** The groups to list: the web app has no panels, so only the desktop app lists their commands. */
+/** The keys of the PDF reader (PdfReader.tsx, useMarkEditing.ts): the web app has no reader. */
+const PDF_GROUP: ShortcutGroup = {
+  title: "Reading a PDF",
+  shortcuts: [
+    { combos: [["Mod", "Shift", "H"]], description: "Highlight the selected text" },
+    { combos: [["Mod", "Shift", "U"]], description: "Underline the selected text" },
+    { combos: [["Mod", "Shift", "S"]], description: "Strike through the selected text" },
+    { combos: [["Mod", "Z"]], description: "Undo the last change to the PDF's marks (until the app is closed)" },
+    { combos: [["Mod", "Shift", "Z"], ["Ctrl", "Y"]], description: "Redo it" },
+    { combos: [["Delete"], ["Backspace"]], description: "Delete the selected mark" },
+    { combos: [["Esc"]], description: "Let go of the selected mark, or give up placing a text note" },
+    { combos: [["Mod", "F"]], description: "Find in the PDF" },
+  ],
+};
+
+/** The groups to list: the web app has no panels and no PDF reader, so only the desktop app lists theirs. */
 export function shortcutGroups(desktop: boolean): readonly ShortcutGroup[] {
   if (!desktop) return SHORTCUT_GROUPS;
   const at = SHORTCUT_GROUPS.findIndex((group) => group.title === "Views and layout") + 1;
-  return [...SHORTCUT_GROUPS.slice(0, at), PANEL_GROUP, ...SHORTCUT_GROUPS.slice(at)];
+  return [...SHORTCUT_GROUPS.slice(0, at), PANEL_GROUP, PDF_GROUP, ...SHORTCUT_GROUPS.slice(at)];
 }

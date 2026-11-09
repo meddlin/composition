@@ -80,6 +80,53 @@ CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
 `;
 
 /**
+ * PDFs and their markup (docs/pdf-markup-plan.md). A note can own one PDF: `documents.note_id` is unique and points at a
+ * note that is live or in the Trash Can, so a PDF follows its note through the Trash Can the way an attachment does
+ * (documents.ts removeOrphans). The file lives in `<application data>/documents/`; the marks are rows beside it and are
+ * never written into it. Deleting a PDF deletes its marks and bookmarks too (documentsRepo.ts does that in one
+ * transaction, so no foreign key is declared). `page` is a 0-based page index, and every rectangle is in raw PDF user
+ * space, the numbers a PDF's own annotation `/Rect` uses (pdfMarkup.ts). The CLI shares this file and ignores the tables.
+ */
+const DOCUMENTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    note_id INTEGER NOT NULL,
+    file_name TEXT NOT NULL,
+    stored_name TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    size INTEGER NOT NULL,
+    page_count INTEGER NOT NULL,
+    view_state TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_note_id ON documents (note_id);
+CREATE INDEX IF NOT EXISTS idx_documents_sha256 ON documents (sha256);
+CREATE TABLE IF NOT EXISTS pdf_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    color TEXT NOT NULL,
+    rects TEXT,
+    quote TEXT NOT NULL DEFAULT '',
+    comment TEXT NOT NULL DEFAULT '',
+    body TEXT,
+    group_uuid TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pdf_annotations_page ON pdf_annotations (document_id, page);
+CREATE TABLE IF NOT EXISTS pdf_bookmarks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page);
+`;
+
+/**
  * The to-do panel's items. `parent_id` makes a tree; deleting an item deletes its sub-items too (todosRepo.ts does
  * that, so no foreign key is declared). The CLI shares this file and ignores the table.
  */
@@ -242,7 +289,17 @@ function ensureColumn(db: Database.Database, table: string, column: string, ddl:
  * nothing that refers to one (favorites, `note:<id>` links, the search index) changes. Trash moves carry the uuid
  * across (trashRepo.ts), so a restored note keeps it.
  */
-const UUID_TABLES = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"] as const;
+const UUID_TABLES = [
+  "notes",
+  "groups",
+  "notebooks",
+  "trashed_notes",
+  "trashed_groups",
+  "attachments",
+  "documents",
+  "pdf_annotations",
+  "pdf_bookmarks",
+] as const;
 
 /** Built-in SQL only: an older build opening this file has no user-defined functions, and its inserts must still work. */
 const NEW_UUID = "lower(hex(randomblob(16)))";
@@ -315,6 +372,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(NOTEBOOKS_SCHEMA);
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
+  db.exec(DOCUMENTS_SCHEMA);
   db.exec(TODOS_SCHEMA);
   db.exec(READING_LIST_SCHEMA);
   db.exec(FEEDS_SCHEMA);

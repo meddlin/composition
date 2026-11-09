@@ -31,6 +31,9 @@ files:
   - "!node_modules/better-sqlite3/prebuilds/win32*"
 
 asar: true
+# The PDF export worker is started as a child process, which needs a real file (scripts/build-main.mjs, src/main/exportProcess.ts).
+asarUnpack:
+  - dist/export-worker.js
 # better-sqlite3 is N-API: there is nothing to rebuild for Electron's ABI.
 npmRebuild: false
 

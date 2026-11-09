@@ -1,0 +1,339 @@
+{
+  "about": "Which of the web app's data-layer files the iPad's Swift core needs, for spike S1's 'measure the v1 logic subset' (R3). It is a judgement, made from docs/ipad-app-design.md's tracker; the Plan and status columns decide, not size. apps/ios/scripts/measure-logic-subset.mjs reads it, fails if a file in apps/web/src/lib/composition is missing from it, and prints the totals. Keys are paths relative to that folder; one ending in '/' covers a whole folder.",
+  "categories": {
+    "ported": "Built in Swift in S1 and checked against the desktop's code.",
+    "v1": "Logic v1 needs that is not ported yet. The whole file counts.",
+    "mixed": "Holds v1 logic among other things (orchestration, settings). Counted whole, so an upper bound for the v1 part.",
+    "polish": "Tracker rows marked M3: release polish, the first to drop from v1.",
+    "later": "The tracker says Later or Never, or has no row for it: not in v1.",
+    "replaced": "Has a native replacement that is not a port (Meilisearch becomes FTS5, S2).",
+    "plugin": "A plugin the design leaves out of v1 (C6): to-dos, RSS Reader, Reading List, AI helper.",
+    "shell": "Transport, IPC, Next.js actions, desktop windows, updates, panels and type contracts: no logic to port."
+  },
+  "files": {
+    "actions.ts": {
+      "category": "shell"
+    },
+    "api.ts": {
+      "category": "shell",
+      "note": "CompositionApi: types and method lists that become the Swift core's public surface"
+    },
+    "appearanceApi.ts": {
+      "category": "shell"
+    },
+    "assistant/": {
+      "category": "plugin"
+    },
+    "assistantApi.ts": {
+      "category": "plugin"
+    },
+    "assistantClient.desktop.ts": {
+      "category": "plugin"
+    },
+    "assistantClient.ts": {
+      "category": "plugin"
+    },
+    "assistantService.ts": {
+      "category": "plugin"
+    },
+    "attachmentNames.ts": {
+      "category": "later",
+      "note": "Attachments: Later (the files still ride along in a backup)"
+    },
+    "attachments.ts": {
+      "category": "later",
+      "note": "Attachments: Later (the files still ride along in a backup)"
+    },
+    "attachmentsApi.ts": {
+      "category": "later",
+      "note": "Attachments: Later (the files still ride along in a backup)"
+    },
+    "attachmentsClient.desktop.ts": {
+      "category": "shell"
+    },
+    "attachmentsClient.ts": {
+      "category": "shell"
+    },
+    "attachmentsRepo.ts": {
+      "category": "later",
+      "note": "Attachments: Later (the files still ride along in a backup)"
+    },
+    "backup.ts": {
+      "category": "ported"
+    },
+    "backupActions.ts": {
+      "category": "shell"
+    },
+    "backupApi.ts": {
+      "category": "shell"
+    },
+    "backupClient.desktop.ts": {
+      "category": "shell"
+    },
+    "backupClient.ts": {
+      "category": "shell"
+    },
+    "client.desktop.ts": {
+      "category": "shell"
+    },
+    "client.ts": {
+      "category": "shell"
+    },
+    "db.ts": {
+      "category": "ported",
+      "note": "schema pass; getDb and the settings-driven path stay on the desktop"
+    },
+    "desktopBridge.ts": {
+      "category": "shell"
+    },
+    "docs.ts": {
+      "category": "later",
+      "note": "no tracker row"
+    },
+    "drawio.ts": {
+      "category": "later",
+      "note": "<Drawio> edited: Never (C9); it is shown as its PNG"
+    },
+    "drawioBase.desktop.ts": {
+      "category": "shell"
+    },
+    "drawioBase.ts": {
+      "category": "shell"
+    },
+    "editorFonts.ts": {
+      "category": "v1"
+    },
+    "favorites.ts": {
+      "category": "v1"
+    },
+    "feeds.ts": {
+      "category": "plugin"
+    },
+    "feedsApi.ts": {
+      "category": "plugin"
+    },
+    "feedsClient.ts": {
+      "category": "plugin"
+    },
+    "feedsRepo.ts": {
+      "category": "plugin"
+    },
+    "feedsService.ts": {
+      "category": "plugin"
+    },
+    "feedsStore.ts": {
+      "category": "plugin"
+    },
+    "frontmatter.ts": {
+      "category": "v1"
+    },
+    "groupMove.ts": {
+      "category": "v1"
+    },
+    "groupsRepo.ts": {
+      "category": "v1"
+    },
+    "home.ts": {
+      "category": "polish"
+    },
+    "imageLimit.desktop.ts": {
+      "category": "shell"
+    },
+    "imageLimit.ts": {
+      "category": "v1"
+    },
+    "imageRefs.ts": {
+      "category": "v1"
+    },
+    "imageUrl.desktop.ts": {
+      "category": "shell"
+    },
+    "imageUrl.ts": {
+      "category": "v1"
+    },
+    "images.ts": {
+      "category": "v1"
+    },
+    "layout.ts": {
+      "category": "shell"
+    },
+    "metrics.ts": {
+      "category": "later",
+      "note": "no tracker row"
+    },
+    "noteBackgrounds.ts": {
+      "category": "later",
+      "note": "Notebook backgrounds: Later"
+    },
+    "noteRefs.ts": {
+      "category": "v1"
+    },
+    "notebooksRepo.ts": {
+      "category": "v1"
+    },
+    "notesRepo.ts": {
+      "category": "v1"
+    },
+    "ordering.ts": {
+      "category": "v1"
+    },
+    "panelsApi.ts": {
+      "category": "shell"
+    },
+    "panelsClient.ts": {
+      "category": "shell"
+    },
+    "panelsService.ts": {
+      "category": "shell"
+    },
+    "paths.ts": {
+      "category": "shell"
+    },
+    "pluginHost.desktop.ts": {
+      "category": "shell"
+    },
+    "pluginHost.ts": {
+      "category": "shell"
+    },
+    "plugins.ts": {
+      "category": "plugin"
+    },
+    "pluginsStore.ts": {
+      "category": "plugin"
+    },
+    "previewFonts.ts": {
+      "category": "v1"
+    },
+    "readingList.ts": {
+      "category": "plugin"
+    },
+    "readingListApi.ts": {
+      "category": "plugin"
+    },
+    "readingListClient.ts": {
+      "category": "plugin"
+    },
+    "readingListRepo.ts": {
+      "category": "plugin"
+    },
+    "readingListService.ts": {
+      "category": "plugin"
+    },
+    "readingListStore.ts": {
+      "category": "plugin"
+    },
+    "searchIndex.ts": {
+      "category": "replaced"
+    },
+    "searchQuery.ts": {
+      "category": "v1"
+    },
+    "service.ts": {
+      "category": "mixed",
+      "note": "orchestration for notes, groups, search, images, to-dos, feeds and the AI helper alike"
+    },
+    "sunSchedule.ts": {
+      "category": "polish"
+    },
+    "sunTimes.ts": {
+      "category": "polish"
+    },
+    "tarArchive.ts": {
+      "category": "ported"
+    },
+    "themes.ts": {
+      "category": "v1"
+    },
+    "todoCycle.ts": {
+      "category": "plugin"
+    },
+    "todoEvents.ts": {
+      "category": "plugin"
+    },
+    "todoLook.ts": {
+      "category": "plugin"
+    },
+    "todoReportIndex.ts": {
+      "category": "plugin"
+    },
+    "todoReportList.ts": {
+      "category": "plugin"
+    },
+    "todoReportMaker.ts": {
+      "category": "plugin"
+    },
+    "todoReports.ts": {
+      "category": "plugin"
+    },
+    "todoReportsRepo.ts": {
+      "category": "plugin"
+    },
+    "todoSettings.ts": {
+      "category": "plugin"
+    },
+    "todoSweep.ts": {
+      "category": "plugin"
+    },
+    "todoWeeks.ts": {
+      "category": "plugin"
+    },
+    "todos.ts": {
+      "category": "plugin"
+    },
+    "todosApi.ts": {
+      "category": "plugin"
+    },
+    "todosClient.ts": {
+      "category": "plugin"
+    },
+    "todosMemoryBackend.ts": {
+      "category": "plugin"
+    },
+    "todosRepo.ts": {
+      "category": "plugin"
+    },
+    "todosService.ts": {
+      "category": "plugin"
+    },
+    "todosStore.ts": {
+      "category": "plugin"
+    },
+    "trash.ts": {
+      "category": "ported"
+    },
+    "trashRepo.ts": {
+      "category": "ported"
+    },
+    "updatesApi.ts": {
+      "category": "shell"
+    },
+    "updatesClient.desktop.ts": {
+      "category": "shell"
+    },
+    "updatesClient.ts": {
+      "category": "shell"
+    },
+    "uploadGuard.ts": {
+      "category": "shell"
+    },
+    "webSettings.ts": {
+      "category": "mixed",
+      "note": "settings file and data location; the iPad keeps a few of these"
+    },
+    "windowApi.ts": {
+      "category": "shell"
+    },
+    "windowClient.desktop.ts": {
+      "category": "shell"
+    },
+    "windowClient.ts": {
+      "category": "shell"
+    },
+    "windowOpacity.ts": {
+      "category": "shell"
+    },
+    "writing.ts": {
+      "category": "polish"
+    }
+  }
+}
