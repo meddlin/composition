@@ -4,7 +4,7 @@ Source: [`NoteMarkdown.tsx`](../../apps/web/src/components/notes/NoteMarkdown.ts
 [`mdx/`](../../apps/web/src/components/notes/mdx/) (web and desktop);
 [`mdx.ts`](../../apps/cli/src/mdx.ts), [`Preview.tsx`](../../apps/cli/src/components/Preview.tsx) (CLI)
 
-Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`) written as
+Notes stay `.md` files, but the preview also renders a small set of components (`<Info>`, `<Warning>`, `<Image>`, `<Drawio>`, `<Ink>`, `<Toc>`, `<Mark>`, `<Footnotes>`, `<YouTube>`, `<Repo>`, `<Chart>`) written as
 JSX tags. They work the same in the web and desktop apps, since both run the same renderer, and the
 CLI draws them in the terminal too (see [In the CLI](#in-the-cli)). Writing them is the same
 everywhere.
@@ -120,6 +120,28 @@ to change. Web and desktop only; the terminal shows the picture.
 Source: [`mdx/Drawio.tsx`](../../apps/web/src/components/notes/mdx/Drawio.tsx),
 [`DrawioDialog.tsx`](../../apps/web/src/components/notes/DrawioDialog.tsx) and
 [`mdx/drawioSrc.ts`](../../apps/web/src/components/notes/mdx/drawioSrc.ts), which writes and rewrites the tag.
+
+## `<Ink>`
+
+A drawing made with the Pencil on the iPad, shown in the note from its strokes. View only: drawing and editing a drawing are the iPad's
+(the terminal shows the picture).
+
+```mdx
+<Ink src="app_data/trip-plan-drawing-3f9c2a71b0de.png" alt="Drawing" width="80%" />
+```
+
+- **What it shows.** The drawing is a stored PNG that carries its own strokes ([ink.md](../architecture/ink.md)), and the preview and the
+  [Live tab](live-editor.md) draw those strokes as an SVG made when the note is drawn, in the **colour scheme in force**: black ink is the
+  scheme's text colour (white on a dark scheme), the accent is its brand colour, a `<Mark>` colour name is that hue, and a fixed colour is as chosen.
+  Changing the scheme restyles a drawing already on screen. It is drawn as large as its canvas, or at `width`.
+- **When it is just a picture.** A PNG with no strokes in it, or with strokes this version cannot read (a damaged chunk, or a drawing from a newer version of Composition),
+  is drawn as the picture it is, at half its pixels. So is one whose `src` is a web address. A drawing whose file has gone shows "Image not found: alt".
+- `src`, `alt`, `title` and `width` are as for [`<Image>`](#image), and so is the editor's completion for them.
+- The file is an ordinary stored image, so it is also on the Images page and in backups. The strokes are drawn simplified: each is one smoothed outline at one opacity,
+  and the textured inks (marker, pencil, watercolour, crayon) are approximated by opacity alone, so it is not PencilKit's own picture of them.
+
+Source: [`mdx/Ink.tsx`](../../apps/web/src/components/notes/mdx/Ink.tsx) and [`liveInk.ts`](../../apps/web/src/components/notes/liveInk.ts), on the reader and renderer in
+[`apps/web/src/lib/composition/`](../../apps/web/src/lib/composition) (`ink.ts`, `inkPng.ts`, `inkSvg.ts`). How the format works: [ink.md](../architecture/ink.md#desktop-and-cli).
 
 ## `<Toc>`
 
@@ -325,6 +347,7 @@ messages, because it parses with the same plugins (`remark-mdx`, then the web's
 | `<Chart>` | A code block of bars made of block characters, one per value, under the title in bold. A table that can't be drawn is said so in words. Inside a sentence or a list item it is left out. |
 | `<Image>` | The picture, when `src` is an image stored with the notes (`app_data/…`): see [images.md](../architecture/images.md#in-the-cli). Any other `src` is the same as `![alt](src)`, which shows as its alt text. Nothing without a `src`. |
 | `<Drawio>` | The same as `<Image>`: the diagram's picture, which is a PNG. The terminal has no editor, so it cannot change one. |
+| `<Ink>` | The same as `<Image>`: the drawing's picture, which is a PNG (in the colours of the scheme it was drawn in; the terminal draws no strokes). The terminal cannot draw or change one. |
 
 A few things follow from the terminal drawing Markdown in whole pieces:
 
@@ -346,6 +369,8 @@ IDE's completion. Keep typing to narrow it (`<wa` leaves `<Warning>`), then pick
 ArrowUp/ArrowDown and Enter or Tab, or with the mouse; Escape dismisses it until the next `<`. Picking
 one inserts a ready-to-fill tag and puts the caret where you'd type next (between the blank lines of a
 callout, inside `src=""` for an image).
+
+`<Ink>` is not in the menu: a drawing is made on the iPad and only shown here, and the iPad's catalogue has none either (the two are compared by the conformance suite, so `Ink` would be added to both together).
 
 **Props.** Inside a component's open tag, a space opens a menu of the props the tag doesn't have
 yet, each with a one-line description. Typing narrows it (`<Image wi` leaves `width`). Picking

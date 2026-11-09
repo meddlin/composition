@@ -88,9 +88,12 @@ export function registerAppProtocol(
       const name = imageNameFromRef(url.pathname.slice(1));
       const image = name ? await readImage(name) : null;
       if (!image) return new Response("Not found", { status: 404 });
-      return new Response(new Uint8Array(image.data), {
-        headers: { "content-type": image.contentType, ...IMAGE_RESPONSE_HEADERS },
-      });
+      const imageHeaders: Record<string, string> = { "content-type": image.contentType, ...IMAGE_RESPONSE_HEADERS, vary: "origin" };
+      // Under `next dev` the page is another origin. An <img> needs nothing, but a drawing's strokes are read from the PNG's
+      // bytes with fetch (see inkDrawings.ts), which a page may do only if it is one of the allowed parents (as for a PDF below).
+      const origin = request.headers.get("origin");
+      if (origin && drawio.parentOrigins.includes(origin)) imageHeaders["access-control-allow-origin"] = origin;
+      return new Response(new Uint8Array(image.data), { headers: imageHeaders });
     }
 
     const documentId = url.host === APP_HOST ? documentIdFromPath(url.pathname) : null;

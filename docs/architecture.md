@@ -158,6 +158,7 @@ Each of these covers one slice of the system in more depth:
   rule, favorites, and how the tree is built.
 - [Images](architecture/images.md): pasting images into a note in the web and desktop apps, and how
   the terminal app draws them.
-- [Ink](architecture/ink.md): drawings made with the Apple Pencil on the iPad (in progress): the stroke
-  format, the PNG that carries its strokes, how PencilKit's drawing maps to it, and how big a page is.
+- [Ink](architecture/ink.md): drawings made with the Apple Pencil on the iPad: the stroke format, the PNG
+  that carries its strokes, how PencilKit's drawing maps to it, how big a page is, and how the web,
+  desktop and CLI show a drawing (view only).
 - [Attachments](architecture/attachments.md): files attached to a note.

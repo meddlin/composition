@@ -91,7 +91,7 @@ Reading the files:
 ## `ink/`
 
 The stroke format of a drawing ([architecture/ink.md](../../docs/architecture/ink.md); the iPad's design decision D9, proposed until Gate C). **This corpus was
-written on the Swift side first**: the TypeScript reader that the desktop's and the CLI's renderers need does not exist yet, so these files are what it is built against.
+written on the Swift side first**; the TypeScript reader (`apps/web/src/lib/composition/ink.ts` and `inkPng.ts`, run against these files by `ink.test.ts`, `inkPng.test.ts` and `inkSvg.test.ts`) was built against it.
 
 | File | What it pins | How a reader uses it |
 |---|---|---|

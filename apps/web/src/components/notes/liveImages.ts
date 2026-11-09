@@ -11,7 +11,8 @@ export type NoteImageSpec = { src: string; alt: string; title: string; width: st
 /** An `<Image … />` as the text writes it, and where. */
 export type ImageElement = NoteImageSpec & { start: number; end: number };
 
-const IMAGE_TAG = /<Image\b[^<>]*\/>/g;
+// `matchAll` works on a copy, so these shared patterns keep no position between calls.
+const TAGS = { Image: /<Image\b[^<>]*\/>/g, Ink: /<Ink\b[^<>]*\/>/g };
 const PROP = /\b([A-Za-z]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|\{\s*"([^"]*)"\s*\})/g;
 
 /** The props an `<Image>` tag writes as quoted text (`src`, `alt`, `title`, `width`); others are not its to draw. */
@@ -23,14 +24,15 @@ function imageProps(tag: string): Record<string, string> {
 
 /**
  * Each complete `<Image … />`, outside code and frontmatter, in the order they appear. A tag with no `src` (one
- * still being typed) is skipped, so there is nothing to draw until it says what to draw.
+ * still being typed) is skipped, so there is nothing to draw until it says what to draw. `name` is another tag
+ * that takes the same props and is drawn the same way, `Ink`.
  */
-export function imageElements(text: string, segments: Segment[]): ImageElement[] {
-  if (!text.includes("<Image")) return [];
+export function imageElements(text: string, segments: Segment[], name: "Image" | "Ink" = "Image"): ImageElement[] {
+  if (!text.includes(`<${name}`)) return [];
 
   const inLiteral = literalFinder(segments);
   const elements: ImageElement[] = [];
-  for (const tag of text.matchAll(IMAGE_TAG)) {
+  for (const tag of text.matchAll(TAGS[name])) {
     if (inLiteral(tag.index)) continue;
     const { src, alt, title, width } = imageProps(tag[0]);
     if (!src) continue;

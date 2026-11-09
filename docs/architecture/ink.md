@@ -6,8 +6,8 @@ Source: the iPad app's [`CompositionInk`](../../apps/ios/CompositionCore/Sources
 [Ink and the Pencil](../ipad-app-design.md#ink-and-the-pencil) and decision D9.
 
 A drawing is a PNG in `app_data/` that **carries its own strokes**, and `<Ink src="app_data/…" />` in a note shows it, the way `<Drawio>` does for a
-diagram. **Status (2026-11-09): built on the iPad only, in the Simulator, and the format is still D9's proposal until Gate C** (which needs the real iPad and
-Pencil: [What Gate C still needs](#what-gate-c-still-needs)). The desktop and the CLI do not know `<Ink>` yet.
+diagram. **Status (2026-11-09): drawn on the iPad only, in the Simulator, and shown (view only) on the web, desktop and CLI; the format is still D9's proposal until Gate C**
+(which needs the real iPad and Pencil: [What Gate C still needs](#what-gate-c-still-needs)). [Desktop and CLI](#desktop-and-cli) says what they do.
 
 ```mdx
 <Ink src="app_data/trip-plan-drawing-3f9c2a71b0de.png" alt="Drawing" width="80%" />
@@ -116,14 +116,42 @@ is as dense as these. In a debug build the same measures are about five times sl
   (like any stored image) and writes the `<Ink>` tag at the caret as a paragraph of its own. A blank page is a cancel.
 - **Tap a drawing in the preview** opens the canvas on its strokes (PencilKit's blob when it is current, else rebuilt from the strokes). Done stores the new PNG under its new
   name and names it in the note in place of the old; the old file is left for the orphan sweep, as for any image the note no longer names.
-- `NoteScanner.components` has `Ink`, which the desktop's catalogue does not yet: a note with an `<Ink>` shows it on the iPad and an "Unknown component" notice on the desktop until the
-  web side is wired (below). Completions and snippets for `<Ink` are not added either.
+- `NoteScanner.components` has `Ink`, so a note with an `<Ink>` shows it on the iPad, and, now that the web side knows the tag ([Desktop and CLI](#desktop-and-cli)), shows no "Unknown
+  component" notice on the desktop. Neither the iPad nor the desktop offers completions, props or a snippet for `<Ink` yet: the conformance suite compares the two catalogues (`MdxCompletions.swift`, `MdxProps.swift` against `completions.ts`, `props.ts`), so `Ink` goes into both together or into neither.
+
+## Desktop and CLI
+
+**Status (2026-11-09): built, view only; checked in the browser pane on the web build in every colour scheme, and in the CLI's own preview. The desktop runs the same renderer code as the
+web build (its renderer is the web app's static export) and has not been run by hand.** A note's `<Ink>` shows its drawing, and the "Unknown component <Ink>" notice is gone.
+
+| Where | What it does |
+|---|---|
+| Reader: [`ink.ts`](../../apps/web/src/lib/composition/ink.ts) | The stroke JSON, read and written back exactly as [`validation.json`](../../fixtures/conformance/ink/validation.json) says (all 33 cases, and writing it again changes nothing), and `drawing.json` written back to the same text byte for byte. Unknown members and point columns are kept. |
+| Container: [`inkPng.ts`](../../apps/web/src/lib/composition/inkPng.ts) | Finds `inKJ`, checks its CRC and version byte, unpacks the zlib stream (the platform's `DecompressionStream`, stopping at the length the chunk says) and requires it to be that long. A damaged chunk, a newer one, a stream that does not unpack, or JSON of a newer drawing is reported, and the PNG shows as the ordinary picture it is. `sample.png`'s chunk is `drawing.json` byte for byte. |
+| Renderer: [`inkSvg.ts`](../../apps/web/src/lib/composition/inkSvg.ts) | The strokes as SVG shapes made at render time (never a stored file: `images.ts` refuses SVG on purpose). One filled outline per stroke, swept by its nib as `InkRenderer` does it, at one opacity (marker 0.45, pencil 0.8, watercolour 0.4, crayon 0.9 of the colour and of the points' own opacity; a monoline one width). `ink` is `var(--foreground)` and `accent` is `var(--brand)`, so a scheme restyles a drawing already on screen; a `<Mark>` colour name is its hue; `#rrggbb` is fixed; a name it does not know is ink. |
+| Preview: [`mdx/Ink.tsx`](../../apps/web/src/components/notes/mdx/Ink.tsx), loaded by [`inkDrawings.ts`](../../apps/web/src/lib/composition/inkDrawings.ts) | Fetches the stored PNG from where the build serves images, reads the strokes, draws the SVG as big as its canvas (or at `width`, as `<Image>`). Without strokes it is the PNG, drawn at half its pixels. A drawing from a web address is just the picture. |
+| Live tab: [`liveInk.ts`](../../apps/web/src/components/notes/liveInk.ts) | The same drawing in place of the tag, and beside it while the caret is in the tag, as for `<Image>`. |
+| Editor | `<Ink>` is in the allowlist and offered after a `<`, with `src`, `alt`, `title` and `width` as for `<Image>`. |
+| Desktop's protocol | `app://composition/app_data/…` answers a fetch from the dev server's origin too (the page is another origin under `next dev`). |
+| CLI: `mdx.ts` | `<Ink>` is the same block as `<Image>` and `<Drawio>`: the PNG, decoded by the existing image path (the private chunks are skipped), shown in the colours of the scheme it was saved in. |
+
+The renderer **thins the control points** (it drops one closer than a quarter of its nib to the last kept) and keeps a drawing to 60,000 samples, so a dense page's path is some hundreds of
+kilobytes of SVG, not tens of megabytes; the Swift renderer draws a sample for about every half nib width and has no such cap. The pictures differ from the iPad's by that, and by the
+antialiasing; neither is compared with PencilKit's own render (that is Gate C's).
+
+**Found ambiguous or unpinned while reading it** (the Swift reader is what these follow; nothing here changed the Swift side, and the format is D9's proposal until Gate C):
+
+- **`null` is not absent.** A stroke's `ink` or `color` set to `null`, or `fields: null`, is refused, since only a missing member takes the default. A `null` in a *known* point column takes the default; in an extra column it is kept. No case in `validation.json` pins either; adding one would stop the platforms drifting.
+- **A colour name's spelling** (lower case letters, digits and dashes, up to 32 characters) is in `InkColor.init` and shown by the corpus (`Red` is refused), but not in this page's colour table.
+- **Two `inKJ` chunks:** the last one that reads wins, as in `InkPNG.contents`; the page does not say.
+- **A drawing too wide for 8,192 pixels** is stored at less than 2 pixels to a point (`InkRenderer.image`), so the picture a reader without strokes shows is drawn at the wrong size for it (the web assumes 2x). The format does not record the scale.
+- **A colour chosen on a dark scheme** is a fixed colour on every scheme (the open R12 above): the web draws it as stored, so it looks the same on a light page.
+- **The 256 MB limit** is on the text's bytes in Swift; JavaScript has the text's length in UTF-16 units, which is never more than that, so it is a little looser for non-ASCII text. A real drawing is ASCII.
 
 ## What is not built
 
-- **The desktop and the CLI.** The web renderer (the strokes drawn as SVG generated at render time, in the scheme's colours, view only: D11), the `Ink` entry in `components.ts`,
-  the allowlist, the editor's completions and snippets, and the CLI's `mdx.ts` (which draws the PNG). The corpus in `fixtures/conformance/ink` is what they are built against.
-- **The Live tab** draws other tags as text; a drawing there waits for the Live work to land.
+- **Editing off Apple.** The web, desktop and CLI show a drawing and do not change one (decision D11): no canvas, no re-save, no `pencilKit` digest written.
+- **The iPad's Live tab** draws other tags as text; a drawing there waits for the Live work to land (the desktop's Live tab draws `<Ink>`: [Desktop and CLI](#desktop-and-cli)).
 - **Handwritten pages and ink on PDFs.** A handwritten page is a note whose body is one tall `<Ink>`; ink on a PDF uses this stroke format, one record per page
   ([pdf-markup-plan.md](../pdf-markup-plan.md)). Neither is built, and PDF ink waits for the PDFKit reader.
 - **Search.** The text Vision recognises goes into `alt` on save (C11): not built, and its accuracy on real handwriting is not known.
