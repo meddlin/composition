@@ -144,6 +144,18 @@ final class NoteTextView: UITextView {
     var look = Look.standard
     /// The width of the view changed (the Live tab lays its pictures out again).
     var onWidthChange: (() -> Void)?
+    /// The Live tab is the one showing (set by `MarkdownStyler.setLive`): what the text view tells VoiceOver then leaves out what the look hides (`LiveAccessibility`).
+    var isLive = false
+
+    override var accessibilityAttributedValue: NSAttributedString? {
+        get { (isLive ? LiveAccessibility.value(of: textStorage, mode: LiveAccessibility.mode) : nil) ?? super.accessibilityAttributedValue }
+        set { super.accessibilityAttributedValue = newValue }
+    }
+
+    override var accessibilityValue: String? {
+        get { isLive && LiveAccessibility.mode != .asItIs ? accessibilityAttributedValue?.string : super.accessibilityValue }
+        set { super.accessibilityValue = newValue }
+    }
     private var lastWidth: CGFloat = 0
 
     /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
@@ -157,7 +169,32 @@ final class NoteTextView: UITextView {
 
     /// Tab and Shift+Tab, ⌃] and ⌃[ for indenting, ⌘B and ⌘I, ⌘⇧K for a note link and ⌘⇧H for a highlight: the desktop's keys. Each has a title, which
     /// is what holding ⌘ lists. Tab has priority over the system, which would otherwise move focus.
-    override var keyCommands: [UIKeyCommand]? { (super.keyCommands ?? []) + Self.shortcuts + [Self.escape] }
+    override var keyCommands: [UIKeyCommand]? {
+        #if DEBUG || EDITOR_TEST_HOOKS
+        if UserDefaults.standard.bool(forKey: "liveCompose") { return (super.keyCommands ?? []) + Self.shortcuts + [Self.escape] + Self.compositionKeys }
+        #endif
+        return (super.keyCommands ?? []) + Self.shortcuts + [Self.escape]
+    }
+
+    #if DEBUG || EDITOR_TEST_HOOKS
+    /// With `-liveCompose 1`, for the UI tests, which cannot start a composition (Scribble, dictation, an input method) any other way: ⌃⌥C puts marked text at the caret (each press
+    /// makes it longer), and ⌃⌥E ends the composition as the system does when it takes the text.
+    private static let compositionKeys: [UIKeyCommand] = {
+        func key(_ input: String, _ action: Selector) -> UIKeyCommand {
+            let command = UIKeyCommand(input: input, modifierFlags: [.control, .alternate], action: action)
+            command.wantsPriorityOverSystemBehavior = true
+            return command
+        }
+        return [key("c", #selector(composeMore)), key("e", #selector(endComposition))]
+    }()
+
+    @objc private func composeMore() {
+        let word = (markedTextRange.flatMap { text(in: $0) } ?? "") + "ni"
+        setMarkedText(word, selectedRange: NSRange(location: (word as NSString).length, length: 0))
+    }
+
+    @objc private func endComposition() { unmarkText() }
+    #endif
 
     /// Escape closes an open list (and does nothing otherwise). It is a key command, the usual way to take Escape, as well as being read in `pressesBegan`;
     /// it has no title, so the ⌘-hold list leaves it out. The UI tests cannot send Escape (it never reaches the app), so it is a manual-test item.
@@ -362,9 +399,27 @@ struct NoteEditorView: UIViewRepresentable {
                 label.alpha = 0.02
                 view.addSubview(label)
                 reportLabel = label
+                // `live-selection`: where the selection is and what surrounds it, and where the caret is drawn (see `selectionSummary`).
+                let selection = UILabel(frame: CGRect(x: 0, y: 4, width: 2, height: 2))
+                selection.isAccessibilityElement = true
+                selection.accessibilityIdentifier = "live-selection"
+                selection.alpha = 0.02
+                view.addSubview(selection)
+                selectionLabel = selection
+                updateSelectionLabel()
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
+                }
+            }
+            // `-liveBench <file>`: measures the editor on the note that is open and writes the result to that file (see `LiveBench`). A file and not an element, so that nothing
+            // asks the text view about itself (the accessibility tree reads the whole note) while it is being timed.
+            if let file = UserDefaults.standard.string(forKey: "liveBench") {
+                let opened = ContinuousClock.now
+                Task { @MainActor [weak styler, weak view] in
+                    guard let styler, let view else { return }
+                    let result = await LiveBench.run(in: view, styler: styler, openedAt: opened)
+                    try? result.write(toFile: file, atomically: true, encoding: .utf8)
                 }
             }
             // `-colourState 1`: an element that says how many full passes the colouring has started and whether it is settled, for the UI tests to see that it comes to rest on a long note.
@@ -422,6 +477,9 @@ struct NoteEditorView: UIViewRepresentable {
             styler?.textDidChange()
             #endif
             assist?.textChanged()
+            #if DEBUG || EDITOR_TEST_HOOKS
+            updateSelectionLabel()
+            #endif
         }
 
         /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
@@ -462,6 +520,24 @@ struct NoteEditorView: UIViewRepresentable {
 
         #if DEBUG || EDITOR_TEST_HOOKS
         fileprivate var reportLabel: UILabel?
+        fileprivate var selectionLabel: UILabel?
+
+        /// `12+0 x=104.5 y=68 sx=315.5 sy=190 «text before|text after»`: where the selection is, where the caret (the selection's moving end) is drawn, in the text and on the
+        /// screen (`sx`, `sy`), and what surrounds it, line breaks shown as ⏎. A key press that leaves x and y where they were moved the caret across something that cannot be seen.
+        fileprivate func updateSelectionLabel() {
+            guard let view = textView, let label = selectionLabel else { return }
+            let whole = view.nativeText as NSString
+            let range = view.selectedRange
+            guard range.location >= 0, NSMaxRange(range) <= whole.length else { return label.accessibilityLabel = "\(range.location)+\(range.length)" }
+            let before = NSRange(location: max(range.location - 14, 0), length: range.location - max(range.location - 14, 0))
+            let after = NSRange(location: NSMaxRange(range), length: min(14, whole.length - NSMaxRange(range)))
+            let marker = range.length == 0 ? "|" : "⟦\(whole.substring(with: range))⟧"
+            let rect = view.selectedTextRange.map { view.caretRect(for: $0.end) } ?? .zero
+            let onScreen = view.convert(rect, to: nil)
+            let summary = String(format: "%d+%d x=%.1f y=%.0f sx=%.1f sy=%.0f «%@%@%@»", range.location, range.length, rect.minX, rect.minY, onScreen.minX, onScreen.minY, whole.substring(with: before), marker, whole.substring(with: after))
+            label.accessibilityLabel = summary.replacingOccurrences(of: "\n", with: "⏎")
+        }
+
         /// How long the whole `textViewDidChange` took each time (the session's part and the colouring's), for the speed test.
         private var delegateMilliseconds: [Double] = []
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
@@ -471,6 +547,9 @@ struct NoteEditorView: UIViewRepresentable {
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
             styler?.selectionChanged()
+            #if DEBUG || EDITOR_TEST_HOOKS
+            updateSelectionLabel()
+            #endif
         }
 
         /// Leaving the field is a good moment to write: it is cheap, and the keyboard going away often means the app is too.

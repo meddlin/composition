@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Spike code (apps/windows/spikes). Not wired into the root workspace or CI.
+    Built here with SDK 9.0.200 on macOS. The design (docs/windows-native-app-design.md) targets the current LTS;
+    retargeting is a one-line change that was NOT tried (see results/S1-core.md).
+    Deliberately no Windows-only API: this library must build and test on macOS and Linux.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Composition.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- bundle_e_sqlite3 (inside this package) ships SQLite 3.46.1 with FTS5 for win-x64, win-arm64, osx and linux. -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

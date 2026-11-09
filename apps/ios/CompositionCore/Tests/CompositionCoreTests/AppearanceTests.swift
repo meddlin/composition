@@ -88,6 +88,43 @@ struct AppearanceTests {
         #expect((Theme.named("cream")?.mutedShare ?? 0) > Theme.Share.mutedForeground, "Cream's grey had to be raised")
     }
 
+    @Test("the Live tab's dimmed syntax reads at 4.5 or better in every scheme, on the page, on the fill of code and on every highlight tint, with and without Increase Contrast")
+    func dimmedSyntax() {
+        for theme in Theme.all {
+            let codeFill = theme.foreground.over(theme.background, alpha: Theme.Share.muted)
+            for increased in [false, true] {
+                let share = theme.mutedShare(increasedContrast: increased)
+                let context = "\(theme.name), Increase Contrast \(increased ? "on" : "off")"
+                #expect(ThemeColor.contrast(theme.foreground.over(theme.background, alpha: share), theme.background) >= Theme.mutedTarget, "\(context): on the page")
+                #expect(ThemeColor.contrast(theme.foreground.over(codeFill, alpha: share), codeFill) >= Theme.readable, "\(context): on the faint fill of code")
+                for name in Theme.markHues.keys.sorted() {
+                    let tint = theme.markTint(name)
+                    let dimmed = theme.dimmedShare(over: tint, increasedContrast: increased)
+                    #expect(dimmed >= share && dimmed <= 1, "\(context): \(name) is never dimmer than the grey text")
+                    #expect(ThemeColor.contrast(theme.foreground.over(tint, alpha: dimmed), tint) >= Theme.readable, "\(context): on \(name)")
+                }
+            }
+            #expect(theme.mutedShare(increasedContrast: true) >= max(theme.mutedShare, Theme.increasedMutedShare), "\(theme.name): Increase Contrast darkens the grey")
+        }
+        // Where the grey already reads on a tint it is left as it is, and where it does not (the dark schemes' tints) it is raised: so the rule is not idle.
+        let dark = Theme.named("dark")!
+        #expect(dark.dimmedShare(over: dark.markTint("yellow"), increasedContrast: false) > dark.mutedShare)
+        let light = Theme.named("light")!
+        #expect(light.dimmedShare(over: light.markTint("yellow"), increasedContrast: false) == light.mutedShare)
+    }
+
+    @Test("a rule (the Live tab's line) is firmer with Increase Contrast and can be told from the page in every scheme")
+    func rule() {
+        for theme in Theme.all {
+            func contrast(_ increased: Bool) -> Double {
+                ThemeColor.contrast(theme.foreground.over(theme.background, alpha: Theme.ruleShare(increasedContrast: increased)), theme.background)
+            }
+            #expect(contrast(false) >= 1.5, "\(theme.name): the desktop's 35% is a line you can see")
+            #expect(contrast(true) >= 3, "\(theme.name): and with Increase Contrast it passes the 3 that WCAG asks of a line that carries meaning")
+            #expect(contrast(true) > contrast(false))
+        }
+    }
+
     @Test("an unknown or missing highlight colour is yellow, and a colour name may be in any case")
     func unknownMarks() {
         let theme = Theme.default

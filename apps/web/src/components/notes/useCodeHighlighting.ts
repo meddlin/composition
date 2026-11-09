@@ -11,10 +11,14 @@ let loading: Promise<PluginList> | undefined;
 
 function loadPlugins(): Promise<PluginList> {
   loading ??= Promise.all([import("rehype-highlight"), import("lowlight")]).then(
-    ([{ default: rehypeHighlight }, { all }]): PluginList => [
+    ([{ default: rehypeHighlight }, { all }]): PluginList => {
+      // react-markdown builds a new processor on every render, and a processor runs each plugin's setup again.
+      // rehype-highlight's setup registers every language it is given (192 in `all`: about 6 ms and 1.3 MB), so
+      // run it once here and hand every processor the same ready transform.
       // detect: false keeps fences without a language tag as plain text.
-      [rehypeHighlight, { languages: all, detect: false }],
-    ],
+      const highlight = rehypeHighlight({ languages: all, detect: false });
+      return [() => highlight];
+    },
   );
   return loading;
 }

@@ -2,7 +2,7 @@ import Foundation
 
 // What the components read from their props (spike S4): ports of the desktop's chartData.ts, repoRef.ts, youtubeRef.ts,
 // imageWidth.ts and the `app_data/` part of imageRefs.ts. They are pure, so they are checked against the real TypeScript
-// (apps/ios/conformance/component-cases.json and what the desktop answers for each, in MdxComponentTests).
+// (fixtures/conformance/component-cases.json and what the desktop answers for each, in MdxComponentTests).
 //
 // The one thing that has no equal here is JavaScript's `new URL`, the WHATWG parser: these use URLComponents and add the
 // parts of WHATWG's behaviour a note can reach (a default port is dropped, `.` and `..` segments are resolved).

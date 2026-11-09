@@ -9,11 +9,11 @@ final class AccessibilityUITests: XCTestCase {
     private let app = XCUIApplication()
 
     /// `size` is a content size category name, or nil for the system's (`UICTContentSizeCategoryAccessibilityXXXL` and so on).
-    private func launch(mode: String, scheme: String, size: String? = nil, note: String = "25", extra: [String] = []) throws {
+    private func launch(mode: String, scheme: String, size: String? = nil, note: String? = "25", extra: [String] = []) throws {
         continueAfterFailure = true
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "Run apps/ios/scripts/ui-test.sh: it makes the backup and passes its path.")
         XCUIDevice.shared.orientation = .landscapeLeft
-        var arguments = ["-importBackup", backup, "-openNote", note, "-openMode", mode, "-theme", scheme]
+        var arguments = ["-importBackup", backup, "-openMode", mode, "-theme", scheme] + (note.map { ["-openNote", $0] } ?? [])
         if let size { arguments += ["-UIPreferredContentSizeCategoryName", size] }
         app.launchArguments = arguments + extra
         app.launch()
@@ -63,6 +63,19 @@ final class AccessibilityUITests: XCTestCase {
     func testThePreviewInCream() throws { try launch(mode: "Preview", scheme: "cream"); try audit("preview, cream") }
     func testThePreviewInForest() throws { try launch(mode: "Preview", scheme: "forest"); try audit("preview, forest") }
     func testTheEditorInForest() throws { try launch(mode: "Markdown", scheme: "forest"); try audit("editor, forest") }
+
+    /// The Live tab (step L6): the same text view with headings drawn large, bold and italic as such and the marks hidden. The audit has nothing to say of the hidden marks (it cannot see
+    /// what VoiceOver would read: that is the manual test's), but it reads the element, its label and traits, and whether the text grows.
+    func testTheLiveTabInForest() throws { try launch(mode: "Live", scheme: "forest"); try audit("live, forest") }
+    /// A note with a heading, bold, italic, strikethrough, code and a highlight, as the Live tab draws them: each of them is a font made from another.
+    func testTheLiveTabWithHeadingsAndMarks() throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("live-audit-note.md")
+        try "# A heading\n\nSome **bold**, *italic*, ***both***, ~~struck~~ and `code` words with a <Mark color=\"green\">highlight</Mark>.\n\n---\n\n## Another\n".write(to: file, atomically: true, encoding: .utf8)
+        try launch(mode: "Live", scheme: "forest", note: nil, extra: ["-importText", file.path])
+        try audit("live, a note with headings and marks, forest")
+    }
+    func testTheLiveTabInCream() throws { try launch(mode: "Live", scheme: "cream"); try audit("live, cream") }
+    func testTheLiveTabAtTheLargestTextSize() throws { try launch(mode: "Live", scheme: "cream", size: "UICTContentSizeCategoryAccessibilityXXXL"); try audit("live, cream, largest text") }
 
     /// The list of images already stored (Image ▸ Stored Image…), audited, with each row at least a finger high; the picture the launch shortcut stores is in it.
     func testTheListOfStoredImages() throws {

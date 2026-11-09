@@ -7,8 +7,8 @@ import Markdown
 //
 // What it has to agree with is the desktop's preview pipeline (remark-mdx with remarkRestrictMdx): the same notes valid and
 // invalid, the same components with the same props, a tag on lines of its own a *block* and one inside a line of text *inline*,
-// the same headings, and footnotes numbered in the same order. apps/ios/conformance/mdx-notes.json holds the notes and
-// apps/web/scripts/ios-conformance-fixtures.test.ts what the real pipeline made of them. Like the desktop, a note that
+// the same headings, and footnotes numbered in the same order. fixtures/conformance/mdx-notes.json holds the notes and
+// apps/web/scripts/conformance-fixtures.test.ts what the real pipeline made of them. Like the desktop, a note that
 // does not mention a component is not scanned at all: it is plain Markdown, where a stray `<` or `{` is fine.
 //
 // A note that is not valid MDX is not an error to show as a blank page: the caller draws it as plain Markdown, with the

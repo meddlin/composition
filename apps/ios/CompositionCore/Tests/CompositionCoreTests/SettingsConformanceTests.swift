@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Build plan, Step 1: the parts of the desktop's `parseWebSettings` the iPad uses, against the real function. The inputs are
-// apps/ios/conformance/settings-cases.json and what the desktop made of each is settings-expected.json (see
+// fixtures/conformance/settings-cases.json and what the desktop made of each is settings-expected.json (see
 // ConformanceTests.swift for how to run this). The backup round trip with settings is in BackupConformanceTests.
 
 private struct Expected: Decodable {

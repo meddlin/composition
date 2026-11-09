@@ -11,7 +11,7 @@ import Testing
 //                      exactly what the desktop says it put in: the notes and their uuids, the Trash Can, every file by hash.
 //   Swift -> desktop   Swift then backs up what it restored, to swift-backup*.tar.gz plus a description of it. The
 //                      TypeScript side restores those with the real `stageBackup` and `applyStagedBackup`, opens the
-//                      result with the real `db.ts`, and compares (apps/web/scripts/ios-conformance-fixtures.test.ts).
+//                      result with the real `db.ts`, and compares (apps/web/scripts/conformance-fixtures.test.ts).
 
 /// What a data directory holds. The desktop writes this as `*.expected.json`; Swift writes the same shape for its own backups.
 private struct Expected: Codable, Equatable {

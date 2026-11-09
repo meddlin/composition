@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Spike S4: the Swift ports of the helpers behind the components against the desktop's real functions (chartData.ts,
-// repoRef.ts, youtubeRef.ts, imageWidth.ts, imageRefs.ts). The inputs are apps/ios/conformance/component-cases.json, the
+// repoRef.ts, youtubeRef.ts, imageWidth.ts, imageRefs.ts). The inputs are fixtures/conformance/component-cases.json, the
 // answers component-expected.json (see ConformanceTests.swift for how to run this).
 
 private struct Cases: Decodable {

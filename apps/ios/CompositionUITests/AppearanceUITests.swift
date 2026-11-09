@@ -107,7 +107,7 @@ final class AppearanceUITests: XCTestCase {
 
     // MARK: The ten components in every scheme
 
-    /// The "Preview showcase" note (apps/ios/conformance/preview-showcase/note.md: every component the preview draws), imported at launch, drawn on the
+    /// The "Preview showcase" note (fixtures/conformance/preview-showcase/note.md: every component the preview draws), imported at launch, drawn on the
     /// Preview tab in each scheme. The page is the scheme's; the screenshot of each is kept as an attachment, which is the snapshot to look at. (The
     /// colours of the components themselves are the tokens' and the `<Mark>` tints', checked against the desktop in CompositionCore.)
     func testTheShowcaseIsDrawnInEveryScheme() throws {

@@ -2,7 +2,7 @@ import Foundation
 
 // Inserting an image that is already stored (the tracker's "Insert a stored image"): the Swift twins of the desktop's `listImages` (images.ts), the join
 // with the notes that point at each image (`imageUsage` in imageRefs.ts), and the picker's own `matchImages`, `usageLabel` and `formatSize`
-// (imagePicker.ts). Pure apart from reading the folder. They are checked against the real functions over apps/ios/conformance/images-cases.json
+// (imagePicker.ts). Pure apart from reading the folder. They are checked against the real functions over fixtures/conformance/images-cases.json
 // (see ImagesConformanceTests).
 
 /// One image in `app_data/`.
