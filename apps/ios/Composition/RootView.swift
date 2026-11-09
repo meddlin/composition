@@ -31,6 +31,14 @@ struct RootView: View {
                 Text(model.notice ?? "")
             }
             .sheet(item: $model.exportedBackup) { ExportSheet(backup: $0) }
+            // A PDF the library already holds is not imported twice without asking.
+            .alert("This PDF is already here", isPresented: Binding(get: { model.duplicatePdf != nil }, set: { if !$0 { model.dismissDuplicatePdf() } }), presenting: model.duplicatePdf) { _ in
+                Button("Open It") { if let pending = model.takeDuplicatePdf() { Task { await model.openExistingPdf(pending) } } }
+                Button("Import Another Copy") { if let pending = model.takeDuplicatePdf() { Task { await model.importDuplicateAnyway(pending) } } }
+                Button("Cancel", role: .cancel) {}
+            } message: { pending in
+                Text("\(pending.name) has the same contents as the PDF in the note \u{201C}\(pending.existing.first?.noteTitle ?? "Untitled")\u{201D}.")
+            }
     }
 
     @ViewBuilder private var content: some View {

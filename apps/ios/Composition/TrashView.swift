@@ -16,7 +16,7 @@ struct TrashView: View {
                         if !model.trashedNotes.isEmpty {
                             Section("Notes") {
                                 ForEach(model.trashedNotes, id: \.id) { note in
-                                    row(title: note.title, deletedAt: note.deletedAt, expiresAt: note.expiresAt)
+                                    row(title: note.title, deletedAt: note.deletedAt, expiresAt: note.expiresAt, pdfSize: model.pdfSizes[note.id])
                                         .swipeActions(edge: .leading) { Button("Restore", systemImage: "arrow.uturn.backward") { Task { await model.restoreNote(note.id) } }.tint(.green) }
                                         .swipeActions(edge: .trailing) { Button("Delete forever", systemImage: "trash", role: .destructive) { Task { await model.purgeNote(note.id) } } }
                                 }
@@ -42,12 +42,14 @@ struct TrashView: View {
         }
     }
 
-    private func row(title: String, deletedAt: String, expiresAt: String?) -> some View {
+    private func row(title: String, deletedAt: String, expiresAt: String?, pdfSize: Int64? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title.isEmpty ? "Untitled" : title).font(.headline)
             HStack(spacing: 8) {
                 if let date = Stamp.date(deletedAt) { Text("Deleted \(date.formatted(date: .abbreviated, time: .omitted))") }
                 if let expiresAt { Text("\(TrashRetention.daysLeft(expiresAt: expiresAt)) days left") }
+                // The PDF's file stays while the note does, and goes when the note is deleted for good.
+                if let pdfSize { Label("PDF, \(DocumentNames.formatBytes(pdfSize))", systemImage: "doc.richtext") }
             }
             .font(.caption)
             .foregroundStyle(look.mutedText)

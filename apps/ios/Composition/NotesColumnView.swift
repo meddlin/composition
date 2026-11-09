@@ -1,5 +1,6 @@
 import CompositionCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The second column: what the sidebar points at. Search, when something is typed, is over every note; otherwise a notebook or group lists
 /// its groups and then its notes, All Notes lists everything by the latest edit, and Favorites lists what is pinned (build plan Step 7).
@@ -9,6 +10,7 @@ struct NotesColumnView: View {
     @Binding var prompt: Prompt?
     @Binding var moving: DraggedItem?
     var footer: AnyView
+    @State private var choosingPdf = false
 
     private var item: SidebarItem { model.sidebar ?? .all }
     private var searching: Bool { !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -45,6 +47,14 @@ struct NotesColumnView: View {
         .tint(look.selectionFill)
         .dropList()
         .textDrop(into: item, model: model)
+        .pdfDrop(into: item, model: model)
+        // A PDF from Files: each becomes a note that owns it, in the group or notebook the list shows.
+        .fileImporter(isPresented: $choosingPdf, allowedContentTypes: [.pdf], allowsMultipleSelection: true) { result in
+            switch result {
+            case .success(let urls): Task { await model.importPdfs(urls.map(PdfFile.picked), into: model.sidebar) }
+            case .failure(let error): model.errorMessage = error.localizedDescription
+            }
+        }
         .navigationTitle(searching ? "Search" : model.title(of: item))
         .searchable(text: $model.query, prompt: "Search notes")
         .onChange(of: model.query) { model.queryChanged() }
@@ -62,6 +72,8 @@ struct NotesColumnView: View {
                 if item != .favorites {
                     Button("New Group", systemImage: "folder.badge.plus") { prompt = .newGroup(in: item == .all ? nil : item) }
                 }
+                Button("Import PDF", systemImage: "doc.badge.plus") { choosingPdf = true }
+                    .accessibilityIdentifier("import-pdf")
                 Button("New Note", systemImage: "square.and.pencil") { Task { await model.createNote() } }
             }
         }
@@ -127,7 +139,7 @@ struct NotesColumnView: View {
     /// `list` is the list the row is in, whose order a drop beside it sets (nil in search results, which have none).
     private func noteRow(_ note: NoteSummary, in list: SidebarItem?) -> some View {
         let favorite = model.isFavorite(.note, note.id)
-        return NoteRow(note: note, favorite: favorite)
+        return NoteRow(note: note, favorite: favorite, isPdf: model.pdfSizes[note.id] != nil)
             .tag(note.id)
             .accessibilityIdentifier("note-row-\(note.id)")
             .swipeActions(edge: .leading) {

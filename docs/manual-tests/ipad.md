@@ -306,9 +306,32 @@ Rules, pictures, highlights and the frontmatter in the Live tab (the second word
 123. **Every scheme.** In each of the five colour schemes the tint behind highlighted words and the rule can be seen, and the text on a tint can be read (dark text on the light schemes' strong tints, light text on the dark ones').
 124. **A note with several pictures.** Scroll through a note with five or more pictures, quickly: the text is never held up, a picture that has not come in yet is a faint box of its size that fills in, and nothing flickers when the keyboard comes up or goes.
 
+## PDFs: import and the reader (M2, first step)
+
+The reader beside the note a PDF belongs to. **Tried in the Simulator only; this is its first time on the iPad.** You need a small PDF (a few pages, with a table of contents if you can), a book of a few hundred pages, and ideally a password-protected one. Marks (highlights, typed notes), the Notes tab, quoting and Pencil ink on a PDF are the next steps and are not here. (These items are numbered from 140 to leave room for the Live view's.)
+
+140. **Import from Files.** In a group, tap *Import PDF* (the page with a plus, next to *New Note* at the top of the notes list) and choose a PDF: a note named after the file appears in that group, with a small PDF icon in the list, and opens with the PDF at its first page.
+141. **Several at once.** Choose three PDFs in the picker: three notes, and the last one opens.
+142. **Drag from Files.** Put the Files app beside this one (Split View or Slide Over) and drag a PDF onto the notes list, then onto a group, and onto a notebook in the first column: each makes a note, in the group or notebook it was dropped on.
+143. **The same PDF twice.** Import a PDF you have already imported: the app asks. *Open It* shows the first note; *Import Another Copy* makes a second note; *Cancel* makes nothing. Tell me if the words are not clear.
+144. **Not a PDF.** Rename a text file to end in `.pdf` and import it: a message says it doesn't look like a PDF, and no note is left behind.
+145. **Reading.** A finger scrolls the pages; pinching zooms; a long press selects words, and Copy works. At first the pages fit the width. Turn the iPad: they still fit, until you have zoomed yourself, and then your zoom stays.
+146. **It comes back.** Read to a page, zoom in, open another note, and come back: the same page and zoom. End the app (swipe it away) and open it again: the same.
+147. **Contents.** The list button at the left of the strip opens *Contents*: the PDF's own table of contents, with sub-headings indented and page numbers at the right. Choosing a line goes there and closes the list. A PDF with no table of contents says so.
+148. **Bookmarks.** The bookmark button marks the page you are on (it is filled while you are on a bookmarked page; pressing it then takes the bookmark off). *Bookmarks* in the list shows them by page; swipe right (or press and hold) to rename one, swipe left to delete it; choosing one goes to its page.
+149. **Go to a page.** Tap *Page 12 of 340* at the right of the strip, type a number, and it goes there.
+150. **Find.** The magnifier opens the system's find bar over the PDF (⌘F with a keyboard does too): type a word, and the matches are marked, with next and previous.
+151. **Beside the note.** In landscape with the lists showing, the pane has a *PDF / Note* switch; choose *Note* and the note is there, and back on *PDF* the PDF is where you left it. Tap the arrows button at the top left to hide the lists: the PDF is on the left and the note on the right with a divider you can drag (double tap puts it in the middle). In portrait: the switch again.
+152. **A big book.** Import the book of a few hundred pages: it opens within a second or two, scrolling keeps up with a finger, and jumping through the contents is quick. Tell me the size and the pages, and anything slow.
+153. **A protected PDF.** It asks for a password instead of showing a blank page. A wrong one says so; the right one opens it, and its contents and page count then show.
+154. **The Trash Can.** Move a PDF's note to the Trash Can: the question says its PDF stays with it; the Trash Can lists it with *PDF* and its size. Restore it: it opens as before. Move it back and delete it for good: it is gone (the iPad's *Storage* in Settings would show the space come back).
+155. **Round trip with the desktop.** Restore a desktop backup that has PDFs: they open here, at the page the desktop was on. Make a backup here and restore it on the desktop: the PDFs and the bookmarks are there. (Highlights made on the desktop are in the backup and come back, but are not drawn here yet.)
+156. **Colour schemes and large text.** In each scheme the strip and the lists read clearly (the pages themselves are always white: dark pages are not built); at the largest text size nothing in the strip is cut off.
+157. **VoiceOver.** The strip's buttons are named (*Contents and bookmarks*, *Find in the PDF*, *Bookmark this page*), the page button says *Page 12 of 340* and offers to go to a page, and the lists read their lines. Tell me what the PDF itself reads as.
+
 ## What it leaves out
 
-Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
+PDF marks (highlights, underline, typed notes), the Notes tab, quoting and citing a page, Pencil ink on a PDF and exporting one annotated, and the PDF's title from its own metadata. Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
 the preview); the notes' sort order and which dates show under a note (the desktop has both); notebook colours; settings other than the colour scheme and fonts; the Pencil; sync. Selecting text
 across blocks of the preview, and the video player of `<YouTube>`, are not there either.
 

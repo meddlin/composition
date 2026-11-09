@@ -75,7 +75,7 @@ private struct EdgeDrop: ViewModifier {
             }
             .overlay(alignment: .top) { if edge == .before { line } }
             .overlay(alignment: .bottom) { if edge == .after { line } }
-            .onDrop(of: [.compositionItem, .plainText], delegate: EdgeDropDelegate(model: model, target: target, frame: frame, edge: $edge))
+            .onDrop(of: [.compositionItem, .plainText, .pdf], delegate: EdgeDropDelegate(model: model, target: target, frame: frame, edge: $edge))
     }
 
     private var line: some View {
@@ -96,9 +96,9 @@ private struct EdgeDropDelegate: DropDelegate {
         return DropEdge.at(offsetY: info.location.y - frame.minY, height: max(frame.height, 1), allowed: model.allowedEdges(of: item, on: target))
     }
 
-    /// Text dropped from Files or another app, rather than one of our own rows.
+    /// Text or a PDF dropped from Files or another app, rather than one of our own rows.
     private func isText(_ info: DropInfo) -> Bool {
-        !info.hasItemsConforming(to: [.compositionItem]) && info.hasItemsConforming(to: [.plainText]) && model.acceptsText(on: target)
+        !info.hasItemsConforming(to: [.compositionItem]) && info.hasItemsConforming(to: [.plainText, .pdf]) && model.acceptsText(on: target)
     }
 
     func validateDrop(info: DropInfo) -> Bool {
@@ -133,6 +133,7 @@ private struct EdgeDropDelegate: DropDelegate {
             case .notebook(let id): into = .notebook(id)
             case .note: return false
             }
+            if info.hasItemsConforming(to: [.pdf]) { return DroppedPdfs.take(info, into: into, model: model) }
             return DroppedTexts.take(info, into: into, model: model)
         }
         guard let item = model.dragging, let landed = edge(at: info) else { return false }
@@ -183,4 +184,61 @@ private struct ListTextDropDelegate: DropDelegate {
     func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .copy) }
 
     func performDrop(info: DropInfo) -> Bool { DroppedTexts.take(info, into: item, model: model) }
+}
+
+/// Reading what was dropped from Files or another app that is a PDF: each file is copied to a folder of its own first (the system's copy lasts only while
+/// it is being handed over), and the copy is what is imported and then removed.
+@MainActor
+enum DroppedPdfs {
+    /// Starts copying the dropped PDFs and imports them when they are copied. True when there was anything to take.
+    static func take(_ info: DropInfo, into item: SidebarItem?, model: AppModel) -> Bool {
+        let providers = info.itemProviders(for: [.pdf])
+        guard !providers.isEmpty else { return false }
+        Task {
+            var files: [PdfFile] = []
+            for provider in providers {
+                if let file = await copy(provider) { files.append(file) }
+            }
+            await model.importPdfs(files, into: item)
+        }
+        return true
+    }
+
+    private static func copy(_ provider: NSItemProvider) async -> PdfFile? {
+        await withCheckedContinuation { continuation in
+            _ = provider.loadFileRepresentation(forTypeIdentifier: UTType.pdf.identifier) { url, _ in
+                guard let url else { return continuation.resume(returning: nil) }
+                let folder = FileManager.default.temporaryDirectory.appending(path: "Dropped-\(UUID().uuidString)", directoryHint: .isDirectory)
+                let copy = folder.appending(path: url.lastPathComponent)
+                do {
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try FileManager.default.copyItem(at: url, to: copy)
+                    continuation.resume(returning: PdfFile.local(copy, cleanup: folder))
+                } catch {
+                    try? FileManager.default.removeItem(at: folder)
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// Lets PDF files be dropped anywhere on the list, into the group or notebook the sidebar points at.
+    func pdfDrop(into item: SidebarItem?, model: AppModel) -> some View {
+        onDrop(of: [.pdf], delegate: ListPdfDropDelegate(model: model, item: item))
+    }
+}
+
+private struct ListPdfDropDelegate: DropDelegate {
+    let model: AppModel
+    let item: SidebarItem?
+
+    func validateDrop(info: DropInfo) -> Bool {
+        !info.hasItemsConforming(to: [.compositionItem]) && info.hasItemsConforming(to: [.pdf])
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? { DropProposal(operation: .copy) }
+
+    func performDrop(info: DropInfo) -> Bool { DroppedPdfs.take(info, into: item, model: model) }
 }

@@ -190,12 +190,15 @@ struct BrowserView: View {
 struct NoteRow: View {
     let note: NoteSummary
     var favorite = false
+    /// The note owns a PDF.
+    var isPdf = false
     @Environment(\.look) private var look
     @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
+                if isPdf { Image(systemName: "doc.richtext").font(.caption).foregroundStyle(look.mutedText).accessibilityLabel("PDF") }
                 // At the accessibility sizes a title is given as many lines as it needs, not cut at two.
                 Text(note.title.isEmpty ? "Untitled" : note.title).font(.headline).lineLimit(textSize.isAccessibilitySize ? nil : 2)
                 if favorite { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow) }
