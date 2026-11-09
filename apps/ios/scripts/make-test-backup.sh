@@ -2,7 +2,7 @@
 # Makes a backup of 1,000 generated notes (the notes the search was judged on), in the desktop's backup format, to try the
 # iPad app with (or the desktop's Restore) without using real notes. They are the `pnpm search:playground` notes: technology
 # titles and lorem ipsum, so they will not look like yours. A 1,001st note, "Preview showcase", uses every component the preview
-# draws (apps/ios/conformance/preview-showcase/), with its two pictures stored as the desktop stores them, in `app_data/`.
+# draws (fixtures/conformance/preview-showcase/), with its two pictures stored as the desktop stores them, in `app_data/`.
 #
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile).
 # Usage: apps/ios/scripts/make-test-backup.sh [output-file]   (composition-test-1000-notes.tar.gz in the current folder by default)
@@ -17,9 +17,9 @@ out="${1:-$PWD/composition-test-1000-notes.tar.gz}"
 dir="$(mktemp -d "${TMPDIR:-/tmp}/composition-test-backup.XXXXXX")"
 trap 'rm -rf "$dir"' EXIT
 
-(cd "$root/apps/web" && IOS_FIXTURE_DIR="$dir" node node_modules/vitest/vitest.mjs run scripts/ios-conformance-fixtures.test.ts -t "writes the search corpora" > /dev/null)
+(cd "$root/apps/web" && COMPOSITION_FIXTURE_DIR="$dir" node node_modules/vitest/vitest.mjs run scripts/conformance-fixtures.test.ts -t "writes the search corpora" > /dev/null)
 cp "$dir/search-corpus-1000.db" "$dir/composition.db"
-showcase="$root/apps/ios/conformance/preview-showcase"
+showcase="$root/fixtures/conformance/preview-showcase"
 python3 - "$dir/composition.db" "$showcase/note.md" <<'PY'
 import sqlite3, sys
 db = sqlite3.connect(sys.argv[1])

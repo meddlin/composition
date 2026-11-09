@@ -1,5 +1,5 @@
 {
-  "comment": "Spike S4: notes for the Markdown/MDX layer. apps/web/scripts/ios-conformance-fixtures.test.ts runs each through the desktop's real preview pipeline (remark-parse, remark-gfm, remark-mdx, remarkIndentedCode, remarkRestrictMdx, remarkHeadings) and writes mdx-expected.json; the Swift scanner must agree on whether a note is valid, which components it holds, their props, whether each is a block or sits in a line of text, and the headings and footnotes.",
+  "comment": "Spike S4: notes for the Markdown/MDX layer. apps/web/scripts/conformance-fixtures.test.ts runs each through the desktop's real preview pipeline (remark-parse, remark-gfm, remark-mdx, remarkIndentedCode, remarkRestrictMdx, remarkHeadings) and writes mdx-expected.json; the Swift scanner must agree on whether a note is valid, which components it holds, their props, whether each is a block or sits in a line of text, and the headings and footnotes.",
   "notes": [
     {
       "name": "plain-no-component",

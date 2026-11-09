@@ -4,7 +4,7 @@ import Testing
 @testable import CompositionCore
 
 // Build plan Step 9: the desktop's `completions.ts`, `props.ts`, `snippets.ts`, `indentLines.ts`, `emphasis.ts` and `noteLinks.ts` (with
-// `noteRefs.ts`), against the real functions. The inputs are apps/ios/conformance/editing-cases.json: 95 texts with a caret at every place in each
+// `noteRefs.ts`), against the real functions. The inputs are fixtures/conformance/editing-cases.json: 95 texts with a caret at every place in each
 // (tags, props and values, quotes, fences, blank lines, emoji, CRLF), snippets, 986 selections to indent or outdent, 1,016 to make bold or italic,
 // note links and their escapes; what the desktop made of each, and the catalogues it offers read through its own code, is editing-expected.json
 // (see ConformanceTests.swift for how to run this).

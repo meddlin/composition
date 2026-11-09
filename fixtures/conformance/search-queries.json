@@ -1,5 +1,5 @@
 {
-  "about": "Queries for spike S2. The desktop's real parseSearchQuery and searchNoteIds, with a real Meilisearch, answered each one over the generated notes (apps/web/scripts/ios-conformance-fixtures.test.ts); the Swift search is compared with those answers (SearchConformanceTests.swift). The notes are apps/cli/src/tools/dummyNotes.ts, seed 42, the clock set to 2026-11-05T12:00:00.000Z. Edit this file, then regenerate the answers (see apps/ios/scripts/regenerate-search-expected.sh).",
+  "about": "Queries for spike S2. The desktop's real parseSearchQuery and searchNoteIds, with a real Meilisearch, answered each one over the generated notes (apps/web/scripts/conformance-fixtures.test.ts); the Swift search is compared with those answers (SearchConformanceTests.swift). The notes are apps/cli/src/tools/dummyNotes.ts, seed 42, the clock set to 2026-11-05T12:00:00.000Z. Edit this file, then regenerate the answers (see apps/ios/scripts/regenerate-search-expected.sh).",
   "groups": [
     {
       "name": "exact: title words",

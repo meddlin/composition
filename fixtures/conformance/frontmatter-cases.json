@@ -1,5 +1,5 @@
 {
- "comment": "Build plan Step 3: frontmatter. What the desktop's frontmatter.ts (js-yaml) makes of each case; the Swift NoteFrontmatter must agree (frontmatter-expected.json is written by apps/web/scripts/ios-conformance-fixtures.test.ts).",
+ "comment": "Build plan Step 3: frontmatter. What the desktop's frontmatter.ts (js-yaml) makes of each case; the Swift NoteFrontmatter must agree (frontmatter-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
  "parse": [
   "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n",
   "---\r\ntitle: Alpha\r\ndescription: ''\r\ntags:\r\n- x\r\n- y\r\ncreatedAt: 2026-11-06\r\nupdatedAt: 2026-11-06\r\n---\r\n# Body\r\n",

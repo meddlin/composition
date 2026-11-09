@@ -1,5 +1,5 @@
 {
-"comment": "Build plan Step 8: images. What the desktop's images.ts (sniffImage, imageFileName, storeImage), imageRefs.ts (imageAlt, imageMarkdown, imageTag, findImageRefs) and imageToMdx.ts (imagesToMdx), and for the picker of images already stored images.ts (listImages, over real folders), imageRefs.ts (imageUsage) and imagePicker.ts (matchImages, usageLabel, formatSize) answer for each case; the Swift StoredImages and MarkdownImages must agree (images-expected.json is written by apps/web/scripts/ios-conformance-fixtures.test.ts).",
+"comment": "Build plan Step 8: images. What the desktop's images.ts (sniffImage, imageFileName, storeImage), imageRefs.ts (imageAlt, imageMarkdown, imageTag, findImageRefs) and imageToMdx.ts (imagesToMdx), and for the picker of images already stored images.ts (listImages, over real folders), imageRefs.ts (imageUsage) and imagePicker.ts (matchImages, usageLabel, formatSize) answer for each case; the Swift StoredImages and MarkdownImages must agree (images-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
 "sniff": [
 {
 "hex": "89504e470d0a1a0a"

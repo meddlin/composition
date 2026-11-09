@@ -3,7 +3,7 @@ import GRDB
 
 // The only way a note or group leaves `notes` and `groups`: it moves to the trash tables, from where it can be restored
 // until it is permanently deleted by hand or outlives the retention window. A port of `trashRepo.ts`; the SQL is the
-// same text, and the conformance script (apps/ios/conformance/trash-script.json) runs both against one database.
+// same text, and the conformance script (fixtures/conformance/trash-script.json) runs both against one database.
 //
 // Each operation is one write transaction. `now` is a parameter so a test can say when something was deleted.
 
