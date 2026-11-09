@@ -185,13 +185,15 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 ## After M1: the Live view
 
-**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). A short note on how; it is planned in step form when M1 is done.
+**Decided 2026-11-08 (you):** the Live tab is in v1 and is built right after M1 closes, before M2 (the Pencil and the PDF reader, which work in the same text view). The step-by-step plan is [ipad-live-view-plan.md](ipad-live-view-plan.md) (written 2026-11-08; its six decisions were taken as proposed); a short note on how follows.
 
 - **The spec** is the desktop's Live tab (CodeMirror 6, PRs #223, #234 and #235): the note drawn as it will read, with the syntax shown only where the caret is, headings and rules drawn large, images inline.
 - **The starting point** is in the lab: *Hide: tiny and clear* (a tiny, clear font on the marks outside the caret's line), which "works well" on the iPad (item 17), with `HighlightModel` for the marks and `LiveReveal` for what stays showing (the caret's line, or the whole of a code block, so both fences show).
 - **To build:** a fourth tab beside Markdown, Preview and Split; headings, rules and images drawn as they will read; the rule for what stays showing, for the other multi-line things (lists, quotes, tables) as well as code; the arrow keys and selection handles across hidden marks; undo and the Pencil (Scribble) with marks hidden; VoiceOver, which reads marks that are only invisible (an accessibility label for the text, or hiding them from VoiceOver too, to be tried on the iPad).
 - **Checked by:** unit tests of the reveal rules, UI tests that move the caret through a note, and new items on the manual test page.
 - **If it does not come out well,** it ships reduced (the Markdown tab is the fallback, [C12](ipad-app-design.md#compromise-register)).
+
+**M1 is done (the author, 2026-11-08).** The code is merged ([#247](https://github.com/meddlin/composition/pull/247)), every M1 row is built, Gate B was answered on the iPad (typing speed, Scribble and the Pencil in a text view, hidden marks, VoiceOver), and the author has run the manual test page's checks on a Release build and calls it done. What was **not** re-checked by anyone but the author, and so is not in any test: the real Split View, Slide Over and Stage Manager as a person would use them, and the export-and-restore round trip by hand. The next piece of work is [the Live view](ipad-live-view-plan.md).
 
 ## Risks
 
