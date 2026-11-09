@@ -1,0 +1,456 @@
+import CompositionCore
+import PDFKit
+import SwiftUI
+
+// M2, the PDF reader (pdf-markup-plan.md, "The iPad"): a PDFKit `PDFView` that scrolls the pages continuously, fits them to the width until
+// the person zooms, finds in the PDF with the system's own find bar, lists the PDF's own outline and the person's bookmarks, and comes back to
+// the page and zoom it was left at. The row and the file are `CompositionCore`'s (`DocumentsStore`); marks are the next step.
+
+/// pdf.js's zoom of 1 is a PDF unit to a CSS pixel (96 to the inch); PDFKit's scale of 1 is a PDF unit to a point (72 to the inch). The zoom in the
+/// row is the desktop's (a backup carries it both ways), so the two are converted.
+private let storedZoomPerScale = 72.0 / 96.0
+
+@MainActor @Observable
+final class PdfReader {
+    /// One line of the PDF's own table of contents, in reading order.
+    struct Entry: Identifiable {
+        let id: Int
+        let level: Int
+        let title: String
+        let page: Int?
+        let destination: PDFDestination
+    }
+
+    let source: PdfSource
+    private let app: AppModel
+    private(set) var pdf: PDFDocument?
+    private(set) var failedToOpen = false
+    /// The PDF asks for a password before it can be read; `wrongPassword` says the last try did not open it.
+    private(set) var locked = false
+    private(set) var wrongPassword = false
+    /// The page at the top of the view. Known from the view itself, once it has gone back to where it was left (so that what is shown is what is there).
+    private(set) var pageIndex = 0
+    private(set) var pageCount = 0
+    /// The view has been laid out and has gone back to the saved page and zoom.
+    private(set) var restored = false
+    private(set) var outline: [Entry] = []
+    private(set) var bookmarks: [PdfBookmark] = []
+    /// The view that shows the document, set by the view; the reader asks it to move and to find.
+    weak var view: PDFView?
+
+    /// Where the reader was left: what the first layout goes back to. Only once it has gone back are the page and zoom saved, so that the first
+    /// frame (page 0, fit to the width) never overwrites them.
+    private var start: PdfViewState
+    private var saved: (page: Int, zoom: Double?)?
+    private var saveTask: Task<Void, Never>?
+
+    init(source: PdfSource, app: AppModel) {
+        self.source = source
+        self.app = app
+        start = source.document.viewState
+        pageCount = source.document.pageCount
+        saved = (start.page ?? 0, start.zoom)
+    }
+
+    var documentId: Int64 { source.document.id }
+
+    // MARK: Opening
+
+    /// The document is made off the main thread: opening a large file reads its index first. (`PDFDocument` is made and used on one thread at a time.)
+    private struct Opened: @unchecked Sendable { let pdf: PDFDocument? }
+
+    private var opening = false
+
+    /// Opens the file, once however often the pane appears (a view's state may be made again before it is kept, so nothing is read when the reader is made).
+    func open() async {
+        guard !opening else { return }
+        opening = true
+        await load()
+    }
+
+    private func load() async {
+        guard let url = source.url else { return }
+        let opened = await Task.detached(priority: .userInitiated) { Opened(pdf: PDFDocument(url: url)) }.value
+        guard let pdf = opened.pdf else {
+            failedToOpen = true
+            return
+        }
+        self.pdf = pdf
+        if pdf.isLocked {
+            locked = true
+        } else {
+            prepare()
+        }
+        await refreshBookmarks()
+    }
+
+    func unlock(with password: String) {
+        guard let pdf, pdf.unlock(withPassword: password) else {
+            wrongPassword = true
+            return
+        }
+        wrongPassword = false
+        locked = false
+        prepare()
+    }
+
+    /// Once the pages can be read: their count (kept if it was not known), and the contents.
+    private func prepare() {
+        guard let pdf else { return }
+        pageCount = pdf.pageCount
+        outline = Self.entries(of: pdf)
+        let (id, count) = (documentId, pdf.pageCount)
+        Task { await app.setPageCountIfUnknown(documentId: id, pageCount: count) }
+    }
+
+    private static func entries(of pdf: PDFDocument) -> [Entry] {
+        var entries: [Entry] = []
+        func visit(_ node: PDFOutline, level: Int) {
+            for index in 0..<node.numberOfChildren {
+                // A table of contents of a few thousand lines is enough for any book; more is a damaged or hostile file.
+                guard entries.count < 5_000, let child = node.child(at: index) else { continue }
+                let destination = child.destination ?? (child.action as? PDFActionGoTo)?.destination
+                if let destination {
+                    let title = (child.label ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                    entries.append(Entry(id: entries.count, level: level, title: title.isEmpty ? "Untitled" : title, page: destination.page.map { pdf.index(for: $0) }, destination: destination))
+                }
+                visit(child, level: level + 1)
+            }
+        }
+        if let root = pdf.outlineRoot { visit(root, level: 0) }
+        return entries
+    }
+
+    // MARK: Where the reader is
+
+    /// Called by the view when its first layout is done: back to the page and zoom the PDF was left at.
+    func restore(in view: PDFView) {
+        guard !restored else { return }
+        if let zoom = start.zoom, zoom > 0 {
+            view.autoScales = false
+            view.scaleFactor = min(max(zoom / storedZoomPerScale, view.minScaleFactor), view.maxScaleFactor)
+        }
+        if let page = start.page, let target = pdf?.page(at: page), page > 0 { view.go(to: target) }
+        if let pdf, let current = view.currentPage { pageIndex = pdf.index(for: current) }
+        restored = true
+    }
+
+    /// The page or zoom changed (a scroll, a pinch, a jump): note the page, and save the place a moment after it settles.
+    func viewChanged() {
+        guard restored, let view, let pdf, let current = view.currentPage else { return }
+        pageIndex = pdf.index(for: current)
+        // A zoom is kept only if the person made one; until then the pages fit the width, whatever the width is.
+        let zoom: Double? = view.autoScales ? nil : view.scaleFactor * storedZoomPerScale
+        saveTask?.cancel()
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else { return }
+            await self?.save(zoom: zoom)
+        }
+    }
+
+    /// Writes the place now (the app is leaving the foreground, or the PDF is closing).
+    func flush() {
+        guard restored, let view else { return }
+        saveTask?.cancel()
+        let zoom: Double? = view.autoScales ? nil : view.scaleFactor * storedZoomPerScale
+        Task { await save(zoom: zoom) }
+    }
+
+    private func save(zoom: Double?) async {
+        guard saved?.page != pageIndex || saved?.zoom != zoom else { return }
+        saved = (pageIndex, zoom)
+        await app.saveViewState(documentId: documentId, page: pageIndex, zoom: zoom)
+    }
+
+    func go(toPage index: Int) {
+        guard let page = pdf?.page(at: min(max(index, 0), max(pageCount - 1, 0))) else { return }
+        view?.go(to: page)
+    }
+
+    func go(to entry: Entry) { view?.go(to: entry.destination) }
+
+    func find() { view?.findInteraction.presentFindNavigator(showingReplace: false) }
+
+    // MARK: Bookmarks
+
+    func refreshBookmarks() async {
+        bookmarks = await app.bookmarks(documentId: documentId).sorted { ($0.page, $0.id) < ($1.page, $1.id) }
+    }
+
+    /// The bookmark on the page being read, if there is one.
+    var bookmarkHere: PdfBookmark? { bookmarks.first { $0.page == pageIndex } }
+
+    /// A key or a tap: bookmark this page, or take the bookmark off it.
+    func toggleBookmark() async {
+        if let here = bookmarkHere {
+            await app.deleteBookmark(id: here.id)
+        } else {
+            await app.addBookmark(documentId: documentId, page: pageIndex)
+        }
+        await refreshBookmarks()
+    }
+
+    func rename(_ bookmark: PdfBookmark, to label: String) async {
+        await app.renameBookmark(id: bookmark.id, label: label)
+        await refreshBookmarks()
+    }
+
+    func delete(_ bookmark: PdfBookmark) async {
+        await app.deleteBookmark(id: bookmark.id)
+        await refreshBookmarks()
+    }
+}
+
+/// A `PDFView` that says when it has first been laid out, because going to a page before that lands on the wrong place.
+final class ReaderPDFView: PDFView {
+    var onFirstLayout: (() -> Void)?
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard bounds.width > 0, bounds.height > 0, let run = onFirstLayout else { return }
+        onFirstLayout = nil
+        run()
+    }
+}
+
+struct PdfKitView: UIViewRepresentable {
+    let reader: PdfReader
+    @Environment(\.look) private var look
+
+    func makeUIView(context: Context) -> ReaderPDFView {
+        let view = ReaderPDFView()
+        view.displayMode = .singlePageContinuous
+        view.displayDirection = .vertical
+        view.displaysPageBreaks = true
+        view.pageBreakMargins = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
+        // Fit to the width until the person zooms, as the desktop's reader does; then the zoom is theirs, and is kept.
+        view.autoScales = true
+        view.minScaleFactor = 0.25
+        view.maxScaleFactor = 8
+        // The system's find bar (⌘F with a keyboard, or the Find button).
+        view.isFindInteractionEnabled = true
+        view.document = reader.pdf
+        view.accessibilityIdentifier = "pdf-view"
+        view.backgroundColor = UIColor(look.surface)
+        view.onFirstLayout = { [weak reader, weak view] in
+            guard let reader, let view else { return }
+            MainActor.assumeIsolated { reader.restore(in: view) }
+        }
+        reader.view = view
+        return view
+    }
+
+    func updateUIView(_ view: ReaderPDFView, context: Context) {
+        view.backgroundColor = UIColor(look.surface)
+    }
+}
+
+/// The reader: a strip of controls above the pages. (The note's own toolbar is above it all and stays the note's.)
+struct PdfReaderPane: View {
+    let reader: PdfReader
+    @Environment(\.look) private var look
+    @State private var showingContents = false
+    @State private var jumping = false
+    @State private var jumpText = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            controls
+            Rectangle().fill(look.border).frame(height: 1)
+            pages
+        }
+        .background(look.surface)
+        .task { await reader.open() }
+        // The place is kept as the person reads, and written when the app is about to leave.
+        .onReceive(NotificationCenter.default.publisher(for: .PDFViewPageChanged)) { if ($0.object as? PDFView) === reader.view { reader.viewChanged() } }
+        .onReceive(NotificationCenter.default.publisher(for: .PDFViewScaleChanged)) { if ($0.object as? PDFView) === reader.view { reader.viewChanged() } }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in reader.flush() }
+        .onDisappear { reader.flush() }
+        .alert("Go to page", isPresented: $jumping) {
+            TextField("Page", text: $jumpText).keyboardType(.numberPad)
+            Button("Cancel", role: .cancel) {}
+            Button("Go") { if let page = Int(jumpText.trimmingCharacters(in: .whitespaces)) { reader.go(toPage: page - 1) } }
+        } message: {
+            Text("1 to \(reader.pageCount)")
+        }
+    }
+
+    private var controls: some View {
+        HStack(spacing: 4) {
+            Button("Contents and bookmarks", systemImage: "list.bullet.indent") { showingContents = true }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("pdf-contents")
+                .popover(isPresented: $showingContents) { PdfSidebar(reader: reader) { showingContents = false }.frame(minWidth: 320, minHeight: 360) }
+            Button("Find in the PDF", systemImage: "magnifyingglass") { reader.find() }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("pdf-find")
+            Button(reader.bookmarkHere == nil ? "Bookmark this page" : "Remove this page's bookmark", systemImage: reader.bookmarkHere == nil ? "bookmark" : "bookmark.fill") {
+                Task { await reader.toggleBookmark() }
+            }
+            .labelStyle(.iconOnly)
+            .accessibilityIdentifier("pdf-bookmark")
+            Spacer(minLength: 8)
+            Button {
+                jumpText = ""
+                jumping = true
+            } label: {
+                Text(reader.pageCount > 0 && reader.restored ? "Page \(reader.pageIndex + 1) of \(reader.pageCount)" : "")
+                    .monospacedDigit()
+                    .foregroundStyle(look.mutedText)
+                    .frame(minHeight: 44)
+            }
+            .disabled(reader.pageCount == 0 || !reader.restored || reader.locked)
+            .accessibilityLabel(reader.restored ? "Page \(reader.pageIndex + 1) of \(reader.pageCount)" : "Page")
+            .accessibilityHint("Double tap to go to a page")
+            .accessibilityIdentifier("pdf-page")
+        }
+        .buttonStyle(.borderless)
+        .tint(look.brand)
+        .padding(.horizontal, 8)
+        .frame(minHeight: 48)
+        .background(look.panel)
+        .disabled(reader.pdf == nil || reader.locked)
+    }
+
+    @ViewBuilder private var pages: some View {
+        if reader.source.url == nil {
+            ContentUnavailableView("This PDF's file is missing", systemImage: "doc.questionmark", description: Text("The note is here, but its file is not. Restore a backup that has it, or move the note to the Trash Can."))
+        } else if reader.failedToOpen {
+            ContentUnavailableView("This PDF can't be opened", systemImage: "exclamationmark.triangle", description: Text("The file is damaged, or is not a PDF this iPad can read."))
+        } else if reader.locked {
+            PdfPasswordPrompt(reader: reader)
+        } else if reader.pdf == nil {
+            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            PdfKitView(reader: reader)
+        }
+    }
+}
+
+/// A PDF that asks for a password: it is not kept, and not tried more than once for each press.
+private struct PdfPasswordPrompt: View {
+    let reader: PdfReader
+    @State private var password = ""
+    @FocusState private var focused: Bool
+    @Environment(\.look) private var look
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.doc").font(.system(size: 44)).foregroundStyle(look.mutedText).accessibilityHidden(true)
+            Text("This PDF needs a password").font(.headline)
+            SecureField("Password", text: $password)
+                .textFieldStyle(.roundedBorder)
+                .focused($focused)
+                .submitLabel(.go)
+                .onSubmit(unlock)
+                .frame(maxWidth: 280)
+                .accessibilityIdentifier("pdf-password")
+            if reader.wrongPassword { Text("That password did not open it.").font(.callout).foregroundStyle(look.error) }
+            Button("Open", action: unlock).buttonStyle(.borderedProminent).disabled(password.isEmpty)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { focused = true }
+    }
+
+    private func unlock() {
+        guard !password.isEmpty else { return }
+        reader.unlock(with: password)
+        password = ""
+    }
+}
+
+/// The PDF's own contents, and the bookmarks the person made. (Highlights and the notes that cite the PDF join them with the marks.)
+struct PdfSidebar: View {
+    let reader: PdfReader
+    var close: () -> Void
+    private enum Tab: String, CaseIterable { case contents = "Contents", bookmarks = "Bookmarks" }
+    @State private var tab = Tab.contents
+    @State private var renaming: PdfBookmark?
+    @State private var label = ""
+    @Environment(\.look) private var look
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("Show", selection: $tab) { ForEach(Tab.allCases, id: \.self) { Text($0.rawValue) } }
+                .pickerStyle(.segmented)
+                .padding(10)
+            switch tab {
+            case .contents: contents
+            case .bookmarks: bookmarks
+            }
+        }
+        .background(look.background)
+        .foregroundStyle(look.foreground)
+        .alert("Name the bookmark", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+            TextField("Page \((renaming?.page ?? 0) + 1)", text: $label)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { if let bookmark = renaming { Task { await reader.rename(bookmark, to: label) } } }
+        }
+    }
+
+    @ViewBuilder private var contents: some View {
+        if reader.outline.isEmpty {
+            ContentUnavailableView("No contents", systemImage: "list.bullet", description: Text("This PDF has no table of contents. Use the page number to go to a page, or bookmark the pages you come back to."))
+        } else {
+            List(reader.outline) { entry in
+                Button {
+                    reader.go(to: entry)
+                    close()
+                } label: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(entry.title).multilineTextAlignment(.leading)
+                        Spacer(minLength: 8)
+                        if let page = entry.page { Text("\(page + 1)").monospacedDigit().foregroundStyle(look.mutedText) }
+                    }
+                    .padding(.leading, CGFloat(min(entry.level, 6)) * 16)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("pdf-outline-\(entry.id)")
+            }
+            .listStyle(.plain)
+            .accessibilityIdentifier("pdf-outline")
+        }
+    }
+
+    @ViewBuilder private var bookmarks: some View {
+        if reader.bookmarks.isEmpty {
+            ContentUnavailableView("No bookmarks", systemImage: "bookmark", description: Text("Tap the bookmark button to mark the page you are on."))
+        } else {
+            List(reader.bookmarks, id: \.id) { bookmark in
+                Button {
+                    reader.go(toPage: bookmark.page)
+                    close()
+                } label: {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(bookmark.label.isEmpty ? "Page \(bookmark.page + 1)" : bookmark.label).multilineTextAlignment(.leading)
+                        Spacer(minLength: 8)
+                        if !bookmark.label.isEmpty { Text("\(bookmark.page + 1)").monospacedDigit().foregroundStyle(look.mutedText) }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .swipeActions(edge: .trailing) { Button("Delete", systemImage: "trash", role: .destructive) { Task { await reader.delete(bookmark) } } }
+                .swipeActions(edge: .leading) {
+                    Button("Rename", systemImage: "pencil") {
+                        label = bookmark.label
+                        renaming = bookmark
+                    }
+                    .tint(look.brand)
+                }
+                .contextMenu {
+                    Button("Rename…", systemImage: "pencil") {
+                        label = bookmark.label
+                        renaming = bookmark
+                    }
+                    Button("Delete", systemImage: "trash", role: .destructive) { Task { await reader.delete(bookmark) } }
+                }
+                .accessibilityIdentifier("pdf-bookmark-\(bookmark.id)")
+            }
+            .listStyle(.plain)
+            .accessibilityIdentifier("pdf-bookmarks")
+        }
+    }
+}

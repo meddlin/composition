@@ -1,5 +1,6 @@
 import type { EditorView } from "@codemirror/view";
 import { useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type KeyboardEvent, type Ref } from "react";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { parse } from "@/lib/composition/frontmatter";
 import { dragRatio, MAX_EDITOR_RATIO, MIN_EDITOR_RATIO } from "@/lib/composition/layout";
@@ -21,6 +22,9 @@ import { highlightRange, removeHighlight, type TextRange } from "./highlightText
 import { rememberHighlightColor } from "./lastHighlightColor";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { PreviewHighlightMenu } from "./PreviewHighlightMenu";
+import { SheetDialog, type SheetEditSource } from "./SheetDialog";
+import { SheetImportDialog, type ImportedSheet, type Replacing } from "./SheetImportDialog";
+import { SheetEditContext, type SheetEditing } from "./SheetEdit";
 import { BOLD_SHORTCUT, emphasisFor, ITALIC_SHORTCUT, toggleEmphasis } from "./emphasis";
 import { indentCommandFor, indentLines, INDENT_SHORTCUT, OUTDENT_SHORTCUT, type IndentEdit } from "./indentLines";
 import { changedSpan, reflowAtCaret, type ReflowEdit } from "./reflowText";
@@ -29,8 +33,12 @@ import { wrapsBeforeColumn } from "./wrapsBeforeColumn";
 import { ResizeHandle } from "./ResizeHandle";
 import { MarkdownHighlight, MAX_HIGHLIGHT_CHARS, useHighlightSync } from "./MarkdownHighlight";
 import { MdxCompletionMenu } from "./MdxCompletionMenu";
+import { insideFence } from "./mdx/completions";
 import { DRAWIO_SHORTCUT, diagramRange, insertDiagram, isDrawioShortcut, replaceDiagramSrc } from "./mdx/drawioSrc";
 import { IMAGE_TO_MDX_SHORTCUT, imagesToMdx, isImageToMdxShortcut } from "./mdx/imageToMdx";
+import { rangeFromClipboard, type SheetSource } from "./mdx/sheetDraft";
+import { importedHash } from "./mdx/sheetImport";
+import { SHEET_SHORTCUT, findOpenedSheet, insertSheet, isSheetShortcut, sheetAt, sheetAttributes, sheetRange, sheetSource, tableAt, writeSheet, type SheetSpan } from "./mdx/sheetSrc";
 import { NoteLinkMenu } from "./NoteLinkMenu";
 import { NoteLinksProvider, type NoteLinks, type PdfLinks } from "./NoteLink";
 import { placeMarkdown, type Insertion } from "./noteInsertions";
@@ -55,11 +63,31 @@ export type FindState = {
 export type MarkdownEditorControls = {
   /** Opens the draw.io editor to draw a diagram, which goes into the note at the caret. */
   insertDiagram: () => void;
+  /** Opens the sheet editor: on the sheet or Markdown table the caret is in, else on a new sheet, which goes in at the caret. */
+  editSheet: () => void;
+  /** Opens **Import from Excel**: a range of a workbook, which goes into the note at the caret as a sheet. */
+  importExcel: () => void;
   /** Puts Markdown into the note at the caret (at the end if the user has not been in the editor yet), as a block or inline. */
   insertMarkdown: (markdown: string, how: Insertion) => void;
 };
 
 const NO_MATCHES: Match[] = [];
+
+/** The workbook reader (SheetJS, 300 KB or so) is loaded when something is imported, not with the editor. */
+const loadWorkbook = (bytes: Uint8Array) => import("./mdx/sheetWorkbook").then((module) => module.readWorkbook(bytes));
+
+/** What a sheet saved from the editor replaces: nothing (a new one goes in at `start`), a Markdown table, the sheet that was opened, or text that was pasted. */
+type SheetTarget =
+  | { kind: "new"; start: number; end: number }
+  | { kind: "promote"; start: number; text: string }
+  | { kind: "edit"; start: number; text: string }
+  | { kind: "range"; start: number; text: string };
+
+/** What a saved sheet says on its tag about its totals row: `totals="true"`, or nothing (an empty value takes the attribute off a tag that had it). */
+const totalsAttribute = (source: SheetSource): Record<string, string> => ({ totals: source.totals ? "true" : "" });
+
+/** A paste that looks like a range copied from a spreadsheet: where it went and what it was, until the note changes. */
+type PasteOffer = { value: string; start: number; text: string; rows: string[][] };
 
 type Props = {
   /** The note being edited; pasted images are filed under its name. */
@@ -90,8 +118,8 @@ type Props = {
 
 const NO_NOTES: readonly Note[] = [];
 
-/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram editor, indenting lines and bold and italic. */
-const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT} ${BOLD_SHORTCUT} ${ITALIC_SHORTCUT}`;
+/** What the editor announces as its shortcuts: the note-link and image pickers, Image → MDX, the diagram and sheet editors, indenting lines and bold and italic. */
+const KEY_SHORTCUTS = `${NOTE_LINK_SHORTCUT} ${IMAGE_PICKER_SHORTCUT} ${IMAGE_TO_MDX_SHORTCUT} ${DRAWIO_SHORTCUT} ${SHEET_SHORTCUT} ${INDENT_SHORTCUT} ${OUTDENT_SHORTCUT} ${BOLD_SHORTCUT} ${ITALIC_SHORTCUT}`;
 
 export function MarkdownEditor({
   noteId,
@@ -194,7 +222,7 @@ export function MarkdownEditor({
     pendingCaret.current = placed.start + placed.caret;
     replaceText(placed.start, placed.end, placed.text);
   }
-  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, insertMarkdown }));
+  useImperativeHandle(controls, () => ({ insertDiagram: startDiagram, editSheet: startSheet, importExcel: startImport, insertMarkdown }));
 
   const drawioEditing = useMemo<DrawioEditing>(
     () => ({ edit: (name) => setDiagram({ source: { kind: "edit", name }, at: { start: 0, end: 0 } }) }),
@@ -218,6 +246,202 @@ export function MarkdownEditor({
     if (next === text) return;
     latest.current = next;
     onChange(next);
+  }
+
+  // The sheet editor: opened on a sheet, on a Markdown table to promote, or on a new sheet; `target` is what its result replaces.
+  const [sheet, setSheet] = useState<{ source: SheetEditSource; target: SheetTarget } | null>(null);
+  const [pasteOffer, setPasteOffer] = useState<PasteOffer | null>(null);
+  // Import from Excel, with where in the note the sheet will go (the caret when it was opened).
+  const [importAt, setImportAt] = useState<{ start: number; end: number } | null>(null);
+
+  function startImport() {
+    const text = surface.text();
+    const bodyStart = text.length - parse(text)[1].length;
+    setImportAt(sheetRange(text, Math.min(surface.selection().start, text.length), bodyStart));
+  }
+
+  /** A range was imported: its sheet goes in where the caret was, with where it came from on its tag. */
+  function sheetImported(imported: ImportedSheet) {
+    const place = importAt;
+    setImportAt(null);
+    if (!place) return;
+    // After the dialog has gone, as for a saved sheet (see sheetSaved).
+    setTimeout(() => {
+      const text = surface.text();
+      const start = Math.min(place.start, text.length);
+      const attributes = { source: imported.file, sheet: imported.sheet, range: imported.range, imported: imported.imported };
+      const edit = insertSheet(text, start, start, imported.source, attributes);
+      applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+    }, 0);
+  }
+
+  /**
+   * A paste. Pictures are taken over (see useImageUpload); a range copied from a spreadsheet stays the text it is, as it always
+   * was, and is offered as a sheet: the offer stays until the note is changed again.
+   */
+  function pasted(event: { clipboardData: DataTransfer | null; defaultPrevented: boolean; preventDefault(): void }) {
+    imageUpload.paste(event);
+    if (event.defaultPrevented || !event.clipboardData) return;
+    // The editors take a line break as one character, however the clipboard wrote it.
+    const text = event.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
+    const rows = rangeFromClipboard(text, event.clipboardData.getData("text/html"));
+    if (!rows) return;
+    const before = surface.text();
+    const start = Math.min(surface.selection().start, before.length);
+    if (insideFence(before, before.lastIndexOf("\n", start - 1) + 1)) return;
+    // The browser puts the text in after this handler, so look for it there a moment later.
+    setTimeout(() => {
+      const now = surface.text();
+      if (now.slice(start, start + text.length) === text) setPasteOffer({ value: now, start, text, rows });
+    }, 0);
+  }
+
+  function makeSheetOfPaste() {
+    const offer = pasteOffer;
+    setPasteOffer(null);
+    if (offer) setSheet({ source: { kind: "promote", rows: offer.rows }, target: { kind: "range", start: offer.start, text: offer.text } });
+  }
+
+  const pasteBanner = pasteOffer && pasteOffer.value === value && (
+    <div role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-4 py-2 text-xs">
+      <span className="min-w-[12rem] flex-1">
+        That looks like a range copied from a spreadsheet ({pasteOffer.rows.length} {pasteOffer.rows.length === 1 ? "row" : "rows"} by {pasteOffer.rows[0].length}{" "}
+        {pasteOffer.rows[0].length === 1 ? "column" : "columns"}).
+      </span>
+      <Button variant="outline" size="xs" onClick={makeSheetOfPaste}>
+        Make it a sheet
+      </Button>
+      <Button variant="ghost" size="xs" onClick={() => setPasteOffer(null)}>
+        Keep as text
+      </Button>
+    </div>
+  );
+
+  function openSheet(span: SheetSpan, text: string) {
+    setSheet({ source: { kind: "edit", ...sheetSource(span) }, target: { kind: "edit", start: span.start, text: text.slice(span.start, span.end) } });
+  }
+
+  /** The sheet editor on what the caret is in: a sheet (to change it), a Markdown table (to promote it), else a new sheet at the caret. */
+  function startSheet() {
+    const text = surface.text();
+    const bodyStart = text.length - parse(text)[1].length;
+    const at = Math.min(surface.selection().start, text.length);
+    // The frontmatter is metadata, never a sheet or a table, and what is selected there is not a choice of place.
+    const span = at >= bodyStart ? sheetAt(text, at) : null;
+    if (span) return openSheet(span, text);
+    const table = at >= bodyStart ? tableAt(text, at) : null;
+    if (table) return setSheet({ source: { kind: "promote", rows: table.rows }, target: { kind: "promote", start: table.start, text: text.slice(table.start, table.end) } });
+    const place = sheetRange(text, at, bodyStart);
+    setSheet({ source: { kind: "new" }, target: { kind: "new", ...place } });
+  }
+
+  // Re-import from Excel into a sheet that is in the note: which one, and what it came from.
+  const [reimport, setReimport] = useState<{ target: { start: number; text: string }; replacing: Replacing } | null>(null);
+
+  /** Opens **Re-import** on the sheet at `offset` into the body: it says where the sheet came from, and whether it has been changed since (its fingerprint no longer matches, or it has none). */
+  async function startReimport(offset: number) {
+    const text = latest.current;
+    const span = sheetAt(text, text.length - parse(text)[1].length + offset);
+    if (!span) return;
+    const attributes = sheetAttributes(text.slice(span.start, span.openEnd));
+    const changed = !attributes.imported || (await importedHash(sheetSource(span))) !== attributes.imported;
+    setReimport({
+      target: { start: span.start, text: text.slice(span.start, span.end) },
+      replacing: { file: attributes.source, sheet: attributes.sheet, range: attributes.range, changed },
+    });
+  }
+
+  /** A re-import was made: the sheet's blocks are replaced, and its tag says where they came from now, and fingerprints what was written. */
+  function sheetReimported(imported: ImportedSheet) {
+    const target = reimport?.target;
+    setReimport(null);
+    if (!target) return;
+    // After the dialog has gone, as for a saved sheet (see sheetSaved).
+    setTimeout(() => {
+      const text = surface.text();
+      const span = findOpenedSheet(text, target);
+      if (!span) return changedUnderneath(text);
+      const next = writeSheet(text, span, imported.source, { source: imported.file, sheet: imported.sheet, range: imported.range, imported: imported.imported });
+      const end = span.end + (next.length - text.length);
+      applyAsTyping({ start: span.start, end: span.end, text: next.slice(span.start, end), caret: end - span.start });
+    }, 0);
+  }
+
+  const sheetEditing = useMemo<SheetEditing>(
+    () => ({
+      edit: (offset) => {
+        const text = latest.current;
+        const span = sheetAt(text, text.length - parse(text)[1].length + offset);
+        if (span) openSheet(span, text);
+      },
+      reimport: (offset) => void startReimport(offset),
+    }),
+    [],
+  );
+
+  /**
+   * Puts `edit` in the note as typing would (so undo takes it back in one step), with the caret `edit.caret` after
+   * its start. Where typing isn't possible (a hidden textarea) the text is replaced and undo starts over, as it
+   * does for a pasted image.
+   */
+  function applyAsTyping(edit: { start: number; end: number; text: string; caret: number }) {
+    if (showLive) {
+      // The live editor keeps its own undo history, in which this is one step.
+      surface.replace(edit.start, edit.end, edit.text, edit.caret);
+      return;
+    }
+    const el = textarea.current;
+    if (!el) return;
+    const after = el.value.slice(0, edit.start) + edit.text + el.value.slice(edit.end);
+    const caret = edit.start + edit.caret;
+    el.focus();
+    if (document.activeElement === el) {
+      el.setSelectionRange(edit.start, edit.end);
+      document.execCommand?.("insertText", false, edit.text);
+    }
+    if (el.value === after) {
+      el.setSelectionRange(caret, caret);
+      return;
+    }
+    pendingCaret.current = caret;
+    replaceText(edit.start, edit.end, edit.text);
+  }
+
+  /** The sheet was saved: a new one goes in at the caret, a promoted table is replaced by its sheet, and a changed one has its blocks rewritten. */
+  function sheetSaved(source: SheetSource) {
+    const saved = sheet;
+    setSheet(null);
+    if (!saved) return;
+    // After the dialog has gone: while it is open it holds the focus, and typing into the editor then isn't possible.
+    setTimeout(() => {
+      const text = surface.text();
+      const { target } = saved;
+      if (target.kind === "new") {
+        const start = Math.min(target.start, text.length);
+        const edit = insertSheet(text, start, Math.min(Math.max(target.end, start), text.length), source, totalsAttribute(source));
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      if (target.kind === "range") {
+        if (text.slice(target.start, target.start + target.text.length) !== target.text) return changedUnderneath(text);
+        const edit = insertSheet(text, target.start, target.start + target.text.length, source, totalsAttribute(source));
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      if (target.kind === "promote") {
+        const table = tableAt(text, target.start);
+        if (!table || text.slice(table.start, table.end) !== target.text) return changedUnderneath(text);
+        const edit = insertSheet(text, table.start, table.end, source, totalsAttribute(source));
+        return applyAsTyping({ start: edit.start, end: edit.end, text: edit.text, caret: edit.caret });
+      }
+      const span = findOpenedSheet(text, { start: target.start, text: target.text });
+      if (!span) return changedUnderneath(text);
+      const next = writeSheet(text, span, source, totalsAttribute(source));
+      const end = span.end + (next.length - text.length);
+      applyAsTyping({ start: span.start, end: span.end, text: next.slice(span.start, end), caret: end - span.start });
+    }, 0);
+  }
+
+  function changedUnderneath(text: string) {
+    setEditNotice({ reason: "The note changed while the sheet was open, so the sheet was not saved.", value: text });
   }
 
   /**
@@ -288,26 +512,7 @@ export function MarkdownEditor({
     }
     setEditNotice(null);
 
-    if (showLive) {
-      // The live editor keeps its own undo history, in which this is one step.
-      surface.replace(edit.start, edit.end, edit.text, edit.caret);
-      return;
-    }
-    const el = textarea.current;
-    if (!el) return;
-    const after = before.slice(0, edit.start) + edit.text + before.slice(edit.end);
-    const caret = edit.start + edit.caret;
-    el.focus();
-    if (document.activeElement === el) {
-      el.setSelectionRange(edit.start, edit.end);
-      document.execCommand?.("insertText", false, edit.text);
-    }
-    if (el.value === after) {
-      el.setSelectionRange(caret, caret);
-      return;
-    }
-    pendingCaret.current = caret;
-    replaceText(edit.start, edit.end, edit.text);
+    applyAsTyping(edit);
   }
 
   const noteLinks = useMemo<NoteLinks>(
@@ -400,6 +605,11 @@ export function MarkdownEditor({
       startDiagram();
       return;
     }
+    if (isSheetShortcut(event) && !event.isComposing && !readOnly) {
+      event.preventDefault(); // Keep the browser from claiming it too (it finds the previous match).
+      startSheet();
+      return;
+    }
     if (isImageToMdxShortcut(event) && !event.isComposing) {
       event.preventDefault(); // Keep the browser from claiming it too.
       convertImagesToMdx();
@@ -470,7 +680,7 @@ export function MarkdownEditor({
   const liveEvents: LiveEditorEvents = {
     onKeyDown: handleKey,
     onPaste: (event) => {
-      if (!readOnly) imageUpload.paste(event);
+      if (!readOnly) pasted(event);
     },
     onChange: features.onChange,
     onSelect: features.onSelect,
@@ -516,6 +726,7 @@ export function MarkdownEditor({
             {editNotice.reason}
           </p>
         )}
+        {showEditor && pasteBanner}
         {/* The pane is the field: no border, fill the pane (not the text), and no focus ring clipped by it. */}
         <div className="note-pane relative flex min-h-0 flex-1 flex-col">
           {highlight && (
@@ -530,7 +741,7 @@ export function MarkdownEditor({
               features.onChange();
             }}
             readOnly={readOnly}
-            onPaste={readOnly ? undefined : imageUpload.paste}
+            onPaste={readOnly ? undefined : pasted}
             // The text is drawn by the highlight layer, but the browser's squiggles still land on the textarea's own text.
             spellCheck
             aria-label="Markdown editor"
@@ -602,7 +813,10 @@ export function MarkdownEditor({
             {fm && <FrontmatterCard fm={fm} />}
             <NoteLinksProvider value={noteLinks}>
               <DrawioEditContext.Provider value={drawioEditing}>
-                <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+                {/* A note that can't be changed has no Edit button on its sheets. */}
+                <SheetEditContext.Provider value={readOnly ? null : sheetEditing}>
+                  <NoteMarkdown body={body} rehypePlugins={rehypePlugins} />
+                </SheetEditContext.Provider>
               </DrawioEditContext.Provider>
             </NoteLinksProvider>
           </PreviewHighlightMenu>
@@ -626,6 +840,7 @@ export function MarkdownEditor({
             {editNotice.reason}
           </p>
         )}
+        {showLive && pasteBanner}
         {/* Not mounted while hidden: it is a second copy of the editor, and the plain editor keeps the undo history. */}
         {showLive && (
           // The box the menus are placed in, as the plain editor's wrapper is for its own.
@@ -666,6 +881,17 @@ export function MarkdownEditor({
         source={diagram?.source ?? { kind: "new" }}
         onClose={() => setDiagram(null)}
         onSaved={diagramSaved}
+      />
+      <SheetDialog open={sheet !== null} source={sheet?.source ?? { kind: "new" }} onClose={() => setSheet(null)} onSaved={sheetSaved} />
+      <SheetImportDialog
+        open={importAt !== null || reimport !== null}
+        replacing={reimport?.replacing}
+        loadWorkbook={loadWorkbook}
+        onClose={() => {
+          setImportAt(null);
+          setReimport(null);
+        }}
+        onImported={reimport ? sheetReimported : sheetImported}
       />
     </div>
   );
