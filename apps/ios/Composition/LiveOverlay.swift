@@ -24,6 +24,9 @@ enum LiveOverlay {
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
     static let hiddenFont = UIFont.systemFont(ofSize: 0.5)
 
+    /// Whether `font` is a hidden mark's: no text of the note is as small as this.
+    static func isHidden(_ font: UIFont) -> Bool { font.pointSize < 1 }
+
     /// How many times the size of the text a heading is drawn (`.cm-live-h1` and the others of the desktop's Live tab).
     static func headingScale(_ level: Int) -> CGFloat {
         switch level {
@@ -44,8 +47,7 @@ enum LiveOverlay {
         }
 
         if let frontmatter = decorations.frontmatterRange, let part = inside(frontmatter) {
-            // Set apart: smaller, and muted, and never hidden (the desktop's `.cm-live-frontmatter`).
-            transformFonts(in: part, of: storage) { scaled($0, by: 0.85) }
+            // Set apart: smaller (the palette's font for it), and muted, and never hidden (the desktop's `.cm-live-frontmatter`).
             storage.addAttribute(.foregroundColor, value: look.uiMutedText, range: part)
         }
         for tint in decorations.tints {
@@ -59,6 +61,8 @@ enum LiveOverlay {
         for heading in decorations.headings {
             guard let part = inside(heading.range) else { continue }
             transformFonts(in: part, of: storage) { scaled(bold($0), by: headingScale(heading.level)) }
+            // For the accessibility value (`LiveAccessibility`): the line is a heading, of this level, to the rotor.
+            storage.addAttribute(.liveHeading, value: heading.level, range: part)
         }
         for style in decorations.styles {
             guard let part = inside(style.range) else { continue }
@@ -71,7 +75,9 @@ enum LiveOverlay {
         }
         for mark in decorations.shown {
             guard let part = inside(mark) else { continue }
-            storage.addAttribute(.foregroundColor, value: look.uiMutedText, range: part)
+            // Dimmed: the grey text, and a firmer grey where the mark sits inside highlighted words (their tint is behind it).
+            let tint = decorations.tints.first { NSIntersectionRange($0.range, part).length > 0 }
+            storage.addAttribute(.foregroundColor, value: tint.map { look.uiDimmedText(overTint: $0.color) } ?? look.uiMutedText, range: part)
             storage.removeAttribute(.obliqueness, range: part)
             transformFonts(in: part, of: storage) { regular($0) }
         }
@@ -137,7 +143,7 @@ enum LiveOverlay {
     private static func transformFonts(in range: NSRange, of storage: NSTextStorage, _ transform: (UIFont) -> UIFont) {
         var runs: [(NSRange, UIFont)] = []
         storage.enumerateAttribute(.font, in: range) { value, run, _ in
-            if let font = value as? UIFont, font.pointSize > 1 { runs.append((run, font)) }  // a hidden mark keeps its tiny font
+            if let font = value as? UIFont, !isHidden(font) { runs.append((run, font)) }  // a hidden mark keeps its tiny font
         }
         for (run, font) in runs { storage.addAttribute(.font, value: transform(font), range: run) }
     }
@@ -166,7 +172,7 @@ enum LiveOverlay {
     private static func italicize(_ range: NSRange, of storage: NSTextStorage) {
         var runs: [(NSRange, UIFont)] = []
         storage.enumerateAttribute(.font, in: range) { value, run, _ in
-            if let font = value as? UIFont, font.pointSize > 1 { runs.append((run, font)) }
+            if let font = value as? UIFont, !isHidden(font) { runs.append((run, font)) }
         }
         for (run, font) in runs {
             let (italic, slanted) = italic(of: font)

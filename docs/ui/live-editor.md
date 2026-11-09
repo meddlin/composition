@@ -30,6 +30,8 @@ it will read, with the syntax showing only where the caret is. The other three t
   uploaded. While the caret is on the text it stays, and the picture is drawn after it; a picture that can't be
   loaded shows "Image not found: alt" in place of the text (beside the text, while the caret is on it, it is left out).
   Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
+- **Drawings** (`<Ink src="…" />`, from the iPad) are drawn the same way: in place of the tag, from the strokes the stored PNG carries, in the colour scheme in force
+  (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is still left as written.
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
 - Everything else (links, lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).

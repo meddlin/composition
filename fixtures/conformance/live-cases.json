@@ -1,0 +1,1033 @@
+{
+ "comment": "The Live view's model, checked against the desktop's real liveDecorations (apps/web/src/components/notes/liveMarkdown.ts). Every text is read with the caret at every position and some selections, by the desktop's code, written to live-expected.json by apps/web/scripts/conformance-fixtures.test.ts, and by the Swift LiveModel, which must give the same hidden, shown, styled, drawn and tinted ranges (build plan: docs/ipad-live-view-plan.md, step L2). The notes of mdx-notes.json and the preview showcase are read as well, with a seeded sample of selections.",
+ "cases": [
+  {
+   "group": "inline",
+   "text": "**some text** and more"
+  },
+  {
+   "group": "inline",
+   "text": "*some text* and more"
+  },
+  {
+   "group": "inline",
+   "text": "_some text_ and more"
+  },
+  {
+   "group": "inline",
+   "text": "__some text__ and more"
+  },
+  {
+   "group": "inline",
+   "text": "~~struck~~ words"
+  },
+  {
+   "group": "inline",
+   "text": "~single tilde~ words"
+  },
+  {
+   "group": "inline",
+   "text": "`code` words"
+  },
+  {
+   "group": "inline",
+   "text": "``code with ` tick`` words"
+  },
+  {
+   "group": "inline",
+   "text": "` code with spaces ` end"
+  },
+  {
+   "group": "inline",
+   "text": "```inline fence``` end"
+  },
+  {
+   "group": "inline",
+   "text": "***both*** words"
+  },
+  {
+   "group": "inline",
+   "text": "**bold with *nested italic* inside** end"
+  },
+  {
+   "group": "inline",
+   "text": "*italic with **nested bold** inside* end"
+  },
+  {
+   "group": "inline",
+   "text": "**bold *and* more *italic* here**"
+  },
+  {
+   "group": "inline",
+   "text": "snake_case_word and snake_case_other"
+  },
+  {
+   "group": "inline",
+   "text": "2*3*4 and a * b * c"
+  },
+  {
+   "group": "inline",
+   "text": "**unmatched bold"
+  },
+  {
+   "group": "inline",
+   "text": "unmatched* italic"
+  },
+  {
+   "group": "inline",
+   "text": "**"
+  },
+  {
+   "group": "inline",
+   "text": "****"
+  },
+  {
+   "group": "inline",
+   "text": "** spaced **"
+  },
+  {
+   "group": "inline",
+   "text": "\\*escaped\\* and \\**mixed*"
+  },
+  {
+   "group": "inline",
+   "text": "a **b** c *d* e ~~f~~ g `h` i"
+  },
+  {
+   "group": "inline",
+   "text": "**bold**\nnext line *italic*\n\n~~strike~~"
+  },
+  {
+   "group": "inline",
+   "text": "**bold across\na line break** after"
+  },
+  {
+   "group": "inline",
+   "text": "*italic across\na line break* after"
+  },
+  {
+   "group": "inline",
+   "text": "`code across\na line` after"
+  },
+  {
+   "group": "inline",
+   "text": "[**bold link**](https://x.test) and [*it*](u)"
+  },
+  {
+   "group": "inline",
+   "text": "[a link](https://x.test/*not italic*) done"
+  },
+  {
+   "group": "inline",
+   "text": "<span>**bold in html**</span>"
+  },
+  {
+   "group": "inline",
+   "text": "`**not bold**` and **`code in bold`**"
+  },
+  {
+   "group": "inline",
+   "text": "emoji 😀 **bold 😀 bold** 😀 *it* é ü"
+  },
+  {
+   "group": "inline",
+   "text": "Ünïcode _it_ and __strong__ ñ"
+  },
+  {
+   "group": "inline",
+   "text": "**a**b *c*d e*f*g"
+  },
+  {
+   "group": "inline",
+   "text": "word**bold**word word*it*word"
+  },
+  {
+   "group": "inline",
+   "text": "__a__b _c_d e_f_g"
+  },
+  {
+   "group": "inline",
+   "text": "**bold**.\n**bold**,\n(**bold**)"
+  },
+  {
+   "group": "inline",
+   "text": "1. **one**\n2. *two*\n3. `three`"
+  },
+  {
+   "group": "inline",
+   "text": "- **item** one\n- *item* two\n  - ~~nested~~"
+  },
+  {
+   "group": "inline",
+   "text": "- [ ] **task** open\n- [x] *task* done"
+  },
+  {
+   "group": "inline",
+   "text": "> **quoted bold** and *it*\n> ~~strike~~"
+  },
+  {
+   "group": "inline",
+   "text": "> > **deep** quote"
+  },
+  {
+   "group": "inline",
+   "text": "| a | b |\n|---|---|\n| **x** | *y* |\n| `z` | ~~w~~ |"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading"
+  },
+  {
+   "group": "headings",
+   "text": "## Heading two"
+  },
+  {
+   "group": "headings",
+   "text": "### Heading three\n#### four\n##### five\n###### six"
+  },
+  {
+   "group": "headings",
+   "text": "####### seven is not a heading"
+  },
+  {
+   "group": "headings",
+   "text": "#NoSpace"
+  },
+  {
+   "group": "headings",
+   "text": "#\tTab after hash"
+  },
+  {
+   "group": "headings",
+   "text": "#"
+  },
+  {
+   "group": "headings",
+   "text": "# "
+  },
+  {
+   "group": "headings",
+   "text": "##"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading #"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading ##"
+  },
+  {
+   "group": "headings",
+   "text": "## Heading   ##   "
+  },
+  {
+   "group": "headings",
+   "text": "# Heading # not closing"
+  },
+  {
+   "group": "headings",
+   "text": "# #"
+  },
+  {
+   "group": "headings",
+   "text": "### ###"
+  },
+  {
+   "group": "headings",
+   "text": "# Trailing spaces   "
+  },
+  {
+   "group": "headings",
+   "text": "   # Indented three"
+  },
+  {
+   "group": "headings",
+   "text": "    # Indented four (code)"
+  },
+  {
+   "group": "headings",
+   "text": "# **bold** in a heading and *it* and `code`"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading with <Mark color=\"green\">tint</Mark>"
+  },
+  {
+   "group": "headings",
+   "text": "> # Heading in quote"
+  },
+  {
+   "group": "headings",
+   "text": "- # Heading in list"
+  },
+  {
+   "group": "headings",
+   "text": "1. ## Numbered heading"
+  },
+  {
+   "group": "headings",
+   "text": "Setext\n======\n\nafter"
+  },
+  {
+   "group": "headings",
+   "text": "Setext two\n----------\n\nafter"
+  },
+  {
+   "group": "headings",
+   "text": "para\n# heading right after\nmore"
+  },
+  {
+   "group": "headings",
+   "text": "# one\n# two\n\n# three"
+  },
+  {
+   "group": "headings",
+   "text": "#\n# \n#  two spaces"
+  },
+  {
+   "group": "headings",
+   "text": "# 😀 Heading ünï"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading\r\n\r\ntext\r\n## Two\r\n"
+  },
+  {
+   "group": "rules",
+   "text": "---"
+  },
+  {
+   "group": "rules",
+   "text": "***"
+  },
+  {
+   "group": "rules",
+   "text": "___"
+  },
+  {
+   "group": "rules",
+   "text": "- - -"
+  },
+  {
+   "group": "rules",
+   "text": "* * *"
+  },
+  {
+   "group": "rules",
+   "text": "_ _ _"
+  },
+  {
+   "group": "rules",
+   "text": "----------"
+  },
+  {
+   "group": "rules",
+   "text": "---   "
+  },
+  {
+   "group": "rules",
+   "text": "   ---"
+  },
+  {
+   "group": "rules",
+   "text": "    ---"
+  },
+  {
+   "group": "rules",
+   "text": "text\n\n---\n\nmore"
+  },
+  {
+   "group": "rules",
+   "text": "text\n---\nmore"
+  },
+  {
+   "group": "rules",
+   "text": "text\n\n***\n\nmore\n\n___\n"
+  },
+  {
+   "group": "rules",
+   "text": "- item\n\n---\n\n- item"
+  },
+  {
+   "group": "rules",
+   "text": "- item\n---\n"
+  },
+  {
+   "group": "rules",
+   "text": "* item\n* * *\n* item"
+  },
+  {
+   "group": "rules",
+   "text": "> ---"
+  },
+  {
+   "group": "rules",
+   "text": "> text\n>\n> ---\n>\n> more"
+  },
+  {
+   "group": "rules",
+   "text": "- ---"
+  },
+  {
+   "group": "rules",
+   "text": "-- -"
+  },
+  {
+   "group": "rules",
+   "text": "--\n"
+  },
+  {
+   "group": "rules",
+   "text": "---\nnot frontmatter\n---\n"
+  },
+  {
+   "group": "rules",
+   "text": "# Heading\n---\n"
+  },
+  {
+   "group": "rules",
+   "text": "**bold**\n\n---\n\n*it*"
+  },
+  {
+   "group": "rules",
+   "text": "---\r\ntext\r\n\r\n---\r\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: Alpha\ndescription: ''\ntags:\n- x\n- y\ncreatedAt: 2026-11-06\nupdatedAt: 2026-11-06\n---\n# Body\n\n**bold** and ---\n\n---\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: Alpha\n---\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: Alpha\n---"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: Alpha\n---\n\n---\nrule above\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: Alpha\n---   \n# Body"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\r\ntitle: Alpha\r\n---\r\n# Body\r\n\r\n**bold**\r\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: **not bold**\ntags:\n- *x*\n---\n**bold**"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: [unclosed\n---\n# Body **bold**"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\nnot closed\n# Body"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\n---\n# empty frontmatter"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: A\n---\n---\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: A\n---\n# H\n---\ntext"
+  },
+  {
+   "group": "frontmatter",
+   "text": "text\n\n---\ntitle: not frontmatter\n---\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": " ---\ntitle: A\n---\n"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: A\n---b\n# after"
+  },
+  {
+   "group": "frontmatter",
+   "text": "---\ntitle: A\n---\n```\n---\n```\n"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png) and text after"
+  },
+  {
+   "group": "pictures",
+   "text": "text before ![alt](pic.png) and after"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt text](app_data/img-0123456789ab.png \"A title\")"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png 'single quoted title')"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png (paren title))"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](<pic with spaces.png>)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](<pic with spaces.png> \"title\")"
+  },
+  {
+   "group": "pictures",
+   "text": "![](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![](pic.png \"t\")"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt]()"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](  )"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt]( pic.png )"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png \"unclosed)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt][ref]\n\n[ref]: pic.png"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt]\n\n[alt]: pic.png"
+  },
+  {
+   "group": "pictures",
+   "text": "![*em* alt **strong**](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt [nested] brackets](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt \\] escaped](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic(1).png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic\\(1.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic%20name.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](https://x.test/a.png?x=1&y=2)"
+  },
+  {
+   "group": "pictures",
+   "text": "[![alt](pic.png)](https://x.test)"
+  },
+  {
+   "group": "pictures",
+   "text": "# Heading ![alt](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "- ![alt](pic.png)\n- text"
+  },
+  {
+   "group": "pictures",
+   "text": "> ![alt](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![a](1.png) ![b](2.png)\n\n![c](3.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png)\n"
+  },
+  {
+   "group": "pictures",
+   "text": "text\n\n![alt](pic.png)\n\ntext"
+  },
+  {
+   "group": "pictures",
+   "text": "```\n![alt](pic.png)\n```"
+  },
+  {
+   "group": "pictures",
+   "text": "`![alt](pic.png)`"
+  },
+  {
+   "group": "pictures",
+   "text": "![multi\nline alt](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png\n\"title\")"
+  },
+  {
+   "group": "pictures",
+   "text": "!\\[alt](pic.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "![alt](pic.png)![alt2](pic2.png)"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"pic.png\" alt=\"An image\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src='pic.png' alt='single' title='T' width='50%' />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src={\"pic.png\"} alt={\"braced\"} />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"pic.png\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image alt=\"no src\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"\" alt=\"empty\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"pic.png\" alt=\"x\">"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"pic.png\"\n  alt=\"two lines\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "before <Image src=\"a.png\" /> and <Image src=\"b.png\" /> after"
+  },
+  {
+   "group": "pictures",
+   "text": "`<Image src=\"code.png\" />`"
+  },
+  {
+   "group": "pictures",
+   "text": "```\n<Image src=\"fence.png\" />\n```"
+  },
+  {
+   "group": "pictures",
+   "text": "# <Image src=\"h.png\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "> <Image src=\"q.png\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"pic.png\" alt=\"a > b\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"app_data/x.png\" width=\"300\" alt=\"w\" title=\"t\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"a.png\" alt=\"x\" width=\"40\" /><Image src=\"b.png\" />"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">tinted</Mark> words"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark>default colour</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"blue\">blue</Mark> and <Mark color=\"pink\">pink</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"nope\">unknown colour</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"orange\">outer <Mark color=\"yellow\">inner</Mark> outer again</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">never closed"
+  },
+  {
+   "group": "marks",
+   "text": "never opened</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\"/>"
+  },
+  {
+   "group": "marks",
+   "text": "</Mark> stray then <Mark>ok</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">closed</Mark></Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark   color=\"green\"  >spaced</Mark >"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark\ncolor=\"green\">tag over a line break</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">text over\na line break</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">first\n\nsecond paragraph</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "**<Mark color=\"green\">in bold</Mark>**"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">**bold in mark**</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "[<Mark color=\"pink\">in a link</Mark>](https://x.test)"
+  },
+  {
+   "group": "marks",
+   "text": "# <Mark color=\"green\">in a heading</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "- <Mark color=\"green\">in a list</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "> <Mark color=\"green\">in a quote</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "`<Mark color=\"green\">in code</Mark>`"
+  },
+  {
+   "group": "marks",
+   "text": "``<Mark>in double code</Mark>``"
+  },
+  {
+   "group": "marks",
+   "text": "```\n<Mark color=\"green\">in a fence</Mark>\n```"
+  },
+  {
+   "group": "marks",
+   "text": "~~~\n<Mark>in a tilde fence</Mark>\n~~~"
+  },
+  {
+   "group": "marks",
+   "text": "    <Mark>indented code</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "---\ntitle: <Mark>in frontmatter</Mark>\n---\n<Mark>after</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\" data-x=\"a>b\">attr with angle</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<mark color=\"green\">lowercase</mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<MarkdownThing>not a mark</MarkdownThing>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">a</Mark><Mark color=\"blue\">b</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\"></Mark> empty"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\"> </Mark> blank"
+  },
+  {
+   "group": "marks",
+   "text": "<Info>\n\nA panel with <Mark color=\"green\">tint</Mark>\n\n</Info>"
+  },
+  {
+   "group": "marks",
+   "text": "a <Mark color=\"green\">tint</Mark> and an ![img](x.png) and <Image src=\"y.png\" />"
+  },
+  {
+   "group": "blocks",
+   "text": "```\n**not bold**\n# not heading\n---\n```"
+  },
+  {
+   "group": "blocks",
+   "text": "```js\nlet a = *b*;\n```"
+  },
+  {
+   "group": "blocks",
+   "text": "~~~\n# tilde fence\n~~~"
+  },
+  {
+   "group": "blocks",
+   "text": "````\n```\ninner\n```\n````"
+  },
+  {
+   "group": "blocks",
+   "text": "```\nunclosed fence\n**x**"
+  },
+  {
+   "group": "blocks",
+   "text": "    indented **code**\n    # not heading"
+  },
+  {
+   "group": "blocks",
+   "text": "text\n\n    code\n\ntext **bold**"
+  },
+  {
+   "group": "blocks",
+   "text": "<div>\n**html block**\n</div>\n\n**after**"
+  },
+  {
+   "group": "blocks",
+   "text": "<Info>\n\nA panel with a list:\n\n- back up first\n- then deploy\n\n</Info>\n\n**after**"
+  },
+  {
+   "group": "blocks",
+   "text": "<Toc />\n\n# Heading\n\n**bold**"
+  },
+  {
+   "group": "blocks",
+   "text": "[ref]: https://x.test\n\n**bold**"
+  },
+  {
+   "group": "blocks",
+   "text": "Term\n: definition **bold**"
+  },
+  {
+   "group": "blocks",
+   "text": "Hard  \nbreak **bold**\\\nbackslash *it*"
+  },
+  {
+   "group": "blocks",
+   "text": "A paragraph with a footnote[^1] and **bold**.\n\n[^1]: The note with *italic*."
+  },
+  {
+   "group": "blocks",
+   "text": "1. one\n\n   para **bold** in item\n\n2. two"
+  },
+  {
+   "group": "blocks",
+   "text": "- a\n  - b **bold**\n    - c *it*"
+  },
+  {
+   "group": "blocks",
+   "text": "* * *\n- - -\n"
+  },
+  {
+   "group": "blocks",
+   "text": "<!-- comment **bold** -->\n\n**after**"
+  },
+  {
+   "group": "blocks",
+   "text": "text <!-- inline **comment** --> **bold**"
+  },
+  {
+   "group": "blocks",
+   "text": "line one\r\nline **two**\r\n\r\n# Heading\r\n\r\n---\r\n\r\n![i](p.png)\r\n"
+  },
+  {
+   "group": "blocks",
+   "text": ""
+  },
+  {
+   "group": "blocks",
+   "text": "\n"
+  },
+  {
+   "group": "blocks",
+   "text": "\n\n\n"
+  },
+  {
+   "group": "blocks",
+   "text": "plain text only"
+  },
+  {
+   "group": "blocks",
+   "text": "😀"
+  },
+  {
+   "group": "blocks",
+   "text": "# 😀\n**😀**\n![😀](😀.png)\n<Mark color=\"green\">😀</Mark>"
+  },
+  {
+   "group": "headings",
+   "text": "# C#"
+  },
+  {
+   "group": "headings",
+   "text": "## F# and C#"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading#"
+  },
+  {
+   "group": "headings",
+   "text": "### a #b"
+  },
+  {
+   "group": "headings",
+   "text": "# Heading # \t"
+  },
+  {
+   "group": "headings",
+   "text": "# Head `<Mark color=\"green\">tint</Mark>` end"
+  },
+  {
+   "group": "headings",
+   "text": "### `<Image src=\"h.png\" />` after"
+  },
+  {
+   "group": "headings",
+   "text": "## Title ##\n\ntext **bold**"
+  },
+  {
+   "group": "marks",
+   "text": "before <Mark\ncolor=\"green\">tag over a line break</Mark> after"
+  },
+  {
+   "group": "marks",
+   "text": "x <Mark color=\"green\">text over\na line break</Mark> y"
+  },
+  {
+   "group": "marks",
+   "text": "x <Mark color=\"green\">tint</Mark\n> y"
+  },
+  {
+   "group": "marks",
+   "text": "x <Mark\ncolor=\"green\">a</Mark\n> y"
+  },
+  {
+   "group": "marks",
+   "text": "<Markée>accent</Mark> after"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark xcolor=\"green\">no colour</Mark> after"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark ècolor=\"green\">odd boundary</Mark> after"
+  },
+  {
+   "group": "marks",
+   "text": "<Imageé src=\"a.png\" /> after"
+  },
+  {
+   "group": "marks",
+   "text": "- `<Mark>code in list</Mark>` and <Mark>tint</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "> `<Mark>code in quote</Mark>` and <Mark>tint</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "1. `<Mark>in numbered</Mark>` <Mark color=\"pink\">t</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "\\`<Mark>escaped ticks</Mark>\\` after"
+  },
+  {
+   "group": "marks",
+   "text": "`code` then <Mark color=\"green\">tint</Mark> then `more <Mark>code</Mark>`"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">a</Mark> `<Mark>b</Mark>` xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "group": "marks",
+   "text": "<Mark color=\"green\">a</Mark> `<Mark>b</Mark>` xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  {
+   "group": "marks",
+   "text": "````\n```\n<Mark>inner fence line</Mark>\n```\n<Mark>still inside</Mark>\n````\n<Mark>after</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "```\n<Mark>one</Mark>\n``\n<Mark>two</Mark>\n```\n<Mark>after</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "``` a `b`\n<Mark>not a fence (backtick in info)</Mark>\n```"
+  },
+  {
+   "group": "marks",
+   "text": "~~~ a `b`\n<Mark>tilde fence with backtick info</Mark>\n~~~\n<Mark>after</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "  ```\n<Mark>indented fence</Mark>\n  ```\n<Mark>after</Mark>"
+  },
+  {
+   "group": "marks",
+   "text": "    ```\n<Mark>four spaces: not a fence</Mark>"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image src=\"a.png\" data-alt=\"x\" alt=\"real\" />"
+  },
+  {
+   "group": "pictures",
+   "text": "<Image alt=\"first\" alt=\"second\" src=\"a.png\" />"
+  }
+ ]
+}

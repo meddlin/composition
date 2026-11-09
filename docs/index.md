@@ -40,6 +40,8 @@ See [shared-core-plan.md](shared-core-plan.md) for the plan to move the code the
 See [ui/mdx-components.md](ui/mdx-components.md) for the components (like `<Info>` and `<Warning>`) a note can use, and
 [architecture/diagrams.md](architecture/diagrams.md) for draw.io diagrams in a note (`<Drawio>`).
 
+See [architecture/ink.md](architecture/ink.md) for handwritten drawings from the iPad in a note (`<Ink>`): the stroke format, and how the web, desktop and CLI show them.
+
 See [ui/ai-helper.md](ui/ai-helper.md) for the AI helper, the chat panel beside a note that talks to your own Ollama server or, if you sign in, your ChatGPT plan, and
 [manual-tests/ai-helper.md](manual-tests/ai-helper.md) for checking it by hand. Its research and build plan are
 [ai-helper-research.md](ai-helper-research.md) and [ai-helper-plan.md](ai-helper-plan.md).
@@ -161,4 +163,8 @@ and [panel-system-research.md](panel-system-research.md) for the pop-out spike a
 
 See [windows-build-plan.md](windows-build-plan.md) for the design of the Windows 10/11 x64 build: an NSIS installer with the CLI, Meilisearch and in-app updates inside, what has to change, the decisions to make, and the order to build it in.
 
+See [windows-native-app-design.md](windows-native-app-design.md) for the design of a native Windows app (C#/.NET, WinUI 3, the note preview in a WebView2): what carries over from the Electron Windows plan, a tracker of which features port, the compromises, the decisions made and open, the spikes (run on a Mac, and the one that needs Windows) and the gates. Design and spikes only; the Electron app stays the shipping Windows plan.
+
 See [ipad-app-design.md](ipad-app-design.md) for the design of a native iPad app (Swift, with Apple Pencil handwriting): the architecture, a tracker of which features work or are expected to, the compromises made to get it running, the decisions still open, and the spikes to run first. Built so far: the data layer, backup, Trash Can and search as a Swift package (`apps/ios/CompositionCore`), checked against the desktop's own code (plus the Markdown and MDX layer and a highlighter for the editor), and a prototype app (`apps/ios/Composition`) that draws notes and their components, runs on an iPad, and has an editor lab; [ipad-build-plan.md](ipad-build-plan.md) is the order of work for the first milestone, [ipad-live-view-plan.md](ipad-live-view-plan.md) is the plan for the Live view that follows it, and [manual-tests/ipad.md](manual-tests/ipad.md) is how to install the prototype on an iPad and what to try.
+
+See [linux-native-app-design.md](linux-native-app-design.md) for the design of a native Linux app (Rust, GTK 4 and libadwaita, GNOME first): the architecture, a tracker of which features port, the compromises, the decisions made and still open, what the spikes in `apps/linux/spikes/` showed, and what could not be verified without a real GNOME desktop. Design and spikes only; no production code.

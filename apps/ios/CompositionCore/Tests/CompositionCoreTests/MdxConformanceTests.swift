@@ -4,8 +4,8 @@ import Testing
 @testable import CompositionCore
 
 // Spike S4: the restricted MDX layer against the desktop's real preview pipeline (docs/ipad-app-design.md, "Markdown and
-// MDX"). The notes are apps/ios/conformance/mdx-notes.json; what remark-mdx and the desktop's own plugins made of each is
-// mdx-expected.json, written by apps/web/scripts/ios-conformance-fixtures.test.ts (see ConformanceTests.swift for how to run
+// MDX"). The notes are fixtures/conformance/mdx-notes.json; what remark-mdx and the desktop's own plugins made of each is
+// mdx-expected.json, written by apps/web/scripts/conformance-fixtures.test.ts (see ConformanceTests.swift for how to run
 // this). A note must come out the same way on both sides: valid or not, the components with their props, block or inline,
 // the headings and the order of the footnotes. The error *messages* are not compared; they are the desktop's words.
 

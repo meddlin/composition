@@ -121,7 +121,7 @@ final class EditorLab: NSObject, UITextViewDelegate, @MainActor NSTextContentSto
     var tracksSelection = UserDefaults.standard.bool(forKey: "labSelectionHud") || UserDefaults.standard.string(forKey: "labSelectionLog") != nil
     /// `-labSelectionLog <file>`: every selection and text change is appended there (for driving the lab by hand and reading what happened without a screenshot).
     private let selectionLog = UserDefaults.standard.string(forKey: "labSelectionLog")
-    var axMode: LabAXMode {
+    var axMode: LiveAccessibility.Mode {
         get { textView.axMode }
         set { textView.axMode = newValue; axModeChanges += 1 }
     }
@@ -1287,63 +1287,34 @@ private struct LabPanel: View {
 
 // MARK: - The lab's text view
 
-/// What the text view tells VoiceOver (spike L6, docs/ipad-live-view-plan.md). The marks the Live look hides are only invisible, so by default the accessibility value
-/// holds them; these are the plan's two candidate fixes.
-enum LabAXMode: String, CaseIterable, Identifiable {
-    case off = "VoiceOver: as it is"
-    /// The accessibility value is the text without the hidden marks (its length differs from the text view's).
-    case withoutMarks = "VoiceOver: value without the marks"
-    /// The accessibility value is the whole text, with the hidden marks marked "speak no punctuation" (positions stay), and headings given their level.
-    case silentMarks = "VoiceOver: marks silent, headings marked"
-
-    var id: String { rawValue }
-}
-
 /// The lab's text view: a place for what the spikes of the Live view (docs/ipad-live-view-plan.md) try on the text view itself.
 final class LabTextView: UITextView {
-    var axMode = LabAXMode.off
-
-    /// A character the Live look has hidden: its font is the tiny one (below one point), which nothing else uses.
-    private func hiddenRuns() -> [NSRange] {
-        var runs: [NSRange] = []
-        textStorage.enumerateAttribute(.font, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
-            if let font = value as? UIFont, font.pointSize < 1 { runs.append(range) }
-        }
-        return runs
+    /// What the text view tells VoiceOver (spike L6): the way the Live tab uses too (`LiveAccessibility`), set by the lab's *VoiceOver* switch.
+    var axMode: LiveAccessibility.Mode {
+        get { LiveAccessibility.mode }
+        set { LiveAccessibility.mode = newValue }
     }
 
     override var accessibilityAttributedValue: NSAttributedString? {
         get {
-            switch axMode {
-            case .off: return super.accessibilityAttributedValue
-            case .withoutMarks:
-                let result = NSMutableAttributedString(attributedString: textStorage)
-                for run in hiddenRuns().reversed() { result.deleteCharacters(in: run) }
-                return result
-            case .silentMarks:
-                let result = NSMutableAttributedString(string: textStorage.string)
-                for run in hiddenRuns() { result.addAttribute(.accessibilitySpeechPunctuation, value: false, range: run) }
-                // A heading is the line whose font is bold and larger than the text's.
-                textStorage.enumerateAttribute(.font, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
-                    guard let font = value as? UIFont, font.pointSize >= 18 else { return }
-                    let level = font.pointSize >= 30 ? 1 : font.pointSize >= 22 ? 2 : 3
-                    result.addAttribute(.accessibilityTextHeadingLevel, value: level, range: range)
-                }
-                return result
-            }
+            // The lab's Live look sizes headings but does not mark them: a heading is the run whose font is bold and larger than the text's.
+            LiveAccessibility.value(of: textStorage, mode: axMode) { _, attributes in
+                guard let font = attributes[.font] as? UIFont, font.pointSize >= 18 else { return nil }
+                return font.pointSize >= 30 ? 1 : font.pointSize >= 22 ? 2 : 3
+            } ?? super.accessibilityAttributedValue
         }
         set { super.accessibilityAttributedValue = newValue }
     }
 
     override var accessibilityValue: String? {
-        get { axMode == .off ? super.accessibilityValue : accessibilityAttributedValue?.string }
+        get { axMode == .asItIs ? super.accessibilityValue : accessibilityAttributedValue?.string }
         set { super.accessibilityValue = newValue }
     }
 
     /// What the text view says about itself to the accessibility tree, as a dictionary to write out: the value, its attributes, the traits, and what a line-by-line
     /// reading (`UIAccessibilityReadingContent`) would use, if the text view answers to it.
     func accessibilityProbe() -> [String: Any] {
-        var report: [String: Any] = ["axMode": axMode.rawValue]
+        var report: [String: Any] = ["axMode": axMode.title]
         let value = accessibilityValue ?? ""
         report["isAccessibilityElement"] = isAccessibilityElement
         report["accessibilityLabel"] = accessibilityLabel ?? "nil"

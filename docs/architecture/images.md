@@ -153,6 +153,12 @@ drawing inside it, named `<note title>-diagram-<hash>.png`, through the same `sa
 in backups and in the terminal app like any other. Saving an edited diagram stores a new file and leaves the old one in
 `app_data/`, unused.
 
+## Drawings
+
+A handwritten drawing from the iPad (`<Ink>`, see [ink.md](ink.md)) is also an ordinary image here: a PNG with its stroke data in a private chunk (`inKJ`) that every reader of images ignores, so
+`images.ts` sniffs it as a PNG and needs no exception. The web and desktop read that chunk to draw the strokes as an SVG, **generated when the note is drawn and never stored or accepted**: SVG stays
+refused as an upload, as above.
+
 ## Header image
 
 A note can have a picture above its title in the preview, for looks only. It is two optional

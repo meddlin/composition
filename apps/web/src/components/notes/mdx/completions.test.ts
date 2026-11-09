@@ -3,8 +3,8 @@ import { mdxComponents, usesMdxComponent } from "./components";
 import { expandCompletion, findTrigger, matchCompletions, mdxCompletions } from "./completions";
 
 describe("mdxCompletions", () => {
-  it("offers exactly the allowed components", () => {
-    expect(mdxCompletions.map((c) => c.name).sort()).toEqual(Object.keys(mdxComponents).sort());
+  it("offers exactly the allowed components, but for <Ink>, which the iPad makes and this app only shows", () => {
+    expect(mdxCompletions.map((c) => c.name).sort()).toEqual(Object.keys(mdxComponents).filter((name) => name !== "Ink").sort());
   });
 
   it.each(mdxCompletions)("expands $name into a tag the preview recognises", (completion) => {

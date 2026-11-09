@@ -31,7 +31,7 @@ struct Look: Equatable {
     var selectionText: Color { theme.selection.text.color }
     /// The grey text, and the faint fill and line the desktop makes of the foreground (`--muted-foreground`, `--muted`, `--border`).
     /// (Raised above the desktop's 60% where that would read at under 4.5 on the scheme's pages: `Theme.mutedShare`.)
-    var mutedText: Color { theme.foreground.color(opacity: increasedContrast ? max(theme.mutedShare, 0.85) : theme.mutedShare) }
+    var mutedText: Color { theme.foreground.color(opacity: theme.mutedShare(increasedContrast: increasedContrast)) }
     var mutedFill: Color { theme.foreground.color(opacity: Theme.Share.muted) }
     var border: Color { theme.foreground.color(opacity: increasedContrast ? 0.4 : Theme.Share.border) }
 
@@ -51,10 +51,14 @@ struct Look: Equatable {
     var uiMutedFill: UIColor { theme.foreground.uiColor(alpha: Theme.Share.muted) }
     /// What a `<Mark color="…">` is tinted in this scheme (the five hues, at the strength the scheme gives them), behind its words.
     func uiMarkTint(_ name: String?) -> UIColor { theme.markTint(name).uiColor }
-    /// A horizontal rule: the text colour at 35%, as the desktop's Live tab draws it (a hairline, `--border`, would be too faint to read as a rule).
-    var uiRule: UIColor { theme.foreground.uiColor(alpha: 0.35) }
+    /// A horizontal rule: the text colour at 35%, as the desktop's Live tab draws it (a hairline, `--border`, would be too faint to read as a rule); firmer with Increase Contrast.
+    var uiRule: UIColor { theme.foreground.uiColor(alpha: Theme.ruleShare(increasedContrast: increasedContrast)) }
     /// The grey text of `mutedText`, for what the Live tab dims (the marks that show while the selection is in their construct).
-    var uiMutedText: UIColor { theme.foreground.uiColor(alpha: increasedContrast ? max(theme.mutedShare, 0.85) : theme.mutedShare) }
+    var uiMutedText: UIColor { theme.foreground.uiColor(alpha: theme.mutedShare(increasedContrast: increasedContrast)) }
+    /// The same, for a mark that shows over a `<Mark>`'s tint (raised where the grey would not read on that colour: `Theme.dimmedShare`).
+    func uiDimmedText(overTint name: String?) -> UIColor {
+        theme.foreground.uiColor(alpha: theme.dimmedShare(over: theme.markTint(name), increasedContrast: increasedContrast))
+    }
 }
 
 extension EnvironmentValues {

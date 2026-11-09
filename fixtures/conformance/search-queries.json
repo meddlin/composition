@@ -1,0 +1,369 @@
+{
+  "about": "Queries for spike S2. The desktop's real parseSearchQuery and searchNoteIds, with a real Meilisearch, answered each one over the generated notes (apps/web/scripts/conformance-fixtures.test.ts); the Swift search is compared with those answers (SearchConformanceTests.swift). The notes are apps/cli/src/tools/dummyNotes.ts, seed 42, the clock set to 2026-11-05T12:00:00.000Z. Edit this file, then regenerate the answers (see apps/ios/scripts/regenerate-search-expected.sh).",
+  "groups": [
+    {
+      "name": "exact: title words",
+      "queries": [
+        "kubernetes",
+        "react",
+        "postgresql",
+        "git",
+        "grpc",
+        "dns",
+        "webassembly",
+        "sqlite",
+        "docker",
+        "terraform",
+        "graphql",
+        "redis",
+        "rust",
+        "observability",
+        "roadmap",
+        "troubleshooting",
+        "cheat",
+        "sheet",
+        "deep",
+        "dive",
+        "intro",
+        "understanding",
+        "thoughts",
+        "notes",
+        "balancing",
+        "sourcing",
+        "pipelines",
+        "KUBERNETES",
+        "Kubernetes",
+        "kubérnetes",
+        "Reáct"
+      ]
+    },
+    {
+      "name": "exact: topics with punctuation",
+      "queries": [
+        "tcp/ip",
+        "TCP IP",
+        "tcp",
+        "next.js",
+        "next js",
+        "nextjs",
+        "ci/cd",
+        "ci cd pipelines",
+        "async/await",
+        "async await",
+        "load balancing",
+        "event sourcing"
+      ]
+    },
+    {
+      "name": "exact: content words",
+      "queries": [
+        "reconciliation",
+        "handshake",
+        "congestion",
+        "rebasing",
+        "multiplexed",
+        "serialization",
+        "anycast",
+        "sandboxed",
+        "serverless",
+        "atomicity",
+        "isolation",
+        "durability",
+        "namespaces",
+        "reconciles",
+        "deployments",
+        "controllers",
+        "resolvers",
+        "authoritative",
+        "bidirectional",
+        "cooperatively",
+        "lorem",
+        "ipsum",
+        "dolor",
+        "magna",
+        "veniam",
+        "cupidatat",
+        "officia",
+        "voluptate",
+        "tempor",
+        "incididunt"
+      ]
+    },
+    {
+      "name": "multi-word",
+      "queries": [
+        "kubernetes deep",
+        "redis cheat sheet",
+        "deep dive",
+        "troubleshooting log",
+        "rolling updates",
+        "linear memory",
+        "write ahead logging",
+        "write-ahead logging",
+        "lorem ipsum dolor",
+        "thoughts on docker",
+        "understanding react",
+        "docker roadmap",
+        "congestion control",
+        "three-way handshake",
+        "declarative model",
+        "redis deep dive troubleshooting"
+      ]
+    },
+    {
+      "name": "phrase",
+      "queries": [
+        "\"deep dive\"",
+        "\"dive deep\"",
+        "\"cheat sheet\"",
+        "\"rolling updates\"",
+        "\"lorem ipsum\""
+      ]
+    },
+    {
+      "name": "prefix",
+      "queries": [
+        "kube",
+        "kubernet",
+        "kuber",
+        "postgre",
+        "obs",
+        "observ",
+        "trouble",
+        "terra",
+        "graph",
+        "web",
+        "sql",
+        "a",
+        "s",
+        "rea",
+        "dep",
+        "cong",
+        "recon",
+        "serv",
+        "tempo",
+        "dolo"
+      ]
+    },
+    {
+      "name": "typo, one edit (words of 5 to 8 letters allow one)",
+      "queries": [
+        "dotker",
+        "webassemlby",
+        "trouleshooting",
+        "webassembby",
+        "cngestion",
+        "ckubernetes",
+        "sqlzte",
+        "hanshake",
+        "observablity",
+        "coongestion",
+        "postgresqv",
+        "sqilte",
+        "sourcnig",
+        "grapqhl",
+        "serializiation",
+        "reconciiation",
+        "redbis",
+        "reconfciliation",
+        "sqite",
+        "rwoadmap",
+        "thoughfs",
+        "congespion",
+        "redi",
+        "htoughts",
+        "sourcin",
+        "thougts",
+        "terrafrom",
+        "ttoubleshooting",
+        "namespces",
+        "observabiilty",
+        "balancicg",
+        "sourving",
+        "undestanding",
+        "pipelinse",
+        "balapncing",
+        "webpassembly",
+        "troubelshooting",
+        "authouitative",
+        "roadma",
+        "handeshake",
+        "kuberntes",
+        "webassemby",
+        "tercraform",
+        "dehloyments",
+        "authoritaive",
+        "rect",
+        "handshkae",
+        "sourwcing",
+        "ocker",
+        "ablancing",
+        "nameswaces",
+        "pipeline",
+        "posgresql",
+        "psotgresql",
+        "thpoughts",
+        "authorittaive",
+        "authoeritative",
+        "postgdresql",
+        "eract",
+        "sqlsite"
+      ]
+    },
+    {
+      "name": "typo, one edit at the first letter",
+      "queries": [
+        "xubernetes",
+        "ocker",
+        "eact",
+        "qedis",
+        "wust"
+      ]
+    },
+    {
+      "name": "typo, two edits (words of 9 letters or more allow two)",
+      "queries": [
+        "kubrnetss",
+        "kubrentes",
+        "webasembly",
+        "obsrvabilty",
+        "troublshotting",
+        "postgresq",
+        "understandng",
+        "reconcliatin",
+        "pipelnes",
+        "serializaton",
+        "authoratative",
+        "deploymnts"
+      ]
+    },
+    {
+      "name": "typo on the last word, which is also a prefix",
+      "queries": [
+        "kubernet",
+        "kubrnet",
+        "kuberntes dep",
+        "reakt roadm",
+        "obsrv",
+        "trubleshoot",
+        "terrafrm",
+        "postgre sql",
+        "dockr deep",
+        "sqlte che"
+      ]
+    },
+    {
+      "name": "typo with several words",
+      "queries": [
+        "kubernets deep",
+        "reakt roadmap",
+        "reakt roadmp",
+        "redis cheat shet",
+        "terrafrom deep dive",
+        "dokcer roadmap",
+        "understandng react",
+        "troubleshootng log"
+      ]
+    },
+    {
+      "name": "too short for a typo (4 letters or fewer)",
+      "queries": [
+        "gitt",
+        "dnss",
+        "reat",
+        "rusr",
+        "gti",
+        "dsn",
+        "sqlt",
+        "wasm"
+      ]
+    },
+    {
+      "name": "words that match nothing, or only part of the query",
+      "queries": [
+        "zzzzqq",
+        "kubernetes zzzzqq",
+        "zzzzqq kubernetes",
+        "lorem zzz",
+        "deep zzzzqq",
+        "zzzzqq deep dive",
+        "qqqq wwww"
+      ]
+    },
+    {
+      "name": "filters: tags",
+      "queries": [
+        "tag: software",
+        "tags: infra",
+        "tag: Software",
+        "TAGS: SOFTWARE",
+        "tag: networking roadmap",
+        "tag:\"web development\"",
+        "tag: database kubernetes",
+        "tag: frontend react",
+        "tag: nonexistent",
+        "kubernetes tag: infra"
+      ]
+    },
+    {
+      "name": "filters: title and description",
+      "queries": [
+        "title: Next.js",
+        "title: kubernetes",
+        "title: kubrnetes",
+        "title: roadmap",
+        "title: deep dive",
+        "title: lorem",
+        "description: ownership",
+        "description: x kubernetes",
+        "title: react tag: frontend"
+      ]
+    },
+    {
+      "name": "filters: dates",
+      "queries": [
+        "created: >2026-05-30",
+        "created: >=2026-01-01",
+        "created: <2026-01-01",
+        "created: <=2026-01-01",
+        "created: 2026-08-01",
+        "created: =2026-08-01",
+        "updated: <2025-12-01",
+        "updated: >=2026-10-01",
+        "createdAt: >2026-09-01",
+        "createdOn: <2026-02-01",
+        "updatedAt: >2026-06-01",
+        "created: 2026-02-31",
+        "created: tomorrow",
+        "created: >2026-13-01"
+      ]
+    },
+    {
+      "name": "filters combined with text",
+      "queries": [
+        "tag: infra created: >=2026-01-01 roadmap",
+        "tag: software title: dive",
+        "created: >2026-06-01 docker",
+        "updated: <2026-03-01 tag: backend lorem",
+        "roadmap created: >=2026-06-01 updated: <2026-10-01"
+      ]
+    },
+    {
+      "name": "half-typed filters and odd input",
+      "queries": [
+        "tag:",
+        "tags:  ",
+        "title:",
+        "created:",
+        "tag: created:",
+        "",
+        "   ",
+        "  kubernetes   deep  ",
+        "metatag:x",
+        "http://tag:foo",
+        "TITLE:Docker",
+        "title:docker"
+      ]
+    }
+  ]
+}

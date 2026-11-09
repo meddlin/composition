@@ -2,7 +2,7 @@ import Foundation
 
 // The search bar's `field: value` syntax, parsed the way `searchQuery.ts` does it, character for character. Pure, so it is
 // safe to run on every keystroke. The rules are in docs/architecture/search.md; the conformance test runs every query in
-// apps/ios/conformance/search-queries.json through the desktop's parser and compares.
+// fixtures/conformance/search-queries.json through the desktop's parser and compares.
 
 /// A condition on a note: the parsed form of `tag:` and the date fields.
 public enum SearchFilter: Equatable, Sendable {
