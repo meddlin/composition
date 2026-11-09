@@ -21,8 +21,63 @@ use gtk::{gdk, gio, glib, graphene, pango};
 use parse::{parse_line, Construct, Kind};
 use sourceview5::prelude::*;
 
+/// How rules are drawn: as overlay widgets (S8), by a text tag (a tiny font on a coloured paragraph), or by the draw-time layer.
+#[derive(Clone, Copy, PartialEq, Debug)]
+enum RuleMode {
+    Overlay,
+    Tag,
+    Layer,
+}
+
 const PICTURE_HEIGHT: i32 = 150;
 const IMAGE_SPACE: i32 = PICTURE_HEIGHT + 10;
+
+/// A widget laid over the editor that draws pictures and rules itself, at paint time, from the layout's own coordinates.
+mod layer {
+    use gtk::glib;
+    use gtk::prelude::*;
+    use gtk::subclass::prelude::*;
+    use std::cell::RefCell;
+
+    mod imp {
+        use super::*;
+
+        #[derive(Default)]
+        pub struct DrawLayer {
+            pub draw: RefCell<Option<Box<dyn Fn(&gtk::Widget, &gtk::Snapshot)>>>,
+        }
+
+        #[glib::object_subclass]
+        impl ObjectSubclass for DrawLayer {
+            const NAME: &'static str = "SpikeDrawLayer";
+            type Type = super::DrawLayer;
+            type ParentType = gtk::Widget;
+        }
+
+        impl ObjectImpl for DrawLayer {}
+
+        impl WidgetImpl for DrawLayer {
+            fn snapshot(&self, snapshot: &gtk::Snapshot) {
+                if let Some(draw) = &*self.draw.borrow() {
+                    draw(self.obj().upcast_ref(), snapshot);
+                }
+            }
+        }
+    }
+
+    glib::wrapper! {
+        pub struct DrawLayer(ObjectSubclass<imp::DrawLayer>) @extends gtk::Widget, @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
+    }
+
+    impl DrawLayer {
+        pub fn new() -> Self {
+            glib::Object::new()
+        }
+        pub fn set_draw(&self, f: impl Fn(&gtk::Widget, &gtk::Snapshot) + 'static) {
+            *self.imp().draw.borrow_mut() = Some(Box::new(f));
+        }
+    }
+}
 
 struct Tags {
     hid: gtk::TextTag,
@@ -36,6 +91,7 @@ struct Tags {
     frontmatter: gtk::TextTag,
     image_space: gtk::TextTag,
     rule_space: gtk::TextTag,
+    rule_line: gtk::TextTag,
 }
 
 impl Tags {
@@ -54,11 +110,12 @@ impl Tags {
             frontmatter: make("fm", &[("family", &"monospace"), ("scale", &0.85f64), ("foreground-rgba", &gdk::RGBA::new(0.55, 0.55, 0.55, 1.0))]),
             image_space: make("imgspace", &[("pixels-below-lines", &IMAGE_SPACE)]),
             rule_space: make("rulespace", &[("pixels-below-lines", &14i32)]),
+            rule_line: make("ruleline", &[("scale", &0.12f64), ("paragraph-background-rgba", &gdk::RGBA::new(0.55, 0.55, 0.55, 0.7)), ("foreground-rgba", &gdk::RGBA::new(0.0, 0.0, 0.0, 0.0)), ("pixels-above-lines", &10i32), ("pixels-below-lines", &10i32)]),
         }
     }
 
     fn all(&self) -> Vec<&gtk::TextTag> {
-        let mut v = vec![&self.hid, &self.dim, &self.bold, &self.italic, &self.strike, &self.code, &self.mark, &self.frontmatter, &self.image_space, &self.rule_space];
+        let mut v = vec![&self.hid, &self.dim, &self.bold, &self.italic, &self.strike, &self.code, &self.mark, &self.frontmatter, &self.image_space, &self.rule_space, &self.rule_line];
         v.extend(self.heading.iter());
         v
     }
@@ -78,6 +135,8 @@ struct State {
     touched: Vec<(usize, usize)>,
     overlays: Vec<Overlay>,
     frontmatter_end: Option<usize>,
+    /// The lines that hold a picture or a rule, in order: all the draw-time layer needs to look at.
+    special: Vec<usize>,
 }
 
 struct Live {
@@ -90,6 +149,10 @@ struct Live {
     dirty: Cell<bool>,
     watch_len: Cell<Option<(i32, Instant)>>,
     overlays_on: bool,
+    rules: RuleMode,
+    pictures_in_layer: bool,
+    textures: RefCell<std::collections::HashMap<String, gdk::Texture>>,
+    frame_ms: RefCell<Vec<f64>>,
 }
 
 impl Live {
@@ -131,6 +194,7 @@ impl Live {
             Kind::Code => Some(&self.tags.code),
             Kind::Mark => Some(&self.tags.mark),
             Kind::Image { .. } => Some(&self.tags.image_space),
+            Kind::Rule if self.rules == RuleMode::Tag => None,
             Kind::Rule => Some(&self.tags.rule_space),
         };
         if let Some(tag) = tag {
@@ -142,6 +206,13 @@ impl Live {
     }
 
     fn apply_marks(&self, line: usize, c: &Construct, revealed: bool) {
+        if c.kind == Kind::Rule && self.rules == RuleMode::Tag {
+            let (s, e) = (self.iter(line, c.start), self.iter(line, c.end));
+            self.buffer.remove_tag(&self.tags.rule_line, &s, &e);
+            self.buffer.remove_tag(&self.tags.dim, &s, &e);
+            self.buffer.apply_tag(if revealed { &self.tags.dim } else { &self.tags.rule_line }, &s, &e);
+            return;
+        }
         for &(a, b) in &c.marks {
             if b <= a {
                 continue;
@@ -156,6 +227,11 @@ impl Live {
     fn make_overlay(&self, line: usize, c: &Construct) -> Option<Overlay> {
         if !self.overlays_on {
             return None;
+        }
+        match &c.kind {
+            Kind::Image { .. } if self.pictures_in_layer => return None,
+            Kind::Rule if self.rules != RuleMode::Overlay => return None,
+            _ => {}
         }
         let widget: gtk::Widget = match &c.kind {
             Kind::Image { alt, src } => {
@@ -225,6 +301,7 @@ impl Live {
             }
             offset += len as i32 + 1;
         }
+        st.special = st.lines.iter().enumerate().filter(|(_, l)| l.iter().any(|c| matches!(c.kind, Kind::Image { .. } | Kind::Rule))).map(|(i, _)| i).collect();
         self.dirty.set(true);
     }
 
@@ -324,6 +401,65 @@ impl Live {
             }
         }
         moved
+    }
+
+    fn texture(&self, src: &str) -> Option<gdk::Texture> {
+        let mut cache = self.textures.borrow_mut();
+        if let Some(t) = cache.get(src) {
+            return Some(t.clone());
+        }
+        let t = gdk::Texture::from_filename(self.data_dir.join(src)).ok()?;
+        cache.insert(src.to_string(), t.clone());
+        Some(t)
+    }
+
+    /// Draws the pictures and rules of the visible lines, from where the layout puts those lines right now. Nothing is remembered between
+    /// frames, so there is nothing to go stale. Only `line_yrange` is asked of the layout (a line's top and height, wrapped lines and the
+    /// spacing below it included), and only for the lines that hold a picture or a rule, found by bisection.
+    fn draw_layer(&self, width: f32, snapshot: &gtk::Snapshot) {
+        let started = Instant::now();
+        let Ok(st) = self.st.try_borrow() else { return };
+        // The scan runs inside the buffer's `changed` signal, so a frame never sees it behind; this only keeps a bug there from crashing.
+        if st.lines.len() != self.buffer.line_count() as usize {
+            return;
+        }
+        let vis = self.view.visible_rect();
+        let yrange = |line: usize| {
+            let it = self.buffer.iter_at_line(line as i32).expect("line");
+            self.view.line_yrange(&it)
+        };
+        let first = st.special.partition_point(|&l| {
+            let (y, h) = yrange(l);
+            y + h < vis.y()
+        });
+        for &line in &st.special[first..] {
+            let (y, h) = yrange(line);
+            if y > vis.y() + vis.height() {
+                break;
+            }
+            let top = (y - vis.y()) as f32;
+            for c in &st.lines[line] {
+                match &c.kind {
+                    Kind::Image { src, .. } if self.pictures_in_layer => {
+                        if let Some(tex) = self.texture(src) {
+                            // The picture goes in the room the line's `pixels-below-lines` reserved at the bottom of its box.
+                            let rect = graphene::Rect::new(14.0, top + h as f32 - IMAGE_SPACE as f32 + 5.0, 300.0, PICTURE_HEIGHT as f32);
+                            snapshot.append_scaled_texture(&tex, gtk::gsk::ScalingFilter::Linear, &rect);
+                        }
+                    }
+                    Kind::Rule if self.rules == RuleMode::Layer && !c.revealed => {
+                        let rect = graphene::Rect::new(14.0, top + (h as f32 - 14.0) / 2.0, (width - 28.0).max(10.0), 1.5);
+                        snapshot.append_color(&gdk::RGBA::new(0.55, 0.55, 0.55, 0.7), &rect);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut ms = self.frame_ms.borrow_mut();
+        ms.push(started.elapsed().as_secs_f64() * 1000.0);
+        if ms.len() > 600 {
+            ms.remove(0);
+        }
     }
 
     fn state_json(&self) -> serde_json::Value {
@@ -433,6 +569,12 @@ impl Live {
                     println!("INFO overlay line={} rule={} iter_location y={} h={} placed at {:?} allocation y={} (window y of line {})", o.line, o.rule, r.y(), r.height(), o.at.get(), alloc.y(), r.y() - visible.y());
                 }
             }
+            ["bench", "layer"] => {
+                let ms = self.frame_ms.borrow();
+                let avg = ms.iter().sum::<f64>() / ms.len().max(1) as f64;
+                let max = ms.iter().cloned().fold(0.0, f64::max);
+                println!("BENCH layer frames={} avg_ms={avg:.3} max_ms={max:.3}", ms.len());
+            }
             ["bench", "reposition"] => {
                 let t = Instant::now();
                 let moved = self.reposition();
@@ -509,6 +651,12 @@ fn main() -> glib::ExitCode {
     };
     let enabled = !flag("--no-live");
     let no_overlays = flag("--no-overlays");
+    let rules = match value("--rules").as_deref() {
+        Some("tag") => RuleMode::Tag,
+        Some("layer") => RuleMode::Layer,
+        _ => RuleMode::Overlay,
+    };
+    let pictures_in_layer = value("--pictures").as_deref() == Some("layer");
     let data_dir = PathBuf::from(value("--data-dir").unwrap_or_else(|| "/data".into()));
     let scheme = value("--scheme");
     let size: (i32, i32) = value("--size").and_then(|s| s.split_once('x').map(|(w, h)| (w.parse().unwrap_or(900), h.parse().unwrap_or(700)))).unwrap_or((900, 700));
@@ -532,9 +680,11 @@ fn main() -> glib::ExitCode {
         view.set_pixels_below_lines(6);
         view.set_pixels_inside_wrap(2);
         let scroll = gtk::ScrolledWindow::builder().child(&view).build();
-        let window = adw::ApplicationWindow::builder().application(app).default_width(size.0).default_height(size.1).title("Live spike").content(&scroll).build();
+        let stack = gtk::Overlay::new();
+        stack.set_child(Some(&scroll));
+        let window = adw::ApplicationWindow::builder().application(app).default_width(size.0).default_height(size.1).title("Live spike").content(&stack).build();
 
-        let live = Rc::new(Live { tags: Tags::new(&buffer), buffer: buffer.clone(), view: view.clone(), st: RefCell::new(State::default()), enabled, data_dir: data_dir.clone(), dirty: Cell::new(false), watch_len: Cell::new(None), overlays_on: !no_overlays });
+        let live = Rc::new(Live { tags: Tags::new(&buffer), buffer: buffer.clone(), view: view.clone(), st: RefCell::new(State::default()), enabled, data_dir: data_dir.clone(), dirty: Cell::new(false), watch_len: Cell::new(None), overlays_on: !no_overlays, rules, pictures_in_layer, textures: RefCell::new(Default::default()), frame_ms: RefCell::new(vec![]) });
         let started = Instant::now();
         if enabled {
             live.rescan_all();
@@ -553,6 +703,23 @@ fn main() -> glib::ExitCode {
             let live = live.clone();
             move |_| live.edited()
         });
+        if rules == RuleMode::Layer || pictures_in_layer {
+            let draw = layer::DrawLayer::new();
+            draw.set_can_target(false);
+            draw.set_can_focus(false);
+            draw.set_overflow(gtk::Overflow::Hidden);
+            draw.set_draw({
+                let live = live.clone();
+                move |w, snap| live.draw_layer(w.width() as f32, snap)
+            });
+            stack.add_overlay(&draw);
+            stack.set_clip_overlay(&draw, true);
+            // It draws from the live layout, so it only has to be asked to draw again whenever the picture could have changed.
+            draw.add_tick_callback(|w, _| {
+                w.queue_draw();
+                glib::ControlFlow::Continue
+            });
+        }
         view.add_tick_callback({
             let live = live.clone();
             move |_, _| {

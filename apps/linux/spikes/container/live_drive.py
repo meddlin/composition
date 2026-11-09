@@ -20,7 +20,7 @@ def sh(*cmd, **kw):
 
 class App:
     def __init__(self, *args, env=None):
-        self.p = subprocess.Popen([BIN, "--data-dir", DATA, *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1, env={**os.environ, **(env or {})})
+        self.p = subprocess.Popen([BIN, "--data-dir", DATA, *args], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=(None if os.environ.get('LIVE_STDERR') else subprocess.DEVNULL), text=True, bufsize=1, env={**os.environ, **(env or {})})
         # A thread moves the app's lines into a queue: waiting on the pipe itself misses lines a buffered reader already holds.
         self.lines = queue.Queue()
         threading.Thread(target=lambda: [self.lines.put(l) for l in self.p.stdout], daemon=True).start()
@@ -323,7 +323,56 @@ def bigshot():
     a.close()
 
 
-SCENARIOS = {"bigshot": bigshot, "arrows": arrows, "selection": selection, "edits": edits, "ime": ime, "visuals": visuals, "big": big}
+def s11():
+    show("S11. Pictures and rules in a 5,000-line note, three ways")
+    configs = (
+        ("overlay", ["--rules", "overlay"], "pictures and rules as overlay widgets (S8)"),
+        ("tag-layer", ["--rules", "tag", "--pictures", "layer"], "rules by a text tag, pictures by the draw-time layer"),
+        ("layer", ["--rules", "layer", "--pictures", "layer"], "rules and pictures by the draw-time layer"),
+    )
+    for name, flags, what in configs:
+        a = App("--generate", "5000", *flags)
+        print(f"-- {name}: {what}\n   {a.ready}")
+        time.sleep(1.5)
+        rss0 = a.rss_mb()
+        for label, line in (("top", 0), ("picture", 2425), ("middle", 2500), ("far", 4900)):
+            a.goto(line, 0)
+            time.sleep(1.8)
+            a.shot(f"s11-{name}-{label}")
+        a.goto(2425, 0)
+        time.sleep(1.0)
+        a.key("Next", repeat=3)  # Page Down three times, then back
+        a.key("Prior", repeat=3)
+        time.sleep(1.0)
+        a.shot(f"s11-{name}-after-paging")
+        sh("xdotool", "windowsize", a.win, "560", "700")
+        time.sleep(1.5)
+        a.goto(2425, 0)
+        time.sleep(1.5)
+        a.shot(f"s11-{name}-narrow")
+        sh("xdotool", "windowsize", a.win, "900", "700")
+        time.sleep(1.0)
+        if flags:
+            try:
+                print("   " + a.cmd("bench layer", "BENCH"))
+            except TimeoutError:
+                pass
+        a.goto(2500, 0)
+        rss1 = a.rss_mb()
+        time.sleep(10)
+        rss2 = a.rss_mb()
+        t0 = time.time()
+        a.cmd("expect_len %d" % (a.state()["chars"] + 20), "OK expect_len")
+        sh("xdotool", "key", "--delay", "0", *(["Return"] * 20))
+        a.read("LEN_REACHED", 30)
+        enter_ms = (time.time() - t0) * 1000
+        time.sleep(1.0)
+        print(f"   memory: {rss0:.0f} MB after start, {rss1:.0f} MB after the screenshots, {rss2:.0f} MB after 10 s idle, {a.rss_mb():.0f} MB after 20 Enter presses ({enter_ms/20:.0f} ms each)")
+        a.close()
+    print(f"   screenshots in {SHOTS}")
+
+
+SCENARIOS = {"s11": s11, "bigshot": bigshot, "arrows": arrows, "selection": selection, "edits": edits, "ime": ime, "visuals": visuals, "big": big}
 
 if __name__ == "__main__":
     os.makedirs(SHOTS, exist_ok=True)

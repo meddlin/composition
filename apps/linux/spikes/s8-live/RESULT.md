@@ -81,6 +81,8 @@ paragraph background) for rules; drawing pictures at draw time in a `GtkTextView
 the layout's own; or inline widgets through `GtkTextChildAnchor`, which put a U+FFFC character in the buffer and so break "the buffer is the
 Markdown".
 
+**Update, 2026-11-09: [S11](RESULT-S11.md) answered this.** A draw-time layer (the third alternative above, without `snapshot_layer`: a widget over the view) draws pictures and rules in the right place in the same note, with no overlay widgets and flat memory. The cause of the misplacement is still unknown.
+
 ## For the decision (Live tab in v1?)
 
 **Recommendation at the time: no, keep it Later.** (The user then chose v1: D24.) The mechanism is sound and cheaper than the iPad's TextKit 2 route, but a Live tab that
