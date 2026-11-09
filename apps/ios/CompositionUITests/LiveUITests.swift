@@ -8,12 +8,12 @@ import XCTest
 final class LiveUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    private func launch() throws {
+    private func launch(_ extra: [String] = []) throws {
         continueAfterFailure = false
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "Run apps/ios/scripts/ui-test.sh: it makes the backup and passes its path.")
         XCUIDevice.shared.orientation = .landscapeLeft
         // Note 25 is "CI/CD pipelines cheat sheet" in the organization backup.
-        app.launchArguments = ["-importBackup", backup, "-openNote", "25", "-openMode", "Live", "-liveReport", "1"]
+        app.launchArguments = ["-importBackup", backup, "-openNote", "25", "-openMode", "Live", "-liveReport", "1"] + extra
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
@@ -142,4 +142,127 @@ final class LiveUITests: XCTestCase {
         XCTAssertTrue(eventually { drawn()["hidden"] == at((4, 6), (9, 11)) }, "and hide once the next word has begun: \(drawn())")
         XCTAssertEqual(drawn()["bold"], at((6, 9)))
     }
+
+    // MARK: Rules, pictures, highlights and the frontmatter (step L4)
+
+    func testTheFrontmatterIsSetApartAndNeverHidden() throws {
+        try launch()
+        XCTAssertTrue(eventually { drawn()["small"]?.hasPrefix("0-") == true }, "the frontmatter, from the first character, is drawn smaller: \(drawn())")
+        XCTAssertNil(drawn()["hidden"], "and none of it is hidden")
+    }
+
+    func testARuleIsALineAndItsDashesShowWhileTheCaretIsOnThem() throws {
+        try launch()
+        write("above\n\n---\n\nbelow")
+        XCTAssertTrue(eventually { drawn()["hidden"] == at((7, 10)) && drawn()["draw-rule"] == at((7, 11)) }, "the dashes are hidden and the paragraph is drawn as a rule: \(drawn())")
+        press(.upArrow, 2)  // the line of the dashes
+        XCTAssertTrue(eventually { drawn()["hidden"] == nil && drawn()["draw-rule"] == nil }, "with the caret on it the dashes show and no line is drawn: \(drawn())")
+        press(.downArrow, 2)
+        XCTAssertTrue(eventually { drawn()["draw-rule"] == at((7, 11)) }, "and it is drawn again when the caret has left: \(drawn())")
+    }
+
+    func testAHighlightIsTintedItsTagsAreHiddenAndTypingInItKeepsItTinted() throws {
+        try launch()
+        write("a <Mark color=\"green\">tint</Mark> b")
+        XCTAssertTrue(eventually { drawn()["hidden"] == at((2, 22), (26, 33)) && drawn()["fill"] == at((22, 26)) }, "the tags are hidden and the words tinted: \(drawn())")
+        press(.leftArrow, 11)  // inside the tinted words
+        XCTAssertTrue(eventually { drawn()["hidden"] == nil }, "both tags show while the caret is in the highlight: \(drawn())")
+        app.typeText("X")
+        XCTAssertTrue(eventually { drawn()["fill"] == at((22, 27)) }, "what is typed in the highlight is tinted at once, before the pause: \(drawn())")
+        XCTAssertTrue(eventually { drawn()["fill"] == at((22, 27)) }, "and stays so after the pause reads the note again: \(drawn())")
+    }
+
+    func testAStoredPictureIsDrawnInPlaceOfItsMarkdownAndTheMarkdownShowsWhileTheCaretIsOnIt() throws {
+        let picture = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_IMAGE"], "Run apps/ios/scripts/ui-test.sh: it passes the picture.")
+        try launch(["-pasteImage", picture])
+        XCTAssertTrue(eventually(60) { text().contains("](app_data/") }, "the picture was stored and its Markdown written: \(text().suffix(80))")
+        XCTAssertTrue(eventually { drawn()["draw-picture"] != nil }, "the picture is drawn in place of its Markdown: \(drawn())")
+        let whole = text() as NSString
+        let start = whole.range(of: "![").location
+        let end = NSMaxRange(whole.range(of: ")", range: NSRange(location: start, length: whole.length - start)))
+        XCTAssertEqual(drawn()["hidden"], "\(start)-\(end)", "the Markdown that writes it is hidden")
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()  // the keys need the editor to have the keyboard
+        // Into the Markdown: the keys from the start of the note to just short of the picture's text, then one at a time until the caret touches it (a key sent
+        // while the machine is busy can be lost, so the number of them is not counted on).
+        press(.upArrow, 1, modifiers: .command)
+        press(.rightArrow, max(0, start - 10))
+        var more = 0
+        while drawn()["draw-picture"] != nil, more < 40 { press(.rightArrow); more += 1 }
+        XCTAssertTrue(eventually { drawn()["draw-pictureAfter"] != nil && drawn()["draw-picture"] == nil && drawn()["hidden"] == nil }, "the Markdown shows and the picture is drawn after it: \(drawn())")
+    }
+
+    // MARK: What the screen shows, in each colour scheme (pixels)
+
+    /// What a scheme paints: its page, the yellow `<Mark>` tint over it and a rule (the text colour at 35%), from the real tokens (the desktop's `globals.css` through
+    /// `Theme`, checked by CompositionCore's `AppearanceConformanceTests`).
+    private struct Scheme {
+        let name: String
+        let tint: (r: Int, g: Int, b: Int)
+        let rule: (r: Int, g: Int, b: Int)
+    }
+
+    private static let schemes = [
+        Scheme(name: "dark", tint: (0x68, 0x56, 0x14), rule: (0x5a, 0x5a, 0x5a)),
+        Scheme(name: "light", tint: (0xf6, 0xdc, 0x7b), rule: (0xad, 0xaf, 0xaf)),
+        Scheme(name: "forest", tint: (0x65, 0x58, 0x13), rule: (0x52, 0x5e, 0x57)),
+        Scheme(name: "wine", tint: (0x6b, 0x51, 0x12), rule: (0x61, 0x54, 0x57)),
+        Scheme(name: "cream", tint: (0xf5, 0xd8, 0x72), rule: (0xb5, 0xae, 0xa0)),
+    ]
+
+    /// The window's pixels as red, green, blue and alpha bytes, and its size in pixels.
+    private func pixels() throws -> (data: [UInt8], width: Int, height: Int) {
+        let image = try XCTUnwrap(app.windows.firstMatch.screenshot().image.cgImage)
+        var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try XCTUnwrap(CGContext(data: &data, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4, space: space,
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        return (data, image.width, image.height)
+    }
+
+    /// How many pixels are within `tolerance` of `color`, and the longest straight run of such pixels, along a row or down a column (the window's image comes
+    /// turned a quarter in landscape, so a line across the page may run either way in it).
+    private func look(for color: (r: Int, g: Int, b: Int), tolerance: Int = 4) throws -> (count: Int, longestRun: Int) {
+        let picture = try pixels()
+        func near(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * picture.width + x) * 4
+            return abs(Int(picture.data[i]) - color.r) <= tolerance && abs(Int(picture.data[i + 1]) - color.g) <= tolerance && abs(Int(picture.data[i + 2]) - color.b) <= tolerance
+        }
+        var count = 0, longest = 0
+        for y in 0..<picture.height {
+            var run = 0
+            for x in 0..<picture.width { if near(x, y) { count += 1; run += 1; longest = max(longest, run) } else { run = 0 } }
+        }
+        for x in 0..<picture.width {
+            var run = 0
+            for y in 0..<picture.height { if near(x, y) { run += 1; longest = max(longest, run) } else { run = 0 } }
+        }
+        return (count, longest)
+    }
+
+    private func checkTheLiveLookIsPainted(in scheme: Scheme) throws {
+        try launch(["-theme", scheme.name])
+        write("above\n\n---\n\n<Mark color=\"yellow\">tinted words tinted words tinted words tinted words</Mark>\n\nend")
+        XCTAssertTrue(eventually { drawn()["draw-rule"] != nil && drawn()["fill"] != nil }, "\(scheme.name): the rule and the tint are in the text: \(drawn())")
+        let tint = try look(for: scheme.tint, tolerance: 2)
+        XCTAssertGreaterThan(tint.count, 3_000, "\(scheme.name): the tint is painted behind the words (\(tint.count) pixels of it)")
+        let rule = try look(for: scheme.rule, tolerance: 6)
+        XCTAssertGreaterThan(rule.longestRun, 400, "\(scheme.name): the rule is a line across the page (the longest run of its colour is \(rule.longestRun) pixels)")
+        // The same note in the Markdown tab has neither: a mark's tags and the dashes are text there.
+        app.buttons["Markdown"].tap()
+        XCTAssertTrue(eventually { report.label == "markdown" })
+        let plainTint = try look(for: scheme.tint, tolerance: 2), plainRule = try look(for: scheme.rule, tolerance: 6)
+        XCTAssertLessThan(plainTint.count, 300, "\(scheme.name): no tint in the Markdown tab")
+        XCTAssertLessThan(plainRule.longestRun, 100, "\(scheme.name): no rule in the Markdown tab")
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = "live, \(scheme.name)"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
+    func testTheDarkSchemePaintsTheTintAndTheRule() throws { try checkTheLiveLookIsPainted(in: Self.schemes[0]) }
+    func testTheLightSchemePaintsTheTintAndTheRule() throws { try checkTheLiveLookIsPainted(in: Self.schemes[1]) }
+    func testTheForestSchemePaintsTheTintAndTheRule() throws { try checkTheLiveLookIsPainted(in: Self.schemes[2]) }
+    func testTheWineSchemePaintsTheTintAndTheRule() throws { try checkTheLiveLookIsPainted(in: Self.schemes[3]) }
+    func testTheCreamSchemePaintsTheTintAndTheRule() throws { try checkTheLiveLookIsPainted(in: Self.schemes[4]) }
 }

@@ -212,3 +212,69 @@ struct LiveModelFollowingTests {
         #expect(nested.constructRanges(touching: NSRange(location: 9, length: 0)).count == 2)
     }
 }
+
+// MARK: Highlights, pictures and the frontmatter while typing (step L4)
+
+@Suite("The Live model keeps highlights, pictures and the frontmatter right")
+struct LiveModelDrawnTests {
+    /// Types `insertion` over `range` of `text`, the way the editor tells the models: the highlights re-read their blocks and the Live model follows.
+    private func typed(_ insertion: String, over range: NSRange, in text: String, highlights: inout HighlightModel, live: inout LiveModel) -> String {
+        let after = (text as NSString).replacingCharacters(in: range, with: insertion)
+        let now = after as NSString
+        let window = highlights.edited(replacing: range, withLength: (insertion as NSString).length, in: now)
+        live.edited(replacing: range, withLength: (insertion as NSString).length, rereading: window, in: now)
+        return after
+    }
+
+    private func tints(_ model: LiveModel) -> [String] {
+        model.decorations(selection: NSRange(location: 0, length: 0)).tints.map { "\($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
+    }
+
+    @Test("typing in a highlight keeps it tinted, and typing before it moves it")
+    func tintsFollowTyping() {
+        var text = "first <Mark color=\"green\">tint</Mark> last\n\nsecond paragraph"
+        var highlights = HighlightModel(text: text)
+        var live = LiveModel(text: text)
+        #expect(tints(live) == ["26-30 green"])
+        text = typed("ish", over: NSRange(location: 30, length: 0), in: text, highlights: &highlights, live: &live)  // at the end of the tinted words
+        #expect(tints(live) == tints(LiveModel(text: text)))
+        text = typed("X", over: NSRange(location: 28, length: 0), in: text, highlights: &highlights, live: &live)  // in the middle
+        #expect(tints(live) == tints(LiveModel(text: text)))
+        text = typed("new ", over: NSRange(location: 0, length: 0), in: text, highlights: &highlights, live: &live)  // before it
+        #expect(tints(live) == tints(LiveModel(text: text)))
+        text = typed("more", over: NSRange(location: (text as NSString).length, length: 0), in: text, highlights: &highlights, live: &live)  // in the next paragraph
+        #expect(tints(live) == tints(LiveModel(text: text)))
+    }
+
+    @Test("an edit in a tag drops the highlight until the pause, and the full read says what changed")
+    func tagsEditedAndTheFullRead() {
+        var text = "a <Mark color=\"green\">tint</Mark> b"
+        var highlights = HighlightModel(text: text)
+        var live = LiveModel(text: text)
+        text = typed("blue", over: NSRange(location: 15, length: 5), in: text, highlights: &highlights, live: &live)  // green becomes blue, inside the tag
+        #expect(tints(live) == ["21-25 green"], "the tinted words moved with the edit, in the colour they had")
+        let fresh = LiveModel(text: text)
+        #expect(tints(fresh) == ["21-25 blue"])
+        // The tag that was edited was dropped (it may no longer be one), and the tint's colour changed: the whole highlight, 2 to 32, is what to draw again.
+        #expect(fresh.differences(from: live) == [NSRange(location: 2, length: 30)])
+        #expect(LiveModel(text: text).differences(from: LiveModel(text: text)).isEmpty)
+    }
+
+    @Test("a picture stands on its own line or not, and only those are drawn in place")
+    func ownLine() {
+        let text = "![a](one.png)\n\ntext ![b](two.png) more\n\n  ![c](three.png)  \n\n<Image src=\"four.png\" />\n\n<Image src=\"five.png\" /> beside"
+        let model = LiveModel(text: text)
+        let pictures = model.decorations(selection: NSRange(location: 0, length: 0)).pictures.sorted { $0.range.location < $1.range.location }
+        #expect(pictures.map(\.src) == ["one.png", "two.png", "three.png", "four.png", "five.png"])
+        #expect(pictures.map(\.ownLine) == [true, false, true, true, false])
+        #expect(model.drawnPictureRanges.count == 3)
+    }
+
+    @Test("the frontmatter is one range, from its first character to the end of its closing line")
+    func frontmatter() {
+        let text = "---\ntitle: A\ntags:\n- x\n---\n# Body"
+        #expect(LiveModel(text: text).decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 26))
+        #expect(LiveModel(text: "# No frontmatter").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == nil)
+        #expect(LiveModel(text: "---\r\ntitle: A\r\n---\r\ntext").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 18))
+    }
+}

@@ -292,6 +292,20 @@ The fourth tab of a note: *Markdown, Live, Preview, Split*. It is the Markdown t
 114. **Every scheme, and large text.** In each of the five colour schemes the dimmed marks, the code colours and the heading text read clearly; at the largest accessibility text size the headings are still larger than the text and nothing is cut off.
 115. **Your hands.** The typing aids work as in the Markdown tab (the list after `<`, `[[` for a note link, Tab, bold and italic from the keyboard), and so do Find, the Link button and the Image menu. Write a word with the Pencil in a paragraph that has hidden marks (Scribble must be on). Tell me anything that behaves differently from the Markdown tab.
 
+## The rest of the Live tab (Live view plan, step L4)
+
+Rules, pictures, highlights and the frontmatter in the Live tab (the second word of the picker). To try them, open a note in Live and put in a `---` on a line of its own, a picture (the Image menu, or paste one), a `<Mark color="green">highlighted</Mark>` and look at the top of the note.
+
+116. **The frontmatter.** The block at the top of the note (the lines between the two `---`) is smaller than the text and grey; it is never hidden, and nothing in it is drawn as bold or italic.
+117. **A highlight.** `<Mark color="green">words</Mark>` is tinted green behind the words, with the two tags gone; try yellow, blue, pink and orange, and a colour that is not one of them (yellow). Tap in the highlighted words: the tags show, dimmed. Type a word in the middle of a highlight: it is tinted as you type, not a moment later.
+118. **A rule.** `---` on a line of its own is a thin line across the page, with the dashes gone. Tap on the line: the dashes show and the line goes; tap away and it is back. Arrow up and down across it with a hardware keyboard: one press for each line.
+119. **A picture.** A picture on a line of its own (`![alt](app_data/…)`, or `<Image src="app_data/…" />`) is the picture itself, at about the size the Preview draws it, and never wider than the text. Tap it: its Markdown shows and the picture is drawn below it; tap away and it is drawn in place again. `<Image … width="50%" />` is half the width of the text.
+120. **Turning the iPad.** With a picture on screen, turn the iPad to portrait and back: the picture fits the new width a moment after, and the note below it does not jump or leave a gap.
+121. **A picture whose file is gone.** Change the file name in a picture's Markdown to one that is not stored: the line says `Image not found: …`, muted and in italics, where the picture was; put the name back and the picture returns.
+122. **What stays text.** A picture in the middle of a sentence, one with a web address (`https://…`), and a `<Drawio>` tag stay as their text. Tell me if one of them should be drawn.
+123. **Every scheme.** In each of the five colour schemes the tint behind highlighted words and the rule can be seen, and the text on a tint can be read (dark text on the light schemes' strong tints, light text on the dark ones').
+124. **A note with several pictures.** Scroll through a note with five or more pictures, quickly: the text is never held up, a picture that has not come in yet is a faint box of its size that fills in, and nothing flickers when the keyboard comes up or goes.
+
 ## What it leaves out
 
 Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in

@@ -6,19 +6,19 @@ import Foundation
 // JavaScript's `\w`, `\s`, `\S`, `\b` and `.` written out, because ICU's are wider (Unicode word characters and spaces, more line terminators).
 
 enum LiveScan {
-    struct Tint: Equatable, Sendable {
+    struct Tint: Hashable, Sendable {
         var range: NSRange
         var color: String
     }
 
     /// A highlight's pair of tags.
-    struct MarkElement: Equatable, Sendable {
+    struct MarkElement: Hashable, Sendable {
         var open: NSRange
         var close: NSRange
     }
 
     /// An `<Image … />` as the text writes it.
-    struct ImageTag: Equatable, Sendable {
+    struct ImageTag: Hashable, Sendable {
         var range: NSRange
         var src: String
         var alt: String
@@ -30,6 +30,48 @@ enum LiveScan {
         var tints: [Tint] = []
         var elements: [MarkElement] = []
         var images: [ImageTag] = []
+
+        /// Where these places are after `edit` (a range of the old text) was replaced by text `delta` units longer: what is before it stays, what is after it moves,
+        /// a highlight's tinted stretch that holds the edit takes it in (so typing in a highlight keeps it tinted), and a tag or an `<Image />` that the edit
+        /// touches is dropped, as it may no longer be one. A full read after a pause puts right what this gets wrong (a tag typed, or broken).
+        func shifted(replacing edit: NSRange, by delta: Int) -> Result {
+            func moved(_ range: NSRange) -> NSRange? {
+                if NSMaxRange(range) <= edit.location { return range }
+                if range.location >= NSMaxRange(edit) { return NSRange(location: range.location + delta, length: range.length) }
+                return nil
+            }
+            var out = Result()
+            for tint in tints {
+                if tint.range.location <= edit.location, NSMaxRange(edit) <= NSMaxRange(tint.range) {
+                    out.tints.append(Tint(range: NSRange(location: tint.range.location, length: tint.range.length + delta), color: tint.color))
+                } else if let range = moved(tint.range) {
+                    out.tints.append(Tint(range: range, color: tint.color))
+                }
+            }
+            for element in elements {
+                if let open = moved(element.open), let close = moved(element.close) { out.elements.append(MarkElement(open: open, close: close)) }
+            }
+            for image in images {
+                if let range = moved(image.range) { out.images.append(ImageTag(range: range, src: image.src, alt: image.alt, title: image.title, width: image.width)) }
+            }
+            return out
+        }
+
+        /// The places in which this and `other` differ: what one has and the other has not.
+        func differences(from other: Result) -> [NSRange] {
+            var found: [NSRange] = []
+            let oldTints = Set(other.tints), newTints = Set(tints)
+            found += newTints.symmetricDifference(oldTints).map(\.range)
+            func whole(_ element: MarkElement) -> NSRange { NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location) }
+            found += Set(elements).symmetricDifference(Set(other.elements)).map(whole)
+            found += Set(images).symmetricDifference(Set(other.images)).map(\.range)
+            // In order, with places that overlap or touch made into one.
+            var joined: [NSRange] = []
+            for range in found.sorted(by: { $0.location < $1.location }) {
+                if let last = joined.last, range.location <= NSMaxRange(last) { joined[joined.count - 1] = NSUnionRange(last, range) } else { joined.append(range) }
+            }
+            return joined
+        }
     }
 
     // JavaScript's `\s`, `\w`, and `.`, as character-class contents.

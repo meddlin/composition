@@ -43,6 +43,12 @@ final class MarkdownStyler {
     private var drawnSelection: NSRange?
     /// Called after text has been coloured (the UI tests' view of what the screen shows).
     var didApply: (() -> Void)?
+    /// Where the notes' pictures are kept: asked when the Live tab draws one.
+    var imageFolder: () -> URL? = { nil }
+    /// Gives the paragraphs the Live tab draws a rule or a picture on their layout fragment.
+    private let drawingDelegate = LiveDrawingDelegate()
+    private nonisolated(unsafe) var pictureObserver: NSObjectProtocol?
+    private var widthPass: DispatchWorkItem?
     private var pendingEdits = EditAccumulator()
     private var version = 0
     /// The pause's pass, while it is waiting to start (nil once it has started).
@@ -58,12 +64,21 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
         self.look = look
         palette = Palette(look: look, live: false)
+        textView.textLayoutManager?.delegate = drawingDelegate
+        // A picture the Live tab asked for has come in: the text is drawn again, with it.
+        pictureObserver = NotificationCenter.default.addObserver(forName: LiveImages.didLoad, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, self.isLive, let layout = self.textView?.textLayoutManager else { return }
+                layout.invalidateLayout(for: layout.documentRange)
+                self.textView?.setNeedsLayout()
+            }
+        }
         // Every change to the characters, from anywhere: typing, a paste, an undo, a change made in code. (The delegate's `shouldChangeTextIn`
         // is not called for `insertText` or for changes made in code.) A change to attributes only, which is all the colouring does, is not an edit.
         observer = NotificationCenter.default.addObserver(forName: NSTextStorage.didProcessEditingNotification, object: textView.textStorage, queue: nil) { [weak self] _ in
@@ -73,6 +88,29 @@ final class MarkdownStyler {
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let pictureObserver { NotificationCenter.default.removeObserver(pictureObserver) }
+    }
+
+    /// The width of the text view changed (the iPad was turned, the divider was dragged): a picture is as tall as the width allows, so the ones the Live tab
+    /// draws are laid out again, a moment after the last change.
+    func widthChanged() {
+        guard isLive else { return }
+        widthPass?.cancel()
+        let item = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.redrawPictures() } }
+        widthPass = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: item)
+    }
+
+    private func redrawPictures() {
+        guard isLive, let model, let live, let storage = textView?.textStorage, live.length == storage.length else { return }
+        for range in live.drawnPictureRanges { applyColours(to: range, using: model) }
+    }
+
+    /// How wide a line of the note's text is.
+    private var textWidth: CGFloat {
+        guard let container = textView?.textContainer else { return NoteTextView.readableWidth }
+        let width = container.size.width - 2 * container.lineFragmentPadding
+        return width > 100 ? width : NoteTextView.readableWidth
     }
 
     // MARK: What the owner calls
@@ -169,8 +207,10 @@ final class MarkdownStyler {
     /// Puts the colours of `model` on `range` and nothing else: clears what a colour put there before, then sets what the spans there say.
     private func applyColours(to range: NSRange, using model: HighlightModel) {
         guard let storage = textView?.textStorage else { return }
-        let range = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
+        var range = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
         guard range.length > 0 else { return }
+        // In the Live tab whole paragraphs: what is drawn in place of a paragraph's text is set on the paragraph, and made again as a whole.
+        if isLive { range = storage.mutableString.paragraphRange(for: range) }
         storage.beginEditing()
         for key in Self.managedKeys { storage.removeAttribute(key, range: range) }
         storage.addAttributes(palette.base, range: range)
@@ -180,7 +220,7 @@ final class MarkdownStyler {
         }
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
-            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, look: look)
+            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth))
         }
         storage.endEditing()
         didApply?()
@@ -217,6 +257,9 @@ final class MarkdownStyler {
                     guard let self else { return }
                     guard self.version == seen else { return self.endPass() }  // typed again meanwhile: the next pause reads it again
                     self.measurements.fullReadMilliseconds = Self.milliseconds(spent)
+                    var dirty = dirty
+                    // Highlights, `<Image />` tags and the frontmatter pair across blocks: what the quick reads had moved and what the full read says differ there.
+                    if let freshLive, let current = self.live { dirty = Self.joined(dirty + freshLive.differences(from: current)) }
                     if known != nil, !dirty.isEmpty { self.measurements.corrections += 1 }
                     self.beginPuttingOn(fresh, live: freshLive, dirty: dirty)
                 }
@@ -270,6 +313,15 @@ final class MarkdownStyler {
         guard passDue else { return }
         passDue = false
         if idlePass == nil { scheduleFullPass(after: 0) }
+    }
+
+    /// In order, with ranges that overlap or touch made into one.
+    private static func joined(_ ranges: [NSRange]) -> [NSRange] {
+        var result: [NSRange] = []
+        for range in ranges.sorted(by: { $0.location < $1.location }) {
+            if let last = result.last, range.location <= NSMaxRange(last) { result[result.count - 1] = NSUnionRange(last, range) } else { result.append(range) }
+        }
+        return result
     }
 
     private static func milliseconds(_ duration: Duration) -> Double {
