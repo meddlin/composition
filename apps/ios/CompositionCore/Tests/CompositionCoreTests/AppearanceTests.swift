@@ -156,7 +156,7 @@ struct AppearanceTests {
         }
     }
 
-    @Test("a desktop's scheme is the iPad's, a desktop's Follow the sun reads as System, and nothing else the file holds matters")
+    @Test("a desktop's scheme is the iPad's, a desktop's Follow the sun is Follow the sun, and nothing else the file holds matters")
     func fromTheDesktop() throws {
         try withScratch { scratch in
             let (store, _) = try store(scratch, file: #"{"theme":"forest","sidebarWidth":300}"#)
@@ -164,7 +164,17 @@ struct AppearanceTests {
         }
         try withScratch { scratch in
             let (store, _) = try store(scratch, file: #"{"theme":"auto"}"#)
-            #expect(store.appearance().scheme == .system)
+            #expect(store.appearance().scheme == .sun)
+            #expect(store.appearance().sunPair == .classic, "with no pair saved it is the classic one")
+        }
+        try withScratch { scratch in
+            let (store, _) = try store(scratch, file: #"{"theme":"auto","sunPair":"blush-wine"}"#)
+            #expect(store.appearance() == Appearance(scheme: .sun, sunPair: .blushWine))
+            #expect(store.sunPair() == .blushWine)
+        }
+        try withScratch { scratch in
+            let (store, _) = try store(scratch, file: #"{"theme":"forest","sunPair":"neon"}"#)
+            #expect(store.appearance() == Appearance(scheme: .theme("forest"), sunPair: .classic), "a pair the desktop does not have is the classic one")
         }
         try withScratch { scratch in
             let (store, _) = try store(scratch, file: #"{"theme":"neon","iosEditorFont":"comic","iosPreviewFont":7,"followSystem":"yes"}"#)
@@ -187,6 +197,21 @@ struct AppearanceTests {
             written = try object(location)
             #expect(written["theme"] as? String == "cream" && written["followSystem"] as? Bool == false)
             #expect(written["panels"] != nil && store.favorites() == [Favorite(.note, 4)], "the rest of the file is as it was")
+        }
+    }
+
+    @Test("choosing Follow the sun writes the desktop's auto and its pair, and keeps every other key")
+    func followingTheSun() throws {
+        try withScratch { scratch in
+            let (store, location) = try store(scratch, file: #"{"theme":"cream","followSystem":true,"location":{"name":"Austin","latitude":30.27,"longitude":-97.74,"timezone":"America/Chicago"},"panels":{"version":2}}"#)
+            try store.setScheme(.sun)
+            try store.setSunPair(.skyMidnight)
+            #expect(store.appearance() == Appearance(scheme: .sun, sunPair: .skyMidnight))
+            let written = try object(location)
+            #expect(written["theme"] as? String == "auto" && written["sunPair"] as? String == "sky-midnight" && written["followSystem"] as? Bool == false)
+            #expect(written["panels"] != nil && store.location()?.name == "Austin", "the city and the rest of the file are as they were")
+            try store.setScheme(.theme("dark"))
+            #expect(store.appearance() == Appearance(scheme: .theme("dark"), sunPair: .skyMidnight), "the pair is kept for when it is chosen again")
         }
     }
 

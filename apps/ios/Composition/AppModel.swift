@@ -62,6 +62,10 @@ final class AppModel {
     private(set) var settings: SettingsStore?
     /// How the app looks (the colour scheme and the two type families), read from `settings.json` when the data opens (build plan Step 10).
     private(set) var appearance = Appearance()
+    /// The ruler and reflow settings, read from `settings.json` with the appearance (`WritingSettings`; both are off until switched on).
+    private(set) var writing = WritingSettings()
+    /// The sunrise and sunset times Follow the sun follows, and how light it is now (M3†).
+    let sun = SunClock()
     private var searchTask: Task<Void, Never>?
 
     /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
@@ -200,14 +204,44 @@ final class AppModel {
         var current = settings?.appearance() ?? Appearance()
         #if DEBUG || EDITOR_TEST_HOOKS
         let defaults = UserDefaults.standard
-        if let name = defaults.string(forKey: "theme") { current.scheme = name == "system" ? .system : .theme(name) }
+        if let name = defaults.string(forKey: "theme") { current.scheme = name == "system" ? .system : name == "auto" ? .sun : .theme(name) }
+        if let name = defaults.string(forKey: "sunPair"), let pair = SunPairName(rawValue: name) { current.sunPair = pair }
         if let name = defaults.string(forKey: "editorFont"), let family = FontFamily(rawValue: name) { current.editorFont = family }
         if let name = defaults.string(forKey: "previewFont"), let family = FontFamily(rawValue: name) { current.previewFont = family }
         #endif
         appearance = current
+        var writingNow = settings?.writing() ?? WritingSettings()
+        #if DEBUG || EDITOR_TEST_HOOKS
+        // `-reflow 1 -reflowColumn 20 -ruler 1 -rulerColumn 30` set the writing aids for that run without writing anything (any column, which Settings would refuse).
+        let launch = UserDefaults.standard
+        if launch.object(forKey: "reflow") != nil { writingNow.reflowEnabled = launch.bool(forKey: "reflow") }
+        if let column = launch.string(forKey: "reflowColumn").flatMap(Int.init) { writingNow.reflowColumn = column }
+        if launch.object(forKey: "ruler") != nil { writingNow.rulerEnabled = launch.bool(forKey: "ruler") }
+        if let column = launch.string(forKey: "rulerColumn").flatMap(Int.init) { writingNow.rulerColumn = column }
+        #endif
+        writing = writingNow
+        sun.configure(location: settings?.location(), following: current.scheme == .sun)
     }
 
     func chooseScheme(_ choice: SchemeChoice) { change { try $0.setScheme(choice) } }
+    func chooseSunPair(_ pair: SunPairName) { change { try $0.setSunPair(pair) } }
+
+    /// Changes one of the writing aids and keeps it in `settings.json` (the `writing` object, with every other key as it was).
+    func chooseWriting(_ edit: (inout WritingSettings) -> Void) {
+        change { store in
+            var next = store.writing()
+            edit(&next)
+            try store.setWriting(next)
+        }
+    }
+
+    /// Looks a city up and keeps it as the one Follow the sun uses (empty forgets it); says what came of it.
+    func saveCity(_ city: String) async -> SunService.CityResult {
+        guard let settings else { return .failed("Your notes are not open yet.") }
+        let result = await sun.lookup.saveCity(city, settings: settings, now: Date().timeIntervalSince1970 * 1000)
+        loadAppearance()
+        return result
+    }
     func chooseEditorFont(_ family: FontFamily) { change { try $0.setEditorFont(family) } }
     func choosePreviewFont(_ family: FontFamily) { change { try $0.setPreviewFont(family) } }
 
@@ -336,6 +370,30 @@ final class AppModel {
         guard let database else { return nil }
         let location = location
         return try? await Self.perform { try StoredImages.library(in: location) { try database.noteTexts() } }
+    }
+
+    /// A stored image the Images page wants put in the open note (its *Insert in Open Note*): the note's screen puts it in and clears this.
+    var imageToInsert: String?
+
+    /// Deletes a stored image if nothing refers to it now (the Images page's *Delete*). What was typed is written first, and the notes (and the Trash Can's) are
+    /// read again here, so a picture put into a note a moment ago is never deleted from under it.
+    func deleteStoredImage(_ name: String) async -> StoredImages.RemoveOutcome {
+        guard let database else { return .failed("The notes are not open.") }
+        flushEditing()
+        let location = location
+        do {
+            return try await Self.perform {
+                StoredImages.remove(named: name, in: location, liveNotes: try database.noteTexts(), trashedTexts: try database.trashedNoteTexts())
+            }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    /// A line of each of these notes' text, for the home page's cards.
+    func excerpts(of ids: [Int64]) async -> [Int64: String] {
+        guard let database else { return [:] }
+        return (try? await Self.perform { try database.excerpts(of: ids) }) ?? [:]
     }
 
     /// Opens a note for editing, or joins the session another window already has for it.

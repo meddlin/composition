@@ -181,7 +181,7 @@ the words also go into the drawing's `transcript` so that an edit knows whether 
 
 **Checked:** the picture a recognizer is given (colours, the marker left out, the size), what is done with the lines, the tag's `alt` refresh, and that Vision reads a picture of typed
 words (the test draws "Meeting notes" with Core Text; the first Vision run on a Mac takes about 30 seconds, the rest well under a second). **Not known: how well Vision reads real
-handwriting.** That is manual item 172, and it is the only answer that matters for C11.
+handwriting.** That is manual item 263, and it is the only answer that matters for C11.
 
 ## Desktop and CLI
 
@@ -224,16 +224,16 @@ little looser for non-ASCII text. A real drawing is ASCII.
 ## What Gate C still needs
 
 **Gate C is not passed, and the format stays *proposed* until it is.** Seven things were on its list; this is where each stands (2026-11-09), and the Pencil's part of each is in
-[the manual test page](../manual-tests/ipad.md#drawings-m2-s5-the-stroke-format-and-the-canvas) (items 160 to 176, with a checklist of what to bring).
+[the manual test page](../manual-tests/ipad.md#drawings-m2-s5-the-stroke-format-and-the-canvas) (items 160 to 171 and 263 to 267, with a checklist of what to bring).
 
 | # | Gate C item | Done without the iPad | Only the iPad and the Pencil can say |
 |---|---|---|---|
 | 1 | Real handwriting: a dense page by hand, strokes, PNG and re-edit agree | The writer, reader, blob/strokes digest and the size measurements, on synthetic pages; the cut page and the room round it | A real page: that the three agree, how long Done takes, how big the file is (items 162, 167, 168) |
-| 2 | Latency next to Notes (N7); the tool picker with a big canvas | Nothing: it is hardware | Items 160, 173 |
+| 2 | Latency next to Notes (N7); the tool picker with a big canvas | Nothing: it is hardware | Items 160, 264 |
 | 3 | Dark schemes | **How PencilKit shows a colour in a dark style: measured in the Simulator** (HSL lightness reversed), and both renderers follow it | What the tool picker shows and hands in in a dark style (item 164) |
 | 4 | Every ink, then the renderer's picture beside PencilKit's | The renderers agree with each other (`renderer.json`) | The comparison with PencilKit's own render, including the grain (item 163) |
 | 5 | The pixel eraser on a long stroke | The mask rule, probed on macOS | On the iPad (item 165) |
-| 6 | Vision on real handwriting for `alt` | The recognizer, its picture, the `alt` it writes and refreshes, behind a seam; Vision reads typed words | **How well it reads yours** (item 172) |
-| 7 | A backup restored on the desktop shows the strokes in every scheme | **Done with a backup the Swift code wrote**, restored by the desktop's real code and drawn in all five schemes (`inkBackup.test.ts`, the browser pane) | A backup of a drawing made with the Pencil (items 169, 175) |
+| 6 | Vision on real handwriting for `alt` | The recognizer, its picture, the `alt` it writes and refreshes, behind a seam; Vision reads typed words | **How well it reads yours** (item 263) |
+| 7 | A backup restored on the desktop shows the strokes in every scheme | **Done with a backup the Swift code wrote**, restored by the desktop's real code and drawn in all five schemes (`inkBackup.test.ts`, the browser pane) | A backup of a drawing made with the Pencil (items 169, 266) |
 
 Once the Pencil items are answered, the format is frozen: what changes after that bumps `version`.

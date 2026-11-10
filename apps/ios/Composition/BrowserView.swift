@@ -9,6 +9,8 @@ struct BrowserView: View {
     @State private var showingAbout = false
     @State private var showingAppearance = false
     @State private var showingLab = false
+    @State private var showingImages = false
+    @State private var showingPdfInkLab = false
     @State private var confirmingReplace = false
     /// The note that was open when the app was last ended; the system brings it back (0 is none).
     @SceneStorage("selectedNote") private var storedSelection = 0
@@ -32,6 +34,10 @@ struct BrowserView: View {
                 .navigationTitle("Notebooks")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
+                        Button { model.open(nil) } label: { Label("Home", systemImage: "house") }
+                            .accessibilityIdentifier("home-button")
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Button { prompt = .newNotebook } label: { Label("New notebook", systemImage: "plus") }
                     }
                     ToolbarItem(placement: .primaryAction) {
@@ -43,8 +49,10 @@ struct BrowserView: View {
                         Menu {
                             Button("Export a backup…", systemImage: "square.and.arrow.up") { Task { await model.exportBackup() } }
                             Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
+                            Button("Images…", systemImage: "photo.on.rectangle.angled") { showingImages = true }
                             Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
+                            Button("PDF ink lab (spike B)", systemImage: "pencil.and.scribble") { showingPdfInkLab = true }
                             Button("About this build", systemImage: "info.circle") { showingAbout = true }
                         } label: {
                             Label("More", systemImage: "ellipsis.circle")
@@ -58,7 +66,11 @@ struct BrowserView: View {
             if let id = model.selection {
                 NoteDetailView(model: model, noteID: id)
             } else {
-                ContentUnavailableView("Select a note", systemImage: "doc.text")
+                HomePageView(model: model) { item in
+                    model.visit(item)
+                    // In portrait the notes list is out of sight: bring it in beside the page, so that the card is seen to do something.
+                    if width < 900 { columns = .doubleColumn }
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -74,6 +86,8 @@ struct BrowserView: View {
         .onAppear {
             // Developer shortcut: `-openLab 1` opens the editor lab at launch.
             if UserDefaults.standard.bool(forKey: "openLab") { showingLab = true }
+            // Developer shortcut: `-openPdfInkLab 1` opens spike B's lab at launch (see `PdfInkLab` for the arguments that run it).
+            if UserDefaults.standard.bool(forKey: "openPdfInkLab") { showingPdfInkLab = true }
         }
         // Once the notes are read, back to where the app was left (the screen can appear before they are).
         .onChange(of: model.loads, initial: true) { _, loads in
@@ -88,8 +102,10 @@ struct BrowserView: View {
         .sheet(isPresented: $showingTrash) { TrashView(model: model) }
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
         .sheet(isPresented: $showingAppearance) { AppearanceView(model: model) }
+        .sheet(isPresented: $showingImages) { ImagesPage(model: model) }
         .sheet(item: $moving) { MoveSheet(model: model, item: $0) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
+        .fullScreenCover(isPresented: $showingPdfInkLab) { PdfInkLabView() }
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in
             TextField("Name", text: $promptText)
             Button("Cancel", role: .cancel) {}
@@ -166,6 +182,7 @@ struct BrowserView: View {
     private var schemeName: String {
         switch model.appearance.scheme {
         case .system: "System"
+        case .sun: "Follow the sun"
         case .theme(let name): Theme.named(name).map { $0.label.components(separatedBy: " (").first ?? $0.label } ?? name
         }
     }
