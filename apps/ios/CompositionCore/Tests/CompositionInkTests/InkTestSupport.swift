@@ -1,6 +1,7 @@
 import CompositionCore
 import CoreGraphics
 import Foundation
+import Testing
 
 @testable import CompositionInk
 
@@ -82,12 +83,50 @@ enum InkCorpus {
 }
 
 extension InkCorpus {
-    /// With `UPDATE_FIXTURES` set, rewrites drawing.json and sample.png from `InkSamples.page()` before any test reads them (tests run in parallel, so the
-    /// first one to ask does it, once).
+    /// With `UPDATE_FIXTURES` set, rewrites drawing.json, sample.png and the container fixtures from `InkSamples.page()` before any test reads them (tests run in
+    /// parallel, so the first one to ask does it, once). `containers.json` says what a reader must find in each; it is only ever edited by hand.
     static let regenerated: Void = {
         guard ProcessInfo.processInfo.environment["UPDATE_FIXTURES"] != nil, let directory else { return }
         let page = InkSamples.page()
         try? page.jsonData().write(to: directory.appendingPathComponent("drawing.json"))
-        if let png = try? InkRenderer.pngData(of: page, palette: InkPalette(theme: .default), scale: 2) { try? png.write(to: directory.appendingPathComponent("sample.png")) }
+        guard let sample = try? InkRenderer.pngData(of: page, palette: InkPalette(theme: .default), scale: 2) else { return }
+        try? sample.write(to: directory.appendingPathComponent("sample.png"))
+
+        // The page again, a hundredth of a point wider, as the chunk a second writer appended after the first.
+        var wider = page
+        wider.width = 201
+        if let second = try? chunkPayload(of: wider) {
+            try? appending(chunk: InkPNG.jsonChunk, payload: second, to: sample).write(to: directory.appendingPathComponent("two-chunks.png"))
+            try? appending(chunk: InkPNG.jsonChunk, payload: second, badCRC: true, to: sample).write(to: directory.appendingPathComponent("second-chunk-damaged.png"))
+        }
+
+        // A drawing too wide for 2 pixels to a point (4,096 points would be 8,192 pixels): its PNG says what it has.
+        let wide = InkDocument(width: 5000, height: 40, strokes: [InkStroke(points: [InkPoint(x: 10, y: 20), InkPoint(x: 2500, y: 10, t: 400), InkPoint(x: 4990, y: 20, t: 800)])])
+        if let png = try? InkRenderer.pngData(of: wide, palette: InkPalette(theme: .default), scale: 2) { try? png.write(to: directory.appendingPathComponent("wide.png")) }
     }()
+
+    /// The payload of an `inKJ` chunk for `drawing`: the version byte, the length of the text, the text as a zlib stream.
+    static func chunkPayload(of drawing: InkDocument) throws -> Data {
+        let text = drawing.jsonData()
+        var payload = Data([1])
+        payload.append(contentsOf: bigEndian(UInt32(text.count)))
+        payload.append(try InkPNG.deflate(text))
+        return payload
+    }
+
+    /// `png` with one more chunk just before IEND, with the CRC that goes with it (or a wrong one).
+    static func appending(chunk type: String, payload: Data, badCRC: Bool = false, to png: Data) throws -> Data {
+        let chunks = try InkPNG.walk(png)
+        let end = try #require(chunks.last)
+        var body = Data(type.utf8)
+        body.append(payload)
+        var out = Data(png[png.startIndex..<end.start])
+        out.append(contentsOf: bigEndian(UInt32(payload.count)))
+        out.append(body)
+        out.append(contentsOf: bigEndian(InkPNG.crc(of: body) ^ (badCRC ? 0xFFFF_FFFF : 0)))
+        out.append(png[end.start..<end.end])
+        return out
+    }
+
+    static func bigEndian(_ value: UInt32) -> [UInt8] { [UInt8(value >> 24), UInt8((value >> 16) & 0xFF), UInt8((value >> 8) & 0xFF), UInt8(value & 0xFF)] }
 }

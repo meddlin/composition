@@ -42,7 +42,7 @@ describe("InkWidget", () => {
     expect([...svg.querySelectorAll("path")].map((path) => [path.style.fill, path.getAttribute("fill-opacity")])).toEqual([
       ["var(--foreground)", "1"],
       ["rgb(245, 197, 24)", "0.225"],
-      ["rgb(200, 30, 30)", "1"],
+      ["light-dark(rgb(200, 30, 30), rgb(225, 55, 55))", "1"],
       ["var(--brand)", "1"],
     ]);
     expect(requestMeasure).toHaveBeenCalled();

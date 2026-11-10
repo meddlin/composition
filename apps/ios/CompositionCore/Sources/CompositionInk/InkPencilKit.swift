@@ -34,6 +34,15 @@ extension InkDocument {
         self.init(width: Double(size.width), height: Double(size.height), strokes: strokes)
     }
 
+    /// A PencilKit drawing as the format's, **cut to its ink** (`cropBox`), and PencilKit's own drawing moved by the same amount: the PNG's blob is made from the
+    /// moved one, so the blob and the strokes are the same drawing. A drawing with no ink is `size` as it is.
+    public static func cropping(drawing: PKDrawing, size: CGSize, padding: Double = InkCrop.padding, minimum: Double = InkCrop.minimumSide, colorName: (CGColor) -> InkColor = InkDocument.defaultColorName) -> (document: InkDocument, drawing: PKDrawing) {
+        let whole = InkDocument(drawing: drawing, size: size, colorName: colorName)
+        guard let box = whole.cropBox(padding: padding, minimum: minimum) else { return (whole, drawing) }
+        let moved = drawing.transformed(using: CGAffineTransform(translationX: -box.minX, y: -box.minY))
+        return (InkDocument(drawing: moved, size: box.size, colorName: colorName), moved)
+    }
+
     /// The control points of the stretches of a stroke that show (a pixel-erased stroke is several), with its transform applied.
     private static func pieces(of stroke: PKStroke) -> [[InkPoint]] {
         let path = stroke.path

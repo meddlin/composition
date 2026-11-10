@@ -20,6 +20,9 @@ final class EditorHandle {
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
+    /// The outline's tap (Outline.swift): the caret at the line at `offset`, scrolled to the top.
+    func reveal(offset: Int) { textView?.reveal(offset: offset) }
+
     /// The Link button: a link to another note at the caret, or over the selected words.
     func linkToNote() {
         guard let view = textView else { return }
@@ -73,14 +76,15 @@ final class EditorHandle {
         return true
     }
 
-    /// Stores a drawing's PNG and writes the `<Ink>` tag that shows it at the caret, as a paragraph of its own.
-    func insertInk(png: Data) {
+    /// Stores a drawing's PNG and writes the `<Ink>` tag that shows it at the caret, as a paragraph of its own, with the words read from the drawing as its `alt`
+    /// (search finds the note by them; the transcript stays editable, C11).
+    func insertInk(png: Data, alt: String) {
         guard let location, textView != nil else { return }
         let title = noteTitle()
         Task {
             let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: png, in: location) }.value
             switch outcome {
-            case .stored(let name): write(paragraphs: [InkTag.markdown(forName: name)])
+            case .stored(let name): write(paragraphs: [InkTag.markdown(forName: name, alt: alt.isEmpty ? InkTag.defaultAlt : alt)])
             case .failed(let message): problem(message)
             }
         }

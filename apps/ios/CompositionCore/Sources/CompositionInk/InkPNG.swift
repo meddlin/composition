@@ -97,6 +97,18 @@ public enum InkPNG {
         return contents
     }
 
+    /// How many pixels the PNG has to a point of its drawing's canvas: its `pHYs` chunk (pixels to a metre, 72 dots to an inch being a pixel to a point),
+    /// to a hundredth; 2 when it has none, or one that is not in metres, or not square, as every drawing before the chunk was written is 2x. A PNG whose
+    /// structure is broken is 2 as well: the caller is showing it as a picture, and 2 is what the iPad draws at.
+    public static func pixelsPerPoint(of png: Data) -> Double {
+        let fallback = 2.0
+        guard let chunks = try? walk(png), let phys = chunks.first(where: { $0.type == "pHYs" }), phys.end - phys.start == 12 + 9 else { return fallback }
+        let x = readBigEndian(png, at: phys.start + 8), y = readBigEndian(png, at: phys.start + 12)
+        guard png[phys.start + 16] == 1, x == y, x > 0 else { return fallback }
+        let density = (Double(x) * 0.0254 / 72 * 100).rounded() / 100
+        return density > 0 ? density : fallback
+    }
+
     // MARK: Chunks
 
     struct Chunk {

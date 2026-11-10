@@ -9,6 +9,7 @@ struct BrowserView: View {
     @State private var showingAbout = false
     @State private var showingAppearance = false
     @State private var showingLab = false
+    @State private var showingImages = false
     @State private var showingPdfInkLab = false
     @State private var confirmingReplace = false
     /// The note that was open when the app was last ended; the system brings it back (0 is none).
@@ -33,6 +34,10 @@ struct BrowserView: View {
                 .navigationTitle("Notebooks")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
+                        Button { model.open(nil) } label: { Label("Home", systemImage: "house") }
+                            .accessibilityIdentifier("home-button")
+                    }
+                    ToolbarItem(placement: .primaryAction) {
                         Button { prompt = .newNotebook } label: { Label("New notebook", systemImage: "plus") }
                     }
                     ToolbarItem(placement: .primaryAction) {
@@ -44,6 +49,7 @@ struct BrowserView: View {
                         Menu {
                             Button("Export a backup…", systemImage: "square.and.arrow.up") { Task { await model.exportBackup() } }
                             Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
+                            Button("Images…", systemImage: "photo.on.rectangle.angled") { showingImages = true }
                             Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
                             Button("PDF ink lab (spike B)", systemImage: "pencil.and.scribble") { showingPdfInkLab = true }
@@ -60,7 +66,11 @@ struct BrowserView: View {
             if let id = model.selection {
                 NoteDetailView(model: model, noteID: id)
             } else {
-                ContentUnavailableView("Select a note", systemImage: "doc.text")
+                HomePageView(model: model) { item in
+                    model.visit(item)
+                    // In portrait the notes list is out of sight: bring it in beside the page, so that the card is seen to do something.
+                    if width < 900 { columns = .doubleColumn }
+                }
             }
         }
         .navigationSplitViewStyle(.balanced)
@@ -92,6 +102,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showingTrash) { TrashView(model: model) }
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
         .sheet(isPresented: $showingAppearance) { AppearanceView(model: model) }
+        .sheet(isPresented: $showingImages) { ImagesPage(model: model) }
         .sheet(item: $moving) { MoveSheet(model: model, item: $0) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
         .fullScreenCover(isPresented: $showingPdfInkLab) { PdfInkLabView() }

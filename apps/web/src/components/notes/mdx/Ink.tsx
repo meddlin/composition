@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { INK_DENSITY, type InkDrawing } from "@/lib/composition/ink";
-import { loadInkDrawing } from "@/lib/composition/inkDrawings";
+import { loadInkDensity, loadInkDrawing } from "@/lib/composition/inkDrawings";
 import { imageNameFromRef } from "@/lib/composition/imageRefs";
 import { inkPicture } from "@/lib/composition/inkSvg";
 import { NoteImage } from "../NoteImage";
@@ -28,15 +28,31 @@ export function Ink({ src, alt, title, width }: { src?: string; alt?: string; ti
   );
 }
 
-/** Just the picture: a drawing from a web address has no strokes to read, and the pixels are drawn at the size of the canvas they came from. */
-function Picture({ src, alt, title, width }: { src: string; alt?: string; title?: string; width?: string }) {
-  return <NoteImage src={src} alt={alt} title={title} width={width ? "100%" : undefined} density={INK_DENSITY} />;
+/** Just the picture: a drawing from a web address has no strokes to read, and the pixels are drawn at the size of the canvas they came from (`density` pixels to a point). */
+function Picture({ src, alt, title, width, density = INK_DENSITY }: { src: string; alt?: string; title?: string; width?: string; density?: number }) {
+  return <NoteImage src={src} alt={alt} title={title} width={width ? "100%" : undefined} density={density} />;
+}
+
+/** The picture of a stored PNG that carries no strokes, at the density its own `pHYs` chunk states (2 until it has been read, and when it says nothing). */
+function StoredPicture({ name, ...rest }: { name: string; src: string; alt?: string; title?: string; width?: string }) {
+  const [density, setDensity] = useState<{ name: string; value: number } | null>(null);
+  useEffect(() => {
+    let current = true;
+    loadInkDensity(name).then(
+      (value) => current && setDensity({ name, value }),
+      () => {},
+    );
+    return () => {
+      current = false;
+    };
+  }, [name]);
+  return <Picture {...rest} density={density?.name === name ? density.value : INK_DENSITY} />;
 }
 
 function StoredInk({ name, src, alt, title, width }: { name: string; src: string; alt?: string; title?: string; width?: string }) {
   const drawing = useInkDrawing(name);
   if (drawing === undefined) return <span className="text-muted-foreground italic">Drawing…</span>;
-  if (drawing === null) return <Picture src={src} alt={alt} title={title} width={width} />;
+  if (drawing === null) return <StoredPicture name={name} src={src} alt={alt} title={title} width={width} />;
   return <InkSvg drawing={drawing} alt={alt} title={title} width={width} />;
 }
 

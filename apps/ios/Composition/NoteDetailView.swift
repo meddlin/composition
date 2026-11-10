@@ -37,6 +37,12 @@ struct NoteDetailView: View {
     @State private var pickedStored: StoredImageInfo?
     /// The drawing canvas, open on a blank page (Image menu, *Drawing…*).
     @State private var drawing: InkEditing?
+    /// The sheet that picks the picture above the note's title (HeaderImage.swift).
+    @State private var showingHeaderImage = false
+    /// The outline popover (Outline.swift): the headings, read when it opens, and the request it makes of the preview.
+    @State private var showingOutline = false
+    @State private var outline: [OutlineHeading]?
+    @State private var outlineJump = OutlineJump()
 
     var body: some View {
         Group {
@@ -99,7 +105,28 @@ struct NoteDetailView: View {
                     Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                     Menu { imageItems } label: { Label("Image", systemImage: "photo.badge.plus") }
                 }
+                Button("Outline", systemImage: "list.bullet.indent") { openOutline() }
+                    .accessibilityIdentifier("outline-button")
+                    // A popover where the window is wide; the system makes it a sheet where it is narrow.
+                    .popover(isPresented: $showingOutline) {
+                        OutlineList(headings: outline, current: mode == .preview ? nil : outline.flatMap { NoteOutline.current(in: $0, at: caret)?.ordinal }) { jump(to: $0) }
+                    }
+                Button("Header Image", systemImage: "photo.artframe") { showingHeaderImage = true }
+                    .accessibilityIdentifier("header-image-button")
                 Button("Move to Trash Can", systemImage: "trash") { confirmingTrash = true }
+            }
+        }
+        .sheet(isPresented: $showingHeaderImage) {
+            if let session { HeaderImageSheet(model: model, session: session) }
+        }
+        // The Images page's *Insert in Open Note*: a stored picture goes in at the caret, from the Preview tab too (which has no text to put it in, so it opens the Markdown tab first).
+        .onChange(of: model.imageToInsert) { _, name in
+            guard let name else { return }
+            model.imageToInsert = nil
+            if mode == .preview { mode = .markdown }
+            Task {
+                try? await Task.sleep(for: .milliseconds(500))
+                handle.insertStoredImage(named: name, description: "")
             }
         }
         .photosPicker(isPresented: $showingPhotos, selection: $pickedPhotos, maxSelectionCount: 10, matching: .images)
@@ -124,9 +151,9 @@ struct NoteDetailView: View {
             .ignoresSafeArea()
         }
         .fullScreenCover(item: $drawing) { editing in
-            InkCanvasScreen(editing: editing, look: look) { png in
+            InkCanvasScreen(editing: editing, look: look) { saved in
                 drawing = nil
-                handle.insertInk(png: png)
+                handle.insertInk(png: saved.png, alt: saved.transcript)
             } cancelled: {
                 drawing = nil
             }
@@ -174,12 +201,12 @@ struct NoteDetailView: View {
         // One branch for both writing tabs, so that going from one to the other does not rebuild the text view: the caret, the keyboard and the
         // scroll stay where they are.
         case .markdown, .live: editor(session, live: mode == .live)
-        case .preview: NoteReader(model: model, session: session)
+        case .preview: NoteReader(model: model, session: session, jump: outlineJump)
         case .split:
             SplitLayout {
                 editor(session)
             } trailing: {
-                NoteReader(model: model, session: session)
+                NoteReader(model: model, session: session, jump: outlineJump)
             }
         }
     }
@@ -191,6 +218,21 @@ struct NoteDetailView: View {
             caretNote = Int(noteID)
         }
         .id(session.noteId)
+    }
+
+    /// Reads the note's headings (off the main thread: a long note is a moment's work) and shows them.
+    private func openOutline() {
+        guard let text = session?.text else { return }
+        outline = nil
+        showingOutline = true
+        Task { outline = await Task.detached(priority: .userInitiated) { NoteOutline.make(content: text) }.value }
+    }
+
+    /// A heading was chosen in the outline: the editor goes to its line, where one is showing, and the preview to the heading, where one is.
+    private func jump(to heading: OutlineHeading) {
+        showingOutline = false
+        if mode != .preview, let offset = heading.offset { handle.reveal(offset: offset) }
+        if mode == .preview || mode == .split { outlineJump.go(to: heading.ordinal) }
     }
 
     /// Opens the note's session (and closes the previous note's, saving what is unsaved).
@@ -372,23 +414,29 @@ struct NoteReader: View {
     @State private var live: LivePreview
     /// A stored drawing opened on the canvas by a tap in the preview.
     @State private var editingInk: InkEditing?
+    /// Where the outline asks the preview to scroll to.
+    var jump: OutlineJump?
 
-    init(model: AppModel, session: NoteSession) {
+    init(model: AppModel, session: NoteSession, jump: OutlineJump? = nil) {
         self.model = model
         self.session = session
+        self.jump = jump
         _live = State(initialValue: LivePreview(session: session))
     }
 
-    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old.
-    private func saveEdited(_ editing: InkEditing, png: Data) {
+    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old. The `alt`
+    /// follows the words read from the drawing unless a person has changed it.
+    private func saveEdited(_ editing: InkEditing, saved: InkSaved) {
         editingInk = nil
         guard let old = editing.stored else { return }
         let location = model.location
         let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
         Task {
-            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: png, in: location) }.value
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
             switch outcome {
-            case .stored(let name): session.edit(InkTag.replacing(old, with: name, in: session.text))
+            case .stored(let name):
+                let renamed = InkTag.replacing(old, with: name, in: session.text)
+                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
             case .failed(let message): model.errorMessage = message
             }
         }
@@ -403,6 +451,8 @@ struct NoteReader: View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    // The picture above the title, from the frontmatter's `headerImage`.
+                    if let headerImage = live.headerImage { HeaderImageBanner(header: headerImage) }
                     Text(live.title.isEmpty ? "Untitled" : live.title).font(.largeTitle.bold())
                     // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
                     ViewThatFits(in: .horizontal) {
@@ -434,10 +484,15 @@ struct NoteReader: View {
             })
             .environment(\.pdfLinks, PdfLinks { model.isPdfHere(uuid: $0) })
             .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
+            // The outline (Outline.swift) asked for a heading.
+            .onChange(of: jump?.serial) { _, _ in
+                guard let jump else { return }
+                withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(jump.ordinal), anchor: .top) }
+            }
             .environment(\.imageFolder, model.location.imagesURL)
             .environment(\.editInk, { name in editingInk = InkEditing.load(named: name, from: model.location.imagesURL) })
             .fullScreenCover(item: $editingInk) { editing in
-                InkCanvasScreen(editing: editing, look: look) { png in saveEdited(editing, png: png) } cancelled: { editingInk = nil }
+                InkCanvasScreen(editing: editing, look: look) { saved in saveEdited(editing, saved: saved) } cancelled: { editingInk = nil }
             }
         }
     }
@@ -451,6 +506,7 @@ final class LivePreview {
     private(set) var title = ""
     private(set) var updated = ""
     private(set) var tags = ""
+    private(set) var headerImage: HeaderImage?
     private var observation: NoteSession.Observation?
     private var task: Task<Void, Never>?
 
@@ -472,6 +528,7 @@ final class LivePreview {
             title = made.1?.title ?? ""
             updated = made.1?.updatedAt ?? ""
             tags = made.1.map { NoteFrontmatter.tagsToString($0.tags).tagLine } ?? ""
+            headerImage = made.1?.headerImage
         }
     }
 }
