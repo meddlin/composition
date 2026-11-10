@@ -32,7 +32,24 @@ public actor PdfMarkEditor {
         self.documentId = documentId
     }
 
-    public var state: State { get throws { State(marks: try store.database.annotations(documentId: documentId), canUndo: !undoSteps.isEmpty, canRedo: !redoSteps.isEmpty) } }
+    /// Every mark of the PDF except its pages' ink (`inkPages`, `inkBody`): the list the reader holds is of marks that are words and rectangles, not megabytes of strokes.
+    public var state: State { get throws { State(marks: try store.database.annotations(documentId: documentId, withInk: false), canUndo: !undoSteps.isEmpty, canRedo: !redoSteps.isEmpty) } }
+
+    // MARK: Ink
+
+    /// The pages (0-based) that have ink.
+    public func inkPages() throws -> Set<Int> { Set(try store.database.inkPages(documentId: documentId).keys) }
+
+    /// A page's stroke JSON as stored; nil when it has none.
+    public func inkBody(page: Int) throws -> String? { try store.database.inkBody(documentId: documentId, page: page) }
+
+    /// Keeps a page's ink (or, with nil, takes it away) and answers the pages that have ink. **Not a step**: undo and redo of a stroke are PencilKit's own, on the canvas
+    /// that shows it, and the history here is of marks.
+    @discardableResult
+    public func setInk(page: Int, body: String?) throws -> Set<Int> {
+        try store.setInk(documentId: documentId, page: page, body: body)
+        return try inkPages()
+    }
 
     // MARK: Changes
 

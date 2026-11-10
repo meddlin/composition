@@ -28,7 +28,7 @@ let package = Package(
         ),
         .target(
             name: "CompositionPDF",
-            dependencies: ["CompositionCore"]
+            dependencies: ["CompositionCore", "CompositionInk"]
         ),
         .testTarget(
             name: "CompositionCoreTests",
@@ -36,7 +36,7 @@ let package = Package(
         ),
         .testTarget(
             name: "CompositionPDFTests",
-            dependencies: ["CompositionPDF", "CompositionCore"]
+            dependencies: ["CompositionPDF", "CompositionCore", "CompositionInk"]
         ),
         // CompositionInk: strokes, their JSON, the PNG that carries them, and the CoreGraphics renderer (docs/architecture/ink.md).
         // Foundation, CoreGraphics, ImageIO and zlib only; the PencilKit bridge is compiled where PencilKit exists, so it tests on a Mac.

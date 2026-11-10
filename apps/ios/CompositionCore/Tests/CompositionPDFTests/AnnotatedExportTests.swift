@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionInk
 import Foundation
 import PDFKit
 import Testing
@@ -39,7 +40,7 @@ struct AnnotatedExportTests {
             let made = try marks(in: world)
             let target = folder.appendingPathComponent("out.pdf")
             let outcome = try AnnotatedExport.export(source: source, password: nil, marks: made, flatten: false, to: target)
-            #expect(outcome == AnnotatedExport.Outcome(written: 10, skippedInk: 0, skippedOffPage: 0, passwordProtected: false))
+            #expect(outcome == AnnotatedExport.Outcome(written: 10, inkPages: 0, skippedInk: 0, skippedOffPage: 0, passwordProtected: false))
 
             let copy = try #require(PDFDocument(url: target))
             #expect(copy.pageCount == 9)
@@ -126,17 +127,17 @@ struct AnnotatedExportTests {
         }
     }
 
-    @Test("ink is left out and counted, and so is a mark on a page the PDF does not have; a failure leaves nothing behind")
+    @Test("a mark on a page the PDF does not have is counted; a failure leaves nothing behind")
     func skipsAndFailures() throws {
         let folder = try scratch()
         defer { try? FileManager.default.removeItem(at: folder) }
         try withMarkWorld(pageCount: 0) { world in
-            let ink = try world.add([PdfMarkInput(page: 0, kind: .ink, color: "blue", body: .array([]))])
+            let ink = try world.add([PdfMarkInput(page: 0, kind: .ink, color: "blue", body: .array([]))])  // not a mark of the list: ignored here
             let high = try world.add([PdfMarkInput(page: 40, kind: .highlight, color: "green", rects: [PdfRect(x0: 1, y0: 1, x1: 9, y1: 9)], quote: "x")])
             let fine = try world.add([PdfMarkInput(page: 1, kind: .highlight, color: "green", rects: [PdfRect(x0: 1, y0: 1, x1: 9, y1: 9)], quote: "y")])
             let target = folder.appendingPathComponent("out.pdf")
             let outcome = try AnnotatedExport.export(source: source, password: nil, marks: ink + high + fine, flatten: false, to: target)
-            #expect(outcome.written == 1 && outcome.skippedInk == 1 && outcome.skippedOffPage == 1)
+            #expect(outcome.written == 1 && outcome.inkPages == 0 && outcome.skippedInk == 0 && outcome.skippedOffPage == 1)
 
             let missing = folder.appendingPathComponent("missing.pdf")
             #expect(throws: AnnotatedExport.Failure.cannotOpen) { try AnnotatedExport.export(source: missing, password: nil, marks: [], flatten: false, to: folder.appendingPathComponent("m.pdf")) }
@@ -144,6 +145,48 @@ struct AnnotatedExportTests {
             #expect(throws: AnnotatedExport.Failure.cannotWrite) { try AnnotatedExport.export(source: source, password: nil, marks: fine, flatten: false, to: unwritable) }
             #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["out.pdf"], "no half-written copy is left")
         }
+    }
+
+    @Test("a page's ink is written as Ink annotations in a native copy and burned in by a flattened one, where it was drawn; a page it cannot read is counted")
+    func ink() throws {
+        let folder = try scratch()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let blue = ThemeColor(red: 0, green: 0, blue: 255)
+        func page(_ index: Int, in document: PDFDocument) -> InkDocument {
+            let crop = document.page(at: index)!.bounds(for: .cropBox)
+            let points = [InkPoint(x: 20, y: 20, width: 6, height: 6), InkPoint(x: 70, y: 20, width: 6, height: 6), InkPoint(x: 120, y: 20, width: 6, height: 6)]
+            return InkDocument(width: Double(crop.width), height: Double(crop.height), strokes: [InkStroke(ink: .pen, color: .fixed(blue), points: points)])
+        }
+        let original = try geometryDocument()
+        let drawings = [0: page(0, in: original), 3: page(3, in: original)]
+        let reader: @Sendable (Int) throws -> InkDocument? = { [drawings] in drawings[$0] }  // page 5 is "damaged": nil
+
+        let native = folder.appendingPathComponent("native.pdf")
+        let outcome = try AnnotatedExport.export(source: source, password: nil, marks: [], inkPages: [0, 3, 5, 40], ink: reader, flatten: false, to: native)
+        #expect(outcome.inkPages == 2 && outcome.skippedInk == 1 && outcome.skippedOffPage == 1 && outcome.written == 0, "\(outcome)")
+        let copy = try #require(PDFDocument(url: native))
+        for index in [0, 3] {
+            let inks = (copy.page(at: index)?.annotations ?? []).filter { $0.type == "Ink" }
+            #expect(inks.count == 1 && inks[0].userName == MarkAnnotations.author, "page \(index + 1): one Ink annotation, by the app and not the device's owner")
+        }
+        let untouched = (copy.page(at: 1)?.annotations ?? []).filter { $0.type == "Ink" }
+        #expect(untouched.isEmpty, "a page with no ink has no Ink annotation")
+        let isBlue: (Int, Int, Int) -> Bool = { r, g, b in b > 180 && r < 90 && g < 90 }
+        let nativePage = render(try #require(copy.page(at: 0)))
+        let flatTarget = folder.appendingPathComponent("flat.pdf")
+        _ = try AnnotatedExport.export(source: source, password: nil, marks: [], inkPages: [0, 3], ink: reader, flatten: true, to: flatTarget)
+        let flat = try #require(PDFDocument(url: flatTarget))
+        #expect((flat.page(at: 0)?.annotations ?? []).isEmpty, "burned into the page: nothing left to edit")
+        let flatPage = render(try #require(flat.page(at: 0)))
+        for (name, pixels) in [("native", nativePage), ("flattened", flatPage)] {
+            let found = try #require(pixels.extent(scale: renderScale, where: isBlue), "\(name): the stroke is drawn")
+            #expect(abs(found.minX - 17) <= 2.5 && abs(found.maxX - 123) <= 2.5 && abs(found.minY - 17) <= 2.5 && abs(found.maxY - 23) <= 2.5, "\(name): \(found)")
+        }
+        // The turned page (index 3 is rotate270): the corner is the bottom-left one.
+        let turned = render(try #require(flat.page(at: 3)))
+        let found = try #require(turned.extent(scale: renderScale, where: isBlue))
+        #expect(abs(found.minX - 17) <= 2.5 && abs(found.maxY - (Double(turned.height) / renderScale - 20 + 3)) <= 2.5, "rotate270 flattened: \(found)")
+        #expect(try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() == ["flat.pdf", "native.pdf"])
     }
 
     @Test("a protected PDF is exported with its password and the copy is protected with the same one")

@@ -37,8 +37,8 @@ public enum MarkAnnotations {
         (annotation.value(forAnnotationKey: .name) as? String).flatMap { PdfMarkup.isHexUuid($0) ? $0 : nil }
     }
 
-    /// The annotations that draw a mark: one for a text mark (its lines are quadrilaterals of the one annotation) or a typed note, none for ink (a
-    /// stroke is drawn by the ink layer, and an export leaves it out). `fontSize` and the colours are the desktop's.
+    /// The annotations that draw a mark: one for a text mark (its lines are quadrilaterals of the one annotation) or a typed note, none for ink (a page's ink
+    /// is not a mark of the list; `InkAnnotations` writes it into an export). `fontSize` and the colours are the desktop's.
     public static func annotations(for mark: PdfMark) -> [PDFAnnotation] {
         let paint = PdfMarkPaint.paint(for: mark.color)
         switch mark.kind {

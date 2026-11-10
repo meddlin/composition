@@ -89,13 +89,15 @@ extension CompositionDatabase {
 
     // MARK: Marks
 
-    /// The marks of a PDF, or of one page of it, in the order they were made.
-    public func annotations(documentId: Int64, page: Int? = nil) throws -> [PdfMark] {
-        try pool.read { db in
+    /// The marks of a PDF, or of one page of it, in the order they were made. `withInk: false` leaves out the pages' ink, whose strokes are megabytes
+    /// (`PdfInkStore.swift`): what the reader holds as its list of marks.
+    public func annotations(documentId: Int64, page: Int? = nil, withInk: Bool = true) throws -> [PdfMark] {
+        let notInk = withInk ? "" : " AND kind <> 'ink'"
+        return try pool.read { db in
             if let page {
-                return try PdfMark.fetchAll(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE document_id = ? AND page = ? ORDER BY id", arguments: [documentId, page])
+                return try PdfMark.fetchAll(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE document_id = ? AND page = ?\(notInk) ORDER BY id", arguments: [documentId, page])
             }
-            return try PdfMark.fetchAll(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE document_id = ? ORDER BY page, id", arguments: [documentId])
+            return try PdfMark.fetchAll(db, sql: "SELECT \(Self.markColumns) FROM pdf_annotations WHERE document_id = ?\(notInk) ORDER BY page, id", arguments: [documentId])
         }
     }
 
@@ -223,7 +225,7 @@ extension CompositionDatabase {
             let marks = try Row.fetchAll(
                 db,
                 sql: """
-                    SELECT d.note_id AS note_id, a.kind AS kind, a.quote AS quote, a.comment AS comment, a.body AS body
+                    SELECT d.note_id AS note_id, a.kind AS kind, a.quote AS quote, a.comment AS comment, CASE WHEN a.kind = 'text' THEN a.body END AS body
                     FROM pdf_annotations a JOIN documents d ON d.id = a.document_id \(filter) ORDER BY d.note_id, a.page, a.id
                     """,
                 arguments: arguments)
