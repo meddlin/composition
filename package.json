@@ -11,6 +11,7 @@
     "manual:backup": "bash scripts/manual-tests/backup-restore.sh",
     "manual:backup:selftest": "pnpm --dir apps/cli manual:backup selftest",
     "manual:todo": "node apps/desktop/scripts/todo-manual.mjs",
+    "manual:sheet": "node apps/desktop/scripts/sheet-manual.mjs",
     "manual:stress": "bash apps/web/scripts/sample-db/stress-test.sh",
     "manual:stress:lines": "bash apps/web/scripts/sample-db/stress-test.sh --lines",
     "test": "pnpm run test:scripts && pnpm run test:web && pnpm run test:desktop",

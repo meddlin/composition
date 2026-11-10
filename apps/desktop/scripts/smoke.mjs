@@ -40,6 +40,7 @@ const { API_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/
 // The desktop-only attachment and backup methods (attachmentsApi.ts, backupApi.ts) ride on the same bridge.
 const { ATTACHMENT_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/attachmentsApi.ts"));
 const { BACKUP_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/backupApi.ts"));
+const { SAVE_FILE_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/saveFileApi.ts"));
 const { PANELS_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/panelsApi.ts"));
 const { TODO_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/todosApi.ts"));
 const { READING_LIST_METHODS } = await importTypeScript(path.resolve(desktopDir, "../web/src/lib/composition/readingListApi.ts"));
@@ -53,6 +54,7 @@ const expectedBridge = [
   ...API_METHODS,
   ...ATTACHMENT_METHODS,
   ...BACKUP_METHODS,
+  ...SAVE_FILE_METHODS,
   ...PANELS_METHODS,
   ...TODO_METHODS,
   ...READING_LIST_METHODS,
@@ -1017,6 +1019,57 @@ try {
   await page.getByRole("alert").filter({ hasText: "not a Composition backup" }).waitFor({ timeout: 10_000 });
   const afterRefusal = await page.evaluate(async () => (await window.composition.loadWorkspace()).notes.map((n) => n.title).sort());
   check("a file that isn't a backup is refused, and nothing changes", JSON.stringify(afterRefusal) === JSON.stringify(beforeBackup.titles));
+
+  // ---- Saving a file the page made (Export… on a sheet): the save dialog is replaced as above, so the real bridge, the real
+  // argument checks and the real write are exercised, from bytes the page makes; only the OS picker is not.
+  const exportTarget = path.join(inbox, "smoke-export.xlsx");
+  await app.evaluate(({ dialog }, file) => {
+    globalThis.saveDialogOptions = [];
+    globalThis.saveDialogAnswer = "save";
+    dialog.showSaveDialog = async (...args) => {
+      globalThis.saveDialogOptions.push(args.at(-1));
+      return globalThis.saveDialogAnswer === "cancel" ? { canceled: true } : { canceled: false, filePath: file };
+    };
+  }, exportTarget);
+  const exportBytes = [0x50, 0x4b, 3, 4, 0, 255, 128, 7];
+  const exportSaved = await page.evaluate((bytes) => window.composition.saveFile({ name: "../../evil/Q3 budget.xlsx", kind: "xlsx", bytes: new Uint8Array(bytes) }), exportBytes);
+  const exportOffered = await app.evaluate(({ app: electronApp }) => ({ options: globalThis.saveDialogOptions.at(-1), documents: electronApp.getPath("documents") }));
+  check(
+    "saveFile writes the page's bytes to the file the save dialog chose",
+    exportSaved.saved === true && exportSaved.error === undefined && fs.existsSync(exportTarget) && Buffer.compare(fs.readFileSync(exportTarget), Buffer.from(exportBytes)) === 0,
+    JSON.stringify(exportSaved),
+  );
+  check(
+    "the dialog is offered the name without any folder the page put in it, and a filter for the kind",
+    path.basename(exportOffered.options.defaultPath) === "Q3 budget.xlsx" && path.dirname(exportOffered.options.defaultPath) === exportOffered.documents && exportOffered.options.filters?.[0]?.extensions?.[0] === "xlsx",
+    JSON.stringify(exportOffered.options),
+  );
+  check("no temporary file is left beside it", fs.readdirSync(inbox).every((name) => !name.startsWith("smoke-export.xlsx.")));
+  fs.rmSync(exportTarget);
+  await app.evaluate(() => { globalThis.saveDialogAnswer = "cancel"; });
+  const exportCanceled = await page.evaluate(() => window.composition.saveFile({ name: "a.csv", kind: "csv", bytes: new Uint8Array([97]) }));
+  check("dismissing the save dialog saves nothing and is not an error", exportCanceled.saved === false && exportCanceled.error === undefined && !fs.existsSync(exportTarget), JSON.stringify(exportCanceled));
+  const exportRefusals = await page.evaluate(async () => {
+    const attempt = async (input) => {
+      try {
+        await window.composition.saveFile(input);
+        return "accepted";
+      } catch {
+        return "refused";
+      }
+    };
+    return [
+      await attempt({ name: "a.sh", kind: "sh", bytes: new Uint8Array(1) }),
+      await attempt({ name: "a.csv", kind: "csv", bytes: [97] }),
+      await attempt({ name: "a.csv", kind: "csv", bytes: new Uint8Array(0) }),
+      await attempt("/etc/passwd"),
+    ];
+  });
+  check(
+    "saveFile refuses a kind it doesn't know, bytes that aren't bytes, no bytes and no file, without opening a dialog",
+    exportRefusals.every((answer) => answer === "refused") && (await app.evaluate(() => globalThis.saveDialogOptions.length)) === 2,
+    exportRefusals.join(","),
+  );
 
   // ---- Back to notes; state survives
   await page.getByRole("link", { name: /Back to notes/ }).click();

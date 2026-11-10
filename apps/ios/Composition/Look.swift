@@ -51,6 +51,8 @@ struct Look: Equatable {
     var uiMutedFill: UIColor { theme.foreground.uiColor(alpha: Theme.Share.muted) }
     /// What a `<Mark color="…">` is tinted in this scheme (the five hues, at the strength the scheme gives them), behind its words.
     func uiMarkTint(_ name: String?) -> UIColor { theme.markTint(name).uiColor }
+    /// The ruler's guide line: a faint line at a column of the editor, firmer with Increase Contrast.
+    var uiRulerGuide: UIColor { theme.foreground.uiColor(alpha: increasedContrast ? 0.5 : 0.2) }
     /// A horizontal rule: the text colour at 35%, as the desktop's Live tab draws it (a hairline, `--border`, would be too faint to read as a rule); firmer with Increase Contrast.
     var uiRule: UIColor { theme.foreground.uiColor(alpha: Theme.ruleShare(increasedContrast: increasedContrast)) }
     /// The grey text of `mutedText`, for what the Live tab dims (the marks that show while the selection is in their construct).
@@ -63,6 +65,8 @@ struct Look: Equatable {
 
 extension EnvironmentValues {
     @Entry var look = Look.standard
+    /// The ruler and reflow settings in force (the Markdown and Live tabs read them).
+    @Entry var writing = WritingSettings()
 }
 
 extension ThemeColor {
@@ -80,16 +84,18 @@ extension ThemeColor {
 }
 
 extension Appearance {
-    /// The scheme in force: the named one, or, for System, the light or dark one that matches what the iPad is showing.
-    func theme(system: ColorScheme) -> Theme {
+    /// The scheme in force: the named one, or, for System, the light or dark one that matches what the iPad is showing, or, for Follow the sun, the pair's
+    /// colours at `sunLevel` (0 dark to 1 light: `SunClock.level`).
+    func theme(system: ColorScheme, sunLevel: Double = 1) -> Theme {
         switch scheme {
         case .theme(let name): Theme.named(name) ?? .default
         case .system: Theme.named(system == .dark ? "dark" : "light") ?? .default
+        case .sun: Theme.sun(pair: sunPair, level: sunLevel)
         }
     }
 
-    func look(system: ColorScheme, contrast: ColorSchemeContrast = .standard) -> Look {
-        Look(theme: theme(system: system), editorFont: editorFont, previewFont: previewFont, increasedContrast: contrast == .increased)
+    func look(system: ColorScheme, contrast: ColorSchemeContrast = .standard, sunLevel: Double = 1) -> Look {
+        Look(theme: theme(system: system, sunLevel: sunLevel), editorFont: editorFont, previewFont: previewFont, increasedContrast: contrast == .increased)
     }
 }
 

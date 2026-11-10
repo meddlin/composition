@@ -1,4 +1,5 @@
 import type { mdxComponents } from "./components";
+import { insideFence } from "./fences";
 
 export type MdxCompletion = {
   name: string;
@@ -64,6 +65,11 @@ const catalog: Record<OfferedComponent, Omit<MdxCompletion, "name">> = {
     // Blank lines around the fence are what make it a code block (see Chart).
     template: '<Chart type="bar">\n\n```csv\n$0\n```\n\n</Chart>',
   },
+  Sheet: {
+    description: "A spreadsheet-style grid of a CSV table written inside the tag",
+    // As for Chart: blank lines around the fence make it a code block, and the caret is where the header row goes.
+    template: "<Sheet>\n\n```csv\n$0\n```\n\n</Sheet>",
+  },
 };
 
 export const mdxCompletions: MdxCompletion[] = Object.entries(catalog).map(([name, entry]) => ({ name, ...entry }));
@@ -77,12 +83,8 @@ export type CompletionTrigger = {
 
 /** A `<` that starts a tag: not glued to a word (`a<b`) and not part of `<<`. */
 const OPEN_TAG = /(?:^|[^\w<])<([A-Za-z]*)$/;
-const FENCE = /^ {0,3}(?:`{3,}|~{3,})/gm;
 
-/** Whether the line starting at `lineStart` sits inside a fenced code block. */
-export function insideFence(text: string, lineStart: number): boolean {
-  return (text.slice(0, lineStart).match(FENCE)?.length ?? 0) % 2 === 1;
-}
+export { insideFence };
 
 /**
  * The `<` the caret is just after, if the user is starting a tag there.

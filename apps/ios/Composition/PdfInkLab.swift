@@ -1,534 +1,532 @@
+import CompositionInk
 import PDFKit
 import PencilKit
 import SwiftUI
+import UIKit
 
-// Spike B's lab (pdf-markup-plan.md, risk X3; build order step 0): does PencilKit over PDFKit work as the iPad's PDF ink needs it to? Three questions,
-// asked of a PDF with a `PKCanvasView` over each page that is on screen (the page-overlay provider PDFKit has had since iOS 16):
-//
-//   1. Can a finger still scroll and select text while the Pencil draws on the canvases over the pages? (The canvases take the Pencil only.)
-//   2. Does the ink follow the Pencil as it should (latency), and does the app keep its frames?
-//   3. What does it cost to have a canvas on every page of a 500-page PDF? (Only the pages on screen have one; the drawings are kept as data.)
-//
-// It is a lab, not the reader: nothing here is saved, it makes its own PDFs, and it reads no note. It was run in the Simulator, which has no Pencil: the
-// *Any input* switch lets a finger draw there, so the machinery (overlays made and dropped as pages come and go, a finger still scrolling and selecting
-// when the canvases are Pencil-only, the drawings kept per page, the memory) is checked; the Pencil itself, and how the ink feels, are the iPad's to say
-// (docs/manual-tests/ipad.md, "The PDF ink lab").
+// Spike B's lab (docs/pdf-markup-plan.md, "Spike B status"): PencilKit over PDFKit, for the three questions the plan leaves open. Does a finger still scroll and select
+// while the Pencil draws on a canvas over the page? Is the ink as quick as Notes'? And does a 500-page book fit in memory when each page near the screen has a canvas?
+// The lab is a `PDFView` with a canvas on each page near the screen, a test book (or one of your own from Files), runs that scroll and draw on their own and
+// measure, a recording for what you do by hand, a checklist for what only a person can judge, and a report to copy out. It stores nothing: ink lives while the lab is open.
 
 @MainActor @Observable
 final class PdfInkLab {
-    enum Book: String, CaseIterable, Identifiable {
-        case small = "12 pages"
-        case big = "500 pages"
+    enum Tool: String, CaseIterable, Identifiable {
+        case pen = "Black pen", blue = "Blue pen", marker = "Yellow marker", pixelEraser = "Pixel eraser", strokeEraser = "Stroke eraser", lasso = "Lasso"
         var id: String { rawValue }
-        var pages: Int { self == .small ? 12 : 500 }
-    }
-
-    var book = Book.small
-    var document: PDFDocument?
-    var making = false
-    /// A canvas over each page on screen (off: the plain reader, to compare the memory).
-    var overlaysOn = true { didSet { reload() } }
-    /// The canvases take the Pencil only (a finger scrolls and selects). On the Simulator, which has no Pencil, *Any input* lets a finger draw.
-    var pencilOnly = true { didSet { updatePolicy() } }
-    /// Put a stroke of a few hundred points on each page as it comes on screen, to see what drawn pages cost.
-    var strokeEveryPage = false
-
-    // What the lab counts.
-    private(set) var overlaysLive = 0
-    private(set) var overlaysMade = 0
-    private(set) var overlaysDropped = 0
-    private(set) var overlaysShown = 0
-    private(set) var overlaysPeak = 0
-    private(set) var pageIndex = 0
-    private(set) var selectionLength = 0
-    private(set) var strokes = 0
-    private(set) var pencilTouches = 0
-    private(set) var fingerTouches = 0
-    private(set) var pencilSamples = 0
-    private(set) var delayMeanMS = 0.0
-    private(set) var delayWorstMS = 0.0
-    private(set) var worstFrameMS = 0.0
-    private(set) var framesOver = 0
-    private(set) var footprintMB = 0.0
-    private(set) var footprintPeakMB = 0.0
-    private(set) var overlayGeometry = "no overlay yet"
-    /// What a touch on the PDF landed on (the deepest view under the finger or Pencil), as a hit test says: a canvas, or PDFKit's own view.
-    private(set) var lastTouchLanded = "nothing touched yet"
-    private(set) var scrollReport = ""
-    private(set) var scrolling = false
-
-    @ObservationIgnored weak var view: PDFView?
-    @ObservationIgnored fileprivate var canvases: [Int: InkCanvas] = [:]
-    @ObservationIgnored fileprivate var drawings: [Int: PKDrawing] = [:]
-    @ObservationIgnored private var delaySum = 0.0
-    @ObservationIgnored private var delayCount = 0
-    @ObservationIgnored private var link: CADisplayLink?
-    @ObservationIgnored private var lastFrame: CFTimeInterval = 0
-    @ObservationIgnored private var delegateKeepAlive: Overlays?
-
-    // MARK: The PDFs
-
-    private static func file(_ book: Book) -> URL {
-        FileManager.default.temporaryDirectory.appending(path: "PdfInkLab-\(book.pages).pdf")
-    }
-
-    /// Makes the PDF the first time and keeps it (500 pages of a few lines each, about 2 MB).
-    func load() async {
-        making = true
-        let book = book
-        let url = Self.file(book)
-        if !FileManager.default.fileExists(atPath: url.path) {
-            await Task.detached(priority: .userInitiated) { Self.make(book, at: url) }.value
-        }
-        document = PDFDocument(url: url)
-        drawings = [:]
-        canvases = [:]
-        strokes = 0
-        making = false
-        resetCounts()
-        sampleMemory()
-    }
-
-    nonisolated private static func make(_ book: Book, at url: URL) {
-        let bounds = CGRect(x: 0, y: 0, width: 612, height: 792)
-        let data = UIGraphicsPDFRenderer(bounds: bounds).pdfData { context in
-            for page in 1...book.pages {
-                context.beginPage()
-                ("Page \(page)" as NSString).draw(at: CGPoint(x: 72, y: 60), withAttributes: [.font: UIFont.systemFont(ofSize: 36)])
-                for line in 0..<28 {
-                    ("Line \(line + 1) of page \(page): the quick brown fox jumps over the lazy dog, again and again and again." as NSString)
-                        .draw(at: CGPoint(x: 72, y: 130 + CGFloat(line) * 22), withAttributes: [.font: UIFont.systemFont(ofSize: 13)])
-                }
+        var pkTool: PKTool {
+            switch self {
+            case .pen: PKInkingTool(.pen, color: .black, width: 3)
+            case .blue: PKInkingTool(.pen, color: .systemBlue, width: 3)
+            case .marker: PKInkingTool(.marker, color: .systemYellow, width: 18)
+            case .pixelEraser: PKEraserTool(.bitmap)
+            case .strokeEraser: PKEraserTool(.vector)
+            case .lasso: PKLassoTool()
             }
         }
-        try? data.write(to: url)
     }
 
-    // MARK: The view and its overlays
+    struct Result: Identifiable {
+        let id = UUID()
+        let title: String
+        let lines: [String]
+    }
 
+    static let onSimulator: Bool = {
+        #if targetEnvironment(simulator)
+        true
+        #else
+        false
+        #endif
+    }()
+
+    // MARK: What the screen shows
+
+    var bookName = "No book yet"
+    var pageCount = 0
+    /// What the lab is doing (making a book, a run), or nil when it is idle.
+    var busy: String?
+    var progress: Double?
+    var hud = ""
+    var results: [Result] = []
+    var cases: [String: LabCaseState] = [:]
+    var notes = ""
+    var recording = false
+    var status = ""
+
+    // MARK: Settings (the view's controls; `settingsChanged()` carries them over)
+
+    var canvasesOn = true
+    var retention = Retention.drop
+    var holding = InkHolding.drawing
+    /// Builds the stroke format (JSON) of a page that leaves with new ink, as the build will; off, for the memory of the canvases and the held ink alone.
+    var buildsStrokeFormat = true
+    /// Empties a canvas as its page leaves (see `PdfInkLabOverlays.emptiesOnLeave`).
+    var emptiesOnLeave = false
+    /// On the Simulator there is no Pencil, so a finger draws unless it is turned off; on an iPad the Pencil draws and a finger scrolls and selects.
+    var fingerDraws = PdfInkLab.onSimulator
+    var tool = Tool.pen
+    var systemPicker = false
+    /// Turns touches back on in PDFKit's page view, which holds the canvases and takes none (see `PdfInkLabOverlays.letTouchesThrough`).
+    var touchesThrough = true
+    var density = LabInk.Density.dense
+    /// How fast the scroll run goes: pages a second (4 is reading, 12 is looking for a page, 30 is a hard flick).
+    var speed = 12.0
+
+    var settingsKey: String { "\(canvasesOn)|\(retention.rawValue)|\(holding.rawValue)|\(buildsStrokeFormat)|\(emptiesOnLeave)|\(fingerDraws)|\(tool.rawValue)|\(systemPicker)|\(touchesThrough)" }
+
+    var settingsLine: String {
+        [canvasesOn ? "canvases on pages" : "no canvases", canvasesOn ? (retention == .drop ? "dropped when their page leaves" : "all kept") : nil, holding == .data ? "off-screen ink held as PencilKit data" : nil, buildsStrokeFormat ? nil : "stroke format not built", emptiesOnLeave ? "canvas emptied on leaving" : nil,
+         touchesThrough ? "page view touches on" : "page view as PDFKit made it", fingerDraws ? "finger draws, two fingers scroll" : "Pencil only", systemPicker ? "system tool picker" : tool.rawValue].compactMap { $0 }.joined(separator: ", ")
+    }
+
+    // MARK: Inside
+
+    @ObservationIgnored let overlays = PdfInkLabOverlays()
+    @ObservationIgnored private(set) weak var pdfView: PDFView?
+    @ObservationIgnored private(set) var document: PDFDocument?
+    @ObservationIgnored private var scopedURL: URL?
+    @ObservationIgnored private let trace = LabTrace()
+    @ObservationIgnored private let frames = LabFrames()
+    @ObservationIgnored private let probe = LabTouchProbe(target: nil, action: nil)
+    @ObservationIgnored private var touches: [LabTouchSample] = []
+    @ObservationIgnored private var collecting = false
+    @ObservationIgnored private var appliedRetention = Retention.drop
+    @ObservationIgnored private var recordingBefore: PdfInkLabOverlays.Stats?
+    @ObservationIgnored private var runTask: Task<Void, Never>?
+    @ObservationIgnored private var stopRequested = false
+    @ObservationIgnored private var started = false
+
+    init() {
+        probe.record = { [weak self] sample in
+            guard let self, self.collecting, self.touches.count < 60_000 else { return }
+            self.touches.append(sample)
+        }
+    }
+
+    /// Called by the view that holds the `PDFView`.
     func attach(_ view: PDFView) {
-        self.view = view
+        pdfView = view
+        view.autoScales = true
         view.displayMode = .singlePageContinuous
         view.displayDirection = .vertical
-        view.autoScales = true
         view.displaysPageBreaks = true
-        view.document = document
-        view.accessibilityIdentifier = "ink-lab-pdf"
-        // Says what each touch lands on (without taking it from anything).
-        ProbeTarget.shared.lab = self
-        let probe = UILongPressGestureRecognizer(target: ProbeTarget.shared, action: #selector(ProbeTarget.touched(_:)))
-        probe.minimumPressDuration = 0
-        probe.cancelsTouchesInView = false
-        probe.delaysTouchesBegan = false
-        probe.delegate = ProbeTarget.shared
+        view.backgroundColor = .systemGray5
         view.addGestureRecognizer(probe)
-        reload()
-        startFrames()
+        view.pageOverlayViewProvider = canvasesOn ? overlays : nil
+        appliedRetention = retention
+        settingsChanged()
+        if let document { view.document = document }
     }
 
-    /// Gives the view (or takes from it) the provider of canvases.
-    func reload() {
-        guard let view else { return }
-        canvases = [:]
-        overlaysLive = 0
-        if overlaysOn {
-            let provider = Overlays(lab: self)
-            delegateKeepAlive = provider
-            view.pageOverlayViewProvider = provider
-        } else {
-            view.pageOverlayViewProvider = nil
-            delegateKeepAlive = nil
+    /// Opens the book the lab starts with and runs what the launch arguments ask for; then keeps the readout up to date until the screen goes.
+    func start() async {
+        if !started {
+            started = true
+            Task { await runLaunchArguments() }
         }
-        // PDFKit asks again for the overlays of the pages in view when the document is set again.
-        let keep = view.document
-        view.document = nil
-        view.document = keep
-    }
-
-    private func updatePolicy() {
-        for canvas in canvases.values { canvas.drawingPolicy = pencilOnly ? .pencilOnly : .anyInput }
-    }
-
-    fileprivate func overlayMade(_ canvas: InkCanvas, for page: PDFPage) {
-        overlaysMade += 1
-        canvas.drawingPolicy = pencilOnly ? .pencilOnly : .anyInput
-    }
-
-    fileprivate func overlayShown(_ canvas: InkCanvas, index: Int, view: PDFView) {
-        canvases[index] = canvas
-        overlaysShown += 1
-        canvas.pageIndex = index
-        canvas.drawing = drawings[index] ?? PKDrawing()
-        if strokeEveryPage, canvas.drawing.strokes.isEmpty { canvas.drawing = Self.sampleStroke(on: CGRect(x: 0, y: 0, width: 612, height: 792)) }
-        overlaysLive = canvases.count
-        overlaysPeak = max(overlaysPeak, overlaysLive)
-        let transform = canvas.transform
-        overlayGeometry = String(format: "page %d: frame %.0f×%.0f, bounds %.0f×%.0f, transform scale %.2f, view scale %.2f", index + 1, canvas.frame.width, canvas.frame.height, canvas.bounds.width, canvas.bounds.height, transform.a, view.scaleFactor)
-        recountStrokes()
-    }
-
-    fileprivate func overlayHidden(_ canvas: InkCanvas, index: Int) {
-        // What was drawn is kept as data, and the canvas goes with the page.
-        if !canvas.drawing.strokes.isEmpty || drawings[index] == nil { drawings[index] = canvas.drawing }
-        if canvases[index] === canvas { canvases[index] = nil }
-        overlaysDropped += 1
-        overlaysLive = canvases.count
-        recountStrokes()
-    }
-
-    fileprivate func recountStrokes() {
-        var live = drawings
-        // A canvas that has nothing on it does not hide what is kept for its page.
-        for (index, canvas) in canvases where !canvas.drawing.strokes.isEmpty || live[index] == nil { live[index] = canvas.drawing }
-        strokes = live.values.reduce(0) { $0 + $1.strokes.count }
-    }
-
-    func strokeChanged() { recountStrokes() }
-
-    /// A hundred and fifty points of a wavy line: about what a few words of handwriting weigh.
-    private static func sampleStroke(on bounds: CGRect) -> PKDrawing {
-        let ink = PKInk(.pen, color: .systemBlue)
-        let points = (0..<150).map { step -> PKStrokePoint in
-            let t = Double(step) / 149
-            let location = CGPoint(x: bounds.width * (0.2 + 0.6 * t), y: bounds.height * 0.5 + 24 * sin(t * 14))
-            return PKStrokePoint(location: location, timeOffset: t * 0.8, size: CGSize(width: 3, height: 3), opacity: 1, force: 1, azimuth: 0, altitude: .pi / 2)
-        }
-        let path = PKStrokePath(controlPoints: points, creationDate: Date())
-        return PKDrawing(strokes: [PKStroke(ink: ink, path: path)])
-    }
-
-    func clearDrawings() {
-        drawings = [:]
-        for canvas in canvases.values { canvas.drawing = PKDrawing() }
-        recountStrokes()
-    }
-
-    // MARK: What is counted
-
-    func pageChanged() {
-        guard let view, let document, let page = view.currentPage else { return }
-        // A page of the book that was just replaced is not in this one (the view and the lab change books a moment apart).
-        let index = document.index(for: page)
-        guard index != NSNotFound else { return }
-        pageIndex = index
-    }
-
-    func selectionChanged() { selectionLength = view?.currentSelection?.string?.count ?? 0 }
-
-    fileprivate func touch(_ touch: UITouch, _ event: UIEvent?, moved: Bool) {
-        let delay = max(0, (ProcessInfo.processInfo.systemUptime - touch.timestamp) * 1000)
-        if touch.type == .pencil {
-            if !moved { pencilTouches += 1 }
-            let samples = max(event?.coalescedTouches(for: touch)?.count ?? 1, 1)
-            pencilSamples += samples
-            delaySum += delay
-            delayCount += 1
-            delayMeanMS = delaySum / Double(delayCount)
-            delayWorstMS = max(delayWorstMS, delay)
-        } else if !moved {
-            fingerTouches += 1
+        while !Task.isCancelled {
+            refreshReadout()
+            try? await Task.sleep(for: .milliseconds(250))
         }
     }
 
-    /// Where a touch in the middle of the PDF would land, asked of the view directly (no touch needed): the views from the deepest up, and where the canvas of the page
-    /// there is, in the PDF view's own coordinates. If the canvas is not what a touch lands on, nothing drawn on it can reach it.
-    func whereWouldATouchLand() {
-        guard let view else { return }
-        let point = CGPoint(x: view.bounds.midX, y: view.bounds.height * 0.4)
-        touchLanded(on: view.hitTest(point, with: nil), kind: "a probe")
-        let rects = canvases.sorted { $0.key < $1.key }.map { index, canvas -> String in
-            let box = canvas.convert(canvas.bounds, to: view)
-            return String(format: "page %d at x %.0f y %.0f, %.0f×%.0f", index + 1, box.minX, box.minY, box.width, box.height)
-        }
-        lastTouchLanded += " · the PDF view is \(Int(view.bounds.width))×\(Int(view.bounds.height)), the probe is at x \(Int(point.x)) y \(Int(point.y)) · canvases in it: " + (rects.isEmpty ? "none" : rects.joined(separator: "; "))
-        lastTouchLanded += " · policy: " + (pencilOnly ? "Pencil only" : "any input")
+    func close() {
+        stopRequested = true
+        trace.stop()
+        frames.stop()
+        frames.onTick = nil
+        scopedURL?.stopAccessingSecurityScopedResource()
+        scopedURL = nil
     }
 
-    fileprivate func touchLanded(on hit: UIView?, kind: String) {
-        var names: [String] = []
-        var current = hit
-        while let view = current, names.count < 4 {
-            names.append(String(describing: type(of: view)))
-            current = view.superview
-        }
-        lastTouchLanded = "\(kind) touch landed on " + names.joined(separator: " in ")
-    }
+    // MARK: Settings
 
-    func resetCounts() {
-        overlaysMade = 0
-        overlaysDropped = 0
-        overlaysShown = 0
-        overlaysPeak = overlaysLive
-        pencilTouches = 0
-        fingerTouches = 0
-        pencilSamples = 0
-        delaySum = 0
-        delayCount = 0
-        delayMeanMS = 0
-        delayWorstMS = 0
-        worstFrameMS = 0
-        framesOver = 0
-        footprintPeakMB = 0
-        scrollReport = ""
-        sampleMemory()
-    }
-
-    // MARK: Frames and memory
-
-    private func startFrames() {
-        guard link == nil else { return }
-        let display = CADisplayLink(target: FrameTarget(self), selector: #selector(FrameTarget.tick(_:)))
-        display.add(to: .main, forMode: .common)
-        link = display
-    }
-
-    fileprivate func frame(_ now: CFTimeInterval, expected: CFTimeInterval) {
-        defer { lastFrame = now }
-        guard lastFrame > 0 else { return }
-        let gap = (now - lastFrame) * 1000
-        // Only a frame well past its time counts, and only while something is happening: a still screen is not drawn again.
-        if gap > expected * 1000 * 1.9, gap < 500 {
-            framesOver += 1
-            worstFrameMS = max(worstFrameMS, gap)
-        }
-    }
-
-    func sampleMemory() {
-        footprintMB = Self.footprint()
-        footprintPeakMB = max(footprintPeakMB, footprintMB)
-    }
-
-    /// The memory the system charges the app for (`phys_footprint`, the number Xcode's memory gauge shows).
-    private static func footprint() -> Double {
-        var info = task_vm_info_data_t()
-        var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) { pointer in
-            pointer.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
-        }
-        return result == KERN_SUCCESS ? Double(info.phys_footprint) / 1_048_576 : 0
-    }
-
-    /// Goes down the whole book as a reader paging fast would: to every other page, a moment to draw it, then a nudge down it, so that PDFKit draws the pages on
-    /// the way and asks for their canvases (a jump on its own, with no time to draw, gives it no reason to).
-    func scrollThroughTheBook() async {
-        guard let view, let document, !scrolling else { return }
-        scrolling = true
-        defer { scrolling = false }
-        // *A stroke on every page*: a drawing of one stroke is made for every page of the book first (kept as data, as a book marked on every page would have), and the
-        // canvases that are put on pages load theirs.
-        if strokeEveryPage {
-            for index in 0..<document.pageCount where drawings[index]?.strokes.isEmpty ?? true { drawings[index] = Self.sampleStroke(on: CGRect(x: 0, y: 0, width: 612, height: 792)) }
-            recountStrokes()
-        }
-        resetCounts()
-        let before = footprintMB
-        let started = ContinuousClock.now
-        let scroll = Self.scrollView(in: view)
-        var visited = 0
-        for index in stride(from: 0, to: document.pageCount, by: 2) {
-            guard let page = document.page(at: index) else { continue }
-            view.go(to: page)
-            try? await Task.sleep(for: .milliseconds(45))
-            if let scroll {
-                scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: scroll.contentOffset.y + view.bounds.height * 0.5), animated: false)
-                try? await Task.sleep(for: .milliseconds(45))
+    func settingsChanged() {
+        overlays.retention = retention
+        overlays.holding = holding
+        overlays.buildsStrokeFormat = buildsStrokeFormat
+        overlays.emptiesOnLeave = emptiesOnLeave
+        overlays.policy = fingerDraws ? .anyInput : .pencilOnly
+        overlays.tool = tool.pkTool
+        overlays.usesSystemPicker = systemPicker
+        overlays.letTouchesThrough = touchesThrough
+        overlays.settingsChanged()
+        guard let view = pdfView else { return }
+        // Where a finger draws it is one finger that draws and two that scroll, as in a drawing app; otherwise a finger scrolls and only the Pencil draws.
+        if let scroll = Self.scrollView(in: view) { scroll.panGestureRecognizer.minimumNumberOfTouches = fingerDraws ? 2 : 1 }
+        let have = view.pageOverlayViewProvider != nil
+        if canvasesOn != have || retention != appliedRetention {
+            appliedRetention = retention
+            if retention == .drop { overlays.dropKept() }
+            view.pageOverlayViewProvider = canvasesOn ? overlays : nil
+            // Pages already on show keep the overlays (or none) they had, so the view is given its document again.
+            if let document {
+                let page = view.currentPage
+                overlays.forgetScreen()
+                view.document = nil
+                view.document = document
+                if let page { view.go(to: page) }
             }
-            visited += 1
-            if visited % 10 == 0 { sampleMemory() }
         }
-        sampleMemory()
-        let elapsed = started.duration(to: .now)
-        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
-        scrollReport = String(
-            format: "Went through all %d pages in %.1f s (every other page, %d stops). Canvases: %d made, %d put on a page, %d taken off, at most %d on screen at once. Memory %.0f MB before, %.0f MB at the end, %.0f MB at most. %d slow frames, worst %.0f ms. %d strokes kept.",
-            document.pageCount, seconds, visited, overlaysMade, overlaysShown, overlaysDropped, overlaysPeak, before, footprintMB, footprintPeakMB, framesOver, worstFrameMS, strokes)
     }
 
-    /// The scroll view PDFKit scrolls its pages in.
-    private static func scrollView(in view: UIView) -> UIScrollView? {
-        if let scroll = view as? UIScrollView, !(scroll is PKCanvasView) { return scroll }
-        for child in view.subviews { if let found = scrollView(in: child) { return found } }
+    // MARK: Books
+
+    private struct Opened: @unchecked Sendable { let document: PDFDocument? }
+
+    func openGenerated(pages: Int, turned: Bool = false) async {
+        guard busy == nil else { return }
+        busy = "Making a \(pages)-page book…"
+        let url: URL? = await Task.detached(priority: .userInitiated) {
+            try? LabBook.make(pages: pages) { done in
+                Task { @MainActor in self.progress = Double(done) / Double(pages) }
+            }
+        }.value
+        progress = nil
+        guard let url else {
+            busy = nil
+            status = "The book could not be written."
+            return
+        }
+        await load(url, name: turned ? "Generated book with turned and cropped pages" : "Generated book", turned: turned)
+    }
+
+    func open(fileAt url: URL) async {
+        guard busy == nil else { return }
+        scopedURL?.stopAccessingSecurityScopedResource()
+        scopedURL = url.startAccessingSecurityScopedResource() ? url : nil
+        let bytes = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        await load(url, name: url.lastPathComponent + (bytes.map { " (\(LabMemory.size($0)))" } ?? ""))
+    }
+
+    private func load(_ url: URL, name: String, turned: Bool = false) async {
+        busy = "Opening \(name)…"
+        let opened = await Task.detached(priority: .userInitiated) { Opened(document: PDFDocument(url: url)) }.value
+        busy = nil
+        guard let opened = opened.document else {
+            status = "That file could not be opened as a PDF."
+            return
+        }
+        guard !opened.isLocked else {
+            status = "That PDF is locked; the lab does not ask for a password."
+            return
+        }
+        if turned { LabBook.turnAndCrop(opened) }
+        overlays.reset()
+        overlays.document = opened
+        document = opened
+        pageCount = opened.pageCount
+        bookName = name
+        status = ""
+        pdfView?.document = opened
+    }
+
+    func jump(to index: Int) {
+        guard let document, let page = document.page(at: max(0, min(index, document.pageCount - 1))) else { return }
+        pdfView?.go(to: page)
+    }
+
+    // MARK: Runs
+
+    func perform(_ label: String, _ body: @MainActor () async -> Void) async {
+        guard busy == nil, document != nil else { return }
+        stopRequested = false
+        busy = label
+        await body()
+        busy = nil
+        progress = nil
+    }
+
+    func start(_ label: String, _ body: @escaping @MainActor () async -> Void) {
+        runTask = Task { await perform(label, body) }
+    }
+
+    func stop() { stopRequested = true }
+
+    private func begin() -> PdfInkLabOverlays.Stats {
+        touches = []
+        collecting = true
+        overlays.resetPeak()
+        trace.start()
+        frames.start()
+        return overlays.stats
+    }
+
+    private func finish(_ title: String, before: PdfInkLabOverlays.Stats, extra: [String] = []) {
+        collecting = false
+        frames.stop()
+        frames.onTick = nil
+        trace.stop()
+        var lines = [frames.line, trace.line] + extra
+        lines += overlayLines(before: before, after: overlays.stats)
+        if !touches.isEmpty { lines += LabStats.touchLines(touches, frameTargets: frames.targets) }
+        results.append(Result(title: "\(title) — \(bookName); \(settingsLine)", lines: lines))
+    }
+
+    private func overlayLines(before: PdfInkLabOverlays.Stats, after: PdfInkLabOverlays.Stats) -> [String] {
+        guard canvasesOn else { return ["Canvases were off: this is the PDF alone."] }
+        func added<T>(_ new: [T], _ old: [T]) -> [T] { Array(new.dropFirst(old.count)) }
+        var lines = ["Canvases: \(after.created - before.created) made, \(after.leftScreen - before.leftScreen) left the screen, most on screen at once \(after.mostOnScreen), \(overlays.keptCount) kept now"]
+        let made = added(after.createMilliseconds, before.createMilliseconds)
+        if !made.isEmpty { lines.append("Making a canvas: \(LabStats.line(made))") }
+        let restored = added(after.restoreMilliseconds, before.restoreMilliseconds)
+        if !restored.isEmpty { lines.append("Putting a page's ink back on a canvas that came back: \(LabStats.line(restored))") }
+        let held = added(after.holdMilliseconds, before.holdMilliseconds)
+        if !held.isEmpty { lines.append("Making PencilKit's data from a page's drawing when it leaves (main thread): \(LabStats.line(held))") }
+        let converted = added(after.convertMilliseconds, before.convertMilliseconds)
+        if !converted.isEmpty {
+            lines.append("Leaving a page with new ink (the stroke format built from PencilKit's drawing, off the main thread): \(LabStats.line(converted))")
+            lines.append("… then written as JSON: \(LabStats.line(added(after.jsonMilliseconds, before.jsonMilliseconds)))")
+            let json = added(after.jsonBytes, before.jsonBytes).map(Double.init)
+            let packed = added(after.packedBytes, before.packedBytes).map(Double.init)
+            let blob = added(after.pencilKitBytes, before.pencilKitBytes).map(Double.init)
+            lines.append("A page's record: JSON \(LabStats.line(json.map { $0 / 1024 }, unit: "KB", digits: 0)); zipped \(LabStats.line(packed.map { $0 / 1024 }, unit: "KB", digits: 0)); PencilKit's own copy \(LabStats.line(blob.map { $0 / 1024 }, unit: "KB", digits: 0))")
+        }
+        let strokes = after.strokesStarted - before.strokesStarted
+        if strokes > 0 { lines.append("Strokes begun by hand or tool in this stretch: \(strokes)") }
+        return lines
+    }
+
+    /// Until the pages that were left have had their records built (they are built on another thread, so a run would end before they were counted).
+    private func waitForConversions() async {
+        let end = CACurrentMediaTime() + 120
+        while overlays.pendingConversions > 0, CACurrentMediaTime() < end, !stopRequested { try? await Task.sleep(for: .milliseconds(50)) }
+    }
+
+    private func settle(_ seconds: Double) async {
+        let end = CACurrentMediaTime() + seconds
+        while CACurrentMediaTime() < end, !stopRequested { try? await Task.sleep(for: .milliseconds(50)) }
+    }
+
+    private func waitForCanvas(_ index: Int) async -> PKCanvasView? {
+        let end = CACurrentMediaTime() + 2
+        while CACurrentMediaTime() < end, !stopRequested {
+            if let canvas = overlays.canvas(at: index), canvas.bounds.width > 0 { return canvas }
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+        return overlays.canvas(at: index)
+    }
+
+    /// Scrolls the PDF's own scroll view, which is the first one under the `PDFView` (the canvases are scroll views too, on the pages).
+    private static func scrollView(in root: UIView) -> UIScrollView? {
+        var queue = [root]
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            if view !== root, let scroll = view as? UIScrollView, !(scroll is PKCanvasView) { return scroll }
+            queue.append(contentsOf: view.subviews)
+        }
         return nil
     }
-}
 
-@MainActor
-private final class ProbeTarget: NSObject, UIGestureRecognizerDelegate {
-    static let shared = ProbeTarget(nil)
-    weak var lab: PdfInkLab?
-
-    init(_ lab: PdfInkLab?) { self.lab = lab }
-
-    @objc func touched(_ recogniser: UILongPressGestureRecognizer) {
-        guard recogniser.state == .began, let view = recogniser.view else { return }
-        lab?.touchLanded(on: view.hitTest(recogniser.location(in: view), with: nil), kind: "a")
-    }
-
-    nonisolated func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
-}
-
-/// CADisplayLink holds its target; this one only passes the beat on.
-@MainActor
-private final class FrameTarget: NSObject {
-    weak var lab: PdfInkLab?
-
-    init(_ lab: PdfInkLab) { self.lab = lab }
-
-    @objc func tick(_ link: CADisplayLink) {
-        lab?.frame(link.timestamp, expected: link.targetTimestamp - link.timestamp)
-    }
-}
-
-/// The canvas over a page: it counts what touches it, by what touched.
-final class InkCanvas: PKCanvasView {
-    weak var lab: PdfInkLab?
-    var pageIndex = 0
-
-    init(lab: PdfInkLab) {
-        self.lab = lab
-        super.init(frame: .zero)
-        backgroundColor = .clear
-        isOpaque = false
-        isScrollEnabled = false
-        tool = PKInkingTool(.pen, color: .systemBlue, width: 3)
-    }
-
-    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches { lab?.touch(touch, event, moved: false) }
-        super.touchesBegan(touches, with: event)
-    }
-
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for touch in touches { lab?.touch(touch, event, moved: true) }
-        super.touchesMoved(touches, with: event)
-    }
-
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        super.touchesEnded(touches, with: event)
-        lab?.strokeChanged()
-    }
-}
-
-/// PDFKit's page-overlay provider: a canvas for a page when it comes on screen, and the drawing kept when it goes.
-@MainActor
-private final class Overlays: NSObject, @preconcurrency PDFPageOverlayViewProvider {
-    weak var lab: PdfInkLab?
-
-    init(lab: PdfInkLab) { self.lab = lab }
-
-    func pdfView(_ view: PDFView, overlayViewFor page: PDFPage) -> UIView? {
-        guard let lab else { return nil }
-        let canvas = InkCanvas(lab: lab)
-        lab.overlayMade(canvas, for: page)
-        return canvas
-    }
-
-    func pdfView(_ pdfView: PDFView, willDisplayOverlayView overlayView: UIView, for page: PDFPage) {
-        guard let canvas = overlayView as? InkCanvas, let document = pdfView.document else { return }
-        let index = document.index(for: page)
-        guard index != NSNotFound else { return }
-        lab?.overlayShown(canvas, index: index, view: pdfView)
-    }
-
-    func pdfView(_ pdfView: PDFView, willEndDisplayingOverlayView overlayView: UIView, for page: PDFPage) {
-        guard let canvas = overlayView as? InkCanvas, let document = pdfView.document else { return }
-        let index = document.index(for: page)
-        guard index != NSNotFound else { return }
-        lab?.overlayHidden(canvas, index: index)
-    }
-}
-
-// MARK: - The screen
-
-struct PdfInkLabView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var lab = PdfInkLab()
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if lab.document == nil {
-                    ProgressView(lab.making ? "Making the PDF…" : "").frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    InkPdfView(lab: lab).id(lab.book)
-                }
-                Divider()
-                hud
+    /// The scroll run: from the first page to the last at a steady speed, the way a hand flicking through a book goes, measuring memory and frames.
+    func scrollThroughEveryPage() async {
+        await perform("Scrolling through every page") {
+            guard let view = pdfView, document != nil, let scroll = Self.scrollView(in: view), scroll.contentSize.height > 0 else {
+                status = "Nothing to scroll."
+                return
             }
-            .navigationTitle("PDF ink lab (spike B)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
-                ToolbarItem(placement: .principal) {
-                    Picker("Book", selection: $lab.book) { ForEach(PdfInkLab.Book.allCases) { Text($0.rawValue).tag($0) } }
-                        .pickerStyle(.segmented)
-                        .frame(width: 220)
-                        .accessibilityIdentifier("ink-lab-book")
+            jump(to: 0)
+            await settle(1.5)
+            let pointsPerSecond = scroll.contentSize.height / CGFloat(pageCount) * CGFloat(speed)
+            let before = begin()
+            let began = CACurrentMediaTime()
+            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                var finished = false
+                frames.onTick = { [weak self, weak scroll] interval in
+                    guard let self, let scroll, !finished else { return }
+                    let last = max(0, scroll.contentSize.height - scroll.bounds.height)
+                    let y = scroll.contentOffset.y + CGFloat(min(interval, 0.1)) * pointsPerSecond
+                    self.progress = last > 0 ? Double(y / last) : 1
+                    if y >= last || self.stopRequested {
+                        finished = true
+                        done.resume()
+                    } else {
+                        scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x, y: y), animated: false)
+                    }
                 }
             }
-        }
-        .task(id: lab.book) { await lab.load() }
-        .onReceive(NotificationCenter.default.publisher(for: .PDFViewPageChanged)) { _ in lab.pageChanged() }
-        .onReceive(NotificationCenter.default.publisher(for: .PDFViewSelectionChanged)) { _ in lab.selectionChanged() }
-        .task {
-            // Developer shortcut for scripts: `-pdfInkLabBook 500` chooses the big book at launch.
-            if UserDefaults.standard.integer(forKey: "pdfInkLabBook") == 500 { lab.book = .big }
+            let seconds = CACurrentMediaTime() - began
+            await settle(1.0)
+            finish("Scroll through all \(pageCount) pages at \(Int(speed)) pages a second",
+                   before: before, extra: [String(format: "Pages a second reached: %.1f (asked for %.0f)", Double(pageCount) / seconds, speed)])
         }
     }
 
-    private var hud: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 18) {
-                Toggle("Canvas over each page", isOn: $lab.overlaysOn).accessibilityIdentifier("ink-lab-overlays")
-                Toggle("Pencil only", isOn: $lab.pencilOnly).accessibilityIdentifier("ink-lab-pencil-only")
-                Toggle("A stroke on every page", isOn: $lab.strokeEveryPage).accessibilityIdentifier("ink-lab-stroke-every")
+    /// The draw run: ink put on the first `count` pages by code, one page at a time, then back to the start. Each page is shown first so that its canvas exists and draws
+    /// the ink, as it would under a hand; leaving it saves the page's record and the lab times the conversion. A second stretch visits the same pages again for the cost of coming back.
+    func drawOnPages(_ count: Int) async {
+        await perform("Drawing on \(count) pages") {
+            guard document != nil, canvasesOn else {
+                status = "Canvases are off, or there is no book."
+                return
             }
-            .font(.callout)
-            HStack {
-                Button("Scroll through the book") { Task { await lab.scrollThroughTheBook() } }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(lab.scrolling || lab.document == nil)
-                    .accessibilityIdentifier("ink-lab-scroll")
-                Button("Where would a touch land?") { lab.whereWouldATouchLand() }.accessibilityIdentifier("ink-lab-probe")
-                Button("Count again") { lab.resetCounts() }.accessibilityIdentifier("ink-lab-reset")
-                Button("Clear the drawing") { lab.clearDrawings() }.accessibilityIdentifier("ink-lab-clear")
-                Button("Memory now") { lab.sampleMemory() }
+            let total = min(count, pageCount)
+            overlays.clearAllInk()
+            jump(to: 0)
+            await settle(1.5)
+            let baseline = LabMemory.read()
+            let before = begin()
+            for index in 0..<total where !stopRequested {
+                jump(to: index)
+                let size = await waitForCanvas(index)?.bounds.size ?? document?.page(at: index)?.bounds(for: .cropBox).size ?? CGSize(width: 612, height: 792)
+                overlays.setInk(LabInk.drawing(page: index, size: size, density: density), page: index)
+                progress = Double(index + 1) / Double(total)
+                await settle(0.08)
             }
-            .buttonStyle(.bordered)
-            Text(report)
-                .font(.system(.footnote, design: .monospaced))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityIdentifier("ink-lab-report")
-            if !lab.scrollReport.isEmpty {
-                Text(lab.scrollReport).font(.footnote).accessibilityIdentifier("ink-lab-scroll-report")
+            jump(to: 0)
+            await settle(2.0)
+            await waitForConversions()
+            let after = LabMemory.read()
+            let totals = overlays.inkTotals
+            finish("Draw on \(total) pages (\(density.rawValue))", before: before, extra: [
+                "Ink stored: \(totals.pages) pages, \(totals.strokes) strokes, \(totals.points) points",
+                "Memory before the first page \(LabMemory.megabytes(baseline.footprint)), two seconds after the last \(LabMemory.megabytes(after.footprint)): \(LabMemory.megabytes(after.footprint - baseline.footprint)) more for \(total) pages of ink",
+            ])
+
+            // Back through the same pages: what each costs to come back to.
+            let revisit = begin()
+            for index in 0..<total where !stopRequested {
+                jump(to: index)
+                _ = await waitForCanvas(index)
+                progress = Double(index + 1) / Double(total)
+                await settle(0.05)
+            }
+            jump(to: 0)
+            await settle(1.0)
+            finish("Come back to those \(total) pages", before: revisit)
+        }
+    }
+
+    /// Starts or ends a recording of what you do by hand: touches, frames, memory and canvases, from the first press to the stop.
+    func toggleRecording() {
+        if recording {
+            recording = false
+            if let before = recordingBefore {
+                let totals = overlays.inkTotals
+                finish("By hand", before: before, extra: ["Ink now stored: \(totals.pages) pages, \(totals.strokes) strokes, \(totals.points) points"])
+            }
+            recordingBefore = nil
+        } else {
+            recordingBefore = begin()
+            recording = true
+        }
+    }
+
+    /// One line of memory, labelled by where you are, for the by-hand steps (drawing on 5 pages, and so on).
+    func markMemory() {
+        let reading = LabMemory.read()
+        let totals = overlays.inkTotals
+        results.append(Result(title: "Memory mark — page \(currentPage + 1), \(settingsLine)", lines: [
+            "Memory \(LabMemory.megabytes(reading.footprint)) · room left \(LabMemory.megabytes(reading.available)) · \(totals.pages) pages with ink, \(totals.points) points · \(overlays.onScreenCount) canvases on screen, \(overlays.keptCount) kept",
+        ]))
+    }
+
+    /// Which view a touch in the middle of the PDF reaches, and how the canvases on show look to the touch system. For when a touch does not do what was expected.
+    func whereTouchesGo() {
+        guard let view = pdfView else { return }
+        let centre = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        var chain: [String] = []
+        var hit = view.hitTest(centre, with: nil)
+        while let current = hit, chain.count < 12 {
+            chain.append(String(describing: type(of: current)))
+            hit = current === view ? nil : current.superview
+        }
+        var lines = ["A touch at the middle of the PDF reaches: " + PdfInkLabOverlays.chain(from: view.hitTest(centre, with: nil), stoppingAt: view)]
+        if let scroll = Self.scrollView(in: view) {
+            let pan = scroll.panGestureRecognizer
+            lines.append("The PDF's scroll view (\(type(of: scroll))) pans with \(pan.minimumNumberOfTouches)–\(pan.maximumNumberOfTouches) touches, delays content touches \(scroll.delaysContentTouches ? "yes" : "no"), accepts touch types \(pan.allowedTouchTypes.map(\.intValue)) (0 finger, 1 indirect, 2 Pencil, 3 pointer)")
+        }
+        lines += overlays.canvasDescriptions(in: view)
+        if overlays.onScreenCount == 0 { lines.append("No canvas is on screen.") }
+        results.append(Result(title: "Where touches go — page \(currentPage + 1), \(settingsLine)", lines: lines))
+    }
+
+    func clearInk() {
+        overlays.clearAllInk()
+        status = "All ink cleared."
+    }
+
+    // MARK: Readout
+
+    var currentPage: Int {
+        guard let view = pdfView, let page = view.currentPage, let document else { return 0 }
+        return document.index(for: page)
+    }
+
+    private func refreshReadout() {
+        guard document != nil, let view = pdfView else {
+            hud = busy ?? "Open a book from the Book menu."
+            return
+        }
+        let reading = LabMemory.read()
+        let fit = max(view.scaleFactorForSizeToFit, 0.01)
+        let totals = overlays.inkTotals
+        hud = "Page \(currentPage + 1) of \(pageCount) · zoom \(Int((view.scaleFactor / fit * 100).rounded()))% · "
+            + (canvasesOn ? "canvases on screen \(overlays.onScreenCount), made \(overlays.stats.created), kept \(overlays.keptCount)" : "no canvases")
+            + " · memory \(LabMemory.megabytes(reading.footprint)), room left \(LabMemory.megabytes(reading.available)) · ink on \(totals.pages) pages"
+    }
+
+    // MARK: Report
+
+    static var deviceName: String {
+        if let simulated = ProcessInfo.processInfo.environment["SIMULATOR_MODEL_IDENTIFIER"] { return "Simulator (\(simulated))" }
+        var system = utsname()
+        uname(&system)
+        return withUnsafePointer(to: &system.machine) { $0.withMemoryRebound(to: CChar.self, capacity: Int(_SYS_NAMELEN)) { String(cString: $0) } }
+    }
+
+    func report() -> String {
+        var out = ["PDF ink lab (spike B)", ""]
+        let screen = pdfView?.window?.screen
+        out.append("Device: \(Self.deviceName) · \(UIDevice.current.systemName) \(UIDevice.current.systemVersion) · \(_isDebugAssertConfiguration() ? "Debug" : "Release") build · up to \(screen?.maximumFramesPerSecond ?? 0) Hz · memory \(LabMemory.megabytes(Int(ProcessInfo.processInfo.physicalMemory)))")
+        out.append("Book: \(bookName), \(pageCount) pages")
+        out.append("Settings now: \(settingsLine); ink for runs: \(density.rawValue); scroll speed \(Int(speed)) pages a second")
+        if !overlays.geometries.isEmpty {
+            out.append("Canvas against its page (as each page first showed):")
+            out += overlays.geometries.sorted { $0.key < $1.key }.map { "  " + $0.value }
+        }
+        out.append("")
+        out.append("Cases tried by hand:")
+        for item in LabCase.all { out.append("  [\((cases[item.id] ?? .untried).rawValue)] \(item.title)") }
+        if !notes.isEmpty { out += ["", "Notes: \(notes)"] }
+        for result in results {
+            out += ["", result.title]
+            out += result.lines.map { "  " + $0 }
+        }
+        return out.joined(separator: "\n")
+    }
+
+    // MARK: Launch arguments (developer shortcuts, like the editor lab's)
+
+    /// `-openPdfInkLab 1` opens this screen at launch. `-pdfInkLabPages 30` picks the book (500 by default; `-pdfInkLabTurned 1` turns and crops its first nine pages). `-pdfInkLabRun scroll,draw5,draw50,draw200,where` runs those in order,
+    /// `-pdfInkLabSpeed 30`, `-pdfInkLabCanvases 0`, `-pdfInkLabKeep 1`, `-pdfInkLabHold data`, `-pdfInkLabConvert 0` (do not build the stroke format), `-pdfInkLabEmpty 1` (empty a canvas as its page leaves), `-pdfInkLabFinger 0` (Pencil only), `-pdfInkLabTouches 0` and `-pdfInkLabDensity light` set what they use, and `-pdfInkLabReport <file>` writes the report there at the end.
+    private func runLaunchArguments() async {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "pdfInkLabCanvases") != nil { canvasesOn = defaults.bool(forKey: "pdfInkLabCanvases") }
+        if defaults.bool(forKey: "pdfInkLabKeep") { retention = .keep }
+        if defaults.string(forKey: "pdfInkLabHold") == "data" { holding = .data }
+        if defaults.bool(forKey: "pdfInkLabEmpty") { emptiesOnLeave = true }
+        if defaults.object(forKey: "pdfInkLabConvert") != nil { buildsStrokeFormat = defaults.bool(forKey: "pdfInkLabConvert") }
+        if defaults.string(forKey: "pdfInkLabDensity") == "light" { density = .light }
+        if defaults.double(forKey: "pdfInkLabSpeed") > 0 { speed = defaults.double(forKey: "pdfInkLabSpeed") }
+        if defaults.object(forKey: "pdfInkLabFinger") != nil { fingerDraws = defaults.bool(forKey: "pdfInkLabFinger") }
+        if defaults.object(forKey: "pdfInkLabTouches") != nil { touchesThrough = defaults.bool(forKey: "pdfInkLabTouches") }
+        settingsChanged()
+        let pages = defaults.integer(forKey: "pdfInkLabPages")
+        await openGenerated(pages: pages > 0 ? pages : 500, turned: defaults.bool(forKey: "pdfInkLabTurned"))
+        guard let script = defaults.string(forKey: "pdfInkLabRun") else { return }
+        try? await Task.sleep(for: .seconds(1))
+        for step in script.split(separator: ",") {
+            switch step {
+            case "scroll": await scrollThroughEveryPage()
+            case "draw5": await drawOnPages(5)
+            case "draw50": await drawOnPages(50)
+            case "draw200": await drawOnPages(200)
+            case "where": whereTouchesGo()
+            default: break
             }
         }
-        .padding(12)
-        .background(.bar)
+        if let file = defaults.string(forKey: "pdfInkLabReport") { try? report().write(toFile: file, atomically: true, encoding: .utf8) }
     }
-
-    private var report: String {
-        let delay = lab.pencilSamples == 0 ? "no Pencil yet" : String(format: "delivery delay %.1f ms mean, %.1f ms worst over %d samples", lab.delayMeanMS, lab.delayWorstMS, lab.pencilSamples)
-        return """
-        page \(lab.pageIndex + 1) · canvases on screen \(lab.overlaysLive) (\(lab.overlaysMade) made, \(lab.overlaysShown) shown, \(lab.overlaysDropped) dropped, most at once \(lab.overlaysPeak)) · strokes \(lab.strokes)
-        touches on a canvas: Pencil \(lab.pencilTouches), finger \(lab.fingerTouches) · selected \(lab.selectionLength) characters
-        \(delay) · slow frames \(lab.framesOver), worst \(String(format: "%.0f", lab.worstFrameMS)) ms · memory \(String(format: "%.0f", lab.footprintMB)) MB (most \(String(format: "%.0f", lab.footprintPeakMB)))
-        \(lab.overlayGeometry)
-        \(lab.lastTouchLanded)
-        """
-    }
-}
-
-private struct InkPdfView: UIViewRepresentable {
-    let lab: PdfInkLab
-
-    func makeUIView(context: Context) -> PDFView {
-        let view = PDFView()
-        lab.attach(view)
-        return view
-    }
-
-    func updateUIView(_ view: PDFView, context: Context) {}
 }

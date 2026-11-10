@@ -18,13 +18,14 @@ import remarkMdx from "remark-mdx";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
 import { chartMarkdown } from "./chartText";
-import { HEADINGS_PROP, imageNameFromRef, parseChart, parseRepo, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
+import { sheetMarkdown } from "./sheetText";
+import { HEADINGS_PROP, calculate, imageNameFromRef, isTotalsRow, parseChart, parseFormulas, parseRepo, parseSheet, parseYouTube, remarkHeadings, remarkIndentedCode, remarkRestrictMdx, renderKey, repoLabel, youtubeWatchUrl, type TocHeading } from "./backend";
 
 /**
  * The tags a note may use: the keys of the web app's `mdxComponents`. They are listed again here
  * because that module is React; mdx.test.ts fails if the two lists drift.
  */
-export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Ink", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"] as const;
+export const MDX_COMPONENTS = ["Info", "Warning", "Image", "Drawio", "Ink", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart", "Sheet"] as const;
 type ComponentName = (typeof MDX_COMPONENTS)[number];
 
 /** One line of a table of contents. */
@@ -67,6 +68,8 @@ type Node = {
   url?: string;
   title?: string | null;
   alt?: string | null;
+  /** On a fenced `code` node: the language after the opening fence. */
+  lang?: string | null;
   /** On a `footnoteDefinition` or `footnoteReference`: what the note called the footnote. */
   identifier?: string;
   /** Set by `numberFootnotes`: on a citation, its footnote's number; on a `<Footnotes>` tag, the list it draws. */
@@ -224,6 +227,8 @@ function elementBlocks(element: Node, source: string): Block[] {
       return [{ kind: "markdown", source: repoMarkdown(element) }];
     case "Chart":
       return [{ kind: "markdown", source: chartText(element) }];
+    case "Sheet":
+      return [{ kind: "markdown", source: sheetText(element) }];
     default:
       return [];
   }
@@ -271,8 +276,9 @@ function replacement(element: Node, source: string): string {
       return youtubeMarkdown(element);
     case "Repo":
       return repoMarkdown(element);
-    // A block of bars can't sit in a sentence or a list item, any more than a table of contents can.
+    // A block of bars, or of cells, can't sit in a sentence or a list item, any more than a table of contents can.
     case "Chart":
+    case "Sheet":
       return "";
     case "Info":
     case "Warning":
@@ -337,6 +343,55 @@ function csvOf(node: Node): string {
 function chartText(element: Node): string {
   const parsed = parseChart({ type: attribute(element, "type"), x: attribute(element, "x"), y: attribute(element, "y"), csv: csvOf(element) });
   return parsed.spec ? chartMarkdown(parsed.spec, attribute(element, "title")) : parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
+}
+
+/**
+ * The text of the fenced block tagged `lang` under a tag, else its first block, else all its text: a
+ * `<Sheet>`'s CSV, with a `formulas` block beside it that must not run into it. As on the web (Sheet.tsx).
+ */
+function blockOf(node: Node, lang: string): string {
+  const blocks: Node[] = [];
+  const collect = (n: Node) => {
+    if (n.type === "code") blocks.push(n);
+    else n.children?.forEach(collect);
+  };
+  collect(node);
+  const wanted = blocks.find((block) => block.lang === lang) ?? blocks[0];
+  return wanted ? (wanted.value ?? "") : csvOf(node);
+}
+
+/** The text of the `formulas` block under a tag, if it has one: no stand-in, as the CSV has, since it would be read as formulas. */
+function formulasOf(node: Node): string {
+  const blocks: Node[] = [];
+  const collect = (n: Node) => {
+    if (n.type === "code") blocks.push(n);
+    else n.children?.forEach(collect);
+  };
+  collect(node);
+  return blocks.find((block) => block.lang === "formulas")?.value ?? "";
+}
+
+/**
+ * `<Sheet>` as its cells in a code block (see sheetText.ts), since a terminal can't draw a grid. Its formulas are
+ * calculated, as on the web, and a cell that could not be is listed under it, since there is no pointing at a cell.
+ * A table that can't be drawn is said so in words, as on the web.
+ */
+function sheetText(element: Node): string {
+  const parsed = parseSheet(blockOf(element, "csv"));
+  if (!parsed.sheet) return parsed.error.replace(/[\\[\]<>`*_]/g, "\\$&");
+  const { formulas, carried } = parseFormulas(formulasOf(element));
+  // `<Sheet totals>`, bare, has no string value: its being there is the answer.
+  const totalsAttribute = element.attributes?.find((a) => a.name === "totals");
+  const totals = totalsAttribute !== undefined && isTotalsRow(typeof totalsAttribute.value === "string" ? totalsAttribute.value : true);
+  const { sheet, results } = calculate(parsed.sheet, formulas, carried, { totals });
+  const notCalculated = [...results].filter(([, result]) => result.unsupported.length > 0).map(([address, result]) => `${address} (${result.unsupported[0]})`);
+  const shown = notCalculated.slice(0, 5).join("; ");
+  const note = notCalculated.length > 0 ? `\n\nNot calculated: ${shown.replace(/[\\[\]<>`*_]/g, "\\$&")}${notCalculated.length > 5 ? `; and ${notCalculated.length - 5} more` : ""}.` : "";
+  const source = attribute(element, "source")?.trim();
+  const sheetName = attribute(element, "sheet")?.trim();
+  const range = attribute(element, "range")?.trim();
+  const from = source ? `\n\nImported from ${source}${sheetName ? `, sheet ${sheetName}` : ""}${range ? `, ${range}` : ""}.`.replace(/[\\[\]<>`*_]/g, "\\$&") : "";
+  return sheetMarkdown(sheet, attribute(element, "title")) + from + note;
 }
 
 function parseHeadings(json: string | undefined): TocHeading[] {

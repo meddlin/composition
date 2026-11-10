@@ -335,7 +335,8 @@ Each step ends with something checkable. **Your steps** are G3 and G7; everythin
      against two other variants and pdf.js on the nine geometries and on four real files (one of 183 MB). Still untested: a
      signed PDF, AES-256, Acrobat, and non-Latin text notes with a font we may ship.
    - **B, PencilKit over PDFKit,** needs the iPad: finger scroll, selection and Pencil drawing together; ink latency; memory on
-     500 pages. It runs at the start of M2 and gates the iPad's ink, not the desktop's work.
+     500 pages. It runs at the start of M2 and gates the iPad's ink, not the desktop's work. **The harness is built (2026-11-09) and
+     exercised in the Simulator; the answers are still the iPad's.** See [Spike B status](#spike-b-status-2026-11-09).
 1. **Shared schema and core (TypeScript). Done 2026-11-07.** The three tables with uuids (the uuid pass now covers nine),
    repos, `removeOrphans` for documents, backup and restore of `documents/`, the counts message, tests as each earlier schema
    opened (the intent of `db.test.ts`), and fixtures the Swift core will replay
@@ -641,38 +642,68 @@ Simulator and with `swift test` on a Mac; none of it has been on an iPad**. The 
   burn-in takes every annotation into the page; a test pins it); a typed note's border is drawn a little heavier once written. Ink is left out and counted, and when it exists textured strokes are simplified to paths (C21).
   **Not measured:** memory and time on a 300 MB book on the iPad (PDFKit holds a copy of the book while it writes it).
 
-### Spike B: the lab (2026-11-09)
+## Spike B status (2026-11-09)
 
-**More, PDF ink lab (spike B)** is a lab, not the reader: its own 12-page and 500-page PDFs, a `PKCanvasView` over each page on screen (PDFKit's `PDFPageOverlayViewProvider`), switches for *Pencil only*,
-*Canvas over each page* and *A stroke on every page*, a **Scroll through the book** button, and a report of the canvases on screen, made and dropped, strokes, touches by finger and Pencil, how long a touch waited before
-the app saw it, slow frames, memory (`phys_footprint`), and the size and transform PDFKit gave a canvas. `PdfInkLabUITests` drive it in the Simulator.
+**The instrument is built; the answers are the iPad's.** Nothing here was run with a Pencil or on an iPad. The lab was run in the iPad Simulator (iPadOS 26.4, a
+Debug build, a finger standing in for the Pencil, the Mac's memory), which shows how the overlay approach is built and what it costs in shape, not what the numbers will be
+on the iPad. The checklist to run on the iPad is [manual-tests/ipad.md](manual-tests/ipad.md#spike-b-the-pdf-ink-lab-m2-pencilkit-over-pdfkit), items 200 to 215.
 
-**Simulator findings (a Mac, no Pencil):** (`PdfInkLabUITests`, run on the iPad Pro 11-inch Simulator, iOS 26.4, a Debug build, so the memory and the slow frames are not the iPad's)
+**What was built.** A lab screen in the iPad app, `apps/ios/Composition/PdfInkLab*.swift`, reached from the notebooks column's *More* menu (*PDF ink lab (spike B)*) or with
+`-openPdfInkLab 1`:
+
+- a PDFKit `PDFView` whose `pageOverlayViewProvider` gives each page near the screen a PencilKit `PKCanvasView` (transparent, not scrolling, Pencil-only on an iPad), made when the page
+  comes near and dropped when it leaves, with one ink record per page kept apart from the canvas and built into the D9 stroke format (`CompositionInk`) when the page leaves;
+- a test book written on the device (500 pages of real, selectable text, a chapter title every tenth page and a drawn figure every seventh; or 30 pages; or 30 with the first nine
+  turned and cropped as spike C's fixture does), and *Open a PDF from Files* for a real book;
+- runs that go by themselves: scroll through every page at 4, 12 or 30 pages a second, and ink put on 5, 50 or 200 pages by code (a light or a dense page of strokes) and then
+  back through the same pages; and a recording for what you do by hand (the touches the PDF sees, the frames and the memory);
+- switches for the variants the build may have to choose between: canvases on or off, dropped or kept, off-screen ink held as PencilKit's drawing or its data, a canvas emptied when its
+  page leaves, the stroke format built or not, the system tool picker, and PDFKit's page view told to take touches or not;
+- a list of 18 cases to try by hand (each marked Fine or Problem, and in the report), *Where does a touch go?* (the view a touch reaches, what is above the canvas, the scroll
+  view's touch types), and a *Report* to copy: the device, the settings, the cases, every run, and how each page's canvas sits on its page.
+
+The runs can also be started from the command line, which is how they were exercised here (the app must have notes, or the More menu is not on screen):
+`xcrun simctl launch <device> com.rushinglabs.composition.ipad.dev -openPdfInkLab 1 -pdfInkLabPages 500 -pdfInkLabRun scroll,draw5,draw50,draw200,where -pdfInkLabReport <file>`,
+with `-pdfInkLabSpeed`, `-pdfInkLabFinger 0`, `-pdfInkLabKeep 1`, `-pdfInkLabHold data`, `-pdfInkLabConvert 0`, `-pdfInkLabEmpty 1`, `-pdfInkLabTouches 0`, `-pdfInkLabCanvases 0`,
+`-pdfInkLabDensity light` and `-pdfInkLabTurned 1` for the variants (documented at the top of `runLaunchArguments` in `PdfInkLab.swift`).
+
+**How to run it on the iPad** (the manual-test items are the same, in this order):
+
+1. Install a **Release** build on the iPad (a Debug build is several times slower and its memory is not the app's). Open *More* ▸ *PDF ink lab (spike B)*; the first time it writes the 500-page book.
+2. *By hand* ▸ *Where does a touch go?*, then open the *Report*: the line for the canvas must end with "the canvas gets it".
+3. Work the *Cases to try* with the Pencil and your fingers (the *Pen* menu's *A finger draws* stays off), marking each.
+4. *By hand* ▸ *Start recording*; write for a minute; *Stop recording*. Do the same in Notes and say which is quicker.
+5. *Runs* ▸ *Scroll through every page* at 12 pages a second and at 30; once more with *Canvases on the pages* turned off.
+6. *Runs* ▸ *Draw on 5 pages*, *50*, *200*; again with *Ink of pages off the screen* set to PencilKit's data, and with *Empty a canvas when its page leaves* on.
+7. *Book* ▸ *Open a PDF from Files…* with your biggest book, and the scroll run and a few pages by hand on it.
+8. Copy the report (*Report* ▸ the copy button) and send it with the cases marked.
+
+**What each number is.**
+
+| In the report | What it is |
+|---|---|
+| late, dropped frames, worst frame | From a display link: how the main thread kept up during the run. A canvas made, or ink put on one, on the main thread shows here. (The Simulator is 60 Hz; an iPad Pro is up to 120.) |
+| memory, room left | `phys_footprint`, the figure Xcode's gauge shows, sampled four times a second; and `os_proc_available_memory`, how far the app is from the system ending it (the Simulator does not report it). |
+| Pencil samples: hardware to the app, hardware to the soonest frame | From the touch's own timestamp: how long the app took to be given each sample (coalesced samples included), and until the first frame that was due after it had it. **This is not the ink's latency**: PencilKit draws, and predicts ahead of the tip, in a way the app cannot time. The real comparison is writing the same words in Notes. |
+| making a canvas, putting a page's ink back | Main-thread time to make a `PKCanvasView`, and to set (or decode, with PencilKit's data) a stored page on a canvas that came back. |
+| leaving a page with new ink | The stroke format built from PencilKit's drawing, and written as JSON, on one background queue, one page at a time (as the build will do it); the time the work itself takes. |
+| a page's record | The JSON's size, zipped, and PencilKit's own data for the same page. |
+
+**What the Simulator showed** (a finger, Debug, the Mac's memory: the shape of it, not decisions):
 
 | Question | Answer |
 |---|---|
-| Does PDFKit give a canvas for each page on screen, and is it where the page is? | **Yes.** Each canvas's own coordinates are the page's points (612 by 792 for a letter page; the last line of the lab reports it) and PDFKit scales them with the page: a canvas at the page's place in the view (x 8, y 9, 1,194 by 1,546 on a 1,210-point-wide view at fit-width), its transform scale 1.00 and the view scale 1.00 as first reported (the zoom is applied to the view above it). Strokes drawn on a canvas are therefore in **raw page points**, which is the unit the marks are stored in. |
-| Does a canvas exist only for the pages on screen? | **Yes.** A 500-page book gone through every other page (250 stops, 35 s): 11 canvases made, 11 put on a page, 12 taken off, **at most 3 on screen at once**. PDFKit asks for a canvas only for a page it has drawn: stops too short for it to draw a page gave none (jumping from page to page at 30 ms gave none at all), and a second pass over the same book, straight after the first, put none on a page (**not understood**; PDFKit reuses the canvases it has, and the lab cannot say why it did not ask again). The first pass is the reliable measure. |
-| What does it cost in memory? | **Flat.** Over five runs, a 500-page book gone through: about 75 MB before, 80 to 82 MB at the end, 80 to 86 MB at most, with no ink. With a stroke of 150 points kept for every one of the 500 pages (as data; only the canvases on screen hold a live drawing): 88 MB before, 84 to 85 MB at the end, 88 MB at most (the first number is higher because the run before it was in the same process). **Not the iPad's number**, a Debug build, and a drawing of real handwriting is far bigger than 150 points: the iPad run (item 210) is the one to read. |
-| Does a finger still scroll and select text with Pencil-only canvases over the pages? | **Yes, in the Simulator.** A finger's swipes scroll the book and a long press selects words (the lab reports the characters selected) with canvases over the pages, and the strokes stay at 0. |
-| **Can a touch reach a canvas that PDFKit has put over a page?** | **Not in the Simulator, and this is a risk, not an answer.** Asked directly (a hit test of a point inside the page's canvas, with the canvases Pencil-only and again with *any input*) the view that comes back is **PDFKit's `PDFDocumentView`, not the canvas**. So the Simulator's finger cannot draw on PDFKit's overlay canvas in either mode. Whether the **Pencil** reaches it on the iPad is exactly item 206. **If it does not**, the fallback is our own canvas: a `PKCanvasView` per visible page placed over the `PDFView` by the app (page frames from `PDFView.convert(_:from:)`, moved on every scroll and zoom), which is more work and has to share the touch with PDFKit's selection. |
-| Latency; Pencil; palm rejection; Pencil with a finger | **Not answerable in the Simulator** (no Pencil). The lab measures how long a touch waits before the app sees it, and counts slow frames; the ink's own latency is the system's and is a person's to judge (item 208). |
+| Can a canvas in a PDFKit overlay be touched at all? | **Not as PDFKit builds it.** The canvas sits in a `PDFPageView` that has `isUserInteractionEnabled` off, so a touch in the middle of the page reaches `PDFDocumentView`, never the canvas, with the canvas covering that spot. With the page view told to take touches (a change to a view PDFKit owns, which is the lab's *Let touches through* setting, on by default), the canvas gets it and draws. **This is the finding to check first on the iPad**, and the build has to decide whether to rely on it (it is a private view, so it may change) or to lay its own canvas over the `PDFView` and move it with the page. |
+| Does the PDF's own scroll take the Pencil? | `PDFScrollView`'s pan accepts finger, Pencil and pointer (touch types 0, 2 and 3, as the lab reads them off it). With canvases on, in the Simulator a one-finger drag over a page scrolls it and draws nothing, as wanted. **Whether the Pencil draws, or scrolls, is the iPad's to say** (item 201). For a finger to draw in the Simulator the lab makes the PDF's pan need two fingers. |
+| Where is a stroke, in the page's own space? | The canvas is the page's **unturned crop box** size in points, turned with the page by PDFKit, and canvas (x, y) is page space (crop box's minX + x, crop box's maxY − y) on every page tried: quarter turns, a crop box away from the origin (alone and with each turn), and a small crop. So ink stored as raw user space, as spike C settled for the marks, needs only the flip. Not tried: a media box with a negative origin, `UserUnit`, boxes inherited from the page tree. |
+| Do overlays come and go with the pages? | Yes. A pass over 500 pages at 29 pages a second made and dropped 498 canvases with at most 4 to 6 on screen at once; making one took 0.6 ms (p95 1.1 ms); memory without ink stayed in a band over two passes (peaks of 135 and 209 MB, ending at 132 and 159 MB; the Simulator's, in a Debug build). |
+| Does the ink come back? | Yes, on a fresh canvas: 1.5 ms (median) to put a page of 18,720 points back, with 200 dense pages restored in a second stretch over them (n = 200; the screenshots show the ink back on page 1, in portrait and in landscape). |
+| What does ink cost in memory? | 200 dense pages (3.7 million points) added **232 MB** with the stroke format built and the drawing held, 190 MB with it held as PencilKit's data, 170 MB with the format not built, 174 MB with both, and **89 MB with the format not built, the data held and each canvas emptied as its page left** (against 174 MB without the emptying). So the held drawing and the format are not the main cost: a canvas that has drawn keeps about half of what it cost after its page has gone, unless it is emptied. (A page's record: 727 KB as JSON, 173 KB zipped, 283 KB as PencilKit's data.) |
+| What does leaving a page cost? | Building the format took 4 ms and writing its JSON about 300 ms (Debug, off the main thread). **Building them all at once on a background queue was a mistake the lab caught:** 200 pages in parallel peaked at 1,021 MB; one at a time it peaked at 506 MB. The build converts one page at a time. |
 
+**What it cannot see, and the iPad must answer:** whether the Pencil draws and does not scroll with the canvases in place (item 201), whether a long press still selects text and the handles still drag (the Simulator's input could not hold a press reliably, so this was not exercised: item 202), the latency next to Notes (208), palm rejection (204), whether a zoomed canvas stays sharp (205), the memory on the iPad with a real 500-page book and dense ink and which variants help (209 to 213), a stroke across the edge between two pages (204), the system tool picker (207), and every case in the list.
 
-**What the iPad has to say** (the manual test's items 206 to 211): that the Pencil draws on the canvas while a finger scrolls and selects; Pencil and finger at once; palm rejection; the ink's latency (the lab
-measures only how long a touch waits for the app, not the ink's own, which is drawn by the system); pinch and rotate with ink on the page; the 500-page run with a stroke on every page (memory, and whether
-the system ends the app); and the size and transform PDFKit gives a canvas on a rotated or cropped page.
-
-**What the ink steps still need, in order** (nothing of this is built, and the ink stroke format belongs to Gate C, which another session is building: this does not decide it):
-
-1. **The iPad's answers** to the lab, and the owner's go on Pencil-only canvases over PDFKit (or the fallback: a full-screen canvas for one page, which is worse for reading).
-2. **Gate C** (the stroke format, and one `ink` record per page, [data model](#the-data-model)), then the stroke body of an `ink` mark; the Swift side already stores any JSON object or array in an `ink` mark's body.
-3. **The ink layer in the reader:** a `PKCanvasView` per page from the overlay provider, Pencil only, a tool picker (pen, marker, eraser, colour, thickness), the drawing kept as data when its page leaves
-   the screen and written when the page changes or the app leaves the foreground, one record per page; undo through `PdfMarkEditor` (a step per stroke change); `MarkLayer` already leaves ink to its own layer.
-4. **The Pencil's highlighter, underline and strikethrough** snapping to the text lines under the stroke (`PDFPage.selection(for:)` over the stroke's bounds, then the same `SelectionMarks` path as a long press).
-5. **Export:** ink as `Ink` annotations (textured strokes simplified to paths, C21) and burned in exactly as drawn when flattened; `AnnotatedExport` already counts the ink it leaves out.
-6. **Handwritten notes beside the PDF** (P5): a canvas under a typed strip of citations that Quote and Cite this page write into; recognition of the handwriting on the device for search (C11); the desktop shows the canvas view-only.
-7. **The desktop's** view-only ink (the other session's work) and the round trip (Gate P2, item 213).
+**What it decides for the build.** If the Pencil draws without scrolling and a finger still scrolls and selects, the overlay approach stands, with the page-view change guarded by a check at the first page (the lab's *Where does a touch go?* is the check) and a canvas emptied as its page leaves. If the Pencil scrolls the PDF, or the page-view change does not hold, the fallbacks are, in order: a *Draw / Read* toggle in the reader's strip that turns the canvases' touches on only while drawing; then one canvas laid over the `PDFView`, placed over the page in view by our own code (no change to PDFKit's views, at the price of keeping it in step with scroll and zoom). Risk X3 stays open until the iPad has run it.
 
 ## Risks and unknowns
 
@@ -680,7 +711,7 @@ the system ends the app); and the size and transform PDFKit gives a canvas on a 
 |---|---|---|
 | X1 | pdf.js is slow or heavy on a 300 MB, 600-page file. **Mostly answered by spike A:** it works under the CSP and opens in about 0.1 s reading about 10 MB, but memory trends toward the file's size over a long session (it keeps what it has read until the document closes). | Range transport, 16 KB chunks, render only visible pages; closing the panel frees it. Still untested: scrolling in a real window, a cold disk. |
 | X2 | pdf.js and PDFKit place the same mark differently (crop box, rotation). **Answered by spike C** for stored rectangles: raw user space agrees on all nine test geometries. Open: real multi-line selections, and PDFKit on the iPad. | Raw user-space convention; the spike C checks in `spikes/pdf-reader/coords` as a regression test when the code exists. |
-| X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. **Partly answered by spike B's lab, in the Simulator only** ([findings](#spike-b-the-lab-2026-11-09)): with Pencil-only canvases over the pages a finger still scrolls and selects, a canvas exists only for the pages on screen, and a 500-page book is gone through in a flat amount of memory. **Open, and the iPad's to answer:** the Pencil itself, palm rejection, Pencil and finger together, the ink's latency. | Spike B; Pencil-only input; overlays only on visible pages. Items 206 to 211 of the iPad manual test. |
+| X3 | PencilKit over PDFKit fights finger scrolling or text selection, or uses too much memory. **Spike B's lab is built; the Simulator found that a canvas is never reached unless PDFKit's page view is told to take touches** ([status](#spike-b-status-2026-11-09)); the iPad still decides the rest. | Spike B; Pencil-only input; overlays only on visible pages; empty a canvas when its page leaves. |
 | X4 | Quoted text comes out jumbled on multi-column or odd PDFs (selection order), or a highlight's rectangles merge badly. | Keep the rectangles per line; test on a two-column paper and a scanned-then-OCR file; the user can correct the quote in the note. |
 | X5 | A hostile PDF attacks the reader. | Pinned recent pdf.js (this version has no eval to turn off), no scripting, no form widgets, no WebAssembly, the file served only to our own pages. |
 | X6 | A backup grows large and slow with textbooks; a Trash Can holds a large file for 60 days. | Counts in the Backup card and the Trash Can row; no cap beyond 1 GB per file. |
@@ -794,3 +825,4 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   by its marks, and Export annotated PDF (native with appearance streams, or flattened; share sheet), in the Swift packages (`PdfRefs` replaying `fixtures/conformance/pdf-refs.json`; the new `CompositionPDF` target tested on the nine page geometries) and the app.
   **Spike B's lab is built** (`More, PDF ink lab (spike B)`, `PdfInkLabUITests`) and run in the Simulator; the Pencil is not. **Checked in the Simulator and under `swift test` only; nothing was tried on an iPad and nothing in Gate P2 is ticked.** Not built: Pencil ink on a
   PDF, the Pencil's highlighter snapping to lines, handwritten notes beside the PDF, `<Ink>` pages, dark pages, moving a typed note. The checklist is items 180 to 214 of [manual-tests/ipad.md](manual-tests/ipad.md).
+- 2026-11-09: **spike B's lab is built and exercised in the Simulator; the iPad's answers are open** ([status](#spike-b-status-2026-11-09)). A PDF ink lab in the iPad app (`PdfInkLab*.swift`): a `PDFView` with a PencilKit canvas on each page near the screen, a book written on the device (or one of yours from Files), runs that scroll and draw by themselves and measure, a recording for what is done by hand, a list of cases and a report. Found in the Simulator: PDFKit's page view takes no touches, so a canvas in an overlay is never reached unless the page view is told to; the canvas is the page's unturned crop box in points with a plain flip to raw user space; overlays are cheap to make and drop; ink restores quickly; and ink's memory is mostly what a canvas keeps after it has drawn, so a canvas is best emptied as its page leaves. Manual-test items 200 to 215.

@@ -6,6 +6,7 @@ import { broadcastAppearance, notifyAppearanceChanges, notifyTranslucencyChange,
 import { createAttachmentsApi } from "./attachments";
 import { createBackupApi } from "./backup";
 import { createDocumentsApi } from "./documents";
+import { createSaveFileApi } from "./saveFile";
 import { runExport, workerPath } from "./exportProcess";
 import { installCliToolMenuItem } from "./cliToolMenu";
 import { requestImportPdf } from "./importPdfRequest";
@@ -169,6 +170,15 @@ const backup = createBackupApi(service, {
   },
 });
 
+// A file the page made (an exported sheet) is handed over as bytes, and where it goes is chosen in a native dialog too.
+const saveFile = createSaveFileApi({
+  async showSaveDialog(options) {
+    const parent = BrowserWindow.getFocusedWindow();
+    return parent ? dialog.showSaveDialog(parent, options) : dialog.showSaveDialog(options);
+  },
+  defaultFolder: () => app.getPath("documents"),
+});
+
 /** How long quitting waits for the pages to send their unsaved text before it goes ahead without them. */
 const FLUSH_TIMEOUT_MS = 2000;
 
@@ -313,6 +323,7 @@ async function main(): Promise<void> {
     attachments,
     documents,
     backup,
+    saveFile,
     panels: panelsService,
     todos: notifyTodoReports(todosService, announceTodos),
     // Clearing is the one call that needs a browser session, which only this process has.

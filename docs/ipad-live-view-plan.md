@@ -1,6 +1,6 @@
 # iPad: the Live view
 
-The Live view is the Markdown editor with its syntax hidden away from the caret: the note drawn as it will read, headings large, bold and italic as such, and the marks (`#`, `**`, `~~`, backticks) showing only where you are writing. **It is in v1** (you, 2026-11-08; [G7](ipad-build-plan.md#decisions-to-make) reversed, [C12](ipad-app-design.md#compromise-register) "in v1") and is **built right after M1 closes, before M2**. This page is the order of work, in the style of [ipad-build-plan.md](ipad-build-plan.md): what each step ends in, what is checked against the desktop, and what only you can do. Status: **M1 is done (you, 2026-11-08), and the Live view is built, in the Simulator: L0 to L8 are done (2026-11-08 and 2026-11-09). Gate L is yours: the manual-test items for the Live tab on the iPad** (91 to 105, 116 to 124 and 125 to 136); then M2. The six decisions below were taken as proposed (you, 2026-11-08). Dates are 2026-11-08.
+The Live view is the Markdown editor with its syntax hidden away from the caret: the note drawn as it will read, headings large, bold and italic as such, and the marks (`#`, `**`, `~~`, backticks) showing only where you are writing. **It is in v1** (you, 2026-11-08; [G7](ipad-build-plan.md#decisions-to-make) reversed, [C12](ipad-app-design.md#compromise-register) "in v1") and is **built right after M1 closes, before M2**. This page is the order of work, in the style of [ipad-build-plan.md](ipad-build-plan.md): what each step ends in, what is checked against the desktop, and what only you can do. Status: **M1 is done (you, 2026-11-08), and the Live view is built, checked in the Simulator and tried on the iPad: L0 to L8 are done (2026-11-08 and 2026-11-09). Gate L passed (you, 2026-11-09): you tested the Live tab on the iPad and it works well** (the manual-test items 91 to 105, 116 to 124 and 125 to 136 were not recorded one by one); then M2. The six decisions below were taken as proposed (you, 2026-11-08). Dates are 2026-11-08.
 
 ## The spec
 
@@ -162,9 +162,9 @@ The lab's *Typing speed test* on the 5,000-line note, in the Live view, against 
 - **Caveats, kept honest.** The Simulator on a Mac is not an iPad, and these ran under load; the numbers compare variants and are not the iPad's. A keystroke typed during the first seconds after a long note opens costs more (a run that did so measured 24 ms for layout and 32 ms for the whole keystroke at 90% of 404,609 characters, in the Live tab; the Markdown tab had its own 13 ms layouts), because the text system is still laying the note out: the bench now waits six seconds first. The picture-heavy first pass has steps of 13 to 15 ms (reading each picture's size from its file the first time), over the 3 ms that colouring steps keep to. **Item 104 is still the iPad's own number** (the lab's, in a Release build), and items 135 and 136 are the Live tab's.
 
 ### Step L8: close (S)
-The tracker's Live row and C12 updated (built, with what differs from the desktop), new items on the manual test page, the build plan. **Gate L: yours**, the manual test items for the Live view on the iPad. Then M2.
+The tracker's Live row and C12 updated (built, with what differs from the desktop), new items on the manual test page, the build plan. **Gate L: passed (you, 2026-11-09)**; you tested the Live tab on the iPad and it works well. Then M2.
 
-**Closed, 2026-11-09, in the Simulator.** The tracker's Live row (built), C12, R1, the build plan's *After M1: the Live view*, the change log and manual-test items 125 to 136 are written. **Gate L is the author's, and nothing of it is ticked.**
+**Closed, 2026-11-09, in the Simulator.** The tracker's Live row (built), C12, R1, the build plan's *After M1: the Live view*, the change log and manual-test items 125 to 136 are written. **Gate L is the author's, and was passed on 2026-11-09 (the author tried the Live tab on the iPad: it works well). No manual-test item is ticked one by one.**
 
 **Done, and checked in the Simulator:**
 - L0 to L4 as before: the model against the desktop's `liveDecorations`, the tab, rules, pictures, tints and the frontmatter.
@@ -174,12 +174,12 @@ The tracker's Live row and C12 updated (built, with what differs from the deskto
 - **The suites, 2026-11-09:** the core's `swift test` (298 tests, the oracle unchanged and agreeing) and `apps/ios/scripts/conformance.sh` pass; the whole UI suite, run one test at a time in the Simulator, is 84 passed and 50 skipped (the lab's spikes and the speed checks, which wait for `LIVE_LAB_SPIKE` and `LIVE_SPEED`) and **one failed: the L4 test that taps a drawn picture, which also failed on a clean `main`** because the tap fell on the on-screen keyboard when the Simulator shows one (the editor is then 320 points tall); its tap now scans down the editor, and it passes.
 - **Where the Live tab differs from the desktop's, written down:** fences are hidden outside a code block and both show in it (V2); highlights and pictures are read at any length (V5); a picture in the middle of a sentence, a picture from a web address and `<Drawio>` stay text; one parser case (lezer's autolink with a space and `*` in the address); the tab order is Markdown, Live, Preview, Split (V4); reflow and the ruler wait for both writing tabs (V6, M3†).
 
-**Left to the author's iPad (Gate L), none of it judged here:**
+**Gate L, passed on the author's iPad on 2026-11-09 (no item-by-item result was given, so none of the following was judged here):**
 - **The feel of the keys across hidden marks** (the line sliding under the caret at a construct's edge, where a finger lands, selection handles, ⌦ from the keyboard, the Magic Keyboard): items 91 to 97 and 125 to 127.
 - **The Pencil and dictation** beside a mark (items 98 and 130, and the Pencil in L3's item 115), which the Simulator cannot do (the test used marked text, which is what a composition is).
 - **VoiceOver** (items 100 to 103 and 131): whether it honours the speech and heading attributes in a text view's value, what it says at both punctuation levels, the rotor's Headings and Characters, and B against A. **Not decided.**
 - **Speed on the iPad** (item 104, 135 and 136): the Simulator is a Mac, and its numbers compare variants.
-- **L4's pictures, tints, rule and frontmatter** on the iPad, in every scheme (items 116 to 124), which the author has not tried; and **the look in every scheme** (item 114 and 123), Dynamic Type at the largest size (132), Increase Contrast (133) and Reduce Motion (134).
+- **L4's pictures, tints, rule and frontmatter** on the iPad, in every scheme (items 116 to 124), which the author tried as part of Gate L with no item-by-item result; and **the look in every scheme** (item 114 and 123), Dynamic Type at the largest size (132), Increase Contrast (133) and Reduce Motion (134).
 - **Follow-ups worth a card, not this step's:** a very long note is slow in the text system in both tabs (a keystroke in a 404,609-character note cost the Markdown tab 6 to 17 ms in the Simulator, depending on the layout's state), which would need its own look at TextKit 2's layout of long documents.
 
 ## Risks
@@ -200,7 +200,7 @@ The tracker's Live row and C12 updated (built, with what differs from the deskto
 - the caret, selection, undo, Scribble and VoiceOver behave on your iPad, in portrait and landscape;
 - typing in a long note keeps up.
 
-**Status, 2026-11-09:** built and checked in the Simulator on every point; the third (caret, selection, undo, Scribble and VoiceOver on the author's iPad, in portrait and landscape) and the fourth on the iPad itself are Gate L.
+**Status, 2026-11-09:** built and checked in the Simulator on every point; the third (caret, selection, undo, Scribble and VoiceOver on the author's iPad, in portrait and landscape) and the fourth on the iPad itself were Gate L, which you passed on 2026-11-09 (you tried the Live tab on the iPad and it works well, with no item-by-item results).
 
 ## Out of scope
 

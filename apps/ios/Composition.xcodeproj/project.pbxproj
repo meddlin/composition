@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		7F000000000000000000000A /* CompositionCore in Frameworks */ = {isa = PBXBuildFile; productRef = 7F000000000000000000000B /* CompositionCore */; };
 		7F0000000000000000000030 /* CompositionPDF in Frameworks */ = {isa = PBXBuildFile; productRef = 7F0000000000000000000031 /* CompositionPDF */; };
+		7F00000000000000000000E1 /* CompositionInk in Frameworks */ = {isa = PBXBuildFile; productRef = 7F00000000000000000000E2 /* CompositionInk */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 			files = (
 				7F000000000000000000000A /* CompositionCore in Frameworks */,
 				7F0000000000000000000030 /* CompositionPDF in Frameworks */,
+				7F00000000000000000000E1 /* CompositionInk in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -99,6 +101,7 @@
 			packageProductDependencies = (
 				7F000000000000000000000B /* CompositionCore */,
 				7F0000000000000000000031 /* CompositionPDF */,
+				7F00000000000000000000E2 /* CompositionInk */,
 			);
 			productName = Composition;
 			productReference = 7F0000000000000000000004 /* Composition.app */;
@@ -392,6 +395,10 @@
 		7F0000000000000000000031 /* CompositionPDF */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = CompositionPDF;
+		};
+		7F00000000000000000000E2 /* CompositionInk */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = CompositionInk;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

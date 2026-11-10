@@ -46,7 +46,7 @@ struct BrowserView: View {
                             Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
                             Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
-                            Button("PDF ink lab (spike B)", systemImage: "scribble.variable") { showingPdfInkLab = true }
+                            Button("PDF ink lab (spike B)", systemImage: "pencil.and.scribble") { showingPdfInkLab = true }
                             Button("About this build", systemImage: "info.circle") { showingAbout = true }
                         } label: {
                             Label("More", systemImage: "ellipsis.circle")
@@ -76,7 +76,7 @@ struct BrowserView: View {
         .onAppear {
             // Developer shortcut: `-openLab 1` opens the editor lab at launch.
             if UserDefaults.standard.bool(forKey: "openLab") { showingLab = true }
-            // Developer shortcut: `-openPdfInkLab 1` opens the PDF ink lab (spike B) at launch.
+            // Developer shortcut: `-openPdfInkLab 1` opens spike B's lab at launch (see `PdfInkLab` for the arguments that run it).
             if UserDefaults.standard.bool(forKey: "openPdfInkLab") { showingPdfInkLab = true }
         }
         // Once the notes are read, back to where the app was left (the screen can appear before they are).
@@ -171,6 +171,7 @@ struct BrowserView: View {
     private var schemeName: String {
         switch model.appearance.scheme {
         case .system: "System"
+        case .sun: "Follow the sun"
         case .theme(let name): Theme.named(name).map { $0.label.components(separatedBy: " (").first ?? $0.label } ?? name
         }
     }

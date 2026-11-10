@@ -62,6 +62,11 @@ public enum MdxProps {
             Spec(name: "title", description: "Caption shown above the chart"),
             Spec(name: "height", description: "How tall to draw it, in pixels (280 when left out)", values: ["200", "280", "400", "600"].map { Value(value: $0, description: "\($0) pixels tall") }),
         ]),
+        ("Sheet", [
+            Spec(name: "title", description: "Caption shown above the sheet"),
+            Spec(name: "totals", description: "The last row is a totals row, which a column named in a formula (such as [Revenue]) leaves out", values: [Value(value: "true", description: "The last row is the table's totals row")]),
+            Spec(name: "height", description: "How tall it may grow before it scrolls, in pixels (360 when left out)", values: ["240", "360", "500", "700"].map { Value(value: $0, description: "\($0) pixels tall") }),
+        ]),
     ]
 
     private static func props(of component: String) -> [Spec] { catalog.first { $0.component == component }?.props ?? [] }
