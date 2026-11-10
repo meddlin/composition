@@ -148,9 +148,9 @@ struct NoteDetailView: View {
             .ignoresSafeArea()
         }
         .fullScreenCover(item: $drawing) { editing in
-            InkCanvasScreen(editing: editing, look: look) { png in
+            InkCanvasScreen(editing: editing, look: look) { saved in
                 drawing = nil
-                handle.insertInk(png: png)
+                handle.insertInk(png: saved.png, alt: saved.transcript)
             } cancelled: {
                 drawing = nil
             }
@@ -391,16 +391,19 @@ struct NoteReader: View {
         _live = State(initialValue: LivePreview(session: session))
     }
 
-    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old.
-    private func saveEdited(_ editing: InkEditing, png: Data) {
+    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old. The `alt`
+    /// follows the words read from the drawing unless a person has changed it.
+    private func saveEdited(_ editing: InkEditing, saved: InkSaved) {
         editingInk = nil
         guard let old = editing.stored else { return }
         let location = model.location
         let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
         Task {
-            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: png, in: location) }.value
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
             switch outcome {
-            case .stored(let name): session.edit(InkTag.replacing(old, with: name, in: session.text))
+            case .stored(let name):
+                let renamed = InkTag.replacing(old, with: name, in: session.text)
+                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
             case .failed(let message): model.errorMessage = message
             }
         }
@@ -451,7 +454,7 @@ struct NoteReader: View {
             .environment(\.imageFolder, model.location.imagesURL)
             .environment(\.editInk, { name in editingInk = InkEditing.load(named: name, from: model.location.imagesURL) })
             .fullScreenCover(item: $editingInk) { editing in
-                InkCanvasScreen(editing: editing, look: look) { png in saveEdited(editing, png: png) } cancelled: { editingInk = nil }
+                InkCanvasScreen(editing: editing, look: look) { saved in saveEdited(editing, saved: saved) } cancelled: { editingInk = nil }
             }
         }
     }

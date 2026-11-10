@@ -10,28 +10,64 @@ import UniformTypeIdentifiers
 // stroke (so overlapping parts do not darken, as the textured pencil, crayon and watercolour of PencilKit do not either on their flat
 // parts). The grain and bleed of those three are not reproduced. docs/architecture/ink.md records how close this is, from the S5 comparison.
 
-/// What the names in a drawing look like on one scheme. `ink` and `accent` follow the scheme; a `<Mark>` colour name is that hue.
+/// What the names in a drawing look like on one scheme. `ink` and `accent` follow the scheme; a `<Mark>` colour name is that hue. A fixed colour is as stored on
+/// a light scheme and, on a dark one, as PencilKit shows it in a dark interface style (`ThemeColor.darkStyle`), so the preview matches the canvas.
 public struct InkPalette: Equatable, Sendable {
     public var ink: ThemeColor
     public var accent: ThemeColor
     public var marks: [String: ThemeColor]
+    /// Whether a fixed colour is drawn as PencilKit draws it in a dark style.
+    public var darkStyle: Bool
 
-    public init(ink: ThemeColor, accent: ThemeColor, marks: [String: ThemeColor] = Theme.markHues) {
-        (self.ink, self.accent, self.marks) = (ink, accent, marks)
+    public init(ink: ThemeColor, accent: ThemeColor, marks: [String: ThemeColor] = Theme.markHues, darkStyle: Bool = false) {
+        (self.ink, self.accent, self.marks, self.darkStyle) = (ink, accent, marks, darkStyle)
     }
 
     /// The scheme's text colour for `ink` (so black ink is white on a dark scheme) and its brand colour for `accent`.
     public init(theme: Theme) {
-        self.init(ink: theme.foreground, accent: theme.brand)
+        self.init(ink: theme.foreground, accent: theme.brand, darkStyle: theme.isDark)
     }
 
     /// A name this palette does not know is drawn as ink.
     public func color(for color: InkColor) -> ThemeColor {
         switch color {
-        case .fixed(let fixed): fixed
+        case .fixed(let fixed): darkStyle ? fixed.darkStyle : fixed
         case .semantic("accent"): accent
         case .semantic(let name): name == "ink" ? ink : (marks[name] ?? ink)
         }
+    }
+}
+
+extension ThemeColor {
+    /// The colour PencilKit shows for this one in a dark interface style: the lightness of HSL reversed (1 − L), the hue and the saturation kept. Black is white, white is
+    /// black, a red or a yellow of middling lightness stays as it is, and a navy turns a light blue. **Probed on the iPadOS 26.4 Simulator** by drawing a stroke in a dark
+    /// trait collection and reading its pixels: this formula is within 0 of every channel for 40 random colours and for all seven inks (the textured ones only
+    /// change their opacity). A stroke's stored colour is the one of the light style, which is what `PKInk.color` holds whichever style it was drawn in.
+    public var darkStyle: ThemeColor {
+        let r = Double(red) / 255, g = Double(green) / 255, b = Double(blue) / 255
+        let high = max(r, g, b), low = min(r, g, b), lightness = (high + low) / 2, delta = high - low
+        var hue = 0.0, saturation = 0.0
+        if delta > 0 {
+            saturation = delta / (1 - abs(2 * lightness - 1))
+            if high == r { hue = ((g - b) / delta).truncatingRemainder(dividingBy: 6) } else if high == g { hue = (b - r) / delta + 2 } else { hue = (r - g) / delta + 4 }
+            hue *= 60
+            if hue < 0 { hue += 360 }
+        }
+        let flipped = 1 - lightness
+        let chroma = (1 - abs(2 * flipped - 1)) * saturation
+        let second = chroma * (1 - abs((hue / 60).truncatingRemainder(dividingBy: 2) - 1))
+        let offset = flipped - chroma / 2
+        let (r1, g1, b1): (Double, Double, Double)
+        switch hue {
+        case ..<60: (r1, g1, b1) = (chroma, second, 0)
+        case ..<120: (r1, g1, b1) = (second, chroma, 0)
+        case ..<180: (r1, g1, b1) = (0, chroma, second)
+        case ..<240: (r1, g1, b1) = (0, second, chroma)
+        case ..<300: (r1, g1, b1) = (second, 0, chroma)
+        default: (r1, g1, b1) = (chroma, 0, second)
+        }
+        func channel(_ value: Double) -> Int { min(max(Int(((value + offset) * 255).rounded()), 0), 255) }
+        return ThemeColor(red: channel(r1), green: channel(g1), blue: channel(b1))
     }
 }
 
@@ -46,13 +82,25 @@ public enum InkRenderer {
         }
     }
 
-    /// The drawing on transparent pixels, `scale` pixels to a point (reduced when that would pass 8,192 pixels on a side).
-    public static func image(of drawing: InkDocument, palette: InkPalette, scale: CGFloat = 2) -> CGImage? {
-        let fit = min(scale, 8192 / CGFloat(drawing.width), 8192 / CGFloat(drawing.height))
+    /// The most pixels a picture of a drawing has on a side.
+    public static let maxPixels: CGFloat = 8192
+
+    /// How many pixels a point of the drawing gets: `scale`, reduced when that would pass `maxPixels` on a side.
+    public static func pixelsPerPoint(of drawing: InkDocument, scale: CGFloat = 2) -> CGFloat {
+        min(scale, maxPixels / CGFloat(drawing.width), maxPixels / CGFloat(drawing.height))
+    }
+
+    /// The drawing on transparent pixels (or on `background`), `scale` pixels to a point (reduced when that would pass 8,192 pixels on a side).
+    public static func image(of drawing: InkDocument, palette: InkPalette, scale: CGFloat = 2, background: ThemeColor? = nil) -> CGImage? {
+        let fit = pixelsPerPoint(of: drawing, scale: scale)
         let width = max(1, Int((CGFloat(drawing.width) * fit).rounded())), height = max(1, Int((CGFloat(drawing.height) * fit).rounded()))
         guard let space = CGColorSpace(name: CGColorSpace.sRGB),
             let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0, space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
         else { return nil }
+        if let background {
+            context.setFillColor(CGColor(srgbRed: CGFloat(background.red) / 255, green: CGFloat(background.green) / 255, blue: CGFloat(background.blue) / 255, alpha: 1))
+            context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        }
         // y down, as the drawing is.
         context.translateBy(x: 0, y: CGFloat(height))
         context.scaleBy(x: CGFloat(width) / CGFloat(drawing.width), y: -CGFloat(height) / CGFloat(drawing.height))
@@ -61,12 +109,15 @@ public enum InkRenderer {
         return context.makeImage()
     }
 
-    /// The PNG a note stores: the drawing's pixels in this palette, with its strokes (and PencilKit's blob, when there is one) in the ink chunks.
+    /// The PNG a note stores: the drawing's pixels in this palette, with its strokes (and PencilKit's blob, when there is one) in the ink chunks. The pixel
+    /// density goes in the PNG's `pHYs` chunk (72 dots to an inch is a pixel to a point), so a reader that cannot use the strokes, and any image viewer, draws
+    /// the picture at the size of its canvas even when the drawing was too big for `scale` (`InkPNG.pixelsPerPoint(of:)`).
     public static func pngData(of drawing: InkDocument, palette: InkPalette, scale: CGFloat = 2, pencilKit: Data? = nil) throws -> Data {
         guard let image = image(of: drawing, palette: palette, scale: scale) else { throw InkError("The drawing could not be rendered.") }
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(output, UTType.png.identifier as CFString, 1, nil) else { throw InkError("The drawing could not be saved as a PNG.") }
-        CGImageDestinationAddImage(destination, image, nil)
+        let dpi = 72 * Double(image.width) / drawing.width
+        CGImageDestinationAddImage(destination, image, [kCGImagePropertyDPIWidth: dpi, kCGImagePropertyDPIHeight: dpi] as CFDictionary)
         guard CGImageDestinationFinalize(destination) else { throw InkError("The drawing could not be saved as a PNG.") }
         return try InkPNG.embedding(drawing: drawing, pencilKit: pencilKit, in: output as Data)
     }

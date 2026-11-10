@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { conformancePath } from "./__fixtures__/conformance";
-import { forgetInkDrawings, loadInkDrawing } from "./inkDrawings";
+import { forgetInkDrawings, loadInkDensity, loadInkDrawing } from "./inkDrawings";
 
 const sample = fs.readFileSync(conformancePath("ink/sample.png"));
 const respond = (body: Uint8Array | string, status = 200) => new Response(body as BodyInit, { status });
@@ -21,6 +21,16 @@ describe("loadInkDrawing", () => {
     const drawing = await loadInkDrawing("sketch-0123456789ab.png");
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/app_data/sketch-0123456789ab.png");
     expect(drawing?.strokes).toHaveLength(4);
+  });
+
+  it("gives the density of the same fetch: 1.64 for the wide drawing, 2 for the sample and for a PNG that is broken", async () => {
+    const wide = fs.readFileSync(conformancePath("ink/wide.png"));
+    fetchMock.mockImplementation(async (url) => respond(url.endsWith("wide.png") ? wide : url.endsWith("cut.png") ? sample.subarray(0, 40) : sample));
+    expect(await loadInkDensity("wide.png")).toBe(1.64);
+    expect(await loadInkDensity("sample.png")).toBe(2);
+    expect(await loadInkDensity("cut.png")).toBe(2);
+    expect((await loadInkDrawing("wide.png"))?.width).toBe(5000);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("asks once for a drawing it is asked for again", async () => {

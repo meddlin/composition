@@ -132,5 +132,34 @@ struct InkPencilKitTests {
         #expect(InkDocument.defaultColorName(Colour(red: 0.05, green: 0.05, blue: 0.1, alpha: 1).cgColor) == .ink)
         #expect(InkDocument.defaultColorName(Colour.white.cgColor) == .fixed(ThemeColor(red: 255, green: 255, blue: 255)))
     }
+
+    @Test func croppingMovesPencilKitsDrawingAndTheStrokesTogether() throws {
+        // A stroke well inside a screen-sized page, one with a transform (it is baked in), and a marker.
+        let drawing = PKDrawing(strokes: [stroke(.pen, Colour.black), stroke(.pencil, Colour.blue, transform: CGAffineTransform(translationX: 300, y: 400)), stroke(.marker, Colour.red)])
+        let (cut, moved) = InkDocument.cropping(drawing: drawing, size: CGSize(width: 834, height: 1194))
+        let whole = InkDocument(drawing: drawing, size: CGSize(width: 834, height: 1194))
+        let box = try #require(whole.cropBox())
+        #expect((cut.width, cut.height) == (Double(box.width), Double(box.height)))
+        #expect(cut.width < 834 && cut.height < 1194)
+        // Every point is where it was, less the box's corner.
+        for (stroke, original) in zip(cut.strokes, whole.strokes) {
+            for (point, was) in zip(stroke.points, original.points) {
+                #expect(abs(point.x - (was.x - Double(box.minX))) < 0.005 && abs(point.y - (was.y - Double(box.minY))) < 0.005)
+            }
+        }
+        // The ink sits inside the page with the padding to spare.
+        let ink = try #require(cut.inkBounds)
+        #expect(ink.minX >= InkCrop.padding - 0.5 && ink.minY >= InkCrop.padding - 0.5 && ink.maxX <= cut.width - InkCrop.padding + 0.5 && ink.maxY <= cut.height - InkCrop.padding + 0.5)
+        // PencilKit's own moved drawing is the same strokes: its blob, read back, writes the same JSON.
+        let again = InkDocument(drawing: try PKDrawing(data: moved.dataRepresentation()), size: CGSize(width: cut.width, height: cut.height))
+        #expect(again.json == cut.json)
+        // The strokes are not given a different colour or ink on the way.
+        #expect(cut.strokes.map(\.ink) == whole.strokes.map(\.ink) && cut.strokes.map(\.color) == whole.strokes.map(\.color))
+    }
+
+    @Test func croppingABlankDrawingKeepsItsPage() throws {
+        let (cut, moved) = InkDocument.cropping(drawing: PKDrawing(), size: CGSize(width: 834, height: 1194))
+        #expect((cut.width, cut.height) == (834, 1194) && cut.isEmpty && moved.strokes.isEmpty)
+    }
 }
 #endif

@@ -126,11 +126,28 @@ struct InkPNGTests {
     }
 
     @Test func theTagNamesTheStoredPicture() throws {
-        #expect(InkTag.markdown(forName: "trip-drawing-0123456789ab.png") == "<Ink src=\"app_data/trip-drawing-0123456789ab.png\" alt=\"Drawing\" width=\"80%\" />")
-        #expect(InkTag.markdown(forName: "a.png", alt: "a \"quoted\" <b>\nname", width: "50%").contains("alt=\"a quoted bname\""))
+        #expect(InkTag.markdown(forName: "trip-drawing-0123456789ab.png") == "<Ink src=\"app_data/trip-drawing-0123456789ab.png\" alt=\"Drawing\" />")
+        #expect(InkTag.markdown(forName: "a.png", alt: "a \"quoted\" <b>\nname", width: "50%") == "<Ink src=\"app_data/a.png\" alt=\"a quoted bname\" width=\"50%\" />")
         let text = "before\n\n<Ink src=\"app_data/old.png\" alt=\"Drawing\" width=\"80%\" />\n\nand again ![x](app_data/old.png)"
         let changed = InkTag.replacing("old.png", with: "new.png", in: text)
         #expect(changed.contains("app_data/new.png") && !changed.contains("old.png"))
+    }
+
+    @Test func theWordsReadFromADrawingReplaceOnlyWordsNoPersonWrote() {
+        func tag(_ name: String, _ alt: String, _ rest: String = "") -> String { "<Ink src=\"app_data/\(name)\" alt=\"\(alt)\"\(rest) />" }
+        let text = "a\n\n\(tag("new.png", "Drawing", " width=\"50%\""))\n\nb \(tag("other.png", "Drawing"))\n\n\(tag("new.png", "meeting notes"))\n\n\(tag("new.png", "my own words"))"
+        // The default, an empty alt and the words read last time are refreshed, only for this drawing; a person's words are left.
+        let changed = InkTag.refreshingAlt(ofDrawing: "new.png", previous: "meeting notes", to: "meeting notes and a list", in: text)
+        #expect(changed == "a\n\n\(tag("new.png", "meeting notes and a list", " width=\"50%\""))\n\nb \(tag("other.png", "Drawing"))\n\n\(tag("new.png", "meeting notes and a list"))\n\n\(tag("new.png", "my own words"))")
+        // Without any words (the drawing is only a picture) the alt is the default again, but not when a person wrote it.
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: "meeting notes", to: "", in: tag("new.png", "meeting notes")) == tag("new.png", "Drawing"))
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: nil, to: "hello", in: tag("new.png", "")) == tag("new.png", "hello"))
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: nil, to: "hello", in: tag("new.png", "meeting notes")) == tag("new.png", "meeting notes"))
+        // A tag without an alt, text with no tag, and a name that is a prefix of another are left as they are.
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: nil, to: "hello", in: "<Ink src=\"app_data/new.png\" />") == "<Ink src=\"app_data/new.png\" />")
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: nil, to: "hello", in: tag("new.png.bak", "Drawing")) == tag("new.png.bak", "Drawing"))
+        // Quotes and angle brackets cannot be in an attribute.
+        #expect(InkTag.refreshingAlt(ofDrawing: "new.png", previous: nil, to: "say \"hi\" <now>", in: tag("new.png", "Drawing")) == tag("new.png", "say hi now"))
     }
 
     @Test func aStoredFileIsOnlyInkIfItCarriesInk() throws {

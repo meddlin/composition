@@ -22,15 +22,60 @@ export const INK_MARK_HUES: Readonly<Record<string, string>> = {
   orange: "#ff8a2b",
 };
 
-/** What the names in a drawing look like: `ink` and `accent` follow the scheme, a `<Mark>` colour name is that hue. */
-export type InkPalette = { ink: string; accent: string; marks: Readonly<Record<string, string>> };
+/**
+ * What the names in a drawing look like: `ink` and `accent` follow the scheme, a `<Mark>` colour name is that hue, and `fixed` says how a fixed `#rrggbb` is
+ * drawn (as stored when it is absent).
+ */
+export type InkPalette = { ink: string; accent: string; marks: Readonly<Record<string, string>>; fixed?: (hex: string) => string };
 
-/** The page's own tokens, so a drawing already on screen follows a change of colour scheme: black ink is white on a dark one. */
-export const CSS_INK_PALETTE: InkPalette = { ink: "var(--foreground)", accent: "var(--brand)", marks: INK_MARK_HUES };
+/**
+ * The colour PencilKit shows for `hex` in a dark interface style: the lightness of HSL reversed (1 - L), hue and saturation kept, each channel rounded to the
+ * nearest of 255 (docs/architecture/ink.md, "Colours and schemes"; the pairs are in fixtures/conformance/ink/renderer.json, measured on the iPad Simulator).
+ */
+export function darkStyleOf(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
+  const high = Math.max(r, g, b);
+  const low = Math.min(r, g, b);
+  const lightness = (high + low) / 2;
+  const delta = high - low;
+  let hue = 0;
+  let saturation = 0;
+  if (delta > 0) {
+    saturation = delta / (1 - Math.abs(2 * lightness - 1));
+    if (high === r) hue = ((g - b) / delta) % 6;
+    else if (high === g) hue = (b - r) / delta + 2;
+    else hue = (r - g) / delta + 4;
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+  const flipped = 1 - lightness;
+  const chroma = (1 - Math.abs(2 * flipped - 1)) * saturation;
+  const second = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const offset = flipped - chroma / 2;
+  const sector = Math.min(5, Math.floor(hue / 60));
+  const [r1, g1, b1] = [[chroma, second, 0], [second, chroma, 0], [0, chroma, second], [0, second, chroma], [second, 0, chroma], [chroma, 0, second]][sector];
+  // Math.round rounds half up; the values are never negative.
+  const channel = (value: number) => Math.min(255, Math.max(0, Math.round((value + offset) * 255)));
+  return `#${[r1, g1, b1].map((value) => channel(value).toString(16).padStart(2, "0")).join("")}`;
+}
+
+/**
+ * The page's own tokens, so a drawing already on screen follows a change of colour scheme: black ink is white on a dark one, and a fixed colour is drawn as
+ * PencilKit draws it on a dark one (`light-dark()`, which follows the `color-scheme` each scheme sets), as stored on a light one.
+ */
+export const CSS_INK_PALETTE: InkPalette = {
+  ink: "var(--foreground)",
+  accent: "var(--brand)",
+  marks: INK_MARK_HUES,
+  fixed: (hex) => {
+    const dark = darkStyleOf(hex);
+    return dark === hex ? hex : `light-dark(${hex}, ${dark})`;
+  },
+};
 
 /** The colour a stroke is drawn in. A name the palette doesn't know is drawn as ink. */
 export function inkColor(color: string, palette: InkPalette = CSS_INK_PALETTE): string {
-  if (color.startsWith("#")) return color;
+  if (color.startsWith("#")) return palette.fixed ? palette.fixed(color) : color;
   if (color === "accent") return palette.accent;
   return Object.hasOwn(palette.marks, color) ? palette.marks[color] : palette.ink;
 }
@@ -39,7 +84,7 @@ export type InkShape = { d: string; fill: string; opacity: number };
 export type InkPicture = { width: number; height: number; shapes: InkShape[] };
 
 /** How much of the colour each textured ink shows, and which draw one width (the mean of the points') all along. */
-function styleOf(ink: string): { alpha: number; constantWidth: boolean } {
+export function styleOf(ink: string): { alpha: number; constantWidth: boolean } {
   switch (ink) {
     case "marker":
       return { alpha: 0.45, constantWidth: false };

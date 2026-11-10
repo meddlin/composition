@@ -1,0 +1,9 @@
+{
+  "about": "What a reader must find in each PNG of this folder (docs/architecture/ink.md, The container). `width` is the canvas width of the drawing the PNG carries, `problems` the messages it reports (compared as text, in order), `pixelsPerPoint` how many pixels the PNG has to a point of its canvas: its pHYs chunk (pixels to a metre; 72 dots to an inch is one to a point) to a hundredth, and 2 when it has none. When a PNG has two inKJ chunks the last one that reads wins, and one that does not read is reported and passed over.",
+  "cases": [
+    { "file": "sample.png", "name": "one chunk, at 2 pixels to a point", "width": 200, "problems": [], "pixelsPerPoint": 2 },
+    { "file": "two-chunks.png", "name": "two inKJ chunks: the last one wins", "width": 201, "problems": [], "pixelsPerPoint": 2 },
+    { "file": "second-chunk-damaged.png", "name": "two inKJ chunks, the last with a wrong CRC: the first is used and the second is reported", "width": 200, "problems": ["The inKJ chunk is damaged."], "pixelsPerPoint": 2 },
+    { "file": "wide.png", "name": "a drawing 5,000 points wide is stored at 8,192 pixels, and says so", "width": 5000, "problems": [], "pixelsPerPoint": 1.64 }
+  ]
+}

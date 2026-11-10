@@ -60,10 +60,27 @@ final class InkUITests: XCTestCase {
         XCTAssertTrue(eventually { tags().count == 1 }, "the tag is in the note: \(text)")
         let tag = tags()[0]
         XCTAssertTrue(tag.hasPrefix(prefix), "the PNG is stored under the note's title and a hash of its bytes: \(tag)")
-        XCTAssertTrue(tag.hasSuffix(".png\" alt=\"Drawing\" width=\"80%\" />"), tag)
+        // Vision's reading of a finger's line is nothing, or a stray mark: either way the tag is a `src`, an `alt` and no `width` (the drawing is shown at its own size).
+        XCTAssertTrue(tag.range(of: #"\.png" alt="[^"]*" />$"#, options: .regularExpression) != nil, tag)
+        XCTAssertFalse(tag.contains("width="), tag)
         let shown = app.descendants(matching: .any)["ink-picture"].waitForExistence(timeout: 20)
         if !shown { print("INK UI TEST: no ink-picture in the tree:\n\(app.debugDescription)") }
         XCTAssertTrue(shown, "the preview shows the drawing")
+    }
+
+    func testTheStoredDrawingIsCutToWhatWasDrawn() {
+        XCTAssertTrue(editor.waitForExistence(timeout: 20))
+        let canvas = openCanvas()
+        // A wide, flat stroke across a screen-sized page: 50 % of the width, 30 % of the height.
+        scribble(on: canvas, from: CGVector(dx: 0.2, dy: 0.3), to: CGVector(dx: 0.7, dy: 0.6))
+        let page = canvas.frame.size
+        app.buttons["ink-done"].tap()
+        let picture = app.descendants(matching: .any)["ink-picture"]
+        XCTAssertTrue(picture.waitForExistence(timeout: 20), "the preview shows the drawing")
+        let shape = picture.frame.size
+        // The picture is the ink and its margin, so its proportions are the stroke's (about 2:1 here), not the screen's (about 1.4:1), whatever size the column shows it at.
+        let screen = page.width / page.height
+        XCTAssertGreaterThan(shape.width / shape.height, screen * 1.25, "the picture is \(shape) and the page was \(page): it was not cut")
     }
 
     func testCancelOnABlankPageLeavesTheNoteAlone() {
