@@ -47,6 +47,7 @@ extension PdfReader {
         guard let pdf, editor == nil, let made = app.markEditor(documentId: documentId) else { return }
         editor = made
         layer = MarkLayer(document: pdf)
+        await attachInk(made, to: pdf)
         do {
             apply(try await made.state)
         } catch {
@@ -55,6 +56,53 @@ extension PdfReader {
         marksLoaded = true
         await refreshCitations()
     }
+
+    // MARK: Ink
+
+    /// The ink beside the PDF is known and the layer over the pages can show it and keep what is drawn.
+    private func attachInk(_ made: PdfMarkEditor, to pdf: PDFDocument) async {
+        inkPages = (try? await made.inkPages()) ?? []
+        inkLayer.onPagesChanged = { [weak self] in
+            guard let self else { return }
+            inkPages = inkLayer.pagesWithInk
+        }
+        inkLayer.onProblem = { [weak self] message in self?.app.errorMessage = message }
+        inkLayer.attach(
+            pages: inkPages,
+            read: { page in try? await made.inkBody(page: page) },
+            write: { [weak self] page, body in
+                do {
+                    try await made.setInk(page: page, body: body)
+                } catch {
+                    await MainActor.run { self?.app.errorMessage = "The ink on page \(page + 1) could not be kept: \(error.localizedDescription)" }
+                }
+            })
+    }
+
+    /// The pencil button: the Pencil draws on the pages, or stops.
+    func toggleInking() { setInking(!inking) }
+
+    func setInking(_ on: Bool) {
+        guard on != inking, pdf != nil, !locked else { return }
+        if on {
+            card = nil
+            placingNote = false
+            selection = nil
+            selectionWords = ""
+            view?.clearSelection()
+        }
+        inking = on
+        inkLayer.setDrawing(on, fingerDraws: fingerDraws)
+    }
+
+    func setFingerDraws(_ on: Bool) {
+        fingerDraws = on
+        UserDefaults.standard.set(on, forKey: "pdfInkFinger")
+        if inking { inkLayer.setDrawing(true, fingerDraws: on) }
+    }
+
+    /// The Highlights tab's swipe on a page of ink.
+    func clearInk(page: Int) { inkLayer.clear(page: page) }
 
     func apply(_ state: PdfMarkEditor.State) {
         marks = state.marks
@@ -79,7 +127,7 @@ extension PdfReader {
 
     /// The selection changed in the PDF view (a long press, a drag of a handle, a tap that lets go of it).
     func selectionChanged() {
-        guard let view, let pdf else { return }
+        guard let view, let pdf, !inking else { return }
         if let current = view.currentSelection, !(current.string ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             selection = current
             selectionWords = SelectionMarks.words(of: current)
@@ -109,7 +157,7 @@ extension PdfReader {
 
     /// A tap in the PDF view: places a typed note when one is being placed, opens the card of the mark under it, or closes the card.
     func tapped(at point: CGPoint) {
-        guard let view, let pdf, !locked else { return }
+        guard let view, let pdf, !locked, !inking else { return }
         guard let page = view.page(for: point, nearest: false) else {
             card = nil
             return
@@ -172,6 +220,7 @@ extension PdfReader {
     // MARK: Typed notes
 
     func beginPlacingNote() {
+        setInking(false)
         card = nil
         view?.clearSelection()
         placingNote.toggle()

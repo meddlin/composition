@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionInk
 import CompositionPDF
 import SwiftUI
 
@@ -22,8 +23,6 @@ struct PdfExportSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.look) private var look
 
-    private var inkCount: Int { reader.marks.filter { $0.kind == .ink }.count }
-
     var body: some View {
         NavigationStack {
             Form {
@@ -37,19 +36,21 @@ struct PdfExportSheet: View {
                         : "Your marks are standard annotations (highlights, underlines, strikethroughs and notes) that other apps draw and can still edit.")
                 }
                 Section {
-                    LabeledContent("Marks to write", value: "\(reader.marks.count - inkCount)")
-                    if inkCount > 0 { LabeledContent("Ink left out", value: "\(inkCount)") }
+                    LabeledContent("Marks to write", value: "\(reader.marks.count)")
+                    if !reader.inkPages.isEmpty { LabeledContent("Pages of ink", value: "\(reader.inkPages.count)") }
                     if reader.password != nil { Text("This PDF is protected. The copy asks for the same password.").font(.callout) }
                 } footer: {
-                    Text("The PDF in your library is not changed. Ink is not exported yet.")
+                    Text(reader.inkPages.isEmpty
+                        ? "The PDF in your library is not changed."
+                        : "The PDF in your library is not changed. Ink is written as plain lines: a pencil's or a crayon's texture and a pen's change of width are not kept.")
                 }
                 Section {
                     if let made {
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("Written: \(made.outcome.written) marks, \(DocumentNames.formatBytes(made.bytes))", systemImage: "checkmark.circle.fill")
+                            Label("Written: \(Self.summary(made.outcome)), \(DocumentNames.formatBytes(made.bytes))", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(look.success)
                                 .accessibilityIdentifier("pdf-export-done")
-                            if made.outcome.skippedInk > 0 { Text("\(made.outcome.skippedInk) ink marks were left out.").font(.callout) }
+                            if made.outcome.skippedInk > 0 { Text("\(made.outcome.skippedInk) \(made.outcome.skippedInk == 1 ? "page of ink" : "pages of ink") could not be read and \(made.outcome.skippedInk == 1 ? "was" : "were") left out.").font(.callout) }
                             if made.outcome.skippedOffPage > 0 { Text("\(made.outcome.skippedOffPage) marks on pages this PDF does not have were left out.").font(.callout) }
                         }
                         ShareLink(item: made.file) { Label("Save or share…", systemImage: "square.and.arrow.up") }
@@ -80,19 +81,31 @@ struct PdfExportSheet: View {
         failure = nil
         defer { working = false }
         let marks = reader.marks, password = reader.password, flatten = flatten
+        let inkPages = reader.inkPages.sorted(), database = reader.app.store?.database, documentId = reader.documentId
         let name = Self.copyName(for: reader.document.fileName)
         do {
             made = try await AppModel.perform {
                 let folder = FileManager.default.temporaryDirectory.appending(path: "Exports", directoryHint: .isDirectory).appending(path: UUID().uuidString, directoryHint: .isDirectory)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let target = folder.appending(path: name)
-                let outcome = try AnnotatedExport.export(source: source, password: password, marks: marks, flatten: flatten, to: target)
+                // A page's ink is read as it is written, one page at a time (a book's strokes are never all in memory).
+                let outcome = try AnnotatedExport.export(
+                    source: source, password: password, marks: marks, inkPages: inkPages,
+                    ink: { page in try database?.inkBody(documentId: documentId, page: page).map { try InkDocument(data: Data($0.utf8)) } },
+                    flatten: flatten, to: target)
                 let size = (try? FileManager.default.attributesOfItem(atPath: target.path)[.size] as? Int64) ?? 0
                 return ExportedPdf(file: target, outcome: outcome, bytes: size)
             }
         } catch {
             failure = error.localizedDescription
         }
+    }
+
+    /// "3 marks, 2 pages of ink".
+    static func summary(_ outcome: AnnotatedExport.Outcome) -> String {
+        var parts = ["\(outcome.written) \(outcome.written == 1 ? "mark" : "marks")"]
+        if outcome.inkPages > 0 { parts.append("\(outcome.inkPages) \(outcome.inkPages == 1 ? "page" : "pages") of ink") }
+        return parts.joined(separator: ", ")
     }
 
     /// `Designing Data.pdf` becomes `Designing Data (annotated).pdf`.

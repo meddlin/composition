@@ -59,6 +59,12 @@ final class PdfReader {
     var color: String = UserDefaults.standard.string(forKey: "pdfMarkColor").flatMap { PdfMarkup.markColors.contains($0) ? $0 : nil } ?? "yellow" {
         didSet { UserDefaults.standard.set(color, forKey: "pdfMarkColor") }
     }
+    /// The pages that have ink (PdfInkLayer.swift), for the banner while drawing, the Highlights tab and the export.
+    var inkPages: Set<Int> = []
+    /// The Pencil draws on the pages (otherwise ink only shows).
+    var inking = false
+    /// A finger draws too, for an iPad with no Pencil (and the Simulator); the PDF then scrolls with two fingers.
+    var fingerDraws = UserDefaults.standard.bool(forKey: "pdfInkFinger")
     /// A line of confirmation (a quote put in the note) that goes by itself.
     var notice: String?
     /// The notes that belong with this PDF, for the Notes tab and the Highlights tab's "quoted" marks.
@@ -67,6 +73,7 @@ final class PdfReader {
     @ObservationIgnored var insertion = PdfInsertion()
     @ObservationIgnored var editor: PdfMarkEditor?
     @ObservationIgnored var layer: MarkLayer?
+    @ObservationIgnored let inkLayer = PdfInkLayer()
     @ObservationIgnored var flashing: [PDFAnnotation] = []
     @ObservationIgnored var flashPage: PDFPage?
     @ObservationIgnored var flashTask: Task<Void, Never>?
@@ -193,6 +200,7 @@ final class PdfReader {
 
     /// Writes the place now (the app is leaving the foreground, or the PDF is closing).
     func flush() {
+        inkLayer.flushAll()
         guard restored, let view else { return }
         saveTask?.cancel()
         let zoom: Double? = view.autoScales ? nil : view.scaleFactor * storedZoomPerScale
@@ -286,6 +294,10 @@ struct PdfKitView: UIViewRepresentable {
         tap.cancelsTouchesInView = false
         tap.delegate = context.coordinator
         view.addGestureRecognizer(tap)
+        // Ink: PDFKit lays a canvas over each page near the screen, which the Pencil draws on.
+        reader.inkLayer.use(document: reader.pdf ?? PDFDocument())
+        reader.inkLayer.pdfView = view
+        view.pageOverlayViewProvider = reader.inkLayer
         reader.view = view
         return view
     }
@@ -366,6 +378,9 @@ struct PdfReaderPane: View {
             Button("Add a typed note", systemImage: reader.placingNote ? "text.bubble.fill" : "text.bubble") { reader.beginPlacingNote() }
                 .labelStyle(.iconOnly)
                 .accessibilityIdentifier("pdf-add-note")
+            Button(reader.inking ? "Stop drawing" : "Draw on the pages", systemImage: reader.inking ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle") { reader.toggleInking() }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("pdf-ink")
             if compact {
                 Menu {
                     Button("Undo", systemImage: "arrow.uturn.backward") { Task { await reader.undo() } }.disabled(!reader.canUndo)
@@ -458,7 +473,9 @@ struct PdfReaderPane: View {
 
     /// What says that a note is being placed, or that something was put in the note.
     @ViewBuilder private var banner: some View {
-        if reader.placingNote {
+        if reader.inking {
+            PdfInkBanner(reader: reader)
+        } else if reader.placingNote {
             Label("Tap where the note goes", systemImage: "hand.tap")
                 .padding(.horizontal, 14).padding(.vertical, 8)
                 .background(.regularMaterial, in: Capsule())

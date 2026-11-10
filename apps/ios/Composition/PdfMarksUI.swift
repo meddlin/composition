@@ -182,13 +182,18 @@ struct PdfHighlightsList: View {
     }
 
     var body: some View {
-        if reader.marks.isEmpty {
-            ContentUnavailableView("No highlights", systemImage: "highlighter", description: Text("Press and hold a word in the PDF, drag to take more, then choose a colour and Highlight, Underline or Strikethrough. A typed note goes anywhere with the note button."))
+        if reader.marks.isEmpty && reader.inkPages.isEmpty {
+            ContentUnavailableView("No highlights", systemImage: "highlighter", description: Text("Press and hold a word in the PDF, drag to take more, then choose a colour and Highlight, Underline or Strikethrough. A typed note goes anywhere with the note button, and the pencil button draws on the pages."))
         } else {
             let quoted = reader.quotedMarks
             List {
                 ForEach(shown, id: \.id) { mark in
                     row(mark, quoted: quoted.contains(mark.uuid))
+                }
+                if !reader.inkPages.isEmpty && filter.trimmingCharacters(in: .whitespaces).isEmpty {
+                    Section("Ink") {
+                        ForEach(reader.inkPages.sorted(), id: \.self) { page in inkRow(page) }
+                    }
                 }
             }
             .listStyle(.plain)
@@ -227,6 +232,24 @@ struct PdfHighlightsList: View {
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing) { Button("Delete", systemImage: "trash", role: .destructive) { Task { await reader.delete(mark) } } }
         .accessibilityIdentifier("pdf-highlight-\(mark.id)")
+    }
+
+    private func inkRow(_ page: Int) -> some View {
+        Button {
+            reader.go(toPage: page)
+            close()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "pencil.tip").foregroundStyle(look.mutedText).accessibilityHidden(true)
+                Text("Page \(page + 1)").font(.body)
+                Text("handwriting").foregroundStyle(look.mutedText)
+                Spacer(minLength: 4)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .swipeActions(edge: .trailing) { Button("Clear ink", systemImage: "trash", role: .destructive) { reader.clearInk(page: page) } }
+        .accessibilityIdentifier("pdf-ink-page-\(page)")
     }
 
     private func icon(_ kind: PdfMarkKind) -> String {
@@ -283,5 +306,37 @@ struct PdfNotesList: View {
         }
         .listStyle(.plain)
         .accessibilityIdentifier("pdf-notes")
+    }
+}
+
+// MARK: - Drawing
+
+/// What shows while the Pencil draws: where the ink goes, a switch for a finger that draws too, and Done.
+struct PdfInkBanner: View {
+    let reader: PdfReader
+    @Environment(\.look) private var look
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "pencil.tip").accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(reader.fingerDraws ? "Drawing with a finger or the Pencil" : "Drawing with the Pencil").font(.subheadline.weight(.semibold))
+                Text(reader.inkPages.isEmpty ? "No ink yet" : "Ink on \(reader.inkPages.count) \(reader.inkPages.count == 1 ? "page" : "pages")")
+                    .font(.caption).foregroundStyle(look.mutedText)
+                    .accessibilityIdentifier("pdf-ink-count")
+            }
+            Toggle("Finger draws", isOn: Binding(get: { reader.fingerDraws }, set: { reader.setFingerDraws($0) }))
+                .toggleStyle(.switch)
+                .fixedSize()
+                .accessibilityIdentifier("pdf-ink-finger")
+            Button("Done") { reader.setInking(false) }
+                .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("pdf-ink-done")
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
+        .overlay(Capsule().stroke(look.border, lineWidth: 1))
+        .padding(.top, 10)
+        .accessibilityIdentifier("pdf-ink-banner")
     }
 }
