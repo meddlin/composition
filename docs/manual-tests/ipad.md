@@ -393,6 +393,49 @@ These start at 160 because the Live items end at 136 and the PDF reader's start 
 170. **VoiceOver.** On the drawing in the preview, VoiceOver says *Drawing, image, button* and a double tap opens the page.
 171. **Elsewhere.** A note with an `<Ink>` shows an *Unknown component* notice on the desktop and in the CLI until their side is built: this is expected, so just confirm nothing else in the note changes.
 
+## Release polish screens (M3†: header image, outline, Images page, home page)
+
+Built 2026-11-09 and tried only in the Simulator (`PolishUITests`: the header image is chosen, changed and removed; the outline lists the headings and moves the preview and the editor; the Images page browses, filters, inserts and deletes; the home page lists notebooks, recent notes and pinned ones and leads to them), in landscape first and then portrait. What is yours is how they feel on the iPad, with a hand, and with your own notes and pictures. These continue after 183 (the follow-the-sun, ruler and reflow items above), and are numbered from 184 to 199; items 200 to 215 belong to spike B's PDF ink lab (below), so the rest of this section's items continue at 216 and run to 226.
+
+**Header image** (the picture-in-a-frame button in a note's toolbar)
+
+184. **Choose one.** The button opens a sheet with *Full width* and *Centered* and a grid of every stored picture. Tap one: the preview behind it shows the picture above the note's title at once, fading out at its lower edge. In the Markdown tab the frontmatter says `headerImage: app_data/…` and `headerImageLayout: full`.
+185. **The two layouts.** *Full width* is a banner as wide as the note, cropped to fit (taller in a wide window); *Centered* is the whole picture at its own size, shrunk to the note and never taller than 288 points. Changing it in the sheet changes the preview behind it.
+186. **Add one.** *Add Image* offers *Photo Library…* and *Choose File…*: the picture is stored as a pasted one is (named for the note, never twice) and becomes the header. Try a HEIC photo.
+187. **Remove it.** *Remove Header Image* takes both lines out of the frontmatter and the banner goes; the rest of the frontmatter stays.
+188. **A web address.** Type `headerImage: https://example.com/a.png` into the frontmatter by hand: nothing is drawn (the iPad fetches nothing from the network), and the sheet says that the address is kept and not loaded.
+189. **Both ways.** Set one here, make a backup, restore it on the desktop: the banner is there in the same layout. Set one on the desktop and restore that backup here.
+190. **Schemes and VoiceOver.** In each colour scheme the fade into the page has no hard edge or coloured band. VoiceOver passes over the banner (it is decoration, as on the desktop); in the sheet each picture reads as the words of its file name and says *selected* for the chosen one.
+
+**Outline** (the list-with-indent button; the desktop's heading rail)
+
+191. **Open it.** The button opens a popover of the note's headings, indented by level. A note with none says *No headings yet*.
+192. **Preview.** Tap a heading: the popover closes and the preview scrolls so the heading is at the top. In Split the editor goes there too, with the caret at the start of the heading's line.
+193. **Markdown and Live.** The same in those tabs: the text scrolls so the heading's line is at the top, the caret is on it, and the keyboard need not be up. Open the outline again: the heading the caret is in is marked with a small arrow.
+194. **A long note.** In a note of a few thousand lines the popover opens at once and a tap lands on the heading. (The editor's lines are measured as they are reached, so in a very long note it may land a few lines off: tell me.)
+195. **Narrow.** In Slide Over, or a third of the screen, the outline opens as a sheet instead of a popover, and works the same.
+196. **VoiceOver.** Each heading reads as its words and *heading level 2*, and the one the caret is in as selected.
+197. **Components.** In a note with a panel (`<Info>`) that holds a heading, tap that heading in the outline: the preview goes to it. The editor reads some of those differently (a heading straight after an opening tag with no blank line is HTML to it), so a heading may have no place in the editor: tell me if a tap does nothing or goes to the wrong one.
+
+**Images page** (More menu, *Images…*)
+
+198. **The page.** Every stored picture is a card with its name and *Used in 2 notes* or *Not used*. The line above says how many there are, how big they are together and how much the unused ones could free.
+199. **Filter.** *Not used* lists the pictures no note points at; the field narrows the list by words of the name.
+216. **A picture.** Tap a card: the picture, its size and date, the Markdown and component that put it in a note (*Copy* each, then paste in a note and the picture shows), and the notes that use it (tap one: the page closes and the note opens).
+217. **Insert in Open Note.** From the Markdown, Live or Split tab, the picture goes in at the caret; from the Preview tab the Markdown tab opens first. With no note open the button is off and says so.
+218. **Delete.** On a picture no note uses, *Delete Image…* asks, says its size and that it cannot be brought back, and *Delete Image* takes it from the page and from the picker (and the space from the iPad). A picture a note uses has no delete button and says why. A picture only a note in the Trash Can uses is kept, with a message: restore that note afterwards and its picture still shows.
+219. **A backup after deleting.** Make a backup and restore it: the deleted picture is not in it, and the others are.
+220. **Many pictures.** With hundreds of photos the grid scrolls smoothly and the thumbnails fill in as you go (they are made as each card appears); tell me if it stutters.
+
+**Home page** (the detail column with no note open; the house button at the top of the first column brings it back)
+
+221. **The page.** After launch with no note remembered, or the house button, the right-hand column is *Home*: *Pinned* (only when you have favorites), *Notebooks* with their counts, and *Recent* (the twelve notes edited last, each with a line of its text, its notebook and when).
+222. **Leading on.** A notebook card shows that notebook's notes in the list; a recent or pinned note opens that note, in the list that holds it; a pinned group opens the group.
+223. **Pinning.** Favorite a note or a group (swipe, or press and hold): it is under *Pinned*, in the order pinned, and goes when unfavorited.
+224. **Width.** In a wide pane (landscape with the lists hidden) the cards run several to a row; in a narrow one, a single column.
+225. **Text size and VoiceOver.** A card reads as one thing (title, line, notebook, time); at the largest text size nothing is cut off.
+226. **What is not here.** The desktop lets you choose which sections show and in what order, how dense the cards are, which notebook *Recent* draws from, and a colour for each notebook; the iPad shows the default page, and colours the notebooks from the scheme in the order they are listed. *Recent* is by last edit (the iPad does not record when a note was opened).
+
 ## Spike B: the PDF ink lab (M2, PencilKit over PDFKit)
 
 Built 2026-11-09 and tried only in the Simulator, where a finger stands in for the Pencil. It answers the three questions the PDF plan leaves open before the iPad draws on PDFs ([the plan's Spike B section](../pdf-markup-plan.md#spike-b-status-2026-11-09), risk X3): does a finger still scroll and select text while the Pencil draws on a canvas over the page, is the ink as quick as in Notes, and does a 500-page book fit in memory when every page near the screen has a canvas. **Use a Release build** for the numbers (see *Install it on your iPad*); a Debug build is several times slower and its memory is not the app's.
@@ -422,6 +465,7 @@ Open it from the ellipsis menu at the top of the notebooks column: *PDF ink lab 
 - **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not
   tried in the Simulator; you used a backup of your real notes on the iPad, which I take to mean that route worked there.)
 - **Drawing on a real iPad with the Pencil** (items 160 to 171): latency, palm rejection, the textured inks and how the dark schemes treat colours; only the Simulator, with a finger, has been used.
+- **The release polish screens on a real iPad** (items 184 to 199 and 216 to 226): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 

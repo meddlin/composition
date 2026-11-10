@@ -20,6 +20,9 @@ final class EditorHandle {
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
+    /// The outline's tap (Outline.swift): the caret at the line at `offset`, scrolled to the top.
+    func reveal(offset: Int) { textView?.reveal(offset: offset) }
+
     /// The Link button: a link to another note at the caret, or over the selected words.
     func linkToNote() {
         guard let view = textView else { return }
