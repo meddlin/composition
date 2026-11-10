@@ -80,7 +80,7 @@ final class PdfUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["pdf-view"].waitForExistence(timeout: 30), "the PDF is shown")
         waitForPage(1)
         XCTAssertTrue(app.buttons["Find in the PDF"].exists)
-        XCTAssertTrue(app.buttons["Contents and bookmarks"].exists)
+        XCTAssertTrue(app.buttons["Contents, bookmarks, highlights and notes"].exists)
     }
 
     func testTheNoteListMarksANoteThatOwnsAPdf() {

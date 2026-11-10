@@ -4,6 +4,16 @@ import SwiftUI
 /// The Markdown blocks of a note, drawn from `CompositionCore`'s model: the headings, text, lists, quotes, code and tables.
 /// (The design settles on one read-only text view for the preview so that selection runs across blocks; this is the
 /// quicker way to see every component draw, and what it cannot do is select across them.)
+/// Whether the PDF a `pdf:` link names is on this iPad and can be opened: a link whose PDF is not here (a backup without it, or its note in the Trash Can) is
+/// drawn struck through and says so, with its words still readable (the desktop's "PDF not on this device").
+struct PdfLinks {
+    var isHere: (String) -> Bool = { _ in true }
+}
+
+extension EnvironmentValues {
+    @Entry var pdfLinks = PdfLinks()
+}
+
 struct MarkdownView: View {
     let blocks: [MdBlock]
     var body: some View {
@@ -16,11 +26,12 @@ struct MarkdownView: View {
 private struct MdBlockView: View {
     let block: MdBlock
     @Environment(\.look) private var look
+    @Environment(\.pdfLinks) private var pdfLinks
 
     var body: some View {
         switch block {
         case .heading(let level, let ordinal, let inlines):
-            Text(inlines.attributed(look))
+            Text(inlines.attributed(look, pdf: pdfLinks))
                 .font(Self.headingFont(level))
                 .padding(.top, level <= 2 ? 6 : 2)
                 .id(PreviewScroll.headingID(ordinal))
@@ -29,7 +40,7 @@ private struct MdBlockView: View {
             if let images = Self.onlyImages(inlines) {
                 VStack(alignment: .leading, spacing: 8) { ForEach(images.indices, id: \.self) { InlineImageView(image: images[$0]) } }
             } else {
-                Text(inlines.attributed(look)).textSelection(.enabled)
+                Text(inlines.attributed(look, pdf: pdfLinks)).textSelection(.enabled)
             }
         case .code(_, let text):
             ScrollView(.horizontal) {
@@ -75,7 +86,7 @@ private struct MdBlockView: View {
             case .trailing: .trailing
             }
         }()
-        return Text(inlines.attributed(look)).frame(minWidth: 40, alignment: alignment)
+        return Text(inlines.attributed(look, pdf: pdfLinks)).frame(minWidth: 40, alignment: alignment)
     }
 
     @ViewBuilder
@@ -134,15 +145,15 @@ private struct InlineImageView: View {
 
 extension Array where Element == MdInline {
     /// The inline content as one styled run of text, in the scheme in force (code gets the faint fill, a `<Mark>` its tint).
-    func attributed(_ look: Look) -> AttributedString {
+    func attributed(_ look: Look, pdf: PdfLinks = PdfLinks()) -> AttributedString {
         var out = AttributedString()
-        for inline in self { out += inline.attributed(look) }
+        for inline in self { out += inline.attributed(look, pdf) }
         return out
     }
 }
 
 private extension MdInline {
-    func attributed(_ look: Look) -> AttributedString {
+    func attributed(_ look: Look, _ pdf: PdfLinks) -> AttributedString {
         switch self {
         case .text(let text): return AttributedString(text)
         case .code(let text):
@@ -150,11 +161,21 @@ private extension MdInline {
             run.inlinePresentationIntent = .code
             run.backgroundColor = look.mutedFill
             return run
-        case .emphasis(let inner): return inner.attributed(look).adding(.emphasized)
-        case .strong(let inner): return inner.attributed(look).adding(.stronglyEmphasized)
-        case .strikethrough(let inner): return inner.attributed(look).adding(.strikethrough)
+        case .emphasis(let inner): return inner.attributed(look, pdf: pdf).adding(.emphasized)
+        case .strong(let inner): return inner.attributed(look, pdf: pdf).adding(.stronglyEmphasized)
+        case .strikethrough(let inner): return inner.attributed(look, pdf: pdf).adding(.strikethrough)
         case .link(let destination, let inner):
-            var run = inner.attributed(look)
+            var run = inner.attributed(look, pdf: pdf)
+            if let destination, let ref = PdfRefs.parse(destination), !pdf.isHere(ref.uuid) {
+                // A PDF that is not here: no link to follow, its words struck through but readable, and the reason said after them (a finger has no
+                // hover to say it).
+                run.inlinePresentationIntent = .strikethrough
+                run.foregroundColor = look.mutedText
+                var reason = AttributedString(" (PDF not on this device)")
+                reason.inlinePresentationIntent = .emphasized
+                reason.foregroundColor = look.mutedText
+                return run + reason
+            }
             if let destination, let url = URL(string: destination) { run.link = url }
             return run
         case .image(_, let alt, _, _):
@@ -163,7 +184,7 @@ private extension MdInline {
             run.inlinePresentationIntent = .emphasized
             return run
         case .mark(let color, let inner):
-            var run = inner.attributed(look)
+            var run = inner.attributed(look, pdf: pdf)
             run.backgroundColor = look.markTint(color)
             return run
         case .softBreak: return AttributedString(" ")

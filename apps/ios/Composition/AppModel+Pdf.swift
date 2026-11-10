@@ -212,27 +212,128 @@ extension AppModel {
     }
 
     func addBookmark(documentId: Int64, page: Int, label: String = "") async {
-        guard let database = store?.database else { return }
+        guard let store else { return }
         do {
-            _ = try await Self.perform { try database.addBookmark(documentId: documentId, page: page, label: label) }
+            _ = try await Self.perform { try store.addBookmark(documentId: documentId, page: page, label: label) }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func renameBookmark(id: Int64, label: String) async {
-        guard let database = store?.database else { return }
+        guard let store else { return }
         do {
-            _ = try await Self.perform { try database.renameBookmark(id: id, label: label) }
+            _ = try await Self.perform { try store.renameBookmark(id: id, label: label) }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func deleteBookmark(id: Int64) async {
-        guard let database = store?.database else { return }
+        guard let store else { return }
         do {
-            try await Self.perform { try database.deleteBookmark(id: id) }
+            try await Self.perform { try store.deleteBookmark(id: id) }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - Marks, citations and links (M2, typed markup)
+
+/// A PDF a `pdf:` link can name: its id and the note that owns it.
+struct PdfEntry: Equatable, Sendable {
+    let documentId: Int64
+    let noteId: Int64
+}
+
+/// A link's request to show a page of a PDF and flash a mark on it. `sequence` tells a new request from one the reader has taken.
+struct PdfGoTo: Equatable {
+    let documentId: Int64
+    /// 0-based.
+    let page: Int?
+    let mark: String?
+    let sequence: Int
+}
+
+extension AppModel {
+    /// The editor of one PDF's marks, with its undo and redo (made by the reader once and kept as long as the PDF is open).
+    func markEditor(documentId: Int64) -> PdfMarkEditor? { store.map { PdfMarkEditor(store: $0, documentId: documentId) } }
+
+    /// The PDF with this id, as the reader opens it.
+    func pdfSource(forDocument id: Int64) async -> PdfSource? {
+        guard let library else { return nil }
+        return try? await Self.perform {
+            guard let document = try library.store.database.document(id: id) else { return nil }
+            return PdfSource(document: document, url: try library.documentFile(id: document.id)?.url)
+        }
+    }
+
+    /// The notes that belong with a PDF: its own first, then every note whose text links to it, each with the pages it cites.
+    func citations(of document: StoredDocument) async -> [PdfCitation] {
+        guard let database = store?.database else { return [] }
+        let uuid = document.uuid, owner = document.noteId
+        return (try? await Self.perform { PdfRefs.citations(among: try database.notesForPdf(uuid: uuid, ownerNoteId: owner), documentUuid: uuid, ownerNoteId: owner) }) ?? []
+    }
+
+    /// Whether the PDF a link names is on this iPad and open to read: its note is here, not in the Trash Can.
+    func isPdfHere(uuid: String) -> Bool {
+        guard let entry = pdfsByUuid[uuid] else { return false }
+        return orderedNotes.contains { $0.id == entry.noteId }
+    }
+
+    // MARK: Following a link
+
+    /// A `pdf:` link was opened in a note's preview. The PDF opens beside the note the link is in (the note stays where it is), at the page and mark
+    /// the link names. A PDF that is not here (a backup without it, or one in the Trash Can) is said, and the quote the note carries stays.
+    func followPdfLink(_ ref: PdfRef, from noteId: Int64?) {
+        guard let entry = pdfsByUuid[ref.uuid], orderedNotes.contains(where: { $0.id == entry.noteId }) else {
+            errorMessage = pdfsByUuid[ref.uuid] == nil ? "PDF not on this device. The quote in the note stays, but its link has nothing to open." : "That PDF is in the Trash Can. Restore it from there to open its links."
+            return
+        }
+        if let noteId, noteId != entry.noteId {
+            pdfBeside[noteId] = entry.documentId
+        } else if noteId == nil || selection != entry.noteId {
+            followNoteLink(entry.noteId)
+        }
+        pdfGoToCount += 1
+        pdfGoTo = PdfGoTo(documentId: entry.documentId, page: ref.page.map { $0 - 1 }, mark: ref.mark, sequence: pdfGoToCount)
+    }
+
+    /// The reader has taken the request.
+    func clearPdfGoTo(_ sequence: Int) {
+        if pdfGoTo?.sequence == sequence { pdfGoTo = nil }
+    }
+
+    // MARK: The Notes tab
+
+    /// Shows a note that cites a PDF beside the PDF, in the note's own place in the lists.
+    func openNote(_ noteId: Int64, besidePdf documentId: Int64) {
+        if let owned = pdfsByUuid.values.first(where: { $0.noteId == noteId }), owned.documentId == documentId {
+            pdfBeside[noteId] = nil
+        } else {
+            pdfBeside[noteId] = documentId
+        }
+        followNoteLink(noteId)
+    }
+
+    /// **New note for this PDF**: a note in the owner's group whose first line is a link to the PDF, so it is one of the PDF's notes at once, shown
+    /// beside the PDF.
+    func newNote(forPdf document: StoredDocument, title: String) async {
+        guard let store else { return }
+        let owner = orderedNotes.first { $0.id == document.noteId }
+        let name = "Notes on \(title)"
+        do {
+            let (group, notebook) = (owner?.groupId, owner?.notebookId)
+            let created = try await Self.perform {
+                let note = try store.createNote(title: name, groupId: group, notebookId: group == nil ? notebook : nil)
+                guard let frontmatter = NoteFrontmatter.parse(note.content).frontmatter else { return note }
+                let link = PdfRefs.link(uuid: document.uuid, title: title)
+                return try store.saveNoteContent(id: note.id, content: NoteFrontmatter.render(frontmatter, body: link + "\n\n"))
+            }
+            await reload()
+            pdfBeside[created.id] = document.id
+            followNoteLink(created.id)
         } catch {
             errorMessage = error.localizedDescription
         }

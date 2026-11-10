@@ -56,6 +56,26 @@ final class EditorHandle {
         }
     }
 
+    /// A block of Markdown (a quote from a PDF) as a paragraph of its own at the caret, never in the frontmatter. False when the note's editor is not
+    /// showing (the Preview tab), so that the caller can put it at the end of the note instead.
+    func insertBlock(_ markdown: String) -> Bool {
+        // A text view that is not on screen (the note is behind the PDF, or in the Preview tab) takes nothing: the caller puts the Markdown at the end of the note.
+        guard let view = textView, view.window != nil else { return false }
+        write(paragraphs: [markdown])
+        return true
+    }
+
+    /// A short piece of Markdown (a link to a page of a PDF) in the words around the caret; False when the editor is not showing.
+    func insertInline(_ markdown: String) -> Bool {
+        guard let view = textView, view.window != nil else { return false }
+        view.becomeFirstResponder()
+        let whole = view.nativeText as NSString
+        let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
+        if view.selectedRange.location < frontmatterEnd { view.selectedRange = NSRange(location: frontmatterEnd, length: 0) }
+        view.insertText(markdown)
+        return true
+    }
+
     /// Stores a drawing's PNG and writes the `<Ink>` tag that shows it at the caret, as a paragraph of its own, with the words read from the drawing as its `alt`
     /// (search finds the note by them; the transcript stays editable, C11).
     func insertInk(png: Data, alt: String) {

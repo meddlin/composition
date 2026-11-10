@@ -21,7 +21,7 @@ public final class NoteStore: Sendable {
 
     public func createNote(title: String, groupId: Int64? = nil, notebookId: Int64? = nil, now: Date = Date()) throws -> NoteDetail {
         try write({ try database.createNote(title: title, groupId: groupId, notebookId: notebookId, now: now) }) { index, note in
-            try index.upsert([Self.indexed(note)])
+            try index.upsert([try indexed(note)])
         }
     }
 
@@ -37,7 +37,7 @@ public final class NoteStore: Sendable {
     /// Saves what the editor holds (see `CompositionDatabase.saveNoteContent`) and re-indexes the note.
     public func saveNoteContent(id: Int64, content: String, now: Date = Date()) throws -> NoteDetail {
         try write({ try database.saveNoteContent(id: id, content: content, now: now) }) { index, note in
-            try index.upsert([Self.indexed(note)])
+            try index.upsert([try indexed(note)])
         }
     }
 
@@ -51,7 +51,7 @@ public final class NoteStore: Sendable {
         try write({ try database.restoreNote(id: id) }) { index, restored in
             guard restored != nil else { return }
             if let note = try database.note(id: id) {
-                try index.upsert([Self.indexed(note)])
+                try index.upsert([try indexed(note)])
             } else {
                 // The note came back under a new id (its own was taken), so there is nothing to add by the old one: start the index over.
                 try index.rebuild(from: database)
@@ -125,10 +125,68 @@ public final class NoteStore: Sendable {
         try database.deleteNotebook(id: id)
     }
 
+    // MARK: A PDF's marks and bookmarks
+    //
+    // The owner note of a PDF is found by the words of its PDF's marks (docs/pdf-markup-plan.md, "Search"), so a change to a mark or a bookmark
+    // puts that note back in the index. Like every index change here it is derived state: it never fails the write.
+
+    @discardableResult
+    public func addAnnotations(documentId: Int64, _ inputs: [PdfMarkInput], now: Date = Date()) throws -> [PdfMark] {
+        try withMarks(of: documentId) { try database.addAnnotationGroup(documentId: documentId, inputs, now: now) }
+    }
+
+    @discardableResult
+    public func updateAnnotation(id: Int64, changes: PdfMarkChanges, now: Date = Date()) throws -> PdfMark? {
+        let documentId = try database.annotation(id: id)?.documentId
+        return try withMarks(of: documentId) { try database.updateAnnotation(id: id, changes: changes, now: now) }
+    }
+
+    /// Deletes a mark and the rest of its selection; returns everything removed.
+    @discardableResult
+    public func deleteAnnotation(id: Int64) throws -> [PdfMark] {
+        let documentId = try database.annotation(id: id)?.documentId
+        return try withMarks(of: documentId) { try database.deleteAnnotation(id: id) }
+    }
+
+    @discardableResult
+    public func restoreAnnotations(documentId: Int64, _ rows: [PdfMark]) throws -> [PdfMark] {
+        try withMarks(of: documentId) { try database.restoreAnnotations(documentId: documentId, rows) }
+    }
+
+    @discardableResult
+    public func addBookmark(documentId: Int64, page: Int, label: String = "", now: Date = Date()) throws -> PdfBookmark {
+        try withMarks(of: documentId) { try database.addBookmark(documentId: documentId, page: page, label: label, now: now) }
+    }
+
+    @discardableResult
+    public func renameBookmark(id: Int64, label: String) throws -> PdfBookmark? {
+        let documentId = try database.bookmark(id: id)?.documentId
+        return try withMarks(of: documentId) { try database.renameBookmark(id: id, label: label) }
+    }
+
+    public func deleteBookmark(id: Int64) throws {
+        let documentId = try database.bookmark(id: id)?.documentId
+        try withMarks(of: documentId) { try database.deleteBookmark(id: id) }
+    }
+
+    /// Runs a change to a PDF's marks or bookmarks, then re-indexes the note that owns the PDF.
+    private func withMarks<T>(of documentId: Int64?, _ change: () throws -> T) throws -> T {
+        let result = try change()
+        if let documentId, let search, let document = try? database.document(id: documentId), let note = try? database.note(id: document.noteId) {
+            do { try search.upsert([try indexed(note)]) } catch { NSLog("[search] indexing failed: \(error)") }
+        }
+        return result
+    }
+
     // MARK: Keeping the index in step
 
-    private static func indexed(_ note: NoteDetail) -> IndexedNote {
-        IndexedNote(id: note.id, title: note.title, description: note.description, content: note.content, tags: note.tags, createdAt: note.createdAt, updatedAt: note.updatedAt)
+    /// The note as the index holds it: its own text, and for a note that owns a PDF the words of that PDF's marks after it, never shown
+    /// (`noteToDocument` in the desktop's `searchIndex.ts`).
+    private func indexed(_ note: NoteDetail) throws -> IndexedNote {
+        let marks = try database.marksSearchText(noteId: note.id)[note.id] ?? ""
+        return IndexedNote(
+            id: note.id, title: note.title, description: note.description, content: marks.isEmpty ? note.content : "\(note.content)\n\n\(marks)", tags: note.tags,
+            createdAt: note.createdAt, updatedAt: note.updatedAt)
     }
 
     private func existing<T>(_ value: T?, _ what: String) throws -> T {

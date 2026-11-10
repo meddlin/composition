@@ -17,12 +17,17 @@ struct PdfWithNote<NoteContent: View>: View {
     private let note: NoteContent
     @Environment(\.look) private var look
 
-    init(model: AppModel, source: PdfSource, @ViewBuilder note: () -> NoteContent) {
+    private let insertion: PdfInsertion
+
+    init(model: AppModel, source: PdfSource, insertion: PdfInsertion = PdfInsertion(), @ViewBuilder note: () -> NoteContent) {
         _reader = State(initialValue: PdfReader(source: source, app: model))
+        self.insertion = insertion
         self.note = note()
     }
 
     var body: some View {
+        // Quote and Cite this page write into the note shown beside the PDF, which is a different note when the person chooses one in the Notes tab.
+        let _ = { reader.insertion = insertion }()
         GeometryReader { geometry in
             layout(wide: geometry.size.width >= Self.sideBySideWidth)
         }

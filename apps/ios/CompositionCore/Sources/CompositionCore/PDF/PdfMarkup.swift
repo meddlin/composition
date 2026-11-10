@@ -261,7 +261,7 @@ public enum PdfMarkup {
     }
 
     /// `^[0-9a-f]{32}$`
-    static func isHexUuid(_ text: String) -> Bool {
+    public static func isHexUuid(_ text: String) -> Bool {
         let bytes = Array(text.utf8)
         return bytes.count == 32 && bytes.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
     }

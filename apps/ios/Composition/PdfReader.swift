@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionPDF
 import PDFKit
 import SwiftUI
 
@@ -22,7 +23,7 @@ final class PdfReader {
     }
 
     let source: PdfSource
-    private let app: AppModel
+    let app: AppModel
     private(set) var pdf: PDFDocument?
     private(set) var failedToOpen = false
     /// The PDF asks for a password before it can be read; `wrongPassword` says the last try did not open it.
@@ -37,6 +38,49 @@ final class PdfReader {
     private(set) var bookmarks: [PdfBookmark] = []
     /// The view that shows the document, set by the view; the reader asks it to move and to find.
     weak var view: PDFView?
+
+    // MARK: State of the marks (PdfReader+Marks.swift)
+
+    /// Every mark of the PDF, by page, as they are stored.
+    var marks: [PdfMark] = []
+    var marksLoaded = false
+    var canUndo = false
+    var canRedo = false
+    /// The words selected in the PDF, if any are: what the bar of colours and tools is for.
+    var selection: PDFSelection?
+    var selectionWords = ""
+    /// The mark whose card is open, and where it is in the view.
+    var card: MarkCard?
+    /// A typed note being written (new, or a mark being retyped).
+    var draft: NoteDraft?
+    /// The next tap on a page puts a typed note there.
+    var placingNote = false
+    /// The colour the next mark gets (the last one chosen).
+    var color: String = UserDefaults.standard.string(forKey: "pdfMarkColor").flatMap { PdfMarkup.markColors.contains($0) ? $0 : nil } ?? "yellow" {
+        didSet { UserDefaults.standard.set(color, forKey: "pdfMarkColor") }
+    }
+    /// The pages that have ink (PdfInkLayer.swift), for the banner while drawing, the Highlights tab and the export.
+    var inkPages: Set<Int> = []
+    /// The Pencil draws on the pages (otherwise ink only shows).
+    var inking = false
+    /// A finger draws too, for an iPad with no Pencil (and the Simulator); the PDF then scrolls with two fingers.
+    var fingerDraws = UserDefaults.standard.bool(forKey: "pdfInkFinger")
+    /// A line of confirmation (a quote put in the note) that goes by itself.
+    var notice: String?
+    /// The notes that belong with this PDF, for the Notes tab and the Highlights tab's "quoted" marks.
+    var citations: [PdfCitation] = []
+    /// What puts Markdown into the note shown beside the PDF; set by the screen that has the note.
+    @ObservationIgnored var insertion = PdfInsertion()
+    @ObservationIgnored var editor: PdfMarkEditor?
+    @ObservationIgnored var layer: MarkLayer?
+    @ObservationIgnored let inkLayer = PdfInkLayer()
+    @ObservationIgnored var flashing: [PDFAnnotation] = []
+    @ObservationIgnored var flashPage: PDFPage?
+    @ObservationIgnored var flashTask: Task<Void, Never>?
+    @ObservationIgnored var noticeTask: Task<Void, Never>?
+    @ObservationIgnored var pageLabels: [String]?
+    /// The password the PDF was opened with, if it needed one. In memory only, for an export's sake.
+    private(set) var password: String?
 
     /// Where the reader was left: what the first layout goes back to. Only once it has gone back are the page and zoom saved, so that the first
     /// frame (page 0, fit to the width) never overwrites them.
@@ -89,6 +133,8 @@ final class PdfReader {
             wrongPassword = true
             return
         }
+        // Kept in memory only, for an export of this PDF (the copy is protected with it); never stored or logged.
+        self.password = password
         wrongPassword = false
         locked = false
         prepare()
@@ -100,7 +146,10 @@ final class PdfReader {
         pageCount = pdf.pageCount
         outline = Self.entries(of: pdf)
         let (id, count) = (documentId, pdf.pageCount)
-        Task { await app.setPageCountIfUnknown(documentId: id, pageCount: count) }
+        Task {
+            await app.setPageCountIfUnknown(documentId: id, pageCount: count)
+            await loadMarks()
+        }
     }
 
     private static func entries(of pdf: PDFDocument) -> [Entry] {
@@ -151,6 +200,7 @@ final class PdfReader {
 
     /// Writes the place now (the app is leaving the foreground, or the PDF is closing).
     func flush() {
+        inkLayer.flushAll()
         guard restored, let view else { return }
         saveTask?.cancel()
         let zoom: Double? = view.autoScales ? nil : view.scaleFactor * storedZoomPerScale
@@ -218,6 +268,8 @@ struct PdfKitView: UIViewRepresentable {
     let reader: PdfReader
     @Environment(\.look) private var look
 
+    func makeCoordinator() -> Coordinator { Coordinator(reader: reader) }
+
     func makeUIView(context: Context) -> ReaderPDFView {
         let view = ReaderPDFView()
         view.displayMode = .singlePageContinuous
@@ -230,6 +282,11 @@ struct PdfKitView: UIViewRepresentable {
         view.maxScaleFactor = 8
         // The system's find bar (⌘F with a keyboard, or the Find button).
         view.isFindInteractionEnabled = true
+        // Ink: PDFKit lays a canvas over each page near the screen, which the Pencil draws on. The provider is set **before** the document: PDFKit asks for a
+        // page's overlay when it makes the page, so a provider given afterwards is never asked (spike B's lab does it in this order).
+        if let pdf = reader.pdf { reader.inkLayer.use(document: pdf) }
+        reader.inkLayer.pdfView = view
+        view.pageOverlayViewProvider = reader.inkLayer
         view.document = reader.pdf
         view.accessibilityIdentifier = "pdf-view"
         view.backgroundColor = UIColor(look.surface)
@@ -237,12 +294,31 @@ struct PdfKitView: UIViewRepresentable {
             guard let reader, let view else { return }
             MainActor.assumeIsolated { reader.restore(in: view) }
         }
+        // A tap opens the card of the mark under it (or places a typed note); it does not take the touch from PDFKit's own gestures (selection, links).
+        let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:)))
+        tap.cancelsTouchesInView = false
+        tap.delegate = context.coordinator
+        view.addGestureRecognizer(tap)
         reader.view = view
         return view
     }
 
     func updateUIView(_ view: ReaderPDFView, context: Context) {
         view.backgroundColor = UIColor(look.surface)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        let reader: PdfReader
+
+        init(reader: PdfReader) { self.reader = reader }
+
+        @objc func tapped(_ recogniser: UITapGestureRecognizer) {
+            guard recogniser.state == .ended else { return }
+            reader.tapped(at: recogniser.location(in: recogniser.view))
+        }
+
+        nonisolated func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool { true }
     }
 }
 
@@ -253,10 +329,14 @@ struct PdfReaderPane: View {
     @State private var showingContents = false
     @State private var jumping = false
     @State private var jumpText = ""
+    @State private var exporting = false
 
     var body: some View {
         VStack(spacing: 0) {
-            controls
+            ViewThatFits(in: .horizontal) {
+                strip(compact: false)
+                strip(compact: true)
+            }
             Rectangle().fill(look.border).frame(height: 1)
             pages
         }
@@ -265,8 +345,13 @@ struct PdfReaderPane: View {
         // The place is kept as the person reads, and written when the app is about to leave.
         .onReceive(NotificationCenter.default.publisher(for: .PDFViewPageChanged)) { if ($0.object as? PDFView) === reader.view { reader.viewChanged() } }
         .onReceive(NotificationCenter.default.publisher(for: .PDFViewScaleChanged)) { if ($0.object as? PDFView) === reader.view { reader.viewChanged() } }
+        .onReceive(NotificationCenter.default.publisher(for: .PDFViewSelectionChanged)) { if ($0.object as? PDFView) === reader.view { reader.selectionChanged() } }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in reader.flush() }
         .onDisappear { reader.flush() }
+        // A link asked for a page or a mark: shown once the PDF is open and its marks are read.
+        .onChange(of: reader.restored) { reader.takeGoTo() }
+        .onChange(of: reader.marksLoaded) { reader.takeGoTo() }
+        .onChange(of: reader.app.pdfGoTo) { reader.takeGoTo() }
         .alert("Go to page", isPresented: $jumping) {
             TextField("Page", text: $jumpText).keyboardType(.numberPad)
             Button("Cancel", role: .cancel) {}
@@ -274,14 +359,15 @@ struct PdfReaderPane: View {
         } message: {
             Text("1 to \(reader.pageCount)")
         }
+        .sheet(isPresented: $exporting) { PdfExportSheet(reader: reader) }
     }
 
-    private var controls: some View {
+    private func strip(compact: Bool) -> some View {
         HStack(spacing: 4) {
-            Button("Contents and bookmarks", systemImage: "list.bullet.indent") { showingContents = true }
+            Button("Contents, bookmarks, highlights and notes", systemImage: "list.bullet.indent") { showingContents = true }
                 .labelStyle(.iconOnly)
                 .accessibilityIdentifier("pdf-contents")
-                .popover(isPresented: $showingContents) { PdfSidebar(reader: reader) { showingContents = false }.frame(minWidth: 320, minHeight: 360) }
+                .popover(isPresented: $showingContents) { PdfSidebar(reader: reader) { showingContents = false }.frame(minWidth: 360, minHeight: 440) }
             Button("Find in the PDF", systemImage: "magnifyingglass") { reader.find() }
                 .labelStyle(.iconOnly)
                 .accessibilityIdentifier("pdf-find")
@@ -290,6 +376,42 @@ struct PdfReaderPane: View {
             }
             .labelStyle(.iconOnly)
             .accessibilityIdentifier("pdf-bookmark")
+            Button("Add a typed note", systemImage: reader.placingNote ? "text.bubble.fill" : "text.bubble") { reader.beginPlacingNote() }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("pdf-add-note")
+            Button(reader.inking ? "Stop drawing" : "Draw on the pages", systemImage: reader.inking ? "pencil.tip.crop.circle.fill" : "pencil.tip.crop.circle") { reader.toggleInking() }
+                .labelStyle(.iconOnly)
+                .accessibilityIdentifier("pdf-ink")
+            if compact {
+                Menu {
+                    Button("Undo", systemImage: "arrow.uturn.backward") { Task { await reader.undo() } }.disabled(!reader.canUndo)
+                    Button("Redo", systemImage: "arrow.uturn.forward") { Task { await reader.redo() } }.disabled(!reader.canRedo)
+                    Button("Cite this page", systemImage: "link") { reader.citeThisPage() }
+                    Button("Export annotated PDF…", systemImage: "square.and.arrow.up") { exporting = true }
+                } label: {
+                    Label("More", systemImage: "ellipsis.circle")
+                        .labelStyle(.iconOnly)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityIdentifier("pdf-more")
+            } else {
+                Button("Undo", systemImage: "arrow.uturn.backward") { Task { await reader.undo() } }
+                    .labelStyle(.iconOnly)
+                    .disabled(!reader.canUndo)
+                    .keyboardShortcut("z", modifiers: .command)
+                    .accessibilityIdentifier("pdf-undo")
+                Button("Redo", systemImage: "arrow.uturn.forward") { Task { await reader.redo() } }
+                    .labelStyle(.iconOnly)
+                    .disabled(!reader.canRedo)
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                    .accessibilityIdentifier("pdf-redo")
+                Button("Cite this page", systemImage: "link") { reader.citeThisPage() }
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("pdf-cite")
+                Button("Export annotated PDF", systemImage: "square.and.arrow.up") { exporting = true }
+                    .labelStyle(.iconOnly)
+                    .accessibilityIdentifier("pdf-export")
+            }
             Spacer(minLength: 8)
             Button {
                 jumpText = ""
@@ -298,6 +420,8 @@ struct PdfReaderPane: View {
                 Text(reader.pageCount > 0 && reader.restored ? "Page \(reader.pageIndex + 1) of \(reader.pageCount)" : "")
                     .monospacedDigit()
                     .foregroundStyle(look.mutedText)
+                    .lineLimit(1)
+                    .fixedSize()
                     .frame(minHeight: 44)
             }
             .disabled(reader.pageCount == 0 || !reader.restored || reader.locked)
@@ -324,7 +448,64 @@ struct PdfReaderPane: View {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             PdfKitView(reader: reader)
+                .overlay(alignment: .topLeading) { anchors }
+                .overlay(alignment: .bottom) {
+                    if reader.selection != nil {
+                        PdfSelectionBar(reader: reader).padding(.bottom, 14).transition(.opacity)
+                    }
+                }
+                // A mark's card is a panel over the pages, on the side away from the mark, and not a popover: a popover's arrow covers the page, and one anchored high on the
+                // screen sits under the navigation bar.
+                .overlay(alignment: reader.card.map { $0.rect.midY > (reader.view?.bounds.height ?? 0) * 0.5 } == true ? .top : .bottom) {
+                    if reader.card != nil, let mark = reader.cardMark {
+                        MarkCardView(reader: reader, mark: mark)
+                            .id(mark.id)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay(RoundedRectangle(cornerRadius: 16).stroke(look.border, lineWidth: 1))
+                            .shadow(color: .black.opacity(0.15), radius: 8, y: 2)
+                            .padding(12)
+                            .transition(.opacity)
+                    }
+                }
+                .overlay(alignment: .top) { banner }
+                .animation(.default, value: reader.selection != nil)
         }
+    }
+
+    /// What says that a note is being placed, or that something was put in the note.
+    @ViewBuilder private var banner: some View {
+        if reader.inking {
+            PdfInkBanner(reader: reader)
+        } else if reader.placingNote {
+            Label("Tap where the note goes", systemImage: "hand.tap")
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.top, 10)
+                .accessibilityIdentifier("pdf-placing-note")
+        } else if let notice = reader.notice {
+            Label(notice, systemImage: "checkmark.circle")
+                .padding(.horizontal, 14).padding(.vertical, 8)
+                .background(.regularMaterial, in: Capsule())
+                .padding(.top, 10)
+                .accessibilityIdentifier("pdf-notice")
+        }
+    }
+
+    /// An invisible view at the typed note being written, which the note's box is attached to.
+    private var anchors: some View {
+        ZStack(alignment: .topLeading) {
+            anchor(reader.draft?.anchor)
+                .popover(item: Binding(get: { reader.draft }, set: { if $0 == nil { reader.draft = nil } }), arrowEdge: .bottom) { draft in
+                    NoteDraftView(reader: reader, draft: draft).presentationCompactAdaptation(.popover)
+                }
+        }
+    }
+
+    /// An invisible view where a mark or a typed note is, which the card or the note's box is attached to. It is a clear colour, which takes no touch (the PDF under it does). It must not
+    /// be given `allowsHitTesting(false)`: that reaches into the popover too, and the buttons in the card did nothing.
+    private func anchor(_ rect: CGRect?) -> some View {
+        let box = rect ?? .zero
+        return Color.clear.frame(width: max(box.width, 2), height: max(box.height, 2)).offset(x: box.minX, y: box.minY)
     }
 }
 
@@ -361,11 +542,11 @@ private struct PdfPasswordPrompt: View {
     }
 }
 
-/// The PDF's own contents, and the bookmarks the person made. (Highlights and the notes that cite the PDF join them with the marks.)
+/// The PDF's own contents, the bookmarks the person made, the marks (Highlights) and the notes that cite the PDF (Notes).
 struct PdfSidebar: View {
     let reader: PdfReader
     var close: () -> Void
-    private enum Tab: String, CaseIterable { case contents = "Contents", bookmarks = "Bookmarks" }
+    private enum Tab: String, CaseIterable { case contents = "Contents", bookmarks = "Bookmarks", highlights = "Highlights", notes = "Notes" }
     @State private var tab = Tab.contents
     @State private var renaming: PdfBookmark?
     @State private var label = ""
@@ -379,6 +560,8 @@ struct PdfSidebar: View {
             switch tab {
             case .contents: contents
             case .bookmarks: bookmarks
+            case .highlights: PdfHighlightsList(reader: reader, close: close)
+            case .notes: PdfNotesList(reader: reader, close: close)
             }
         }
         .background(look.background)

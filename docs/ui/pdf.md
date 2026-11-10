@@ -7,7 +7,7 @@ Source: [`PdfReader.tsx`](../../apps/web/src/components/pdf/PdfReader.tsx) (the 
 [`selectionMarks.ts`](../../apps/web/src/components/pdf/selectionMarks.ts) (making and changing marks),
 [`ExportPdfDialog.tsx`](../../apps/web/src/components/pdf/ExportPdfDialog.tsx),
 [`pdfRefs.ts`](../../apps/web/src/lib/composition/pdfRefs.ts) (citations),
-[`pdfExport.ts`](../../apps/web/src/lib/composition/pdfExport.ts) (export) — **desktop app only**. How it works inside:
+[`pdfExport.ts`](../../apps/web/src/lib/composition/pdfExport.ts) (export) — **the desktop app** (the iPad app has its own reader, [below](#on-the-ipad)). How it works inside:
 [architecture/pdf.md](../architecture/pdf.md). The design and the reasons behind it: [pdf-markup-plan.md](../pdf-markup-plan.md).
 To check it by hand: [manual-tests/pdf.md](../manual-tests/pdf.md).
 
@@ -209,7 +209,27 @@ is inside:
 The Trash Can row shows the same counts. Restoring the note brings the PDF and its marks back with it; when the note is deleted for
 good, so are the file and its marks.
 
+## On the iPad
+
+The iPad app (milestone M2, [apps/ios](../../apps/ios)) has its own reader, drawn by PDFKit, beside the note that owns the PDF. **Built and checked in the iPad Simulator and with `swift test` only; not yet tried on an iPad**
+(Gate P2, [manual-tests/ipad.md](../manual-tests/ipad.md#pdf-markup-notes-search-export-and-ink-m2-gate-p2)). The data is the same (the same tables, `pdf:` links, raw PDF coordinates), so a backup carries a PDF and its marks both ways.
+
+- **Layout.** Side by side with a draggable divider where the pane is 900 points wide (landscape with the lists hidden), one at a time with a *PDF / Note* switch where it is not.
+- **Marking.** Press and hold a word and drag to take more; a bar of the five colours and *Highlight*, *Underline*, *Strikethrough* floats over the pages. The colour you chose last is the next one. *Add a typed note* (speech bubble), then tap
+  where it goes. Tap a mark for its **card**: colours, a one-line comment, *Quote in the note*, delete (and *Edit the note* for a typed one). *Undo* and *Redo* are in the strip (⌘Z and ⇧⌘Z). A typed note cannot yet be moved or resized.
+- **The list button** (left of the strip) opens **Contents**, **Bookmarks**, **Highlights** and **Notes**. Highlights: every mark by page with its words and comment, a filter, a swipe to delete, a quote button, a quote icon on a mark a note
+  already quotes; a tap goes to the page and a frame flashes round the mark. Notes: the PDF's own note, then every note that links to the PDF; choosing one shows it beside the PDF; **New note for this PDF** makes "Notes on <title>".
+- **Quote** and **Cite this page** (the link button) write the same Markdown as the desktop into the note beside the PDF, at its caret, or at the end of the note when its Preview tab is showing. **A `pdf:` link** in the Preview tab opens the PDF at the page and
+  flashes the mark; from a note that does not own the PDF, the PDF opens beside that note. A link whose PDF is not here is struck through with "(PDF not on this device)". The Markdown and Live tabs draw the link and do not follow it.
+- **Search** finds a PDF's note by the words of its highlights, comments, typed notes and bookmark labels.
+- **Export annotated PDF** (the share button in the strip): *Flatten markup* off (standard annotations) or on (burned into the pages), then the share sheet. A protected PDF's copy asks for the same password. Differences from the desktop's:
+  typed notes in any script are written (the system's fonts), a flattened copy loses the PDF's own links, and the original's limits on printing and copying are not carried.
+- **Ink** (the pencil button in the strip). While it is on, a bar says *Drawing with the Pencil* and how many pages have ink, the system's tool picker shows (pens, eraser, lasso, ruler, colours, undo and redo of strokes), and **the Pencil draws on the page** while a
+  finger still scrolls, pinches and selects words. *Finger draws* in the bar lets a finger draw too, for an iPad with no Pencil, and then two fingers scroll. *Done* puts the Pencil down; the ink stays and shows. A page's ink is kept a moment after the last stroke (at once when the
+  page scrolls away, or *Done*, or the app leaves the screen), is on the Highlights tab under **Ink** (tap to go to the page, swipe to *Clear ink*), and comes back after the app is ended. The strip's *Undo* is for marks only; strokes are undone with the tool picker's arrows. Export writes
+  the ink as plain lines (a pencil's or crayon's texture and a pen's change of width are not kept). The desktop does not draw this ink yet. **Not tried with a Pencil.** Spike B's lab (*More, PDF ink lab*) is where PDFKit with PencilKit was tried first.
+
 ## Not built yet
 
-Ink and handwritten notes (the iPad app, milestone M2); the
+Handwritten notes beside a PDF and standalone `<Ink>` pages of a PDF's own (the iPad app, milestone M2; ink on the pages of a PDF is built, see above), the Pencil's highlighter snapping to text lines, ink drawn by the desktop's reader (the desktop keeps and counts it), and the
 full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

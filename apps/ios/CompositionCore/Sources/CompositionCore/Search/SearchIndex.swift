@@ -120,9 +120,14 @@ public final class SearchIndex: Sendable {
     /// Empties the index and fills it from every note in `database`.
     public func rebuild(from database: CompositionDatabase) throws {
         let fingerprint = try database.notesFingerprint()
+        // A note that owns a PDF is also found by the words of that PDF's marks, which follow its text and are never shown.
+        let marks = try database.marksSearchText()
         let notes = try database.pool.read { db in
-            try Row.fetchAll(db, sql: "SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map {
-                IndexedNote(id: $0["id"], title: $0["title"], description: $0["description"], content: $0["content"], tags: $0["tags"], createdAt: $0["created_at"], updatedAt: $0["updated_at"])
+            try Row.fetchAll(db, sql: "SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map { row -> IndexedNote in
+                let id: Int64 = row["id"], content: String = row["content"]
+                return IndexedNote(
+                    id: id, title: row["title"], description: row["description"], content: marks[id].map { "\(content)\n\n\($0)" } ?? content, tags: row["tags"],
+                    createdAt: row["created_at"], updatedAt: row["updated_at"])
             }
         }
         try pool.write { db in
