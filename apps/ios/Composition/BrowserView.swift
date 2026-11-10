@@ -10,6 +10,7 @@ struct BrowserView: View {
     @State private var showingAppearance = false
     @State private var showingLab = false
     @State private var showingImages = false
+    @State private var showingPdfInkLab = false
     @State private var confirmingReplace = false
     /// The note that was open when the app was last ended; the system brings it back (0 is none).
     @SceneStorage("selectedNote") private var storedSelection = 0
@@ -51,6 +52,7 @@ struct BrowserView: View {
                             Button("Images…", systemImage: "photo.on.rectangle.angled") { showingImages = true }
                             Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
+                            Button("PDF ink lab (spike B)", systemImage: "pencil.and.scribble") { showingPdfInkLab = true }
                             Button("About this build", systemImage: "info.circle") { showingAbout = true }
                         } label: {
                             Label("More", systemImage: "ellipsis.circle")
@@ -84,6 +86,8 @@ struct BrowserView: View {
         .onAppear {
             // Developer shortcut: `-openLab 1` opens the editor lab at launch.
             if UserDefaults.standard.bool(forKey: "openLab") { showingLab = true }
+            // Developer shortcut: `-openPdfInkLab 1` opens spike B's lab at launch (see `PdfInkLab` for the arguments that run it).
+            if UserDefaults.standard.bool(forKey: "openPdfInkLab") { showingPdfInkLab = true }
         }
         // Once the notes are read, back to where the app was left (the screen can appear before they are).
         .onChange(of: model.loads, initial: true) { _, loads in
@@ -101,6 +105,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showingImages) { ImagesPage(model: model) }
         .sheet(item: $moving) { MoveSheet(model: model, item: $0) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
+        .fullScreenCover(isPresented: $showingPdfInkLab) { PdfInkLabView() }
         .alert(prompt?.title ?? "", isPresented: Binding(get: { prompt != nil }, set: { if !$0 { prompt = nil } }), presenting: prompt) { current in
             TextField("Name", text: $promptText)
             Button("Cancel", role: .cancel) {}
