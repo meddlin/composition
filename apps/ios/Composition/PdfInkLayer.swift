@@ -99,16 +99,26 @@ final class PdfInkLayer: NSObject, @preconcurrency PDFPageOverlayViewProvider, P
         if drawing, !usesPicker || !pickerShown { canvas.tool = tool }
     }
 
+    /// What the PDF's scroll view accepted before drawing, so that putting the Pencil down gives back exactly that (an empty list of touch types means none at all).
+    private var originalTouchTypes: [NSNumber]?
+    private var originalMinimumTouches = 1
+
     /// While drawing, the Pencil must not also scroll the book, and when a finger draws it scrolls with two. (The PDF's own scroll view accepts the Pencil as well
     /// as fingers, spike B; whether this is enough with a real Pencil is the iPad's to say.)
     private func adjustScrolling() {
         guard let scroll = pdfView?.subviews.compactMap({ $0 as? UIScrollView }).first else { return }
+        let pan = scroll.panGestureRecognizer
+        if originalTouchTypes == nil {
+            originalTouchTypes = pan.allowedTouchTypes
+            originalMinimumTouches = pan.minimumNumberOfTouches
+        }
+        let original = originalTouchTypes ?? pan.allowedTouchTypes
         if drawing {
-            scroll.panGestureRecognizer.minimumNumberOfTouches = fingerDraws ? 2 : 1
-            scroll.panGestureRecognizer.allowedTouchTypes = fingerDraws ? [] : [NSNumber(value: UITouch.TouchType.direct.rawValue)]
+            pan.minimumNumberOfTouches = fingerDraws ? 2 : originalMinimumTouches
+            pan.allowedTouchTypes = fingerDraws ? original : [NSNumber(value: UITouch.TouchType.direct.rawValue)]
         } else {
-            scroll.panGestureRecognizer.minimumNumberOfTouches = 1
-            scroll.panGestureRecognizer.allowedTouchTypes = []
+            pan.minimumNumberOfTouches = originalMinimumTouches
+            pan.allowedTouchTypes = original
         }
     }
 

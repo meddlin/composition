@@ -337,6 +337,8 @@ struct PdfInkBanner: View {
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().stroke(look.border, lineWidth: 1))
         .padding(.top, 10)
+        // The words and the buttons in it stay separate for VoiceOver and for the tests (a container would otherwise be one element).
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("pdf-ink-banner")
     }
 }

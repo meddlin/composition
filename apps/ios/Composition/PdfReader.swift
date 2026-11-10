@@ -282,6 +282,11 @@ struct PdfKitView: UIViewRepresentable {
         view.maxScaleFactor = 8
         // The system's find bar (⌘F with a keyboard, or the Find button).
         view.isFindInteractionEnabled = true
+        // Ink: PDFKit lays a canvas over each page near the screen, which the Pencil draws on. The provider is set **before** the document: PDFKit asks for a
+        // page's overlay when it makes the page, so a provider given afterwards is never asked (spike B's lab does it in this order).
+        if let pdf = reader.pdf { reader.inkLayer.use(document: pdf) }
+        reader.inkLayer.pdfView = view
+        view.pageOverlayViewProvider = reader.inkLayer
         view.document = reader.pdf
         view.accessibilityIdentifier = "pdf-view"
         view.backgroundColor = UIColor(look.surface)
@@ -294,10 +299,6 @@ struct PdfKitView: UIViewRepresentable {
         tap.cancelsTouchesInView = false
         tap.delegate = context.coordinator
         view.addGestureRecognizer(tap)
-        // Ink: PDFKit lays a canvas over each page near the screen, which the Pencil draws on.
-        reader.inkLayer.use(document: reader.pdf ?? PDFDocument())
-        reader.inkLayer.pdfView = view
-        view.pageOverlayViewProvider = reader.inkLayer
         reader.view = view
         return view
     }
