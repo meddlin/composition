@@ -9,7 +9,7 @@ Pencil) and M3 (the first release) get their own plans when M1 is in hand. Dates
 search; images; the MDX components other than `<Ink>` and `<YouTube>`'s player; the six colour schemes and a System scheme; backup and
 restore both ways; installed on your iPad from Xcode.
 **Out of scope:** `<Ink>` and the Pencil canvas (M2), the release polish and TestFlight (M3), sync, the plugins, **any AI helper
-([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)): **it is in v1** (you, 2026-11-08) but not in M1: it is built right after M1 closes, before M2 (see [After M1: the Live view](#after-m1-the-live-view)); **it is built and checked in the Simulator (2026-11-09), and Gate L, the author's iPad, is what is left.**
+([D19](ipad-app-design.md#decisions))**, and the Live tab ([C12](ipad-app-design.md#compromise-register)): **it is in v1** (you, 2026-11-08) but not in M1: it is built right after M1 closes, before M2 (see [After M1: the Live view](#after-m1-the-live-view)); **it is built and checked in the Simulator (2026-11-09), and Gate L passed (the author, 2026-11-09): the Live tab was tried on the iPad and works well.**
 
 ## Where M1 starts
 
