@@ -121,4 +121,33 @@ final class InkUITests: XCTestCase {
         XCTAssertEqual(tags().count, 1, "in place of the old one, not beside it")
         XCTAssertTrue(app.descendants(matching: .any)["ink-picture"].waitForExistence(timeout: 20))
     }
+
+    /// Found on the iPad (2026-11-11): after *Done* on an edited drawing the preview kept showing the old picture until the tab was changed and changed back. The note named the new file
+    /// at once, but the preview drew the new name with the old strokes (they load a moment later) and never drew again. The second stroke runs the other way and widens the drawing's
+    /// box, so the picture's proportions are what tell the old picture from the new one.
+    func testThePreviewShowsTheEditedDrawingAtOnceAndNotTheOldPicture() {
+        XCTAssertTrue(editor.waitForExistence(timeout: 20))
+        var canvas = openCanvas()
+        scribble(on: canvas, from: CGVector(dx: 0.2, dy: 0.3), to: CGVector(dx: 0.7, dy: 0.6))
+        app.buttons["ink-done"].tap()
+        XCTAssertTrue(eventually { tags().count == 1 })
+        let first = tags()[0]
+
+        let picture = app.descendants(matching: .any)["ink-picture"]
+        XCTAssertTrue(picture.waitForExistence(timeout: 20))
+        let before = picture.frame.size
+        picture.tap()
+        canvas = app.descendants(matching: .any)["ink-canvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 20), "a tap on the drawing opens it again")
+        scribble(on: canvas, from: CGVector(dx: 0.3, dy: 0.7), to: CGVector(dx: 0.8, dy: 0.2))
+        app.buttons["ink-done"].tap()
+        XCTAssertTrue(eventually { tags().first.map { $0 != first } ?? false }, "the note names the edited drawing: \(tags())")
+
+        // The first drawing is about 5:3 (a stroke 50 % of the width by 30 % of the height of a landscape page); with the second stroke it is about 6:5.
+        let wide = before.width / before.height
+        XCTAssertTrue(eventually {
+            let now = app.descendants(matching: .any)["ink-picture"].frame.size
+            return now.height > 0 && now.width / now.height < wide * 0.85
+        }, "the preview still shows the old picture (\(before) before, \(app.descendants(matching: .any)["ink-picture"].frame.size) now)")
+    }
 }
