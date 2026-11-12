@@ -199,15 +199,48 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 ## Between M2 and M3: the Follow the sun redesign
 
-**Decided 2026-11-12 (you):** the scheme is redesigned on every platform that has it, and is built after M2 and before M3 (the first release). The
-person sets by hand the hours of the day at which the app moves to the next step of the blended scheme, instead of the steps following a saved city's
-sunrise and sunset. **Not designed yet.** **Open:** whether the sunrise option stays beside the hours. It gets its own plan when M2 closes.
+**Decided 2026-11-12 (you), designed the same day with you.** The scheme no longer asks where the sun is. The person sets by hand the
+hours at which the app moves from step to step of the blend, on every platform that has it (web, desktop, the CLI and the iPad now; the Windows and Linux
+ports when they come). The saved city, the lookup and every network request are gone, so the iPad app has no network use at all.
 
-Why it sits before the release: the lookup is the iPad's only network use, and with it come the App Store privacy answer and Open-Meteo's
-non-commercial licence (the facts are in the 2026-11-12 entries of [the design's log](ipad-app-design.md)). If the redesign drops the lookup and
-lands before M3, the first TestFlight build has nothing to declare there; if it keeps it, those two answers are still to give. The pieces that change
-are the web and desktop (`sunSchedule.ts`, `sunTimes.ts`, [web-follow-the-sun.md](ui/web-follow-the-sun.md)), the CLI, and the iPad's `CompositionCore/Sun`;
-the Windows and Linux designs say they follow it.
+**What was agreed (you, 2026-11-12):**
+
+| Question | Answer |
+|---|---|
+| What the hours mean | **Four hours, fading between.** *Starts getting lighter*, *Fully light from*, *Starts getting darker*, *Fully dark from*. Between each pair the page eases through the strip's seven steps (the same smoothstep as before, now over the span you set); it holds full day, or full night, the rest of the time. Not twelve held steps (the three middle steps read at only 3.1 to 3.35:1 and would stay for hours), and not two hours with a fixed fade. |
+| Defaults | 05:45, 07:15, 17:45 and 19:15: exactly what the scheme did with no city saved (06:30 and 18:30, a 90-minute fade centred on each), so nobody who never chose a city sees a change. |
+| The clock | The device's own wall clock, no time zone and no city. Travelling moves the scheme with the clock; a day with a clock change keeps the same hours. |
+| Granularity | Hours and minutes (`HH:MM`, 24-hour). |
+| Order | **Any starting point, going once round the clock in order**, so a person who sleeps by day can have light over the night. Each step is at least one minute after the one before it (one minute is a near-instant switch), and the four go round the 24 hours once, never twice. A set that does not is refused with a reason and nothing is saved. |
+| The sunrise option | **Removed entirely.** No mode switch, no city field, no lookup, no geocoding, no cache, on any platform. |
+| A saved city (`location`) and the old keys | **Ignored, and removed the next time settings are written.** No platform reads `location` any more. The desktop's rewrite of the file from known keys drops it; the iPad's settings store deletes it on purpose on any write, so the platforms agree. A backup with a city in it still restores, and the city is simply dropped. `theme: "auto"` and `sunPair` are kept as they are. With no hours saved, the defaults apply. The iPad's `sun.lastTimes.v1` default (the last launch's sunrise and sunset) is removed on launch. An older desktop that restores a new backup does not know `sunHours` and runs on its stand-in times. |
+
+**How it is kept.** One new key in `settings.json`, the same on every platform:
+`"sunHours": {"lightenFrom": "05:45", "lightFrom": "07:15", "darkenFrom": "17:45", "darkFrom": "19:15"}`. A value that is not all four valid `HH:MM` strings in
+order round the clock is read as the defaults (all or nothing: a half-valid set would not describe a day). A backup restores both ways.
+
+**The maths.** The level is a pure function of the wall-clock time of day, with no events and no calendar: with the minutes since midnight of the four hours
+and of the moment, measure forward from *Starts getting lighter*; the level eases 0 to 1 over the span to *Fully light from*, holds 1 to *Starts getting darker*,
+eases 1 to 0 to *Fully dark from*, and holds 0 round to the start. A fade may cross midnight. The text still flips between the two palettes' inks at the pair's
+point (`inkFlipLevel`), and `--auto-light` is written the same way.
+
+**The settings, on each platform.** Four rows (a label and a time) in a *When it changes* section where *Your city* was, a strip of the day drawn in the chosen
+pair's colours so the person can see what the hours make, a Save button that is off while the four are not in order (with the reason beside it), and *Use the
+defaults*. The web and desktop (Settings ▸ Styling ▸ Follow the sun) use time inputs; the iPad (Appearance ▸ Follow the sun) uses compact time pickers; the CLI
+(Settings) uses four typed `HH:MM` fields. The strips of the five pairs, and the pair choice, stay as they were.
+
+**The privacy label that follows.** With no request left in the app, *Data Not Collected* is the answer, `NSPrivacyCollectedDataTypes` stays empty (and its
+comment no longer calls it open), and the Open-Meteo non-commercial licence and 90-day logging questions are gone with the lookup. The checklist for App Store
+Connect, which is yours to enter, is in [the design's log](ipad-app-design.md).
+
+**What changes.** Web and desktop: `sunSchedule.ts` (the new level), a new `sunHours.ts`, `sunTimes.ts` deleted, `SunThemeSync`, the Settings page,
+`service.ts`, the `CompositionApi` (`saveSunHours` and `loadSunHours` replace `saveLocation` and `loadSunSchedule`), the desktop bridge, `webSettings.ts`. CLI:
+`useSunLevel.ts` and its Settings screen. iPad: `CompositionCore/Sun` (`SunHours.swift` new, `SunTimes.swift` deleted), `SunClock`, the Appearance sheet,
+`SettingsStore`. The conformance corpus [`sun.json`](../fixtures/conformance/README.md) loses the city lookup, the cache and today's times and gains the hours, the
+level over them and the wall clock in fourteen zones; `sunConformance.test.ts` writes it and `SunConformanceTests` replays it. The Windows and Linux designs already
+say they port the hours, not `sunTimes.ts`.
+
+**Status:** design agreed with you 2026-11-12; building.
 
 ## Risks
 
