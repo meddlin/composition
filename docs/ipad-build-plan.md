@@ -197,6 +197,18 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 **M1 is done (the author, 2026-11-08).** The code is merged ([#247](https://github.com/meddlin/composition/pull/247)), every M1 row is built, Gate B was answered on the iPad (typing speed, Scribble and the Pencil in a text view, hidden marks, VoiceOver), and the author has run the manual test page's checks on a Release build and calls it done. What was **not** re-checked by anyone but the author, and so is not in any test: the real Split View, Slide Over and Stage Manager as a person would use them, and the export-and-restore round trip by hand. The next piece of work is [the Live view](ipad-live-view-plan.md).
 
+## Between M2 and M3: the Follow the sun redesign
+
+**Decided 2026-11-12 (you):** the scheme is redesigned on every platform that has it, and is built after M2 and before M3 (the first release). The
+person sets by hand the hours of the day at which the app moves to the next step of the blended scheme, instead of the steps following a saved city's
+sunrise and sunset. **Not designed yet.** **Open:** whether the sunrise option stays beside the hours. It gets its own plan when M2 closes.
+
+Why it sits before the release: the lookup is the iPad's only network use, and with it come the App Store privacy answer and Open-Meteo's
+non-commercial licence (the facts are in the 2026-11-12 entries of [the design's log](ipad-app-design.md)). If the redesign drops the lookup and
+lands before M3, the first TestFlight build has nothing to declare there; if it keeps it, those two answers are still to give. The pieces that change
+are the web and desktop (`sunSchedule.ts`, `sunTimes.ts`, [web-follow-the-sun.md](ui/web-follow-the-sun.md)), the CLI, and the iPad's `CompositionCore/Sun`;
+the Windows and Linux designs say they follow it.
+
 ## Risks
 
 | Risk | Likelihood / impact | Mitigation |

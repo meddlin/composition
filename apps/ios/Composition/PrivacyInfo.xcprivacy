@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The app's own privacy manifest, which Apple requires on every upload (docs/ipad-build-plan.md, G3). It covers the app and the local
+	     CompositionCore package compiled into it; GRDB.swift ships its own manifest and swift-markdown and swift-cmark need none.
+	     Keep it in step with the code: a new use of one of Apple's "required reason" APIs needs its category and reason added here. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<!-- OPEN, the author's call with the App Privacy answers in App Store Connect: the sunrise and sunset lookup (SunTimes.swift) sends the city
+	     the person types, and then that city's coordinates, to Open-Meteo, a third party. Whether Apple counts that as "collected" decides whether
+	     this lists Coarse Location (not linked, not for tracking, for App Functionality), and the two answers should agree. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- File timestamps: the stored images' modification dates (ImageLibrary), `lstat` and sizes of files in the app's own folder (Backup,
+		     export), and the size and type of a file picked in Files before it is imported (DocumentLibrary). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+				<string>3B52.1</string>
+			</array>
+		</dict>
+		<!-- System boot time: `ProcessInfo.systemUptime` times the autosave pause (NoteAutosaver). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+		<!-- User defaults: the app's own settings (the sun clock's saved level, the PDF mark colour, the finger-draws switch, split-view sizes). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

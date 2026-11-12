@@ -375,7 +375,7 @@ iPad's acceptance criteria on the first run, with no sidecar. It is not planned 
   `AdwTabView` and `AdwTabOverview` (both in 1.5) are the route if tabs are wanted later.
 - **Themes:** a **System** scheme is the default and follows GNOME's light and dark live through `AdwStyleManager` (forced either way in
   the spikes, never changed through the system setting: unverified). The five colour schemes become a CSS provider over libadwaita's named
-  colours, custom GtkSourceView style schemes, and the preview's `data-theme`. "Follow the sun" ports `sunTimes.ts`. There is no system
+  colours, custom GtkSourceView style schemes, and the preview's `data-theme`. "Follow the sun" follows the redesign decided 2026-11-12 (the hours set by hand, built on the other platforms first), not `sunTimes.ts`. There is no system
   accent colour on Ubuntu 24.04 (libadwaita 1.5).
 - **Fonts:** the system font and the system monospace font by default; the desktop's open-source choices as options.
 - **Keyboard:** `GtkShortcutsWindow` on `Ctrl+?` replaces the shortcuts helper; GNOME's text-editing keys come with GTK.
@@ -462,7 +462,7 @@ same pull request that changes it.**
 |---|:-:|:-:|:-:|---|
 | App shell, windows, lifecycle | 🆕 | M1 | 🔬 | `AdwApplication`; flush on `close-request`; spiked ([S3](../apps/linux/spikes/s3-shell/RESULT.md)) |
 | Five colour schemes | 🔁 | M1 | ⬜ | CSS over libadwaita colours, GtkSourceView schemes, the preview's `data-theme`; add **System** (⭐) |
-| "Follow the sun" | 🔁 | M3† | ⬜ | Port `sunTimes.ts`; needs the saved city |
+| "Follow the sun" | 🔁 | M3† | ⬜ | **Redesign decided 2026-11-12:** port the hours-set-by-hand scheme once it is built elsewhere, not `sunTimes.ts` and its saved city (whether the sunrise option stays is open) |
 | Fonts | 🔁 | M1 | ⬜ | System fonts by default; bundled families as options |
 | Keyboard shortcuts and helper | ⭐ | M1 | ⬜ | `GtkShortcutsWindow` |
 | Accessibility, IME, text scaling | ⭐ | M1 | 🔬 | AT-SPI tree and IBus Hangul shown in a container; the native bar N6 to N8 |

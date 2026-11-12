@@ -9,7 +9,12 @@ Source: [`sunSchedule.ts`](../../apps/web/src/lib/composition/sunSchedule.ts),
 
 A fifth color scheme, chosen in Settings like the others, that is dark at night and light
 by day and eases between the two around the sunrise and sunset of a saved city. Available
-in the web and desktop apps; the CLI has no counterpart.
+in the web and desktop apps, and in the CLI and the iPad app (see [the feature matrix](../feature-matrix.md)).
+
+> **Planned change (decided 2026-11-12, not designed):** on every platform, the person will set by hand the hours of the day at
+> which the scheme moves to the next step of the blend, instead of it following a saved city's sunrise and sunset. It is built
+> between M2 and M3 of the iPad plan ([ipad-build-plan.md](../ipad-build-plan.md#between-m2-and-m3-the-follow-the-sun-redesign)).
+> Whether the sunrise option stays as a choice beside the hours is open.
 
 ## Setting it up
 
