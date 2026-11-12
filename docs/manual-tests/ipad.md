@@ -450,6 +450,8 @@ Built 2026-11-09 and tried only in the Simulator, **with a finger standing in fo
 (items 161, 168, 265), the words Vision reads go into `alt` (item 263), a dark scheme draws a fixed colour as PencilKit does (item 164), and the desktop and the CLI now show a drawing
 (item 171). These start at 160 because the Live items end at 136 and the PDF reader's start at 140 and run to 157; items 263 to 267 are new and come last so that the numbers above do not move (172 to 262 were taken by other lists by the time they were written).
 
+**Tried with the Pencil, 2026-11-11 (a Release build):** drawing with the Pencil "works well" (item 160, said as a whole: latency against Notes (264), the pens (163), the dark schemes (164) and the rest of the list were not reported, so Gate C is still not passed). One bug came out of it: after *Done* on an **edited** drawing (item 162) the preview kept the old picture until the tab was changed and changed back. The note had the new name at once, but the preview drew the new name with the old strokes, which load a moment later, and never drew again. Fixed in `PreviewImageView` (the strokes are used only for the name they were read from); `testThePreviewShowsTheEditedDrawingAtOnceAndNotTheOldPicture` fails without the fix and passes with it, and item 162 was tried again on the iPad with a build that has it: the edited drawing shows at once.
+
 **What to bring to Gate C**
 
 - [ ] The **Apple Pencil paired** to the iPad, and *Only draw with Apple Pencil* in Settings → Apple Pencil on for 160 and off for a finger try.
@@ -481,6 +483,8 @@ Built 2026-11-09 and tried only in the Simulator, **with a finger standing in fo
 ## Release polish screens (M3†: header image, outline, Images page, home page)
 
 Built 2026-11-09 and tried only in the Simulator (`PolishUITests`: the header image is chosen, changed and removed; the outline lists the headings and moves the preview and the editor; the Images page browses, filters, inserts and deletes; the home page lists notebooks, recent notes and pinned ones and leads to them), in landscape first and then portrait. What is yours is how they feel on the iPad, with a hand, and with your own notes and pictures. These continue after 183 (the follow-the-sun, ruler and reflow items above), and are numbered from 184 to 199; items 200 to 215 belong to spike B's PDF ink lab (below), so the rest of this section's items continue at 216 and run to 226.
+
+**Tried on the iPad, 2026-11-11 (a Release build, with the hand):** the header image works, the Images page works, and the home page works. That was said of each as a whole: the items above were not gone through one by one, so none is ticked, and the outline (191 to 197) was not mentioned.
 
 **Header image** (the picture-in-a-frame button in a note's toolbar)
 

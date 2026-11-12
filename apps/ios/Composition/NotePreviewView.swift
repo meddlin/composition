@@ -169,8 +169,10 @@ struct PreviewImageView: View {
     let width: ImageWidth?
     let isDiagram: Bool
     @Environment(\.imageFolder) private var folder
-    /// The strokes of a stored PNG that carries some (a drawing): it is drawn from them, in the scheme in force, instead of from its pixels.
-    @State private var strokes: InkDocument?
+    /// The strokes of a stored PNG that carries some (a drawing), and the file they were read from: it is drawn from them, in the scheme in force, instead of from its pixels.
+    /// They are used only while they belong to the name now in the note. An edited drawing is a new file under a new name, this view keeps its place in the preview, and the
+    /// new strokes load a moment after the new name arrives: drawn from the old ones in that moment, the picture would be the old drawing for good (found on the iPad, 2026-11-11).
+    @State private var loaded: (name: String, strokes: InkDocument)?
 
     private var storedName: String? {
         if case .stored(let name) = source { name } else { nil }
@@ -181,7 +183,7 @@ struct PreviewImageView: View {
             switch source {
             case .stored(let name):
                 if let folder, let image = UIImage(contentsOfFile: folder.appendingPathComponent(name).path) {
-                    if let strokes { InkPictureView(name: name, alt: alt, width: width, strokes: strokes) } else { drawn(image) }
+                    if let loaded, loaded.name == name { InkPictureView(name: name, alt: alt, width: width, strokes: loaded.strokes) } else { drawn(image) }
                 } else {
                     NoticeView(text: "Image not found: \(name)", tone: .warning)
                 }
@@ -195,9 +197,10 @@ struct PreviewImageView: View {
             }
         }
         .task(id: storedName) {
-            guard let folder, let name = storedName else { return strokes = nil }
+            guard let folder, let name = storedName else { return loaded = nil }
             let url = folder.appendingPathComponent(name)
-            strokes = await Task.detached { InkTag.contents(ofFileAt: url).flatMap { try? $0.drawing() } }.value
+            let strokes = await Task.detached { InkTag.contents(ofFileAt: url).flatMap { try? $0.drawing() } }.value
+            loaded = strokes.map { (name: name, strokes: $0) }
         }
     }
 
