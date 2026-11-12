@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <title>Benchnote app icon: a note page, one line highlighted, standing on a workbench</title>
+  <!--
+    The source of the iPad app icon. build.sh renders it to the three PNGs in the asset catalog; read the README beside it.
+    Colours are the Cream scheme's (apps/web/src/app/globals.css: brand #9a4a1f, paper #f6f0e1, panel #e4d9be, ink #3b3226) and the
+    Cream-to-amber pair's amber (#e8a13a). The styles below are the "Any" appearance; dark.css and tinted.css override them.
+    Flat shapes only, no blur, shadow or highlight: the system adds its own (HIG, Visual effects). The corners are square: the system rounds them.
+  -->
+  <style>
+    .bg { fill: #9a4a1f; }
+    .paper { fill: #f6f0e1; stroke: #f6f0e1; }
+    .fold { fill: #e4d9be; stroke: #e4d9be; }
+    .mark { fill: #e8a13a; }
+    .bar { fill: #3b3226; }
+    .bench { fill: #3b3226; }
+  </style>
+  <g id="background">
+    <rect class="bg" width="1024" height="1024"/>
+  </g>
+  <!-- Lifted 18 px so the heavy bench does not drag the picture below the middle of the tile. -->
+  <g id="foreground" transform="translate(0 -18)">
+    <g id="page">
+      <!-- The page's corners are rounded by a 40 px stroke of its own colour, so its path is 20 px inside the edge. -->
+      <path class="paper" d="M332 200 H602 L692 290 V620 H332 Z" stroke-width="40" stroke-linejoin="round"/>
+      <path class="fold" d="M602 200 V290 H692 Z" stroke-width="40" stroke-linejoin="round"/>
+      <rect class="mark" x="352" y="400" width="320" height="96" rx="16"/>
+      <rect class="bar" x="384" y="334" width="200" height="40" rx="20"/>
+      <rect class="bar" x="384" y="428" width="256" height="40" rx="20"/>
+      <rect class="bar" x="384" y="526" width="170" height="40" rx="20"/>
+    </g>
+    <g id="bench">
+      <rect class="bench" x="112" y="640" width="800" height="104" rx="20"/>
+      <rect class="bench" x="184" y="744" width="76" height="136"/>
+      <rect class="bench" x="764" y="744" width="76" height="136"/>
+    </g>
+  </g>
+</svg>
