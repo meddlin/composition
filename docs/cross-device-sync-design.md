@@ -143,7 +143,7 @@ Facts that drive the design, checked against `main`.
 | Attachments (files attached to a note) | **Fast follow** | Desktop only today; up to 1 GB each, so they need quotas, chunked upload and download on demand. |
 | PDFs: the file, its marks and its bookmarks | **Fast follow** | Desktop and iPad (M2) both read them. Files up to 1 GB, so the same plan as attachments; the marks are small records with a `uuid` each; see [Fast follow](#fast-follow-attachments-and-plugin-data). |
 | To-do (with its weekly cycle), Reading List, RSS Reader | **Fast follow** | The iPad has none of the plugins in v1, but desktops share them. The weekly cycle needs rules so two devices don't both close a week. |
-| Settings: colour scheme, fonts, city, window layout | **No** | Per device on purpose. |
+| Settings: colour scheme, fonts, Follow the sun hours, window layout | **No** | Per device on purpose. |
 | Favorites | Later | They hold device-local integer ids today. |
 | AI helper keys and sign-in tokens | **Never** | Secrets stay on the device. |
 | The search index | **Never** | Derived data; each device rebuilds its own. |

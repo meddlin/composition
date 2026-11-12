@@ -19,7 +19,7 @@ can list and unpack, so a backup never locks the user into this app:
 
 ```
 composition-backup.json   what this is, the format version, when, how many of each thing
-settings.json             color scheme, city, column sizes, favorites, the AI helper's server address and context size, the to-do settings
+settings.json             color scheme, Follow the sun hours, column sizes, favorites, the AI helper's server address and context size, the to-do settings
 composition.db            a consistent snapshot of the database
 app_data/<image>          every pasted image
 attachments/<file>        every attached file

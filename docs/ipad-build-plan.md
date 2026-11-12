@@ -227,7 +227,7 @@ point (`inkFlipLevel`), and `--auto-light` is written the same way.
 **The settings, on each platform.** Four rows (a label and a time) in a *When it changes* section where *Your city* was, a strip of the day drawn in the chosen
 pair's colours so the person can see what the hours make, a Save button that is off while the four are not in order (with the reason beside it), and *Use the
 defaults*. The web and desktop (Settings ▸ Styling ▸ Follow the sun) use time inputs; the iPad (Appearance ▸ Follow the sun) uses compact time pickers; the CLI
-(Settings) uses four typed `HH:MM` fields. The strips of the five pairs, and the pair choice, stay as they were.
+(Settings) uses one line holding the four typed `HH:MM` (its screen has no room for four fields). The strips of the five pairs, and the pair choice, stay as they were.
 
 **The privacy label that follows.** With no request left in the app, *Data Not Collected* is the answer, `NSPrivacyCollectedDataTypes` stays empty (and its
 comment no longer calls it open), and the Open-Meteo non-commercial licence and 90-day logging questions are gone with the lookup. The checklist for App Store
@@ -240,7 +240,7 @@ Connect, which is yours to enter, is in [the design's log](ipad-app-design.md).
 level over them and the wall clock in fourteen zones; `sunConformance.test.ts` writes it and `SunConformanceTests` replays it. The Windows and Linux designs already
 say they port the hours, not `sunTimes.ts`.
 
-**Status:** design agreed with you 2026-11-12; building.
+**Status: done 2026-11-12** (design agreed with you, then built the same day on the web, desktop, CLI and iPad; Simulator only on the iPad, so manual items 172 to 177 and the App Store Connect answers are yours). See [the design's log](ipad-app-design.md). The Windows and Linux ports follow later.
 
 ## Risks
 

@@ -158,7 +158,7 @@ Each of these covers one slice of the system in more depth:
   rule, favorites, and how the tree is built.
 - [Images](architecture/images.md): pasting images into a note in the web and desktop apps, and how
   the terminal app draws them.
-- [Appearance](architecture/appearance.md): the iPad app's colour schemes, Follow the sun (its palettes, the city lookup and the fade), and the ruler and reflow that help with the shape of the text.
+- [Appearance](architecture/appearance.md): the iPad app's colour schemes, Follow the sun (its palettes, the four hand-set hours and the fade), and the ruler and reflow that help with the shape of the text.
 - [Ink](architecture/ink.md): drawings made with the Apple Pencil on the iPad: the stroke format, the PNG
   that carries its strokes, how PencilKit's drawing maps to it, how big a page is, and how the web,
   desktop and CLI show a drawing (view only).

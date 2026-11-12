@@ -237,7 +237,7 @@ as commands (in the editor and, through the bridge, the preview), and the ruler 
 - **Navigation:** a `NavigationView` or a custom three-column layout for notebooks and groups, the notes list and the note; a `TabView` for open notes; **Open in new window** through `AppWindow`. Back and forward as history plus Alt+Left and Alt+Right.
   Resizable columns need a splitter (WinUI 3 has none): a Toolkit sizer or our own.
 - **Materials and chrome:** Mica as `Window.SystemBackdrop` on Windows 11 (a solid colour on Windows 10, and wherever transparency effects are off or the GPU is below DirectX 11: [materials](https://learn.microsoft.com/en-us/windows/apps/develop/ui/materials)); a custom title bar only if it keeps the system caption buttons so **snap layouts** keep working (unverified, S5).
-- **Themes:** the six schemes become resource dictionaries of semantic tokens ported from `themes.ts`, plus a **System** scheme that follows Windows light, dark and **high contrast** (⭐). "Follow the sun" follows the redesign decided 2026-11-12 (the hours set by hand, built on the other platforms first), not `sunTimes.ts` (M3†). The WebView2 preview receives the scheme as `data-theme` (S3 re-rendered one).
+- **Themes:** the six schemes become resource dictionaries of semantic tokens ported from `themes.ts`, plus a **System** scheme that follows Windows light, dark and **high contrast** (⭐). "Follow the sun" is the four hand-set hours built on the other platforms on 2026-11-12 (`sunHours.ts`, with `fixtures/conformance/sun.json` as its oracle), not the city lookup of `sunTimes.ts`, which is gone: no network request and no saved city (M3†). The WebView2 preview receives the scheme as `data-theme` (S3 re-rendered one).
   Fonts default to Segoe UI Variable and Cascadia Mono; the desktop's open-source families can be bundled.
 - **Keyboard:** `KeyboardAccelerator`s with the Windows shortcuts that exist (Ctrl+N, Ctrl+F, Ctrl+W, F6); the shortcuts helper becomes a dialog (M3†).
 - **Drag and drop:** `CanDrag` and `AllowDrop` for notes and groups, plus files and images dropped from Explorer.
@@ -313,7 +313,7 @@ Sections follow [feature-matrix.md](feature-matrix.md). Compromise ids point at 
 |---|:-:|:-:|:-:|---|
 | App shell, windows, lifecycle, single-instance | 🆕 | M1 | ⬜ | WinUI 3 `Application`, `AppWindow`; flush on deactivate and close |
 | Six colour schemes | 🔁 | M1 | ⬜ | Token resource dictionaries ported from `themes.ts`; + **System** scheme (⭐) that follows light, dark and high contrast |
-| "Follow the sun" scheme | 🔁 | M3† | ⬜ | **Redesign decided 2026-11-12:** port the hours-set-by-hand scheme once it is built elsewhere, not `sunTimes.ts` and its saved city (whether the sunrise option stays is open) |
+| "Follow the sun" scheme | 🔁 | M3† | ⬜ | **Redesigned and built on the other platforms 2026-11-12:** port the four hand-set hours (`sunHours.ts`, `sunSchedule.ts`; replay `fixtures/conformance/sun.json`) in the Appearance page; the sunrise option and the city lookup are gone, so there is no network use to port |
 | Fonts | 🔁 | M1 | ⬜ | Segoe UI Variable and Cascadia Mono by default; bundled families as options |
 | Mica, snap layouts, system accent | ⭐ | M1 | ⬜ | The native bar, N2 to N4; Windows 11 only for Mica |
 | Hardware-keyboard shortcuts | 🔁 | M1 | ⬜ | `KeyboardAccelerator`; audit against Windows-reserved combinations |

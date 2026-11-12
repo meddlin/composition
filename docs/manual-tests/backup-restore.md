@@ -28,7 +28,7 @@ and says which command to run there.
 | Stage | You | The wizard |
 |---|---|---|
 | 1 | | Builds the check tool and runs its headless self-test (backup → wipe → restore → verify, no app) |
-| 2 | | Creates the test data: groups *Projects* ⊃ *Alpha*; notes *Welcome*, *Alpha plan*, *Picture note* (with an image), *Report note* (with an attached file), and *Deleted note* in the Trash Can; the Forest scheme, a city, column sizes and a pinned favorite |
+| 2 | | Creates the test data: groups *Projects* ⊃ *Alpha*; notes *Welcome*, *Alpha plan*, *Picture note* (with an image), *Report note* (with an attached file), and *Deleted note* in the Trash Can; the Forest scheme, Follow the sun hours (19:00, 20:00, 05:00, 06:00), column sizes and a pinned favorite |
 | 3 | Start the app on that data (second terminal) and look around | Prints the command |
 | 4 | **Create a backup** in Settings | Finds the file, lists what is in it and checks it against the test data |
 | 5 | Quit the app | Wipes the database, images, attachments and settings, and shows `verify` failing (the loss is real) |
