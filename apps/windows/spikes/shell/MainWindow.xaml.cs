@@ -73,7 +73,7 @@ public sealed partial class MainWindow : Window
         var sb = new StringBuilder();
         for (var i = 0; i < lines; i++)
         {
-            sb.Append(i % 50 switch
+            sb.Append((i % 50) switch
             {
                 0 => $"# Section {i / 50}\r",
                 1 => "<Info>\r",
@@ -121,17 +121,44 @@ public sealed partial class MainWindow : Window
         var middle = all.IndexOf("Line 2500:", StringComparison.Ordinal);
         doc.Selection.SetRange(Math.Max(middle, 0), Math.Max(middle, 0));
         var times = new List<double>(200);
+        var typeOnly = new List<double>(200);
+        var colourOnly = new List<double>(200);
         for (var i = 0; i < 200; i++)
         {
             var t0 = Stopwatch.GetTimestamp();
             doc.Selection.TypeText("x");
+            var t1 = Stopwatch.GetTimestamp();
             MarkdownColour.ApplyParagraph(doc, doc.Selection.StartPosition);
             times.Add(Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
+            typeOnly.Add(Stopwatch.GetElapsedTime(t0, t1).TotalMilliseconds);
+            colourOnly.Add(Stopwatch.GetElapsedTime(t1).TotalMilliseconds);
         }
-        times.Sort();
-        _results["typeEdit_ms_p50"] = Math.Round(times[times.Count / 2], 2);
-        _results["typeEdit_ms_p95"] = Math.Round(times[(int)(times.Count * 0.95)], 2);
-        _results["typeEdit_ms_max"] = Math.Round(times[^1], 2);
+        void Record(string name, List<double> xs)
+        {
+            xs.Sort();
+            _results[$"{name}_ms_p50"] = Math.Round(xs[xs.Count / 2], 2);
+            _results[$"{name}_ms_p95"] = Math.Round(xs[(int)(xs.Count * 0.95)], 2);
+            _results[$"{name}_ms_max"] = Math.Round(xs[^1], 2);
+        }
+        // The same edit with repaint held for the keystroke and the recolour (one repaint per edit instead of two). If this is far
+        // below the sum of the two parts, their cost is waiting on display updates, not RichEdit's text work.
+        var batched = new List<double>(200);
+        for (var i = 0; i < 200; i++)
+        {
+            var t0 = Stopwatch.GetTimestamp();
+            doc.BatchDisplayUpdates();
+            try
+            {
+                doc.Selection.TypeText("y");
+                MarkdownColour.ApplyParagraph(doc, doc.Selection.StartPosition);
+            }
+            finally { doc.ApplyDisplayUpdates(); }
+            batched.Add(Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
+        }
+        Record("typeEditBatched", batched);
+        Record("typeEdit", times);         // the keystroke and the recolour together, as before
+        Record("typeTextOnly", typeOnly);  // RichEdit inserting one character
+        Record("colourParagraphOnly", colourOnly);
         Say($"200 edits in a 5,000-line note: p50 {_results["typeEdit_ms_p50"]} ms, p95 {_results["typeEdit_ms_p95"]} ms, max {_results["typeEdit_ms_max"]} ms (the call, not the paint).");
     }
 
@@ -169,13 +196,25 @@ public sealed partial class MainWindow : Window
     {
         long Mb(long bytes) => bytes / 1024 / 1024;
         using var self = Process.GetCurrentProcess();
-        // Counts EVERY msedgewebview2 on the machine, so run this on a machine with no other WebView2 app open.
-        var web = Process.GetProcessesByName("msedgewebview2");
         _results["mbWorkingSet_app"] = Mb(self.WorkingSet64);
-        _results["mbWorkingSet_webview2_all"] = Mb(web.Sum(p => p.WorkingSet64));
-        _results["webview2ProcessCount"] = web.Length;
         _results["mbPrivate_app"] = Mb(self.PrivateMemorySize64);
-        _results["mbPrivate_webview2_all"] = Mb(web.Sum(p => p.PrivateMemorySize64));
+
+        // This app's own WebView2 processes (browser, renderer, GPU, utilities), as WebView2 reports them, so other WebView2
+        // apps on the machine (Search, Widgets, Copilot, Teams) do not count.
+        var own = new List<Process>();
+        foreach (var info in Preview.CoreWebView2.Environment.GetProcessInfos())
+        {
+            try { own.Add(Process.GetProcessById(info.ProcessId)); } catch (ArgumentException) { /* exited since */ }
+        }
+        _results["mbWorkingSet_webview2_own"] = Mb(own.Sum(p => p.WorkingSet64));
+        _results["mbPrivate_webview2_own"] = Mb(own.Sum(p => p.PrivateMemorySize64));
+        _results["webview2ProcessCount_own"] = own.Count;
+        foreach (var p in own) p.Dispose();
+
+        // Every msedgewebview2 on the machine, kept for comparison with runs of the earlier version of this spike.
+        var web = Process.GetProcessesByName("msedgewebview2");
+        _results["mbWorkingSet_webview2_all"] = Mb(web.Sum(p => p.WorkingSet64));
+        _results["webview2ProcessCount_all"] = web.Length;
         foreach (var p in web) p.Dispose();
     }
 }
