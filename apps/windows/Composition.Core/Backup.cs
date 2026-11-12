@@ -7,17 +7,17 @@ using Microsoft.Data.Sqlite;
 namespace Composition.Core;
 
 public sealed record BackupCounts(long Notes, long Groups, long TrashedNotes, long TrashedGroups, long Attachments,
-    long Todos, long ArchivedTodos, long Contacts, long Images);
+    long Documents, long Todos, long ArchivedTodos, long Contacts, long Images);
 
 public sealed record BackupSummary(string File, long Bytes, string CreatedAt, BackupCounts Counts);
 
 /// <summary>An unpacked, checked backup waiting in a scratch folder (nothing outside it has been touched).</summary>
-public sealed record StagedBackup(string Dir, string CreatedAt, BackupCounts Counts, byte[]? SettingsJson, bool HasImages, bool HasAttachments);
+public sealed record StagedBackup(string Dir, string CreatedAt, BackupCounts Counts, byte[]? SettingsJson, bool HasImages, bool HasAttachments, bool HasDocuments);
 
 /// <summary>
 /// Backup and restore, ported from apps/web/src/lib/composition/backup.ts. One <c>.tar.gz</c>:
 /// <c>composition-backup.json</c>, <c>settings.json</c>, <c>composition.db</c> (a <c>VACUUM INTO</c> snapshot),
-/// <c>app_data/&lt;image&gt;</c>, <c>attachments/&lt;file&gt;</c>. Restore is two steps (stage, then apply with rollback)
+/// <c>app_data/&lt;image&gt;</c>, <c>attachments/&lt;file&gt;</c>, <c>documents/&lt;file&gt;</c> (the PDFs notes own). Restore is two steps (stage, then apply with rollback)
 /// so nothing is touched until the file is known to be good.
 /// </summary>
 public static class Backup
@@ -26,6 +26,7 @@ public static class Backup
     public const int FormatVersion = 1;
     public const string ImageDir = "app_data";
     public const string AttachmentDir = "attachments";
+    public const string DocumentDir = "documents"; // documentNames.ts DOCUMENT_DIR_NAME
     private const string ManifestName = "composition-backup.json";
     private const string SettingsName = "settings.json";
     private const string DatabaseName = "composition.db";
@@ -67,7 +68,7 @@ public static class Backup
         using var db = OpenFile(databaseFile, readOnly: true);
         var archived = Count(db, "todos", "archived_at IS NOT NULL");
         return new BackupCounts(Count(db, "notes"), Count(db, "groups"), Count(db, "trashed_notes"), Count(db, "trashed_groups"),
-            Count(db, "attachments"), Count(db, "todos") - archived, archived, Count(db, "contacts"), images);
+            Count(db, "attachments"), Count(db, "documents"), Count(db, "todos") - archived, archived, Count(db, "contacts"), images);
     }
 
     private static List<string> ListFiles(string dir) =>
@@ -91,6 +92,7 @@ public static class Backup
             w.WriteNumber("trashedNotes", c.TrashedNotes);
             w.WriteNumber("trashedGroups", c.TrashedGroups);
             w.WriteNumber("attachments", c.Attachments);
+            w.WriteNumber("documents", c.Documents);
             w.WriteNumber("todos", c.Todos);
             w.WriteNumber("archivedTodos", c.ArchivedTodos);
             w.WriteNumber("contacts", c.Contacts);
@@ -122,6 +124,7 @@ public static class Backup
             }
             var images = ListFiles(Path.Combine(appDataDir, ImageDir)).Where(n => ImageName.IsMatch(n)).ToList();
             var attachments = ListFiles(Path.Combine(appDataDir, AttachmentDir)).Where(n => StoredName.IsMatch(n)).ToList();
+            var documents = ListFiles(Path.Combine(appDataDir, DocumentDir)).Where(n => StoredName.IsMatch(n)).ToList();
             var createdAt = Timestamp.Format(now ?? DateTime.UtcNow);
             var counts = CountRows(snapshot, images.Count);
 
@@ -130,6 +133,7 @@ public static class Backup
             var sources = new List<ArchiveSource> { new(DatabaseName, snapshot) };
             sources.AddRange(images.Select(n => new ArchiveSource($"{ImageDir}/{n}", Path.Combine(appDataDir, ImageDir, n))));
             sources.AddRange(attachments.Select(n => new ArchiveSource($"{AttachmentDir}/{n}", Path.Combine(appDataDir, AttachmentDir, n))));
+            sources.AddRange(documents.Select(n => new ArchiveSource($"{DocumentDir}/{n}", Path.Combine(appDataDir, DocumentDir, n))));
             TarGz.Write(file, contents, sources);
             return new BackupSummary(file, new FileInfo(file).Length, createdAt, counts);
         }
@@ -162,7 +166,7 @@ public static class Backup
             byte[]? settings = null;
             var hasDatabase = false;
             var seen = new HashSet<string>(StringComparer.Ordinal);
-            long images = 0, attachments = 0;
+            long images = 0, attachments = 0, documents = 0;
 
             TarGz.Read(file, (name, size, data) =>
             {
@@ -191,9 +195,10 @@ public static class Backup
                 else
                 {
                     var parts = name.Split('/');
-                    var valid = parts.Length == 2 && ((parts[0] == ImageDir && ImageName.IsMatch(parts[1])) || (parts[0] == AttachmentDir && StoredName.IsMatch(parts[1])));
+                    var valid = parts.Length == 2 && ((parts[0] == ImageDir && ImageName.IsMatch(parts[1])) || (parts[0] == AttachmentDir && StoredName.IsMatch(parts[1]))
+                        || (parts[0] == DocumentDir && StoredName.IsMatch(parts[1])));
                     if (!valid) throw new ArchiveError($"The backup contains a file Composition doesn't know ({name}), so it was not restored.");
-                    if (parts[0] == ImageDir) images++; else attachments++;
+                    if (parts[0] == ImageDir) images++; else if (parts[0] == DocumentDir) documents++; else attachments++;
                     Directory.CreateDirectory(Path.Combine(dir, parts[0]));
                     target = Path.Combine(dir, parts[0], parts[1]);
                 }
@@ -205,7 +210,7 @@ public static class Backup
             if (!hasDatabase) throw new ArchiveError("This backup has no database in it, so nothing was restored.");
             var staged = Path.Combine(dir, DatabaseName);
             AssertUsable(staged);
-            return new StagedBackup(dir, createdAt, CountRows(staged, images), settings, images > 0, attachments > 0);
+            return new StagedBackup(dir, createdAt, CountRows(staged, images), settings, images > 0, attachments > 0, documents > 0);
         }
         catch
         {
@@ -257,7 +262,7 @@ public static class Backup
     }
 
     /// <summary>
-    /// Replaces the current database, images and attachments with the staged ones, with a rollback if anything fails halfway.
+    /// Replaces the current database, images, attachments and PDFs with the staged ones, with a rollback if anything fails halfway.
     /// The caller must have closed every connection to the database (with pooling on, on Windows, "closed" is not enough).
     /// </summary>
     public static void ApplyStaged(StagedBackup staged, string appDataDir, string dbPath)
@@ -270,6 +275,7 @@ public static class Backup
         swaps.AddRange(DatabaseSuffixes.Select(s => (dbPath + s, (string?)null)));
         swaps.Add((Path.Combine(appDataDir, ImageDir), staged.HasImages ? Path.Combine(staged.Dir, ImageDir) : null));
         swaps.Add((Path.Combine(appDataDir, AttachmentDir), staged.HasAttachments ? Path.Combine(staged.Dir, AttachmentDir) : null));
+        swaps.Add((Path.Combine(appDataDir, DocumentDir), staged.HasDocuments ? Path.Combine(staged.Dir, DocumentDir) : null));
 
         var setAside = new List<(string Current, string Parked)>();
         var placed = new List<string>();

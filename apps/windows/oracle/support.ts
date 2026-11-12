@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-export const WEB_DIR = path.resolve(here, "../../../web");
+export const WEB_DIR = path.resolve(here, "../../web");
 export const COMPOSITION_LIB = path.join(WEB_DIR, "src/lib/composition");
 
 // better-sqlite3 lives in apps/web/node_modules, not above this folder.
@@ -15,14 +15,14 @@ export const Database = requireFromWeb("better-sqlite3") as typeof import("bette
 
 export function oracleDir(): string {
   const dir = process.env.COMPOSITION_ORACLE_DIR;
-  if (!dir) throw new Error("Set COMPOSITION_ORACLE_DIR (run through apps/windows/spikes/run-core-spike.sh).");
+  if (!dir) throw new Error("Set COMPOSITION_ORACLE_DIR (run through apps/windows/scripts/conformance.sh).");
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
 
 /** A throwaway HOME, so the real db.ts / backup.ts resolve ~/.composition into it and never into the user's data. */
 export function isolatedHome(): { home: string; appDataDir: string; dbFile: string } {
-  const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-winspike-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "composition-windows-oracle-"));
   const appDataDir = path.join(home, ".composition");
   fs.mkdirSync(appDataDir, { recursive: true });
   return { home, appDataDir, dbFile: path.join(appDataDir, "composition.db") };
@@ -103,4 +103,16 @@ export function populate(db: Db, insertSql: (sql: string, ...params: unknown[]) 
   insertSql("INSERT INTO trashed_notes (id, title, content, created_at, updated_at, group_id, deleted_at, notebook_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 90, "Trashed", "gone", t, t, null, t, 1);
   insertSql("INSERT INTO trashed_groups (id, name, parent_id, created_at, updated_at, deleted_at, notebook_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 91, "Trashed group", null, t, t, t, 1);
   insertSql("INSERT INTO attachments (note_id, file_name, stored_name, size, created_at) VALUES (?, ?, ?, ?, ?)", 1, "Spec.pdf", "spec-1a2b3c.pdf", 5, t);
+  insertSql(
+    "INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, view_state, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    2, "Paper.pdf", "paper-0a1b2c.pdf", "ab".repeat(32), 6, 2, null, t,
+  );
+  insertSql(
+    "INSERT INTO pdf_annotations (document_id, page, kind, color, rects, quote, comment, body, group_uuid, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    1, 0, "highlight", "yellow", "[[72,700,300,712]]", "a quoted line", "", null, null, t, t,
+  );
+  insertSql("INSERT INTO pdf_bookmarks (document_id, page, label, created_at) VALUES (?, ?, ?, ?)", 1, 1, "Intro", t);
 }
+
+/** The tables that carry a uuid (db.ts UUID_TABLES); every one of them must survive a round trip, uuid included. */
+export const UUID_TABLES = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments", "documents", "pdf_annotations", "pdf_bookmarks"];

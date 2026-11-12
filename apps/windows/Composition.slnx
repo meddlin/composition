@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Composition.Core/Composition.Core.csproj" />
+  <Project Path="Composition.Core.Tests/Composition.Core.Tests.csproj" />
+</Solution>
