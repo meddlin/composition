@@ -106,7 +106,7 @@ struct BackupConformanceTests {
             #expect(NSDictionary(dictionary: arrived) == NSDictionary(dictionary: original), "settings.json arrives as the desktop wrote it")
             let settings = SettingsStore(location: target)
             #expect(settings.favorites() == [Favorite(.note, 1), Favorite(.group, 1)] && settings.theme() == "forest")
-            #expect(settings.location() == SavedLocation(name: "Reykjavik", latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik"))
+            #expect(settings.sunHours() == SunHours(lightenFrom: 19 * 60, lightFrom: 20 * 60, darkenFrom: 5 * 60, darkFrom: 6 * 60), "the hours the desktop saved are the iPad's")
             try settings.toggleFavorite(.note, 1)  // unpin
             try settings.toggleFavorite(.note, 2)  // pin
             #expect(settings.favorites() == [Favorite(.group, 1), Favorite(.note, 2)])

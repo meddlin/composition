@@ -52,9 +52,9 @@ export {
   MIN_EDITOR_RATIO,
 } from "../../web/src/lib/composition/layout";
 export { canMoveGroup, wouldCreateCycle } from "../../web/src/lib/composition/groupMove";
-export { fallbackSunEvents, INK_FLIP_LEVEL, sunLevel, RAMP_HALF_WIDTH_MS } from "../../web/src/lib/composition/sunSchedule";
-export type { SunEvent } from "../../web/src/lib/composition/sunSchedule";
-export type { SunSchedule } from "../../web/src/lib/composition/sunTimes";
+export { INK_FLIP_LEVEL, sunLevel } from "../../web/src/lib/composition/sunSchedule";
+export { DEFAULT_SUN_HOURS, formatClock, parseClock } from "../../web/src/lib/composition/sunHours";
+export type { SunHours } from "../../web/src/lib/composition/sunHours";
 export type { RestoreResult, Trash, TrashedGroup, TrashedNote } from "../../web/src/lib/composition/trash";
 export { daysLeft, TRASH_RETENTION_DAYS } from "../../web/src/lib/composition/trash";
 export type { ThemeName } from "../../web/src/lib/composition/themes";

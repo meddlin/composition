@@ -175,7 +175,7 @@ export function StylingSettings({
           ))}
         </RadioGroup>
         <FieldDescription className="text-xs">
-          Follow the sun fades between a light and a dark set of colors with sunrise and sunset in your city.
+          Follow the sun fades between a light and a dark set of colors at the hours you set.
           {openPage && (
             <>
               {" "}
@@ -185,7 +185,7 @@ export function StylingSettings({
                 className="h-auto p-0 text-xs underline"
                 onClick={() => openPage(FOLLOW_THE_SUN_PAGE)}
               >
-                Choose its colors and city
+                Choose its colors and hours
               </Button>
             </>
           )}

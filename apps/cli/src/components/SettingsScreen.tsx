@@ -2,12 +2,15 @@ import type { SelectOption } from "@opentui/core";
 import { useKeyboard } from "@opentui/react";
 import { useEffect, useRef, useState } from "react";
 import type { Api } from "../api";
-import { describeCounts, expandHome, formatBytes, themes, type BackupResult, type SettingsSnapshot, type ThemeName } from "../backend";
+import { DEFAULT_SUN_HOURS, describeCounts, expandHome, formatBytes, themes, type BackupResult, type SettingsSnapshot, type SunHours, type ThemeName } from "../backend";
 import { actionFor, footerFor } from "../keymap";
 import type { Palette } from "../theme";
 
-type Field = "path" | "theme" | "city" | "backup" | "restore";
-const FIELDS: Field[] = ["path", "theme", "city", "backup", "restore"];
+type Field = "path" | "theme" | "hours" | "backup" | "restore";
+const FIELDS: Field[] = ["path", "theme", "hours", "backup", "restore"];
+
+/** The four hours as typed in the field: the times in order, with a space between. */
+const showHours = (hours: SunHours) => `${hours.lightenFrom} ${hours.lightFrom} ${hours.darkenFrom} ${hours.darkFrom}`;
 
 type SettingsScreenProps = {
   api: Api;
@@ -15,8 +18,8 @@ type SettingsScreenProps = {
   width: number;
   theme: string;
   onThemeChange: (theme: ThemeName) => void;
-  /** The saved city changed: "follow the sun" should look its times up again. */
-  onCityChanged: () => void;
+  /** The scheme or the "follow the sun" hours changed: it should read them again. */
+  onSunChanged: () => void;
   /** Moves every file to a new folder and reopens it there; absent where that can't be done. */
   moveDataLocation?: (destination: string) => Promise<void>;
   /** Called after the data has moved, so the workspace can load it again. */
@@ -52,23 +55,23 @@ function Section({ title, focused, palette, height, children }: {
 }
 
 /**
- * Where the data lives, which color scheme to use, the city "follow the sun" uses, and backing up
+ * Where the data lives, which color scheme to use, the hours "follow the sun" moves at, and backing up
  * and restoring everything. Tab moves between them; Enter saves or applies the one you are on.
  */
-export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCityChanged, moveDataLocation, onDataMoved, flushNotes, onRestored, onClose }: SettingsScreenProps) {
+export function SettingsScreen({ api, palette, width, theme, onThemeChange, onSunChanged, moveDataLocation, onDataMoved, flushNotes, onRestored, onClose }: SettingsScreenProps) {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null);
   const [field, setField] = useState<Field>("path");
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [path, setPath] = useState("");
-  const [city, setCity] = useState("");
+  const [hours, setHours] = useState("");
   const [backupDir, setBackupDir] = useState("");
   const [backupFile, setBackupFile] = useState("");
   // The backup file waiting for a "y": restoring replaces everything, so Enter only asks.
   const [confirming, setConfirming] = useState<string | null>(null);
   // The inputs' own submit argument is typed loosely; what was typed is tracked here instead.
   const typedPath = useRef("");
-  const typedCity = useRef("");
+  const typedHours = useRef("");
   const typedBackupDir = useRef("");
   const typedBackupFile = useRef("");
 
@@ -81,8 +84,8 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
     void load().then((first) => {
       setPath(first.appDataDir);
       typedPath.current = first.appDataDir;
-      setCity(first.city);
-      typedCity.current = first.city;
+      setHours(showHours(first.sunHours));
+      typedHours.current = showHours(first.sunHours);
       setBackupDir(first.backupDir);
       typedBackupDir.current = first.backupDir;
     });
@@ -112,14 +115,17 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
     }
   };
 
-  const saveCity = async () => {
-    const result = await api.saveLocation(typedCity.current);
+  const saveHours = async () => {
+    const typed = typedHours.current.trim().split(/[\s,]+/).filter(Boolean);
+    if (typed.length !== 4) return setMessage(`Type four times, like ${showHours(DEFAULT_SUN_HOURS)}.`);
+    const [lightenFrom, lightFrom, darkenFrom, darkFrom] = typed;
+    const result = await api.saveSunHours({ lightenFrom, lightFrom, darkenFrom, darkFrom });
     if (result.error) return setMessage(result.error);
-    await load();
-    onCityChanged();
-    if (!result.saved) return setMessage("Forgot the saved city; follow the sun uses stand-in times.");
-    const { name, sunrise, sunset } = result.saved;
-    setMessage(`Saved ${name}${sunrise && sunset ? `: sunrise ${sunrise}, sunset ${sunset}` : ""}.`);
+    const next = await load();
+    setHours(showHours(next.sunHours));
+    typedHours.current = showHours(next.sunHours);
+    onSunChanged();
+    setMessage(`Saved: lighter from ${next.sunHours.lightenFrom}, light from ${next.sunHours.lightFrom}, darker from ${next.sunHours.darkenFrom}, dark from ${next.sunHours.darkFrom}.`);
   };
 
   const describe = (result: BackupResult) => (result.counts ? describeCounts(result.counts) : "everything");
@@ -156,10 +162,10 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
       const next = await load();
       setPath(next.appDataDir);
       typedPath.current = next.appDataDir;
-      setCity(next.city);
-      typedCity.current = next.city;
+      setHours(showHours(next.sunHours));
+      typedHours.current = showHours(next.sunHours);
       onThemeChange(next.theme);
-      onCityChanged();
+      onSunChanged();
       onRestored();
       setMessage(`Restored ${describe(result)}.${result.safetyBackup ? ` What it replaced is saved in ${result.safetyBackup}.` : ""}`);
     } finally {
@@ -171,7 +177,7 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
     const result = await api.saveTheme(name);
     if (result.error) return setMessage(result.error);
     onThemeChange(name);
-    onCityChanged(); // "follow the sun" may have just been chosen, or left
+    onSunChanged(); // "follow the sun" may have just been chosen, or left
     setMessage(`Color scheme: ${themes.THEME_CHOICES.find((c) => c.name === name)?.label ?? name}.`);
   };
 
@@ -250,23 +256,19 @@ export function SettingsScreen({ api, palette, width, theme, onThemeChange, onCi
             />
           </Section>
 
-          <Section title="City, for follow the sun" focused={field === "city"} palette={palette} height={4}>
+          <Section title="Hours, for follow the sun" focused={field === "hours"} palette={palette} height={4}>
             <input
-              focused={field === "city"}
-              value={city}
-              placeholder="City, State or City, Country"
+              focused={field === "hours"}
+              value={hours}
+              placeholder={showHours(DEFAULT_SUN_HOURS)}
               onInput={(next) => {
-                typedCity.current = next;
-                setCity(next);
+                typedHours.current = next;
+                setHours(next);
               }}
-              onSubmit={() => void saveCity().catch(fail)}
+              onSubmit={() => void saveHours().catch(fail)}
               {...input}
             />
-            <text fg={palette.muted}>
-              {snapshot.sunTimes?.sunrise && snapshot.sunTimes?.sunset
-                ? `Today: sunrise ${snapshot.sunTimes.sunrise}, sunset ${snapshot.sunTimes.sunset}`
-                : "Without a city it uses 06:30 and 18:30."}
-            </text>
+            <text fg={palette.muted}>Lighter from, light from, darker from, dark from: 24-hour times on this clock, once round the day.</text>
           </Section>
 
           <Section title="Create a backup, in this folder" focused={field === "backup"} palette={palette} height={3}>

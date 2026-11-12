@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SettingsSnapshot } from "@/lib/composition/api";
 import { DEFAULT_ASSISTANT_SETTINGS } from "@/lib/composition/assistant/settings";
 import { DEFAULT_HOME_SETTINGS } from "@/lib/composition/home";
+import { DEFAULT_SUN_HOURS } from "@/lib/composition/sunHours";
 import { DEFAULT_PLUGIN_SETTINGS } from "@/lib/composition/plugins";
 import { EMPTY_TRASH } from "@/lib/composition/trash";
 import { DEFAULT_WRITING_SETTINGS } from "@/lib/composition/writing";
@@ -22,7 +23,7 @@ vi.mock("@/lib/composition/client", () => {
     saveAssistantSettings: stub(),
     saveEditorFont: stub(),
     saveHomeSettings: stub(),
-    saveLocation: stub(),
+    saveSunHours: stub(),
     saveNoteBackground: stub(),
     savePluginSettings: stub(),
     savePreviewFont: stub(),
@@ -74,7 +75,7 @@ const snapshot: SettingsSnapshot = {
   trash: EMPTY_TRASH,
   metrics: { noteCount: 3, words: 120, characters: 700, averageWords: 40, databaseBytes: 4096, assetsBytes: 0, mediaBytes: 0 },
   assistant: DEFAULT_ASSISTANT_SETTINGS,
-  city: "",
+  sunHours: DEFAULT_SUN_HOURS,
 };
 
 const sidebar = () => within(document.querySelector("aside")!);
@@ -146,7 +147,7 @@ describe("the Follow the sun page", () => {
     render(<SettingsScreen snapshot={snapshot} />);
     fireEvent.click(sidebar().getByRole("button", { name: "Styling" }));
 
-    fireEvent.click(within(section("Styling")).getByRole("button", { name: "Choose its colors and city" }));
+    fireEvent.click(within(section("Styling")).getByRole("button", { name: "Choose its colors and hours" }));
 
     expect(section("Follow the sun").hidden).toBe(false);
     expect(section("Styling").hidden).toBe(true);
@@ -162,13 +163,14 @@ describe("the Follow the sun page", () => {
     expect(section("Styling").hidden).toBe(false);
   });
 
-  it("explains the scheme, takes the city, and offers every pair of colors", () => {
-    render(<SettingsScreen snapshot={{ ...snapshot, city: "Austin, Texas, United States", sunPair: "mint-forest" }} />);
+  it("explains the scheme, takes the four hours, and offers every pair of colors", () => {
+    render(<SettingsScreen snapshot={{ ...snapshot, sunHours: { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:30", darkFrom: "20:00" }, sunPair: "mint-forest" }} />);
     openIt();
     const page = within(section("Follow the sun"));
 
-    expect(page.getByText(/changes between its light-scheme and dark-scheme color halfway through the fade/)).toBeTruthy();
-    expect((page.getByLabelText("City") as HTMLInputElement).value).toBe("Austin, Texas, United States");
+    expect(page.getByText(/changes between its light-scheme and dark-scheme color halfway through a fade/)).toBeTruthy();
+    expect((page.getByLabelText("Starts getting lighter") as HTMLInputElement).value).toBe("06:00");
+    expect((page.getByLabelText("Fully dark from") as HTMLInputElement).value).toBe("20:00");
     const pairs = page.getByRole("radiogroup", { name: "Light and dark colors" });
     expect(within(pairs).getAllByRole("radio").map((radio) => radio.getAttribute("aria-checked"))).toEqual([
       "false",
@@ -214,7 +216,7 @@ describe("the Follow the sun page", () => {
   it("is found by searching for what it does", () => {
     render(<SettingsScreen snapshot={snapshot} />);
 
-    search("sunrise");
+    search("fully light");
 
     expect(found().some((hit) => hit.endsWith("Styling › Follow the sun"))).toBe(true);
   });
@@ -264,12 +266,12 @@ describe("searching the Settings screen", () => {
     expect(found().some((hit) => hit.endsWith("AI Configuration"))).toBe(true);
   });
 
-  it("finds the city setting, on the Follow the sun page under Styling, first", () => {
+  it("finds the hours setting, on the Follow the sun page under Styling, first", () => {
     render(<SettingsScreen snapshot={snapshot} />);
 
-    search("city");
+    search("when it changes");
 
-    expect(found()[0]).toBe("Your cityStyling › Follow the sun");
+    expect(found()[0]).toBe("When it changesStyling › Follow the sun");
   });
 
   it("opens the page a result is on", () => {

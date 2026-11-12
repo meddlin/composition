@@ -53,7 +53,7 @@ export function ColorSchemeProvider({
         setTheme(previous);
         setThemeError(result.error);
       } else {
-        // "auto" takes its starting point from the sun times; tell it to load them.
+        // "auto" takes its starting point from the saved hours; tell it to load them.
         window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
       }
     });

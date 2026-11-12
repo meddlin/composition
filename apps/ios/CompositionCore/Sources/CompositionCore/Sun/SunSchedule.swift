@@ -1,25 +1,16 @@
 import Foundation
 
-// "Follow the sun": how light the app should be at a moment, from a city's sunrises and sunsets. A port of the desktop's `sunSchedule.ts`,
-// checked against it by `SunConformanceTests` over `fixtures/conformance/sun.json`. The level is 0 (fully dark) to 1 (fully light); it
-// ramps up across a window centred on each sunrise and back down across one centred on each sunset, and holds steady the rest of the time.
-
-/// A sunrise or a sunset. `at` is epoch milliseconds, as the desktop's `SunEvent.at` is (a JavaScript number).
-public struct SunEvent: Equatable, Sendable {
-    public enum Kind: String, Sendable {
-        case sunrise
-        case sunset
-    }
-
-    public var at: Double
-    public var kind: Kind
-
-    public init(at: Double, kind: Kind) { (self.at, self.kind) = (at, kind) }
-}
+// "Follow the sun": how light the app should be at a moment, from the four hours a person set by hand (`SunHours`). A port of the desktop's
+// `sunSchedule.ts`, checked against it by `SunConformanceTests` over `fixtures/conformance/sun.json`. The level is 0 (fully dark) to 1 (fully light) and
+// is a function of the time of day on the wall clock alone, with no events and no calendar. Measured forward from "starts getting lighter", it eases
+// from 0 to 1 over the span to "fully light from", holds 1 until "starts getting darker", eases back to 0 over the span to "fully dark from", and holds 0
+// round to the start. A fade may cross midnight.
+//
+// Everything is whole milliseconds (the time of day, the spans), so this divides the same two integers the TypeScript does and gets the same level.
 
 public enum Sun {
-    /// The ramp extends this far before and after each event (90 minutes end to end).
-    public static let rampHalfWidth: Double = 45 * 60 * 1000
+    public static let millisecondsPerMinute: Int64 = 60 * 1000
+    public static let millisecondsPerDay: Int64 = 24 * 60 * millisecondsPerMinute
 
     /// Text flips between its dark-scheme and light-scheme colour at this level rather than cross-fading: a blend of the two inks is unreadable
     /// against the half-way background. The classic pair's point; the other pairs have their own (`SunPairName.inkFlipLevel`).
@@ -30,25 +21,37 @@ public enum Sun {
         case dark
     }
 
-    /// `sunLevel`: events in any order (equal times keep the order they came in, as JavaScript's stable sort does).
-    public static func level(_ events: [SunEvent], now: Double) -> Double {
-        let sorted = events.enumerated().sorted { $0.element.at != $1.element.at ? $0.element.at < $1.element.at : $0.offset < $1.offset }.map(\.element)
+    /// `msOfLocalDay`: the milliseconds since midnight on the wall clock of `timeZone` (the device's own by default) at `now` (epoch milliseconds). A day
+    /// with a clock change is as long as the clock says: the time of day just follows the wall.
+    public static func msOfLocalDay(now: Double, timeZone: TimeZone = .current) -> Int64 {
+        // A `Date` holds whole milliseconds here, as a JavaScript one does.
+        let whole = Int64(now.rounded(.towardZero))
+        let offset = Int64(timeZone.secondsFromGMT(for: Date(timeIntervalSince1970: Double(whole) / 1000)))
+        let local = whole + offset * 1000
+        return ((local % millisecondsPerDay) + millisecondsPerDay) % millisecondsPerDay
+    }
 
-        var previous: SunEvent?
-        for event in sorted {
-            let progress = (now - event.at + rampHalfWidth) / (2 * rampHalfWidth)
-            if progress >= 0 && progress <= 1 {
-                let eased = progress * progress * (3 - 2 * progress)
-                return event.kind == .sunrise ? eased : 1 - eased
-            }
-            if progress < 0 { break }
-            previous = event
-        }
+    /// `levelAtTimeOfDay`: the level at a time of day, in milliseconds since midnight (0 up to a day). Hours that do not go round the clock in order describe
+    /// no day: they read as the defaults, as a settings file's do.
+    public static func level(_ hours: SunHours, msOfDay: Int64) -> Double {
+        guard hours.goesRoundTheClock else { return level(.default, msOfDay: msOfDay) }
+        let perMinute = millisecondsPerMinute, perDay = millisecondsPerDay
+        let minutesPerDay = Int64(SunHours.minutesPerDay)
+        // Measure everything forward from "starts getting lighter", which is 0.
+        func since(_ minute: Int) -> Int64 { ((Int64(minute - hours.lightenFrom) % minutesPerDay + minutesPerDay) % minutesPerDay) * perMinute }
+        let rise = since(hours.lightFrom), fall = since(hours.darkenFrom), dark = since(hours.darkFrom)
+        let at = ((msOfDay - Int64(hours.lightenFrom) * perMinute) % perDay + perDay) % perDay
 
-        if let previous { return previous.kind == .sunrise ? 1 : 0 }
-        // Before every known event: it's night if the next one is a sunrise.
-        guard let next = sorted.first else { return 0 }
-        return next.kind == .sunrise ? 0 : 1
+        func smoothstep(_ progress: Double) -> Double { progress * progress * (3 - 2 * progress) }
+        if at < rise { return smoothstep(Double(at) / Double(rise)) }
+        if at < fall { return 1 }
+        if at < dark { return 1 - smoothstep(Double(at - fall) / Double(dark - fall)) }
+        return 0
+    }
+
+    /// `sunLevel`: how light the app should be at `now` (epoch milliseconds), 0 (dark) to 1 (light), on the device's clock.
+    public static func level(_ hours: SunHours, now: Double, timeZone: TimeZone = .current) -> Double {
+        level(hours, msOfDay: msOfLocalDay(now: now, timeZone: timeZone))
     }
 
     /// `toneForLevel`: which of the pair's two palettes the text takes.
@@ -73,23 +76,5 @@ public enum Sun {
         var tenths = Int(String(whole) + String(decimals[0])) ?? 0
         if let second = decimals.dropFirst().first, second >= "5" { tenths += 1 }
         return "\(tenths / 10).\(tenths % 10)"
-    }
-
-    /// `fallbackSunEvents`: stand-ins for when the real times are unavailable (no city saved, or the lookup failed and nothing is cached): 06:30 and
-    /// 18:30 on the machine's clock, for yesterday, today and tomorrow.
-    public static func fallbackEvents(now: Double, calendar: Calendar = .current) -> [SunEvent] {
-        let moment = Date(timeIntervalSince1970: now / 1000)
-        var events: [SunEvent] = []
-        for dayOffset in [-1, 0, 1] {
-            let day = calendar.date(byAdding: .day, value: dayOffset, to: moment) ?? moment
-            func at(_ hour: Int, _ minute: Int) -> Double {
-                var parts = calendar.dateComponents([.year, .month, .day], from: day)
-                (parts.hour, parts.minute, parts.second) = (hour, minute, 0)
-                return (calendar.date(from: parts) ?? day).timeIntervalSince1970 * 1000
-            }
-            events.append(SunEvent(at: at(6, 30), kind: .sunrise))
-            events.append(SunEvent(at: at(18, 30), kind: .sunset))
-        }
-        return events
     }
 }

@@ -124,7 +124,7 @@ try {
       console.log(`  Trash Can:    ${fixture.trashedNotes.map((n) => n.title).join(", ")}`);
       console.log(`  image:        ${fixture.images.map((i) => i.name).join(", ")}`);
       console.log(`  attachment:   ${fixture.attachments.map((a) => a.fileName).join(", ")}`);
-      console.log(`  settings:     ${settingsFileFor(app, home)} (${fixture.settings.theme}, ${fixture.settings.city}, 1 favorite)`);
+      console.log(`  settings:     ${settingsFileFor(app, home)} (${fixture.settings.theme}, follow the sun ${fixture.settings.sunHours.lightenFrom}-${fixture.settings.sunHours.darkFrom}, 1 favorite)`);
       console.log(`  data folder:  ${dataDirFor(home)}`);
       break;
     }

@@ -9,9 +9,9 @@ import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import type { EditorFontName } from "./editorFonts";
 import type { NoteBackgroundName } from "./noteBackgrounds";
+import type { SunHours } from "./sunHours";
 import type { SunPairName } from "./sunPairs";
 import type { PreviewFontName } from "./previewFonts";
-import type { SunSchedule } from "./sunTimes";
 import type { ThemeName } from "./themes";
 import type { RestoreResult, Trash } from "./trash";
 import type { HomeSettings } from "./home";
@@ -63,6 +63,8 @@ export type SettingsSnapshot = {
   noteBackground: NoteBackgroundName;
   /** The light and dark colors "Follow the sun" moves between. */
   sunPair: SunPairName;
+  /** The hours "Follow the sun" gets lighter and darker at, on this device's clock. */
+  sunHours: SunHours;
   writing: WritingSettings;
   home: HomeSettings;
   /** Which built-in plugins are on. */
@@ -86,18 +88,6 @@ export type SettingsSnapshot = {
   metrics: Metrics;
   /** The AI helper's saved Ollama server and context size (the defaults until some are saved). */
   assistant: AssistantSettings;
-  /** The saved city for the "Follow the sun" scheme, or "". */
-  city: string;
-  /** Today's sunrise and sunset there, formatted in its own timezone (when a city is saved and reachable). */
-  sunTimes?: SunTimesToday;
-};
-
-export type SunTimesToday = { sunrise?: string; sunset?: string };
-
-/** `saved` is absent when the city was cleared or couldn't be saved (then `error` may say why). */
-export type SaveLocationResult = {
-  error?: string;
-  saved?: { name: string } & SunTimesToday;
 };
 
 /** A refused move (into itself or a descendant, or a group that's gone) comes back as `error`. */
@@ -255,10 +245,13 @@ export interface CompositionApi {
   /** Forgets the ChatGPT account on this computer. */
   signOutChatGpt(): Promise<{ error?: string }>;
 
-  /** Geocodes and saves the city that "Follow the sun" tracks; an empty string forgets it. */
-  saveLocation(city: string): Promise<SaveLocationResult>;
-  /** Sunrise/sunset events for the "auto" scheme, or null when another scheme is selected. */
-  loadSunSchedule(): Promise<SunSchedule | null>;
+  /**
+   * Saves the four hours "Follow the sun" moves at (`HH:MM` on the device's clock). Hours that are not valid, or that do not go
+   * once round the clock in order, come back as `error` and nothing is saved.
+   */
+  saveSunHours(hours: SunHours): Promise<{ error?: string }>;
+  /** The hours for the "auto" scheme, or null when another scheme is selected. */
+  loadSunHours(): Promise<SunHours | null>;
 }
 
 /**
@@ -308,8 +301,8 @@ export const API_METHODS = [
   "chatGptStatus",
   "startChatGptSignIn",
   "signOutChatGpt",
-  "saveLocation",
-  "loadSunSchedule",
+  "saveSunHours",
+  "loadSunHours",
 ] as const satisfies readonly (keyof CompositionApi)[];
 
 export type ApiMethod = (typeof API_METHODS)[number];

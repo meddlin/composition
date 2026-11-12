@@ -1,7 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { conformancePath, UPDATING_FIXTURES } from "./__fixtures__/conformance";
+import {
+  DEFAULT_SUN_HOURS,
+  SUN_HOUR_KEYS,
+  formatClock,
+  parseClock,
+  parseSunHours,
+  validateSunHours,
+  type SunHours,
+} from "./sunHours";
 import {
   DEFAULT_SUN_PAIR,
   SUN_PAIR_CHOICES,
@@ -10,24 +19,24 @@ import {
 } from "./sunPairs";
 import {
   INK_FLIP_LEVEL,
-  RAMP_HALF_WIDTH_MS,
-  fallbackSunEvents,
-  sunLevel,
+  MS_PER_DAY,
+  MS_PER_MINUTE,
+  levelAtTimeOfDay,
+  msOfLocalDay,
   sunThemeAttributes,
   toneForLevel,
-  type SunEvent,
 } from "./sunSchedule";
 
 /**
- * "Follow the sun" is a pure function of sunrise and sunset times, which the Swift core ports (`CompositionCore/Sun`), so it must
- * agree exactly. This test pins what the Swift side replays, `fixtures/conformance/sun.json` (see fixtures/conformance/README.md):
+ * "Follow the sun" is a pure function of four hours the person sets by hand and the time of day on the wall clock, which the
+ * Swift core ports (`CompositionCore/Sun`), so it must agree exactly. This test pins what the Swift side replays,
+ * `fixtures/conformance/sun.json` (see fixtures/conformance/README.md):
  *
- *   constants, pairs, pairProbes   sunSchedule.ts and sunPairs.ts: the ramp, the flip points, the five pairs and what names them
- *   levels, tones, autoLight       sunLevel over many event lists (unsorted, tied, one-sided, overlapping), toneForLevel, and the
- *                                  `--auto-light` text `toFixed(1)` makes
- *   fallback                       the stand-in 06:30 and 18:30 events in fourteen time zones, across their clock changes
- *   todays                         todaysSunTimes: the sunrise and sunset that fall on today's date in a city's own zone
- *   geocode, loads                 geocodeCity and the sun-event cache of sunTimes.ts, driven with canned Open-Meteo answers
+ *   constants, pairs, pairProbes   sunHours.ts, sunSchedule.ts and sunPairs.ts: the flip point, the defaults, the five pairs and what names them
+ *   clocks, hourSets               `HH:MM` read and written, and which sets of four hours are accepted, refused (with the words) or read as the defaults
+ *   levels                         the level over many sets of hours, at every edge of a fade and between
+ *   tones, autoLight               toneForLevel, and the `--auto-light` text `toFixed(1)` makes
+ *   wallClock                      the time of day in fourteen zones, across the days their clocks change
  *   palettes, blends               the colours of every pair as `globals.css` declares them, and its surface blend endpoints
  *
  * A change to the TypeScript behaviour fails here until the fixture is regenerated (`UPDATE_FIXTURES=1 pnpm exec vitest run
@@ -60,54 +69,108 @@ function random(seed: number) {
   };
 }
 
-const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
-const BASE = Date.UTC(2026, 10, 9, 12, 0, 0);
-const ev = (kind: SunEvent["kind"], at: number): SunEvent => ({ at, kind });
+const hoursOf = (...minutes: number[]): SunHours => {
+  const [lightenFrom, lightFrom, darkenFrom, darkFrom] = minutes.map(formatClock);
+  return { lightenFrom, lightFrom, darkenFrom, darkFrom };
+};
+
+/** Sets of hours that are all valid: the defaults, odd ones and a hundred drawn at random (any starting point, any gaps of a minute or more). */
+function validHourSets(): SunHours[] {
+  const next = random(20261112);
+  const sets: SunHours[] = [
+    DEFAULT_SUN_HOURS,
+    hoursOf(0, 1, 2, 3),
+    hoursOf(1437, 1438, 1439, 0),
+    hoursOf(1439, 0, 720, 721),
+    hoursOf(1140, 1200, 300, 360), // light over the night
+    hoursOf(570, 600, 1410, 30), // the evening fade crosses midnight
+    hoursOf(1380, 1410, 60, 120), // both fades near midnight
+    hoursOf(420, 421, 1260, 1261), // switches a minute wide
+    hoursOf(0, 720, 721, 1439), // a fade as long as half a day
+    hoursOf(360, 1000, 1001, 1002),
+    hoursOf(1, 2, 1438, 1439),
+  ];
+  for (let i = 0; i < 100; i++) {
+    // Four distinct minutes in order round the clock, from a random start.
+    const chosen = new Set<number>();
+    while (chosen.size < 4) chosen.add(Math.floor(next() * 1440));
+    const sorted = [...chosen].sort((a, b) => a - b);
+    const start = Math.floor(next() * 4);
+    sets.push(hoursOf(...sorted.slice(start), ...sorted.slice(0, start)));
+  }
+  return sets;
+}
 
 function levelCases(): Json[] {
-  const next = random(20261109);
-  const lists: SunEvent[][] = [
-    [],
-    [ev("sunrise", BASE)],
-    [ev("sunset", BASE)],
-    // three ordinary days
-    [-1, 0, 1].flatMap((d) => [ev("sunrise", BASE + d * DAY - 5.3 * HOUR), ev("sunset", BASE + d * DAY + 4.9 * HOUR)]),
-    // the same, out of order
-    [ev("sunset", BASE + DAY + 4.9 * HOUR), ev("sunrise", BASE - 5.3 * HOUR), ev("sunset", BASE - DAY + 4.9 * HOUR), ev("sunrise", BASE + DAY - 5.3 * HOUR)],
-    // two events at the same moment, both ways round (the sort must keep their order)
-    [ev("sunrise", BASE), ev("sunset", BASE)],
-    [ev("sunset", BASE), ev("sunrise", BASE)],
-    // a day shorter than the ramp, a night shorter than the ramp
-    [ev("sunrise", BASE), ev("sunset", BASE + 10 * 60_000)],
-    [ev("sunset", BASE), ev("sunrise", BASE + 20 * 60_000)],
-    // the same event twice, then the epoch itself
-    [ev("sunrise", BASE), ev("sunrise", BASE), ev("sunset", BASE + 8 * HOUR)],
-    [ev("sunset", 0), ev("sunrise", RAMP_HALF_WIDTH_MS * 2)],
-    // two sunrises with no sunset between (polar edge), then two sunsets
-    [ev("sunrise", BASE - DAY), ev("sunrise", BASE + DAY)],
-    [ev("sunset", BASE - DAY), ev("sunset", BASE + DAY)],
-  ];
-  for (let i = 0; i < 30; i++) {
-    const count = Math.floor(next() * 7);
-    lists.push(
-      Array.from({ length: count }, () => ev(next() < 0.5 ? "sunrise" : "sunset", BASE + Math.round((next() * 6 - 3) * DAY / 1000) * 1000)),
-    );
-  }
-  return lists.map((events) => {
-    const moments = new Set<number>([BASE, 0, BASE - 40 * DAY, BASE + 40 * DAY]);
-    for (const { at } of events) {
-      for (const offset of [-RAMP_HALF_WIDTH_MS - 1, -RAMP_HALF_WIDTH_MS, -RAMP_HALF_WIDTH_MS + 1, -RAMP_HALF_WIDTH_MS / 2, -1, 0, 1, RAMP_HALF_WIDTH_MS / 2, RAMP_HALF_WIDTH_MS - 1, RAMP_HALF_WIDTH_MS, RAMP_HALF_WIDTH_MS + 1]) {
-        moments.add(at + offset);
-      }
-      moments.add(at + Math.round(next() * 2 * RAMP_HALF_WIDTH_MS - RAMP_HALF_WIDTH_MS));
+  const next = random(777);
+  return validHourSets().map((hours) => {
+    const minutes = SUN_HOUR_KEYS.map((key) => parseClock(hours[key])!);
+    const moments = new Set<number>([0, MS_PER_DAY - 1, MS_PER_DAY / 2]);
+    for (const minute of minutes) {
+      const edge = minute * MS_PER_MINUTE;
+      for (const offset of [-MS_PER_MINUTE, -1000, -1, 0, 1, 1000, MS_PER_MINUTE]) moments.add((edge + offset + MS_PER_DAY) % MS_PER_DAY);
     }
-    const min = events.length ? Math.min(...events.map((e) => e.at)) : BASE;
-    const max = events.length ? Math.max(...events.map((e) => e.at)) : BASE;
-    moments.add(min - DAY);
-    moments.add(max + DAY);
-    moments.add(Math.round((min + max) / 2));
-    return { events: events.map((e) => ({ ...e })), nows: [...moments].map((now) => [now, sunLevel(events, now)]) };
+    // The middle and the quarters of each fade, and some time in each hold.
+    for (let i = 0; i < 4; i++) {
+      const from = minutes[i];
+      const span = (minutes[(i + 1) % 4] - from + 1440) % 1440;
+      for (const share of [0.25, 0.5, 0.75]) moments.add((Math.round(from * MS_PER_MINUTE + span * MS_PER_MINUTE * share) + MS_PER_DAY) % MS_PER_DAY);
+    }
+    for (let i = 0; i < 24; i++) moments.add(Math.floor(next() * MS_PER_DAY));
+    return { hours: { ...hours }, nows: [...moments].sort((a, b) => a - b).map((ms) => [ms, levelAtTimeOfDay(hours, ms)]) };
+  });
+}
+
+function clockCases(): Json[] {
+  const text = [
+    "00:00", "07:15", "23:59", "12:30", "19:15", "09:05", "24:00", "7:15", "07:60", "07:15:30", " 07:15", "07:15 ", "0715", "", "noon",
+    "1:5", "07.15", "07-15", "٠٧:١٥", "07:1", "-1:00", "+7:15",
+  ];
+  const other: Json[] = [null, 7, 435, true, ["07:15"], { at: "07:15" }];
+  return [...text, ...other].map((value) => {
+    const minutes = parseClock(value);
+    return { value, minutes: minutes ?? null, written: minutes === undefined ? null : formatClock(minutes) };
+  });
+}
+
+function hourSetCases(): Json[] {
+  const set = (lightenFrom: Json, lightFrom: Json, darkenFrom: Json, darkFrom: Json): Json => ({ lightenFrom, lightFrom, darkenFrom, darkFrom });
+  const values: Json[] = [
+    DEFAULT_SUN_HOURS,
+    set("06:00", "07:00", "18:30", "20:00"),
+    set("19:00", "20:00", "05:00", "06:00"),
+    set("23:30", "00:30", "12:00", "13:00"),
+    set("00:00", "00:01", "00:02", "00:03"),
+    set("23:57", "23:58", "23:59", "00:00"),
+    // the same time twice, or the order wrong
+    set("06:00", "06:00", "18:30", "20:00"),
+    set("06:00", "07:00", "07:00", "20:00"),
+    set("06:00", "07:00", "18:30", "18:30"),
+    set("06:00", "07:00", "18:30", "06:00"),
+    set("08:00", "07:00", "18:30", "20:00"),
+    set("06:00", "20:00", "18:30", "07:00"),
+    set("20:00", "18:30", "07:00", "06:00"),
+    // two times round the clock
+    set("06:00", "18:00", "07:00", "19:00"),
+    set("06:00", "12:00", "05:00", "13:00"),
+    // not times
+    set("6:00", "07:00", "18:30", "20:00"),
+    set("06:00", "07:00", "18:30", "24:00"),
+    set("06:00", "07:00", "18:30", null),
+    set("06:00", "07:00", 1830, "20:00"),
+    { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:30" },
+    { ...(DEFAULT_SUN_HOURS as Record<string, Json>), extra: "ignored", location: { name: "Austin" } },
+    {},
+    [],
+    ["05:45", "07:15", "17:45", "19:15"],
+    "05:45",
+    null,
+    0,
+    true,
+  ];
+  return values.map((value) => {
+    const checked = validateSunHours(value);
+    return { value, valid: checked.hours !== undefined, hours: (checked.hours ?? null) as Json, error: checked.error ?? null, parsed: parseSunHours(value) as unknown as Json };
   });
 }
 
@@ -139,327 +202,26 @@ const INSTANTS = [
   Date.UTC(2026, 9, 4, 16), Date.UTC(2026, 9, 25, 1), Date.UTC(2026, 10, 1, 7), Date.UTC(2026, 10, 1, 23, 59),
 ];
 
-/** Runs `body` with the process in the zone, as the machine-local zone `fallbackSunEvents` reads. */
-function inZone<T>(zone: string, body: () => T): T {
-  const before = process.env.TZ;
-  process.env.TZ = zone;
-  try {
-    // The zone must really have changed (it does on Node's main thread and in a forked worker; not in a worker thread).
-    const t = Date.UTC(2026, 6, 1, 12);
-    const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", hourCycle: "h23" }).format(t));
-    expect(new Date(t).getHours(), `the process is in ${zone}`).toBe(hour);
-    return body();
-  } finally {
-    if (before === undefined) delete process.env.TZ;
-    else process.env.TZ = before;
-  }
-}
 
-function fallbackCases(): Json[] {
-  return ZONES.flatMap((timeZone) =>
-    INSTANTS.map((now) => ({ timeZone, now, events: inZone(timeZone, () => fallbackSunEvents(now)).map((e) => ({ ...e })) })),
+/** The instants a zone's clock jumps (forward or back, by an hour or by half of one), where the wall clock and the instant part company. */
+const CLOCK_CHANGES: [string, number][] = [
+  ["America/Chicago", Date.UTC(2026, 2, 8, 8, 0)],
+  ["America/Chicago", Date.UTC(2026, 10, 1, 7, 0)],
+  ["Europe/Berlin", Date.UTC(2026, 2, 29, 1, 0)],
+  ["Europe/London", Date.UTC(2026, 9, 25, 1, 0)],
+  ["Australia/Lord_Howe", Date.UTC(2026, 3, 4, 15, 0)],
+  ["Australia/Lord_Howe", Date.UTC(2026, 9, 4, 15, 30)],
+  ["America/St_Johns", Date.UTC(2026, 2, 8, 5, 30)],
+  ["Pacific/Auckland", Date.UTC(2026, 8, 26, 14, 0)],
+  ["America/Sao_Paulo", Date.UTC(2019, 1, 17, 2, 0)],
+];
+
+function wallClockCases(): Json[] {
+  const ordinary = ZONES.flatMap((timeZone) => INSTANTS.map((now) => ({ timeZone, now, ms: msOfLocalDay(now, timeZone) })));
+  const changes = CLOCK_CHANGES.flatMap(([timeZone, at]) =>
+    [-1, 0, 1, 60_000].map((offset) => ({ timeZone, now: at + offset, ms: msOfLocalDay(at + offset, timeZone) })),
   );
-}
-
-type Loc = { name: string; latitude: number; longitude: number; timezone: string };
-
-async function todaysCases(): Promise<Json[]> {
-  const { todaysSunTimes } = await import("./sunTimes");
-  const cases: Json[] = [];
-  const zones = [...ZONES, "Europe/Oslo", "America/Los_Angeles", "Asia/Dubai", "Etc/GMT+12", "Africa/Cairo"];
-  for (const timeZone of zones) {
-    for (const now of INSTANTS.slice(0, 6)) {
-      // Sunrise and sunset for the days around `now`, 17 minutes later each day, plus events at the edges of the local day.
-      const events: SunEvent[] = [];
-      for (let d = -1; d <= 1; d++) {
-        events.push(ev("sunrise", now + d * DAY - 5 * HOUR + d * 17 * 60_000), ev("sunset", now + d * DAY + 6 * HOUR + d * 17 * 60_000));
-      }
-      cases.push({ timeZone, now, events: events.map((e) => ({ ...e })), times: todaysSunTimes(events, timeZone, now) as Json });
-    }
-  }
-  // Odd shapes in one zone: nothing today, two of a kind in a day (the later wins), events out of order, the first and last millisecond of a local day.
-  const zone = "America/Chicago";
-  const noon = Date.UTC(2026, 10, 9, 18);
-  const odd: SunEvent[][] = [
-    [],
-    [ev("sunrise", noon - 5 * DAY)],
-    [ev("sunrise", noon - 4 * HOUR), ev("sunrise", noon - 3 * HOUR), ev("sunset", noon + 3 * HOUR)],
-    [ev("sunset", noon + 3 * HOUR), ev("sunrise", noon - 4 * HOUR)],
-    [ev("sunrise", Date.UTC(2026, 10, 9, 6, 0, 0)), ev("sunset", Date.UTC(2026, 10, 10, 5, 59, 59, 999))],
-    [ev("sunrise", Date.UTC(2026, 10, 9, 5, 59, 59, 999)), ev("sunset", Date.UTC(2026, 10, 10, 6, 0, 0))],
-    [ev("sunrise", noon + 0.4), ev("sunset", noon + 7 * HOUR + 0.6)],
-    [ev("sunrise", Date.UTC(2026, 10, 9, 12, 5)), ev("sunset", Date.UTC(2026, 10, 9, 23, 7))],
-    [ev("sunrise", Date.UTC(2026, 10, 9, 6, 7)), ev("sunset", Date.UTC(2026, 10, 9, 17, 0))],
-    // The same day number in another month and in another year is not today.
-    [ev("sunrise", Date.UTC(2026, 9, 9, 13)), ev("sunset", Date.UTC(2026, 11, 9, 23)), ev("sunrise", Date.UTC(2027, 10, 9, 13)), ev("sunset", Date.UTC(2025, 10, 9, 23))],
-    [ev("sunrise", Date.UTC(2026, 9, 9, 13)), ev("sunset", Date.UTC(2026, 10, 9, 23)), ev("sunrise", Date.UTC(2025, 10, 9, 13))],
-  ];
-  for (const events of odd) {
-    cases.push({ timeZone: zone, now: noon, events: events.map((e) => ({ ...e })), times: todaysSunTimes(events, zone, noon) as Json });
-  }
-  // A zone that does not exist: the desktop throws a RangeError.
-  expect(() => todaysSunTimes([ev("sunrise", noon)], "Not/AZone", noon)).toThrow(RangeError);
-  cases.push({ timeZone: "Not/AZone", now: noon, events: [{ at: noon, kind: "sunrise" }], throws: true });
-  // The clock reads like this in this build of Node; the Swift side writes the same text with an ordinary space.
-  return cases.map((c) => JSON.parse(JSON.stringify(c).replace(/\u202f/g, " ")) as Json);
-}
-
-// ---------------------------------------------------------------------------------------------------------------------------------
-// Open-Meteo, with canned answers
-
-type Spec = { kind: "ok"; body: Json } | { kind: "status"; status: number } | { kind: "throw" } | { kind: "badjson" };
-
-/** A `fetch` that says what it was asked for and answers as the spec says. */
-function fakeFetch(spec: Spec, requests: string[]): typeof fetch {
-  return (async (url: URL | string) => {
-    requests.push(String(url));
-    await Promise.resolve();
-    if (spec.kind === "throw") throw new TypeError("network down");
-    return {
-      ok: spec.kind !== "status",
-      status: spec.kind === "status" ? spec.status : 200,
-      json: async () => {
-        if (spec.kind === "badjson") throw new SyntaxError("not json");
-        return spec.kind === "ok" ? spec.body : null;
-      },
-    } as unknown as Response;
-  }) as unknown as typeof fetch;
-}
-
-const forecast = (sunrise: Json, sunset: Json): Json => ({ daily: { time: [1, 2, 3, 4], sunrise, sunset } });
-const answer = (body: Json): Spec => ({ kind: "ok", body });
-
-const austin: Loc = { name: "Austin, Texas, United States", latitude: 30.26715, longitude: -97.74306, timezone: "America/Chicago" };
-const tromso: Loc = { name: "Tromsø, Troms, Norway", latitude: 69.6496, longitude: 18.957, timezone: "Europe/Oslo" };
-const T0 = Date.UTC(2026, 10, 9, 14, 0, 0);
-const seconds = (ms: number) => Math.round(ms / 1000);
-const okAustin = answer(
-  forecast(
-    [T0 / 1000 - DAY / 1000 + 1000, seconds(T0 + 15 * HOUR), seconds(T0 + 39 * HOUR), seconds(T0 + 63 * HOUR)],
-    [seconds(T0 - 5 * HOUR), seconds(T0 + 20 * HOUR), seconds(T0 + 44 * HOUR), seconds(T0 + 68 * HOUR)],
-  ),
-);
-
-type Step =
-  | { op: "load"; now: number; location: Loc; fetch: Spec }
-  | { op: "loadMany"; now: number; location: Loc; fetch: Spec; count: number }
-  | { op: "resolve"; now: number; location: Loc | null; fetch: Spec }
-  | { op: "cached"; now: number; location: Loc | null };
-
-const NOT_USED: Spec = { kind: "throw" };
-const SCENARIOS: { name: string; steps: Step[] }[] = [
-  {
-    name: "a good answer is reused for six hours, then asked for again",
-    steps: [
-      { op: "load", now: T0, location: austin, fetch: okAustin },
-      { op: "load", now: T0 + HOUR, location: austin, fetch: NOT_USED },
-      { op: "load", now: T0 + 6 * HOUR - 1, location: austin, fetch: NOT_USED },
-      { op: "load", now: T0 + 6 * HOUR, location: austin, fetch: okAustin },
-      { op: "load", now: T0 + 6 * HOUR + 1, location: austin, fetch: NOT_USED },
-    ],
-  },
-  {
-    name: "the cache is keyed by latitude and longitude alone",
-    steps: [
-      { op: "load", now: T0, location: austin, fetch: okAustin },
-      { op: "load", now: T0 + 1, location: { ...austin, name: "Somewhere else", timezone: "UTC" }, fetch: NOT_USED },
-      { op: "load", now: T0 + 2, location: { ...austin, latitude: 30.26716 }, fetch: okAustin },
-      { op: "load", now: T0 + 3, location: tromso, fetch: answer(forecast([], [])) },
-    ],
-  },
-  {
-    name: "numbers are written into the address the way JavaScript writes them",
-    steps: [
-      { op: "load", now: T0, location: { name: "a", latitude: 0, longitude: 0, timezone: "UTC" }, fetch: { kind: "ok", body: {} } },
-      { op: "load", now: T0, location: { name: "b", latitude: -0.5, longitude: 5e-7, timezone: "UTC" }, fetch: { kind: "ok", body: {} } },
-      { op: "load", now: T0, location: { name: "c", latitude: 90, longitude: -180, timezone: "UTC" }, fetch: { kind: "ok", body: {} } },
-      { op: "load", now: T0, location: { name: "d", latitude: 0.1 + 0.2, longitude: 1e21, timezone: "UTC" }, fetch: { kind: "ok", body: {} } },
-      { op: "load", now: T0, location: { name: "e", latitude: 12.345678901234567, longitude: -1e-7, timezone: "UTC" }, fetch: { kind: "ok", body: {} } },
-    ],
-  },
-  {
-    name: "polar gaps (null), words and out-of-order times in the answer",
-    steps: [
-      { op: "load", now: T0, location: tromso, fetch: { kind: "ok", body: forecast([null, 1_800_000_000, null, 1_800_086_400], [1_800_043_200, null, "x", 1_800_129_600]) } },
-      { op: "load", now: T0 + 7 * HOUR, location: { ...tromso, latitude: 70 }, fetch: { kind: "ok", body: forecast([300, 100, 200], [250, 150, 50]) } },
-      { op: "load", now: T0, location: { ...tromso, latitude: 71 }, fetch: { kind: "ok", body: forecast([100.5, 100, true, [5], {}], [100, 100.4999]) } },
-    ],
-  },
-  {
-    name: "a time that is the same moment for a sunrise and a sunset keeps the sunrises first",
-    steps: [{ op: "load", now: T0, location: austin, fetch: { kind: "ok", body: forecast([500, 700], [500, 600]) } }],
-  },
-  {
-    name: "answers of unexpected shape, each looked at again three minutes later (a good answer is kept, a failed one is asked for again)",
-    steps: [
-      { op: "load", now: T0, location: { ...austin, latitude: 1 }, fetch: { kind: "ok", body: {} } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 1 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 2 }, fetch: { kind: "ok", body: [] } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 2 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 3 }, fetch: { kind: "ok", body: { daily: null } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 3 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 4 }, fetch: { kind: "ok", body: { daily: "text" } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 4 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 5 }, fetch: { kind: "ok", body: { daily: { sunrise: "abc", sunset: null } } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 5 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 6 }, fetch: { kind: "ok", body: { daily: { sunrise: 5 } } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 6 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 7 }, fetch: { kind: "ok", body: { daily: { sunrise: {} } } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 7 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 8 }, fetch: { kind: "ok", body: { daily: { sunset: true } } } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 8 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 9 }, fetch: { kind: "ok", body: null } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 9 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 10 }, fetch: { kind: "ok", body: 7 } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 10 }, fetch: NOT_USED },
-      { op: "load", now: T0, location: { ...austin, latitude: 11 }, fetch: { kind: "ok", body: "text" } },
-      { op: "load", now: T0 + 180_000, location: { ...austin, latitude: 11 }, fetch: NOT_USED },
-    ],
-  },
-  {
-    name: "a failure with nothing cached gives no events and waits two minutes before trying again",
-    steps: [
-      { op: "load", now: T0, location: austin, fetch: { kind: "status", status: 503 } },
-      { op: "load", now: T0 + 119_999, location: austin, fetch: NOT_USED },
-      { op: "load", now: T0 + 120_000, location: austin, fetch: { kind: "throw" } },
-      { op: "load", now: T0 + 120_001, location: austin, fetch: NOT_USED },
-      { op: "load", now: T0 + 240_000, location: austin, fetch: { kind: "badjson" } },
-      { op: "load", now: T0 + 360_000, location: austin, fetch: okAustin },
-      { op: "load", now: T0 + 360_001, location: austin, fetch: NOT_USED },
-    ],
-  },
-  {
-    name: "a failure after a good answer keeps serving the good one",
-    steps: [
-      { op: "load", now: T0, location: austin, fetch: okAustin },
-      { op: "load", now: T0 + 6 * HOUR, location: austin, fetch: { kind: "status", status: 500 } },
-      { op: "load", now: T0 + 6 * HOUR + 60_000, location: austin, fetch: NOT_USED },
-      { op: "load", now: T0 + 6 * HOUR + 120_000, location: austin, fetch: { kind: "throw" } },
-      { op: "load", now: T0 + 6 * HOUR + 240_000, location: austin, fetch: okAustin },
-    ],
-  },
-  {
-    name: "simultaneous callers share one request, and one failure",
-    steps: [
-      { op: "loadMany", now: T0, location: austin, fetch: okAustin, count: 4 },
-      { op: "loadMany", now: T0 + 7 * HOUR, location: austin, fetch: { kind: "throw" }, count: 3 },
-      { op: "loadMany", now: T0 + 8 * HOUR, location: tromso, fetch: { kind: "status", status: 429 }, count: 2 },
-    ],
-  },
-  {
-    name: "resolving: real times, stand-ins with nothing saved, stand-ins and a retry when a saved city fails",
-    steps: [
-      { op: "resolve", now: T0 + 3 * HOUR, location: null, fetch: NOT_USED },
-      { op: "cached", now: T0, location: austin },
-      { op: "resolve", now: T0, location: austin, fetch: okAustin },
-      { op: "cached", now: T0 + 5 * HOUR, location: austin },
-      { op: "cached", now: T0 + 5 * HOUR, location: null },
-      { op: "resolve", now: T0 + 20 * HOUR, location: austin, fetch: NOT_USED },
-      { op: "resolve", now: T0 + 3 * HOUR, location: tromso, fetch: { kind: "throw" } },
-      { op: "cached", now: T0 + 3 * HOUR, location: tromso },
-      { op: "resolve", now: T0 + 3 * HOUR + 120_000, location: tromso, fetch: answer(forecast([], [])) },
-      { op: "resolve", now: T0 + 4 * HOUR, location: { ...tromso, longitude: 19 }, fetch: answer(forecast([seconds(T0 + 2 * HOUR)], [seconds(T0 + 11 * HOUR)])) },
-    ],
-  },
-];
-
-async function runScenario(steps: Step[]): Promise<Json[]> {
-  vi.resetModules();
-  // The stand-in times are machine-local; the scenarios are written for UTC.
-  const before = process.env.TZ;
-  process.env.TZ = "UTC";
-  try {
-    const sun = await import("./sunTimes");
-    const out: Json[] = [];
-    for (const step of steps) {
-      const requests: string[] = [];
-      const fetchImpl = fakeFetch("fetch" in step ? step.fetch : NOT_USED, requests);
-      const events = (list: readonly SunEvent[]) => list.map((e) => ({ at: e.at, kind: e.kind }));
-      const schedule = (s: { events: SunEvent[]; level: number; estimated: boolean; retry: boolean }) => ({ ...s, events: events(s.events) });
-      let result: Json;
-      switch (step.op) {
-        case "load":
-          result = { events: events(await sun.loadSunEvents(step.location, step.now, fetchImpl)) };
-          break;
-        case "loadMany": {
-          const all = await Promise.all(Array.from({ length: step.count }, () => sun.loadSunEvents(step.location, step.now, fetchImpl)));
-          result = { many: all.map(events) };
-          break;
-        }
-        case "resolve":
-          result = { schedule: schedule(await sun.resolveSunSchedule(step.location ?? undefined, step.now, fetchImpl)) };
-          break;
-        case "cached":
-          result = { schedule: schedule(sun.cachedSunSchedule(step.location ?? undefined, step.now)) };
-          break;
-      }
-      out.push({ ...step, ...(result as object), requests } as Json);
-    }
-    return out;
-  } finally {
-    if (before === undefined) delete process.env.TZ;
-    else process.env.TZ = before;
-  }
-}
-
-// ---------------------------------------------------------------------------------------------------------------------------------
-// The city lookup
-
-const geo = (...results: Json[]): Spec => ({ kind: "ok", body: { results } });
-const hit = (extra: Record<string, Json> = {}): Json => ({
-  name: "Austin", admin1: "Texas", country: "United States", latitude: 30.26715, longitude: -97.74306, timezone: "America/Chicago", ...extra,
-});
-
-const GEOCODE: { query: string; fetch: Spec }[] = [
-  { query: "Austin, TX", fetch: geo(hit(), hit({ name: "Austin, MN" })) },
-  { query: "Paris", fetch: geo(hit({ name: "Paris", admin1: "Île-de-France", country: "France", latitude: 48.85341, longitude: 2.3488, timezone: "Europe/Paris" })) },
-  { query: "São Paulo", fetch: geo(hit({ name: "São Paulo", admin1: "São Paulo", country: "Brazil", latitude: -23.5475, longitude: -46.63611, timezone: "America/Sao_Paulo" })) },
-  { query: "St. John's & co=?#%", fetch: geo(hit({ name: "St. John's", admin1: "Newfoundland and Labrador", country: "Canada" })) },
-  { query: "東京", fetch: geo(hit({ name: "東京都", admin1: "", country: "日本", timezone: "Asia/Tokyo" })) },
-  { query: "a+b c~d*e(f)g!h'i-j_k.l", fetch: geo(hit()) },
-  { query: "Zürich  ", fetch: geo(hit({ name: "Zürich", admin1: undefined as unknown as Json, country: "Switzerland" })) },
-  { query: "", fetch: geo() },
-  { query: "nowhere", fetch: { kind: "ok", body: {} } },
-  { query: "nowhere", fetch: geo() },
-  { query: "no admin", fetch: geo(hit({ admin1: null, country: null })) },
-  { query: "empty parts", fetch: geo(hit({ name: "", admin1: "", country: "" })) },
-  { query: "name only", fetch: geo(hit({ admin1: "", country: "" })) },
-  { query: "name not a string", fetch: geo(hit({ name: 5 })) },
-  { query: "region and country that are not strings", fetch: geo(hit({ admin1: 5, country: true })) },
-  { query: "region and country that are false", fetch: geo(hit({ admin1: 0, country: false })) },
-  { query: "no name", fetch: geo({ latitude: 1, longitude: 2, timezone: "UTC" }) },
-  { query: "latitude a string", fetch: geo(hit({ latitude: "30.2" })) },
-  { query: "no longitude", fetch: geo(hit({ longitude: null })) },
-  { query: "no timezone", fetch: geo(hit({ timezone: undefined as unknown as Json })) },
-  { query: "latitude out of range", fetch: geo(hit({ latitude: 91, longitude: 181 })) },
-  { query: "first result is bad", fetch: geo({ name: "x" }, hit()) },
-  { query: "result is null", fetch: geo(null) },
-  { query: "result is a number", fetch: geo(5) },
-  { query: "results is an object with a zero key", fetch: { kind: "ok", body: { results: { "0": hit({ name: "Zero" }) } } } },
-  { query: "results is a string", fetch: { kind: "ok", body: { results: "Austin" } } },
-  { query: "results is null", fetch: { kind: "ok", body: { results: null } } },
-  { query: "body is null", fetch: { kind: "ok", body: null } },
-  { query: "body is a number", fetch: { kind: "ok", body: 7 } },
-  { query: "server error", fetch: { kind: "status", status: 500 } },
-  { query: "not found", fetch: { kind: "status", status: 404 } },
-  { query: "offline", fetch: { kind: "throw" } },
-  { query: "not json", fetch: { kind: "badjson" } },
-];
-
-async function geocodeCases(): Promise<Json[]> {
-  const { geocodeCity } = await import("./sunTimes");
-  const out: Json[] = [];
-  for (const { query, fetch: spec } of GEOCODE) {
-    const requests: string[] = [];
-    let result: Json;
-    try {
-      result = (await geocodeCity(query, fakeFetch(spec, requests))) as Json;
-    } catch {
-      result = { throws: true };
-    }
-    out.push({ query, fetch: JSON.parse(JSON.stringify(spec)), result, requests });
-  }
-  return out;
+  return [...ordinary, ...changes];
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -510,24 +272,21 @@ function paletteCases(): { palettes: Json; blends: Json } {
 async function build(): Promise<Json> {
   const { tones, autoLight } = toneCases();
   const { palettes, blends } = paletteCases();
-  const scenarios: Json[] = [];
-  for (const { name, steps } of SCENARIOS) scenarios.push({ name, steps: await runScenario(steps) });
   return {
     about:
-      "Made by apps/web/src/lib/composition/sunConformance.test.ts from the desktop's sunSchedule.ts, sunPairs.ts, sunTimes.ts and globals.css; SunConformanceTests replays it. Do not edit by hand: UPDATE_FIXTURES=1 pnpm exec vitest run src/lib/composition/sunConformance.test.ts",
-    constants: { rampHalfWidthMs: RAMP_HALF_WIDTH_MS, inkFlipLevel: INK_FLIP_LEVEL, defaultSunPair: DEFAULT_SUN_PAIR },
+      "Made by apps/web/src/lib/composition/sunConformance.test.ts from the desktop's sunHours.ts, sunSchedule.ts, sunPairs.ts and globals.css; SunConformanceTests replays it. Do not edit by hand: UPDATE_FIXTURES=1 pnpm exec vitest run src/lib/composition/sunConformance.test.ts",
+    constants: { inkFlipLevel: INK_FLIP_LEVEL, defaultSunPair: DEFAULT_SUN_PAIR, defaultHours: { ...DEFAULT_SUN_HOURS }, msPerDay: MS_PER_DAY },
     pairs: SUN_PAIR_CHOICES.map((choice) => ({ ...choice })),
     pairProbes: [
       ...SUN_PAIR_CHOICES.map((choice) => choice.name),
       "Classic", "classic ", "", "neon", "mint-forest-", null, 5, true, ["classic"], { name: "classic" },
     ].map((value) => ({ value: value as Json, isName: isSunPairName(value), inkFlipLevel: inkFlipLevelOf(value) })),
+    clocks: clockCases(),
+    hourSets: hourSetCases(),
     levels: levelCases(),
     tones,
     autoLight,
-    fallback: fallbackCases(),
-    todays: await todaysCases(),
-    geocode: await geocodeCases(),
-    loads: scenarios,
+    wallClock: wallClockCases(),
     palettes,
     blends,
   };
@@ -561,14 +320,13 @@ describe("the Follow the sun fixture (fixtures/conformance/sun.json)", () => {
   it("covers what it is meant to", async () => {
     const fixture = JSON.parse(JSON.stringify(await fixtureOnce())) as { [key: string]: Json[] | Json };
     const rows = (key: string) => fixture[key] as { [k: string]: Json }[];
-    expect(rows("levels").length).toBeGreaterThan(40);
+    expect(rows("levels").length).toBeGreaterThan(100);
     expect(rows("levels").some((l) => (l.nows as [number, number][]).some(([, level]) => level > 0 && level < 1))).toBe(true);
     expect(rows("autoLight").length).toBeGreaterThan(800);
-    expect(rows("fallback").length).toBe(ZONES.length * INSTANTS.length);
-    // Every fallback day has six events, a sunrise and a sunset for yesterday, today and tomorrow, at 06:30 and 18:30 local time.
-    for (const row of rows("fallback")) expect(row.events as Json[]).toHaveLength(6);
-    expect(rows("todays").some((t) => t.throws === true)).toBe(true);
-    expect(rows("geocode").some((g) => (g.result as { throws?: boolean } | null)?.throws)).toBe(true);
-    expect(rows("loads").length).toBe(SCENARIOS.length);
+    expect(rows("hourSets").some((h) => h.valid === true) && rows("hourSets").some((h) => h.valid === false)).toBe(true);
+    expect(rows("clocks").length).toBeGreaterThan(25);
+    expect(rows("wallClock").length).toBe(ZONES.length * INSTANTS.length + CLOCK_CHANGES.length * 4);
+    // Midnight is 0, never 24 hours, in every zone that has one in the list.
+    for (const row of rows("wallClock")) expect(row.ms as number).toBeLessThan(MS_PER_DAY);
   }, 60_000);
 });

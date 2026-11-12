@@ -20,7 +20,6 @@ import type {
   MoveGroupResult,
   SaveImageInput,
   SaveImageResult,
-  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -49,15 +48,8 @@ import { defaultDatabasePath, expandHome } from "./paths";
 import * as searchIndex from "./searchIndex";
 import { EMPTY_TRASH, type RestoreResult, type Trash } from "./trash";
 import * as trashRepo from "./trashRepo";
-import {
-  cachedSunSchedule,
-  geocodeCity,
-  loadSunEvents,
-  resolveSunSchedule,
-  todaysSunTimes,
-  type SunSchedule,
-} from "./sunTimes";
-import { sunThemeAttributes } from "./sunSchedule";
+import { sunLevel, sunThemeAttributes } from "./sunSchedule";
+import { validateSunHours, type SunHours } from "./sunHours";
 import { isEditorFontName } from "./editorFonts";
 import { isNoteBackgroundName } from "./noteBackgrounds";
 import { inkFlipLevelOf, isSunPairName } from "./sunPairs";
@@ -142,7 +134,6 @@ function isWritableDir(dir: string): boolean {
 export async function loadSettings(): Promise<SettingsSnapshot> {
   const settings = loadWebSettings();
   const dbPath = resolvedDbPath(settings);
-  const { location } = settings;
   // Looking at Settings must not be what creates a missing database file.
   const dbExists = fs.existsSync(dbPath);
   const trash = dbExists ? await loadTrash() : EMPTY_TRASH;
@@ -152,6 +143,7 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
     editorFont: settings.editorFont,
     noteBackground: settings.noteBackground,
     sunPair: settings.sunPair,
+    sunHours: settings.sunHours,
     writing: settings.writing,
     home: settings.home,
     plugins: settings.plugins,
@@ -170,10 +162,6 @@ export async function loadSettings(): Promise<SettingsSnapshot> {
       appDataDir: settings.appDataDir,
     }),
     assistant: settings.assistant ?? DEFAULT_ASSISTANT_SETTINGS,
-    city: location?.name ?? "",
-    sunTimes: location
-      ? todaysSunTimes(await loadSunEvents(location), location.timezone)
-      : undefined,
   };
 }
 
@@ -944,47 +932,24 @@ export async function saveHomeSettings(home: HomeSettings): Promise<{ error?: st
   return {};
 }
 
-export async function saveLocation(city: string): Promise<SaveLocationResult> {
-  const query = city.trim();
-
-  if (query === "") {
-    // Forgetting the city leaves "auto" running on stand-in times.
-    const settings = loadWebSettings();
-    delete settings.location;
-    saveWebSettings(settings);
-    return {};
-  }
-
-  let location;
-  try {
-    location = await geocodeCity(query);
-  } catch {
-    return { error: "Couldn't reach the city lookup service. Check your connection and try again." };
-  }
-  if (!location) {
-    return {
-      error: `Couldn't find a city matching "${query}". Try "City, State" or "City, Country".`,
-    };
-  }
-
-  saveWebSettings({ ...loadWebSettings(), location });
-  const times = todaysSunTimes(await loadSunEvents(location), location.timezone);
-  return { saved: { name: location.name, ...times } };
+export async function saveSunHours(hours: SunHours): Promise<{ error?: string }> {
+  const checked = validateSunHours(hours);
+  if (!checked.hours) return { error: checked.error };
+  saveWebSettings({ ...loadWebSettings(), sunHours: checked.hours });
+  return {};
 }
 
-export async function loadSunSchedule(): Promise<SunSchedule | null> {
-  const { theme, location } = loadWebSettings();
-  return theme === "auto" ? resolveSunSchedule(location) : null;
+export async function loadSunHours(): Promise<SunHours | null> {
+  const { theme, sunHours } = loadWebSettings();
+  return theme === "auto" ? sunHours : null;
 }
 
 /**
- * For the very first paint, which can't wait on the network: the "auto" scheme's
- * attributes from whatever sun times are already cached, else stand-in times.
- * Undefined when another scheme is selected.
+ * For the very first paint: the "auto" scheme's attributes at this moment, from the saved hours. Undefined when another scheme is selected.
  */
 export function initialSunTheme(): { tone: "light" | "dark"; autoLight: string } | undefined {
-  const { theme, location, sunPair } = loadWebSettings();
-  return theme === "auto" ? sunThemeAttributes(cachedSunSchedule(location).level, inkFlipLevelOf(sunPair)) : undefined;
+  const { theme, sunHours, sunPair } = loadWebSettings();
+  return theme === "auto" ? sunThemeAttributes(sunLevel(sunHours, Date.now()), inkFlipLevelOf(sunPair)) : undefined;
 }
 
 // The AI helper's settings and model list live in assistantService.ts; they are part of this module's surface.
@@ -1033,7 +998,7 @@ const _implementsApi: CompositionApi = {
   chatGptStatus,
   startChatGptSignIn,
   signOutChatGpt,
-  saveLocation,
-  loadSunSchedule,
+  saveSunHours,
+  loadSunHours,
 };
 void _implementsApi;

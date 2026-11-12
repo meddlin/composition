@@ -122,7 +122,7 @@ export function SettingsScreen({ snapshot }: { snapshot: SettingsSnapshot }) {
           id: FOLLOW_THE_SUN_PAGE,
           label: "Follow the sun",
           icon: <SunMoonIcon />,
-          content: <FollowTheSunSettings currentCity={snapshot.city} currentSunTimes={snapshot.sunTimes} />,
+          content: <FollowTheSunSettings currentHours={snapshot.sunHours} />,
         },
       ],
     },

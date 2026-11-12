@@ -101,7 +101,7 @@ export const BINDINGS: readonly KeyBinding[] = [
   { action: "back", scope: "attachments", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 
   { action: "next-field", scope: "settings", keys: ["tab"], hint: "Tab next field", description: "Move to the next setting", footer: true },
-  { action: "save", scope: "settings", keys: ["enter"], hint: "Enter save", description: "Save the data location or city, apply the highlighted color scheme, create a backup, or ask to restore one", footer: true },
+  { action: "save", scope: "settings", keys: ["enter"], hint: "Enter save", description: "Save the data location or the follow the sun hours, apply the highlighted color scheme, create a backup, or ask to restore one", footer: true },
   { action: "confirm", scope: "settings", keys: ["y"], hint: "y confirm", description: "Confirm restoring a backup, when asked (any other key cancels)", footer: false },
   { action: "back", scope: "settings", keys: ["escape"], hint: "Esc back", description: "Back to the notes", footer: true, essential: true },
 ];

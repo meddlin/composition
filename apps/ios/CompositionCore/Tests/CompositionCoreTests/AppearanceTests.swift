@@ -209,7 +209,7 @@ struct AppearanceTests {
             #expect(store.appearance() == Appearance(scheme: .sun, sunPair: .skyMidnight))
             let written = try object(location)
             #expect(written["theme"] as? String == "auto" && written["sunPair"] as? String == "sky-midnight" && written["followSystem"] as? Bool == false)
-            #expect(written["panels"] != nil && store.location()?.name == "Austin", "the city and the rest of the file are as they were")
+            #expect(written["panels"] != nil && written["location"] == nil, "the old city goes with this write, and the rest of the file is as it was")
             try store.setScheme(.theme("dark"))
             #expect(store.appearance() == Appearance(scheme: .theme("dark"), sunPair: .skyMidnight), "the pair is kept for when it is chosen again")
         }

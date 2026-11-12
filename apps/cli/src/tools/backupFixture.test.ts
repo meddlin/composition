@@ -48,7 +48,7 @@ describe.each(APPS)("the %s fixture", (app) => {
     expect(fixture.groups.map((g) => g.name).sort()).toEqual(["Alpha", "Projects"]);
     expect(fixture.images).toHaveLength(1);
     expect(fixture.attachments.map((a) => a.fileName)).toEqual(["Quarterly report.txt"]);
-    expect(fixture.settings).toMatchObject({ theme: "forest", city: "Austin, Texas, United States", sidebarWidth: 300 });
+    expect(fixture.settings).toMatchObject({ theme: "forest", sunHours: { lightenFrom: "19:00", darkFrom: "06:00" }, sidebarWidth: 300 });
     expect(failing(home)).toEqual([]);
   });
 

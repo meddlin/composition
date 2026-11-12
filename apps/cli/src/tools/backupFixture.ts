@@ -48,7 +48,7 @@ type Fixture = {
   trashedNotes: { id: number; title: string }[];
   images: { name: string; sha: string }[];
   attachments: { id: number; noteId: number; fileName: string; storedName: string; sha: string }[];
-  settings: { theme: string; city: string; sidebarWidth: number; editorRatio: number; favorites: { type: "note" | "group"; id: number }[] };
+  settings: { theme: string; sunHours: { lightenFrom: string; lightFrom: string; darkenFrom: string; darkFrom: string }; sidebarWidth: number; editorRatio: number; favorites: { type: "note" | "group"; id: number }[] };
 };
 
 const sha = (data: string | Buffer) => crypto.createHash("sha256").update(data).digest("hex");
@@ -134,7 +134,7 @@ export async function setupFixture(app: App, home: string): Promise<Fixture> {
     theme: "forest",
     sidebarWidth: 300,
     editorRatio: 0.4,
-    location: { name: "Austin, Texas, United States", latitude: 30.27, longitude: -97.74, timezone: "America/Chicago" },
+    sunHours: { lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" },
     favorites: [{ type: "note", id: plan.id }],
   });
 
@@ -184,7 +184,7 @@ function readFixtureFromDisk(app: App, home: string, settingsFile: string): Fixt
       }),
       settings: {
         theme: settings.theme,
-        city: settings.location?.name ?? "",
+        sunHours: settings.sunHours,
         sidebarWidth: settings.sidebarWidth,
         editorRatio: settings.editorRatio,
         favorites: settings.favorites ?? [],
@@ -246,7 +246,7 @@ export function verifyFixture(home: string): Check[] {
     same(expected.attachments, actual.attachments),
     `found ${actual.attachments.map((a) => a.fileName || a.storedName).join(", ") || "none"}`,
   );
-  check("settings: color scheme, city, column sizes and favorites", same(expected.settings, actual.settings), JSON.stringify(actual.settings));
+  check("settings: color scheme, follow the sun hours, column sizes and favorites", same(expected.settings, actual.settings), JSON.stringify(actual.settings));
   const settings = JSON.parse(fs.readFileSync(expected.settingsFile, "utf-8"));
   check("the data location was left alone", settings.appDataDir === dataDir && !settings.dbPath, String(settings.appDataDir));
   const strays = fs.readdirSync(dataDir).filter((n) => n.startsWith(".restore-") || n.startsWith(".composition-backup-"));

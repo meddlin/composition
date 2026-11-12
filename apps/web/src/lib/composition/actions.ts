@@ -10,7 +10,6 @@ import type {
   SaveAssistantSettingsResult,
   SaveImageInput,
   SaveImageResult,
-  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchResult,
@@ -24,7 +23,7 @@ import type { Layout } from "./layout";
 import type { Notebook } from "./notebooksRepo";
 import type { Note } from "./notesRepo";
 import * as service from "./service";
-import type { SunSchedule } from "./sunTimes";
+import type { SunHours } from "./sunHours";
 import type { RestoreResult, Trash } from "./trash";
 import type { HomeSettings } from "./home";
 import type { PluginSettings } from "./plugins";
@@ -328,8 +327,8 @@ export async function signOutChatGpt(): Promise<{ error?: string }> {
   return result;
 }
 
-export async function saveLocation(city: string): Promise<SaveLocationResult> {
-  const result = await service.saveLocation(city);
+export async function saveSunHours(hours: SunHours): Promise<{ error?: string }> {
+  const result = await service.saveSunHours(hours);
   if (!result.error) {
     revalidatePath("/settings");
     revalidatePath("/");
@@ -337,6 +336,6 @@ export async function saveLocation(city: string): Promise<SaveLocationResult> {
   return result;
 }
 
-export async function loadSunSchedule(): Promise<SunSchedule | null> {
-  return service.loadSunSchedule();
+export async function loadSunHours(): Promise<SunHours | null> {
+  return service.loadSunHours();
 }

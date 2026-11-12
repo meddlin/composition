@@ -78,7 +78,7 @@ describe("AppearanceSync", () => {
     expect(root().style.getPropertyValue("--glass-alpha")).toBe("55");
   });
 
-  it("gives it where it is on the sunrise and sunset ramp, when it follows the sun", () => {
+  it("gives it where it is on the fade between its hours, when it follows the sun", () => {
     render(<AppearanceSync />);
 
     tell({ theme: "auto", previewFont: "default", editorFont: "default", sun: { tone: "light", autoLight: "0.65" } });
@@ -98,7 +98,7 @@ describe("AppearanceSync", () => {
     expect(root().dataset.sunPair).toBe("classic");
   });
 
-  it("tells the window's own sun sync to read the schedule again, since the scheme or the city may have changed it", () => {
+  it("tells the window's own sun sync to read the hours again, since the scheme or the hours may have changed", () => {
     render(<AppearanceSync />);
     const heard = vi.fn();
     window.addEventListener(SUN_SETTINGS_CHANGED, heard);
