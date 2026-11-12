@@ -9,9 +9,11 @@
 	<false/>
 	<key>NSPrivacyTrackingDomains</key>
 	<array/>
-	<!-- OPEN, the author's call with the App Privacy answers in App Store Connect: the sunrise and sunset lookup (SunTimes.swift) sends the city
-	     the person types, and then that city's coordinates, to Open-Meteo, a third party. Whether Apple counts that as "collected" decides whether
-	     this lists Coarse Location (not linked, not for tracking, for App Functionality), and the two answers should agree. -->
+	<!-- Nothing is collected, so this stays empty (App Store Connect: "Data Not Collected"). The app makes no network request of its own: there is no URLSession,
+	     no web view and no networking framework in it or in CompositionCore, and "Follow the sun" runs on four hours the person sets by hand (no city, no location,
+	     no lookup; until 2026-11-12 it sent a typed city and then its coordinates to Open-Meteo, which is why this was once an open question). A link the person
+	     taps in a note (a web address, a <Repo> or <YouTube> card, a remote picture shown as a link) is handed to the system to open in their browser, which is not
+	     the app sending anything. If a network use is ever added, this list and the App Privacy answers must change with it. -->
 	<key>NSPrivacyCollectedDataTypes</key>
 	<array/>
 	<key>NSPrivacyAccessedAPITypes</key>
@@ -36,7 +38,8 @@
 				<string>35F9.1</string>
 			</array>
 		</dict>
-		<!-- User defaults: the app's own settings (the sun clock's saved level, the PDF mark colour, the finger-draws switch, split-view sizes). -->
+		<!-- User defaults: the app's own settings (the PDF mark colour, the finger-draws switch, the Live tab's VoiceOver choice) and the removal, at launch, of the key an
+	     earlier build kept the last launch's sunrise and sunset in (SunClock). -->
 		<dict>
 			<key>NSPrivacyAccessedAPIType</key>
 			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
