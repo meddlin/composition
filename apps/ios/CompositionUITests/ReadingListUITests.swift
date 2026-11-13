@@ -112,7 +112,8 @@ final class ReadingListUITests: XCTestCase {
         // A link inside the page is followed in place, and the page's own Back returns.
         app.webViews.links["Second page"].tap()
         XCTAssertTrue(app.webViews.staticTexts["The second page"].waitForExistence(timeout: 20), "the link inside the page is followed")
-        XCTAssertTrue(app.buttons["page-back"].isEnabled)
+        // The web view says it can go back a moment after the new page's text is there, so this waits for it.
+        XCTAssertTrue(eventually { self.app.buttons["page-back"].isEnabled }, "the page's own Back is enabled")
         app.buttons["page-back"].tap()
         XCTAssertTrue(app.webViews.staticTexts["Hello from the test"].waitForExistence(timeout: 20), "back to the article")
         XCTAssertTrue(link.label.contains("A local article"), "the second page did not rename the link")
