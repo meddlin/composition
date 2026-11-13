@@ -148,3 +148,18 @@ export function parseSearchQuery(raw: string): ParsedQuery {
     attributesToSearchOn: textAttributes.length > 0 ? textAttributes : undefined,
   };
 }
+
+/**
+ * What a search result found in a PDF's text puts in the reader's find bar, which looks for one run of text: the query's first quoted
+ * phrase, or else its longest word (every word is on the page found, but not always side by side; a tie goes to the first). Filters
+ * (`tags:` …) are left out. "" when there is nothing to find. The iPad's `PdfSearchText.findText` does the same.
+ */
+export function findTextForQuery(query: string): string {
+  const { text } = parseSearchQuery(query);
+  const parts = text.split('"');
+  // The odd pieces were between quotes.
+  const phrase = parts.find((part, index) => index % 2 === 1 && part.trim() !== "");
+  if (phrase !== undefined) return phrase.trim().split(/\s+/u).join(" ");
+  const words = text.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  return words.reduce((best, word) => (word.length > best.length ? word : best), "");
+}

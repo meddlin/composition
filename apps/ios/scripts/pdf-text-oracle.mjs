@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Writes fixtures/conformance/pdf-text.json: what the desktop's own code makes of a PDF's text for search. Two parts:
 //   cases  raw page texts and what `pageSearchText` (apps/web/src/lib/composition/pdfText.ts) turns each into, exactly;
-//   pages  every page of fixtures/conformance/pdf-text.pdf read by the desktop's pdf.js (the reader's own options), through
-//          `pageTextFromItems` and `pageSearchText`, with the words a search must find on it (folded: lower case, no accents).
+//   pages  every page of fixtures/conformance/pdf-text.pdf as the desktop reads it for search (`readPdfText` in pdfText.ts, pdf.js
+//          with the reader's own options, then `pageTextFromItems` and `pageSearchText`), with the words a search must find on it
+//          (folded: lower case, no accents).
 // The Swift core's PdfSearchText and the iPad's PDFKit extraction are checked against that file (PdfTextConformanceTests), and the
 // file is committed so a plain `swift test` needs no Node.
 //
@@ -14,7 +15,8 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const web = new URL("../../web/", import.meta.url);
-const { pageSearchText, pageTextFromItems } = await import(new URL("src/lib/composition/pdfText.ts", web));
+// `readPdfText` is the desktop's own reading (the same function its utility process runs), so the pages below are what it indexes.
+const { pageSearchText, readPdfText } = await import(new URL("src/lib/composition/pdfText.ts", web));
 const pdfjs = await import(new URL("node_modules/pdfjs-dist/legacy/build/pdf.mjs", web));
 const pdfjsRoot = fileURLToPath(new URL("node_modules/pdfjs-dist/", web));
 
@@ -32,27 +34,12 @@ const cases = [
 ];
 
 async function readPages() {
-  const data = new Uint8Array(fs.readFileSync(fixturePdf));
-  const task = pdfjs.getDocument({
-    data,
-    useWasm: false,
-    enableXfa: false,
-    isEvalSupported: false,
+  const outcome = await readPdfText(pdfjs, { data: new Uint8Array(fs.readFileSync(fixturePdf)) }, {
     cMapUrl: `${pdfjsRoot}cmaps/`,
-    cMapPacked: true,
     standardFontDataUrl: `${pdfjsRoot}standard_fonts/`,
-    iccUrl: `${pdfjsRoot}iccs/`,
-    verbosity: 0,
   });
-  const doc = await task.promise;
-  const pages = [];
-  for (let number = 1; number <= doc.numPages; number++) {
-    const content = await (await doc.getPage(number)).getTextContent();
-    const text = pageSearchText(pageTextFromItems(content.items));
-    pages.push({ page: number - 1, text, words: words(text) });
-  }
-  await task.destroy();
-  return pages;
+  if (outcome.status !== "pages") throw new Error(`the fixture did not read: ${outcome.status}`);
+  return outcome.pages.map(({ page, text }) => ({ page, text, words: words(text) }));
 }
 
 /** The distinct words of `text`, lower case and without accents, sorted: what a search must find. */

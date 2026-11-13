@@ -186,9 +186,9 @@ function groupPath(groupId: number | null): string[] {
  */
 export async function searchNotes(query: string): Promise<SearchResult> {
   try {
-    const ids = await searchIndex.searchNoteIds(query);
+    const found = await searchIndex.searchNotesWithPdfText(query);
     const hits: SearchHit[] = [];
-    for (const id of ids) {
+    for (const { id, pdfPage, pdfPageLabel } of found) {
       const note = notesRepo.getNote(id);
       if (note) {
         hits.push({
@@ -196,6 +196,7 @@ export async function searchNotes(query: string): Promise<SearchResult> {
           title: note.title,
           description: note.description,
           groupPath: groupPath(note.groupId),
+          ...(pdfPage === undefined ? {} : { pdf: { page: pdfPage + 1, label: pdfPageLabel ?? null } }),
         });
       }
     }
@@ -468,6 +469,18 @@ export async function importPdf(sourcePath: string, target: ImportTarget, option
 export function findDocumentFile(id: number): { path: string; fileName: string } | null {
   const found = documents.documentPath(loadWebSettings().appDataDir, id);
   return found ? { path: found.path, fileName: found.document.fileName } : null;
+}
+
+/**
+ * Every PDF whose file is here, as search reads their text (the desktop's PdfTextIndexer): its row, its owner note, the SHA-256 of its
+ * bytes (a changed file is read again) and where the file is.
+ */
+export function pdfTextSources(): { documentId: number; noteId: number; sha256: string; path: string }[] {
+  const dataDir = loadWebSettings().appDataDir;
+  return documentsRepo.listDocuments().flatMap((document) => {
+    const found = documents.documentPath(dataDir, document.id);
+    return found ? [{ documentId: document.id, noteId: document.noteId, sha256: document.sha256, path: found.path }] : [];
+  });
 }
 
 /** What an export needs: where the PDF's bytes are, and every mark on it. Null when the row is gone or the file is. */

@@ -310,6 +310,8 @@ export const DOCUMENT_VALIDATORS: Record<DocumentMethod, Validator> = {
   updateAnnotation: ([annotationId, changes]) => [id("updateAnnotation", annotationId, "annotationId"), record("updateAnnotation", changes, "changes")],
   deleteAnnotation: ([annotationId]) => [id("deleteAnnotation", annotationId, "annotationId")],
   restoreAnnotations: ([documentId, annotations]) => [id("restoreAnnotations", documentId, "documentId"), records("restoreAnnotations", annotations, "annotations", MAX_MARKS_AT_ONCE)],
+  pdfTextState: ([documentId]) => [id("pdfTextState", documentId, "documentId")],
+  readUnlockedPdfText: ([documentId, password]) => [id("readUnlockedPdfText", documentId, "documentId"), text("readUnlockedPdfText", password, "password")],
 };
 
 /** The desktop-only backup methods take nothing: the main process asks with a dialog, so no path ever comes from the renderer. */

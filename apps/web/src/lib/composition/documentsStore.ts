@@ -1,4 +1,4 @@
-import type { DocumentsApi, ExistingPdf, ExportPdfOptions, ExportPdfResult, ImportPdfResult, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument } from "./documentsApi";
+import type { DocumentsApi, ExistingPdf, ExportPdfOptions, ExportPdfResult, ImportPdfResult, ImportTarget, PdfAnnotation, PdfBookmark, PdfContents, PdfDocument, PdfTextState } from "./documentsApi";
 import { createMarksController, type DocumentMarks } from "./documentMarks";
 import type { AnnotationChanges, PdfAnnotationInput, PdfViewState } from "./pdfMarkup";
 
@@ -40,10 +40,13 @@ export type DocumentsStore = {
   /**
    * The password a protected PDF was opened with this session, so a panel opened again (or a pop-out, which shares this store)
    * does not ask again, and so an export can unlock the file. Kept in this object's memory only: it is not in the snapshot,
-   * never sent anywhere but to pdf.js and, for an export, to the main process, and gone when the app closes.
+   * never sent anywhere but to pdf.js and to the main process (for an export, and once when it is first remembered, so that search
+   * can read the PDF's text; neither keeps it), and gone when the app closes.
    */
   passwordFor(documentId: number): string | undefined;
   rememberPassword(documentId: number, password: string): void;
+  /** Where the PDF's text is in search, for the reader's outline (a scan says it has none); null when not known. Never throws. */
+  pdfTextState(documentId: number): Promise<PdfTextState | null>;
   /** Remembers the page count the reader found (it shows at once; the backend is told). */
   setPageCount(documentId: number, pageCount: number): void;
   /** Remembers where the reader was. Not awaited: it is a convenience and must not get in the way of reading. */
@@ -157,7 +160,18 @@ export function createDocumentsStore(deps: DocumentsDeps, available = true): Doc
     importDropped,
     importCopy,
     passwordFor: (documentId) => passwords.get(documentId),
-    rememberPassword: (documentId, password) => void passwords.set(documentId, password),
+    rememberPassword(documentId, password) {
+      passwords.set(documentId, password);
+      // Search reads a protected PDF's text once it is unlocked (if it was waiting for that); the password is not kept there.
+      void deps.readUnlockedPdfText(documentId, password).catch(log("the PDF's text was not read for search"));
+    },
+    async pdfTextState(documentId) {
+      try {
+        return await deps.pdfTextState(documentId);
+      } catch {
+        return null;
+      }
+    },
     setPageCount(documentId, pageCount) {
       const document = state.documents.find((d) => d.id === documentId);
       if (!document || document.pageCount === pageCount) return;
@@ -211,4 +225,6 @@ export const unavailableDocuments: DocumentsDeps = {
   updateAnnotation: () => Promise.reject(new Error(UNAVAILABLE)),
   deleteAnnotation: () => Promise.reject(new Error(UNAVAILABLE)),
   restoreAnnotations: () => Promise.reject(new Error(UNAVAILABLE)),
+  pdfTextState: () => Promise.reject(new Error(UNAVAILABLE)),
+  readUnlockedPdfText: () => Promise.reject(new Error(UNAVAILABLE)),
 };

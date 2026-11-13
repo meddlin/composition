@@ -145,6 +145,9 @@ export type WorkspaceOptions = {
   };
 };
 
+/** Where to open a note's PDF: a page (1-based) and words to find on it (a search result found in the PDF's text). */
+export type PdfPlace = { page: number; find: string };
+
 export type WorkspaceStore = {
   /** The AI helper's chats, which live with the workspace so they outlast any one screen or window. */
   readonly assistant: ChatsStore;
@@ -199,7 +202,7 @@ export type WorkspaceStore = {
    * Shows a note the way picking it in the sidebar does (see `openNote` in `panelsState.ts`); a note that owns a PDF opens
    * with its PDF beside it (see `openPdfPair`).
    */
-  openNote(noteId: number, windowId?: WindowId): void;
+  openNote(noteId: number, windowId?: WindowId, pdfPlace?: PdfPlace): void;
   /** The sidebar's "Open to the side": a new note panel beside the focused one, even if the note is open already. */
   openNoteBeside(noteId: number, windowId?: WindowId): void;
   /** A note dropped on a panel: onto its middle to fill it or replace its note, or on a side for a new panel there. */
@@ -718,9 +721,10 @@ export function createWorkspaceStore(
       if (opened.panels !== state.panels) set({ panels: opened.panels });
       return opened.panelId;
     },
-    openNote: (noteId, windowId = MAIN_WINDOW) => {
+    openNote: (noteId, windowId = MAIN_WINDOW, pdfPlace) => {
       const pdf = grid ? documents.forNote(noteId) : undefined;
-      updatePanels((panels) => (pdf ? openPdfPairIn(panels, windowId, noteId, pdf.id, newPanelId) : openNoteIn(panels, windowId, noteId, newPanelId)));
+      const goTo = pdf && pdfPlace ? { page: pdfPlace.page, mark: null, find: pdfPlace.find, seq: ++goToCount } : undefined;
+      updatePanels((panels) => (pdf ? openPdfPairIn(panels, windowId, noteId, pdf.id, newPanelId, goTo) : openNoteIn(panels, windowId, noteId, newPanelId)));
     },
     openNoteBeside: (noteId, windowId = MAIN_WINDOW) =>
       updatePanels((panels) => openNoteBesideIn(panels, windowId, noteId, newPanelId)),

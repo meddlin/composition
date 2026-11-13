@@ -65,6 +65,7 @@ function documents(over: Partial<DocumentsStore> = {}) {
     addBookmark: vi.fn(async () => ({}) as never),
     renameBookmark: vi.fn(async () => null),
     removeBookmark: vi.fn(async () => {}),
+    pdfTextState: vi.fn(async () => null),
     ...over,
   } as unknown as DocumentsStore & Record<string, ReturnType<typeof vi.fn>>;
 }
@@ -818,5 +819,47 @@ describe("exporting a copy with the marks", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("password does not open");
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("the PDF's text in search", () => {
+  const pairing = (goTo: PdfPairing["goTo"]): PdfPairing => ({
+    title: "Field guide",
+    citations: [],
+    noteId: 3,
+    noteTitle: "Field guide",
+    follow: false,
+    insert: vi.fn(() => true),
+    onToggleFollow: vi.fn(),
+    onOpenNote: vi.fn(),
+    onNewNote: vi.fn(),
+    onGoToDone: vi.fn(),
+    goTo,
+  });
+
+  it("opens a search result at its page with the find bar looking for its words", async () => {
+    const c = controls();
+    viewer = ready({ controls: c, find: { current: 1, total: 3, notFound: false } });
+    marksState = { 7: { status: "ready", items: [], error: null, undoCount: 0, redoCount: 0 } };
+    render(<PdfReader document={document_} documents={documents()} pairing={pairing({ page: 9, mark: null, find: "estuary", seq: 1 })} />);
+
+    await waitFor(() => expect(c.goToPage).toHaveBeenCalledWith(9));
+    const box = await screen.findByRole<HTMLInputElement>("textbox", { name: "Find in this PDF" });
+    expect(box.value).toBe("estuary");
+    expect(c.find).toHaveBeenLastCalledWith("estuary");
+    expect(screen.getByText("1 of 3")).toBeTruthy();
+  });
+
+  it("says in the outline that a scan has no searchable text, and says nothing for a PDF that has some", async () => {
+    viewer = ready();
+    const { unmount } = render(<PdfReader document={document_} documents={documents({ pdfTextState: vi.fn(async () => "noText" as const) })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Outline and bookmarks" }));
+    expect(await screen.findByText(/No searchable text \(scanned\)/)).toBeTruthy();
+    unmount();
+
+    render(<PdfReader document={document_} documents={documents({ pdfTextState: vi.fn(async () => "indexed" as const) })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Outline and bookmarks" }));
+    await act(async () => {});
+    expect(screen.queryByText(/No searchable text/)).toBeNull();
   });
 });

@@ -195,7 +195,14 @@ What to know:
 ## Finding things
 
 Searching for a word in a highlight, a comment, a text note or a bookmark's label finds the PDF's note, as if the words were in it. Your
-own notes are searched as always. Searching the *full text* of every PDF is not built; **Find in this PDF** searches the one you are reading.
+own notes are searched as always.
+
+A word that is only in a PDF's own pages finds it too: the result says *In the PDF, p. 212* (the page's printed number when the book has its
+own). Choosing it opens the PDF at that page with **Find in this PDF** looking for the words you searched, ready to go on to the next. Every word
+you type has to be on the same page, and a word has to be spelt as it is in the PDF (the last one may be the start of a word); your notes'
+own text is forgiving of mistakes, as before. Each PDF's text is read once, in the background, after it is imported (a few seconds for a big
+book); a protected PDF is read after you unlock it, and a scanned PDF has no text to read: its outline says *No searchable text (scanned)*.
+**Find in this PDF** searches the one you are reading.
 
 ## Deleting a PDF
 
@@ -232,4 +239,4 @@ The iPad app (milestone M2, [apps/ios](../../apps/ios)) has its own reader, draw
 ## Not built yet
 
 Handwritten notes beside a PDF and standalone `<Ink>` pages of a PDF's own (the iPad app, milestone M2; ink on the pages of a PDF is built, see above), the Pencil's highlighter snapping to text lines, ink drawn by the desktop's reader (the desktop keeps and counts it), and the
-full text of every PDF in search, and scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).
+scanned PDFs and OCR. See [pdf-markup-plan.md](../pdf-markup-plan.md#not-in-scope).

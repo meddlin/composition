@@ -148,9 +148,14 @@ through `escapeMarkdown`, so a `*`, `<` or `{` in a textbook starts no Markdown 
 [Search](search.md) holds one document per note. A note that owns a PDF is indexed with the words of its PDF's marks (quotes, comments, text notes)
 and its bookmarks' labels appended to its content (`marksSearchText`), so a search for a word in a highlight finds the note. Only ids come back from a
 search, so the added words are never shown. Any change to a mark or bookmark re-indexes the owner note afterwards without the caller waiting
-(`reindexOwnerSoon`: while one pass is running, further changes ask for exactly one more). The full text of the PDF is **not** indexed on the
-desktop yet; the iPad indexes it page by page ([search.md](search.md#the-text-of-a-pdf)), with the rule for a page's text in `pdfText.ts`
-(`pageTextFromItems`, `pageSearchText`) ready for the desktop to use.
+(`reindexOwnerSoon`: while one pass is running, further changes ask for exactly one more).
+
+The PDF's own text is indexed too, a page a document in a Meilisearch index of its own (`pdf_pages`), so that a word only in the PDF finds the
+note, with the page it is on ([search.md](search.md#the-text-of-a-pdf)). `PdfTextIndexer` (`main/pdfText.ts`) reads each PDF in a utility process
+(`worker/pdfTextWorker.ts`, pdf.js bundled in, `readPdfText` from `pdfText.ts`) after search starts, after an import, after a delete for good and
+after a protected PDF is unlocked (the documents store's `rememberPassword` hands the password over once, `readUnlockedPdfText`; it is not kept). A
+search result found there opens the PDF at that page with the find bar looking for the query's words (the panel's `goTo` carries `find`); the
+outline of a PDF with no text says *No searchable text (scanned)* (`pdfTextState`).
 
 ## Export
 
@@ -206,8 +211,7 @@ checked against the stored-name pattern, and the export reads only the library's
 Links inside a PDF (a contents page, a cross-reference) are followed by pdf.js's link service; how a link to a web address inside a PDF behaves has not
 been checked. The reader needs the whole app (a web build has none); undo history is not stored; a followed link works from the preview only; a note open in two panels
 takes a quote in the later editor; export is checked against pdf.js (not yet Acrobat or PDFKit's reading of this writer), has not been measured near the
-1 GB limit, and has not been started from a packaged app in CI (only that its file is unpacked). Ink, handwritten notes, the full text of a PDF
-(built on the iPad only) and scans are not built ([the plan](../pdf-markup-plan.md#not-in-scope)).
+1 GB limit, and has not been started from a packaged app in CI (only that its file is unpacked). Ink, handwritten notes and scans (OCR) are not built ([the plan](../pdf-markup-plan.md#not-in-scope)).
 
 ## On the iPad
 

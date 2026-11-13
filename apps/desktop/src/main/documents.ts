@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import type { DocumentsHost, ImportPdfResult, ImportTarget } from "../../../web/src/lib/composition/documentsApi";
+import type { DocumentsHost, ImportPdfResult, ImportTarget, PdfTextState } from "../../../web/src/lib/composition/documentsApi";
 import type { ImportPdfOutcome } from "../../../web/src/lib/composition/service";
 import type { service as Service } from "./backend";
 import { checkDroppedPdf } from "./droppedPdf";
@@ -29,6 +29,8 @@ export type DocumentUi = {
   exportPdf(job: ExportJob): Promise<ExportOutcome>;
   /** The application data folder: the library's own files, which a dropped file must not come from. */
   dataFolder(): string;
+  /** Search's reading of PDFs' text (pdfText.ts): told of each import, asked where a PDF's text is, and given a password just used. */
+  pdfText: { imported(): void; state(documentId: number): Promise<PdfTextState | null>; readUnlocked(documentId: number, password: string): void };
 };
 
 type DocumentService = Pick<
@@ -57,7 +59,11 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
   const pending = new Map<string, string>();
 
   function answer(outcome: ImportPdfOutcome, sourcePath: string): ImportPdfResult {
-    if (outcome.status === "added") return { note: outcome.note, document: outcome.document };
+    if (outcome.status === "added") {
+      // Its text is read for search in the background; the import does not wait for it.
+      ui.pdfText.imported();
+      return { note: outcome.note, document: outcome.document };
+    }
     if (outcome.status === "refused") return { error: outcome.error };
     const token = crypto.randomBytes(8).toString("hex");
     pending.set(token, sourcePath);
@@ -112,5 +118,9 @@ export function createDocumentsApi(service: DocumentService, ui: DocumentUi): Do
     updateAnnotation: (annotationId, changes) => service.updateAnnotation(annotationId, changes),
     deleteAnnotation: (annotationId) => service.deleteAnnotation(annotationId),
     restoreAnnotations: (documentId, annotations) => service.restoreAnnotations(documentId, annotations),
+    pdfTextState: (documentId) => ui.pdfText.state(documentId),
+    async readUnlockedPdfText(documentId, password) {
+      ui.pdfText.readUnlocked(documentId, password);
+    },
   };
 }

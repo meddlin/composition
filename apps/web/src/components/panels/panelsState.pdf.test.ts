@@ -44,6 +44,20 @@ describe("opening a note that owns a PDF", () => {
     expect(focused(opened).kind).toBe("pdf");
   });
 
+  it("asks the PDF panel to show a page with words found, whether it opens now or was open already (a search result in the PDF's text)", () => {
+    const { panels, newId } = start();
+    const goTo = { page: 212, mark: null, find: "estuary", seq: 1 };
+
+    const opened = openPdfPair(panels, MAIN_WINDOW, 7, 70, newId, goTo);
+    const pdfPanel = panelIds(opened.windows[MAIN_WINDOW].layout)[0];
+    expect(opened.byId[pdfPanel].state).toEqual({ documentId: 70, noteId: 7, follow: false, goTo } satisfies PdfPanelState);
+
+    const again = openPdfPair(opened, MAIN_WINDOW, 7, 70, newId, { ...goTo, page: 3, seq: 2 });
+    expect(kindsOf(again)).toEqual(["pdf", "note"]);
+    expect((again.byId[pdfPanel].state as PdfPanelState).goTo).toEqual({ page: 3, mark: null, find: "estuary", seq: 2 });
+    expect(focused(again).id).toBe(pdfPanel);
+  });
+
   it("puts the note where picking it would, in the note panel that is there", () => {
     const { panels, newId } = start();
     const withNote = openNote(panels, MAIN_WINDOW, 1, newId);

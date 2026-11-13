@@ -43,3 +43,80 @@ export function pageSearchText(raw: string): string {
   }
   return [...lines, ...(joined.length > 0 ? [joined.join(" ")] : [])].join("\n");
 }
+
+/**
+ * Reading a PDF's pages with pdf.js, for search (docs/architecture/search.md, "The text of a PDF"). The desktop runs `readPdfText`
+ * in a utility process (apps/desktop/src/worker/pdfTextWorker.ts); `apps/ios/scripts/pdf-text-oracle.mjs` runs the same function over
+ * `fixtures/conformance/pdf-text.pdf` to write the file the iPad's PDFKit reading is checked against, so the two cannot drift apart.
+ *
+ * pdf.js is passed in (the legacy build in Node) so that this module stays free of a particular build.
+ */
+
+/** One page as it is indexed: 0-based, the printed label when the PDF has one that is not simply the page's number, and the text. */
+export type PdfTextPage = { page: number; label: string | null; text: string };
+
+/** What reading a PDF came to. A protected PDF read without its password (or with a wrong one) is `locked`. */
+export type PdfTextOutcome = { status: "pages"; pages: PdfTextPage[] } | { status: "locked" } | { status: "unreadable" };
+
+/** The part of pdf.js this needs. */
+export type PdfjsForText = {
+  getDocument(source: Record<string, unknown>): {
+    promise: Promise<{
+      numPages: number;
+      getPageLabels(): Promise<string[] | null>;
+      getPage(number: number): Promise<{ getTextContent(): Promise<{ items: object[] }>; cleanup(): unknown }>;
+    }>;
+    destroy(): Promise<void>;
+  };
+};
+
+export type ReadOptions = {
+  /** Where pdf.js's CMaps and standard fonts are, each ending in a slash (the reader's own options). */
+  cMapUrl: string;
+  standardFontDataUrl: string;
+  /** Used for this reading only; never kept. */
+  password?: string;
+  /** More `getDocument` parameters: how the bytes and pdf.js's own data files are fetched where its defaults cannot (the desktop's worker). */
+  extra?: Record<string, unknown>;
+};
+
+/** A page's label, kept only when it says something its number does not (a textbook's "xii", or "42" on the 44th page). */
+export function pageLabel(label: string | null | undefined, index: number): string | null {
+  const trimmed = label?.trim() ?? "";
+  return trimmed === "" || trimmed === String(index + 1) ? null : trimmed;
+}
+
+export async function readPdfText(pdfjs: PdfjsForText, source: { data: Uint8Array } | { url: string } | { range: object }, options: ReadOptions): Promise<PdfTextOutcome> {
+  const task = pdfjs.getDocument({
+    ...source,
+    useWasm: false,
+    enableXfa: false,
+    isEvalSupported: false,
+    cMapUrl: options.cMapUrl,
+    cMapPacked: true,
+    standardFontDataUrl: options.standardFontDataUrl,
+    verbosity: 0,
+    ...options.extra,
+    ...(options.password === undefined ? {} : { password: options.password }),
+  });
+  try {
+    let doc;
+    try {
+      doc = await task.promise;
+    } catch (error) {
+      return { status: (error as { name?: string }).name === "PasswordException" ? "locked" : "unreadable" };
+    }
+    const labels = await doc.getPageLabels().catch(() => null);
+    const pages: PdfTextPage[] = [];
+    for (let number = 1; number <= doc.numPages; number++) {
+      const page = await doc.getPage(number);
+      const content = await page.getTextContent();
+      pages.push({ page: number - 1, label: pageLabel(labels?.[number - 1], number - 1), text: pageSearchText(pageTextFromItems(content.items)) });
+      // A page's parsed resources are let go as soon as its text is read: a 600-page book would otherwise hold them all.
+      page.cleanup();
+    }
+    return { status: "pages", pages };
+  } finally {
+    await task.destroy();
+  }
+}

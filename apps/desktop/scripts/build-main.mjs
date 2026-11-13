@@ -32,6 +32,13 @@ const configs = [
     external: ["electron"],
   },
   {
+    // Reading a PDF's text for search runs in a utility process of its own too (src/main/pdfText.ts), with pdf.js bundled in.
+    ...common,
+    entryPoints: ["src/worker/pdfTextWorker.ts"],
+    outfile: "dist/pdf-text-worker.js",
+    external: ["electron"],
+  },
+  {
     ...common,
     entryPoints: ["src/main/index.ts"],
     outfile: "dist/main.js",

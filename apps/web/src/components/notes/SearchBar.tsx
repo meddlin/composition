@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { Input } from "@/components/ui/input";
 import { searchNotes, type SearchHit, type SearchResult } from "@/lib/composition/client";
+import { findTextForQuery } from "@/lib/composition/searchQuery";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "./useDebouncedValue";
 
@@ -15,7 +16,8 @@ const clientShortcutHint = () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "
 const serverShortcutHint = () => null;
 
 type Props = {
-  onSelect: (id: number) => void;
+  /** A result was chosen; one found only in its PDF's text comes with the page to open and the words to find there. */
+  onSelect: (id: number, pdfPlace?: { page: number; find: string }) => void;
 };
 
 export function SearchBar({ onSelect }: Props) {
@@ -69,7 +71,7 @@ export function SearchBar({ onSelect }: Props) {
   const hits = result?.hits ?? [];
 
   function choose(hit: SearchHit) {
-    onSelect(hit.id);
+    onSelect(hit.id, hit.pdf ? { page: hit.pdf.page, find: findTextForQuery(debouncedQuery) } : undefined);
     setOpen(false);
   }
 
@@ -151,6 +153,11 @@ export function SearchBar({ onSelect }: Props) {
                 <div className="truncate font-medium">
                   {hit.title || "Untitled"}
                 </div>
+                {hit.pdf && (
+                  <div className="truncate text-xs text-muted-foreground">
+                    In the PDF, p. {hit.pdf.label ?? hit.pdf.page}
+                  </div>
+                )}
                 {hit.groupPath.length > 0 && (
                   <div className="truncate text-xs text-muted-foreground">
                     {hit.groupPath.join(" › ")}

@@ -16,7 +16,8 @@ export type NotesBrowserState = { notebookId: number | null };
 export type AssistantPanelState = { noteId: number | null; follow: boolean };
 
 /** A place a followed `pdf:` link asked the reader to show: a page (from 1), the mark on it if the link names one, and which ask this is. */
-export type PdfGoTo = { page: number; mark: string | null; seq: number };
+/** A request to show a page (1-based), perhaps a mark on it, and perhaps words to find there (a search result found in the PDF's text). */
+export type PdfGoTo = { page: number; mark: string | null; find?: string; seq: number };
 
 /**
  * What a PDF panel saves: the PDF it shows (none when it was saved before the PDF existed or its note is gone), and the note

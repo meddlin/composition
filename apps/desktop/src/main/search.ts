@@ -61,6 +61,8 @@ export class SearchSidecar {
       searchIndex: typeof SearchIndex;
       listNotes: typeof ListNotes;
       log: (message: string, detail?: unknown) => void;
+      /** Runs after each rebuild of the notes' index: the PDFs' text is read then (pdfText.ts), since search is up and the library is known. */
+      afterReindex?: () => void;
     },
   ) {}
 
@@ -116,6 +118,7 @@ export class SearchSidecar {
     if (!this.manager?.running) return;
     try {
       await this.deps.searchIndex.reindexAll(this.deps.listNotes());
+      this.deps.afterReindex?.();
     } catch (error) {
       this.deps.log("[search] reindex failed", error);
     }

@@ -174,6 +174,30 @@ try {
   check("find counts the matches in the whole PDF, not just the page in view", Boolean(counting), await reader.getByRole("search").innerText());
   await reader.getByRole("button", { name: "Close find" }).click();
 
+  // ---- Search finds words in the PDF's own text (docs/architecture/search.md, "The text of a PDF"), read in a utility process
+  const textState = await waitFor(async () => (await page.evaluate((id) => window.composition.pdfTextState(id), (await documents(page))[0].id)) === "indexed", { timeout: 30_000 }).catch(() => false);
+  check("the PDF's text is read into search in the background after the import", Boolean(textState));
+  const pdfHit = (await page.evaluate(() => window.composition.searchNotes("test book 9"))).hits.find((hit) => hit.pdf);
+  check("search finds words only in the PDF's pages, at the page they are on, with its printed label", pdfHit?.pdf?.page === 9 && pdfHit?.pdf?.label === "6", JSON.stringify(pdfHit));
+  await page.getByRole("combobox", { name: "Search notes" }).fill("test book 9");
+  const resultLine = page.getByText("In the PDF, p. 6");
+  await resultLine.waitFor({ timeout: 10_000 });
+  check("the result says where: In the PDF, p. 6", true);
+  await reader.getByRole("textbox", { name: "Page number" }).fill("2");
+  await reader.getByRole("textbox", { name: "Page number" }).press("Enter");
+  await resultLine.click();
+  const atPage = await waitFor(async () => (await reader.getByRole("textbox", { name: "Page number" }).inputValue()) === "9", { timeout: 10_000 }).catch(() => false);
+  check("choosing it goes to that page", Boolean(atPage), await reader.getByRole("textbox", { name: "Page number" }).inputValue());
+  const findValue = await reader.getByRole("textbox", { name: "Find in this PDF" }).inputValue().catch(() => "");
+  check("with the find bar open on the query's words", findValue === "test", findValue);
+  const fromThere = await waitFor(async () => /^9 of 12$/.test((await reader.getByRole("search").innerText()).trim())).catch(() => false);
+  check("and finding them from that page on: the 9th of the 12 pages that have them", Boolean(fromThere), await reader.getByRole("search").innerText());
+  await page.screenshot({ path: path.join(out, "pdf-search-result.png") });
+  await reader.getByRole("button", { name: "Close find" }).click();
+  // The reader is put back where the checks below expect it.
+  await reader.getByRole("textbox", { name: "Page number" }).fill("6");
+  await reader.getByRole("textbox", { name: "Page number" }).press("Enter");
+
   // ---- Dark pages
   await reader.getByRole("button", { name: "Dark pages" }).click();
   check("dark pages inverts the page images and is remembered for the PDF", (await reader.getByRole("button", { name: "Dark pages" }).getAttribute("aria-pressed")) === "true" && (await documents(page))[0]?.viewState.darkPages === true);
@@ -634,7 +658,9 @@ try {
   await page.getByRole("region", { name: "PDF: Metadata_Title.pdf" }).waitFor({ timeout: 20_000 });
   const retitled = await waitFor(async () => (await savedNotes()).find((n) => n.title === "Designing Data-Intensive Applications")).catch(() => null);
   check("a note made from a file with a title in its metadata takes that title, saved in its frontmatter", Boolean(retitled) && /^title: Designing Data-Intensive Applications$/m.test(retitled.content), JSON.stringify((await savedNotes()).map((n) => n.title)));
-  check("and the row in the sidebar shows it, not the file's name", (await sidebar.getByText("Designing Data-Intensive Applications", { exact: true }).count()) >= 1 && (await sidebar.getByText("Metadata Title", { exact: true }).count()) === 0);
+  // The sidebar follows the saved title a moment later (and an import now also starts reading the PDF's text for search, in the background).
+  const rowRetitled = await waitFor(async () => (await sidebar.getByText("Designing Data-Intensive Applications", { exact: true }).count()) >= 1 && (await sidebar.getByText("Metadata Title", { exact: true }).count()) === 0, { timeout: 10_000 }).catch(() => false);
+  check("and the row in the sidebar shows it, not the file's name", Boolean(rowRetitled));
   await page.screenshot({ path: path.join(out, "pdf-own-title.png") });
 
   const both = path.join(home, "Both_Titles.pdf");
@@ -732,8 +758,10 @@ try {
   check("after quitting, the password is in no file the app wrote (the database, settings, its browser profile)", written.length === 0, written.join(", "));
   app = await launch();
   page = await open(app);
-  await page.getByRole("button", { name: /Locked Book/ }).first().click();
   const askAgain = page.getByRole("dialog", { name: "This PDF needs a password" });
+  // The layout comes back with the protected PDF's panel, which asks at once, and its dialog covers the sidebar; only when the panel
+  // did not come back is the row opened (clicking it under the dialog would wait for ever).
+  if ((await page.getByRole("region", { name: "PDF: Locked_Book.pdf" }).count()) === 0) await page.getByRole("button", { name: /Locked Book/ }).first().click();
   await askAgain.waitFor({ timeout: 20_000 });
   check("after a restart the password is asked for again", true);
   await askAgain.getByRole("button", { name: "Cancel" }).click();

@@ -1,0 +1,653 @@
+{
+ "about": "How search finds words in a PDF's own text: notes, the PDFs they own (pages as pageSearchText makes them; page is 0-based), and what a real Meilisearch answered through the desktop's searchIndex.ts for each query (page and label null when the note was found by its own text). Made by apps/web/src/lib/composition/pdfTextSearch.test.ts (UPDATE_FIXTURES=1 rewrites it); the iPad replays it in PdfTextSearchConformanceTests.",
+ "meilisearch": "1.53.1",
+ "notes": [
+  {
+   "id": 1,
+   "title": "Coastal birds",
+   "content": "We saw quetzals at dawn by the old wall.",
+   "tags": "birds",
+   "updatedAt": "2026-03-01T10:00:00.000Z"
+  },
+  {
+   "id": 2,
+   "title": "Search fixture",
+   "content": "",
+   "tags": "pdf",
+   "updatedAt": "2026-02-01T10:00:00.000Z"
+  },
+  {
+   "id": 3,
+   "title": "Field guide",
+   "content": "",
+   "tags": "birds,guide",
+   "updatedAt": "2026-01-15T10:00:00.000Z"
+  },
+  {
+   "id": 4,
+   "title": "Scanned letter",
+   "content": "",
+   "tags": "",
+   "updatedAt": "2025-12-01T10:00:00.000Z"
+  },
+  {
+   "id": 5,
+   "title": "Old cookbook",
+   "content": "",
+   "tags": "kitchen",
+   "updatedAt": "2026-04-01T10:00:00.000Z",
+   "trashed": true
+  },
+  {
+   "id": 6,
+   "title": "Harbour notes",
+   "content": "The harbour master spoke of tides.",
+   "tags": "sea",
+   "updatedAt": "2025-11-01T10:00:00.000Z"
+  }
+ ],
+ "pdfs": [
+  {
+   "documentId": 1,
+   "noteId": 2,
+   "pages": [
+    {
+     "page": 0,
+     "label": null,
+     "text": "Page one: the lighthouse keeper counted quetzals\nat the harbour wall, 1987 of them."
+    },
+    {
+     "page": 1,
+     "label": null,
+     "text": "The official affidavit flew to the fjord office.\nSpelled out: official affidavit flew."
+    },
+    {
+     "page": 2,
+     "label": null,
+     "text": "Careful extrac-\ntion of every term.\nA well-\nKnown name.\nNotwith\nstanding the rain.\nextraction"
+    },
+    {
+     "page": 3,
+     "label": null,
+     "text": "Café naïve façade Zürich\nΖεύς Αθήνα Москва Санкт\nWide letters"
+    },
+    {
+     "page": 4,
+     "label": null,
+     "text": "Left column speaks of marmalade\nand of the tidal estuary near the old\nmill.\nRight column answers with\nsaxophones and a quiet\nobservatory on the hill."
+    },
+    {
+     "page": 5,
+     "label": null,
+     "text": "Sideways page about cormorants."
+    },
+    {
+     "page": 6,
+     "label": null,
+     "text": ""
+    },
+    {
+     "page": 7,
+     "label": null,
+     "text": "Version 3.14 (beta) e-mail: x@example.com\nhttps://example.org/path_to/item-42 — done."
+    }
+   ]
+  },
+  {
+   "documentId": 2,
+   "noteId": 3,
+   "pages": [
+    {
+     "page": 0,
+     "label": "i",
+     "text": "Preface\nA guide to the birds of the coast."
+    },
+    {
+     "page": 1,
+     "label": "ii",
+     "text": ""
+    },
+    {
+     "page": 2,
+     "label": "1",
+     "text": "The lighthouse keeper counted quetzals\nalong the estuary at low tide."
+    },
+    {
+     "page": 3,
+     "label": "2",
+     "text": "Cormorants dry their wings on the harbour wall.\nextraction"
+    },
+    {
+     "page": 4,
+     "label": "3",
+     "text": "Marmalade, said the keeper, is for the lighthouse."
+    }
+   ]
+  },
+  {
+   "documentId": 3,
+   "noteId": 4,
+   "pages": [
+    {
+     "page": 0,
+     "label": null,
+     "text": ""
+    },
+    {
+     "page": 1,
+     "label": null,
+     "text": ""
+    }
+   ]
+  },
+  {
+   "documentId": 4,
+   "noteId": 5,
+   "pages": [
+    {
+     "page": 0,
+     "label": null,
+     "text": "Marmalade and quetzals and a lighthouse."
+    }
+   ]
+  }
+ ],
+ "states": [
+  {
+   "documentId": 1,
+   "state": "indexed"
+  },
+  {
+   "documentId": 2,
+   "state": "indexed"
+  },
+  {
+   "documentId": 3,
+   "state": "noText"
+  },
+  {
+   "documentId": 4,
+   "state": "indexed"
+  }
+ ],
+ "results": [
+  {
+   "query": "sideways",
+   "hits": [
+    {
+     "id": 2,
+     "page": 5,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "cormorants",
+   "hits": [
+    {
+     "id": 2,
+     "page": 5,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 3,
+     "label": "2"
+    }
+   ]
+  },
+  {
+   "query": "marmalade",
+   "hits": [
+    {
+     "id": 2,
+     "page": 4,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 4,
+     "label": "3"
+    }
+   ]
+  },
+  {
+   "query": "estuary",
+   "hits": [
+    {
+     "id": 2,
+     "page": 4,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "preface",
+   "hits": [
+    {
+     "id": 3,
+     "page": 0,
+     "label": "i"
+    }
+   ]
+  },
+  {
+   "query": "quetzals",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    },
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "harbour",
+   "hits": [
+    {
+     "id": 6,
+     "page": null,
+     "label": null
+    },
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 3,
+     "label": "2"
+    }
+   ]
+  },
+  {
+   "query": "wall",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    },
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 3,
+     "label": "2"
+    }
+   ]
+  },
+  {
+   "query": "quetz",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    },
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "lightho",
+   "hits": [
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "quetzal harbour",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "quetzals harb",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    },
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "lighthouse keeper",
+   "hits": [
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "lighthouse cormorants",
+   "hits": []
+  },
+  {
+   "query": "estuary observatory",
+   "hits": [
+    {
+     "id": 2,
+     "page": 4,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "keeper marmalade",
+   "hits": [
+    {
+     "id": 3,
+     "page": 4,
+     "label": "3"
+    }
+   ]
+  },
+  {
+   "query": "\"lighthouse keeper\"",
+   "hits": [
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "\"keeper lighthouse\"",
+   "hits": []
+  },
+  {
+   "query": "\"tidal estuary\"",
+   "hits": [
+    {
+     "id": 2,
+     "page": 4,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "cormorents",
+   "hits": []
+  },
+  {
+   "query": "sidways",
+   "hits": []
+  },
+  {
+   "query": "quetzls",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "extraction",
+   "hits": [
+    {
+     "id": 2,
+     "page": 2,
+     "label": null
+    },
+    {
+     "id": 3,
+     "page": 3,
+     "label": "2"
+    }
+   ]
+  },
+  {
+   "query": "office",
+   "hits": [
+    {
+     "id": 2,
+     "page": 1,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "affidavit",
+   "hits": [
+    {
+     "id": 2,
+     "page": 1,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "cafe",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "café",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "zurich",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "naive",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "wide",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "москва",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "ζευς",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "ζεύς",
+   "hits": [
+    {
+     "id": 2,
+     "page": 3,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "beta",
+   "hits": [
+    {
+     "id": 2,
+     "page": 7,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "version",
+   "hits": [
+    {
+     "id": 2,
+     "page": 7,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "example",
+   "hits": [
+    {
+     "id": 2,
+     "page": 7,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "item",
+   "hits": [
+    {
+     "id": 2,
+     "page": 7,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "quetzals tag: guide",
+   "hits": [
+    {
+     "id": 3,
+     "page": 2,
+     "label": "1"
+    }
+   ]
+  },
+  {
+   "query": "marmalade tag: birds",
+   "hits": [
+    {
+     "id": 3,
+     "page": 4,
+     "label": "3"
+    }
+   ]
+  },
+  {
+   "query": "lighthouse updated: >=2026-01-20",
+   "hits": [
+    {
+     "id": 2,
+     "page": 0,
+     "label": null
+    }
+   ]
+  },
+  {
+   "query": "title: marmalade",
+   "hits": []
+  },
+  {
+   "query": "description: marmalade",
+   "hits": []
+  },
+  {
+   "query": "xylophone",
+   "hits": []
+  },
+  {
+   "query": "quetzals xylophone",
+   "hits": [
+    {
+     "id": 1,
+     "page": null,
+     "label": null
+    }
+   ]
+  }
+ ]
+}
