@@ -146,8 +146,8 @@ layout (a panel saved before the board, the reports and the archive existed open
   (sub-items nest without limit, and the box stays open for more; Escape closes it). A new item starts in **This week**; the **Backlog** has its own box, with its own **Add**.
 - **Renaming.** The pencil on an item, or double-click its title. Enter saves, Escape gives up.
 - **Done.** The checkbox ticks an item off and its text is struck through and dimmed. Ticking an item does not tick its sub-items.
-- **Removing.** The bin on an item is **Remove**: it goes to the archive at once, with its sub-items, and a bar says so with an **Undo** for a few
-  seconds. Nothing is asked first. An item that comes back from the archive is a to-do again, whatever it was.
+- **Removing.** The bin on an item is **Remove**: a confirmation asks first (Cancel has the focus, so a stray Enter backs out), saying how many
+  sub-items go with it. On **Remove** it goes to the archive with its sub-items, and a bar says so with an **Undo** for a few seconds. An item that comes back from the archive is a to-do again, whatever it was.
 - **Delete permanently.** The **⋯** menu beside Remove on a row or a board card, and the bin on an Archive entry, erase an item, everything under
   it and its history for good. A confirmation says how many items go, that it cannot be undone, that backup files made earlier may still contain it,
   and lists the reports that mention it as links that open the report beside, so you can edit them first. Reports are never changed by a delete.
