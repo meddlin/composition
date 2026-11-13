@@ -1345,6 +1345,119 @@ describe("rearranging the list", () => {
   });
 });
 
+describe("dragging an item onto another to make it a sub-item", () => {
+  const items = [item(1, null, "Plan trip"), item(2, null, "Buy milk"), item(3, null, "Call mum"), item(4, 1, "Book flights"), item(6, null, "Someday", false, "backlog")];
+  /** The line of a row, given a size, since jsdom lays nothing out: 40px tall, from 0. */
+  const line = (region: string, title: string) => {
+    const element = rowIn(region, title).firstElementChild as HTMLElement;
+    element.getBoundingClientRect = () => ({ top: 0, bottom: 40, height: 40, left: 0, right: 200, width: 200, x: 0, y: 0, toJSON: () => ({}) });
+    return element;
+  };
+  const aimed = (type: "dragOver" | "drop", target: Element, transfer: ReturnType<typeof dataTransfer>, clientY: number) => {
+    const event = createEvent[type](target, { dataTransfer: transfer });
+    Object.defineProperty(event, "clientY", { value: clientY });
+    return fireEvent(target, event);
+  };
+  const parentOf = (todos: { getSnapshot(): { todos: Todo[] } }, id: number) => todos.getSnapshot().todos.find((t) => t.id === id)?.parentId;
+
+  it("makes a top-level item the last sub-item of the item it is dropped on the middle of, and says so", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("dragOver", line("This week", "Plan trip"), transfer, 20);
+    expect(line("This week", "Plan trip").getAttribute("data-drop")).toBe("inside");
+    aimed("drop", line("This week", "Plan trip"), transfer, 20);
+
+    await waitFor(() => expect(parentOf(todos, 3)).toBe(1));
+    expect(todos.getSnapshot().todos.filter((t) => t.parentId === 1).map((t) => t.title)).toEqual(["Book flights", "Call mum"]);
+    expect(screen.getByRole("status").textContent).toContain("Moved “Call mum” under “Plan trip”.");
+    expect(line("This week", "Plan trip").getAttribute("data-drop")).toBeNull();
+  });
+
+  it("still puts it before or after the row when it is dropped near the row's top or bottom edge", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("dragOver", line("This week", "Plan trip"), transfer, 5);
+    expect(line("This week", "Plan trip").getAttribute("data-drop")).toBe("before");
+    aimed("dragOver", line("This week", "Plan trip"), transfer, 35);
+    expect(line("This week", "Plan trip").getAttribute("data-drop")).toBe("after");
+    aimed("drop", line("This week", "Plan trip"), transfer, 35);
+
+    await waitFor(() => expect(todos.getSnapshot().todos.filter((t) => t.parentId === null && t.status !== "backlog").map((t) => t.title)).toEqual(["Plan trip", "Call mum", "Buy milk"]));
+    expect(parentOf(todos, 3)).toBeNull();
+  });
+
+  it("puts it back at the top level where it was with Undo", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Buy milk"), { dataTransfer: transfer });
+    aimed("drop", line("This week", "Plan trip"), transfer, 20);
+    await waitFor(() => expect(parentOf(todos, 2)).toBe(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() => expect(parentOf(todos, 2)).toBeNull());
+    expect(todos.getSnapshot().todos.filter((t) => t.parentId === null && t.status !== "backlog").map((t) => t.title)).toEqual(["Plan trip", "Buy milk", "Call mum"]);
+  });
+
+  it("takes it anywhere on a sub-item's row, or a row in the other section, keeping its status", async () => {
+    const { todos } = await openList(items);
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("dragOver", line("This week", "Book flights"), transfer, 2);
+    expect(line("This week", "Book flights").getAttribute("data-drop")).toBe("inside");
+    aimed("drop", line("This week", "Book flights"), transfer, 2);
+    await waitFor(() => expect(parentOf(todos, 3)).toBe(4));
+
+    fireEvent.dragStart(rowIn("Backlog", "Someday"), { dataTransfer: transfer });
+    aimed("drop", line("This week", "Buy milk"), transfer, 20);
+    await waitFor(() => expect(parentOf(todos, 6)).toBe(2));
+    expect(todos.getSnapshot().todos.find((t) => t.id === 6)).toMatchObject({ status: "backlog" });
+    expect(within(section("This week")).getByText("Someday")).toBeTruthy();
+  });
+
+  it("opens a folded item it is dropped on, so the new sub-item shows", async () => {
+    const { setPanelState } = setup(items, { ...LIST, collapsed: [1] });
+    await screen.findByRole("region", { name: "This week" });
+    const transfer = dataTransfer();
+
+    fireEvent.dragStart(rowIn("This week", "Call mum"), { dataTransfer: transfer });
+    aimed("drop", line("This week", "Plan trip"), transfer, 20);
+
+    expect(setPanelState).toHaveBeenCalledWith("p1", { ...LIST, collapsed: [] });
+    await waitFor(() => expect(within(section("This week")).getByText("Call mum")).toBeTruthy());
+  });
+
+  it("does not take an item on itself or on what is under it, nor a sub-item, nor a rolled-over item", async () => {
+    const { todos } = await openList([...items, rolled(7, null, "Old chore")]);
+    const transfer = dataTransfer();
+    const before = todos.getSnapshot().todos;
+
+    fireEvent.dragStart(rowIn("This week", "Plan trip"), { dataTransfer: transfer });
+    expect(aimed("dragOver", line("This week", "Book flights"), transfer, 20)).toBe(true); // not offered, so not cancelled
+    aimed("drop", line("This week", "Book flights"), transfer, 20);
+    expect(aimed("dragOver", line("This week", "Plan trip"), transfer, 20)).toBe(true);
+    fireEvent.dragEnd(rowIn("This week", "Plan trip"));
+
+    fireEvent.dragStart(rowIn("This week", "Book flights"), { dataTransfer: transfer });
+    expect(aimed("dragOver", line("This week", "Buy milk"), transfer, 20)).toBe(true);
+    aimed("drop", line("This week", "Buy milk"), transfer, 20);
+    fireEvent.dragEnd(rowIn("This week", "Book flights"));
+
+    fireEvent.dragStart(rowIn("Rolled over", "Old chore"), { dataTransfer: transfer });
+    expect(aimed("dragOver", line("This week", "Buy milk"), transfer, 20)).toBe(false); // This week takes it, as before: to place it
+    expect(line("This week", "Buy milk").getAttribute("data-drop")).toBeNull();
+    fireEvent.dragEnd(rowIn("Rolled over", "Old chore"));
+
+    expect(todos.getSnapshot().todos).toEqual(before);
+  });
+});
+
 describe("moving the completed to the bottom", () => {
   const titles = (region: string) => within(section(region)).getAllByRole("checkbox").map((box) => (box.getAttribute("aria-label") ?? "").replace(": done", ""));
 

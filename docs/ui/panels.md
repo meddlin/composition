@@ -175,6 +175,13 @@ dragged on its own (dragging it picks up the item it is under), and a row being 
 note's editor has no text to take from it. It is mouse-only: the keyboard way to place a Rolled over entry is its **Add to this week** button, and a Backlog item or a to-do is moved
 on the board. The board is unchanged: its cards move by their arrows or by dragging between columns.
 
+**Dragging onto an item.** A top-level item in **This week** or the **Backlog** (done or not) can be dropped *on* another row in either section to become its last
+sub-item, with everything under it coming along ([`nestTodo`](../../apps/web/src/lib/composition/todos.ts)). On a row it could also be reordered among, the top and
+bottom quarters still put it before or after (a line), and the middle half puts it under (a ring and a tint); on any other row, sub-items included, the whole row puts
+it under. The item keeps its status, a folded item it lands in is opened, and a bar says **Moved “A” under “B”** with an **Undo** that puts it back at the top level
+where it was. It cannot go under itself or under one of its own sub-items, a sub-item cannot be dragged onto another item, and Rolled over neither gives nor takes one.
+Like the other drags it is mouse-only, and there is no drag back out to the top level yet beyond the Undo.
+
 ### The board
 
 **Board** shows a column per status: **Backlog**, **To-do**, **In progress** and **Done** ([`TodoBoard.tsx`](../../apps/web/src/components/panels/TodoBoard.tsx)).

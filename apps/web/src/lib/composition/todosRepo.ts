@@ -240,6 +240,31 @@ export function placeTodo(id: number, beforeId: number | null): boolean {
   })();
 }
 
+/**
+ * Moves the item, with everything under it, under `parentId` (or to the top level when that is null), immediately before
+ * `beforeId` among its new live siblings or last, and fixes their order. Like `placeTodo` it is not a content edit: nothing
+ * is logged and `updated_at` is left alone. "missing" when the item or the parent is not on the live list, "inside" when
+ * the parent is the item or under it; nothing changes then.
+ */
+export function nestTodo(id: number, parentId: number | null, beforeId: number | null): "ok" | "missing" | "inside" {
+  const db = getDb();
+  return db.transaction(() => {
+    const live = (todoId: number) => db.prepare("SELECT 1 FROM todos WHERE id = ? AND archived_at IS NULL").get(todoId) !== undefined;
+    if (!live(id) || (parentId !== null && !live(parentId))) return "missing";
+    if (parentId !== null) {
+      const inside = db.prepare(`${SUBTREE} SELECT 1 FROM subtree WHERE id = ?`).get(id, parentId) !== undefined;
+      if (inside) return "inside";
+    }
+    db.prepare("UPDATE todos SET parent_id = ? WHERE id = ?").run(parentId, id);
+    const siblings = (
+      db.prepare(`SELECT id FROM todos WHERE parent_id IS ? AND archived_at IS NULL ORDER BY ${DISPLAY_ORDER}`).all(parentId) as { id: number }[]
+    ).map((sibling) => sibling.id);
+    const setPosition = db.prepare("UPDATE todos SET position = ? WHERE id = ?");
+    placeBefore(siblings, id, beforeId).forEach((todoId, index) => setPosition.run(index, todoId));
+    return "ok" as const;
+  })();
+}
+
 /** "Move completed to the bottom": among the siblings at every level, the done items go below the open ones, each keeping its order. */
 export function sortDoneLast(): void {
   const db = getDb();

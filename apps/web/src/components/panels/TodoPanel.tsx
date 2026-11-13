@@ -137,11 +137,13 @@ type DragHandlers = { onDragStart: (event: DragEvent<HTMLElement>) => void; onDr
 
 /** Which side of a row a dragged item would land on. */
 type Edge = "before" | "after";
+/** Where a dragged item would land on a row: beside it, or under it as its last sub-item. */
+type Landing = Edge | "inside";
 
 type RowDrag = {
   source: (todo: Todo, section: DragFrom) => DragHandlers;
-  /** The row edge a dragged item is over, where a line shows it would land. */
-  mark: { id: number; edge: Edge } | null;
+  /** The row a dragged item is over, and where on it: a line at the edge it would land beside, or a ring when it would go under it. */
+  mark: { id: number; at: Landing } | null;
   onOver: (event: DragEvent<HTMLElement>, todo: Todo, section: DragFrom) => void;
   onLeave: (event: DragEvent<HTMLElement>, todo: Todo) => void;
   onDrop: (event: DragEvent<HTMLElement>, todo: Todo, section: DragFrom) => void;
@@ -157,12 +159,12 @@ function TodoRow(props: RowProps) {
   const below = siblings[place + 1];
   // A box being typed in is not a handle: dragging inside it should select text.
   const handlers = section && editing !== todo.id ? drag?.source(todo, section) : undefined;
-  const mark = drag?.mark?.id === todo.id ? drag.mark.edge : undefined;
+  const mark = drag?.mark?.id === todo.id ? drag.mark.at : undefined;
 
   return (
     <li draggable={handlers ? true : undefined} onDragStart={handlers?.onDragStart} onDragEnd={handlers?.onDragEnd}>
       <div
-        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-muted/50 focus-within:bg-muted/50 data-[drop=before]:shadow-[inset_0_2px_0_0_var(--ring)] data-[drop=after]:shadow-[inset_0_-2px_0_0_var(--ring)]"
+        className="group flex items-center gap-1 rounded-md py-0.5 pr-1 hover:bg-muted/50 focus-within:bg-muted/50 data-[drop=before]:shadow-[inset_0_2px_0_0_var(--ring)] data-[drop=after]:shadow-[inset_0_-2px_0_0_var(--ring)] data-[drop=inside]:bg-accent data-[drop=inside]:shadow-[inset_0_0_0_2px_var(--ring)]"
         style={{ paddingLeft: depth * INDENT }}
         data-drop={mark}
         onDragOver={section && drag ? (event) => drag.onOver(event, todo, section) : undefined}
@@ -276,10 +278,16 @@ type DropZone = {
   onDrop: (event: DragEvent<HTMLElement>) => void;
 };
 
-/** The half of a row the pointer is over: dropped there, an item lands before the row (upper half) or after it. */
-function edgeOf(event: DragEvent<HTMLElement>): Edge {
+/**
+ * Where on a row the pointer is. When the dragged item can only go beside the row, the upper half is before it and the
+ * lower half after it. When it can also go under it, the top and bottom quarters are before and after, and the middle is
+ * under it.
+ */
+function landingOf(event: DragEvent<HTMLElement>, canNest: boolean): Landing {
   const box = event.currentTarget.getBoundingClientRect();
-  return event.clientY < box.top + box.height / 2 ? "before" : "after";
+  const y = event.clientY - box.top;
+  if (!canNest) return y < box.height / 2 ? "before" : "after";
+  return y < box.height / 4 ? "before" : y > (box.height * 3) / 4 ? "after" : "inside";
 }
 
 /** A section of the list: a heading that folds it away, and what is in it. */
@@ -350,11 +358,11 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
   // another place among its siblings. Which section it is over, and which row edge, are kept beside it.
   const [dragging, setDragging] = useState<{ id: number; parentId: number | null; from: DragFrom; moves: boolean } | null>(null);
   const [over, setOver] = useState<DragTarget | null>(null);
-  const [mark, setMark] = useState<{ id: number; edge: Edge } | null>(null);
+  const [mark, setMark] = useState<{ id: number; at: Landing } | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const [addingTo, setAddingTo] = useState<number | null>(null);
-  /** What was just done, said at the bottom for a few seconds; with the id of an item just removed, an Undo comes with it. */
-  const [bar, setBar] = useState<{ message: string; undo?: number } | null>(null);
+  /** What was just done, said at the bottom for a few seconds; with an Undo when it can be taken back. */
+  const [bar, setBar] = useState<{ message: string; undo?: () => void } | null>(null);
   /** The item the owner has asked to remove, waiting on their yes, so a slip of the mouse cannot take it off the list. */
   const [removing, setRemoving] = useState<Todo | null>(null);
   /** What is typed in the Archive view's search box. */
@@ -397,6 +405,8 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
   const titles = useMemo(() => new Map([...todos, ...(archive ?? [])].map((t) => [t.id, t.title])), [todos, archive]);
   const sectionsOfReports = useMemo(() => (reports ? reportSections(reports) : null), [reports]);
   const groups = useMemo(() => (archive ? archiveGroups(archive, titles, query) : null), [archive, titles, query]);
+  /** The item being dragged and everything under it: none of them can take it as a sub-item. */
+  const draggedBranch = useMemo(() => (dragging ? subtreeIds(todos, dragging.id) : null), [dragging, todos]);
   /** What is waiting in Rolled over, whole branches, so the board's columns can leave it out. */
   const inRolledOver = useMemo(() => new Set(sections.rolledOver.flatMap((node) => [...subtreeIds(todos, node.todo.id)])), [sections, todos]);
 
@@ -438,32 +448,61 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     void todosStore.move(id, edge === "before" ? targetId : (next?.id ?? null));
   }
 
-  // A row takes a drop from an item of the same list under the same parent, which rearranges them. Anything else is left to
-  // bubble up to the section (an item from another section) or to whoever wants it.
+  /**
+   * Makes a top-level item the last sub-item of another one, opening that one so it shows, and offers an Undo that puts it
+   * back at the top level where it was.
+   */
+  function nestUnder(id: number, parent: Todo) {
+    const todo = todos.find((t) => t.id === id);
+    if (!todo || todo.parentId !== null) return;
+    const tops = todos.filter((t) => t.parentId === null);
+    const wasBefore = tops[tops.findIndex((t) => t.id === id) + 1]?.id ?? null;
+    toggleCollapsed(parent.id, false);
+    setBar({ message: `Moved “${todo.title}” under “${parent.title}”.`, undo: () => void todosStore.nest(id, null, wasBefore) });
+    void todosStore.nest(id, parent.id, null);
+  }
+
+  // A row takes a drop from an item of the same list under the same parent, which rearranges them. A top-level item from
+  // This week or the Backlog can also be dropped on the middle of any row there (but its own branch) to become its last
+  // sub-item. Anything else is left to bubble up to the section (an item from another section) or to whoever wants it.
   const reorders = (todo: Todo, section: DragFrom) =>
     dragging !== null && dragging.id !== todo.id && dragging.parentId === todo.parentId && dragging.from === section;
+  const nests = (todo: Todo, section: DragFrom) =>
+    dragging !== null &&
+    dragging.parentId === null &&
+    dragging.from !== "rolled-over" &&
+    section !== "rolled-over" &&
+    !draggedBranch?.has(todo.id);
+  /** Where a drop on the row would land, or null when the row does not take this drop. */
+  const landing = (event: DragEvent<HTMLElement>, todo: Todo, section: DragFrom): Landing | null => {
+    const canNest = nests(todo, section);
+    if (!reorders(todo, section)) return canNest ? "inside" : null;
+    return landingOf(event, canNest);
+  };
   const rowDrag: RowDrag = {
     source: (todo, section) => dragSource(todo, section, todo.parentId === null && !todo.done),
     mark,
     onOver: (event, todo, section) => {
-      if (!reorders(todo, section)) return;
+      const at = landing(event, todo, section);
+      if (at === null) return;
       event.preventDefault();
       event.stopPropagation();
       event.dataTransfer.dropEffect = "move";
-      const edge = edgeOf(event);
-      setMark((now) => (now?.id === todo.id && now.edge === edge ? now : { id: todo.id, edge }));
+      setMark((now) => (now?.id === todo.id && now.at === at ? now : { id: todo.id, at }));
     },
     onLeave: (event, todo) => {
       if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
       setMark((now) => (now?.id === todo.id ? null : now));
     },
     onDrop: (event, todo, section) => {
-      if (!reorders(todo, section)) return;
+      const at = landing(event, todo, section);
+      if (at === null) return;
       event.preventDefault();
       event.stopPropagation();
       const { id } = dragging!;
       endDrag();
-      place(id, todo.id, edgeOf(event));
+      if (at === "inside") nestUnder(id, todo);
+      else place(id, todo.id, at);
     },
   };
 
@@ -514,15 +553,17 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
   // Removing keeps the item in the archive, and the Undo is there afterwards too.
   function remove(todo: Todo) {
     const subItems = countDescendants(todos, todo.id);
-    setBar({ message: `Removed “${todo.title}”${subItems > 0 ? ` and ${subItems === 1 ? "1 sub-item" : `${subItems} sub-items`}` : ""}.`, undo: todo.id });
+    setBar({
+      message: `Removed “${todo.title}”${subItems > 0 ? ` and ${subItems === 1 ? "1 sub-item" : `${subItems} sub-items`}` : ""}.`,
+      undo: () => void todosStore.restore(todo.id),
+    });
     void todosStore.remove(todo.id);
   }
 
-  async function undoRemove() {
-    if (bar?.undo === undefined) return;
-    const id = bar.undo;
+  function undoBar() {
+    const undo = bar?.undo;
     setBar(null);
-    await todosStore.restore(id);
+    undo?.();
   }
 
   async function restore(item: ArchivedTodo) {
@@ -795,7 +836,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
         <div role="status" className="flex items-center justify-between gap-2 rounded-md border bg-card px-3 py-2 text-sm text-card-foreground shadow-sm">
           <span className="min-w-0 break-words">{bar.message}</span>
           {bar.undo !== undefined && (
-            <Button size="xs" variant="secondary" onClick={() => void undoRemove()}>
+            <Button size="xs" variant="secondary" onClick={undoBar}>
               Undo
             </Button>
           )}

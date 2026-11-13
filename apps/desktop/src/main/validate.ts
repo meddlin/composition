@@ -386,6 +386,11 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     priority === null || isTodoPriority(priority) ? priority : fail("setTodoPriority", "priority"),
   ],
   moveTodo: ([todoId, beforeId]) => [id("moveTodo", todoId, "id"), nullableId("moveTodo", beforeId, "beforeId")],
+  nestTodo: ([todoId, parentId, beforeId]) => [
+    id("nestTodo", todoId, "id"),
+    nullableId("nestTodo", parentId, "parentId"),
+    nullableId("nestTodo", beforeId, "beforeId"),
+  ],
   sortDoneTodosLast: none,
   sortTodosByPriority: none,
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],

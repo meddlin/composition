@@ -1,6 +1,6 @@
 import type { TodoLook } from "./todoLook";
 import { DEFAULT_TODO_SETTINGS } from "./todoSettings";
-import { placeTodo, sortByPriority, sortDoneLast, subtreeIds, withDone, withPriority, withStatus } from "./todos";
+import { nestTodo, placeTodo, sortByPriority, sortDoneLast, subtreeIds, withDone, withPriority, withStatus } from "./todos";
 import type { ArchivedTodo, Todo, TodoReportRef, TodoReports, TodoSetup, TodosApi } from "./todosApi";
 
 const REPORT_NAMES = { weekly: "Weekly", monthly: "Monthly", quarterly: "Quarterly" } as const;
@@ -94,6 +94,12 @@ export function memoryTodosBackend(
     moveTodo: async (id, beforeId) => {
       need(id);
       items = placeTodo(items, id, beforeId);
+    },
+    nestTodo: async (id, parentId, beforeId) => {
+      need(id);
+      if (parentId !== null) need(parentId);
+      if (parentId !== null && subtreeIds(items, id).has(parentId)) throw new Error("A to-do can't go under itself or one of its own sub-items.");
+      items = nestTodo(items, id, parentId, beforeId);
     },
     sortDoneTodosLast: async () => {
       items = sortDoneLast(items);
