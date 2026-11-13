@@ -385,7 +385,7 @@ How it behaves is in [ui/panels.md](ui/panels.md#pop-out-windows). Where it live
 Differences from the plan as first written (the first four were agreed with the owner at the seams):
 
 - **Appearance is a main-process broadcast, not a store slice (P10).** After `saveTheme`, `savePreviewFont`, `saveEditorFont` or
-  `saveLocation` succeeds, every window is sent the new look, and each applies it to its own document.
+  `saveSunHours` (once `saveLocation`) succeeds, every window is sent the new look, and each applies it to its own document.
 - **The main process tells the workspace when the *user* closes a pop-out, and a pop-out page no longer reports its own closing.**
   Found in testing: `BrowserWindow.destroy()` still runs the page's `beforeunload`, `pagehide` and `unload` in this Electron, so a
   page cannot tell the app tearing it down (the main window closing or reloading, or quitting) from the user closing it, and the first

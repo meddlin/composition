@@ -1,4 +1,5 @@
 import type { AppearanceMessage } from "../../../web/src/lib/composition/appearanceApi";
+import type { SunHours } from "../../../web/src/lib/composition/sunHours";
 import type { WindowApi } from "../../../web/src/lib/composition/windowApi";
 import { APPEARANCE_CHANNEL } from "../shared/channels";
 
@@ -13,20 +14,22 @@ export function broadcastAppearance(windows: readonly WindowLike[], appearance: 
   }
 }
 
-type Change = (value: string) => Promise<{ error?: string }>;
+type Change<Value = string> = (value: Value) => Promise<{ error?: string }>;
 
 /**
  * The API with `announce` called after each way of changing the appearance has gone through (not after one that was
  * refused or failed). Settings is one page in one window; this is what lets the others, pop-outs among them, follow it.
  */
 export function notifyAppearanceChanges<
-  T extends Record<"saveTheme" | "savePreviewFont" | "saveEditorFont" | "saveLocation" | "saveNoteBackground" | "saveSunPair", Change>,
+  T extends Record<"saveTheme" | "savePreviewFont" | "saveEditorFont" | "saveNoteBackground" | "saveSunPair", Change> & {
+    saveSunHours: Change<SunHours>;
+  },
 >(
   api: T,
   announce: () => void,
 ): T {
   const announcing =
-    (change: Change): Change =>
+    <Value>(change: Change<Value>): Change<Value> =>
     async (value) => {
       const result = await change(value);
       if (!result.error) announce();
@@ -37,7 +40,7 @@ export function notifyAppearanceChanges<
     saveTheme: announcing(api.saveTheme),
     savePreviewFont: announcing(api.savePreviewFont),
     saveEditorFont: announcing(api.saveEditorFont),
-    saveLocation: announcing(api.saveLocation),
+    saveSunHours: announcing(api.saveSunHours),
     saveNoteBackground: announcing(api.saveNoteBackground),
     saveSunPair: announcing(api.saveSunPair),
   } as T;

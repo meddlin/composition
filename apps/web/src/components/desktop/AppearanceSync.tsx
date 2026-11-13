@@ -33,7 +33,7 @@ export function AppearanceSync() {
   useEffect(() => {
     return window.composition?.onAppearance((appearance) => {
       applyAppearance(document.documentElement, appearance);
-      // The scheme or the city may have changed what the sun's schedule is.
+      // The scheme or the hours may have changed what Follow the sun does.
       window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
     });
   }, []);

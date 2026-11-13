@@ -1,5 +1,5 @@
 {
- "comment": "Build plan Step 1: what the desktop's parseWebSettings makes of favorites, a theme and a saved city. The Swift SettingsStore must agree (settings-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
+ "comment": "Build plan Step 1: what the desktop's parseWebSettings makes of favorites, a theme and the Follow the sun hours (until 2026-11-12 it also made a saved city of `location`, which is no longer read). The Swift SettingsStore must agree (settings-expected.json is written by apps/web/scripts/conformance-fixtures.test.ts).",
  "favorites": [
   null,
   "x",
@@ -167,128 +167,108 @@
    "name": "dark"
   }
  ],
- "location": [
+ "sunHours": [
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "05:45",
+   "lightFrom": "07:15",
+   "darkenFrom": "17:45",
+   "darkFrom": "19:15"
   },
   {
-   "name": "",
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "20:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": ""
+   "lightenFrom": "19:00",
+   "lightFrom": "20:00",
+   "darkenFrom": "05:00",
+   "darkFrom": "06:00"
   },
   {
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "23:30",
+   "lightFrom": "00:30",
+   "darkenFrom": "12:00",
+   "darkFrom": "13:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -21.9426
+   "lightenFrom": "00:00",
+   "lightFrom": "00:01",
+   "darkenFrom": "00:02",
+   "darkFrom": "00:03"
   },
   {
-   "name": "Reykjavik",
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "23:57",
+   "lightFrom": "23:58",
+   "darkenFrom": "23:59",
+   "darkFrom": "00:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "06:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "20:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 90,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "08:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "20:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 90.0001,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "18:00",
+   "darkenFrom": "07:00",
+   "darkFrom": "19:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": -90,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "6:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "20:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": -90.5,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "24:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": 180,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": null
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -180,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": 1830,
+   "darkFrom": "20:00"
   },
   {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": 180.5,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30"
   },
   {
-   "name": "Reykjavik",
-   "latitude": "64",
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
+   "lightenFrom": "06:00",
+   "lightFrom": "07:00",
+   "darkenFrom": "18:30",
+   "darkFrom": "20:00",
+   "extra": "ignored"
   },
-  {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": "1",
-   "timezone": "Atlantic/Reykjavik"
-  },
-  {
-   "name": "Reykjavik",
-   "latitude": true,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
-  },
-  {
-   "name": 5,
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik"
-  },
-  {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": null
-  },
-  {
-   "name": "Reykjavik",
-   "latitude": 64.1466,
-   "longitude": -21.9426,
-   "timezone": "Atlantic/Reykjavik",
-   "extra": "x"
-  },
-  null,
+  {},
   [],
-  "x",
-  5,
-  {}
+  [
+   "05:45",
+   "07:15",
+   "17:45",
+   "19:15"
+  ],
+  "05:45",
+  null,
+  0,
+  true
  ]
 }

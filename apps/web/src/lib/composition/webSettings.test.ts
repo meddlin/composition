@@ -47,6 +47,7 @@ describe("web settings layout", () => {
       editorFont: "default",
       noteBackground: "plain",
       sunPair: "classic",
+      sunHours: { lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" },
       todoLook: { background: "notes", color: null },
       todos: DEFAULT_TODO_SETTINGS,
       plugins: { todo: true, "reading-list": false, rss: false, contacts: true },
@@ -250,39 +251,51 @@ describe("settings file location", () => {
   });
 });
 
-describe("web settings location", () => {
-  const austin = {
-    name: "Austin, Texas, United States",
-    latitude: 30.26715,
-    longitude: -97.74306,
-    timezone: "America/Chicago",
-  };
+describe("web settings sunHours", () => {
+  const evening = { lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" };
+  const defaults = { lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" };
 
-  it("has no location by default", async () => {
+  it("has the defaults when the file says nothing", async () => {
     writeSettings({ appDataDir: "/data", theme: "auto" });
     const { loadWebSettings } = await import("./webSettings");
 
-    expect(loadWebSettings()).not.toHaveProperty("location");
+    expect(loadWebSettings().sunHours).toEqual(defaults);
   });
 
-  it("round-trips a saved location", async () => {
+  it("round-trips saved hours", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
 
-    saveWebSettings({ ...loadWebSettings(), theme: "auto", location: austin });
+    saveWebSettings({ ...loadWebSettings(), theme: "auto", sunHours: evening });
 
-    expect(loadWebSettings()).toMatchObject({ theme: "auto", location: austin });
+    expect(loadWebSettings()).toMatchObject({ theme: "auto", sunHours: evening });
   });
 
   it.each([
-    ["a missing timezone", { ...austin, timezone: "" }],
-    ["a latitude off the globe", { ...austin, latitude: 91 }],
-    ["a longitude off the globe", { ...austin, longitude: "west" }],
-    ["a non-object", "Austin"],
-  ])("ignores a stored location with %s", async (_label, location) => {
-    writeSettings({ appDataDir: "/data", theme: "auto", location });
+    ["a missing hour", { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:00" }],
+    ["an hour that is not a time", { ...evening, darkFrom: "late" }],
+    ["hours out of order", { lightenFrom: "08:00", lightFrom: "07:00", darkenFrom: "18:00", darkFrom: "19:00" }],
+    ["two hours the same", { ...evening, lightFrom: "19:00" }],
+    ["a non-object", "05:45"],
+    ["a list", [345, 435, 1065, 1155]],
+  ])("reads stored hours with %s as the defaults, all or nothing", async (_label, sunHours) => {
+    writeSettings({ appDataDir: "/data", theme: "auto", sunHours });
     const { loadWebSettings } = await import("./webSettings");
 
+    expect(loadWebSettings().sunHours).toEqual(defaults);
+  });
+
+  it("does not read an older file's saved city, and does not write it back", async () => {
+    writeSettings({
+      appDataDir: "/data",
+      theme: "auto",
+      location: { name: "Austin, Texas, United States", latitude: 30.26715, longitude: -97.74306, timezone: "America/Chicago" },
+    });
+    const { loadWebSettings, saveWebSettings, settingsPath } = await import("./webSettings");
+
     expect(loadWebSettings()).not.toHaveProperty("location");
+    saveWebSettings(loadWebSettings());
+
+    expect(JSON.parse(fs.readFileSync(settingsPath(), "utf-8"))).not.toHaveProperty("location");
   });
 });
 

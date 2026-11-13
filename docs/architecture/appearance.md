@@ -7,7 +7,7 @@ Source: the iPad app's [`CompositionCore`](../../apps/ios/CompositionCore/Source
 [Step 10](../ipad-app-design.md#step-10-status) and the M3† rows of its tracker; the desktop's side is
 [ui/web-follow-the-sun.md](../ui/web-follow-the-sun.md).
 
-Three things live here: the colour schemes, **Follow the sun** (a sixth scheme that moves with the day), and the **ruler** and **reflow** that help with the shape
+Three things live here: the colour schemes, **Follow the sun** (a sixth scheme that moves with the day at hours the person sets), and the **ruler** and **reflow** that help with the shape
 of the text. The last two ports of the desktop's TypeScript are checked against it by committed fixtures, like the PDF tables are.
 
 ## Colour schemes
@@ -19,48 +19,49 @@ desktop ignores). Every token is checked against the real stylesheet by `Appeara
 
 ## Follow the sun
 
-The scheme is dark at night and light by day and eases between the two around the sunrise and sunset of a saved city. It is the desktop's `auto` theme, with the
-desktop's `sunPair` setting (which two palettes it moves between). Choosing it in the Appearance sheet shows the five pairs, each as a strip from full day to full
-night, and a city field.
+The scheme is dark at night and light by day and eases between the two at **four hours the person sets by hand** (Appearance ▸ Follow the sun ▸ *When it changes*). It is
+the desktop's `auto` theme, with the desktop's `sunPair` setting (which two palettes it moves between) and its `sunHours` setting. Choosing it in the Appearance sheet shows
+the five pairs, each as a strip from full day to full night, and four time pickers with a strip of the whole day in the chosen pair's colours. Until 2026-11-12 it followed a
+saved city's sunrise and sunset, looked up on Open-Meteo; that lookup, and every network request in the app, is gone ([the redesign](../ipad-build-plan.md#between-m2-and-m3-the-follow-the-sun-redesign)).
 
 | Piece | Where | What it is |
 |---|---|---|
-| `Sun.level`, `Sun.tone`, `Sun.autoLight`, `Sun.fallbackEvents` | `Sun/SunSchedule.swift` | `sunSchedule.ts`: how light the app is at a moment (a 90-minute smoothstep ramp centred on each sunrise and sunset), when the text flips between the two palettes' inks, the `--auto-light` percentage (`toFixed(1)`, a tie going up), and the stand-in 06:30 and 18:30 events on the machine's clock |
+| `Sun.level`, `Sun.msOfLocalDay`, `Sun.tone`, `Sun.autoLight` | `Sun/SunSchedule.swift` | `sunSchedule.ts`: how light the app is at a time of day (a smoothstep over each of the two spans the hours set, in whole milliseconds), the time of day on the wall clock in a zone, when the text flips between the two palettes' inks, and the `--auto-light` percentage (`toFixed(1)`, a tie going up) |
+| `SunHours` | `Sun/SunHours.swift` | `sunHours.ts`: the four hours as minutes after midnight; `HH:MM` read and written, the rule that they go once round the clock in order (each at least a minute after the one before), the words for refusing a set, and the defaults (05:45, 07:15, 17:45, 19:15) |
 | `SunPairName` | `Sun/SunPairs.swift` | `sunPairs.ts`: classic, cream-amber, mint-forest, blush-wine, sky-midnight, each with the point (0.45 to 0.5) where its two inks read equally |
 | `Theme.sunOnly`, `Theme.sun(pair:level:)` | `Appearance/Theme+SunPalettes.swift`, `Theme+Sun.swift` | the five palettes that exist only as halves of a pair (a dark amber, a mint, a blush, a sky and a midnight), and the scheme at a level: the text and accents are one palette outright, only the page, the cards and the panel blend (`color-mix(in srgb, day <auto-light>, night)`) |
-| `SunLookup`, `SunService` | `Sun/SunTimes.swift` | `sunTimes.ts`: the city lookup and the forecast from [Open-Meteo](https://open-meteo.com), the six-hour cache, the two-minute backoff after a failure, one request for simultaneous callers, today's times in the city's own zone; `saveCity` is the desktop's `saveLocation` (an empty field forgets the city) |
-| `SunClock` | `Composition/SunClock.swift` | what the scheme follows now: the times (real, or the stand-ins), asked for only while the scheme is chosen and a city is saved, again every ten minutes while they are missing or used up |
+| `SettingsStore.sunHours()`, `setSunHours` | `Settings.swift` | the `sunHours` key of `settings.json` (a set that is not all four valid and in order reads as the defaults; `setSunHours` refuses one that does not go round the clock) |
+| `SunClock` | `Composition/SunClock.swift` | holds the saved hours and answers `level(at:)`; nothing to fetch, nothing to keep fresh |
 | `ThemedRoot` | `Composition/CompositionApp.swift` | looks the scheme up again every half minute while it is in force (a `TimelineView`), so the fade moves while the app is open |
 
-**What it asks of the network, and when.** Only while Follow the sun is the scheme in force: the city once, when it is saved (`geocoding-api.open-meteo.com`, the text
-typed), and the times of that city (`api.open-meteo.com`, its latitude and longitude): at most every six hours, and every ten minutes while they could not be loaded.
-Nothing about the person or the iPad is sent. This is the app's only network use; **it is a privacy-label question for M3's distribution checklist.** A request is given
-three seconds in all, and the last good answer is served when it fails.
+**What it asks of the network: nothing.** The level is a function of the iPad's own clock and the four times, so Follow the sun, like the rest of the app, makes no request.
+There is no city, no location, no geocoding and no cache; the app makes no network connection at all (the privacy manifest declares no collected data).
 
-**First paint.** The network cannot be waited for, so the last launch's times are kept in the app's defaults (`sun.lastTimes.v1`, not in `settings.json`, whose backup
-must stay the desktop's) and used until the first answer; with nothing kept, or no city, the scheme runs on 6:30 and 6:30.
+**First paint.** The hours are read from `settings.json` with the rest of the appearance, so the first frame is already at the right point of the fade; there is nothing to wait for.
+Earlier builds kept the last launch's sunrise and sunset in the app's defaults (`sun.lastTimes.v1`); the app removes that key when it starts.
 
-**In the settings file.** `theme: "auto"`, `sunPair` and the existing `location` (name, latitude, longitude, IANA zone), exactly the desktop's, so a backup restores both
-ways: the desktop's Follow the sun is the iPad's, with the same pair and city, and the reverse.
+**In the settings file.** `theme: "auto"`, `sunPair` and `sunHours` (`{"lightenFrom": "05:45", "lightFrom": "07:15", "darkenFrom": "17:45", "darkFrom": "19:15"}`), exactly the
+desktop's, so a backup restores both ways: the desktop's Follow the sun is the iPad's, with the same pair and hours, and the reverse. A city (`location`) that an older version
+saved is not read; the store removes it on the next write of any setting, as the desktop's rewrite of the file does. An older desktop that restores a backup with `sunHours` does
+not know the key and uses its stand-in times.
 
 **What it checks.** [`fixtures/conformance/sun.json`](../../fixtures/conformance/README.md) is what the desktop's own code makes of a long list of inputs, and
-`SunConformanceTests` replays it: the level at 1,752 moments over 43 event lists in every order (ties, one-sided days, a day shorter than the ramp), the tone of 306 levels at every flip
-point, the percentage text for 912 levels (every multiple of 1/800, which is where `toFixed` and `printf` round a tie differently), the stand-in events in fourteen
-zones across the days their clocks change (168 cases), today's times in nineteen zones (126 cases) (half-hour and 45-minute offsets, the date line, the same day number in another month or
-year), 33 replies to the city lookup (the address asked for, the name made, every bad shape), ten scripted sessions of the cache, 65 steps (what it asks for, what it keeps and for
-how long, including a reply that is not iterable and so counts as a failure),, and the palettes and blend endpoints read from the real `globals.css`. Thirty-two deliberate
-breakages of the port were each caught by a check (the first round missed four, which are now pinned).
+`SunConformanceTests` replays it: `HH:MM` read and written (28 inputs), 28 sets of hours accepted, refused (with the desktop's words) or read as the defaults, the level
+over 111 sets of hours (7,376 moments, at every edge of a fade and between, all agreeing to the last bit), the tone of 306 levels at every flip point, the percentage text for 912 levels (every
+multiple of 1/800, which is where `toFixed` and `printf` round a tie differently), the time of day on the wall clock in fourteen zones across the days and the instants their
+clocks change (204 cases), and the palettes and blend endpoints read from the real `globals.css`.
 
 **Where it differs from the desktop**
 
-- A time zone the system does not know gives no times, where the desktop throws a `RangeError`.
-- The clock text is written with an ordinary space before AM and PM (this Node's ICU uses one too; a newer ICU uses a narrow no-break space).
-- The desktop's city field says what matched; the iPad's does too, below the field.
+- A time zone the system does not know is not an input here: the hours are read on the device's own clock.
+- The pickers are the iPad's own compact time pickers (12- or 24-hour as the iPad is set); what is kept is `HH:MM` on a 24-hour clock either way.
+- The desktop rewrites its settings file from the keys it knows, so any save drops a saved city; the iPad's store keeps every other key and drops only `location`.
 
-**A finding, not changed here.** Half way along the fade the page is a mid grey, which neither the day's dark ink nor the night's light ink can read on at 4.5:1. The
-desktop flips the ink where the two read equally, which is about 3.2:1 (3.1 to 3.35 in the five pairs), and it stays under 4.5 for about 14 minutes of each 90-minute fade
-(levels 0.33 to 0.66; 17 minutes for cream-amber). The iPad carries the same design over, `SunTests` pins how bad it gets and for how long, and whether that is acceptable
-for N6 is the author's call.
+**A finding, not changed here.** Half way along a fade the page is a mid grey, which neither the day's dark ink nor the night's light ink can read on at 4.5:1. The
+desktop flips the ink where the two read equally, which is about 3.2:1 (3.1 to 3.35 in the five pairs), and it stays under 4.5 for the middle of a fade (levels 0.33 to
+0.66, 17 minutes of a 90-minute fade for cream-amber and 14 for the others). The iPad carries the same design over, `SunTests` pins how bad it gets, and whether that is
+acceptable for N6 is the author's call. **With hours set by hand the time spent there is the person's choice:** a fade of 90 minutes passes through it in about 14, one of
+six hours stays in it for about an hour, and a fade of a minute does not linger at all.
 
 ## Reflow and the ruler
 
@@ -96,6 +97,6 @@ the caret that is exactly at the end of the spaces; a closing `---` that cannot 
 
 ## Tests
 
-`swift test` runs the two fixture replays (`SunConformanceTests`, `ReflowConformanceTests`), `SunTests` (the scheme at a level, saving a city, the cache across launches, how
-legible the fade is) and `AppearanceTests` (the settings). `apps/ios/scripts/conformance.sh` first checks the desktop still makes both fixtures; the UI tests in
+`swift test` runs the two fixture replays (`SunConformanceTests`, `ReflowConformanceTests`), `SunTests` (the scheme at a level, the hours and what keeping them does to the
+settings file, how legible the fade is) and `AppearanceTests` (the settings). `apps/ios/scripts/conformance.sh` first checks the desktop still makes both fixtures; the UI tests in
 `AppearanceUITests` check what the screen paints at the ends and the middle of the fade (to the pixel), the sheet, reflow by typing into a note, and the ruler.

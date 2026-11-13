@@ -27,7 +27,7 @@ public static class MarkdownColour
     }
 
     /// <summary>Colour every line. One batch, so the control repaints once.</summary>
-    public static void ApplyAll(ITextDocument doc)
+    public static void ApplyAll(RichEditTextDocument doc)
     {
         doc.GetText(TextGetOptions.None, out var text);
         doc.BatchDisplayUpdates();
@@ -49,7 +49,7 @@ public static class MarkdownColour
     /// Recolour only the paragraph around <paramref name="caret"/> (what an editor must do per keystroke). Fence state is NOT tracked
     /// here; a real implementation needs an incremental model, and that is part of what this spike's number is meant to price.
     /// </summary>
-    public static void ApplyParagraph(ITextDocument doc, int caret)
+    public static void ApplyParagraph(RichEditTextDocument doc, int caret)
     {
         var range = doc.GetRange(caret, caret);
         range.Expand(TextRangeUnit.Paragraph);

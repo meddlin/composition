@@ -31,6 +31,11 @@ public class BackupTests
         Insert("INSERT INTO trashed_notes (id, title, content, created_at, updated_at, group_id, deleted_at, notebook_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 90L, "Trashed", "gone", t, t, null, t, 1L);
         Insert("INSERT INTO trashed_groups (id, name, parent_id, created_at, updated_at, deleted_at, notebook_id) VALUES (?, ?, ?, ?, ?, ?, ?)", 91L, "Trashed group", null, t, t, t, 1L);
         Insert("INSERT INTO attachments (note_id, file_name, stored_name, size, created_at) VALUES (?, ?, ?, ?, ?)", 1L, "Spec.pdf", "spec-1a2b3c.pdf", 5L, t);
+        Insert("INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, view_state, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            2L, "Paper.pdf", "paper-0a1b2c.pdf", string.Concat(Enumerable.Repeat("ab", 32)), 6L, 2L, null, t);
+        Insert("INSERT INTO pdf_annotations (document_id, page, kind, color, rects, quote, comment, body, group_uuid, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            1L, 0L, "highlight", "yellow", "[[72,700,300,712]]", "a quoted line", "", null, null, t, t);
+        Insert("INSERT INTO pdf_bookmarks (document_id, page, label, created_at) VALUES (?, ?, ?, ?)", 1L, 1L, "Intro", t);
     }
 
     /// <summary>"?" placeholders to numbered named parameters, so the SQL above reads like the oracle's.</summary>
@@ -46,10 +51,12 @@ public class BackupTests
     {
         Directory.CreateDirectory(Path.Combine(appDataDir, "app_data"));
         Directory.CreateDirectory(Path.Combine(appDataDir, "attachments"));
+        Directory.CreateDirectory(Path.Combine(appDataDir, "documents"));
         File.WriteAllText(Path.Combine(appDataDir, "app_data", "diagram-0123456789ab.png"), "PNGDATA-1");
         File.WriteAllText(Path.Combine(appDataDir, "app_data", "photo-0123456789ab.jpg"), "JPEGDATA-22");
         File.WriteAllText(Path.Combine(appDataDir, "app_data", LongImage), "LONG");
         File.WriteAllText(Path.Combine(appDataDir, "attachments", "spec-1a2b3c.pdf"), "%PDF-1");
+        File.WriteAllText(Path.Combine(appDataDir, "documents", "paper-0a1b2c.pdf"), "%PDF-2");
     }
 
     private static byte[] SettingsFromDesktopBackup()
@@ -75,7 +82,8 @@ public class BackupTests
         Assert.Equal(summary["counts"]!["notes"]!.GetValue<long>(), staged.Counts.Notes);
         Assert.Equal(summary["counts"]!["images"]!.GetValue<long>(), staged.Counts.Images);
         Assert.Equal(summary["createdAt"]!.GetValue<string>(), staged.CreatedAt);
-        Assert.True(staged.HasImages && staged.HasAttachments && staged.SettingsJson is not null);
+        Assert.Equal(summary["counts"]!["documents"]!.GetValue<long>(), staged.Counts.Documents);
+        Assert.True(staged.HasImages && staged.HasAttachments && staged.HasDocuments && staged.SettingsJson is not null);
 
         Backup.ApplyStaged(staged, appData, dbPath);
         using var db = Schema.Open(dbPath); // a restored desktop database goes through the .NET pass: must be a no-op
@@ -87,6 +95,7 @@ public class BackupTests
         Assert.Equal("PNGDATA-1", File.ReadAllText(Path.Combine(appData, "app_data", "diagram-0123456789ab.png")));
         Assert.Equal("LONG", File.ReadAllText(Path.Combine(appData, "app_data", LongImage))); // GNU long-name entry from Node's writer
         Assert.Equal("%PDF-1", File.ReadAllText(Path.Combine(appData, "attachments", "spec-1a2b3c.pdf")));
+        Assert.Equal("%PDF-2", File.ReadAllText(Path.Combine(appData, "documents", "paper-0a1b2c.pdf")));
         Assert.False(Directory.EnumerateDirectories(appData, ".restore-*").Any()); // the scratch folder is gone
     }
 
@@ -113,7 +122,7 @@ public class BackupTests
                 ["counts"] = new JsonObject
                 {
                     ["notes"] = summary.Counts.Notes, ["groups"] = summary.Counts.Groups, ["trashedNotes"] = summary.Counts.TrashedNotes,
-                    ["trashedGroups"] = summary.Counts.TrashedGroups, ["attachments"] = summary.Counts.Attachments, ["todos"] = summary.Counts.Todos,
+                    ["trashedGroups"] = summary.Counts.TrashedGroups, ["attachments"] = summary.Counts.Attachments, ["documents"] = summary.Counts.Documents, ["todos"] = summary.Counts.Todos,
                     ["archivedTodos"] = summary.Counts.ArchivedTodos, ["contacts"] = summary.Counts.Contacts, ["images"] = summary.Counts.Images,
                 },
             }.ToJsonString());
@@ -169,6 +178,7 @@ public class BackupTests
         Assert.Contains("app_data/diagram-0123456789ab.png", names);
         Assert.Contains($"app_data/{LongImage}", names);
         Assert.Contains("attachments/spec-1a2b3c.pdf", names);
+        Assert.Contains("documents/paper-0a1b2c.pdf", names);
     }
 
     [Fact]

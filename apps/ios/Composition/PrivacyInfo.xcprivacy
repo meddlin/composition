@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The app's own privacy manifest, which Apple requires on every upload (docs/ipad-build-plan.md, G3). It covers the app and the local
+	     CompositionCore package compiled into it; GRDB.swift ships its own manifest and swift-markdown and swift-cmark need none.
+	     Keep it in step with the code: a new use of one of Apple's "required reason" APIs needs its category and reason added here. -->
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<!-- Nothing is collected, so this stays empty (App Store Connect: "Data Not Collected"). The app makes no network request of its own: there is no URLSession,
+	     no web view and no networking framework in it or in CompositionCore, and "Follow the sun" runs on four hours the person sets by hand (no city, no location,
+	     no lookup; until 2026-11-12 it sent a typed city and then its coordinates to Open-Meteo, which is why this was once an open question). A link the person
+	     taps in a note (a web address, a <Repo> or <YouTube> card, a remote picture shown as a link) is handed to the system to open in their browser, which is not
+	     the app sending anything. If a network use is ever added, this list and the App Privacy answers must change with it. -->
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<!-- File timestamps: the stored images' modification dates (ImageLibrary), `lstat` and sizes of files in the app's own folder (Backup,
+		     export), and the size and type of a file picked in Files before it is imported (DocumentLibrary). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryFileTimestamp</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>C617.1</string>
+				<string>3B52.1</string>
+			</array>
+		</dict>
+		<!-- System boot time: `ProcessInfo.systemUptime` times the autosave pause (NoteAutosaver). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategorySystemBootTime</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>35F9.1</string>
+			</array>
+		</dict>
+		<!-- User defaults: the app's own settings (the PDF mark colour, the finger-draws switch, the Live tab's VoiceOver choice) and the removal, at launch, of the key an
+	     earlier build kept the last launch's sunrise and sunset in (SunClock). -->
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>CA92.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>

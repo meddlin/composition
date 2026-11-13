@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Windows app's data layer: the desktop's schema pass, backup and restore, and (from build step 2) the search sidecar,
+    ported from apps/web/src/lib/composition and checked against it by ../scripts/conformance.sh.
+    Deliberately no Windows-only API: this library builds and tests on macOS and Linux too (docs/windows-native-app-design.md).
+    Toolchain decided at Gate A (D7): .NET 10, SDK pinned in ../global.json.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Composition.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Brings SQLitePCLRaw's bundle_e_sqlite3: SQLite with FTS5 for win-x64, win-arm64, osx and linux (SqliteFeatureTests checks it). -->
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
+  </ItemGroup>
+
+</Project>

@@ -1,8 +1,8 @@
-// Spike S1, schema half. Phase "write": the real db.ts makes the databases and dumps what it made.
+// The schema pass and backup, against the desktop's real code. Phase "write": the real db.ts makes the databases and dumps what it made.
 // Phase "reverse": after the .NET side has written its own, the real db.ts opens them and must find nothing to change.
 import fs from "node:fs";
 import path from "node:path";
-import { COMPOSITION_LIB, Database, dumpData, dumpSchema, isolatedHome, oracleDir, populate, readJson, writeJson, writeOldestDatabase, type SchemaDump } from "./support";
+import { COMPOSITION_LIB, Database, UUID_TABLES, dumpData, dumpSchema, isolatedHome, oracleDir, populate, readJson, writeJson, writeOldestDatabase } from "./support";
 
 const phase = process.env.COMPOSITION_ORACLE_PHASE ?? "write";
 
@@ -45,9 +45,11 @@ describe.runIf(phase === "write")("the desktop's db.ts writes the reference data
     // images and an attachment on disk, as the app would have them
     fs.mkdirSync(path.join(appDataDir, "app_data"), { recursive: true });
     fs.mkdirSync(path.join(appDataDir, "attachments"), { recursive: true });
+    fs.mkdirSync(path.join(appDataDir, "documents"), { recursive: true });
     fs.writeFileSync(path.join(appDataDir, "app_data", "diagram-0123456789ab.png"), Buffer.from("PNGDATA-1"));
     fs.writeFileSync(path.join(appDataDir, "app_data", "photo-0123456789ab.jpg"), Buffer.from("JPEGDATA-22"));
     fs.writeFileSync(path.join(appDataDir, "attachments", "spec-1a2b3c.pdf"), Buffer.from("%PDF-1"));
+    fs.writeFileSync(path.join(appDataDir, "documents", "paper-0a1b2c.pdf"), Buffer.from("%PDF-2"));
     // a name long enough to need a GNU long-name entry in the tar
     const longName = "a-very-long-image-name-".repeat(5) + "0123456789ab.png";
     fs.writeFileSync(path.join(appDataDir, "app_data", longName), Buffer.from("LONG"));
@@ -105,6 +107,7 @@ describe.runIf(phase === "reverse")("the desktop's db.ts opens what the .NET sid
     expect(staged.counts).toEqual(expected.counts);
     expect(staged.hasImages).toBe(true);
     expect(staged.hasAttachments).toBe(true);
+    expect(staged.hasDocuments).toBe(true);
     backup.applyStagedBackup(staged, { appDataDir, dbPath: dbFile });
 
     const { getDb, closeDb } = await openWithRealDb(home);
@@ -112,11 +115,12 @@ describe.runIf(phase === "reverse")("the desktop's db.ts opens what the .NET sid
     const restored = dumpData(db);
     closeDb();
     const netData = readJson<Record<string, unknown[]>>(path.join(dir, "net-fresh.data.json"));
-    for (const table of ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"]) {
+    for (const table of UUID_TABLES) {
       expect(restored[table], table).toEqual(netData[table]); // every column, uuid included, survives the trip
     }
     expect(fs.readFileSync(path.join(appDataDir, "app_data", "diagram-0123456789ab.png"), "utf8")).toBe("PNGDATA-1");
     expect(fs.readFileSync(path.join(appDataDir, "attachments", "spec-1a2b3c.pdf"), "utf8")).toBe("%PDF-1");
+    expect(fs.readFileSync(path.join(appDataDir, "documents", "paper-0a1b2c.pdf"), "utf8")).toBe("%PDF-2");
     const longNames = fs.readdirSync(path.join(appDataDir, "app_data")).filter((n) => n.length > 90);
     expect(longNames.length).toBe(1); // the GNU long-name entry the .NET writer made was understood
     writeJson(path.join(dir, "ts-read-net-backup.result.json"), { ok: true, counts: staged.counts });

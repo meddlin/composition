@@ -7,10 +7,10 @@ struct AppearanceView: View {
     let model: AppModel
     @Environment(\.dismiss) private var dismiss
     @Environment(\.look) private var look
-    /// What is typed in the city field, and what the last Save city came to.
-    @State private var city = ""
-    @State private var cityOutcome: SunService.CityResult?
-    @State private var looking = false
+    /// The four hours as they are on the pickers, which are saved by Save hours (a half-changed set may not go round the clock in order), and what the last save came to.
+    @State private var hoursDraft = SunHours.default
+    @State private var hoursSaved = false
+    @State private var hoursRefusal: String?
 
     var body: some View {
         NavigationStack {
@@ -20,7 +20,7 @@ struct AppearanceView: View {
                     ForEach(Theme.all, id: \.name) { theme in
                         row(theme.label, detail: nil, choice: .theme(theme.name), id: theme.name) { SchemeSwatch(theme: theme) }
                     }
-                    row("Follow the sun", detail: "Dark at night and light by day, fading around sunrise and sunset where you live", choice: .sun, id: "sun") {
+                    row("Follow the sun", detail: "Dark at night and light by day, fading at the hours you set", choice: .sun, id: "sun") {
                         SunSwatch(pair: model.appearance.sunPair)
                     }
                 } header: {
@@ -91,7 +91,7 @@ struct AppearanceView: View {
 
     // MARK: Follow the sun
 
-    /// Which light and dark colours it fades between, and the city whose sunrise and sunset it follows (the desktop's Settings ▸ Styling ▸ Follow the sun).
+    /// Which light and dark colours it fades between, and the four hours, set by hand, at which it gets lighter and darker (the desktop's Settings ▸ Styling ▸ Follow the sun).
     @ViewBuilder private var followTheSun: some View {
         Section {
             ForEach(SunPairName.allCases, id: \.self) { pair in
@@ -113,62 +113,78 @@ struct AppearanceView: View {
         } header: {
             Text("Light and dark colours").foregroundStyle(look.mutedText)
         } footer: {
-            Text("Each strip runs from full day to full night, the way the page looks as the sun sets. The colours fade across 90 minutes around each sunrise and sunset; the text changes halfway through the fade.")
+            Text("Each strip runs from full day to full night, the way the page looks as the evening fade goes on. The text changes halfway through a fade.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
 
         Section {
-            TextField("Austin, TX", text: $city)
-                .textInputAutocapitalization(.words)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .onSubmit(saveCity)
-                .accessibilityIdentifier("sun-city")
-            Button(action: saveCity) {
-                Text(looking ? "Looking up…" : "Save city")
+            hourRow(SunHours.labels[0], \.lightenFrom, id: "sun-hour-lightenFrom")
+            hourRow(SunHours.labels[1], \.lightFrom, id: "sun-hour-lightFrom")
+            hourRow(SunHours.labels[2], \.darkenFrom, id: "sun-hour-darkenFrom")
+            hourRow(SunHours.labels[3], \.darkFrom, id: "sun-hour-darkFrom")
+            DayStrip(pair: model.appearance.sunPair, hours: hoursDraft.goesRoundTheClock ? hoursDraft : model.sun.hours)
+            if let problem = hoursDraft.problem {
+                Text(problem).foregroundStyle(look.error).accessibilityIdentifier("sun-hours-problem")
             }
-            .disabled(looking)
-            .accessibilityIdentifier("sun-city-save")
-            cityStatus
+            if let refusal = hoursRefusal {
+                Text(refusal).foregroundStyle(look.error).accessibilityIdentifier("sun-hours-status")
+            } else if hoursSaved, hoursDraft == model.sun.hours {
+                Text("Saved.").foregroundStyle(look.success).accessibilityIdentifier("sun-hours-status")
+            }
+            Button("Save hours", action: saveHours)
+                .disabled(!hoursDraft.goesRoundTheClock || hoursDraft == model.sun.hours)
+                .accessibilityIdentifier("sun-hours-save")
+            Button("Use the defaults") {
+                hoursDraft = .default
+                hoursSaved = false
+                hoursRefusal = nil
+            }
+            .disabled(hoursDraft == .default)
+            .accessibilityIdentifier("sun-hours-default")
         } header: {
-            Text("Your city").foregroundStyle(look.mutedText)
+            Text("When it changes").foregroundStyle(look.mutedText)
         } footer: {
-            Text("Sets the sunrise and sunset that Follow the sun tracks. Try Austin, TX or Paris. The city is looked up, and its times asked for, on open-meteo.com; nothing else is sent. Clear the field and save to forget the city.")
+            Text("Times on this iPad's own clock, so they follow it if it changes zone. They go once round the clock in order, starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before. The defaults are 05:45, 07:15, 17:45 and 19:15. Nothing is looked up: there is no city, no location and no network request.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
-        .onAppear { if city.isEmpty { city = model.sun.location?.name ?? "" } }
+        .onAppear { hoursDraft = model.sun.hours }
     }
 
-    @ViewBuilder private var cityStatus: some View {
-        switch cityOutcome {
-        case .saved(let name, let times):
-            Text("Using \(name): \(times.summary).").foregroundStyle(look.success).accessibilityIdentifier("sun-city-status")
-        case .failed(let message):
-            Text(message).foregroundStyle(look.error).accessibilityIdentifier("sun-city-status")
-        case .forgotten:
-            Text("City forgotten, so Follow the sun is using 6:30 AM and 6:30 PM.").foregroundStyle(look.warning).accessibilityIdentifier("sun-city-status")
-        case nil:
-            if let place = model.sun.location {
-                Text(model.sun.todaysTimes().map { "Using \(place.name): \($0.summary)." } ?? "Using \(place.name).")
-                    .foregroundStyle(look.mutedText).accessibilityIdentifier("sun-city-status")
-            } else {
-                Text("No city saved yet, so Follow the sun is using 6:30 AM and 6:30 PM.").foregroundStyle(look.warning).accessibilityIdentifier("sun-city-status")
-            }
-        }
+    /// Hours are kept as minutes after midnight, and shown in a picker that reads them as a time in a fixed zone (GMT, a day with no clock change), so that a
+    /// time such as 02:30 is never one the iPad's own clock skips.
+    private static let pickerCalendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }()
+
+    private func hourRow(_ title: String, _ keyPath: WritableKeyPath<SunHours, Int>, id: String) -> some View {
+        let calendar = Self.pickerCalendar
+        return DatePicker(
+            title,
+            selection: Binding(
+                get: {
+                    let minutes = hoursDraft[keyPath: keyPath]
+                    return calendar.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: minutes / 60, minute: minutes % 60)) ?? Date(timeIntervalSinceReferenceDate: 0)
+                },
+                set: { date in
+                    let parts = calendar.dateComponents([.hour, .minute], from: date)
+                    hoursDraft[keyPath: keyPath] = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+                    hoursSaved = false
+                    hoursRefusal = nil
+                }),
+            displayedComponents: .hourAndMinute
+        )
+        .environment(\.calendar, calendar)
+        .environment(\.timeZone, calendar.timeZone)
+        .accessibilityIdentifier(id)
     }
 
-    private func saveCity() {
-        guard !looking else { return }
-        looking = true
-        Task {
-            let result = await model.saveCity(city)
-            looking = false
-            cityOutcome = result
-            // After a save the field shows the name that matched; after a failure it keeps what was typed.
-            if case .saved(let name, _) = result { city = name } else if case .forgotten = result { city = "" }
-        }
+    private func saveHours() {
+        hoursRefusal = model.saveSunHours(hoursDraft)
+        hoursSaved = hoursRefusal == nil
     }
 
     private func row<Swatch: View>(_ title: String, detail: String?, choice: SchemeChoice, id: String, @ViewBuilder swatch: () -> Swatch) -> some View {
@@ -250,6 +266,33 @@ private struct SunStrip: View {
         .foregroundStyle(.secondary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(pair.label), from day to night")
+    }
+}
+
+/// The whole day from midnight to midnight in the chosen pair's colours, at the level the hours make of each hour of it, so that they can be judged by eye.
+private struct DayStrip: View {
+    let pair: SunPairName
+    let hours: SunHours
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 0) {
+                ForEach(0..<24, id: \.self) { hour in
+                    let level = Sun.level(hours, msOfDay: Int64(hour * 60 + 30) * Sun.millisecondsPerMinute)
+                    Rectangle().fill(Theme.sun(pair: pair, level: level).background.color).frame(height: 26)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.gray.opacity(0.4), lineWidth: 0.5))
+            HStack {
+                Text("00:00"); Spacer(); Text("06:00"); Spacer(); Text("12:00"); Spacer(); Text("18:00"); Spacer(); Text("24:00")
+            }
+            .font(.caption2)
+        }
+        .foregroundStyle(.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("The day from midnight to midnight in \(pair.label) colours, with the hours as set")
+        .accessibilityIdentifier("sun-day-strip")
     }
 }
 

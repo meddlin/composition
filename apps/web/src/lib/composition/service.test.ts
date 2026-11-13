@@ -53,6 +53,7 @@ describe("saveSettings", () => {
       editorFont: "default",
       noteBackground: "plain",
       sunPair: "classic",
+      sunHours: { lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" },
       todoLook: { background: "notes", color: null },
       todos: DEFAULT_TODO_SETTINGS,
       plugins: DEFAULT_PLUGIN_SETTINGS,
@@ -366,7 +367,7 @@ describe("loadSettings", () => {
         mediaBytes: 0,
       },
       assistant: { serverUrl: "http://127.0.0.1:11434", contextTokens: 8192 },
-      city: "",
+      sunHours: { lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" },
     });
   });
 
@@ -906,108 +907,103 @@ describe("searchNotes", () => {
   });
 });
 
-describe("saveLocation", () => {
-  const austin = {
-    name: "Austin, Texas, United States",
-    latitude: 30.26715,
-    longitude: -97.74306,
-    timezone: "America/Chicago",
-  };
+describe("saveSunHours", () => {
+  const evening = { lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" };
 
-  // Answers the geocoding request with `results`, and the forecast request with no days.
-  function stubOpenMeteo(results: unknown[]) {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: URL) => {
-        const body = String(url).includes("geocoding") ? { results } : { daily: {} };
-        return new Response(JSON.stringify(body));
-      }),
-    );
-  }
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("saves the matched city alongside the other settings", async () => {
-    stubOpenMeteo([
-      {
-        name: "Austin",
-        admin1: "Texas",
-        country: "United States",
-        latitude: austin.latitude,
-        longitude: austin.longitude,
-        timezone: austin.timezone,
-      },
-    ]);
+  it("saves the four hours alongside the other settings", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
     saveWebSettings({ ...loadWebSettings(), theme: "auto" });
-    const { saveLocation } = await import("./service");
+    const { saveSunHours } = await import("./service");
 
-    const result = await saveLocation(" Austin, TX ");
+    expect(await saveSunHours(evening)).toEqual({});
 
-    expect(result).toMatchObject({ saved: { name: austin.name } });
-    expect(loadWebSettings()).toMatchObject({ theme: "auto", location: austin });
+    expect(loadWebSettings()).toMatchObject({ theme: "auto", sunHours: evening });
   });
 
-  it("reports an unknown city without touching the saved one", async () => {
-    stubOpenMeteo([]);
+  it("refuses hours that are not in order, and keeps the ones that were saved", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
-    saveWebSettings({ ...loadWebSettings(), location: austin });
-    const { saveLocation } = await import("./service");
+    saveWebSettings({ ...loadWebSettings(), sunHours: evening });
+    const { saveSunHours } = await import("./service");
 
-    const result = await saveLocation("Nowhereville");
+    const result = await saveSunHours({ lightenFrom: "08:00", lightFrom: "07:00", darkenFrom: "18:00", darkFrom: "19:00" });
 
-    expect(result.error).toContain("Nowhereville");
-    expect(result.saved).toBeUndefined();
-    expect(loadWebSettings().location).toEqual(austin);
+    expect(result.error).toMatch(/once round the clock/);
+    expect(loadWebSettings().sunHours).toEqual(evening);
   });
 
-  it("reports an unreachable lookup service", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Promise.reject(new Error("offline"))));
-    const { saveLocation } = await import("./service");
+  it("refuses text that is not a time", async () => {
+    const { saveSunHours } = await import("./service");
 
-    expect((await saveLocation("Austin")).error).toMatch(/connection/);
+    expect((await saveSunHours({ ...evening, darkFrom: "late" })).error).toMatch(/24-hour clock/);
+    expect((await saveSunHours({ lightenFrom: "06:00" } as never)).error).toMatch(/24-hour clock/);
   });
 
-  it("forgets the saved city when the field is emptied", async () => {
+  it("shows the saved hours in the settings snapshot, and the defaults when none were saved", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
-    saveWebSettings({ ...loadWebSettings(), theme: "auto", location: austin });
-    const { saveLocation } = await import("./service");
-
-    expect(await saveLocation("  ")).toEqual({});
-
-    const settings = loadWebSettings();
-    expect(settings.location).toBeUndefined();
-    expect(settings.theme).toBe("auto");
-  });
-
-  it("shows the saved city in the settings snapshot", async () => {
-    stubOpenMeteo([]);
-    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
-    saveWebSettings({ ...loadWebSettings(), location: austin });
     const { loadSettings } = await import("./service");
+    expect((await loadSettings()).sunHours).toEqual({ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" });
 
-    expect(await loadSettings()).toMatchObject({ city: austin.name, sunTimes: {} });
+    saveWebSettings({ ...loadWebSettings(), sunHours: evening });
+    expect((await loadSettings()).sunHours).toEqual(evening);
+  });
+
+  it("never touches the network", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const { loadWebSettings, saveWebSettings } = await import("./webSettings");
+    saveWebSettings({ ...loadWebSettings(), theme: "auto" });
+    const { saveSunHours, loadSunHours, initialSunTheme, loadSettings } = await import("./service");
+
+    await saveSunHours(evening);
+    await loadSunHours();
+    initialSunTheme();
+    await loadSettings();
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
-describe("loadSunSchedule", () => {
+describe("an older settings file's saved city", () => {
+  it("is not read, and is gone the next time settings are written", async () => {
+    const { settingsPath } = await import("./webSettings");
+    fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
+    fs.writeFileSync(
+      settingsPath(),
+      JSON.stringify({ theme: "auto", location: { name: "Austin, Texas, United States", latitude: 30.26715, longitude: -97.74306, timezone: "America/Chicago" } }),
+    );
+    const { loadWebSettings } = await import("./webSettings");
+    const { loadSettings, saveSunPair } = await import("./service");
+
+    expect(loadWebSettings()).not.toHaveProperty("location");
+    expect(loadWebSettings().sunHours).toEqual({ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" });
+    expect(await loadSettings()).not.toHaveProperty("city");
+    expect(JSON.parse(fs.readFileSync(settingsPath(), "utf-8"))).toHaveProperty("location");
+
+    await saveSunPair("mint-forest");
+
+    const written = JSON.parse(fs.readFileSync(settingsPath(), "utf-8"));
+    expect(written).not.toHaveProperty("location");
+    expect(written).toMatchObject({ theme: "auto", sunPair: "mint-forest" });
+  });
+});
+
+describe("loadSunHours", () => {
   it("is null unless the auto scheme is selected", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
     saveWebSettings({ ...loadWebSettings(), theme: "forest" });
-    const { loadSunSchedule, initialSunTheme } = await import("./service");
+    const { loadSunHours, initialSunTheme } = await import("./service");
 
-    expect(await loadSunSchedule()).toBeNull();
+    expect(await loadSunHours()).toBeNull();
     expect(initialSunTheme()).toBeUndefined();
   });
 
-  it("uses stand-in times for the auto scheme when no city is saved", async () => {
+  it("gives the saved hours for the auto scheme, the defaults when none were saved, and a starting tone", async () => {
     const { loadWebSettings, saveWebSettings } = await import("./webSettings");
     saveWebSettings({ ...loadWebSettings(), theme: "auto" });
-    const { loadSunSchedule, initialSunTheme } = await import("./service");
+    const { loadSunHours, initialSunTheme } = await import("./service");
 
-    expect(await loadSunSchedule()).toMatchObject({ estimated: true, retry: false });
+    expect(await loadSunHours()).toEqual({ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" });
     expect(initialSunTheme()).toMatchObject({ tone: expect.stringMatching(/^(light|dark)$/) });
   });
 });

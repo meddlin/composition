@@ -49,7 +49,7 @@ file (`backend.ts`) becomes a thin re-export of the package.
 |---|---|---|
 | Data layer: `db.ts`, `notesRepo`, `groupsRepo`, `trashRepo`, `attachmentsRepo`, `service.ts` | `apps/web/src/lib/composition` | web (Server Actions), desktop (`backend.ts`), CLI (`backend.ts`) |
 | Frontmatter, search query parser, search index client | same folder | all three |
-| Pure rules: `favorites`, `groupMove`, `trash` arithmetic, `sunSchedule`, `sunTimes`, `layout`, `themes` | same folder | all three |
+| Pure rules: `favorites`, `groupMove`, `trash` arithmetic, `sunSchedule`, `sunHours`, `layout`, `themes` | same folder | all three |
 | Pane arrangement (`panes.ts`) | `apps/web/src/components/notes` (a UI folder, but pure) | web, desktop (through web), CLI |
 | Meilisearch process and sidecar: `meili.ts`, `search.ts` | `apps/desktop/src/main` | desktop, CLI |
 | Color palettes | web: `app/globals.css`; CLI: `src/theme.ts` | two copies, held together by a test |
@@ -73,7 +73,7 @@ These are the concrete problems the package has to solve. Each one is a step bel
    its "search is unavailable because…" message in module variables. Tests have to reset them, and the
    terminal tests learned the hard way that an unconfigured search quietly tries web's port 7700.
 4. **`service.ts` is everyone's use cases and also web's extras.** Images, attachments and the
-   sunrise lookup (which makes a network call) sit in the same file as notes and groups, so any app
+   sunrise lookup (which made a network call until 2026-11-12) sit in the same file as notes and groups, so any app
    that wants only notes still carries the rest.
 5. **The toolchains disagree.** TypeScript 6 (web) against 7 (desktop, CLI); pnpm 12.8.1 (web)
    against 11.0.3 (root, desktop, CLI); Node 22 (web, desktop CI) against 26 (CLI); and no root
@@ -183,7 +183,7 @@ open two databases and two search indexes in one process, which module state mad
 
 Move `db.ts` (schema and migrations), the repos, and `service.ts` into the core, split as it is
 described under "What we learned": a core service for notes, groups, trash, favorites, search and the
-settings snapshot, and the app-specific extras (images, attachments, the sunrise lookup) kept as
+settings snapshot, and the app-specific extras (images, attachments) kept as
 small separate modules that an app opts into. The `CompositionApi` contract is the web and desktop
 apps' UI contract; keep it in the web app and have it compose the core service with the extras.
 

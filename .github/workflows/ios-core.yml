@@ -23,7 +23,8 @@ on:
       - "apps/web/src/components/notes/reflowText.ts"
       - "apps/web/src/components/notes/liveReflow.ts"
       - "apps/web/src/components/notes/reflowConformance.test.ts"
-      # Follow the sun's themes, which the Swift core's palettes are read from.
+      # Follow the sun's themes, which the Swift core's palettes are read from (its four hours and its level, sunHours.ts and sunSchedule.ts, are in
+      # apps/web/src/lib/composition above, with sunConformance.test.ts, which writes fixtures/conformance/sun.json).
       - "apps/web/src/app/globals.css"
       - "apps/web/scripts/conformance-fixtures.test.ts"
       - "apps/cli/src/tools/dummyNotes.ts"

@@ -57,7 +57,7 @@ function onAssistantEvent(listener: (message: AssistantEventMessage) => void): (
   return () => void ipcRenderer.removeListener(ASSISTANT_EVENT_CHANNEL, handler);
 }
 
-/** Calls `listener` with how the app looks, each time the scheme, a font or the sun's city is saved; returns the function that stops listening. */
+/** Calls `listener` with how the app looks, each time the scheme, a font or the Follow the sun hours are saved; returns the function that stops listening. */
 function onAppearance(listener: (appearance: AppearanceMessage) => void): () => void {
   const handler = (_event: unknown, appearance: AppearanceMessage) => listener(appearance);
   ipcRenderer.on(APPEARANCE_CHANNEL, handler);

@@ -72,7 +72,7 @@ final class AppModel {
     private(set) var appearance = Appearance()
     /// The ruler and reflow settings, read from `settings.json` with the appearance (`WritingSettings`; both are off until switched on).
     private(set) var writing = WritingSettings()
-    /// The sunrise and sunset times Follow the sun follows, and how light it is now (M3†).
+    /// The four hours Follow the sun moves at, and how light it is now (the hours are the person's, set in Appearance; nothing is looked up).
     let sun = SunClock()
     private var searchTask: Task<Void, Never>?
 
@@ -228,7 +228,7 @@ final class AppModel {
         if let column = launch.string(forKey: "rulerColumn").flatMap(Int.init) { writingNow.rulerColumn = column }
         #endif
         writing = writingNow
-        sun.configure(location: settings?.location(), following: current.scheme == .sun)
+        sun.configure(hours: settings?.sunHours() ?? .default)
     }
 
     func chooseScheme(_ choice: SchemeChoice) { change { try $0.setScheme(choice) } }
@@ -243,12 +243,12 @@ final class AppModel {
         }
     }
 
-    /// Looks a city up and keeps it as the one Follow the sun uses (empty forgets it); says what came of it.
-    func saveCity(_ city: String) async -> SunService.CityResult {
-        guard let settings else { return .failed("Your notes are not open yet.") }
-        let result = await sun.lookup.saveCity(city, settings: settings, now: Date().timeIntervalSince1970 * 1000)
+    /// Keeps the four hours Follow the sun moves at. Returns why they were refused (they must go once round the clock in order), or nil when they were kept.
+    func saveSunHours(_ hours: SunHours) -> String? {
+        guard let settings else { return "Your notes are not open yet." }
+        do { try settings.setSunHours(hours) } catch { return error.localizedDescription }
         loadAppearance()
-        return result
+        return nil
     }
     func chooseEditorFont(_ family: FontFamily) { change { try $0.setEditorFont(family) } }
     func choosePreviewFont(_ family: FontFamily) { change { try $0.setPreviewFont(family) } }

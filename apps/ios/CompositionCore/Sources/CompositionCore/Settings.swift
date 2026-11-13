@@ -21,18 +21,6 @@ public struct Favorite: Equatable, Hashable, Sendable {
     public init(_ kind: FavoriteKind, _ id: Int64) { (self.kind, self.id) = (kind, id) }
 }
 
-/// The city whose sunrise and sunset drive the "Follow the sun" scheme.
-public struct SavedLocation: Equatable, Sendable {
-    public var name: String
-    public var latitude: Double
-    public var longitude: Double
-    public var timezone: String
-
-    public init(name: String, latitude: Double, longitude: Double, timezone: String) {
-        (self.name, self.latitude, self.longitude, self.timezone) = (name, latitude, longitude, timezone)
-    }
-}
-
 extension DataLocation {
     /// The settings a backup carries.
     public var settingsURL: URL { directory.appendingPathComponent(BackupNames.settings) }
@@ -56,7 +44,8 @@ public final class SettingsStore: @unchecked Sendable {
 
     public func theme() -> String { locked { Self.parseTheme($0["theme"]) } }
 
-    public func location() -> SavedLocation? { locked { Self.parseLocation($0["location"]) } }
+    /// The four hours Follow the sun moves at (`parseSunHours`): all four valid and in order round the clock, or the defaults.
+    public func sunHours() -> SunHours { locked { SunHours(settingsValue: $0["sunHours"]) } }
 
     /// The light and dark colours Follow the sun moves between; the classic pair for anything the file does not name.
     public func sunPair() -> SunPairName { locked { SunPairName(settingsValue: $0["sunPair"]) } }
@@ -87,14 +76,10 @@ public final class SettingsStore: @unchecked Sendable {
         try edit { $0["theme"] = name }
     }
 
-    public func setLocation(_ location: SavedLocation?) throws {
-        try edit {
-            if let location {
-                $0["location"] = ["name": location.name, "latitude": location.latitude, "longitude": location.longitude, "timezone": location.timezone] as [String: Any]
-            } else {
-                $0.removeValue(forKey: "location")
-            }
-        }
+    /// Keeps the hours Follow the sun moves at. Hours that do not go round the clock in order are refused (`SunHours.problem`) and nothing is written.
+    public func setSunHours(_ hours: SunHours) throws {
+        if let problem = hours.problem { throw SettingsError.unusableSunHours(problem) }
+        try edit { $0["sunHours"] = hours.settingsObject }
     }
 
     // MARK: The file
@@ -113,13 +98,15 @@ public final class SettingsStore: @unchecked Sendable {
         return body(readObject())
     }
 
-    /// Changes the keys `body` touches and writes the object back, every other key as it was. Written to a temporary name and
+    /// Changes the keys `body` touches and writes the object back, every other key as it was (but for a stale `location`, below). Written to a temporary name and
     /// renamed, so the file is never half written.
     func edit(_ body: (inout [String: Any]) -> Void) throws {
         lock.lock()
         defer { lock.unlock() }
         var object = readObject()
         body(&object)
+        // The city an older version kept for Follow the sun is not read any more, and goes with the next write (the desktop's rewrite of the file drops it too).
+        object.removeValue(forKey: "location")
         let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
@@ -153,30 +140,16 @@ public final class SettingsStore: @unchecked Sendable {
         if let name = value as? String, themeNames.contains(name) { return name }
         return defaultTheme
     }
-
-    /// `parseLocation`: a name and a time zone that are not empty, a latitude within ±90 and a longitude within ±180.
-    static func parseLocation(_ value: Any?) -> SavedLocation? {
-        guard let object = value as? [String: Any], let name = object["name"] as? String, !name.isEmpty,
-            let timezone = object["timezone"] as? String, !timezone.isEmpty,
-            let latitude = number(object["latitude"]), abs(latitude) <= 90,
-            let longitude = number(object["longitude"]), abs(longitude) <= 180
-        else { return nil }
-        return SavedLocation(name: name, latitude: latitude, longitude: longitude, timezone: timezone)
-    }
-
-    /// A JSON number (`typeof value === "number"`): not a boolean, not a string.
-    private static func number(_ value: Any?) -> Double? {
-        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else { return nil }
-        return number.doubleValue
-    }
 }
 
 public enum SettingsError: Error, Equatable, LocalizedError {
     case unknownTheme(String)
+    case unusableSunHours(String)
 
     public var errorDescription: String? {
         switch self {
         case .unknownTheme(let name): "“\(name)” is not one of the colour schemes."
+        case .unusableSunHours(let reason): reason
         }
     }
 }

@@ -79,9 +79,8 @@ export const listAssistantModels: CompositionApi["listAssistantModels"] = () => 
 export const chatGptStatus: CompositionApi["chatGptStatus"] = () => bridge().chatGptStatus();
 export const startChatGptSignIn: CompositionApi["startChatGptSignIn"] = () => bridge().startChatGptSignIn();
 export const signOutChatGpt: CompositionApi["signOutChatGpt"] = () => bridge().signOutChatGpt();
-export const saveLocation: CompositionApi["saveLocation"] = (city) => bridge().saveLocation(city);
-export const loadSunSchedule: CompositionApi["loadSunSchedule"] = () =>
-  bridge().loadSunSchedule();
+export const saveSunHours: CompositionApi["saveSunHours"] = (hours) => bridge().saveSunHours(hours);
+export const loadSunHours: CompositionApi["loadSunHours"] = () => bridge().loadSunHours();
 
 export type {
   AssistantModels,
@@ -93,7 +92,6 @@ export type {
   SaveAssistantSettingsResult,
   SaveImageInput,
   SaveImageResult,
-  SaveLocationResult,
   SaveSettingsInput,
   SaveSettingsResult,
   SearchHit,
@@ -146,7 +144,7 @@ const _implementsApi: CompositionApi = {
   chatGptStatus,
   startChatGptSignIn,
   signOutChatGpt,
-  saveLocation,
-  loadSunSchedule,
+  saveSunHours,
+  loadSunHours,
 };
 void _implementsApi;

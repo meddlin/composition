@@ -1,0 +1,70 @@
+name: Windows core
+
+# Keeps the native Windows app's .NET core (apps/windows/Composition.Core) in step with the desktop's TypeScript data layer
+# (docs/windows-native-app-design.md, "Keeping implementations honest", decision D15). apps/windows/scripts/conformance.sh has
+# the desktop write databases and a real backup, .NET read and restore them and write its own, and the desktop restore those.
+# A change to the TypeScript that the C# does not follow (or the reverse) fails here.
+#
+# The core has no Windows-only API, so it runs on all three systems. The Windows leg matters most: the runner checks out with
+# CRLF line endings, which once put \r into the shared database's schema text (SchemaParityTests guards it).
+# Runs only when something that can break that agreement changes.
+on:
+  pull_request:
+    paths:
+      - "apps/windows/**"
+      - "!apps/windows/spikes/**"
+      # The desktop's data layer the C# is checked against, and the shared corpus later steps replay.
+      - "apps/web/src/lib/composition/**"
+      - "fixtures/conformance/**"
+      - "apps/web/package.json"
+      - "apps/web/pnpm-lock.yaml"
+      - ".github/workflows/windows-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    name: conformance (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          # The SDK decided at Gate A (D7).
+          global-json-file: apps/windows/global.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          # As ios-core.yml: the desktop's data layer and its test runner work on Node 24.
+          node-version: 24
+
+      # apps/web pins its own pnpm (12.x) and the root another (11.x). On Windows, pnpm 11 switching to the web app's version
+      # fails (windows-spike.yml found it), so run apps/web's own pinned pnpm through npx on every system: nothing switches.
+      - name: Install web dependencies
+        run: |
+          pm=$(node -p "require('./apps/web/package.json').packageManager")
+          npx --yes "$pm" --dir apps/web install --frozen-lockfile
+
+      - name: Show the toolchain
+        run: |
+          dotnet --info | head -n 20
+          node --version
+          git ls-files --eol apps/windows/Composition.Core/Schema.cs
+
+      - name: Conformance, desktop to .NET and back
+        run: apps/windows/scripts/conformance.sh "$RUNNER_TEMP/windows-oracle"

@@ -222,7 +222,7 @@ final class AppearanceUITests: XCTestCase {
         scrollSheet(until: sun)
         sun.tap()
         XCTAssertTrue(sun.isSelected, "the choice is marked")
-        // Its own settings appear: the five pairs and the city.
+        // Its own settings appear: the five pairs and the four hours.
         let sky = app.buttons["sun-pair-sky-midnight"]
         scrollSheet(until: sky)
         for pair in ["classic", "cream-amber", "mint-forest", "blush-wine", "sky-midnight"] { XCTAssertTrue(app.buttons["sun-pair-\(pair)"].exists, "the pair \(pair) is listed") }
@@ -230,11 +230,13 @@ final class AppearanceUITests: XCTestCase {
         keepScreenshot("appearance sheet, Follow the sun chosen")
         sky.tap()
         XCTAssertTrue(sky.isSelected)
-        scrollSheet(until: app.textFields["sun-city"])
-        let status = app.staticTexts["sun-city-status"]
-        scrollSheet(until: status)
-        XCTAssertTrue(status.label.hasPrefix("No city saved yet"), "no city is saved, and it says what it uses instead: \(status.label)")
-        keepScreenshot("appearance sheet, the city")
+        // The four hours, each with a picker, and no city.
+        scrollSheet(until: app.buttons["sun-hours-save"])  // the rows above it are on the screen, and so in the tree
+        for hour in ["lightenFrom", "lightFrom", "darkenFrom", "darkFrom"] { XCTAssertTrue(app.datePickers["sun-hour-\(hour)"].exists, "the hour \(hour) has a picker") }
+        XCTAssertFalse(app.textFields["sun-city"].exists, "there is no city field")
+        XCTAssertFalse(app.buttons["sun-hours-save"].isEnabled, "nothing is changed, so there is nothing to save")
+        XCTAssertFalse(app.buttons["sun-hours-default"].isEnabled, "the hours are the defaults already")
+        keepScreenshot("appearance sheet, the hours")
         app.buttons["Done"].tap()
         var screen = try window()
         expect(try pixel(screen, x: screen.width - 300, y: screen.height - 40), "#eef5fb", "sky and midnight, by day: the page")
@@ -248,16 +250,47 @@ final class AppearanceUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter().wait(for: [named], timeout: 10), .completed, "the Appearance button names the scheme: \(app.buttons["sidebar-appearance"].label)")
     }
 
-    /// An empty city is forgotten without asking the network anything, so this needs none.
-    func testSavingAnEmptyCityForgetsIt() throws {
+    /// Sets the hour and minute of a compact time picker the way a person does: open it and turn its wheels.
+    private func set(_ picker: XCUIElement, hour: Int, minute: Int) {
+        picker.tap()
+        let hours = app.pickerWheels.element(boundBy: 0), minutes = app.pickerWheels.element(boundBy: 1)
+        XCTAssertTrue(hours.waitForExistence(timeout: 10), "the wheels opened")
+        hours.adjust(toPickerWheelValue: String(hour))
+        minutes.adjust(toPickerWheelValue: String(format: "%02d", minute))
+        // Tapping the sheet's own title closes the wheels (a tap outside the sheet would close the sheet too).
+        app.navigationBars["Appearance"].staticTexts["Appearance"].tap()
+        XCTAssertTrue(picker.waitForExistence(timeout: 10) && !app.pickerWheels.element(boundBy: 0).exists, "the wheels closed and the sheet is still there")
+    }
+
+    func testTheHoursAreSavedWhenTheyGoRoundTheClockAndRefusedWhenTheyDoNot() throws {
         try launch(["-theme", "auto", "-sunLevel", "1"])
         openAppearance()
-        let save = app.buttons["sun-city-save"]
+        let lighten = app.datePickers["sun-hour-lightenFrom"], light = app.datePickers["sun-hour-lightFrom"]
+        scrollSheet(until: lighten)
+        let save = app.buttons["sun-hours-save"]
+        // "Starts getting lighter" moved after "Fully light from": not a day, so it says so and cannot be saved.
+        set(lighten, hour: 9, minute: 0)
+        let problem = app.staticTexts["sun-hours-problem"]
+        scrollSheet(until: problem)
+        XCTAssertTrue(problem.label.contains("once round the clock"), problem.label)
+        XCTAssertFalse(save.isEnabled)
+        keepScreenshot("appearance sheet, hours out of order")
+        // Both moved, in order: it can be saved.
+        set(light, hour: 10, minute: 0)
         scrollSheet(until: save)
+        XCTAssertTrue(save.isEnabled)
         save.tap()
-        let status = app.staticTexts["sun-city-status"]
+        let status = app.staticTexts["sun-hours-status"]
         XCTAssertTrue(status.waitForExistence(timeout: 10))
-        XCTAssertTrue(status.label.hasPrefix("City forgotten"), status.label)
+        XCTAssertEqual(status.label, "Saved.")
+        XCTAssertTrue(app.buttons["sun-hours-default"].isEnabled, "they are not the defaults now")
+        keepScreenshot("appearance sheet, hours saved")
+        // Kept: a second launch of the same data has them.
+        app.terminate()
+        try launch(["-theme", "auto", "-sunLevel", "1"], importing: false)
+        openAppearance()
+        scrollSheet(until: app.buttons["sun-hours-default"])
+        XCTAssertTrue(app.buttons["sun-hours-default"].isEnabled, "the saved hours are not the defaults")
     }
 
     func testFollowTheSunSettingsFitPortraitToo() throws {
@@ -266,10 +299,10 @@ final class AppearanceUITests: XCTestCase {
         // In portrait the note has the whole screen: bring the lists back, and the way in is where it always is.
         app.buttons["focus-toggle"].tap()
         openAppearance()
-        let city = app.textFields["sun-city"]
-        scrollSheet(until: city)
+        let first = app.datePickers["sun-hour-lightenFrom"]
+        scrollSheet(until: first)
         keepScreenshot("appearance sheet, Follow the sun, portrait")
-        scrollSheet(until: app.buttons["sun-city-save"])
+        scrollSheet(until: app.buttons["sun-hours-save"])
         XCUIDevice.shared.orientation = .landscapeLeft
     }
 

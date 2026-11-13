@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { SunHours } from "../../../web/src/lib/composition/sunHours";
 import { APPEARANCE_CHANNEL } from "../shared/channels";
 import { broadcastAppearance, notifyAppearanceChanges, notifyTranslucencyChange, type AppearanceMessage } from "./appearance";
 
@@ -32,13 +33,13 @@ describe("notifyAppearanceChanges", () => {
     saveTheme: vi.fn(async (_theme: string): Promise<{ error?: string }> => ({})),
     savePreviewFont: vi.fn(async (_font: string): Promise<{ error?: string }> => ({})),
     saveEditorFont: vi.fn(async (_font: string): Promise<{ error?: string }> => ({})),
-    saveLocation: vi.fn(async (_city: string): Promise<{ error?: string }> => ({})),
+    saveSunHours: vi.fn(async (_hours: SunHours): Promise<{ error?: string }> => ({})),
     saveNoteBackground: vi.fn(async (_background: string): Promise<{ error?: string }> => ({})),
     saveSunPair: vi.fn(async (_pair: string): Promise<{ error?: string }> => ({})),
     saveFavorites: vi.fn(async () => {}),
   });
 
-  it.each(["saveTheme", "savePreviewFont", "saveEditorFont", "saveLocation", "saveNoteBackground", "saveSunPair"] as const)(
+  it.each(["saveTheme", "savePreviewFont", "saveEditorFont", "saveNoteBackground", "saveSunPair"] as const)(
     "announces the new appearance once %s has gone through, and returns what it returned",
     async (method) => {
       const inner = api();
@@ -52,6 +53,29 @@ describe("notifyAppearanceChanges", () => {
       expect(announce).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("announces the new appearance once the Follow the sun hours have been saved, and returns what saving them returned", async () => {
+    const inner = api();
+    const announce = vi.fn();
+    const hours = { lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" };
+
+    const result = await notifyAppearanceChanges(inner, announce).saveSunHours(hours);
+
+    expect(result).toEqual({});
+    expect(inner.saveSunHours).toHaveBeenCalledWith(hours);
+    expect(announce).toHaveBeenCalledTimes(1);
+  });
+
+  it("announces nothing when the hours were refused", async () => {
+    const inner = api();
+    inner.saveSunHours.mockResolvedValue({ error: "Not in order" });
+    const announce = vi.fn();
+
+    const result = await notifyAppearanceChanges(inner, announce).saveSunHours({ lightenFrom: "08:00", lightFrom: "07:00", darkenFrom: "18:00", darkFrom: "19:00" });
+
+    expect(result).toEqual({ error: "Not in order" });
+    expect(announce).not.toHaveBeenCalled();
+  });
 
   it("announces nothing when the change was refused", async () => {
     const inner = api();

@@ -25,7 +25,7 @@ desktop) uses today and is meant to use later.
 
 See [feature-matrix.md](feature-matrix.md) for where the CLI, web and desktop apps differ.
 
-See [ui/web-follow-the-sun.md](ui/web-follow-the-sun.md) for the sunrise/sunset color scheme.
+See [ui/web-follow-the-sun.md](ui/web-follow-the-sun.md) for the color scheme that moves with the day at hours you set.
 
 See [feature-matrix.md](feature-matrix.md) for which features the CLI, web and desktop apps each have.
 
@@ -92,7 +92,7 @@ See [manual-tests/stress-databases.md](manual-tests/stress-databases.md) for the
 - [x] Settings page for application configurations:
     - [x] Application data location
     - [x] Color scheme
-        - [x] Web: "Follow the sun" scheme that tracks a saved city's sunrise and sunset
+        - [x] Web: "Follow the sun" scheme that moves between light and dark at four hours you set by hand (it followed a saved city's sunrise and sunset until 2026-11-12)
 
 ### Editing
 

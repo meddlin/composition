@@ -7,7 +7,8 @@ namespace Composition.Core;
 /// The desktop's schema pass, ported from apps/web/src/lib/composition/db.ts (<c>openConnection</c>): the same
 /// statements, in the same order, with the same text, so a database either side has touched is a no-op for the other.
 /// The DDL strings below are copies of db.ts's and are guarded by the oracle comparison in the tests, not by being
-/// shared; when db.ts changes, those tests fail until this file follows.
+/// shared; when db.ts changes, those tests fail until this file follows (apps/windows/scripts/conformance.sh; the
+/// windows-core workflow runs it on every pull request that touches db.ts).
 /// </summary>
 public static class Schema
 {
@@ -74,6 +75,46 @@ public static class Schema
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_attachments_note_id ON attachments (note_id);
+        """;
+
+    /// <summary>db.ts DOCUMENTS_SCHEMA: PDFs a note owns, their marks and bookmarks (docs/pdf-markup-plan.md).</summary>
+    private const string Documents = """
+        CREATE TABLE IF NOT EXISTS documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            note_id INTEGER NOT NULL,
+            file_name TEXT NOT NULL,
+            stored_name TEXT NOT NULL,
+            sha256 TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            page_count INTEGER NOT NULL,
+            view_state TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_note_id ON documents (note_id);
+        CREATE INDEX IF NOT EXISTS idx_documents_sha256 ON documents (sha256);
+        CREATE TABLE IF NOT EXISTS pdf_annotations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page INTEGER NOT NULL,
+            kind TEXT NOT NULL,
+            color TEXT NOT NULL,
+            rects TEXT,
+            quote TEXT NOT NULL DEFAULT '',
+            comment TEXT NOT NULL DEFAULT '',
+            body TEXT,
+            group_uuid TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pdf_annotations_page ON pdf_annotations (document_id, page);
+        CREATE TABLE IF NOT EXISTS pdf_bookmarks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page INTEGER NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page);
         """;
 
     private const string Todos = """
@@ -196,8 +237,12 @@ public static class Schema
         CREATE INDEX IF NOT EXISTS idx_feed_items_feed_published ON feed_items (feed_id, published_at);
         """;
 
-    /// <summary>The six tables that carry a uuid (db.ts UUID_TABLES).</summary>
-    public static readonly string[] UuidTables = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments"];
+    /// <summary>The tables that carry a uuid (db.ts UUID_TABLES), in its order: the order the triggers and indexes are made in.</summary>
+    public static readonly string[] UuidTables =
+    [
+        "notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments",
+        "documents", "pdf_annotations", "pdf_bookmarks",
+    ];
 
     /// <summary>Built-in SQL only: an older build opening this file has no user-defined functions.</summary>
     private const string NewUuid = "lower(hex(randomblob(16)))";
@@ -237,22 +282,23 @@ public static class Schema
         // better-sqlite3 waits up to five seconds for a lock; do the same so two writers (a CLI, this app) queue.
         Exec(db, "PRAGMA busy_timeout = 5000");
         Exec(db, "PRAGMA journal_mode = WAL");
-        Exec(db, Notes);
-        Exec(db, Groups);
-        Exec(db, Notebooks);
-        Exec(db, Trash);
-        Exec(db, Attachments);
-        Exec(db, Todos);
-        Exec(db, ReadingList);
-        Exec(db, Feeds);
-        Exec(db, Contacts);
+        ExecDdl(db, Notes);
+        ExecDdl(db, Groups);
+        ExecDdl(db, Notebooks);
+        ExecDdl(db, Trash);
+        ExecDdl(db, Attachments);
+        ExecDdl(db, Documents);
+        ExecDdl(db, Todos);
+        ExecDdl(db, ReadingList);
+        ExecDdl(db, Feeds);
+        ExecDdl(db, Contacts);
         // A database from before statuses: items already ticked off are "done", the rest keep the default "todo".
         if (!ColumnNames(db, "todos").Contains("status"))
         {
             Exec(db, "ALTER TABLE todos ADD COLUMN status TEXT NOT NULL DEFAULT 'todo'");
             Exec(db, "UPDATE todos SET status = 'done' WHERE done = 1");
         }
-        Exec(db, TodoCycle);
+        ExecDdl(db, TodoCycle);
         foreach (var (column, ddl) in TodoCycleColumns) EnsureColumn(db, "todos", column, ddl);
         EnsureColumn(db, "notes", "tags", "ALTER TABLE notes ADD COLUMN tags TEXT NOT NULL DEFAULT ''");
         EnsureColumn(db, "notes", "description", "ALTER TABLE notes ADD COLUMN description TEXT NOT NULL DEFAULT ''");
@@ -265,6 +311,13 @@ public static class Schema
         EnsureUuids(db);
         AdoptOrphans(db);
     }
+
+    /// <summary>
+    /// Runs one of the DDL constants above with LF line endings whatever the checkout has. A raw string literal takes the source
+    /// file's line endings, and a Windows checkout with core.autocrlf has CRLF: SQLite would store that text in sqlite_master,
+    /// and the schema would stop being byte-identical to the one db.ts writes (found on Windows, 2026-11-12).
+    /// </summary>
+    private static void ExecDdl(SqliteConnection db, string ddl) => Exec(db, ddl.ReplaceLineEndings("\n"));
 
     public static void EnsureColumn(SqliteConnection db, string table, string column, string ddl)
     {

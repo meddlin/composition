@@ -39,7 +39,7 @@ and the desktop app's default. All three open it through the same data layer, `a
 
 Shared: the SQLite file, and the *location* of that file between the desktop and terminal apps
 (see [One data location for desktop and CLI](#one-data-location-for-desktop-and-cli)).
-Not shared, on purpose: each product's settings file (color scheme, city, column sizes and
+Not shared, on purpose: each product's settings file (color scheme, Follow the sun hours, column sizes and
 favorites stay per app) and each product's Meilisearch index.
 The index is derived data that any product rebuilds from SQLite ([search.md](architecture/search.md)).
 
