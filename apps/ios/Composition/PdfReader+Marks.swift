@@ -300,6 +300,7 @@ extension PdfReader {
         guard restored, marksLoaded, let request = app.pdfGoTo, request.documentId == documentId else { return }
         app.clearPdfGoTo(request.sequence)
         show(page: request.page, mark: request.mark)
+        if let words = request.find { find(words, onPage: request.page) }
     }
 
     // MARK: Citing

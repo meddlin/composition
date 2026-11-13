@@ -138,6 +138,8 @@ final class PdfReader {
         wrongPassword = false
         locked = false
         prepare()
+        // Search reads its text now, if it was waiting for the password (which is used for that reading and not kept).
+        app.indexPdfTextAfterUnlock(documentId: documentId, password: password)
     }
 
     /// Once the pages can be read: their count (kept if it was not known), and the contents.
@@ -188,6 +190,10 @@ final class PdfReader {
     func viewChanged() {
         guard restored, let view, let pdf, let current = view.currentPage else { return }
         pageIndex = pdf.index(for: current)
+        if let marked = markedPage, marked != pageIndex {
+            view.highlightedSelections = nil
+            markedPage = nil
+        }
         // A zoom is kept only if the person made one; until then the pages fit the width, whatever the width is.
         let zoom: Double? = view.autoScales ? nil : view.scaleFactor * storedZoomPerScale
         saveTask?.cancel()
@@ -221,6 +227,38 @@ final class PdfReader {
     func go(to entry: Entry) { view?.go(to: entry.destination) }
 
     func find() { view?.findInteraction.presentFindNavigator(showingReplace: false) }
+
+    /// A search result found in the PDF's text was opened at `page`: the places `text` is on that page are marked, the view goes to the first,
+    /// and the find bar is shown with `text` in it, for going on to the next ones (the text is set before the bar is shown, which is what makes the
+    /// bar search for it; set afterwards, it only sits in the field). Only that page's text is looked through here, so a big book does not hold
+    /// the main thread.
+    func find(_ text: String, onPage index: Int?) {
+        guard let view, let pdf, !text.isEmpty else { return }
+        if let index, let page = pdf.page(at: index), let string = page.string {
+            var found: [PDFSelection] = []
+            var range = NSRange(location: 0, length: (string as NSString).length)
+            while found.count < 200 {
+                let match = (string as NSString).range(of: text, options: [.caseInsensitive, .diacriticInsensitive], range: range)
+                guard match.location != NSNotFound, let selection = page.selection(for: match) else { break }
+                selection.color = UIColor.systemYellow.withAlphaComponent(0.6)
+                found.append(selection)
+                range = NSRange(location: match.location + match.length, length: range.length - (match.location + match.length - range.location))
+            }
+            view.highlightedSelections = found.isEmpty ? nil : found
+            markedPage = found.isEmpty ? nil : index
+            if let first = found.first { view.go(to: first) }
+        }
+        view.findInteraction.searchText = text
+        view.findInteraction.presentFindNavigator(showingReplace: false)
+    }
+
+    /// The page whose matches `find(_:onPage:)` marked; the marks go when the reader leaves it.
+    @ObservationIgnored private var markedPage: Int?
+
+    /// Where the PDF's text is in Search: `noText` makes the Contents say that Search cannot find words in it.
+    private(set) var textState: PdfTextState?
+
+    func loadTextState() async { textState = await app.pdfTextState(documentId: documentId) }
 
     // MARK: Bookmarks
 
@@ -566,6 +604,7 @@ struct PdfSidebar: View {
         }
         .background(look.background)
         .foregroundStyle(look.foreground)
+        .task { await reader.loadTextState() }
         .alert("Name the bookmark", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Page \((renaming?.page ?? 0) + 1)", text: $label)
             Button("Cancel", role: .cancel) {}
@@ -574,6 +613,16 @@ struct PdfSidebar: View {
     }
 
     @ViewBuilder private var contents: some View {
+        if reader.textState == .noText {
+            // OCR is not built (docs/pdf-markup-plan.md, P7 and P8): a scan's words are not in Search, its marks and bookmarks are.
+            Label("No searchable text (scanned). Search finds this PDF's highlights, comments, typed notes and bookmarks, not its words.", systemImage: "exclamationmark.magnifyingglass")
+                .font(.footnote)
+                .foregroundStyle(look.mutedText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 6)
+                .accessibilityIdentifier("pdf-no-text")
+        }
         if reader.outline.isEmpty {
             ContentUnavailableView("No contents", systemImage: "list.bullet", description: Text("This PDF has no table of contents. Use the page number to go to a page, or bookmark the pages you come back to."))
         } else {

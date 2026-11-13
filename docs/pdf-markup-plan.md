@@ -38,7 +38,7 @@ All from the owner, 2026-11-07, except where a row says **my pick**.
 | P5 | **Handwriting beside the PDF too:** the note next to the PDF can be handwritten (a canvas in the pane under a typed strip of citations; see [Handwritten notes](#handwritten-notes-beside-the-pdf)). |
 | P6 | **Markup stays inside the page** as printed. No added margin. Coordinates are stored so that a gutter can be added later without a migration. |
 | P7 | **The PDFs are text-based**, 20 to 600 pages and 5 to 300 MB, with an outline. Scans and OCR wait. |
-| P8 | **Search finds** highlighted text, comments and your notes now. The full text of every PDF waits. |
+| P8 | **Search finds** highlighted text, comments and your notes now. The full text of every PDF waits. **Revisited 2026-11-12, after the owner's iPad reader pass ("Search finds words in my notes, but not in the PDF"):** the full text is searched **on the iPad now, the desktop next**, against one oracle; kept in the iPad's own index file, read in the background (at import, at launch for PDFs already here, after an unlock), a result shows the page and opens there with the words found; a scan says it has no searchable text (OCR still waits); a protected PDF is read once unlocked, its password never kept ([search.md](architecture/search.md#the-text-of-a-pdf)). |
 | P9 | **Import copies the file in.** Same 1 GB limit per file as attachments. |
 | P10 | **PDFs sit in the notebook and group tree, next to notes**, as a note that owns a PDF. A PDF is therefore core, not a plugin. |
 | P11 | **Quote to note** inserts `> quote` and a linked citation at the caret, with the printed page label when the PDF has one ([Citations](#notes-and-citations)). |
@@ -292,9 +292,19 @@ comments (so searching "B-tree" returns the textbook's row, and the Highlights t
 indexed as always. **Inference:** the hook is wherever the owner note is indexed today, re-indexed when its marks change; the
 indexing code was not read for this plan, so the exact place is a build-time check. The iPad does the same in its FTS5 index.
 
-Not now: the text of every PDF, which needs a text extractor per device (pdf.js and PDFKit read text differently, so it is
-never synced) and sits in [product-positioning.md](product-positioning.md) as a potential feature; and OCR for scans (Vision on
+Not then: the text of every PDF, which needs a text extractor per device (pdf.js and PDFKit read text differently, so it is
+never synced) and sat in [product-positioning.md](product-positioning.md) as a potential feature; and OCR for scans (Vision on
 the iPad; on the desktop, as far as I know, nothing is built in, so a bundled engine such as Tesseract would be needed).
+
+**The text of every PDF, 2026-11-12 (P8 revisited).** Built on the iPad: PDFKit reads every page in the background, a shared rule
+(`pdfText.ts`'s `pageSearchText`, ported) makes it the text to index, and the iPad keeps it a page a row in its own `search.db`, never in
+the database or a backup. The desktop's pdf.js reading of `fixtures/conformance/pdf-text.pdf` is the oracle: PDFKit must find the same words
+on every page. A result found only in a PDF's text comes after the notes found in their own text, says *In the PDF, p. 212*, and opens the PDF
+at that page with the words marked and the find bar showing them. Every word of the query must be on one page; there is no typo tolerance in
+a PDF's text. **Decided by the owner, 2026-11-12:** the iPad now and the desktop next (a separate step: pdf.js in a utility process, one
+Meilisearch document per page, since Meilisearch ignores words past position 65,535 of a field); the text in the index file only; the page
+shown and opened; a protected PDF read after it is unlocked (password never kept); a scan says *No searchable text (scanned)* in the
+reader's Contents, and OCR still waits. Details and measurements: [search.md](architecture/search.md#the-text-of-a-pdf).
 
 ## Backup, restore and sync
 
@@ -739,7 +749,7 @@ with `-pdfInkLabSpeed`, `-pdfInkLabFinger 0`, `-pdfInkLabKeep 1`, `-pdfInkLabHol
 ## Not in scope
 
 Shapes, stamps, signatures and form filling; inserted pages and a margin gutter; scanned PDFs and OCR; searching the full text
-of every PDF; PDF sync before general sync ships; a reader in the web app or the CLI; the AI helper reading a PDF; iPhone.
+of every PDF on the desktop (built on the iPad 2026-11-12, P8); PDF sync before general sync ships; a reader in the web app or the CLI; the AI helper reading a PDF; iPhone.
 The full-text and OCR rows are *later*, not *never*; the others are decisions to revisit only if you ask.
 
 ## Docs to change when it ships
@@ -841,3 +851,4 @@ All done with Step 6 (2026-11-07), except where a line says what is left.
   PDF, the Pencil's highlighter snapping to lines, handwritten notes beside the PDF, `<Ink>` pages, dark pages, moving a typed note. The checklist is items 180 to 214 of [manual-tests/ipad.md](manual-tests/ipad.md).
 - 2026-11-10: **Pencil ink on a PDF** ([details](#ink-on-the-pages-2026-11-10)). `main` merged into the Gate P2 branch (spike B's lab, PR #290, replaces this branch's copy; manual-test items renumbered, Gate P2 was then 220 to 262, and is now 268 to 310). One ink row per page (D9 strokes, canvas coordinates), `PdfInkLayer` over PDFKit's overlays, the pencil button, *Finger draws*, the Highlights tab's *Ink* section, export as native `Ink` annotations (textured strokes simplified), checked on the nine geometries. Simulator with a finger and `swift test` only; no Pencil. Left: handwritten notes beside the PDF, `<Ink>` pages, the desktop drawing the ink.
 - 2026-11-09: **spike B's lab is built and exercised in the Simulator; the iPad's answers are open** ([status](#spike-b-status-2026-11-09)). A PDF ink lab in the iPad app (`PdfInkLab*.swift`): a `PDFView` with a PencilKit canvas on each page near the screen, a book written on the device (or one of yours from Files), runs that scroll and draw by themselves and measure, a recording for what is done by hand, a list of cases and a report. Found in the Simulator: PDFKit's page view takes no touches, so a canvas in an overlay is never reached unless the page view is told to; the canvas is the page's unturned crop box in points with a plain flip to raw user space; overlays are cheap to make and drop; ink restores quickly; and ink's memory is mostly what a canvas keeps after it has drawn, so a canvas is best emptied as its page leaves. Manual-test items 200 to 215.
+- 2026-11-12: **P8 revisited: the iPad's Search finds words in a PDF's own text** ([Search](#search), [search.md](architecture/search.md#the-text-of-a-pdf)). The owner's reader pass on the iPad found that Search found notes but not words in a PDF; the reader's own find bar did find them (checked again in the Simulator). The owner chose the iPad now and the desktop next, the text in the index file only, the page shown and opened, a protected PDF read once unlocked, and a line for scans. Built test-first: the desktop's rule for a page's text (`pdfText.ts`, with its tests) and an oracle (`pdf-text-oracle.mjs` runs the desktop's pdf.js over `fixtures/conformance/pdf-text.pdf` and writes `pdf-text.json`); the Swift port, the index's three tables and the search tier (`PdfTextConformanceTests`, `PdfTextIndexTests`); PDFKit's reading (`PdfTextExtractionTests`); the app's background reading, the result line, opening at the page with the words marked, and the scan line, tried in the Simulator. Not tried on an iPad; manual-test items 311 to 322 are the owner's.

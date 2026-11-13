@@ -209,6 +209,8 @@ struct NoteRow: View {
     var favorite = false
     /// The note owns a PDF.
     var isPdf = false
+    /// A search found the note only in its PDF's text: where ("In the PDF, p. 212").
+    var pdfHit: String?
     @Environment(\.look) private var look
     @Environment(\.dynamicTypeSize) private var textSize
 
@@ -219,6 +221,12 @@ struct NoteRow: View {
                 // At the accessibility sizes a title is given as many lines as it needs, not cut at two.
                 Text(note.title.isEmpty ? "Untitled" : note.title).font(.headline).lineLimit(textSize.isAccessibilitySize ? nil : 2)
                 if favorite { Image(systemName: "star.fill").font(.caption2).foregroundStyle(.yellow) }
+            }
+            if let pdfHit {
+                Label(pdfHit, systemImage: "text.magnifyingglass")
+                    .font(.caption)
+                    .foregroundStyle(look.mutedText)
+                    .accessibilityIdentifier("pdf-hit-line")
             }
             // The date and the tags side by side when they fit, one under the other when they do not.
             ViewThatFits(in: .horizontal) {
