@@ -369,8 +369,8 @@ finds them. Until slice 3, unsure and held lines are kept and not searched.
 
 After M3, on the iPad first, since the reader, the Pencil, Vision and the guard are all there. **Next to the native-per-platform plans:**
 a native Mac app in Swift, when it comes, would inherit the iPad's OCR through `CompositionCore` (**Inference**); the Windows and Linux designs need
-nothing for it until D4, because the text arrives as rows that name their engine. It is the PDF plan's "scanned PDFs and OCR … later,
-not never" ([pdf-markup-plan.md](pdf-markup-plan.md#not-in-scope)).
+nothing for it until D4, because the text arrives as rows that name their engine. The PDF plan lists scanned PDFs and OCR as not
+in scope, and "OCR is *later*, not *never*" ([pdf-markup-plan.md](pdf-markup-plan.md#not-in-scope)).
 
 ## Recommendation
 
