@@ -52,10 +52,11 @@ echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays t
 # PencilKit's own code traps ("CFEqual() called with NULL first argument", in PKReplicaManager) the first time a PKDrawing is built in a
 # process with no bundle identifier, and `swift test` runs every test in swiftpm-testing-helper, which has none (seen on macOS 27, locally
 # and on the xcode-27 runner). So the PencilKit bridge's tests (InkPencilKitTests, the only ones that build a PKDrawing) are skipped there and
-# run in xcodebuild's test host, which has an identifier. The rest of the core stays on `swift test`.
-(cd "$root/apps/ios/CompositionCore" && swift test --skip InkPencilKitTests)
+# run in xcodebuild's test host, which has an identifier. The rest of the core stays on `swift test`. InkPencilKitRecognizerTests (PencilKit's handwriting reader)
+# builds one too; its reading is checked by spikes/ink-readers, since handwritingd will not read for a test host.
+(cd "$root/apps/ios/CompositionCore" && swift test --skip InkPencilKit)
 echo "== 2/3 the PencilKit bridge, in xcodebuild's test host"
-(cd "$root/apps/ios/CompositionCore" && xcodebuild test -scheme CompositionCore-Package -destination 'platform=macOS' -only-testing:CompositionInkTests/InkPencilKitTests)
+(cd "$root/apps/ios/CompositionCore" && xcodebuild test -scheme CompositionCore-Package -destination 'platform=macOS' -only-testing:CompositionInkTests/InkPencilKitTests -only-testing:CompositionInkTests/InkPencilKitRecognizerTests)
 echo "== 3/3 desktop restores what Swift wrote"
 vitest -t "reads what the Swift core wrote"
 echo "== conformance passed"

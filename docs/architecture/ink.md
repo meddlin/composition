@@ -183,6 +183,82 @@ the words also go into the drawing's `transcript` so that an edit knows whether 
 words (the test draws "Meeting notes" with Core Text; the first Vision run on a Mac takes about 30 seconds, the rest well under a second). **Not known: how well Vision reads real
 handwriting.** That is manual item 263, and it is the only answer that matters for C11.
 
+### PencilKit's reader beside Vision (spike, 2026-11-12)
+
+**Status: a spike on branch `claude/pkstroke-recognizer-spike` (built on PR #301's guard), not wired into the app; the canvas still uses Vision.** iPadOS 27 gave
+PencilKit a handwriting reader of its own, `PKStrokeRecognizer`, which reads the **strokes**, not a picture of them. The seam now hands a reader the writing (the
+drawing with the marker and the watercolour left out and every stroke in ink, `InkTranscript.writing(of:)`); a picture reader (`InkPictureRecognizing`: Vision, and the
+tests' fake) draws it black on white as before, and [`PencilKitTextRecognizer`](../../apps/ios/CompositionCore/Sources/CompositionInk/InkStrokeRecognizer.swift)
+rebuilds it as a `PKDrawing` (`pkDrawing(palette:)`) and reads that.
+
+**What it gives** (Apple's reference and session 203, read 2026-11-12): an actor, every call async, on the device (the model ships with the system, and the work is done
+by a system daemon, `/usr/libexec/handwritingd` on the Mac, so the app's no-network rule holds).
+
+| Call | Returns | Notes |
+|---|---|---|
+| `recognizedText(strokeIDs: Set<UUID>? = nil)` | `String?` | The single most likely reading, of the whole drawing or of the strokes named. **No confidence, here or anywhere in the API.** |
+| `indexableContent` | `String?` | For an index such as Spotlight: it "may contain multiple concatenated candidate matches". Runs at low priority, and returns nil when an interactive call cancels it. |
+| `search(_:fullWordsOnly:caseMatchingOnly:)` | `[SearchResult]` (stroke ids, bounds) | Over every candidate. `SearchResult` is not `Sendable`, so in Swift 6 it is used inside the actor. |
+| `recognitionVersion` | `Int` (9 on macOS 27.0.1) | Store it with any result kept, and read again when it goes up. |
+| `supportedLanguages` | 33 on macOS 27.0.1 | The session says 29. The Simulator reads Latin scripts only. |
+
+Apple asks for writing at the scale of a Letter or A4 page in points; a drawing is in points of the iPad's page, and is not scaled (synthetic print read the same from 6 to 64 points high).
+
+**Compared** with [`spikes/ink-readers`](../../spikes/ink-readers/README.md) on the Mac (full table: [RESULT.md](../../spikes/ink-readers/RESULT.md)), on **your drawings**
+from the iPad backup of 2026-11-12 (six saved versions of one sketched page: boxes, arrows, waves, a marker scribble and your signature, one version also with "How does this
+work?"; and one page with no writing) and on synthetic ones (print letters made of pen strokes, loops, a wave, arcs). The Mac is not the iPad: the Mac's Vision read one of your
+pages differently from the iPad's.
+
+- **Your signature:** PencilKit read it as **"Damien Rushing"** in all six versions and never made a swear word of it, not even among its candidates. Vision read it as
+  "Drien fucking" at **1.00** in two, "Sugarfrom" and "Dmiem Pwsting" at 0.30, and "Dain sking" at 0.30; with PR #301's guard its `alt` is empty for four of the six.
+- **Your question:** PencilKit read "How does this work?" exactly; Vision read "How doek this wok ốè" at **1.00**, which would be the `alt`.
+- **The cost: PencilKit reads the drawn marks too,** as symbols and stray letters on lines of their own: "%", "My a", "←←←" (probably the arrows), "⑤" after the
+  question, "X" (the crosses), "mn", "Ind", "IX". So its `alt` for that page is "←←← How does this work? ⑤ mn on Damien Rushing Ind IX", and for the others
+  "% My a Damien Rushing": right words, with noise round them. (You decided on 2026-11-12 not to filter short or letterless lines out of Vision's `alt`; a symbol-only line
+  filter would remove "%", "←←←" and "⑤" here, and is your call.)
+- **Synthetic print:** both read every sentence; PencilKit read one "a" as "o" ("call som"). On marks that are not writing PencilKit gave nil every time; with a wave beside
+  "call sam", **Vision read the line as "mi Was 1100" at 1.00** and PencilKit "call Sam".
+- **Speed:** once loaded, a drawing took Vision 20 to 290 ms and PencilKit 5 to 800 ms (your pages: 50 to 290 and 5 to 340 ms). The first call in a process, which loads the model, took PencilKit 0.5 to 0.8 s and
+  Vision 0.1 s to 80 s.
+
+**It reads only for the app in front.** The work is done by `handwritingd`, which refuses a process that is not the active app (com.apple.corehandwriting -1003, "does not have
+permission to run remote recognition"; *remote* means the daemon, not the network): xcodebuild's test host always, and the harness whenever another window took the front, after
+which every reading was nil with no error to the caller. On the iPad the canvas reads at Done, in front; **if the person leaves the app during the read, the transcript will
+be empty and `alt` stays "Drawing"** (to check on the iPad). Vision has no such rule.
+
+**PR #301's guard without a confidence.** The floor has nothing to compare, so `trusted` keeps a line with no confidence; the never-guessed words still drop the line they are
+on. PencilKit's whole-drawing reading **broke your pages into lines but joined the synthetic two-line ones with a space** ("meeting notes call som"), and then one such word
+would cost the whole transcript. So the reader reads the whole drawing (nil: nothing to write), splits it at its own line breaks, and only when it is one line while the strokes
+make several (`InkTranscript.lineGroups`) reads each line's strokes (`recognizedText(strokeIDs:)`), keeping those lines only if their words are exactly the whole reading's.
+**That check matters:** read on its own, the wave's line came back as "mmm", which the whole-drawing call had rejected. On the item-263 words both readers drop "drien fucking"
+and keep the next line. The lost floor costs little: Vision gave 1.00 to "Drien fucking", "How doek this wok ốè" and "mi Was 1100", and the floor only caught its 0.30 guesses.
+
+**`indexableContent` is for search only, and not now.** Measured, it is the candidate lines, best first, one per line ("meeting notes / meetingnotes / call som / call Sam /
+call sam"; for your question nine variants such as "How does tis work? ④"), with wrong readings in it on purpose ("Y house", "My a Damien Rishing"). It must never be `alt`,
+the `transcript` or what VoiceOver says. It could help search (the best reading says "call som", a candidate "call sam"), but only in a table of its own (not note text, so
+the desktop would not search it unless it synced), with the never-guessed words dropped per candidate line, never shown as a snippet, read while the person is not drawing (it
+can come back nil), and read again when `recognitionVersion` goes up. Not worth building before the transcript is proven.
+
+**Testing.** PencilKit traps under `swift test`, and `handwritingd` will not read for xcodebuild's test host, so CI checks the seam, the guard without a confidence and the line
+groups (`InkStrokeReaderSeamTests`, `swift test`) and the drawing PencilKit is given (`InkPencilKitRecognizerTests`, xcodebuild); **the reading is checked only by the
+harness**, by hand. The Simulator here has only an iOS 26.4 runtime, which has no `PKStrokeRecognizer`; trying it there needs an iOS 27 runtime (Latin scripts only).
+
+**Minimum iPadOS ([C15](../ipad-app-design.md#compromise-register)).** The reader is iPadOS 27 only, and the floor need not move for it: behind `if #available(iOS 27, *)`
+the canvas would use PencilKit's reader, and Vision on 17 to 26, both behind the seam with the same guard. A floor of 27 would leave out every iPad older than the
+[24 models iPadOS 27 runs on](https://support.apple.com/guide/ipad/ipad-models-compatible-with-ipados-27-ipad213a25b2/ipados) (iPad 9th generation, mini 6th, Air 4th,
+Pro 11-inch 2nd and 12.9-inch 4th generation and later) for one feature, and Vision stays in the app either way (the OCR research proposes it for scanned pages). Your
+iPad is on 27.0.1.
+
+**Recommendation: PencilKit's reader on iPadOS 27, Vision below it; not a replacement.** On your own pages it got the words right where Vision invented words with full
+confidence, and it never produced item 263's word; what it adds is noise from drawn marks, not wrong words. Before wiring it into the canvas: (1) **on the iPad**, that it
+reads at Done, how long the first Done takes, and what `alt` is when you leave the app mid-read; (2) decide whether symbol-only lines go (your call, above); (3) store the
+engine and its version beside `transcript` in the drawing (a member every reader keeps), so a newer engine can refresh an `alt` that is still machine words. Leave
+`indexableContent` out.
+
+Sources: [`PKStrokeRecognizer`](https://developer.apple.com/documentation/pencilkit/pkstrokerecognizer) and its members (Apple, read 2026-11-12); WWDC26 session 203,
+[Read between the strokes with PencilKit](https://developer.apple.com/videos/play/wwdc2026/203/) (transcript and code); the iOS 27.2 SDK's PencilKit interface; Apple's
+[iPadOS 27 model list](https://support.apple.com/guide/ipad/ipad-models-compatible-with-ipados-27-ipad213a25b2/ipados); runs on macOS 27.0.1 with Xcode 27.2.
+
 ## Desktop and CLI
 
 **Status (2026-11-09): built, view only; checked in the browser pane on the web build in every colour scheme, and in the CLI's own preview. The desktop runs the same renderer code as the
