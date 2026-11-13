@@ -77,6 +77,12 @@ export const moveTodo: TodosApi["moveTodo"] = async (id, beforeId) => {
   if (!todosRepo.placeTodo(id, beforeId)) throw new Error("That to-do no longer exists.");
 };
 
+export const nestTodo: TodosApi["nestTodo"] = async (id, parentId, beforeId) => {
+  const result = todosRepo.nestTodo(id, parentId, beforeId);
+  if (result === "missing") throw new Error("That to-do no longer exists.");
+  if (result === "inside") throw new Error("A to-do can't go under itself or one of its own sub-items.");
+};
+
 export const sortDoneTodosLast: TodosApi["sortDoneTodosLast"] = async () => {
   todosRepo.sortDoneLast();
 };

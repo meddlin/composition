@@ -502,6 +502,30 @@ describe("arranging the to-do service's items", () => {
     await expect(moveTodo(999, null)).rejects.toThrow(/no longer exists/);
   });
 
+  it("puts an item, with what is under it, under another and back, and refuses a loop or an item that is gone", async () => {
+    const { createTodo, nestTodo, listTodos } = await import("./todosService");
+    const a = await createTodo("a", null);
+    const b = await createTodo("b", null);
+    const c = await createTodo("c", null);
+    const c1 = await createTodo("c1", c.id);
+    const a1 = await createTodo("a1", a.id);
+
+    await nestTodo(c.id, a.id, a1.id);
+
+    const listed = await listTodos();
+    expect(listed.filter((t) => t.parentId === a.id).map((t) => t.title)).toEqual(["c", "a1"]);
+    expect(listed.find((t) => t.id === c1.id)).toMatchObject({ parentId: c.id });
+    expect(listed.filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["a", "b"]);
+
+    await nestTodo(c.id, null, b.id);
+    expect((await listTodos()).filter((t) => t.parentId === null).map((t) => t.title)).toEqual(["a", "c", "b"]);
+
+    await expect(nestTodo(a.id, a.id, null)).rejects.toThrow(/under itself/);
+    await expect(nestTodo(c.id, c1.id, null)).rejects.toThrow(/under itself/);
+    await expect(nestTodo(999, a.id, null)).rejects.toThrow(/no longer exists/);
+    await expect(nestTodo(a.id, 999, null)).rejects.toThrow(/no longer exists/);
+  });
+
   it("moves the done items to the bottom", async () => {
     const { createTodo, setTodoDone, sortDoneTodosLast, listTodos } = await import("./todosService");
     const a = await createTodo("a", null);

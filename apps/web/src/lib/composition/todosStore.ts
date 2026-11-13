@@ -1,4 +1,4 @@
-import { cleanTodoTitle, placeTodo, sortByPriority, sortDoneLast, subtreeIds, withDone, withPriority, withStatus } from "./todos";
+import { cleanTodoTitle, nestTodo, placeTodo, sortByPriority, sortDoneLast, subtreeIds, withDone, withPriority, withStatus } from "./todos";
 import { DEFAULT_TODO_LOOK, type TodoLook } from "./todoLook";
 import type { ReportKind } from "./todoReports";
 import type { ArchivedTodo, Todo, TodoDeletePreview, TodoReportEntry, TodoReports, TodoPriority, TodosApi, TodoSetup, TodoStatus } from "./todosApi";
@@ -42,6 +42,8 @@ export type TodosStore = {
   setPriority(id: number, priority: TodoPriority | null): Promise<TodoResult>;
   /** Shows the move at once: the item goes immediately before `beforeId` among its siblings, or last when that is null. */
   move(id: number, beforeId: number | null): Promise<TodoResult>;
+  /** Shows the move at once: the item, with everything under it, goes under `parentId` (the top level when null), before `beforeId` among its new siblings or last. */
+  nest(id: number, parentId: number | null, beforeId: number | null): Promise<TodoResult>;
   /** Shows at once the done items moved below the open ones among their siblings, at every level. */
   sortDoneLast(): Promise<TodoResult>;
   /** Shows at once the items sorted by priority among their siblings, at every level: P1 first, items with none last. */
@@ -249,6 +251,16 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
     }
   }
 
+  async function nest(id: number, parentId: number | null, beforeId: number | null): Promise<TodoResult> {
+    set({ todos: nestTodo(state.todos, id, parentId, beforeId), error: null });
+    try {
+      await deps.nestTodo(id, parentId, beforeId);
+      return {};
+    } catch (error) {
+      return undo(error);
+    }
+  }
+
   async function sortDoneToBottom(): Promise<TodoResult> {
     set({ todos: sortDoneLast(state.todos), error: null });
     try {
@@ -386,6 +398,7 @@ export function createTodosStore(deps: TodosDeps): TodosStore {
     setStatus,
     setPriority,
     move,
+    nest,
     sortDoneLast: sortDoneToBottom,
     sortByPriority: sortByPriorityOrder,
     reload,
@@ -419,6 +432,7 @@ export const unavailableTodos: TodosDeps = {
   setTodoPriority: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   sortTodosByPriority: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   moveTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
+  nestTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   sortDoneTodosLast: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   deleteTodo: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),
   previewTodoDelete: () => Promise.reject(new Error("The to-do list is only available in the desktop app.")),

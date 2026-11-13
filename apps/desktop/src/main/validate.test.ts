@@ -607,6 +607,14 @@ describe("TODO_VALIDATORS", () => {
     }
   });
 
+  it("passes on an id, a parent (or null) and what to go before (or null) for nestTodo, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.nestTodo([4, 2, null, "extra"])).toEqual([4, 2, null]);
+    expect(TODO_VALIDATORS.nestTodo([4, null, 3])).toEqual([4, null, 3]);
+    for (const args of [[], [null, 2, null], ["4", 2, null], [4], [4, 2], [4, "2", null], [4, 2, 1.5], [4, {}, null]]) {
+      expect(() => TODO_VALIDATORS.nestTodo(args)).toThrow(InvalidArgumentsError);
+    }
+  });
+
   it("passes on an id and a priority (or null) for setTodoPriority, and refuses anything else", () => {
     expect(TODO_VALIDATORS.setTodoPriority([4, 1, "extra"])).toEqual([4, 1]);
     expect(TODO_VALIDATORS.setTodoPriority([4, null])).toEqual([4, null]);
