@@ -66,3 +66,36 @@ describe("SearchBar results", () => {
     expect(screen.getAllByRole("option")).toHaveLength(3);
   });
 });
+
+describe("SearchBar results found in a PDF's own text", () => {
+  it("says on which page, and opens there with the query's words to find", async () => {
+    vi.mocked(searchNotes).mockResolvedValueOnce({
+      hits: [
+        { id: 1, title: "Coastal birds", description: "", groupPath: [] },
+        { id: 2, title: "Field guide", description: "", groupPath: [], pdf: { page: 3, label: "1" } },
+        { id: 3, title: "Search fixture", description: "", groupPath: [], pdf: { page: 6, label: null } },
+      ],
+    });
+    const onSelect = vi.fn();
+    render(<SearchBar onSelect={onSelect} />);
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Search notes" }), { target: { value: "the estuary tag: birds" } });
+
+    await waitFor(() => expect(screen.getByText("In the PDF, p. 1")).toBeTruthy(), { timeout: SEARCH_DEBOUNCE_MS * 4 });
+    expect(screen.getByText("In the PDF, p. 6")).toBeTruthy();
+    expect(screen.getAllByText(/In the PDF/)).toHaveLength(2);
+
+    fireEvent.click(screen.getByText("Field guide"));
+    expect(onSelect).toHaveBeenCalledWith(2, { page: 3, find: "estuary" });
+  });
+
+  it("opens a note found by its own text as before", async () => {
+    vi.mocked(searchNotes).mockResolvedValueOnce({ hits: [{ id: 1, title: "Coastal birds", description: "", groupPath: [] }] });
+    const onSelect = vi.fn();
+    render(<SearchBar onSelect={onSelect} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Search notes" }), { target: { value: "quetzals" } });
+    await waitFor(() => expect(screen.getByText("Coastal birds")).toBeTruthy(), { timeout: SEARCH_DEBOUNCE_MS * 4 });
+    fireEvent.click(screen.getByText("Coastal birds"));
+    expect(onSelect).toHaveBeenCalledWith(1, undefined);
+  });
+});

@@ -23,6 +23,7 @@ import { isTrustedUrl, registerIpc } from "./ipc";
 import { originOf } from "./origin";
 import { READING_LIST_PARTITION } from "../../../web/src/lib/composition/readingListApi";
 import { APP_ORIGIN, registerAppProtocol, registerSchemePrivileges } from "./protocol";
+import { pdfjsAssets, PdfTextIndexer, pdfTextWorkerPath, readInChild } from "./pdfText";
 import { isExecutableFile, resolveMeiliBinary, SearchSidecar } from "./search";
 import { createElectronUpdates } from "./updater";
 import { clearReadingData, installReadingListGuard } from "./readingListGuard";
@@ -59,6 +60,18 @@ const devUrl = app.isPackaged ? undefined : process.env.COMPOSITION_DEV_URL;
 const devOrigin = devUrl ? originOf(devUrl) : null;
 const allowedOrigins = [APP_ORIGIN, ...(devOrigin ? [devOrigin] : [])];
 
+// The text of every PDF goes into search, read in a utility process one PDF at a time (pdfText.ts).
+const pdfText = new PdfTextIndexer({
+  sources: () => service.pdfTextSources(),
+  search: searchIndex,
+  read: (file) =>
+    readInChild(() => utilityProcess.fork(pdfTextWorkerPath(__dirname), [], { serviceName: "Composition PDF text", stdio: "ignore" }), {
+      ...file,
+      ...pdfjsAssets(__dirname),
+    }),
+  log: (message, detail) => console.log(message, detail ?? ""),
+});
+
 const sidecar = new SearchSidecar({
   binary: resolveMeiliBinary({
     env: process.env,
@@ -71,6 +84,7 @@ const sidecar = new SearchSidecar({
   searchIndex,
   listNotes,
   log: (message, detail) => console.log(message, detail ?? ""),
+  afterReindex: () => void pdfText.run(),
 });
 
 /** How the app looks now: what a window's first paint is given, and what the others are told when Settings changes it. */
@@ -93,6 +107,15 @@ const api: CompositionApi = notifyAppearanceChanges(
       const result = await service.saveSettings(input);
       if (result.success) void sidecar.reindex();
       return result;
+    },
+    // A PDF deleted for good takes its text out of search now (only what is gone is forgotten; nothing is read again).
+    async permanentlyDeleteNote(id) {
+      await service.permanentlyDeleteNote(id);
+      void pdfText.run();
+    },
+    async permanentlyDeleteGroup(id) {
+      await service.permanentlyDeleteGroup(id);
+      void pdfText.run();
     },
   },
   announceAppearance,
@@ -133,6 +156,11 @@ const documents = createDocumentsApi(service, {
   exportPdf: (job) =>
     runExport(() => utilityProcess.fork(workerPath(__dirname), [], { serviceName: "Composition PDF export", stdio: "ignore" }), job),
   dataFolder: () => loadWebSettings().appDataDir,
+  pdfText: {
+    imported: () => void pdfText.run(),
+    state: (documentId) => pdfText.state(documentId),
+    readUnlocked: (documentId, password) => void pdfText.readUnlocked(documentId, password),
+  },
   async pickPdf() {
     const options = {
       properties: ["openFile"] as "openFile"[],

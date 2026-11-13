@@ -24,6 +24,8 @@ export function fakeDocumentsApi(over: Partial<DocumentsApi> = {}): DocumentsApi
     updateAnnotation: vi.fn(async () => null),
     deleteAnnotation: vi.fn(async () => []),
     restoreAnnotations: vi.fn(async () => []),
+    pdfTextState: vi.fn(async () => null),
+    readUnlockedPdfText: vi.fn(async () => {}),
     ...over,
   };
 }

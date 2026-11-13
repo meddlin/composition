@@ -195,19 +195,23 @@ export function openNote(panels: PanelsState, windowId: WindowId, noteId: number
 
 /**
  * Opens a note that owns a PDF the way picking its row in the sidebar does: the note as `openNote` would show it, and the
- * PDF to the left of it, which is focused (reading comes first). A PDF the window already shows is only focused.
+ * PDF to the left of it, which is focused (reading comes first). A PDF the window already shows is only focused. With `goTo`
+ * (a search result found in the PDF's text), the PDF panel is also asked to show that page.
  */
-export function openPdfPair(panels: PanelsState, windowId: WindowId, noteId: number, documentId: number, newId: () => PanelId): PanelsState {
+export function openPdfPair(panels: PanelsState, windowId: WindowId, noteId: number, documentId: number, newId: () => PanelId, goTo?: PdfGoTo): PanelsState {
   const withNote = openNote(panels, windowId, noteId, newId);
   const window = withNote.windows[windowId];
   if (!window) return panels;
 
   const showing = window.focusOrder.find((id) => pdfDocumentIdOf(withNote.byId[id]) === documentId);
-  if (showing !== undefined) return focusPanel(withNote, showing);
+  if (showing !== undefined) {
+    const focused = focusPanel(withNote, showing);
+    return goTo ? setPanelState(focused, showing, { ...(withNote.byId[showing].state as PdfPanelState), goTo } satisfies PdfPanelState) : focused;
+  }
 
   const notePanel = window.focusOrder.find((id) => noteIdOf(withNote.byId[id]) === noteId);
   if (notePanel === undefined) return withNote;
-  const state: PdfPanelState = { documentId, noteId, follow: false };
+  const state: PdfPanelState = { documentId, noteId, follow: false, ...(goTo ? { goTo } : {}) };
   return splitPanel(withNote, notePanel, "left", { id: newId(), kind: "pdf", state });
 }
 

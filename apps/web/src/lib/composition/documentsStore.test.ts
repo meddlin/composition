@@ -140,7 +140,7 @@ describe("the documents store", () => {
       expect(store.passwordFor(2)).toBeUndefined();
     });
 
-    it("is kept out of the snapshot, which every panel reads and anything may inspect, and out of what the backend is sent", async () => {
+    it("is kept out of the snapshot, which every panel reads and anything may inspect, and out of what the backend is sent, but for one reading of the PDF's text for search", async () => {
       const { store, deps } = setup([doc(1)]);
       await store.load();
       store.rememberPassword(1, "s3cret");
@@ -148,7 +148,9 @@ describe("the documents store", () => {
       store.saveViewState(1, { page: 2 });
 
       expect(JSON.stringify(store.getSnapshot())).not.toContain("s3cret");
-      expect(JSON.stringify(Object.values(deps).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock?.calls ?? []))).not.toContain("s3cret");
+      const { readUnlockedPdfText, ...rest } = deps;
+      expect(JSON.stringify(Object.values(rest).flatMap((fn) => (fn as ReturnType<typeof vi.fn>).mock?.calls ?? []))).not.toContain("s3cret");
+      expect(vi.mocked(readUnlockedPdfText).mock.calls).toEqual([[1, "s3cret"]]);
     });
 
     it("does not tell the listeners: nothing is drawn from it", () => {
@@ -272,5 +274,21 @@ describe("exporting a PDF with its marks", () => {
     const store = createDocumentsStore(unavailableDocuments, false);
 
     expect(await store.exportDocument(1, { flatten: false })).toEqual({ error: "PDFs are only available in the desktop app." });
+  });
+});
+
+describe("the PDF's text in search", () => {
+  it("hands a password just used to unlock a PDF to search, to read its text with, and asks where a PDF's text is", async () => {
+    const api = fakeDocumentsApi({ pdfTextState: vi.fn(async () => "noText" as const) });
+    const store = createDocumentsStore(api);
+    store.rememberPassword(4, "s3cret");
+    expect(api.readUnlockedPdfText).toHaveBeenCalledWith(4, "s3cret");
+    expect(await store.pdfTextState(4)).toBe("noText");
+  });
+
+  it("says nothing is known when the backend cannot say, and does not throw", async () => {
+    const store = createDocumentsStore(fakeDocumentsApi({ pdfTextState: vi.fn(async () => Promise.reject(new Error("no search"))) }));
+    expect(await store.pdfTextState(4)).toBeNull();
+    expect(await createDocumentsStore(unavailableDocuments, false).pdfTextState(4)).toBeNull();
   });
 });

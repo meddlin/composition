@@ -98,6 +98,12 @@ export type ExportPdfResult =
   | { canceled: true }
   | { error: string };
 
+/**
+ * Where a PDF's text is in search (docs/architecture/search.md, "The text of a PDF"): `indexed`; `noText` when no page had text (a
+ * scan: OCR is not built); `locked` when it asks for a password (read the next time it is unlocked in the reader); `unreadable`.
+ */
+export type PdfTextState = "indexed" | "noText" | "locked" | "unreadable";
+
 /** Where an imported PDF's note goes: the group and notebook the sidebar is on. */
 export type ImportTarget = { groupId: number | null; notebookId: number };
 
@@ -160,6 +166,13 @@ export interface DocumentsApi {
   deleteAnnotation(annotationId: number): Promise<PdfAnnotation[]>;
   /** Puts back marks deleted a moment ago, as they were, with the same uuids (what undoing a delete does). */
   restoreAnnotations(documentId: number, annotations: PdfAnnotation[]): Promise<PdfAnnotation[]>;
+  /** Where the PDF's text is in search; null while it has not been read yet, or when search is not running. */
+  pdfTextState(documentId: number): Promise<PdfTextState | null>;
+  /**
+   * The reader has just unlocked a protected PDF: search reads its text with this password, if it was waiting for one. The password
+   * is used for that one reading and not kept. Resolves at once; the reading goes on in the background.
+   */
+  readUnlockedPdfText(documentId: number, password: string): Promise<void>;
 }
 
 /**
@@ -189,6 +202,8 @@ export const DOCUMENT_METHODS = [
   "updateAnnotation",
   "deleteAnnotation",
   "restoreAnnotations",
+  "pdfTextState",
+  "readUnlockedPdfText",
 ] as const satisfies readonly (keyof DocumentsApi)[];
 
 export type DocumentMethod = (typeof DOCUMENT_METHODS)[number];

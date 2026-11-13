@@ -98,7 +98,14 @@ Use a scratch home so your own notes and settings are not touched:
 
 ## 8. Search
 
-- [ ] Highlight a distinctive phrase and give a highlight a comment word nothing else contains. Search for each in the search bar: the PDF's note is found, as if the words were in it. Search for a word that only appears in the PDF's text but is not marked: no result (expected; the full text is not searched).
+- [ ] Highlight a distinctive phrase and give a highlight a comment word nothing else contains. Search for each in the search bar: the PDF's note is found, as if the words were in it.
+- [ ] **Words only in the PDF's text** (built 2026-11-13). Search for a word that is in the textbook but that you never marked: its note is found, after any notes that have the word themselves, with *In the PDF, p. …* under its title (the book's own page number when it has one: a page in the front matter says *p. xii*). Choose it: the PDF opens at that page and **Find in this PDF** is open with the word, *1 of …*; Enter goes on to the next. *Tell me if the page is wrong.*
+- [ ] Two words on the same page but not side by side: found at that page. Two words that are never on one page: not found by the PDF (each alone is). A phrase in double quotes finds only the words side by side, and the find bar looks for the phrase.
+- [ ] A word misspelt by one letter does **not** find the PDF by its text (it may still find a note). `tag:` and `updated:` filters apply to what the PDF found; `title:` does not look in PDFs.
+- [ ] Import a book you have not imported before and search for a word in it a few seconds later: found (the reading is in the background; a 600-page book took about half a second in testing). Your library's PDFs from before this build are read when the app starts: search for a word from an old book after a minute.
+- [ ] The password-protected PDF: before you open it, a word from it finds nothing. Open it and give the password: a word from it is found a moment later. Quit and start again: still found, and nothing asked for the password.
+- [ ] A scanned PDF (pages that are pictures): its outline says *No searchable text (scanned)*. Its bookmarks and marks still find it.
+- [ ] Move the textbook's note to the Trash Can: a word only in its pages finds nothing. Restore it: found again. *Tell me the time a search takes with your big books in (it should not feel slower).*
 - [ ] Bookmark a page with a label and search the label: found.
 - [ ] Delete the highlight: the search no longer finds the note by its words (give it a moment).
 

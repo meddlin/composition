@@ -36,6 +36,11 @@ export type SearchHit = {
   description: string;
   /** Names of the note's group and its ancestors, outermost first; empty when the note is ungrouped. */
   groupPath: string[];
+  /**
+   * Set when the note was found only by words in its PDF's own text: the first page they are on (1-based, as the reader counts) and
+   * that page's printed label when the PDF has one of its own (docs/architecture/search.md, "The text of a PDF").
+   */
+  pdf?: { page: number; label: string | null };
 };
 
 export type SearchResult = { hits: SearchHit[]; error?: string };

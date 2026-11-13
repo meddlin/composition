@@ -41,7 +41,7 @@ import { useLayout } from "./useLayout";
 import { useBackForward } from "./useBackForward";
 import { useWorkspaceActions } from "./useWorkspaceActions";
 import { createWorkspace } from "./workspaceInstance";
-import type { WorkspaceStore } from "./workspaceStore";
+import type { PdfPlace, WorkspaceStore } from "./workspaceStore";
 
 // Which notebook was open last, so it is the one shown next time. A convenience only.
 const NOTEBOOK_STORAGE_KEY = "composition.notebook";
@@ -193,16 +193,17 @@ function Workspace({ store, initialLayout }: { store: WorkspaceStore; initialLay
   }
 
   /** Opens a note picked from somewhere other than the sidebar (search, the history) and brings its sidebar row into view. */
-  function selectNoteFromSearch(id: number) {
-    selectNote(id);
+  /** A search result; one found in its PDF's text opens the PDF at that page with the words found (`pdfPlace`). */
+  function selectNoteFromSearch(id: number, pdfPlace?: PdfPlace) {
+    selectNote(id, pdfPlace);
     setReveal((prev) => ({ noteId: id, nonce: (prev?.nonce ?? 0) + 1 }));
   }
 
-  function selectNote(id: number) {
+  function selectNote(id: number, pdfPlace?: PdfPlace) {
     setHomeOpen(false);
     store.flushSaves();
     followNote(id);
-    surface.openNote(id);
+    surface.openNote(id, pdfPlace);
     setViewedGroupId(null);
   }
 

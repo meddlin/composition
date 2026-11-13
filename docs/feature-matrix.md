@@ -52,7 +52,8 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Highlight, underline, strikethrough and typed notes on the page, with undo and redo | ❌ | ❌ | ✅ | Five colors, a one-line comment, a **Highlights** tab. Marks are stored beside the file and never written into it. Ink arrives with the iPad app |
 | Cite a PDF from a note: **Quote**, **Cite this page**, `pdf:` links that flash the mark | ❌ | ❌ | ✅ | The citations are Markdown. The CLI shows them as text, and web as struck-through text ("PDF not on this device"). [note-links.md](ui/note-links.md#linking-to-a-pdf) |
 | Export annotated PDF, native or flattened | ❌ | ❌ | ✅ | A copy for other apps; text notes in Latin, Greek and Cyrillic. [pdf.md](ui/pdf.md#export-annotated-pdf) |
-| Search finds a PDF's note by the words in its marks and bookmarks | ✅ | ✅ | ✅ | The index is the shared data layer's, so it holds them wherever the database is shared; only the desktop app makes marks. The full text of a PDF is not searched here (the iPad searches it, 2026-11-12) |
+| Search finds a PDF's note by a word only in its own pages, and opens it at that page | ❌ | ❌ | ✅ | Read in the background with pdf.js and kept a page a document in the app's own Meilisearch; the web app and CLI keep their own indexes and read no PDFs. The iPad does the same. [search.md](architecture/search.md#the-text-of-a-pdf) |
+| Search finds a PDF's note by the words in its marks and bookmarks | ✅ | ✅ | ✅ | The index is the shared data layer's, so it holds them wherever the database is shared; only the desktop app makes marks |
 
 ## Viewing a note
 
