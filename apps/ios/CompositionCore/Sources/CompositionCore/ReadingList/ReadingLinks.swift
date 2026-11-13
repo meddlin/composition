@@ -83,8 +83,8 @@ public enum ReadingLinks {
 
     /// A page title as it is stored (`cleanReadingTitle`): on one line, trimmed, cut at the limit. Nil when nothing is left.
     ///
-    /// JavaScript cuts by UTF-16 unit, so a cut can fall between the two halves of a character outside the Basic Multilingual Plane;
-    /// SQLite then stores the half as U+FFFD. That is what is written here too, so both apps store the same title.
+    /// JavaScript cuts by UTF-16 unit, so a cut can fall between the two halves of a character outside the Basic Multilingual Plane. The
+    /// desktop's SQLite driver then stores the half as one U+FFFD under Node 24 and later (three under Node 22); one is written here.
     public static func cleanTitle(_ title: String) -> String? {
         var oneLine = ""
         var inSpace = false

@@ -78,6 +78,20 @@ struct ReadingListTests {
         #expect(ReadingLinks.normalize("https://example.com/a^b?c^d") == .success("https://example.com/a%5Eb?c^d"))
     }
 
+    /// Also left out of the corpus for the same reason: a title cut through an emoji leaves half of it, which Node 22's SQLite driver stores
+    /// as three U+FFFD and Node 24's as one. The iPad stores one, as the newer runtime does.
+    @Test("a title cut through an emoji keeps one U+FFFD for the half, as Node 24 and later store it")
+    func cutThroughAnEmoji() throws {
+        let title = String(repeating: "a", count: ReadingLinks.maxTitleLength - 1) + "\u{1F600} and the rest"
+        #expect(ReadingLinks.cleanTitle(title) == String(repeating: "a", count: ReadingLinks.maxTitleLength - 1) + "\u{FFFD}")
+        try withScratch { scratch in
+            let database = try CompositionDatabase.open(at: scratch.databaseURL)
+            let item = try database.addReadingItem("https://example.com/long")
+            #expect(try database.setReadingItemTitle(id: item.id, title: title).title.unicodeScalars.last == "\u{FFFD}")
+            #expect(try database.readingItem(id: item.id)?.title.utf16.count == ReadingLinks.maxTitleLength)
+        }
+    }
+
     @Test("the ids keep counting after a delete, as the desktop's AUTOINCREMENT does")
     func idsAreNotReused() throws {
         try withScratch { scratch in

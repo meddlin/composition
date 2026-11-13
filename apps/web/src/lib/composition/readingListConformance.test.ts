@@ -355,7 +355,10 @@ const SCRIPT: Step[] = [
   { op: "setRead", id: 2, read: true },
   { op: "setRead", id: 99, read: true },
   { op: "add", input: "café.example/menü?p=1" },
-  { op: "setTitle", id: 3, title: `${"a".repeat(MAX_READING_TITLE_LENGTH - 1)}\u{1f600} and the rest` },
+  // A long title cut at the limit, with nothing outside the Basic Multilingual Plane at the cut: a cut through an emoji leaves half of it,
+  // which Node 22's SQLite driver stores as three U+FFFD and Node 24's as one, so the answer would depend on the runtime that makes this
+  // file. The Swift side writes one U+FFFD, the newer answer, and pins it in ReadingListTests.
+  { op: "setTitle", id: 3, title: `${"\u00e9".repeat(MAX_READING_TITLE_LENGTH + 5)} and the rest` },
   { op: "add", input: "http://[2001:DB8::1]:80/x" },
   { op: "setTitle", id: 4, title: "x".repeat(MAX_READING_TITLE_LENGTH + 20) },
   { op: "setRead", id: 1, read: true },
@@ -474,8 +477,8 @@ describe("the Reading List fixture (fixtures/conformance/reading-list.json)", ()
       expect(urls.some((u) => typeof u.error === "string" && reason.test(u.error)), String(reason)).toBe(true);
     }
     expect(urls.filter((u) => typeof u.url === "string").length).toBeGreaterThan(80);
-    // The script stores a title cut through the middle of a pair of UTF-16 units, as SQLite keeps it.
-    expect(JSON.stringify(fixture.script)).toContain("�");
+    // The script stores a title cut at the limit.
+    expect(JSON.stringify(fixture.script)).toContain(`"${"é".repeat(MAX_READING_TITLE_LENGTH)}"`);
     expect(fixture.plugins.some((p) => p.enabled === true) && fixture.plugins.some((p) => p.enabled === false)).toBe(true);
   });
 });
