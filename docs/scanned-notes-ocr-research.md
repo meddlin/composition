@@ -27,9 +27,10 @@ numbers (TrOCR, 2.89 % character error on the IAM handwriting set [22]) are for 
 fast college page is not. What this repo knows: on the owner's iPad on 2026-11-12, Vision read print-like handwriting ("How does this
 work?") well and read a cursive signature as a swear word **at confidence 1.00**, because language correction snapped the marks to a
 common word (PR #301). Apple's own WWDC talk names that hazard: language correction "can also get in the way", turning a code like
-C001 into "cool" [5]. **Inference:** expect print-like handwriting to be good enough to search (the iPad's search already tolerates one
-or two wrong letters per word: C1 and S2 in [ipad-app-design.md](ipad-app-design.md#search)), and fast cursive to be poor. The spike
-settles it on your pages.
+C001 into "cool" [5]. **Inference:** expect print-like handwriting to be good enough to search, and fast cursive to be poor. One catch:
+a PDF's page text, which is where a scan's text would naturally be searched, has **no typo tolerance** by design
+([architecture/search.md](architecture/search.md#the-text-of-a-pdf)), so a word misread by one letter is not found there (a decision
+below). The spike settles it on your pages.
 
 **What would it cost?** My estimate, after M3: **iPad, about 5 to 7 weeks** for the whole feature, with a **first useful slice in 2 to
 3 weeks** (scans in as a note you read and write beside, and the text Vision is sure of made searchable). **Desktop, about 2 to 3 weeks
@@ -152,9 +153,11 @@ The money is small; what they would cost is the product's promises:
 | Apple [5][11][12] | The accurate path handles stylised and skewed text better; Live Text and Notes find handwriting | Any number, or a handwriting claim for the developer API |
 | The owner's iPad, 2026-11-12 (PR #301) | Print-like handwriting read well; a cursive signature misread as an offensive word at confidence 1.00 | A page of notes |
 
-**Inference:** search forgives more than reading does. A word is found if it is read right once on a page, and the typo layer finds a
-word read with one or two letters wrong. So text that is not good enough to quote can still be good enough to find a page. The spike
-measures both: how much is right (for reading), and how many of the words you would search for are found (for search).
+**Inference:** search forgives more than reading does. A word is found if it is read right once on a page; and a note's own text is
+searched with typo tolerance (one or two wrong letters per word: C1 and S2 in [ipad-app-design.md](ipad-app-design.md#search)), though
+a PDF's page text is not ([architecture/search.md](architecture/search.md#the-text-of-a-pdf)). So text that is not good enough to quote
+can still be good enough to find a page, more so if scan text is given typo tolerance. The spike measures both: how much is right (for
+reading), and how many of the words you would search for are found (for search), with and without one wrong letter allowed.
 
 ## The spike on your own pages
 
@@ -252,10 +255,16 @@ CREATE TABLE scan_lines (
 - **The guard, shared with drawings.** A line is `held` when its confidence is under the floor or the never-guessed list matches
   (`InkTranscript`'s rule, PR #301). A held line is never searched, never spoken and never quoted until a person checks or corrects it.
   **Confidence alone is not the safety** (1.00 was wrong); review is.
-- **Search.** The owner note's search entry already carries its marks' words, never shown (`marksSearchText`,
-  [architecture/search.md](architecture/search.md)); it would carry its scan's lines too: **checked and corrected lines always; unchecked
-  lines above the floor only if you choose so** (an open decision). Meilisearch on the desktop and FTS5 on the iPad take it the same
-  way. Showing *where* on the page needs a find over `scan_lines` in the reader, since search returns note ids only.
+- **Search.** Since PRs #302 and #303 (2026-11-12 and 13), a PDF's own text is searched **a page at a time** on both devices: a result
+  says *In the PDF, p. 212* and opens the reader at that page with its find bar on the query's words, and a scan today is in the `noText`
+  state, shown as *No searchable text (scanned)* ([architecture/search.md](architecture/search.md#the-text-of-a-pdf)). My pick: a scan's
+  lines become its pages' text in that same per-page index, so a hit on a scan says its page like any PDF's: **checked and corrected
+  lines always; unchecked lines above the floor only if you choose so** (an open decision, with whether scan text gets the typo
+  tolerance a PDF's text does not have). **The difference from a PDF's text:** that text is read again from the file whenever it is
+  needed and is kept only in the search index, never in the database or a backup; recognised text cannot be, because it is slow to
+  make, differs by device and carries a person's corrections, so it lives in `scan_lines` and the index is built from it. Two reader
+  changes follow: the find bar must look in `scan_lines` on a scan (pdf.js and PDFKit find nothing on an image page), and the search
+  oracles (`pdf-text-search.json` already has a scan in it) gain scans with lines.
 - **Re-running OCR never touches a checked or corrected line.** A newer engine replaces `unchecked` and `held` lines only.
 - **Size:** **Inference:** a page of notes is a few hundred words, about 2 KB of text, so 5,000 pages is about 10 MB in the database and
   the index.
@@ -319,7 +328,7 @@ My pick, for a person to trust what is in their notes:
 | 1 | **Scans in:** the TypeScript schema, rules and fixtures first; then import in order (Files, Photos, document camera), rotate, make the PDF, the owner note; read and write beside it with everything the PDF reader has | About 1 week |
 | 2 | **Searchable:** OCR in the background, `scan_lines`, the shared guard, search text into FTS5, resume after a quit | 1 to 1.5 weeks |
 | 3 | **Review and correct:** the review view, statuses, the unsure filter, VoiceOver | 1.5 to 2 weeks |
-| 4 | **Use it:** find on the page, highlight and Quote from a line, export with a text layer | 1 to 2 weeks |
+| 4 | **Use it:** the find bar over a scan's lines, highlight and Quote from a line, export with a text layer | 1 to 2 weeks |
 
 **First useful slice: 1 and 2**, in 2 to 3 weeks: your pages are notes you can read and write beside, and the text Vision is sure of
 finds them. Until slice 3, unsure and held lines are kept and not searched.
@@ -351,7 +360,8 @@ finds them. Until slice 3, unsure and held lines are kept and not searched.
 1. **Pages for the spike, and who writes the ground truth** (you, or I draft from the images, which sends them to Anthropic's API).
 2. **Shape:** an image-only PDF at import (my pick) or a new page-set note.
 3. **Desktop OCR in the first version:** none, reading the iPad's text (my pick); the Mac only; or every platform.
-4. **Unchecked text in search:** searchable above the floor, or only once checked.
+4. **Unchecked text in search:** searchable above the floor, or only once checked; and whether scan text is searched with typo tolerance,
+   unlike a PDF's text.
 5. **Cloud OCR as an opt-in:** never, or later on the desktop with your own key.
 6. **Scale and content:** roughly how many pages, which languages, and how much maths.
 
