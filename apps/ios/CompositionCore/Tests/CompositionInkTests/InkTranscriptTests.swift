@@ -7,7 +7,7 @@ import Testing
 @testable import CompositionInk
 
 /// Hands back what it is told, and keeps the pictures it was asked about.
-final class FakeRecognizer: InkTextRecognizing, @unchecked Sendable {
+final class FakeRecognizer: InkPictureRecognizing, @unchecked Sendable {
     let reply: [InkRecognizedLine]
     let fails: Bool
     private(set) var images: [CGImage] = []
