@@ -71,6 +71,13 @@ struct ReadingListTests {
         }
     }
 
+    /// The one case the corpus leaves out, because the JavaScript runtimes disagree on it: Node 22 leaves a `^` in a path as it is, while
+    /// Node 24 and 26 (and so, almost certainly, the desktop app's Electron) write %5E. The iPad follows the newer answer.
+    @Test("a ^ in a link's path is written as %5E, as Node 24 and later write it")
+    func caretInAPath() {
+        #expect(ReadingLinks.normalize("https://example.com/a^b?c^d") == .success("https://example.com/a%5Eb?c^d"))
+    }
+
     @Test("the ids keep counting after a delete, as the desktop's AUTOINCREMENT does")
     func idsAreNotReused() throws {
         try withScratch { scratch in

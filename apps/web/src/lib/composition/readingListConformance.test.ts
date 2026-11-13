@@ -122,7 +122,9 @@ const URL_INPUTS: string[] = [
   "https://example.com/p?x#",
   "https://example.com/a?b#c#d",
   "https://example.com/a b c",
-  'https://example.com/a"b<c>d`e{f}g|h^i[j]k',
+  // No `^` in a path here: Node 22 (CI's unit tests) leaves it as it is, and Node 24 and 26 write it as %5E, so the answer depends on the
+  // runtime that makes this file. The Swift side writes %5E, the newer answer, and pins it in ReadingListTests.
+  'https://example.com/a"b<c>d`e{f}g|h[j]k',
   "https://example.com/q?a=b c&d=\"e\"&f='g'&h=<i>&j=`k`&l={m}",
   "https://example.com/café?q=café",
   "https://example.com/\u{1f600}?e=\u{1f600}",
