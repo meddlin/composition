@@ -3,8 +3,8 @@ import Testing
 
 @testable import CompositionCore
 
-// Follow the sun, beyond what the desktop's fixture pins (SunConformanceTests): the scheme the app wears at a level, what saving a city does, and what the
-// cache keeps across launches.
+// Follow the sun, beyond what the desktop's fixture pins (SunConformanceTests): the scheme the app wears at a level, and what keeping the four hours does to
+// the settings file.
 
 @Suite("Follow the sun")
 struct SunTests {
@@ -15,12 +15,6 @@ struct SunTests {
             try file.write(to: location.settingsURL, atomically: true, encoding: .utf8)
         }
         return (SettingsStore(location: location), location)
-    }
-
-    private func withAsyncScratch(_ body: (Scratch) async throws -> Void) async throws {
-        let scratch = try Scratch()
-        defer { scratch.remove() }
-        try await body(scratch)
     }
 
     // MARK: The scheme at a level
@@ -73,88 +67,106 @@ struct SunTests {
         }
     }
 
-    // MARK: The city
+    // MARK: The hours
 
-    @Test("saving a city looks it up, keeps it and every other key in the file, and says today's times")
-    func savingACity() async throws {
-        try await withAsyncScratch { scratch in
+    private func at(_ clock: String) -> Int64 { Int64(SunHours.parseClock(clock)!) * Sun.millisecondsPerMinute }
+
+    @Test("with the default hours it is what the scheme did before they were set by hand: 06:30 and 18:30, a 90-minute fade centred on each")
+    func defaultHoursAreTheOldStandIns() {
+        func old(_ clock: String, around event: String, rising: Bool) -> Double? {
+            let progress = Double(at(clock) - at(event) + 45 * 60_000) / Double(90 * 60_000)
+            guard progress >= 0, progress <= 1 else { return nil }
+            let eased = progress * progress * (3 - 2 * progress)
+            return rising ? eased : 1 - eased
+        }
+        for clock in ["05:45", "06:00", "06:20", "06:30", "06:55", "07:15"] { #expect(Sun.level(.default, msOfDay: at(clock)) == old(clock, around: "06:30", rising: true), "\(clock)") }
+        for clock in ["17:45", "18:10", "18:30", "18:50", "19:15"] { #expect(Sun.level(.default, msOfDay: at(clock)) == old(clock, around: "18:30", rising: false), "\(clock)") }
+        #expect(Sun.level(.default, msOfDay: at("12:00")) == 1 && Sun.level(.default, msOfDay: at("03:00")) == 0 && Sun.level(.default, msOfDay: at("23:00")) == 0)
+    }
+
+    @Test("a day that begins in the evening, and a fade that crosses midnight, are fine")
+    func aDayFromAnyStart() {
+        let night = SunHours(lightenFrom: 19 * 60, lightFrom: 20 * 60, darkenFrom: 5 * 60, darkFrom: 6 * 60)
+        #expect(night.goesRoundTheClock)
+        #expect(Sun.level(night, msOfDay: at("12:00")) == 0 && Sun.level(night, msOfDay: at("23:00")) == 1 && Sun.level(night, msOfDay: at("00:00")) == 1)
+        #expect(abs(Sun.level(night, msOfDay: at("19:30")) - 0.5) < 1e-12 && abs(Sun.level(night, msOfDay: at("05:30")) - 0.5) < 1e-12)
+        let across = SunHours(lightenFrom: 9 * 60, lightFrom: 10 * 60, darkenFrom: 23 * 60 + 30, darkFrom: 30)
+        #expect(Sun.level(across, msOfDay: at("23:00")) == 1 && abs(Sun.level(across, msOfDay: at("00:00")) - 0.5) < 1e-12 && Sun.level(across, msOfDay: at("00:45")) == 0)
+    }
+
+    @Test("hours that do not go once round the clock in order are refused, and read as the defaults when they come off disk")
+    func refusedHours() {
+        let backwards = SunHours(lightenFrom: 8 * 60, lightFrom: 7 * 60, darkenFrom: 18 * 60, darkFrom: 19 * 60)
+        #expect(!backwards.goesRoundTheClock && backwards.problem == SunHours.orderError)
+        #expect(Sun.level(backwards, msOfDay: at("06:30")) == Sun.level(.default, msOfDay: at("06:30")))
+        let twice = SunHours(lightenFrom: 6 * 60, lightFrom: 18 * 60, darkenFrom: 7 * 60, darkFrom: 19 * 60)
+        #expect(!twice.goesRoundTheClock, "two times round the clock")
+        let same = SunHours(lightenFrom: 6 * 60, lightFrom: 6 * 60, darkenFrom: 18 * 60, darkFrom: 20 * 60)
+        #expect(!same.goesRoundTheClock, "two hours the same")
+        #expect(SunHours(lightenFrom: 0, lightFrom: 1, darkenFrom: 2, darkFrom: 3).goesRoundTheClock && SunHours(lightenFrom: 1437, lightFrom: 1438, darkenFrom: 1439, darkFrom: 0).goesRoundTheClock)
+    }
+
+    @Test("the milliseconds since midnight follow the wall clock across a clock change")
+    func wallClockAcrossAClockChange() throws {
+        let chicago = try #require(TimeZone(identifier: "America/Chicago"))
+        // 2026-03-08, 08:00 UTC: 02:00 CST becomes 03:00 CDT.
+        let springForward = Date.utcMilliseconds(2026, 2, 8, 8, 0)
+        #expect(Sun.msOfLocalDay(now: springForward - 1, timeZone: chicago) == 2 * 3_600_000 - 1)
+        #expect(Sun.msOfLocalDay(now: springForward, timeZone: chicago) == 3 * 3_600_000)
+        #expect(Sun.msOfLocalDay(now: Date.utcMilliseconds(2026, 10, 9, 0, 0), timeZone: try #require(TimeZone(identifier: "UTC"))) == 0)
+    }
+
+    // MARK: Keeping them
+
+    @Test("saving hours keeps them, and every other key in the file")
+    func savingHours() throws {
+        try withScratch { scratch in
             let (store, location) = try settings(scratch, file: #"{"theme":"auto","sunPair":"mint-forest","panels":{"version":2}}"#)
-            let now = Date.utcMilliseconds(2026, 10, 9, 18)
-            let service = SunService(fetch: { url in
-                if url.host == "geocoding-api.open-meteo.com" {
-                    let body = #"{"results":[{"name":"Austin","admin1":"Texas","country":"United States","latitude":30.26715,"longitude":-97.74306,"timezone":"America/Chicago"}]}"#
-                    return SunResponse(status: 200, body: Data(body.utf8))
-                }
-                // 6:42 am and 5:21 pm in Austin (UTC-6 in November), and the day before and after.
-                func at(_ day: Int, _ hour: Int, _ minute: Int) -> Int { Int(Date.utcMilliseconds(2026, 10, day, hour, minute) / 1000) }
-                let body = #"{"daily":{"sunrise":[\#(at(8, 12, 42)),\#(at(9, 12, 42)),\#(at(10, 12, 43))],"sunset":[\#(at(8, 23, 21)),\#(at(9, 23, 20)),\#(at(10, 23, 20))]}}"#
-                return SunResponse(status: 200, body: Data(body.utf8))
-            })
-            let result = await service.saveCity("  Austin, TX ", settings: store, now: now)
-            #expect(result == .saved(name: "Austin, Texas, United States", times: SunDayTimes(sunrise: "6:42 AM", sunset: "5:20 PM")))
-            #expect(store.location()?.timezone == "America/Chicago" && store.location()?.name == "Austin, Texas, United States")
+            #expect(store.sunHours() == .default, "nothing saved yet reads as the defaults")
+            let evening = SunHours(lightenFrom: 19 * 60, lightFrom: 20 * 60, darkenFrom: 5 * 60, darkFrom: 6 * 60)
+
+            try store.setSunHours(evening)
+
+            #expect(store.sunHours() == evening)
             #expect(store.appearance() == Appearance(scheme: .sun, sunPair: .mintForest), "the scheme and the pair are as they were")
             let written = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: location.settingsURL)) as? [String: Any])
             #expect(written["panels"] != nil)
+            #expect(written["sunHours"] as? NSDictionary == ["lightenFrom": "19:00", "lightFrom": "20:00", "darkenFrom": "05:00", "darkFrom": "06:00"] as NSDictionary)
         }
     }
 
-    @Test("an empty field forgets the city; a city that is not found, or a lookup that cannot be reached, says so and keeps the old one")
-    func forgettingAndFailing() async throws {
-        try await withAsyncScratch { scratch in
-            let (store, _) = try settings(scratch, file: #"{"location":{"name":"Oslo","latitude":59.9,"longitude":10.7,"timezone":"Europe/Oslo"}}"#)
-            let nothing = SunService(fetch: { _ in SunResponse(status: 200, body: Data(#"{}"#.utf8)) })
-            let unreachable = SunService(fetch: { _ in throw URLError(.notConnectedToInternet) })
-            let now = Date.utcMilliseconds(2026, 10, 9, 18)
+    @Test("hours that are not in order are refused with the reason, and the saved ones stay")
+    func refusingHours() throws {
+        try withScratch { scratch in
+            let (store, location) = try settings(scratch, file: #"{"sunHours":{"lightenFrom":"06:00","lightFrom":"07:00","darkenFrom":"18:30","darkFrom":"20:00"}}"#)
+            let before = try Data(contentsOf: location.settingsURL)
 
-            #expect(await nothing.saveCity("Nowhereville", settings: store, now: now) == .failed(#"Couldn't find a city matching "Nowhereville". Try "City, State" or "City, Country"."#))
-            #expect(await unreachable.saveCity("Oslo", settings: store, now: now) == .failed("Couldn't reach the city lookup service. Check your connection and try again."))
-            #expect(store.location()?.name == "Oslo", "a failed lookup keeps the city that was saved")
+            #expect(throws: SettingsError.unusableSunHours(SunHours.orderError)) {
+                try store.setSunHours(SunHours(lightenFrom: 8 * 60, lightFrom: 7 * 60, darkenFrom: 18 * 60, darkFrom: 19 * 60))
+            }
 
-            #expect(await nothing.saveCity("   ", settings: store, now: now) == .forgotten)
-            #expect(store.location() == nil)
+            #expect(store.sunHours() == SunHours(lightenFrom: 6 * 60, lightFrom: 7 * 60, darkenFrom: 18 * 60 + 30, darkFrom: 20 * 60))
+            #expect(try Data(contentsOf: location.settingsURL) == before, "nothing was written")
         }
     }
 
-    @Test("times seeded from the last launch are what the first paint uses, and are kept when the network fails")
-    func seeding() async {
-        let place = SavedLocation(name: "Austin", latitude: 30.26715, longitude: -97.74306, timezone: "America/Chicago")
-        let now = Date.utcMilliseconds(2026, 10, 9, 18)
-        let events = [SunEvent(at: now - 6 * 3_600_000, kind: .sunrise), SunEvent(at: now + 5 * 3_600_000, kind: .sunset)]
-        let asked = Counter()
-        let service = SunService(fetch: { _ in
-            asked.add()
-            throw URLError(.notConnectedToInternet)
-        })
-        await service.seed(events, for: place)
+    @Test("a city an older version saved is not read, and is gone the next time settings are written")
+    func theOldCityGoes() throws {
+        try withScratch { scratch in
+            let (store, location) = try settings(
+                scratch,
+                file: #"{"theme":"auto","sunPair":"cream-amber","location":{"name":"Austin","latitude":30.27,"longitude":-97.74,"timezone":"America/Chicago"},"panels":{"version":2}}"#)
+            #expect(store.sunHours() == .default && store.appearance() == Appearance(scheme: .sun, sunPair: .creamAmber), "the city changes nothing")
+            let onDisk = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: location.settingsURL)) as? [String: Any])
+            #expect(onDisk["location"] != nil, "reading leaves the file alone")
 
-        let first = await service.cachedSchedule(place, now: now)
-        #expect(!first.estimated && first.events == events && first.level == 1)
-        // Seeded times are not fresh: a lookup still tries (once), and keeps them when it fails.
-        #expect(await service.loadEvents(place, now: now) == events)
-        #expect(asked.count == 1)
-        // Nothing seeded for another city.
-        let other = await service.cachedSchedule(SavedLocation(name: "Oslo", latitude: 59.9, longitude: 10.7, timezone: "Europe/Oslo"), now: now)
-        #expect(other.estimated && other.retry)
+            try store.setSunPair(.mintForest)  // any write
+
+            let written = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: location.settingsURL)) as? [String: Any])
+            #expect(written["location"] == nil, "the city is gone")
+            #expect(written["panels"] != nil && written["theme"] as? String == "auto" && written["sunPair"] as? String == "mint-forest", "everything else is as it was")
+        }
     }
-
-    @Test("times that have run out are noticed, and the words for a day without a sunrise are the desktop's")
-    func exhaustedAndSummary() {
-        let now = Date.utcMilliseconds(2026, 10, 9, 18)
-        let used = SunSchedule(events: [SunEvent(at: now - 1_800_000, kind: .sunset)], level: 0, estimated: false, retry: false)
-        #expect(!used.isExhausted(now: now), "the sunset was half an hour ago: its ramp ends in a quarter of one")
-        #expect(used.isExhausted(now: now + 15 * 60_000), "once the ramp of the last event is over, nothing is left to change the level")
-        #expect(SunDayTimes().summary == "the sun doesn't rise or set there today")
-        #expect(SunDayTimes(sunrise: "6:42 AM").summary == "sunrise 6:42 AM")
-        #expect(SunDayTimes(sunrise: "6:42 AM", sunset: "5:21 PM").summary == "sunrise 6:42 AM, sunset 5:21 PM")
-    }
-}
-
-private final class Counter: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = 0
-    func add() { lock.lock(); value += 1; lock.unlock() }
-    var count: Int { lock.lock(); defer { lock.unlock() }; return value }
 }
 
 extension Date {

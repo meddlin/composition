@@ -3,7 +3,7 @@ import Testing
 
 @testable import CompositionCore
 
-@Suite("Settings: favorites, scheme and city")
+@Suite("Settings: favorites, scheme and Follow the sun hours")
 struct SettingsTests {
     private func location(_ scratch: Scratch, _ name: String = "data") -> DataLocation {
         DataLocation(directory: scratch.directory.appendingPathComponent(name, isDirectory: true))
@@ -12,7 +12,7 @@ struct SettingsTests {
     /// A settings file like the desktop's, with keys the iPad does not use.
     private let desktopSettings = """
         {"theme":"forest","sidebarWidth":321,"editorRatio":0.4,"favorites":[{"type":"note","id":1}],
-         "location":{"name":"Reykjavik","latitude":64.1466,"longitude":-21.9426,"timezone":"Atlantic/Reykjavik"},
+         "sunHours":{"lightenFrom":"19:00","lightFrom":"20:00","darkenFrom":"05:00","darkFrom":"06:00"},
          "todos":{"weekStart":1},"plugins":{"todo":true,"reader":false},"panels":{"version":2,"cells":[1,2,3]},
          "assistant":{"host":"http://localhost:11434"}}
         """
@@ -45,7 +45,7 @@ struct SettingsTests {
 
             let store = SettingsStore(location: place)
             #expect(store.favorites() == [Favorite(.note, 1)] && store.theme() == "forest")
-            #expect(store.location() == SavedLocation(name: "Reykjavik", latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik"))
+            #expect(store.sunHours() == SunHours(lightenFrom: 19 * 60, lightFrom: 20 * 60, darkenFrom: 5 * 60, darkFrom: 6 * 60))
             try store.toggleFavorite(.group, 7)
             try store.setTheme("cream")
 
@@ -55,12 +55,12 @@ struct SettingsTests {
             for key in ["favorites", "theme"] { after[key] = nil }
             var expected = before
             for key in ["favorites", "theme"] { expected[key] = nil }
-            #expect(NSDictionary(dictionary: after) == NSDictionary(dictionary: expected), "sidebarWidth, location, todos, plugins, panels and the assistant are untouched")
+            #expect(NSDictionary(dictionary: after) == NSDictionary(dictionary: expected), "sidebarWidth, sunHours, todos, plugins, panels and the assistant are untouched")
         }
     }
 
-    @Test("the colour scheme is one of the desktop's six, and a city can be set and cleared")
-    func themeAndCity() throws {
+    @Test("the colour scheme is one of the desktop's six, and the Follow the sun hours can be set")
+    func themeAndHours() throws {
         try withScratch { scratch in
             let store = SettingsStore(location: location(scratch))
             #expect(store.theme() == "dark", "the desktop's default when nothing is set")
@@ -68,11 +68,10 @@ struct SettingsTests {
             #expect(throws: SettingsError.unknownTheme("system")) { try store.setTheme("system") }
             #expect(store.theme() == "auto", "a refused name changes nothing")
 
-            let city = SavedLocation(name: "Oslo", latitude: 59.9139, longitude: 10.7522, timezone: "Europe/Oslo")
-            try store.setLocation(city)
-            #expect(store.location() == city)
-            try store.setLocation(nil)
-            #expect(store.location() == nil)
+            #expect(store.sunHours() == .default, "nothing saved reads as the defaults")
+            let hours = SunHours(lightenFrom: 6 * 60, lightFrom: 7 * 60, darkenFrom: 18 * 60 + 30, darkFrom: 20 * 60)
+            try store.setSunHours(hours)
+            #expect(store.sunHours() == hours)
         }
     }
 
@@ -84,7 +83,7 @@ struct SettingsTests {
             for junk in ["not json", "[1,2,3]", "null", ""] {
                 try Data(junk.utf8).write(to: place.settingsURL)
                 let store = SettingsStore(location: place)
-                #expect(store.favorites().isEmpty && store.theme() == "dark" && store.location() == nil)
+                #expect(store.favorites().isEmpty && store.theme() == "dark" && store.sunHours() == .default)
             }
             try SettingsStore(location: place).toggleFavorite(.note, 3)
             #expect(try object(place.settingsURL)["favorites"] != nil)

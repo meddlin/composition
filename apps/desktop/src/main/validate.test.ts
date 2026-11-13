@@ -113,6 +113,13 @@ describe("VALIDATORS", () => {
     expect(VALIDATORS.signOutChatGpt(["x"])).toEqual([]);
   });
 
+  it("passes the four Follow the sun hours along as text and nothing else", () => {
+    expect(
+      VALIDATORS.saveSunHours([{ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15", location: "Austin" }, "extra"]),
+    ).toEqual([{ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" }]);
+    expect(VALIDATORS.loadSunHours(["x"])).toEqual([]);
+  });
+
   it("drops arguments the method doesn't take", () => {
     expect(VALIDATORS.deleteNote([5, "extra", {}])).toEqual([5]);
     expect(VALIDATORS.loadWorkspace(["surprise"])).toEqual([]);
@@ -172,6 +179,10 @@ describe("VALIDATORS", () => {
     ["saveEditorFont", [{}]],
     ["saveNoteBackground", [{}]],
     ["saveSunPair", [{}]],
+    ["saveSunHours", [null]],
+    ["saveSunHours", ["05:45"]],
+    ["saveSunHours", [{ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45" }]],
+    ["saveSunHours", [{ lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: 1155 }]],
     ["saveWritingSettings", [null]],
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],

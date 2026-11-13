@@ -67,7 +67,7 @@ flowchart TD
     Forever --> Trash
     Trash -- "Esc" --> Work
 
-    Work -- "Enter on the Settings row" --> Settings["Settings screen<br/>data location, color scheme, city"]
+    Work -- "Enter on the Settings row" --> Settings["Settings screen<br/>data location, color scheme, follow the sun hours"]
     Settings -- "Esc" --> Work
 
     Work -- "?" --> Help["Key list (scrolls)"]

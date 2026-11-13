@@ -61,8 +61,8 @@ describe("color scheme setting", () => {
 
     expect(screen.getByText(/Follow the sun fades between a light and a dark set of colors/)).toBeTruthy();
     // Outside the Settings screen there is no page to go to, so no link to it.
-    expect(screen.queryByRole("button", { name: "Choose its colors and city" })).toBeNull();
-    expect(screen.queryByLabelText("City")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Choose its colors and hours" })).toBeNull();
+    expect(screen.queryByLabelText("Starts getting lighter")).toBeNull();
   });
 });
 

@@ -232,10 +232,10 @@
       "category": "mixed",
       "note": "orchestration for notes, groups, search, images, to-dos, feeds and the AI helper alike"
     },
-    "sunSchedule.ts": {
+    "sunHours.ts": {
       "category": "polish"
     },
-    "sunTimes.ts": {
+    "sunSchedule.ts": {
       "category": "polish"
     },
     "tarArchive.ts": {

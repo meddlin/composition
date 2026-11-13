@@ -1,34 +1,23 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RAMP_HALF_WIDTH_MS, sunLevel, type SunEvent } from "@/lib/composition/sunSchedule";
-import type { SunSchedule } from "@/lib/composition/sunTimes";
+import { DEFAULT_SUN_HOURS, type SunHours } from "@/lib/composition/sunHours";
+import { MS_PER_MINUTE, sunLevel } from "@/lib/composition/sunSchedule";
 import { SUN_SETTINGS_CHANGED, SunThemeSync } from "./SunThemeSync";
 
-const loadSunSchedule = vi.fn<() => Promise<SunSchedule | null>>();
-vi.mock("@/lib/composition/client", () => ({ loadSunSchedule: () => loadSunSchedule() }));
+const loadSunHours = vi.fn<() => Promise<SunHours | null>>();
+vi.mock("@/lib/composition/client", () => ({ loadSunHours: () => loadSunHours() }));
 
-const HOUR = 60 * 60 * 1000;
-const DAY = 24 * HOUR;
+const MINUTE = MS_PER_MINUTE;
+const HOUR = 60 * MINUTE;
 const MIDNIGHT = new Date(2026, 5, 10).getTime();
-const events: SunEvent[] = [
-  { at: MIDNIGHT + 6 * HOUR, kind: "sunrise" },
-  { at: MIDNIGHT + 19 * HOUR, kind: "sunset" },
-  { at: MIDNIGHT + DAY + 6 * HOUR, kind: "sunrise" },
-];
-const schedule = (overrides: Partial<SunSchedule> = {}): SunSchedule => ({
-  events,
-  level: 1,
-  estimated: false,
-  retry: false,
-  ...overrides,
-});
+const hours: SunHours = { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:30", darkFrom: "20:00" };
 const root = document.documentElement;
 
 beforeEach(() => {
   vi.useFakeTimers();
-  loadSunSchedule.mockReset();
-  loadSunSchedule.mockResolvedValue(null);
+  loadSunHours.mockReset();
+  loadSunHours.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -40,18 +29,17 @@ afterEach(() => {
 });
 
 describe("SunThemeSync and the pair of colors", () => {
-  // Just before sunrise, where the ramp has the surfaces about 47% of the way to light: past the classic pair's
+  // At 06:29:18, where the 06:00 to 07:00 fade has the surfaces about 48% of the way to light: past the classic pair's
   // ink flip (0.45) but not the cream and dark amber pair's (0.5).
-  const sunrise = events[0].at;
-  const now = sunrise + (0.482 - 0.5) * 2 * RAMP_HALF_WIDTH_MS;
+  const now = new Date(2026, 5, 10, 6, 29, 18).getTime();
 
   it("flips the ink where the classic pair does when no pair is named", () => {
     vi.setSystemTime(now);
 
-    render(<SunThemeSync initial={schedule()} />);
+    render(<SunThemeSync initial={hours} />);
 
-    expect(sunLevel(events, now)).toBeGreaterThan(0.45);
-    expect(sunLevel(events, now)).toBeLessThan(0.5);
+    expect(sunLevel(hours, now)).toBeGreaterThan(0.45);
+    expect(sunLevel(hours, now)).toBeLessThan(0.5);
     expect(root.dataset.tone).toBe("light");
   });
 
@@ -59,7 +47,7 @@ describe("SunThemeSync and the pair of colors", () => {
     root.dataset.sunPair = "cream-amber";
     vi.setSystemTime(now);
 
-    render(<SunThemeSync initial={schedule()} />);
+    render(<SunThemeSync initial={hours} />);
 
     expect(root.dataset.tone).toBe("dark");
   });
@@ -69,23 +57,23 @@ describe("SunThemeSync", () => {
   it("sets the scheme for the current time right away", () => {
     vi.setSystemTime(MIDNIGHT + 12 * HOUR);
 
-    render(<SunThemeSync initial={schedule()} />);
+    render(<SunThemeSync initial={hours} />);
 
     expect(root.dataset.tone).toBe("light");
     expect(root.style.getPropertyValue("--auto-light")).toBe("100.0%");
-    expect(loadSunSchedule).not.toHaveBeenCalled();
+    expect(loadSunHours).not.toHaveBeenCalled();
   });
 
-  it("moves along the ramp as time passes", () => {
-    vi.setSystemTime(MIDNIGHT + 18 * HOUR + 15 * 60 * 1000); // 45 minutes before sunset: ramp starts
-    render(<SunThemeSync initial={schedule()} />);
+  it("moves along the fade as time passes", () => {
+    vi.setSystemTime(MIDNIGHT + 18 * HOUR + 30 * MINUTE); // the evening fade starts
+    render(<SunThemeSync initial={hours} />);
     expect(root.style.getPropertyValue("--auto-light")).toBe("100.0%");
 
-    act(() => vi.advanceTimersByTime(45 * 60 * 1000)); // sunset: half way
+    act(() => vi.advanceTimersByTime(45 * MINUTE)); // half way through its 90 minutes
     expect(root.style.getPropertyValue("--auto-light")).toBe("50.0%");
     expect(root.dataset.tone).toBe("light");
 
-    act(() => vi.advanceTimersByTime(30 * 60 * 1000));
+    act(() => vi.advanceTimersByTime(30 * MINUTE));
     expect(root.dataset.tone).toBe("dark");
   });
 
@@ -95,9 +83,9 @@ describe("SunThemeSync", () => {
     expect(root.dataset.tone).toBeUndefined();
   });
 
-  it("loads the schedule itself on mount when none is given", async () => {
+  it("loads the hours itself on mount when none are given", async () => {
     vi.setSystemTime(MIDNIGHT + 12 * HOUR);
-    loadSunSchedule.mockResolvedValue(schedule());
+    loadSunHours.mockResolvedValue(hours);
 
     await act(async () => {
       render(<SunThemeSync />);
@@ -106,10 +94,10 @@ describe("SunThemeSync", () => {
     expect(root.dataset.tone).toBe("light");
   });
 
-  it("re-reads the schedule when settings change", async () => {
+  it("re-reads the hours when settings change", async () => {
     vi.setSystemTime(MIDNIGHT + 12 * HOUR);
     render(<SunThemeSync initial={null} />);
-    loadSunSchedule.mockResolvedValue(schedule());
+    loadSunHours.mockResolvedValue(hours);
 
     await act(async () => {
       window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
@@ -118,26 +106,31 @@ describe("SunThemeSync", () => {
     expect(root.dataset.tone).toBe("light");
   });
 
-  it("asks for fresh times when the schedule says to retry", async () => {
-    vi.setSystemTime(MIDNIGHT + 12 * HOUR);
-    render(<SunThemeSync initial={schedule({ retry: true, estimated: true })} />);
-    expect(loadSunSchedule).not.toHaveBeenCalled();
+  it("follows new hours at once: the same moment is dark, then light", async () => {
+    vi.setSystemTime(MIDNIGHT + 22 * HOUR);
+    render(<SunThemeSync initial={DEFAULT_SUN_HOURS} />);
+    expect(root.dataset.tone).toBe("dark");
+    loadSunHours.mockResolvedValue({ lightenFrom: "20:00", lightFrom: "21:00", darkenFrom: "05:00", darkFrom: "06:00" });
 
     await act(async () => {
-      vi.advanceTimersByTime(10 * 60 * 1000);
+      window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
     });
 
-    expect(loadSunSchedule).toHaveBeenCalledTimes(1);
+    expect(root.dataset.tone).toBe("light");
   });
 
-  it("asks for fresh times once every known event has passed", async () => {
-    vi.setSystemTime(MIDNIGHT + DAY + 5 * HOUR);
-    render(<SunThemeSync initial={schedule()} />);
+  it("never asks the network for anything while it runs", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    vi.setSystemTime(MIDNIGHT + 12 * HOUR);
+    render(<SunThemeSync initial={hours} />);
 
     await act(async () => {
-      vi.advanceTimersByTime(2 * HOUR + 10 * 60 * 1000); // past the last sunrise's ramp
+      vi.advanceTimersByTime(3 * HOUR);
     });
 
-    expect(loadSunSchedule).toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(loadSunHours).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

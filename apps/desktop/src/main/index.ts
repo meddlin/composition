@@ -220,7 +220,7 @@ const todoCycle = createTodoCycleRunner({
 
 const themeBackgroundKey = (theme: ThemeName) => (theme === "auto" ? "dark" : theme);
 
-// "auto" opens as the dark or light end of its ramp, per the cached sun times.
+// "auto" opens as the dark or light end of its fade, from the saved hours.
 const currentThemeKey = () => service.initialSunTheme()?.tone ?? themeBackgroundKey(loadWebSettings().theme);
 
 // The macOS see-through look of the windows (a setting; see translucency.ts).

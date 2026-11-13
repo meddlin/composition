@@ -10,10 +10,10 @@ import { DEFAULT_EDITOR_FONT, isEditorFontName, type EditorFontName } from "./ed
 import { DEFAULT_TODO_LOOK, readTodoLook, type TodoLook } from "./todoLook";
 import { DEFAULT_TODO_SETTINGS, parseTodoSettings, type TodoSettings } from "./todoSettings";
 import { DEFAULT_NOTE_BACKGROUND, isNoteBackgroundName, type NoteBackgroundName } from "./noteBackgrounds";
+import { DEFAULT_SUN_HOURS, parseSunHours, type SunHours } from "./sunHours";
 import { DEFAULT_SUN_PAIR, isSunPairName, type SunPairName } from "./sunPairs";
 import { DEFAULT_PLUGIN_SETTINGS, parsePluginSettings, type PluginSettings } from "./plugins";
 import { DEFAULT_PREVIEW_FONT, isPreviewFontName, type PreviewFontName } from "./previewFonts";
-import type { SavedLocation } from "./sunTimes";
 import { DEFAULT_WRITING_SETTINGS, parseWritingSettings, type WritingSettings } from "./writing";
 import { DEFAULT_THEME, isThemeName, type ThemeName } from "./themes";
 
@@ -68,6 +68,12 @@ export type WebSettings = {
   noteBackground: NoteBackgroundName;
   /** The light and dark colors the "auto" color scheme (Follow the sun) moves between. */
   sunPair: SunPairName;
+  /**
+   * The hours at which "Follow the sun" gets lighter and darker, as `HH:MM` on the device's clock (Settings > Styling > Follow the sun).
+   * Always written, and read back as the defaults unless all four are valid and go once round the clock in order. An older file's
+   * `location` (the city this scheme once followed) is not read, and is gone the next time settings are written.
+   */
+  sunHours: SunHours;
   /** The background of the desktop app's to-do panels, apart from the notes' (all of them share it). */
   todoLook: TodoLook;
   /** How the to-do cycle runs: the week's first day, how long the archive is kept, the fiscal year (Settings > To-dos). */
@@ -78,8 +84,6 @@ export type WebSettings = {
   writing: WritingSettings;
   /** The home page's layout. */
   home: HomeSettings;
-  /** City whose sunrise and sunset drive the "auto" color scheme. */
-  location?: SavedLocation;
   sidebarWidth: number;
   editorRatio: number;
   /** The terminal app's sidebar width in columns; absent until the CLI saves one (see layout.ts). */
@@ -102,6 +106,7 @@ const DEFAULT_SETTINGS: WebSettings = {
   editorFont: DEFAULT_EDITOR_FONT,
   noteBackground: DEFAULT_NOTE_BACKGROUND,
   sunPair: DEFAULT_SUN_PAIR,
+  sunHours: DEFAULT_SUN_HOURS,
   todoLook: DEFAULT_TODO_LOOK,
   todos: DEFAULT_TODO_SETTINGS,
   plugins: DEFAULT_PLUGIN_SETTINGS,
@@ -115,28 +120,6 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseLocation(value: unknown): SavedLocation | undefined {
-  const data = value as Partial<Record<keyof SavedLocation, unknown>> | null;
-  if (
-    typeof data?.name !== "string" ||
-    data.name === "" ||
-    typeof data.timezone !== "string" ||
-    data.timezone === "" ||
-    typeof data.latitude !== "number" ||
-    !(Math.abs(data.latitude) <= 90) ||
-    typeof data.longitude !== "number" ||
-    !(Math.abs(data.longitude) <= 180)
-  ) {
-    return undefined;
-  }
-  return {
-    name: data.name,
-    latitude: data.latitude,
-    longitude: data.longitude,
-    timezone: data.timezone,
-  };
-}
-
 /** Reads settings from already-parsed JSON, falling back to the default for anything missing or invalid. */
 export function parseWebSettings(data: unknown): WebSettings {
   const value = (data ?? {}) as Record<string, unknown>;
@@ -148,6 +131,7 @@ export function parseWebSettings(data: unknown): WebSettings {
     editorFont: isEditorFontName(value.editorFont) ? value.editorFont : DEFAULT_EDITOR_FONT,
     noteBackground: isNoteBackgroundName(value.noteBackground) ? value.noteBackground : DEFAULT_NOTE_BACKGROUND,
     sunPair: isSunPairName(value.sunPair) ? value.sunPair : DEFAULT_SUN_PAIR,
+    sunHours: parseSunHours(value.sunHours),
     todoLook: readTodoLook(value.todoLook),
     todos: parseTodoSettings(value.todos),
     plugins: parsePluginSettings(value.plugins),
@@ -163,8 +147,6 @@ export function parseWebSettings(data: unknown): WebSettings {
   if (value.cliSidebarColumns !== undefined) {
     settings.cliSidebarColumns = clampCliSidebarColumns(value.cliSidebarColumns);
   }
-  const location = parseLocation(value.location);
-  if (location) settings.location = location;
   if (value.assistant !== undefined) settings.assistant = parseAssistantSettings(value.assistant);
   if (isPlainObject(value.panels)) settings.panels = value.panels;
   return settings;

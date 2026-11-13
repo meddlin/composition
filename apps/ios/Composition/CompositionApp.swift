@@ -18,7 +18,6 @@ struct ThemedRoot: View {
     let model: AppModel
     @Environment(\.colorScheme) private var systemScheme
     @Environment(\.colorSchemeContrast) private var contrast
-    @Environment(\.scenePhase) private var scenePhase
 
     /// The system's Increase Contrast. (`-increaseContrast 1` is the UI tests' stand-in for Settings, Accessibility, Display & Text Size, Increase Contrast.)
     private var effectiveContrast: ColorSchemeContrast {
@@ -39,7 +38,6 @@ struct ThemedRoot: View {
                 .tint(look.brand)
                 .preferredColorScheme(model.appearance.scheme == .system ? nil : look.colorScheme)
         }
-        .onChange(of: scenePhase) { _, phase in if phase == .active { model.sun.resume() } }
     }
 }
 

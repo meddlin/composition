@@ -61,7 +61,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   const renderer = useRenderer();
   const { width: terminalWidth } = useTerminalDimensions();
   const [theme, setTheme] = useState(initialTheme);
-  // Bumped when the saved city or the scheme changes, so "follow the sun" looks its times up again.
+  // Bumped when the "follow the sun" hours or the scheme change, so it reads them again.
   const [sunVersion, setSunVersion] = useState(0);
   const sunLevel = useSunLevel(theme === "auto", api, sunVersion);
   const palette = useMemo(
@@ -630,7 +630,7 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
             width={terminalWidth}
             theme={theme}
             onThemeChange={setTheme}
-            onCityChanged={() => setSunVersion((version) => version + 1)}
+            onSunChanged={() => setSunVersion((version) => version + 1)}
             moveDataLocation={
               moveDataLocation &&
               (async (destination) => {

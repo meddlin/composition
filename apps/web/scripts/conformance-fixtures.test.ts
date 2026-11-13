@@ -488,7 +488,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         const { getDb } = await import(path.join(lib, "db"));
         const { loadWebSettings, saveWebSettings } = await import(path.join(lib, "webSettings"));
         const { createBackup } = await import(path.join(lib, "backup"));
-        // Not the defaults, so a restore that loses or resets a key shows: a scheme, a city, columns, favorites, and more.
+        // Not the defaults, so a restore that loses or resets a key shows: a scheme, the Follow the sun hours, columns, favorites, and more.
         saveWebSettings({
           ...loadWebSettings(),
           theme: "forest",
@@ -498,7 +498,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
             { type: "note", id: 1 },
             { type: "group", id: 1 },
           ],
-          location: { name: "Reykjavik", latitude: 64.1466, longitude: -21.9426, timezone: "Atlantic/Reykjavik" },
+          sunHours: { lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" },
         });
         const file = path.join(outDir!, `${name}.tar.gz`);
         fs.rmSync(file, { force: true });
@@ -709,12 +709,12 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
   it("writes the settings cases and what the real parseWebSettings makes of each", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
     const file = path.resolve(__dirname, "../../../fixtures/conformance/settings-cases.json");
-    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { favorites: unknown[]; theme: unknown[]; location: unknown[] };
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { favorites: unknown[]; theme: unknown[]; sunHours: unknown[] };
     const { parseWebSettings } = await import(path.join(lib, "webSettings"));
     const expected = {
       favorites: cases.favorites.map((value) => parseWebSettings({ favorites: value }).favorites),
       theme: cases.theme.map((value) => parseWebSettings({ theme: value }).theme),
-      location: cases.location.map((value) => parseWebSettings({ location: value }).location ?? null),
+      sunHours: cases.sunHours.map((value) => parseWebSettings({ sunHours: value }).sunHours),
     };
     fs.copyFileSync(file, path.join(outDir!, "settings-cases.json"));
     fs.writeFileSync(path.join(outDir!, "settings-expected.json"), JSON.stringify(expected, null, 2));

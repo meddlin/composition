@@ -10,7 +10,7 @@ export const UPDATE_STATE_CHANNEL = "composition:update-state";
 /** Pushed from the main process to the window that asked, once per event of an AI helper chat turn. */
 export const ASSISTANT_EVENT_CHANNEL = "composition:assistant-event";
 
-/** Pushed from the main process to every window whenever the color scheme, a font or the sun's city is saved. */
+/** Pushed from the main process to every window whenever the color scheme, a font or the Follow the sun hours are saved. */
 export const APPEARANCE_CHANNEL = "composition:appearance";
 
 /**

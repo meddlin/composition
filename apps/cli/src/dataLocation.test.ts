@@ -22,6 +22,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
     previewFont: "default",
     noteBackground: "plain",
     sunPair: "classic",
+    sunHours: { lightenFrom: "05:45", lightFrom: "07:15", darkenFrom: "17:45", darkFrom: "19:15" },
     todoLook: { background: "notes", color: null },
     todos: { weekStartsOn: 0, retentionMonths: 60, fiscalYearStartMonth: 1 },
     plugins: { todo: true, "reading-list": false, rss: false, contacts: true },

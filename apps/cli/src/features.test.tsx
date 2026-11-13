@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { closeDb, listNotes, loadWebSettings, resolvedDbPath, service, sunLevel, type SunEvent } from "./backend";
+import { closeDb, formatClock, listNotes, loadWebSettings, resolvedDbPath, service, sunLevel, type SunHours } from "./backend";
 import { loadColumns, saveColumns } from "./columns";
 import { moveApplicationData } from "./dataLocation";
 import { backgroundAt, createSandbox, frame, press, pressEscape, settle, sleep, type Rendered, type Sandbox } from "./testing";
@@ -380,39 +380,42 @@ describe("color schemes", () => {
 });
 
 describe("follow the sun", () => {
-  /** Sunrise and sunset around `now`, so that it is daytime (level 1) or night (level 0). */
-  function scheduleFor(level: 0 | 1) {
-    const now = Date.now();
-    const hour = 3600_000;
-    const events: SunEvent[] =
-      level === 1
-        ? [{ at: now - 6 * hour, kind: "sunrise" }, { at: now + 6 * hour, kind: "sunset" }]
-        : [{ at: now - 6 * hour, kind: "sunset" }, { at: now + 6 * hour, kind: "sunrise" }];
-    return { events, level: sunLevel(events, now), estimated: false, retry: false };
+  /** Four hours around now on the machine's clock, so that it is daytime (level 1) or night (level 0). */
+  function hoursFor(level: 0 | 1): SunHours {
+    const clock = (hoursFromNow: number) => {
+      const when = new Date(Date.now() + hoursFromNow * 3600_000);
+      return formatClock(when.getHours() * 60 + when.getMinutes());
+    };
+    // Light: it has been light since 6 hours ago and gets darker in 6. Dark: the light comes in 6 hours, and went 10 hours ago.
+    return level === 1
+      ? { lightenFrom: clock(-8), lightFrom: clock(-6), darkenFrom: clock(6), darkFrom: clock(8) }
+      : { lightenFrom: clock(6), lightFrom: clock(8), darkenFrom: clock(12), darkFrom: clock(14) };
   }
 
   it("draws the light scheme in the daytime", async () => {
     await seed();
-    const app = await sandbox.mount({ theme: "auto", api: { loadSunSchedule: async () => scheduleFor(1) } });
+    const app = await sandbox.mount({ theme: "auto", api: { loadSunHours: async () => hoursFor(1) } });
     await settle(app, 400);
 
+    expect(sunLevel(hoursFor(1), Date.now())).toBe(1);
     expect(backgroundAt(app, 5, 70)).toBe("#F7F7F4");
   });
 
   it("draws the dark scheme at night", async () => {
     await seed();
-    const app = await sandbox.mount({ theme: "auto", api: { loadSunSchedule: async () => scheduleFor(0) } });
+    const app = await sandbox.mount({ theme: "auto", api: { loadSunHours: async () => hoursFor(0) } });
     await settle(app, 400);
 
+    expect(sunLevel(hoursFor(0), Date.now())).toBe(0);
     expect(backgroundAt(app, 5, 70)).toBe("#121212");
   });
 
-  it("asks for the schedule only while that scheme is on", async () => {
+  it("asks for the hours only while that scheme is on", async () => {
     await seed();
     let asked = 0;
     const app = await sandbox.mount({
       theme: "dark",
-      api: { loadSunSchedule: async () => (asked++, scheduleFor(1)) },
+      api: { loadSunHours: async () => (asked++, hoursFor(1)) },
     });
     await settle(app, 300);
 
@@ -434,7 +437,7 @@ describe("the Settings screen", () => {
     await openSettings(app);
     expect(frame(app)).toContain("Application data location");
     expect(frame(app)).toContain("Color scheme");
-    expect(frame(app)).toContain("City, for follow the sun");
+    expect(frame(app)).toContain("Hours, for follow the sun");
     expect(frame(app)).toContain(path.join(sandbox.home, "data"));
 
     await pressEscape(app, 300);
@@ -468,40 +471,70 @@ describe("the Settings screen", () => {
     expect(frame(app)).not.toContain("● Dark");
   });
 
-  it("saves a city and shows today's sunrise and sunset", async () => {
+  it("shows the four hours follow the sun moves at, and saves the ones typed", async () => {
     await seed();
-    const saved: string[] = [];
+    const saved: SunHours[] = [];
     const app = await sandbox.mount({
       api: {
-        saveLocation: async (city) => (saved.push(city), { saved: { name: "Austin, Texas, United States", sunrise: "7:12 AM", sunset: "7:38 PM" } }),
+        saveSunHours: async (hours) => (saved.push(hours), {}),
       },
     });
     await openSettings(app);
     await press(app, "TAB");
-    await press(app, "TAB"); // to the city field
-    await app.mockInput.typeText("Austin");
+    await press(app, "TAB"); // to the hours field
+    expect(frame(app)).toContain("05:45 07:15 17:45 19:15");
+    for (let i = 0; i < 23; i++) await press(app, "BACKSPACE");
+    await app.mockInput.typeText("19:00 20:00 05:00 06:00");
     await settle(app, 100);
 
     await press(app, "RETURN", {}, 500);
 
-    expect(saved).toEqual(["Austin"]);
-    expect(frame(app)).toContain("Saved Austin, Texas, United States: sunrise 7:12 AM, sunset 7:38 PM.");
+    expect(saved).toEqual([{ lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" }]);
   });
 
-  it("shows why a city could not be saved", async () => {
+  it("says why hours could not be saved, and asks for four when fewer are typed", async () => {
     await seed();
     const app = await sandbox.mount({
-      api: { saveLocation: async () => ({ error: 'Couldn\'t find a city matching "Nowhere".' }) },
+      api: { saveSunHours: async () => ({ error: "The four times must follow each other once round the clock." }) },
     });
     await openSettings(app);
     await press(app, "TAB");
     await press(app, "TAB");
-    await app.mockInput.typeText("Nowhere");
-    await settle(app, 100);
+    await press(app, "RETURN", {}, 500);
+    expect(frame(app)).toContain("once round the clock");
 
+    for (let i = 0; i < 23; i++) await press(app, "BACKSPACE");
+    await app.mockInput.typeText("07:00 19:00");
+    await settle(app, 100);
     await press(app, "RETURN", {}, 500);
 
-    expect(frame(app)).toContain("Couldn't find a city matching");
+    expect(frame(app)).toContain("Type four times, like 05:45 07:15 17:45 19:15.");
+  });
+
+  it("saves hours for real, keeps them in the settings file, and refuses a set that is out of order", async () => {
+    await seed();
+    const app = await sandbox.mount();
+    await openSettings(app);
+    await press(app, "TAB");
+    await press(app, "TAB");
+    for (let i = 0; i < 23; i++) await press(app, "BACKSPACE");
+    await app.mockInput.typeText("08:00 07:00 18:00 19:00");
+    await settle(app, 100);
+    await press(app, "RETURN", {}, 500);
+    expect(frame(app)).toContain("once round the clock");
+
+    for (let i = 0; i < 23; i++) await press(app, "BACKSPACE");
+    await app.mockInput.typeText("06:00 07:00 18:30 20:00");
+    await settle(app, 100);
+    await press(app, "RETURN", {}, 500);
+
+    expect(frame(app)).toContain("Saved: lighter from 06:00, light from 07:00, darker from 18:30, dark from 20:00.");
+    expect(JSON.parse(fs.readFileSync(path.join(sandbox.home, "settings.json"), "utf-8")).sunHours).toEqual({
+      lightenFrom: "06:00",
+      lightFrom: "07:00",
+      darkenFrom: "18:30",
+      darkFrom: "20:00",
+    });
   });
 
   it("moves all the data to a new folder, and the notes are still there", async () => {
@@ -554,7 +587,7 @@ describe("the Settings screen", () => {
       vi.stubEnv("HOME", sandbox.home);
     });
 
-    /** Tab past the path, color scheme and city fields. */
+    /** Tab past the path, color scheme and hours fields. */
     async function tabTo(app: Rendered, field: "backup" | "restore") {
       for (let i = 0; i < (field === "backup" ? 3 : 4); i++) await press(app, "TAB");
     }

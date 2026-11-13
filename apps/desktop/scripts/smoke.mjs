@@ -955,6 +955,19 @@ try {
   check("a pair that doesn't exist is refused with a reason", typeof (await page.evaluate(() => window.composition.saveSunPair("neon-pink"))).error === "string");
   await page.getByRole("radio", { name: "Light and dark", exact: true }).check();
   await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunPair === "classic");
+  // The four hours it moves at, set by hand (no city, no network): the page offers a time for each, saves only a set that goes round the clock in order, and tells the other windows.
+  check("the page offers a time for each of the four hours, and no city", (await page.getByLabel("Starts getting lighter").inputValue()) === "05:45" && (await page.getByLabel("Fully dark from").inputValue()) === "19:15" && (await page.getByLabel("City").count()) === 0);
+  for (const [label, value] of [["Starts getting lighter", "19:00"], ["Fully light from", "20:00"], ["Starts getting darker", "05:00"], ["Fully dark from", "06:00"]]) await page.getByLabel(label).fill(value);
+  await page.getByRole("button", { name: "Save hours" }).click();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunHours.lightenFrom === "19:00");
+  check("the hours are stored in the app's own settings file", JSON.stringify(JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8")).sunHours) === JSON.stringify({ lightenFrom: "19:00", lightFrom: "20:00", darkenFrom: "05:00", darkFrom: "06:00" }));
+  check("a settings file has no saved city to read", !("location" in JSON.parse(fs.readFileSync(path.join(userData, "settings.json"), "utf-8"))));
+  check("hours that do not go round the clock in order are refused with a reason", /once round the clock/.test((await page.evaluate(() => window.composition.saveSunHours({ lightenFrom: "08:00", lightFrom: "07:00", darkenFrom: "18:00", darkFrom: "19:00" }))).error ?? ""));
+  check("hours that are not times are refused with a reason", /24-hour clock/.test((await page.evaluate(() => window.composition.saveSunHours({ lightenFrom: "late", lightFrom: "07:00", darkenFrom: "18:00", darkFrom: "19:00" }))).error ?? ""));
+  check("a refused set leaves the saved hours as they were", (await page.evaluate(() => window.composition.loadSettings())).sunHours.lightenFrom === "19:00");
+  await page.getByRole("button", { name: "Use the defaults" }).click();
+  await page.getByRole("button", { name: "Save hours" }).click();
+  await waitFor(async () => (await page.evaluate(() => window.composition.loadSettings())).sunHours.lightenFrom === "05:45");
   await openSettingsPage(page, "General");
 
   // ---- Backup and restore (Settings): dialogs are replaced as above, so the real button, the real

@@ -61,7 +61,7 @@ async function populate() {
   settings.saveWebSettings({
     ...settings.loadWebSettings(),
     sidebarWidth: 333,
-    location: { name: "Austin, Texas", latitude: 30.27, longitude: -97.74, timezone: "America/Chicago" },
+    sunHours: { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:30", darkFrom: "20:00" },
   });
   return { service, settings, group, first, second, trashed, image, attached };
 }
@@ -112,7 +112,9 @@ describe("createBackup", () => {
 
     const settings = JSON.parse(execFileSync("tar", ["-xzOf", file!, "settings.json"], { encoding: "utf-8" }));
 
-    expect(settings).toMatchObject({ theme: "forest", sidebarWidth: 333, location: { name: "Austin, Texas" } });
+    expect(settings).toMatchObject({ theme: "forest", sidebarWidth: 333, sunHours: { lightenFrom: "06:00", darkFrom: "20:00" } });
+    // The city an older version kept is not written any more.
+    expect(settings).not.toHaveProperty("location");
     expect(settings).not.toHaveProperty("appDataDir");
     expect(settings).not.toHaveProperty("dbPath");
   });
@@ -190,7 +192,7 @@ describe("restoreBackup", () => {
       theme: "forest",
       sidebarWidth: 333,
       favorites: [{ type: "note", id: first.id }],
-      location: { name: "Austin, Texas" },
+      sunHours: { lightenFrom: "06:00", lightFrom: "07:00", darkenFrom: "18:30", darkFrom: "20:00" },
     });
   });
 

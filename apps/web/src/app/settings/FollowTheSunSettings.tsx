@@ -1,46 +1,36 @@
 "use client";
 
-import { useActionState, type CSSProperties } from "react";
+import { useMemo, useState, useTransition, type CSSProperties } from "react";
 import { SUN_SETTINGS_CHANGED } from "@/components/SunThemeSync";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { saveLocation, type SaveLocationResult } from "@/lib/composition/client";
+import { saveSunHours } from "@/lib/composition/client";
+import {
+  DEFAULT_SUN_HOURS,
+  SUN_HOUR_KEYS,
+  SUN_HOUR_LABELS,
+  validateSunHours,
+  type SunHours,
+} from "@/lib/composition/sunHours";
 import { SUN_PAIR_CHOICES, inkFlipLevelOf, type SunPairName } from "@/lib/composition/sunPairs";
-import { RAMP_HALF_WIDTH_MS, toneForLevel } from "@/lib/composition/sunSchedule";
+import { MS_PER_MINUTE, levelAtTimeOfDay, toneForLevel } from "@/lib/composition/sunSchedule";
 import { useColorScheme } from "./ColorSchemeProvider";
 
 const SECTION_TITLE = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
-
-const HALF_RAMP_MINUTES = RAMP_HALF_WIDTH_MS / 60_000;
 
 /** The levels a pair is shown at, from full day to full night: a level is how light the page is (see sunSchedule.ts). */
 const PREVIEW_LEVELS = [1, 0.83, 0.66, 0.5, 0.34, 0.17, 0];
 
 type Props = {
-  currentCity: string;
-  /** Today's times at the saved city, so the page can confirm the lookup worked. */
-  currentSunTimes?: { sunrise?: string; sunset?: string };
+  /** The hours saved now. */
+  currentHours: SunHours;
 };
 
-/** The result of the last city save, plus what to show in the field afterwards. */
-type LocationState = SaveLocationResult & { query?: string };
-
-function formatSunTimes(times: { sunrise?: string; sunset?: string }): string {
-  const parts = [times.sunrise && `sunrise ${times.sunrise}`, times.sunset && `sunset ${times.sunset}`].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : "the sun doesn't rise or set there today";
-}
-
-async function saveLocationFromForm(_previous: LocationState, formData: FormData): Promise<LocationState> {
-  const city = String(formData.get("city") ?? "");
-  const result = await saveLocation(city);
-  // After an error keep what was typed; after a save, show the matched name.
-  const query = result.saved?.name ?? (result.error ? city : "");
-  if (!result.error) window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
-  return { ...result, query };
-}
+/** The cells of the day strip: one per hour, each drawn at the middle of its hour. */
+const DAY_CELLS = Array.from({ length: 24 }, (_, hour) => hour);
 
 /**
  * A day in a pair's colors, from full light to full dark. Each cell is drawn by the stylesheet's own rules for that
@@ -73,12 +63,73 @@ function SunStrip({ pair }: { pair: SunPairName }) {
 }
 
 /**
- * Settings > Styling > Follow the sun: what the color scheme of that name does, which pair of light and dark colors it
- * moves between, and the city its sunrise and sunset are taken from.
+ * The whole day, from midnight to midnight, in the chosen pair's colors at the level the hours make of each hour of it, so the
+ * hours can be judged by eye. Drawn like `SunStrip`, by the stylesheet's own rules, with nothing here to keep in step with them.
  */
-export function FollowTheSunSettings({ currentCity, currentSunTimes }: Props) {
+function DayStrip({ pair, hours }: { pair: SunPairName; hours: SunHours }) {
+  const flip = inkFlipLevelOf(pair);
+  return (
+    <div aria-hidden className="flex flex-col gap-1 text-xs text-muted-foreground">
+      <span className="flex overflow-hidden rounded-md ring-1 ring-foreground/15">
+        {DAY_CELLS.map((hour) => {
+          const level = levelAtTimeOfDay(hours, (hour * 60 + 30) * MS_PER_MINUTE);
+          return (
+            <span
+              key={hour}
+              data-theme="auto"
+              data-sun-pair={pair}
+              data-tone={toneForLevel(level, flip)}
+              className="grid h-7 flex-1 place-items-center text-[10px] font-medium"
+              style={{ "--auto-light": `${level * 100}%`, backgroundColor: "var(--background)", color: "var(--foreground)" } as CSSProperties}
+            >
+              <span className="hidden sm:inline">Aa</span>
+            </span>
+          );
+        })}
+      </span>
+      <span className="flex justify-between">
+        <span>00:00</span>
+        <span>06:00</span>
+        <span>12:00</span>
+        <span>18:00</span>
+        <span>24:00</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Settings > Styling > Follow the sun: what the color scheme of that name does, which pair of light and dark colors it
+ * moves between, and the four hours, set by hand, at which it gets lighter and darker.
+ */
+export function FollowTheSunSettings({ currentHours }: Props) {
   const { theme, themeError, selectTheme, sunPair, sunPairError, selectSunPair } = useColorScheme();
-  const [locationState, locationAction, locationPending] = useActionState(saveLocationFromForm, {} as LocationState);
+  const [saved, setSaved] = useState(currentHours);
+  const [draft, setDraft] = useState(currentHours);
+  const [result, setResult] = useState<{ error?: string; savedAt?: true }>({});
+  const [pending, startSave] = useTransition();
+
+  const checked = useMemo(() => validateSunHours(draft), [draft]);
+  const changed = SUN_HOUR_KEYS.some((key) => draft[key] !== saved[key]);
+  const isDefault = SUN_HOUR_KEYS.every((key) => draft[key] === DEFAULT_SUN_HOURS[key]);
+
+  function edit(key: keyof SunHours, value: string) {
+    setDraft((previous) => ({ ...previous, [key]: value }));
+    setResult({});
+  }
+
+  function save() {
+    if (!checked.hours) return;
+    const hours = checked.hours;
+    startSave(async () => {
+      const outcome = await saveSunHours(hours);
+      if (outcome.error) return setResult({ error: outcome.error });
+      setSaved(hours);
+      setDraft(hours);
+      setResult({ savedAt: true });
+      window.dispatchEvent(new Event(SUN_SETTINGS_CHANGED));
+    });
+  }
 
   return (
     <>
@@ -90,18 +141,16 @@ export function FollowTheSunSettings({ currentCity, currentSunTimes }: Props) {
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <p>
-            Follow the sun is a color scheme that moves with the day where you live: light colors while the sun is up, and
-            dark colors once it has set.
+            Follow the sun is a color scheme that moves with the day: light colors by day, dark colors at night, and a fade
+            between.
           </p>
           <p>
-            It never switches all at once. The colors fade across {HALF_RAMP_MINUTES * 2} minutes around each sunrise and
-            each sunset, starting {HALF_RAMP_MINUTES} minutes before the sun rises or sets and finishing {HALF_RAMP_MINUTES}{" "}
-            minutes after it. The text changes between its light-scheme and dark-scheme color halfway through the fade, so
-            it stays readable all the way.
+            You say when. Set the four times below on this computer&apos;s clock: when the page starts getting lighter, when it is
+            fully light, when it starts getting darker and when it is fully dark. Between each pair the colors ease through the
+            steps of the strips below; the rest of the time they hold. The text changes between its light-scheme and dark-scheme
+            color halfway through a fade, so it stays readable all the way.
           </p>
-          <p>
-            To know when the sun rises and sets it needs your city, below. Until one is saved it uses 6:30 AM and 6:30 PM.
-          </p>
+          <p>Nothing is looked up: there is no city, no location and no network request.</p>
           {theme === "auto" ? (
             <p role="status" className="text-success">
               Follow the sun is your color scheme now.
@@ -125,7 +174,7 @@ export function FollowTheSunSettings({ currentCity, currentSunTimes }: Props) {
           </CardTitle>
           <CardDescription>
             The two sets of colors it fades between. Each strip runs from full day to full night, the way the page looks as
-            the sun sets.
+            the evening fade goes on.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -152,44 +201,78 @@ export function FollowTheSunSettings({ currentCity, currentSunTimes }: Props) {
       <Card size="sm">
         <CardHeader>
           <CardTitle role="heading" aria-level={2} className={SECTION_TITLE}>
-            Your city
+            When it changes
           </CardTitle>
+          <CardDescription>
+            Times on this computer&apos;s own clock, so they follow it if it changes zone. They go once round the clock in order,
+            starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={locationAction} className="flex flex-col gap-2 text-sm">
-            <Field className="gap-1">
-              <FieldLabel htmlFor="city">City</FieldLabel>
-              <FieldDescription className="text-xs">
-                Sets the sunrise and sunset that Follow the sun tracks. Try <span className="font-mono">Austin, TX</span>.
-              </FieldDescription>
-              <Input
-                id="city"
-                type="text"
-                name="city"
-                defaultValue={locationState.query ?? currentCity}
-                placeholder="Austin, TX"
-                spellCheck={false}
-              />
-            </Field>
-            <Button type="submit" variant="outline" size="lg" disabled={locationPending} className="w-fit px-4">
-              {locationPending ? "Looking up…" : "Save city"}
-            </Button>
-            {locationState.error && <FieldError>{locationState.error}</FieldError>}
-            {locationState.saved && (
+          <form
+            className="flex flex-col gap-3 text-sm"
+            onSubmit={(event) => {
+              event.preventDefault();
+              save();
+            }}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              {SUN_HOUR_KEYS.map((key) => (
+                <Field key={key} className="gap-1">
+                  <FieldLabel htmlFor={`sun-hour-${key}`}>{SUN_HOUR_LABELS[key]}</FieldLabel>
+                  <Input
+                    id={`sun-hour-${key}`}
+                    type="time"
+                    name={key}
+                    value={draft[key]}
+                    required
+                    aria-invalid={checked.error !== undefined}
+                    aria-describedby={checked.error ? "sun-hours-error" : undefined}
+                    onChange={(event) => edit(key, event.target.value)}
+                    className="w-fit"
+                  />
+                </Field>
+              ))}
+            </div>
+
+            <DayStrip pair={sunPair} hours={checked.hours ?? saved} />
+            <FieldDescription className="text-xs">
+              The day from midnight to midnight, in the colors above. It shows the hours as typed once they go round in order.
+            </FieldDescription>
+
+            {checked.error && (
+              <FieldError id="sun-hours-error" role="alert">
+                {checked.error}
+              </FieldError>
+            )}
+            {result.error && <FieldError role="alert">{result.error}</FieldError>}
+            {result.savedAt && !changed && (
               <p role="status" className="text-success">
-                Using {locationState.saved.name}: {formatSunTimes(locationState.saved)}.
+                Saved.
               </p>
             )}
-            {!locationState.saved && !locationState.error && currentCity && currentSunTimes && (
-              <p className="text-muted-foreground">
-                Using {currentCity}: {formatSunTimes(currentSunTimes)}.
-              </p>
-            )}
-            {!currentCity && !locationState.saved && (
-              <p className={theme === "auto" ? "text-warning" : "text-muted-foreground"}>
-                No city saved yet, so Follow the sun is using 6:30 AM and 6:30 PM.
-              </p>
-            )}
+
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" variant="outline" size="lg" disabled={pending || !checked.hours || !changed} className="px-4">
+                {pending ? "Saving…" : "Save hours"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                disabled={pending || isDefault}
+                onClick={() => {
+                  setDraft(DEFAULT_SUN_HOURS);
+                  setResult({});
+                }}
+                className="px-4"
+              >
+                Use the defaults
+              </Button>
+            </div>
+            <FieldDescription className="text-xs">
+              The defaults are 05:45, 07:15, 17:45 and 19:15: a 90-minute fade up to full light, and another down to full dark.
+            </FieldDescription>
           </form>
         </CardContent>
       </Card>

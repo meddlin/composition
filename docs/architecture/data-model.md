@@ -36,7 +36,7 @@ The directory defaults to `~/.composition`.
 ### Settings
 
 The terminal app's settings are its own file, `~/.composition-cli/settings.json`, in the web app's
-settings format: the data directory, the color scheme, the city for "follow the sun", the pinned
+settings format: the data directory, the color scheme, the hours "follow the sun" moves at, the pinned
 favorites, and the column layout (stored but not used by the terminal). It sits **outside** the data
 directory on purpose, so it can say where the data directory is, and survives that directory
 moving. The web and desktop apps keep theirs in their own places (see

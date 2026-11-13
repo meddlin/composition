@@ -233,8 +233,19 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
   chatGptStatus: none,
   startChatGptSignIn: none,
   signOutChatGpt: none,
-  saveLocation: ([city]) => [text("saveLocation", city, "city")],
-  loadSunSchedule: none,
+  // The four hours, each as text: whether they are times that go once round the clock in order is for the settings code to say.
+  saveSunHours: ([input]) => {
+    const hours = record("saveSunHours", input, "hours");
+    return [
+      {
+        lightenFrom: text("saveSunHours", hours.lightenFrom, "lightenFrom"),
+        lightFrom: text("saveSunHours", hours.lightFrom, "lightFrom"),
+        darkenFrom: text("saveSunHours", hours.darkenFrom, "darkenFrom"),
+        darkFrom: text("saveSunHours", hours.darkFrom, "darkFrom"),
+      },
+    ];
+  },
+  loadSunHours: none,
 };
 
 /** Arguments of the desktop-only attachment methods (see attachments.ts). Ids only: no path ever comes from the renderer. */

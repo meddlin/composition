@@ -24,7 +24,7 @@ leaving the terminal. It opens the same notes as the web and desktop apps in thi
 - Search across all notes with fuzzy full-text search and filters (`tag: work`, `created: >2026-05-30`),
   powered by [Meilisearch](https://www.meilisearch.com/)
 - Pin favorites, and restore deleted notes and groups from the Trash Can for 60 days
-- Five color schemes, including one that follows the sunrise and sunset of a city you choose
+- Five color schemes, including one that moves between light and dark at hours you choose
 - Navigate a fast, keyboard-driven UI. Press `?` for every key; they are also listed in
   [docs/ui/cli-keybindings.md](../../docs/ui/cli-keybindings.md)
 - Move all application data to a directory of your choice from Settings
