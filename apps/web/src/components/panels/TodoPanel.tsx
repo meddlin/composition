@@ -347,7 +347,7 @@ const UNDO_MS = 8000;
  * A to-do list: items with sub-items, to add, rename, remove and tick off (a done item is struck through). The list view
  * has three sections: what rolled over from earlier weeks and waits to be placed (shown only while something does), this
  * week, and the backlog. It can also be shown as a board with a column per status (backlog, to-do, in progress, done), with
- * Rolled over as a strip above the columns. Removing an item archives it and offers an Undo. The items are the workspace's, so
+ * Rolled over as a strip above the columns. Removing an item asks first, then archives it and offers an Undo. The items are the workspace's, so
  * every to-do panel, in any window, shows the same items; the panel itself saves only which items and sections it has
  * folded away and which view it is on.
  */
@@ -363,6 +363,8 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
   const [addingTo, setAddingTo] = useState<number | null>(null);
   /** What was just done, said at the bottom for a few seconds; with an Undo when it can be taken back. */
   const [bar, setBar] = useState<{ message: string; undo?: () => void } | null>(null);
+  /** The item the owner has asked to remove, waiting on their yes, so a slip of the mouse cannot take it off the list. */
+  const [removing, setRemoving] = useState<Todo | null>(null);
   /** What is typed in the Archive view's search box. */
   const [query, setQuery] = useState("");
   /** The item the owner is deleting for good, and what that would erase, once found out (for that item). */
@@ -536,7 +538,19 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     if (view !== state.view) store.setPanelState(panelId, { ...state, view } satisfies TodoPanelState);
   }
 
-  // Removing keeps the item in the archive, so it needs no question: the Undo is there for a slip.
+  /** Asks before removing; the item goes only on a yes, and the Undo is still there afterwards. */
+  function askRemove(todo: Todo) {
+    setRemoving(todo);
+  }
+
+  function confirmRemove() {
+    if (!removing) return;
+    const todo = removing;
+    setRemoving(null);
+    remove(todo);
+  }
+
+  // Removing keeps the item in the archive, and the Undo is there afterwards too.
   function remove(todo: Todo) {
     const subItems = countDescendants(todos, todo.id);
     setBar({
@@ -591,7 +605,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
     onEdit: setEditing,
     addingTo,
     onAddTo: setAddingTo,
-    onRemove: remove,
+    onRemove: askRemove,
     onDeleteForGood: (todo: Todo) => setDeleting({ id: todo.id, title: todo.title }),
     onPlace: place,
     drag: rowDrag,
@@ -745,7 +759,7 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
               <TodoBoard
                 todos={todos.filter((t) => !inRolledOver.has(t.id))}
                 onMove={(id, next) => void todosStore.setStatus(id, next)}
-                onRemove={remove}
+                onRemove={askRemove}
                 onDeleteForGood={rowProps.onDeleteForGood}
               />
             </div>
@@ -828,6 +842,25 @@ export function TodoPanel({ store, panelId, state }: { store: WorkspaceStore; pa
           )}
         </div>
       )}
+      <ConfirmDialog
+        open={removing !== null}
+        title="Remove this to-do?"
+        description={
+          removing && (
+            <>
+              “{removing.title}”
+              {(() => {
+                const subItems = countDescendants(todos, removing.id);
+                return subItems > 0 ? ` and ${subItems === 1 ? "its 1 sub-item" : `its ${subItems} sub-items`}` : "";
+              })()}{" "}
+              will be taken off the list and kept in the archive, where you can restore it.
+            </>
+          )
+        }
+        confirmLabel="Remove"
+        onConfirm={confirmRemove}
+        onCancel={() => setRemoving(null)}
+      />
       <ConfirmDialog
         open={deleting !== null}
         title="Delete permanently?"

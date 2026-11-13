@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 /**
- * The small "⋯" menu beside Remove on a to-do row or board card. Remove is one click and can be undone; what is here
+ * The small "⋯" menu beside Remove on a to-do row or board card. Remove asks first and can be undone; what is here
  * cannot be, so it is a step further away: Delete permanently erases the item, what is under it and their history.
  */
 export function TodoMenu({ title, onDeleteForGood }: { title: string; onDeleteForGood: () => void }) {

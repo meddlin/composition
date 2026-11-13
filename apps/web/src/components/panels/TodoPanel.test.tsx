@@ -54,6 +54,14 @@ function setup(
   return { todos, setPanelState, openNoteBeside };
 }
 
+/** Clicks an item's Remove and says yes to the question it asks. */
+async function removeItem(title: string) {
+  fireEvent.click(await screen.findByRole("button", { name: `Remove ${title}` }));
+  const dialog = await screen.findByRole("alertdialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+  await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+}
+
 const typeInto = (name: string, value: string) => {
   const box = screen.getByRole("textbox", { name });
   fireEvent.change(box, { target: { value } });
@@ -175,10 +183,28 @@ describe("the to-do panel", () => {
     await waitFor(() => expect(screen.getByText("Buy milk").className).not.toContain("line-through"));
   });
 
-  it("removes an item at once, and says so with an Undo", async () => {
-    setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
+  it("asks before removing an item, and leaves it be on Cancel", async () => {
+    const { todos } = setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
 
     fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Remove this to-do?");
+    expect(dialog.textContent).toContain("“Buy milk” will be taken off the list and kept in the archive");
+    // Cancel holds the focus, so an Enter pressed by accident backs out.
+    expect(document.activeElement?.textContent).toBe("Cancel");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByText("Buy milk")).toBeTruthy();
+    expect(todos.getSnapshot().todos.map((t) => t.id)).toEqual([1, 2]);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("removes an item on a yes, and says so with an Undo", async () => {
+    setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
+
+    await removeItem("Buy milk");
 
     await waitFor(() => expect(screen.queryByText("Buy milk", { selector: "span.break-words" })).toBeNull());
     expect(screen.getByText("Walk dog")).toBeTruthy();
@@ -187,7 +213,7 @@ describe("the to-do panel", () => {
 
   it("brings a removed item back with Undo", async () => {
     setup([item(1, null, "Buy milk"), item(2, null, "Walk dog")]);
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
+    await removeItem("Buy milk");
 
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
 
@@ -195,14 +221,16 @@ describe("the to-do panel", () => {
     await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
   });
 
-  it("removes an item with sub-items without asking, says how many went with it, and Undo brings them all back", async () => {
+  it("says in the question how many sub-items go with an item, and after it how many went; Undo brings them all back", async () => {
     setup([item(1, null, "Plan trip"), item(2, 1, "Book flights"), item(3, null, "Walk dog")]);
 
     fireEvent.click(await screen.findByRole("button", { name: "Remove Plan trip" }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("“Plan trip” and its 1 sub-item will be taken off the list");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
 
     expect((await screen.findByRole("status")).textContent).toContain("Removed “Plan trip” and 1 sub-item.");
     expect(screen.queryByText("Book flights")).toBeNull();
-    expect(screen.queryByRole("dialog")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Book flights")).toBeTruthy();
@@ -216,6 +244,7 @@ describe("the to-do panel", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     fireEvent.click(screen.getByRole("button", { name: "Remove Buy milk" }));
+    fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Remove" }));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(0);
     });
@@ -315,10 +344,10 @@ describe("the to-do board", () => {
 
   it("removes a card, with an Undo, whether or not it has sub-items", async () => {
     onBoard();
-    fireEvent.click(await screen.findByRole("button", { name: "Remove Plan trip" }));
+    await removeItem("Plan trip");
     await waitFor(() => expect(cardsIn("Backlog")).toEqual([]));
 
-    fireEvent.click(screen.getByRole("button", { name: "Remove Write report" }));
+    await removeItem("Write report");
     await waitFor(() => expect(cardsIn("In progress")).toEqual([]));
     expect(cardsIn("To-do")).toEqual(["Buy milk"]);
 
@@ -848,13 +877,16 @@ describe("Delete permanently beside Remove", () => {
     expect(await screen.findByRole("alertdialog")).toBeTruthy();
   });
 
-  it("keeps Remove as it was: one click, no question", async () => {
+  it("keeps Remove a separate, gentler question", async () => {
     setup([item(2, null, "Buy milk")]);
 
     fireEvent.click(await screen.findByRole("button", { name: "Remove Buy milk" }));
 
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog.textContent).toContain("Remove this to-do?");
+    expect(dialog.textContent).not.toContain("erased for good");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Removed “Buy milk”."));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
   });
 });
 
