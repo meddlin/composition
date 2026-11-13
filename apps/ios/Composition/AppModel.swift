@@ -57,6 +57,11 @@ final class AppModel {
     var pdfGoToCount = 0
     /// A PDF just picked or dropped that the library already holds, waiting for the answer (open it, import it again, or neither).
     var duplicatePdf: DuplicatePdf?
+    /// The Reading List plugin (AppModel+ReadingList.swift): whether it is on, its links oldest first, and the one whose page is open.
+    /// Set only there.
+    var readingListEnabled = false
+    var readingItems: [ReadingItem] = []
+    var readingSelection: Int64?
     private(set) var noteCount = 0
     private(set) var sqliteVersion = ""
     private(set) var lastSearchMilliseconds: Double?
@@ -180,6 +185,7 @@ final class AppModel {
             sessions = stores.sessions
             settings = SettingsStore(location: location)
             loadAppearance()
+            await loadReadingList()
             indexRebuiltAtOpen = stores.rebuilt
             if stores.recovered > 0 {
                 notice = "The app was closed while you were typing. What you had typed in \(stores.recovered == 1 ? "1 note" : "\(stores.recovered) notes") is back."

@@ -50,6 +50,9 @@ public final class SettingsStore: @unchecked Sendable {
     /// The light and dark colours Follow the sun moves between; the classic pair for anything the file does not name.
     public func sunPair() -> SunPairName { locked { SunPairName(settingsValue: $0["sunPair"]) } }
 
+    /// Whether the Reading List plugin is on: the desktop's `plugins["reading-list"]`, off unless the file says `true`.
+    public func readingListEnabled() -> Bool { locked { PluginSettings.readingListEnabled(settingsValue: $0["plugins"]) } }
+
     // MARK: Writing
 
     public func setFavorites(_ favorites: [Favorite]) throws {
@@ -80,6 +83,16 @@ public final class SettingsStore: @unchecked Sendable {
     public func setSunHours(_ hours: SunHours) throws {
         if let problem = hours.problem { throw SettingsError.unusableSunHours(problem) }
         try edit { $0["sunHours"] = hours.settingsObject }
+    }
+
+    /// Turns the Reading List plugin on or off. The other plugins' entries (the desktop's to-do list, RSS Reader, Contacts) are kept as
+    /// they were; a `plugins` value that is not an object is replaced, as the desktop's parser would have ignored it.
+    public func setReadingListEnabled(_ enabled: Bool) throws {
+        try edit { object in
+            var plugins = object["plugins"] as? [String: Any] ?? [:]
+            plugins[ReadingLinks.pluginId] = enabled
+            object["plugins"] = plugins
+        }
     }
 
     // MARK: The file

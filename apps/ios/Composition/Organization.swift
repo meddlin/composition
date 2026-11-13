@@ -12,14 +12,17 @@ enum SidebarItem: Hashable, Sendable {
     case favorites
     case notebook(Int64)
     case group(Int64)
+    /// The Reading List plugin's links, there while the plugin is on (AppModel+ReadingList.swift).
+    case readingList
 
-    /// For `@SceneStorage`: `all`, `favorites`, `notebook:3`, `group:12`.
+    /// For `@SceneStorage`: `all`, `favorites`, `notebook:3`, `group:12`, `reading-list`.
     var stored: String {
         switch self {
         case .all: "all"
         case .favorites: "favorites"
         case .notebook(let id): "notebook:\(id)"
         case .group(let id): "group:\(id)"
+        case .readingList: "reading-list"
         }
     }
 
@@ -28,6 +31,7 @@ enum SidebarItem: Hashable, Sendable {
         switch (parts.first, parts.dropFirst().first.flatMap { Int64($0) }) {
         case ("all", nil): self = .all
         case ("favorites", nil): self = .favorites
+        case ("reading-list", nil): self = .readingList
         case ("notebook", let id?): self = .notebook(id)
         case ("group", let id?): self = .group(id)
         default: return nil

@@ -454,6 +454,26 @@ Built 2026-11-12 after your reader pass ("Search finds words in my notes, but no
 321. **A restored backup.** Restore a desktop backup that has PDFs: after a little while their words are found, as in 311.
 322. **Speed.** With your real library, the line under the results (*3 results · 12 ms*) for a few searches that reach your books. *Tell me the numbers, the biggest book's pages, and Debug or Release.*
 
+## The Reading List (plugin, ahead of M3)
+
+Built 2026-11-13 at your request. **Checked in the iPad Simulator only (two UI tests against a local page); nothing here is ticked.** The
+desktop's Reading List on the iPad: links in the second column, the page in the third. [What it is and how it maps to the desktop](../ipad-build-plan.md#ahead-of-m3-the-reading-list).
+
+323. **Off until you turn it on.** Install this build and open the app: no *Reading List* in the sidebar. More ▸ *Plugins…*: *Reading List* is off, and To-do, RSS Reader and Contacts are listed as *Desktop app only*. Turn it on and tap Done: *Reading List* appears under Favorites with 0.
+324. **Add a link.** Tap *Reading List*. In Safari, copy a real article's link (Share ▸ Copy). Back in the app, tap the box and paste, then Return: the row appears with the site's name and a blue dot, and the page opens on the right. A moment later the row takes the page's title. **Tell me a site where the title is wrong or never comes.**
+325. **The Paste button.** Copy another link and tap the clipboard button at the top of the list: it is added without the box, and the system does not ask to paste.
+326. **Refused links.** Type `javascript:alert(1)`, then `mailto:you@example.com`, then `https://user:pass@example.com`: each is refused with a reason under the box, and the text stays to be fixed. Paste a link already in the list with `#something` on the end: *That link is already in your list: …*, and that link opens.
+327. **Reading.** On the page: scroll, follow a link inside it (it opens in place), use the page's back and forward arrows and a two-finger swipe from the edge. *Reload* reloads; while a page loads the button stops it, and a thin bar under the address shows the progress.
+328. **New windows go to Safari.** On a page, tap a link that opens a new tab (many sites' external links do): Safari opens with it, and the app's page stays where it was.
+329. **Read and unread.** Tap *Mark as Read* (the tick at the top right): the dot goes, the title greys, the row moves below the unread ones and the sidebar count drops. Swipe the row right for *Unread*: it comes back.
+330. **Delete asks first.** Swipe a row left and tap *Delete*: a question names the link and says it is not sent to the Trash Can. Tap outside it: nothing is deleted. Again, and *Delete*: it is gone. The same from the row's menu (press and hold).
+331. **Signed in to a paywall.** Open a site you subscribe to and sign in on the page. End the app and open it again: still signed in. More ▸ *Plugins…* ▸ *Clear Browsing Data…*: it asks first; after it, the site has signed you out and your links are all still there. **Tell me if a sign-in page refused to work inside the app.**
+332. **From Safari in Split View.** Put Safari beside the app and drag a link (or the address) from Safari onto the list, and onto the *Reading List* row in the sidebar: each is added.
+333. **Turn it off.** With a page open, More ▸ *Plugins…*, turn it off: the sidebar row goes and the notes are back. Turn it on again: the same links, the dots as they were.
+334. **Into the desktop and back.** Export a backup (More ▸ *Export a backup…*), restore it in the desktop app: the desktop's Reading List (turned on by the backup, since the switch travels with it) has the same links, titles and read marks. Add one on the desktop, back up, restore on the iPad: it is there.
+335. **The other columns.** In portrait, with the list hidden, picking a link from the list brings its page; the back and forward arrows at the top of the list move between the Reading List and your notebooks. In each colour scheme, the list, the box and the bar over the page are readable (the page itself keeps its own colours).
+336. **Speed and memory.** Open ten heavy pages one after another. **Tell me if the app was ever ended by the system or felt slow, and whether a page went blank** (the app reloads a page whose web process was ended).
+
 ## What it leaves out
 
 The Pencil's highlighter snapping to text lines, handwritten notes beside a PDF, dark pages, moving or resizing a typed note, printed page labels in the page button and the contents, and the PDF's title from its own metadata. Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
@@ -574,6 +594,7 @@ Open it from the ellipsis menu at the top of the notebooks column: *PDF ink lab 
 - **The release polish screens on a real iPad** (items 184 to 199 and 216 to 226): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - **Finding words in a PDF's own text on a real iPad** (items 311 to 322): how long the first reading of a real library takes, the index's size, search speed with books in it, and real books' text (ligatures, hyphenation, columns) as PDFKit reads it.
+- **The Reading List on a real iPad** (items 323 to 336): real sites, titles, paywall sign-ins, Safari in Split View, and memory with heavy pages; only the Simulator, against a test page, has been used.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 
 ## What to tell me
