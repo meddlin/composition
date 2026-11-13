@@ -1,0 +1,8 @@
+/* The "Dark" appearance: the foreground only. The asset catalog's dark icon has a transparent background so the system's own dark
+   background shows through (Xcode, "Configuring your app icon using an asset catalog"). The ink bench would vanish on that, so it takes
+   the Cream scheme's --highlight (#c2762b), and the page the Cream-to-amber pair's night ink (#f0e2cc, the pair's --foreground),
+   a little duller than the paper so the icon is not excessively bright. */
+#background { display: none !important; }
+.paper { fill: #f0e2cc !important; stroke: #f0e2cc !important; }
+.fold { fill: #cdbfa6 !important; stroke: #cdbfa6 !important; }
+.bench { fill: #c2762b !important; }

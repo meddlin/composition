@@ -1,0 +1,9 @@
+/* The "Tinted" appearance: a grayscale image (Xcode, "Configuring your app icon using an asset catalog"); the system maps its brightness
+   onto the person's tint. The grays are chosen by brightness, not taken from the colours: bright page, dark text on it, mid-gray
+   highlight and bench, near-black tile, so each part keeps its place when the tint is applied. */
+.bg { fill: #1a1a1a !important; }
+.paper { fill: #f2f2f2 !important; stroke: #f2f2f2 !important; }
+.fold { fill: #c4c4c4 !important; stroke: #c4c4c4 !important; }
+.mark { fill: #b4b4b4 !important; }
+.bar { fill: #2a2a2a !important; }
+.bench { fill: #8c8c8c !important; }
