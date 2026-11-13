@@ -164,6 +164,7 @@ extension AppModel {
 
     private func finishImport(opened: Int64?, group: Int64?, notebook: Int64?, problems: [String]) async {
         await reload()
+        indexPdfText()
         if let opened {
             query = ""
             open(opened)
@@ -253,6 +254,8 @@ struct PdfGoTo: Equatable {
     /// 0-based.
     let page: Int?
     let mark: String?
+    /// Words to show in the reader's find bar (a search result found in the PDF's text).
+    var find: String? = nil
     let sequence: Int
 }
 

@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useElementWidth } from "../notes/useElementWidth";
-import type { PdfAnnotation, PdfCitation, PdfDocument } from "@/lib/composition/documentsApi";
+import type { PdfAnnotation, PdfCitation, PdfDocument, PdfTextState } from "@/lib/composition/documentsApi";
 import type { DocumentsStore } from "@/lib/composition/documentsStore";
 import { pageCitation, quoteBlock } from "@/lib/composition/pdfRefs";
 import { cn } from "@/lib/utils";
@@ -79,6 +79,17 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
   const [dark, setDark] = useState(document.viewState.darkPages === true);
   const [sidebar, setSidebar] = useState<SidebarTab | null>(null);
   const [findOpen, setFindOpen] = useState(false);
+  /** The words of the last search result opened here (the request's `seq` tells a new one from it): the find bar opens with them. */
+  const [findAsked, setFindAsked] = useState<{ query: string; seq: number } | null>(null);
+  /** Where this PDF's text is in search: a scan's outline says it has none. */
+  const [textState, setTextState] = useState<PdfTextState | null>(null);
+  useEffect(() => {
+    let current = true;
+    void documents.pdfTextState(document.id).then((state) => current && setTextState(state));
+    return () => {
+      current = false;
+    };
+  }, [documents, document.id]);
   const [bookmarksRead, setBookmarksRead] = useState(0);
 
   const viewer = usePdfViewer(container, pages, {
@@ -166,11 +177,18 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
     const rect = mark?.rects?.[0] ?? (mark?.body as { rect?: [number, number, number, number] } | null | undefined)?.rect;
     if (mark && rect) ready.controls.goToRect(mark.page + 1, rect);
     else ready.controls.goToPage(Math.min(goTo.page, ready.pageCount));
+    // A search result found in the PDF's text: pdf.js finds its words from this page on (the find bar is opened with them below).
+    if (goTo.find) ready.controls.find(goTo.find);
     // The mark keeps its flash for a moment, then the ask is dropped.
     const seq = goTo.seq;
     window.setTimeout(() => goToDone.current?.(seq), FLASH_MS);
   }, [goTo, ready, marksKnown, edit.marks]);
   const flashId = goTo?.mark ? (edit.marks.find((m) => m.uuid === goTo.mark)?.id ?? null) : null;
+  // A new request with words to find opens the find bar with them (state adjusted while rendering, not in an effect).
+  if (goTo?.find && goTo.seq !== findAsked?.seq) {
+    setFindAsked({ query: goTo.find, seq: goTo.seq });
+    setFindOpen(true);
+  }
 
   function onKeyDown(event: KeyboardEvent) {
     if (edit.onKeyDown(event)) return;
@@ -234,7 +252,7 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
         </div>
       )}
       <ExportPdfDialog open={exportOpen} onOpenChange={setExportOpen} onExport={(flatten) => void exportPdf(flatten)} protectedByPassword={documents.passwordFor(document.id) !== undefined} />
-      {ready && findOpen && <FindBar viewer={ready} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
+      {ready && findOpen && <FindBar key={findAsked?.seq ?? 0} viewer={ready} initialQuery={findAsked?.query ?? ""} onClose={() => { setFindOpen(false); ready.controls.closeFind(); }} />}
       <div className="relative flex min-h-0 flex-1">
         {sidebar !== null && (
           <aside
@@ -259,7 +277,15 @@ export function PdfReader({ document, documents, pairing, onTitle }: { document:
               {!ready ? (
                 <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
               ) : sidebar === "outline" ? (
-                <OutlineTree items={ready.outline} controls={ready.controls} />
+                <>
+                  {textState === "noText" && (
+                    // OCR is not built (docs/pdf-markup-plan.md, P7 and P8): a scan's words are not in search; its marks and bookmarks are.
+                    <p role="note" className="border-b px-3 py-2 text-xs text-muted-foreground">
+                      No searchable text (scanned). Search finds this PDF&apos;s highlights, comments, text notes and bookmarks, not its words.
+                    </p>
+                  )}
+                  <OutlineTree items={ready.outline} controls={ready.controls} />
+                </>
               ) : sidebar === "highlights" ? (
                 <HighlightList marks={edit.marks} labels={ready.labels} controls={ready.controls} selectedId={edit.selectedId} onSelect={(mark) => edit.select(mark.id)} onComment={edit.comment} onDelete={edit.remove} onQuote={pairing ? quote : undefined} quotedIn={pairing ? quotedIn : undefined} />
               ) : sidebar === "notes" && pairing ? (
@@ -471,8 +497,9 @@ function PageBox({ viewer }: { viewer: Extract<PdfViewer, { phase: "ready" }> | 
   );
 }
 
-function FindBar({ viewer, onClose }: { viewer: Extract<PdfViewer, { phase: "ready" }>; onClose: () => void }) {
-  const [query, setQuery] = useState("");
+/** The find bar. `initialQuery` is what a search result asked for (the reader has already asked pdf.js to find it); the bar is given a new `key` for each. */
+function FindBar({ viewer, initialQuery, onClose }: { viewer: Extract<PdfViewer, { phase: "ready" }>; initialQuery: string; onClose: () => void }) {
+  const [query, setQuery] = useState(initialQuery);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
 

@@ -46,7 +46,7 @@ export function useNoteSurface(
 
   return {
     focusedNoteId,
-    openNote: (noteId) => store.openNote(noteId, windowId),
+    openNote: (noteId, pdfPlace) => store.openNote(noteId, windowId, pdfPlace),
     openNoteBeside: (noteId) =>
       unlessDuplicate(noteId, isNoteShown(store.getSnapshot().panels, noteId), () => store.openNoteBeside(noteId, windowId)),
     dropNote: (noteId: number, panelId: PanelId, zone: DropZone) =>

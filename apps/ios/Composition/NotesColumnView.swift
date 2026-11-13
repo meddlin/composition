@@ -16,7 +16,11 @@ struct NotesColumnView: View {
     private var searching: Bool { !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        List(selection: Binding(get: { model.selection }, set: { model.open($0) })) {
+        List(selection: Binding(get: { model.selection }, set: { id in
+            model.open(id)
+            // A result found in its PDF's text opens the PDF at the page the words are on, with the find bar showing them.
+            if let id, searching { model.openPdfHit(id) }
+        })) {
             if searching {
                 ForEach(model.notes, id: \.id) { noteRow($0, in: nil) }
             } else if item == .favorites {
@@ -139,7 +143,7 @@ struct NotesColumnView: View {
     /// `list` is the list the row is in, whose order a drop beside it sets (nil in search results, which have none).
     private func noteRow(_ note: NoteSummary, in list: SidebarItem?) -> some View {
         let favorite = model.isFavorite(.note, note.id)
-        return NoteRow(note: note, favorite: favorite, isPdf: model.pdfSizes[note.id] != nil)
+        return NoteRow(note: note, favorite: favorite, isPdf: model.pdfSizes[note.id] != nil, pdfHit: list == nil && searching ? model.pdfHitLine(note.id) : nil)
             .tag(note.id)
             .accessibilityIdentifier("note-row-\(note.id)")
             .swipeActions(edge: .leading) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSearchQuery } from "./searchQuery";
+import { findTextForQuery, parseSearchQuery } from "./searchQuery";
 
 describe("parseSearchQuery", () => {
   it("treats plain text as free text with no filters", () => {
@@ -151,5 +151,17 @@ describe("parseSearchQuery", () => {
     expect(parsed.filters).toEqual(['tags = "web development"', expect.stringContaining("created_at_ts >=")]);
     expect(parsed.text).toBe("routing");
     expect(parsed.attributesToSearchOn).toEqual(["title"]);
+  });
+});
+
+describe("findTextForQuery", () => {
+  it("gives the query's phrase, or else its longest word, without filters (the iPad's PdfSearchText.findText cases)", () => {
+    expect(findTextForQuery("quetzals")).toBe("quetzals");
+    expect(findTextForQuery("the lighthouse keeper")).toBe("lighthouse");
+    expect(findTextForQuery("keeper house")).toBe("keeper");
+    expect(findTextForQuery('old "lighthouse   keeper" harbour')).toBe("lighthouse keeper");
+    expect(findTextForQuery("quetzals tag: birds")).toBe("quetzals");
+    expect(findTextForQuery("tag: birds")).toBe("");
+    expect(findTextForQuery("Zürich, café")).toBe("Zürich");
   });
 });

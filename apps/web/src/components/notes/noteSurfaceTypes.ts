@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { SidebarActions } from "../panels/host";
 import type { DropZone, PanelId } from "../panels/layoutTree";
-import type { WorkspaceStore } from "./workspaceStore";
+import type { PdfPlace, WorkspaceStore } from "./workspaceStore";
 
 /**
  * How the workspace shows notes, which differs by app: the web app has a single row of panes, the desktop app a grid
@@ -11,8 +11,8 @@ import type { WorkspaceStore } from "./workspaceStore";
 export type NoteSurface = {
   /** The note the user is working in, if any: highlighted in the sidebar and counted as opened. */
   focusedNoteId: number | null;
-  /** Shows a note the way picking it in the sidebar does. */
-  openNote(noteId: number): void;
+  /** Shows a note the way picking it in the sidebar does; for a note that owns a PDF, `pdfPlace` opens the PDF at a page with words found. */
+  openNote(noteId: number, pdfPlace?: PdfPlace): void;
   /** The sidebar's "Open to the side". */
   openNoteBeside(noteId: number): void;
   /** A note dropped on a panel (the desktop's grid); the web's panes take drops themselves. */

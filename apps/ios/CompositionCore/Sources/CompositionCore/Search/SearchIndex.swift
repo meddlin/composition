@@ -60,7 +60,7 @@ public final class SearchIndex: Sendable {
     /// The columns, most important first: the order Meilisearch's searchableAttributes put them in.
     static let columns = ["title", "content", "description"]
 
-    private let pool: DatabasePool
+    let pool: DatabasePool
     private let tolerance: SearchTolerance
     private let vocabulary = OSAllocatedUnfairLock<Vocabulary?>(initialState: nil)
 
@@ -79,6 +79,7 @@ public final class SearchIndex: Sendable {
                 CREATE VIRTUAL TABLE IF NOT EXISTS notes_vocab USING fts5vocab(notes_fts, 'row');
                 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 """)
+            try Self.createPdfTextTables(db)
         }
         return SearchIndex(pool: pool, tolerance: tolerance)
     }
@@ -185,13 +186,16 @@ public final class SearchIndex: Sendable {
 
     /// The ids of the notes matching `query`, best first, at most `resultLimit`. The query may mix free text with
     /// `field: value` filters (`SearchQueryParser`). A query with neither matches nothing.
-    public func search(_ query: String) throws -> [Int64] {
+    public func search(_ query: String) throws -> [Int64] { try searchHits(query).map(\.noteId) }
+
+    /// `search`, with where each note was found: a note found only by words in its PDF's own text says on which page they first are.
+    public func searchHits(_ query: String) throws -> [SearchHit] {
         let parsed = SearchQueryParser.parse(query)
         if parsed.text.isEmpty && parsed.filters.isEmpty { return [] }
         return try pool.read { db in try self.search(parsed, db) }
     }
 
-    private func search(_ parsed: ParsedSearchQuery, _ db: Database) throws -> [Int64] {
+    private func search(_ parsed: ParsedSearchQuery, _ db: Database) throws -> [SearchHit] {
         var conditions: [String] = []
         var arguments: [any DatabaseValueConvertible] = []
         for filter in parsed.filters {
@@ -214,7 +218,8 @@ public final class SearchIndex: Sendable {
         guard !query.isEmpty else {
             return try Int64.fetchAll(
                 db, sql: "SELECT id FROM docs WHERE 1 = 1\(filterSQL) ORDER BY updated_ts DESC, updated_at DESC, id DESC LIMIT \(Self.resultLimit)",
-                arguments: StatementArguments(arguments))
+                arguments: StatementArguments(arguments)
+            ).map { SearchHit(noteId: $0) }
         }
 
         let vocabulary = try currentVocabulary(db)
@@ -265,10 +270,15 @@ public final class SearchIndex: Sendable {
         }
 
         let found = try answer(tolerance.rules)
+        var hits = found.map { SearchHit(noteId: $0) }
+        // Then the notes whose PDFs have every word on one page, which their own text did not find (SearchIndex+PdfText.swift).
+        if hits.count < Self.resultLimit, allowed.contains("content") {
+            hits += try pdfTextHits(query, excluding: Set(found), limit: Self.resultLimit - hits.count, filterSQL: filterSQL, arguments: arguments, db)
+        }
         // Nothing at all: read the short words as if one letter of each might be wrong, which is too noisy to do when
         // there is something to show.
-        if found.isEmpty, let fallback = tolerance.fallback { return try answer(fallback) }
-        return found
+        if hits.isEmpty, let fallback = tolerance.fallback { return try answer(fallback).map { SearchHit(noteId: $0) } }
+        return hits
     }
 
     /// The words in the notes, read from the index once and kept until it changes.

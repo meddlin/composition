@@ -14,6 +14,7 @@ vi.mock("./searchIndex", () => ({
   indexNote: vi.fn(async () => {}),
   deleteNoteFromIndex: vi.fn(async () => {}),
   searchNoteIds: vi.fn(async () => []),
+  searchNotesWithPdfText: vi.fn(async () => []),
   unavailableMessage: () => "Search is unavailable. Is Meilisearch running at http://127.0.0.1:7700?",
 }));
 
@@ -883,7 +884,7 @@ describe("searchNotes", () => {
     const inGroup = await service.createNote("Maintenance", lawn.id);
     const inSub = await service.createNote("Winterize", sprinklers.id);
     const loose = await service.createNote("Loose");
-    vi.mocked(searchIndex.searchNoteIds).mockResolvedValueOnce([inGroup.id, inSub.id, loose.id]);
+    vi.mocked(searchIndex.searchNotesWithPdfText).mockResolvedValueOnce([{ id: inGroup.id }, { id: inSub.id }, { id: loose.id, pdfPage: 11, pdfPageLabel: "ix" }]);
 
     const { hits } = await service.searchNotes("anything");
 
@@ -892,11 +893,13 @@ describe("searchNotes", () => {
       ["Lawn Care", "Sprinklers"],
       [],
     ]);
+    // A note found only in its PDF's text says on which page, counted from 1 as the reader counts, with the printed label.
+    expect(hits.map((hit) => hit.pdf)).toEqual([undefined, undefined, { page: 12, label: "ix" }]);
   });
 
   it("reports an unavailable search backend instead of throwing", async () => {
     const searchIndex = await import("./searchIndex");
-    vi.mocked(searchIndex.searchNoteIds).mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    vi.mocked(searchIndex.searchNotesWithPdfText).mockRejectedValueOnce(new Error("ECONNREFUSED"));
     vi.spyOn(console, "error").mockImplementation(() => {});
     const { searchNotes } = await import("./service");
 

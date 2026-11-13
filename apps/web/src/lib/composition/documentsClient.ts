@@ -31,3 +31,5 @@ export const addAnnotations: DocumentsApi["addAnnotations"] = (id, inputs) => br
 export const updateAnnotation: DocumentsApi["updateAnnotation"] = (id, changes) => bridge().updateAnnotation(id, changes);
 export const deleteAnnotation: DocumentsApi["deleteAnnotation"] = (id) => bridge().deleteAnnotation(id);
 export const restoreAnnotations: DocumentsApi["restoreAnnotations"] = (id, annotations) => bridge().restoreAnnotations(id, annotations);
+export const pdfTextState: DocumentsApi["pdfTextState"] = (id) => bridge().pdfTextState(id);
+export const readUnlockedPdfText: DocumentsApi["readUnlockedPdfText"] = (id, password) => bridge().readUnlockedPdfText(id, password);

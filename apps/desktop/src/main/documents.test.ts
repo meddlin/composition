@@ -36,6 +36,7 @@ function setup(outcome: ImportPdfOutcome, ui: Partial<DocumentUi> = {}) {
     pickExportPath: vi.fn(async () => "/out/book (annotated).pdf"),
     exportPdf: vi.fn(async () => ({ ok: true as const, written: 3, skipped: { ink: 0, offPage: 0 }, passwordProtected: false })),
     dataFolder: () => dataFolder,
+    pdfText: { imported: vi.fn(), state: vi.fn(async () => "indexed" as const), readUnlocked: vi.fn() },
     ...ui,
   };
   return { api: createDocumentsApi(service, nativeUi), service, ui: nativeUi };
@@ -245,5 +246,25 @@ describe("exportDocument", () => {
 
     const partial = setup({ status: "refused", error: "x" }, { exportPdf: vi.fn(async () => ({ ok: true as const, written: 2, skipped: { ink: 1, offPage: 0 }, passwordProtected: false })) });
     expect(await partial.api.exportDocument(1, options)).toMatchObject({ saved: true, written: 2, skipped: { ink: 1, offPage: 0 } });
+  });
+});
+
+describe("the text of PDFs in search", () => {
+  it("is read after an import that added a PDF, and not after one that did not", async () => {
+    const added = setup({ status: "added", note, document });
+    await added.api.importPdf(target);
+    expect(added.ui.pdfText.imported).toHaveBeenCalledTimes(1);
+
+    const refused = setup({ status: "refused", error: "not a PDF" });
+    await refused.api.importPdf(target);
+    expect(refused.ui.pdfText.imported).not.toHaveBeenCalled();
+  });
+
+  it("says where a PDF's text is, and passes a password just used to unlock one on to be read with", async () => {
+    const { api, ui } = setup({ status: "added", note, document });
+    expect(await api.pdfTextState(4)).toBe("indexed");
+    expect(ui.pdfText.state).toHaveBeenCalledWith(4);
+    await api.readUnlockedPdfText(4, "secret");
+    expect(ui.pdfText.readUnlocked).toHaveBeenCalledWith(4, "secret");
   });
 });
