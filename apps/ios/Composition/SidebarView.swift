@@ -126,6 +126,17 @@ private struct RowAffordances: ViewModifier {
         switch row.item {
         case .all, .favorites:
             content
+        case .readingList:
+            // A link dragged from Safari (in Split View or Slide Over) onto the row joins the list.
+            content.dropDestination(for: URL.self) { urls, _ in
+                Task {
+                    for url in urls {
+                        // There is no box here to say why a link was refused, so it is said as the app's other problems are.
+                        if let problem = await model.addReadingLink(url.absoluteString) { model.errorMessage = problem }
+                    }
+                }
+                return !urls.isEmpty
+            }
         case .notebook(let id):
             content
                 .contextMenu { notebookMenu(id) }

@@ -22,6 +22,7 @@ extension AppModel {
         case .favorites: "Favorites"
         case .notebook(let id): notebooks.first { $0.id == id }?.name ?? "Notebook"
         case .group(let id): groups.first { $0.id == id }?.name ?? "Group"
+        case .readingList: "Reading List"
         }
     }
 
@@ -35,6 +36,10 @@ extension AppModel {
             SidebarRow(item: .all, title: "All Notes", systemImage: "tray.full", depth: 0, count: noteCount, expandable: false, isExpanded: false),
             SidebarRow(item: .favorites, title: "Favorites", systemImage: "star", depth: 0, count: favoriteGroups.count + favoriteNotes.count, expandable: false, isExpanded: false),
         ]
+        // The Reading List, while its plugin is on, with how many links are unread.
+        if readingListEnabled {
+            rows.append(SidebarRow(item: .readingList, title: "Reading List", systemImage: "eyeglasses", depth: 0, count: unreadReadingCount, expandable: false, isExpanded: false))
+        }
         var children: [Int64?: [NoteGroup]] = [:]
         for group in groups { children[group.parentId, default: []].append(group) }
         func append(_ group: NoteGroup, depth: Int) {
@@ -59,7 +64,7 @@ extension AppModel {
         switch item {
         case .notebook(let id): groups.filter { $0.parentId == nil && $0.notebookId == id }
         case .group(let id): groups.filter { $0.parentId == id }
-        case .all, .favorites: []
+        case .all, .favorites, .readingList: []
         }
     }
 
@@ -70,6 +75,7 @@ extension AppModel {
         case .favorites: favoriteNotes
         case .notebook(let id): orderedNotes.filter { $0.groupId == nil && $0.notebookId == id }
         case .group(let id): orderedNotes.filter { $0.groupId == id }
+        case .readingList: []
         }
     }
 
@@ -135,6 +141,7 @@ extension AppModel {
     func isValid(_ place: Place) -> Bool {
         switch place {
         case .list(.all), .list(.favorites): true
+        case .list(.readingList): readingListEnabled
         case .list(.notebook(let id)): notebook(id) != nil
         case .list(.group(let id)): group(id) != nil
         case .note(let id): orderedNotes.contains { $0.id == id }
@@ -332,7 +339,7 @@ extension AppModel {
         switch item {
         case .group(let id): await change { store, _ in _ = try store.renameGroup(id: id, name: name) }
         case .notebook(let id): await change { store, _ in _ = try store.renameNotebook(id: id, name: name) }
-        case .all, .favorites: break
+        case .all, .favorites, .readingList: break
         }
     }
 

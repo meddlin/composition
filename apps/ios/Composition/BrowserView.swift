@@ -10,12 +10,15 @@ struct BrowserView: View {
     @State private var showingAppearance = false
     @State private var showingLab = false
     @State private var showingImages = false
+    @State private var showingPlugins = false
     @State private var showingPdfInkLab = false
     @State private var confirmingReplace = false
     /// The note that was open when the app was last ended; the system brings it back (0 is none).
     @SceneStorage("selectedNote") private var storedSelection = 0
     @SceneStorage("sidebarItem") private var storedSidebar = "all"
     @SceneStorage("openGroups") private var storedExpanded = ""
+    /// The Reading List link whose page was open (0 is none).
+    @SceneStorage("readingSelection") private var storedReading = 0
     @State private var columns = NavigationSplitViewVisibility.automatic
     @State private var prompt: Prompt?
     @State private var promptText = ""
@@ -34,7 +37,11 @@ struct BrowserView: View {
                 .navigationTitle("Notebooks")
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
-                        Button { model.open(nil) } label: { Label("Home", systemImage: "house") }
+                        Button {
+                            // The home page is in the notes' third column, which the Reading List's page takes while it is showing.
+                            if model.sidebar == .readingList { model.visit(.all) }
+                            model.open(nil)
+                        } label: { Label("Home", systemImage: "house") }
                             .accessibilityIdentifier("home-button")
                     }
                     ToolbarItem(placement: .primaryAction) {
@@ -51,6 +58,7 @@ struct BrowserView: View {
                             Button("Replace with a backup…", systemImage: "arrow.down.doc") { confirmingReplace = true }
                             Button("Images…", systemImage: "photo.on.rectangle.angled") { showingImages = true }
                             Button("Appearance…", systemImage: "paintpalette") { showingAppearance = true }
+                            Button("Plugins…", systemImage: "puzzlepiece.extension") { showingPlugins = true }
                             Button("Editor lab (spike S3)", systemImage: "pencil.and.outline") { showingLab = true }
                             Button("PDF ink lab (spike B)", systemImage: "pencil.and.scribble") { showingPdfInkLab = true }
                             Button("About this build", systemImage: "info.circle") { showingAbout = true }
@@ -60,10 +68,18 @@ struct BrowserView: View {
                     }
                 }
         } content: {
-            NotesColumnView(model: model, prompt: $prompt, moving: $moving, footer: AnyView(footer))
-                .navigationSplitViewColumnWidth(min: 300, ideal: textSize.isAccessibilitySize ? 440 : 360, max: 560)
+            Group {
+                if model.sidebar == .readingList {
+                    ReadingListColumn(model: model)
+                } else {
+                    NotesColumnView(model: model, prompt: $prompt, moving: $moving, footer: AnyView(footer))
+                }
+            }
+            .navigationSplitViewColumnWidth(min: 300, ideal: textSize.isAccessibilitySize ? 440 : 360, max: 560)
         } detail: {
-            if let id = model.selection {
+            if model.sidebar == .readingList {
+                ReadingPageColumn(model: model)
+            } else if let id = model.selection {
                 NoteDetailView(model: model, noteID: id)
             } else {
                 HomePageView(model: model) { item in
@@ -96,6 +112,7 @@ struct BrowserView: View {
             restoreScene()
         }
         .onChange(of: model.selection) { storedSelection = Int($1 ?? 0) }
+        .onChange(of: model.readingSelection) { storedReading = Int($1 ?? 0) }
         .onChange(of: model.sidebar) { storedSidebar = ($1 ?? .all).stored }
         .onChange(of: model.expanded) { storedExpanded = $1.map(\.stored).sorted().joined(separator: ",") }
         .onChange(of: prompt) { promptText = $1?.startingText(in: model) ?? "" }
@@ -103,6 +120,7 @@ struct BrowserView: View {
         .sheet(isPresented: $showingAbout) { AboutView(model: model) }
         .sheet(isPresented: $showingAppearance) { AppearanceView(model: model) }
         .sheet(isPresented: $showingImages) { ImagesPage(model: model) }
+        .sheet(isPresented: $showingPlugins) { PluginsView(model: model) }
         .sheet(item: $moving) { MoveSheet(model: model, item: $0) }
         .fullScreenCover(isPresented: $showingLab) { EditorLabView(model: model) }
         .fullScreenCover(isPresented: $showingPdfInkLab) { PdfInkLabView() }
@@ -124,6 +142,9 @@ struct BrowserView: View {
         if model.expanded.isEmpty { model.expanded = Set(storedExpanded.split(separator: ",").compactMap { SidebarItem(stored: String($0)) }) }
         if model.selection == nil, storedSelection != 0, model.orderedNotes.contains(where: { $0.id == Int64(storedSelection) }) {
             model.selection = Int64(storedSelection)
+        }
+        if model.readingSelection == nil, storedReading != 0, model.readingItems.contains(where: { $0.id == Int64(storedReading) }) {
+            model.readingSelection = Int64(storedReading)
         }
         // The history starts from where the app opens.
         if let item = model.sidebar { model.history.record(.list(item)) }

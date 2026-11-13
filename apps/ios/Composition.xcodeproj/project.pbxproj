@@ -262,6 +262,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Composition-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Composition;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take a picture to put in a note.";
 					INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
@@ -292,6 +293,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Composition-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Composition;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Take a picture to put in a note.";
 					INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;

@@ -16,9 +16,9 @@
 # scripts/pdf-refs-oracle.mjs, scripts/pdf-text-oracle.mjs), and step 2 replays them (PdfConformanceTests, DocumentNamesConformanceTests,
 # PdfRefsConformanceTests, PdfTextConformanceTests, PdfTextExtractionTests, PdfTextSearchConformanceTests).
 #
-# Follow the sun (fixtures/conformance/sun.json) and reflow (fixtures/conformance/reflow.json) are committed the same way: the TypeScript
-# test that writes each (sunConformance.test.ts, reflowConformance.test.ts) fails when it no longer makes the committed file, and step 2
-# replays them (SunConformanceTests, ReflowConformanceTests).
+# Follow the sun (fixtures/conformance/sun.json), reflow (fixtures/conformance/reflow.json) and the Reading List (fixtures/conformance/reading-list.json)
+# are committed the same way: the TypeScript test that writes each (sunConformance.test.ts, reflowConformance.test.ts, readingListConformance.test.ts)
+# fails when it no longer makes the committed file, and step 2 replays them (SunConformanceTests, ReflowConformanceTests, ReadingListConformanceTests).
 #
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile) and Xcode's Swift.
 # Usage: apps/ios/scripts/conformance.sh [directory-for-the-fixtures]   (a temporary one by default)
@@ -41,13 +41,13 @@ pdf_corpus() {
   node --no-warnings "$root/apps/ios/scripts/document-names-oracle.mjs" --check
   node --no-warnings "$root/apps/ios/scripts/pdf-refs-oracle.mjs" --check
   node --no-warnings "$root/apps/ios/scripts/pdf-text-oracle.mjs" --check
-  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/sunConformance.test.ts src/components/notes/reflowConformance.test.ts)
+  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/sunConformance.test.ts src/components/notes/reflowConformance.test.ts src/lib/composition/readingListConformance.test.ts)
 }
 
 echo "== fixtures in $dir"
 echo "== 1/3 desktop writes databases, backups, the Trash Can script and the search notes"
 vitest -t "writes "
-echo "== 1/3 desktop still makes the committed PDF corpus, file names, Follow the sun and reflow fixtures"
+echo "== 1/3 desktop still makes the committed PDF corpus, file names, Follow the sun, reflow and Reading List fixtures"
 pdf_corpus
 echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays the PDF corpus and the committed fixtures, and writes its own backups"
 # PencilKit's own code traps ("CFEqual() called with NULL first argument", in PKReplicaManager) the first time a PKDrawing is built in a
