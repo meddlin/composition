@@ -437,6 +437,23 @@ The reader beside the note a PDF belongs to. **Tried in the Simulator only; this
 
 What to tell me for each: what you did, what you expected, what happened, and Debug or Release.
 
+## Finding words in a PDF's own text (Search, P8 revisited)
+
+Built 2026-11-12 after your reader pass ("Search finds words in my notes, but not in the PDF"). **Checked in the iPad Simulator and with `swift test` on a Mac only; nothing here is ticked.** Search now reads every page of your PDFs in the background and finds a word that is only in a PDF's pages, never marked. The desktop does not do this yet (the next step), so for now the two search differently for such words. [How it works](../architecture/search.md#the-text-of-a-pdf).
+
+311. **Your PDFs already here.** Install this build over the one you have and open the app. Give it a minute with a big book (it reads one PDF at a time, in the background, while you use the app). Then search for a word you know is in a book but that you never highlighted or commented on: the book's note is in the results, under the notes that have the word in their own text, with *In the PDF, p. 212* under its title. *Tell me how long the first reading of your library seemed to take, and whether the app felt slow while it did.*
+312. **The page it says.** The page in the result is the first page the word is on. For a book with its own page numbers (roman numerals before chapter 1, say), it is the printed number, the one the book shows, not the count from the cover.
+313. **Opening a result.** Tap the result: the PDF opens at that page, the word is marked in yellow there, and the find bar is at the bottom with the word in it (*1 of 3*, say); its arrows go on to the next places in the whole book. Scroll away from the page and the yellow goes. Try it in landscape with the lists hidden (the PDF beside the note) and in portrait (the PDF / Note switch).
+314. **Several words.** Search for two words that are on the same page of a book, but not side by side: the book is found, on that page. Two words that are never on the same page: the book is not found by them (each alone finds it). A phrase in double quotes (`"tidal estuary"`) finds only the words side by side, and the find bar shows the phrase.
+315. **As you type.** Type a word slowly: the PDF results come and go as the word grows (the last word is matched as the start of a word). A word misspelt by one letter does **not** find a PDF by its text (it may still find notes): typo tolerance is for the notes' own text only. *Tell me if you missed it.*
+316. **Filters.** A word with `tag:` or `updated:` still finds the PDF's note when the note has that tag or date; `title:` with the word does not look in PDFs.
+317. **A new import.** Import a PDF you have not imported before and, at once, search for a word in it: within a few seconds (longer for a big book) the result appears by itself, without retyping.
+318. **A scan.** Import a scanned PDF (pictures of pages, no text you can select): open the list button at the left of the strip: *Contents* says *No searchable text (scanned)*. Its words are not found; a bookmark's name or a typed note on it is.
+319. **A protected PDF.** Import a PDF with a password. Search for a word in it: not found. Open it and type the password: a few seconds later the word finds it. End the app and open it again: still found, and the app did not ask for the password to do it (it never keeps the password).
+320. **The Trash Can.** Move a PDF's note to the Trash Can: a word only in its pages no longer finds it. Restore it: it does again. Delete it for good: gone, and nothing else is found in its place.
+321. **A restored backup.** Restore a desktop backup that has PDFs: after a little while their words are found, as in 311.
+322. **Speed.** With your real library, the line under the results (*3 results · 12 ms*) for a few searches that reach your books. *Tell me the numbers, the biggest book's pages, and Debug or Release.*
+
 ## What it leaves out
 
 The Pencil's highlighter snapping to text lines, handwritten notes beside a PDF, dark pages, moving or resizing a typed note, printed page labels in the page button and the contents, and the PDF's title from its own metadata. Highlighting in the preview, buttons for Tab and Shift+Tab on the on-screen keyboard, Follow the sun and the desktop's font families, and everything else the real editor will have; attached files (they come in with a backup and go out again, but are not shown; stored *images* are drawn in
@@ -556,6 +573,7 @@ Open it from the ellipsis menu at the top of the notebooks column: *PDF ink lab 
 - **Drawing on a real iPad with the Pencil** (items 160 to 171 and 263 to 267): latency, palm rejection, the textured inks, how well Vision reads handwriting and what the tool picker does in a dark scheme; only the Simulator, with a finger, has been used. **Gate C is not passed.**
 - **The release polish screens on a real iPad** (items 184 to 199 and 216 to 226): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
 - Search speed on the iPad's own CPU and SQLite.
+- **Finding words in a PDF's own text on a real iPad** (items 311 to 322): how long the first reading of a real library takes, the index's size, search speed with books in it, and real books' text (ligatures, hyphenation, columns) as PDFKit reads it.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 
 ## What to tell me

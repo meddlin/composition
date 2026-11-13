@@ -93,7 +93,55 @@ time:
 A note that owns a PDF is indexed with one more thing: the words of its PDF's marks (their quotes, comments and text notes) and its bookmarks' labels,
 appended to its content (`marksSearchText`, [pdf.md](pdf.md#search)). A search returns ids only, so the added words are never shown; they only make
 the note findable. A change to a mark or bookmark re-indexes the owner note afterwards, in the background; `reindexAll` adds them for every owner note
-in one query. The text of the PDF itself is not indexed.
+in one query. On the desktop, the text of the PDF itself is not indexed yet; on the iPad it is ([below](#the-text-of-a-pdf)).
+
+## The text of a PDF
+
+**On the iPad only, for now** (built 2026-11-12; the desktop is the next step, against the same oracle). A word that is only in a PDF's own pages,
+never marked, finds the note that owns the PDF, and says on which page.
+
+- **What is indexed.** Every page of every PDF a note owns, read with PDFKit (`PdfTextExtractor` in `CompositionPDF`, `PDFPage.string`) and
+  put through one rule shared with the desktop: `pageSearchText` in [`pdfText.ts`](../../apps/web/src/lib/composition/pdfText.ts), ported as
+  `PdfSearchText` in the Swift core. Line breaks become `\n`; compatibility forms become plain letters (NFKC: `ﬁ` is `fi`, full-width letters are
+  letters); lines are trimmed and empty ones dropped; a soft hyphen is dropped except at a line's end; and a word broken over two lines with a
+  hyphen (`extrac-` / `tion`, the next line starting in lower case) is also added whole, so `extraction` finds it (the halves still do too).
+- **The oracle.** `fixtures/conformance/pdf-text.pdf` (eight awkward pages, made by `apps/ios/scripts/make-pdf-text-fixture.swift` with CoreText:
+  ligature glyphs, hyphenation, accents, Greek and Cyrillic, full-width letters, two columns, a turned page, a page with no text, punctuation)
+  is read by the desktop's pdf.js, with the reader's own options, through `pdfText.ts`; `apps/ios/scripts/pdf-text-oracle.mjs` writes what comes out
+  to `fixtures/conformance/pdf-text.json`, with 55 more raw texts and what the rule makes of each. The Swift side must make the same text of
+  every case exactly (`PdfTextConformanceTests`), PDFKit must find the same words on every page as pdf.js (`PdfTextExtractionTests`), and every
+  one of those words must find the note at the first page it is on (`PdfTextConformanceTests`). `conformance.sh` checks the file is still what
+  the desktop makes.
+- **Where it is kept.** In the iPad's own index file, `search.db`, never in `composition.db` or a backup: it is derived from the files and
+  can be read again. Three tables of its own: `pdf_files` (one row a PDF: its note, its file's SHA-256 and a state), `pdf_pages` (one row a
+  page with text, with the printed page label when the PDF has its own) and `pdf_text_fts`, a contentless FTS5 table (`content=''`,
+  `contentless_delete=1`, SQLite 3.43, so iOS 17) of the pages' text: the text is never read back, so it is not stored twice. The text is folded
+  as a query is (case and accents, `Typo.fold`) before it goes in, because FTS5's `remove_diacritics` only takes accents off Latin letters
+  (`Ζεύς` would not be found by `Ζεύς` otherwise; a note's own Greek or Cyrillic text has that problem today, which is a separate fix).
+- **When it is read.** In the background (one PDF at a time, at utility priority, after anything already queued), when the notes open, after
+  an import, and after a protected PDF is unlocked in the reader. `reconcilePdfText` compares what is kept with the `documents` table each
+  time: a PDF that is gone, or whose file changed, is forgotten; a PDF never read is read. A rebuild of the notes' index (a restore, a stale
+  fingerprint) does not throw the PDFs' text away. A search that is showing runs again when a PDF has been read.
+- **States.** `indexed`; `noText` when no page had text, which is a scan (OCR is not built: the reader's Contents says *No searchable text
+  (scanned)*, and only the PDF's marks and bookmarks find it); `locked` for a PDF that asks for a password, read the next time it is unlocked
+  in the reader, with the password used for that reading only and never kept (the words are then in `search.db`, which has the iPad's own data
+  protection and no other); `unreadable` when PDFKit cannot open it, not tried again until the file changes.
+- **How a search uses it.** After the notes' own text: a note found by its title, text, description or its marks comes first, as before,
+  and is listed once, without a page. Then the notes whose PDF has **every word of the query on one page** (the last word also as the start
+  of a word, a quoted phrase as a phrase), most recently updated first, each with the first such page. There is **no typo tolerance** in a
+  PDF's text: its words are kept out of the vocabulary the typo search reads on every keystroke, which a library of books would make hundreds
+  of thousands of words long. `tag:` and date filters apply; `title:` and `description:` searches leave PDFs' text out. `searchHits` returns the
+  page; `search` still returns ids, so the conformance tests against Meilisearch are unchanged.
+- **How it is shown.** The result row says *In the PDF, p. 212* (the printed label when the PDF has one, else the page's number). Opening it
+  opens the PDF at that page, marks where the words are on it, and shows the reader's find bar with them (the query's first phrase, or its
+  longest word), for going on to the next.
+- **What it costs.** A 600-page book of filler text (1.28 million characters) was read in 0.68 s and indexed in 0.19 s on a Mac, and grew
+  the index by 387 KB; filler has a small vocabulary, so a real book's index is larger (more distinct words). Not yet measured on an iPad.
+  Search time is unchanged for words the notes have; a query that reaches the PDFs' text costs one more FTS5 query.
+
+The desktop's version is the next step: pdf.js's `getTextContent` per page in a utility process, `pageTextFromItems` and `pageSearchText`
+from `pdfText.ts`, and **one Meilisearch document per page** (Meilisearch ignores every word past position 65,535 of a field, and a long book
+has several hundred thousand), whose hits are mapped to their owner note.
 
 ```mermaid
 sequenceDiagram

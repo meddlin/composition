@@ -1,0 +1,362 @@
+{
+  "comment": "Made by apps/ios/scripts/pdf-text-oracle.mjs from the desktop's pdfText.ts and pdf.js; do not edit. cases: pageSearchText(input) = output exactly. pages: fixtures/conformance/pdf-text.pdf read by pdf.js (page is 0-based), text = what is indexed, words = every word a search must find on that page.",
+  "cases": [
+    {
+      "input": "",
+      "output": ""
+    },
+    {
+      "input": " ",
+      "output": ""
+    },
+    {
+      "input": "\n\n",
+      "output": ""
+    },
+    {
+      "input": "\r\n",
+      "output": ""
+    },
+    {
+      "input": "one line",
+      "output": "one line"
+    },
+    {
+      "input": "  padded  ",
+      "output": "padded"
+    },
+    {
+      "input": "two\nlines",
+      "output": "two\nlines"
+    },
+    {
+      "input": "crlf\r\nlines",
+      "output": "crlf\nlines"
+    },
+    {
+      "input": "cr\rlines",
+      "output": "cr\nlines"
+    },
+    {
+      "input": "mixed\r\n\r\n\n\rbreaks",
+      "output": "mixed\nbreaks"
+    },
+    {
+      "input": "\ttabbed\t",
+      "output": "tabbed"
+    },
+    {
+      "input": "ligatures ﬁ ﬂ ﬀ ﬃ ﬄ ﬅ ﬆ",
+      "output": "ligatures fi fl ff ffi ffl st st"
+    },
+    {
+      "input": "ﬁnd the ﬂoor",
+      "output": "find the floor"
+    },
+    {
+      "input": "ｆｕｌｌ ｗｉｄｔｈ １２３",
+      "output": "full width 123"
+    },
+    {
+      "input": "ℌilbert ℵ ① ¼ x² Ⅻ",
+      "output": "Hilbert א 1 1⁄4 x2 XII"
+    },
+    {
+      "input": "é composed by NFKC",
+      "output": "é composed by NFKC"
+    },
+    {
+      "input": "Ǆ digraph",
+      "output": "DŽ digraph"
+    },
+    {
+      "input": "ſ long s",
+      "output": "s long s"
+    },
+    {
+      "input": "Careful extrac-\ntion",
+      "output": "Careful extrac-\ntion\nextraction"
+    },
+    {
+      "input": "extrac-\n  tion",
+      "output": "extrac-\ntion\nextraction"
+    },
+    {
+      "input": "extrac-  \ntion",
+      "output": "extrac-\ntion\nextraction"
+    },
+    {
+      "input": "extrac-\n\ntion",
+      "output": "extrac-\ntion\nextraction"
+    },
+    {
+      "input": "a-\nb",
+      "output": "a-\nb\nab"
+    },
+    {
+      "input": "well-\nKnown",
+      "output": "well-\nKnown"
+    },
+    {
+      "input": "item-\n42",
+      "output": "item-\n42"
+    },
+    {
+      "input": "3-\nfold",
+      "output": "3-\nfold"
+    },
+    {
+      "input": "end--\nnext",
+      "output": "end--\nnext"
+    },
+    {
+      "input": "last-",
+      "output": "last-"
+    },
+    {
+      "input": "-\nalone",
+      "output": "-\nalone"
+    },
+    {
+      "input": "x -\ny",
+      "output": "x -\ny"
+    },
+    {
+      "input": "soft­\nly",
+      "output": "soft­\nly\nsoftly"
+    },
+    {
+      "input": "mid­word",
+      "output": "midword"
+    },
+    {
+      "input": "mid­word­",
+      "output": "midword­"
+    },
+    {
+      "input": "­",
+      "output": "­"
+    },
+    {
+      "input": "uni‐\ncode",
+      "output": "uni‐\ncode\nunicode"
+    },
+    {
+      "input": "en–\ndash",
+      "output": "en–\ndash"
+    },
+    {
+      "input": "em—\ndash",
+      "output": "em—\ndash"
+    },
+    {
+      "input": "minus−\nsign",
+      "output": "minus−\nsign"
+    },
+    {
+      "input": "Ζεύ-\nς",
+      "output": "Ζεύ-\nς\nΖεύς"
+    },
+    {
+      "input": "Моск-\nва",
+      "output": "Моск-\nва\nМосква"
+    },
+    {
+      "input": "Café-\nété",
+      "output": "Café-\nété\nCaféété"
+    },
+    {
+      "input": "über-\nÄrger",
+      "output": "über-\nÄrger"
+    },
+    {
+      "input": "one-\ntwo-\nthree",
+      "output": "one-\ntwo-\nthree\nonetwo twothree"
+    },
+    {
+      "input": "a-\nb-\nc-\nd",
+      "output": "a-\nb-\nc-\nd\nab bc cd"
+    },
+    {
+      "input": "first-\nsecond line-\nthird",
+      "output": "first-\nsecond line-\nthird\nfirstsecond linethird"
+    },
+    {
+      "input": "Wort-\nmitte und ﬁ-\nnale",
+      "output": "Wort-\nmitte und fi-\nnale\nWortmitte finale"
+    },
+    {
+      "input": "https://example.org/a-\npath",
+      "output": "https://example.org/a-\npath\napath"
+    },
+    {
+      "input": "e-mail\nx@example.com",
+      "output": "e-mail\nx@example.com"
+    },
+    {
+      "input": "3.14 (beta)",
+      "output": "3.14 (beta)"
+    },
+    {
+      "input": "naïve space",
+      "output": "naïve space"
+    },
+    {
+      "input": "zero​width",
+      "output": "zero​width"
+    },
+    {
+      "input": "tab\tin\tline",
+      "output": "tab\tin\tline"
+    },
+    {
+      "input": "trailing　ideographic　",
+      "output": "trailing ideographic"
+    },
+    {
+      "input": "😀 emoji-\nfollows",
+      "output": "😀 emoji-\nfollows\nemojifollows"
+    },
+    {
+      "input": "日本語-\nテキスト",
+      "output": "日本語-\nテキスト"
+    }
+  ],
+  "pages": [
+    {
+      "page": 0,
+      "text": "Page one: the lighthouse keeper counted quetzals\nat the harbour wall, 1987 of them.",
+      "words": [
+        "1987",
+        "at",
+        "counted",
+        "harbour",
+        "keeper",
+        "lighthouse",
+        "of",
+        "one",
+        "page",
+        "quetzals",
+        "the",
+        "them",
+        "wall"
+      ]
+    },
+    {
+      "page": 1,
+      "text": "The official affidavit flew to the fjord office.\nSpelled out: official affidavit flew.",
+      "words": [
+        "affidavit",
+        "fjord",
+        "flew",
+        "office",
+        "official",
+        "out",
+        "spelled",
+        "the",
+        "to"
+      ]
+    },
+    {
+      "page": 2,
+      "text": "Careful extrac-\ntion of every term.\nA well-\nKnown name.\nNotwith\nstanding the rain.\nextraction",
+      "words": [
+        "a",
+        "careful",
+        "every",
+        "extrac",
+        "extraction",
+        "known",
+        "name",
+        "notwith",
+        "of",
+        "rain",
+        "standing",
+        "term",
+        "the",
+        "tion",
+        "well"
+      ]
+    },
+    {
+      "page": 3,
+      "text": "Café naïve façade Zürich\nΖεύς Αθήνα Москва Санкт\nWide letters",
+      "words": [
+        "cafe",
+        "facade",
+        "letters",
+        "naive",
+        "wide",
+        "zurich",
+        "αθηνα",
+        "ζευς",
+        "москва",
+        "санкт"
+      ]
+    },
+    {
+      "page": 4,
+      "text": "Left column speaks of marmalade\nand of the tidal estuary near the old\nmill.\nRight column answers with\nsaxophones and a quiet\nobservatory on the hill.",
+      "words": [
+        "a",
+        "and",
+        "answers",
+        "column",
+        "estuary",
+        "hill",
+        "left",
+        "marmalade",
+        "mill",
+        "near",
+        "observatory",
+        "of",
+        "old",
+        "on",
+        "quiet",
+        "right",
+        "saxophones",
+        "speaks",
+        "the",
+        "tidal",
+        "with"
+      ]
+    },
+    {
+      "page": 5,
+      "text": "Sideways page about cormorants.",
+      "words": [
+        "about",
+        "cormorants",
+        "page",
+        "sideways"
+      ]
+    },
+    {
+      "page": 6,
+      "text": "",
+      "words": []
+    },
+    {
+      "page": 7,
+      "text": "Version 3.14 (beta) e-mail: x@example.com\nhttps://example.org/path_to/item-42 — done.",
+      "words": [
+        "14",
+        "3",
+        "42",
+        "beta",
+        "com",
+        "done",
+        "e",
+        "example",
+        "https",
+        "item",
+        "mail",
+        "org",
+        "path",
+        "to",
+        "version",
+        "x"
+      ]
+    }
+  ]
+}

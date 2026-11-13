@@ -75,6 +75,10 @@ final class AppModel {
     /// The four hours Follow the sun moves at, and how light it is now (the hours are the person's, set in Appearance; nothing is looked up).
     let sun = SunClock()
     private var searchTask: Task<Void, Never>?
+    /// The notes the search found only in their PDF's own text, with the page (AppModel+PdfText.swift).
+    private(set) var pdfHits: [Int64: SearchHit] = [:]
+    /// Reading PDFs' text into the index, one after another (AppModel+PdfText.swift).
+    @ObservationIgnored var pdfTextTask: Task<Void, Never>?
 
     /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
     private var sessions: NoteSessions?
@@ -119,6 +123,13 @@ final class AppModel {
 
     /// What the organization operations (AppModel+Organization.swift) change notes, groups and notebooks through.
     var store: NoteStore? { sessions?.store }
+    /// The index, for reading PDFs' text into it (AppModel+PdfText.swift).
+    var searchIndexForPdfText: SearchIndex? { searchIndex }
+
+    /// More PDF text is in the index: a search that is showing is run again, so a PDF just read is found.
+    func pdfTextChanged() async {
+        if !trimmedQuery.isEmpty { await runSearch(query) }
+    }
 
     // MARK: Opening
 
@@ -198,6 +209,8 @@ final class AppModel {
             }
             #endif
             await reload()
+            // PDFs whose text is not in Search yet (imported before it was, or restored from a backup) are read in the background.
+            indexPdfText()
         } catch {
             errorMessage = "Couldn't open your notes: \(error.localizedDescription)"
             phase = FileManager.default.fileExists(atPath: location.databaseURL.path) ? .ready : .empty
@@ -323,16 +336,21 @@ final class AppModel {
                 let all = try await Self.perform { try database.listNotes() }
                 guard text == query else { return }
                 notes = all
+                pdfHits = [:]
                 resultLine = "\(all.count) notes"
                 lastSearchMilliseconds = nil
                 return
             }
             let started = ContinuousClock.now
-            let found = try await Self.perform { try database.notes(ids: try index.search(trimmed)) }
+            let (found, hits) = try await Self.perform {
+                let hits = try index.searchHits(trimmed)
+                return (try database.notes(ids: hits.map(\.noteId)), hits)
+            }
             let elapsed = started.duration(to: .now)
             guard text == query else { return }  // typing moved on
             let milliseconds = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
             notes = found
+            pdfHits = Dictionary(hits.filter { $0.pdfPage != nil }.map { ($0.noteId, $0) }, uniquingKeysWith: { first, _ in first })
             lastSearchMilliseconds = milliseconds
             resultLine = String(format: "%@ · %.1f ms", found.isEmpty ? "No results" : "\(found.count) result\(found.count == 1 ? "" : "s")", milliseconds)
         } catch {
@@ -498,6 +516,8 @@ final class AppModel {
         do {
             try await Self.perform { try work(database, library) }
             await reload()
+            // A PDF deleted for good takes its text out of Search now, not at the next launch (only its rows go; nothing is read).
+            indexPdfText()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -512,6 +532,8 @@ final class AppModel {
         // Close what is open, so nothing holds the files while they are swapped.
         flushEditing()
         let closingDatabase = database, closingIndex = searchIndex
+        pdfTextTask?.cancel()
+        pdfTextTask = nil
         database = nil
         searchIndex = nil
         sessions = nil

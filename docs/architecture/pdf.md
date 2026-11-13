@@ -148,7 +148,9 @@ through `escapeMarkdown`, so a `*`, `<` or `{` in a textbook starts no Markdown 
 [Search](search.md) holds one document per note. A note that owns a PDF is indexed with the words of its PDF's marks (quotes, comments, text notes)
 and its bookmarks' labels appended to its content (`marksSearchText`), so a search for a word in a highlight finds the note. Only ids come back from a
 search, so the added words are never shown. Any change to a mark or bookmark re-indexes the owner note afterwards without the caller waiting
-(`reindexOwnerSoon`: while one pass is running, further changes ask for exactly one more). The full text of the PDF is **not** indexed.
+(`reindexOwnerSoon`: while one pass is running, further changes ask for exactly one more). The full text of the PDF is **not** indexed on the
+desktop yet; the iPad indexes it page by page ([search.md](search.md#the-text-of-a-pdf)), with the rule for a page's text in `pdfText.ts`
+(`pageTextFromItems`, `pageSearchText`) ready for the desktop to use.
 
 ## Export
 
@@ -204,8 +206,8 @@ checked against the stored-name pattern, and the export reads only the library's
 Links inside a PDF (a contents page, a cross-reference) are followed by pdf.js's link service; how a link to a web address inside a PDF behaves has not
 been checked. The reader needs the whole app (a web build has none); undo history is not stored; a followed link works from the preview only; a note open in two panels
 takes a quote in the later editor; export is checked against pdf.js (not yet Acrobat or PDFKit's reading of this writer), has not been measured near the
-1 GB limit, and has not been started from a packaged app in CI (only that its file is unpacked). Ink, handwritten notes, the full text of a PDF and
-scans are not built ([the plan](../pdf-markup-plan.md#not-in-scope)).
+1 GB limit, and has not been started from a packaged app in CI (only that its file is unpacked). Ink, handwritten notes, the full text of a PDF
+(built on the iPad only) and scans are not built ([the plan](../pdf-markup-plan.md#not-in-scope)).
 
 ## On the iPad
 
@@ -225,4 +227,8 @@ The iPad app (`apps/ios`) reads and marks PDFs with PDFKit. **Built and checked 
   turns that into raw user space). `CompositionDatabase.inkPages / inkBody / setInk / forEachInk` read and write a page at a time and keep one row per page; `annotations(withInk: false)` leaves the strokes out of the list the reader and `PdfMarkEditor` hold, and `marksSearchText` reads a body only for typed notes.
   `PdfInkLayer` is the `PDFPageOverlayViewProvider`: a `PKCanvasView` per page near the screen, light-styled, taking touches only while the pencil button is on, with PDFKit's page view told to take them; its drawings are converted one page at a time on a background queue, kept 1.2 s after the last stroke, and each canvas is emptied when its page leaves.
   `InkAnnotations` writes a page's strokes as native `Ink` annotations (runs of strokes with the same colour, average width and opacity; textured strokes simplified), and `AnnotatedExport.export` takes the pages of ink and a function that reads one. Spike B's lab (`PdfInkLab*.swift`, PR #290) is the harness the layer was designed from.
-- **Checked by:** `swift test` in `apps/ios/CompositionCore` (the corpus, `PdfRefsConformanceTests`, `PdfMarkupStoreTests`, `PdfMarkEditorTests`, `PdfMarkGeometryTests`, and the `CompositionPDF` tests: `MarkAnnotationTests`, `InkAnnotationTests`, `AnnotatedExportTests`, `LinksInTheCopyTests`), `PdfInkStoreTests` in the core, and the UI tests `PdfUITests`, `PdfMarksUITests` and `PdfInkUITests` in the iPad Simulator.
+- **The PDF's own text in Search** (2026-11-12): `PdfTextExtractor` (in `CompositionPDF`) reads every page with PDFKit, off the main thread, and
+  `SearchIndex.storePdfText` keeps it in `search.db`, a row a page, so that a word only in the PDF finds the note at its page; the app reads PDFs
+  when the notes open, after an import and after an unlock (`AppModel+PdfText.swift`). The rule for a page's text is the desktop's
+  (`PdfSearchText`, replaying `fixtures/conformance/pdf-text.json`). How it works, what it costs and what it leaves out: [search.md](search.md#the-text-of-a-pdf).
+- **Checked by:** `swift test` in `apps/ios/CompositionCore` (the corpus, `PdfRefsConformanceTests`, `PdfMarkupStoreTests`, `PdfMarkEditorTests`, `PdfMarkGeometryTests`, and the `CompositionPDF` tests: `MarkAnnotationTests`, `InkAnnotationTests`, `AnnotatedExportTests`, `LinksInTheCopyTests`, `PdfTextExtractionTests`), `PdfInkStoreTests`, `PdfTextConformanceTests` and `PdfTextIndexTests` in the core, and the UI tests `PdfUITests`, `PdfMarksUITests` and `PdfInkUITests` in the iPad Simulator.
