@@ -8,7 +8,7 @@ namespace Composition.Core.Tests;
 /// <summary>
 /// The schema pass against the desktop's real db.ts. Direction 1: the .NET pass on a database the desktop made or touched.
 /// Direction 2 (the other half) is oracle/schema.oracle.ts "reverse": the real db.ts on databases this side wrote, which
-/// run-core-spike.sh runs after these tests.
+/// scripts/conformance.sh runs after these tests.
 /// </summary>
 public partial class SchemaParityTests
 {
@@ -73,6 +73,14 @@ public partial class SchemaParityTests
     }
 
     [Fact]
+    public void TheSchemaTextHasUnixLineEndingsWhateverTheCheckoutHas()
+    {
+        // db.ts writes LF; a CRLF checkout of Schema.cs must not put CR characters into the shared database's sqlite_master.
+        using var db = Schema.Open(Path.Combine(Scratch.NewDir(), "composition.db"));
+        Assert.Equal(0, Dump.Scalar<long>(db, "SELECT COUNT(*) FROM sqlite_master WHERE instr(sql, char(13)) > 0"));
+    }
+
+    [Fact]
     public void ASecondOpenWritesNothing()
     {
         var file = Path.Combine(Scratch.NewDir(), "composition.db");
@@ -89,7 +97,10 @@ public partial class SchemaParityTests
         Schema.Exec(db, "INSERT INTO notes (title, created_at, updated_at, notebook_id) VALUES ('a', 'x', 'x', 1)");
         Schema.Exec(db, "INSERT INTO groups (name, created_at, updated_at, notebook_id) VALUES ('g', 'x', 'x', 1)");
         Schema.Exec(db, "INSERT INTO trashed_notes (id, title, created_at, updated_at, deleted_at) VALUES (5, 't', 'x', 'x', 'x')");
-        foreach (var table in new[] { "notes", "groups", "trashed_notes" })
+        Schema.Exec(db, "INSERT INTO documents (note_id, file_name, stored_name, sha256, size, page_count, created_at) VALUES (1, 'a.pdf', 'a-1.pdf', 'x', 1, 1, 'x')");
+        Schema.Exec(db, "INSERT INTO pdf_annotations (document_id, page, kind, color, created_at, updated_at) VALUES (1, 0, 'note', 'yellow', 'x', 'x')");
+        Schema.Exec(db, "INSERT INTO pdf_bookmarks (document_id, page, created_at) VALUES (1, 0, 'x')");
+        foreach (var table in new[] { "notes", "groups", "trashed_notes", "documents", "pdf_annotations", "pdf_bookmarks" })
             Assert.Matches(Hex32(), Dump.Scalar<string>(db, $"SELECT uuid FROM {table}"));
         // an explicit duplicate is refused by the unique index, as on the desktop
         var uuid = Dump.Scalar<string>(db, "SELECT uuid FROM notes");

@@ -11,7 +11,7 @@ public sealed class OracleFactAttribute : FactAttribute
 {
     public OracleFactAttribute()
     {
-        if (Oracle.Dir is null) Skip = "COMPOSITION_ORACLE_DIR is not set; run apps/windows/spikes/run-core-spike.sh.";
+        if (Oracle.Dir is null) Skip = "COMPOSITION_ORACLE_DIR is not set; run apps/windows/scripts/conformance.sh.";
     }
 }
 
@@ -26,7 +26,7 @@ public static class Scratch
 {
     public static string NewDir()
     {
-        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "composition-core-spike-" + Guid.NewGuid().ToString("N")[..10]);
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "composition-core-tests-" + Guid.NewGuid().ToString("N")[..10]);
         Directory.CreateDirectory(dir);
         return dir;
     }

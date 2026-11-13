@@ -27,7 +27,7 @@ Windows plan** ([windows-build-plan.md](windows-build-plan.md)) until you say ot
 | **Plan** | **M1**, **M2**, **M3†** (†: release polish, first to drop): the [milestone](#v1-scope-and-milestones) · **Later** · **Never** (a deliberate decision) |
 | **Status** | ⬜ not started · 🔬 spiked (answer found, not built) · 🔨 built · 🪟 verified on Windows · ⛔ dropped |
 
-**Verified on Windows today: nothing.** The Mac-side spikes ran on macOS. A row only gets 🪟 after it ran on a Windows machine. Whatever this page says about
+**Verified on Windows (2026-11-12, the physical x64 PC):** the core's backup and restore (S1), the YAML probe (S2), and the WinUI 3 shell building, publishing and running (S5, timings over Remote Desktop only). No feature row is 🪟 yet. A row only gets 🪟 after it ran on a Windows machine. Whatever this page says about
 WinUI 3, WebView2 or Windows behaviour and does not give a source or a spike result for is **unverified**.
 
 ## Summary
@@ -41,8 +41,8 @@ WinUI 3, WebView2 or Windows behaviour and does not give a source or a spike res
 - **The costs that matter most:** the notes rules now exist once per platform guarded only by a corpus that **does not exist on `main`** ([the gap](#keeping-implementations-honest));
   the preview, and possibly the editor, stay web ([C1](#compromise-register)); unpackaged means we own the installer, the updater and the signing ([C5](#compromise-register));
   Meilisearch keeps the Arm64 and footprint costs the iPad avoided ([C4](#compromise-register)); two or three apps can write one database ([C3](#compromise-register)).
-- **What nobody has seen yet:** any WinUI 3 behaviour. There is no Windows machine. Gate B waits for S5, which is written and not run.
-- **Decided by you today:** search, editor, database, packaging, scope and test machine ([D1 to D6](#decisions)). **Waiting on you:** where the shared corpus lives (D10), the signing route (W4, unchanged), and the app's name and identity (D11).
+- **What nobody has seen yet:** WinUI 3 behaviour at a console. S5 now builds and runs on the physical x64 PC (2026-11-12), but every timing was over Remote Desktop: the preview path passes its lines, **RichEditBox typing on a 5,000-line note does not** (about 17 ms per call, p95 43 ms). Gate B waits for the same run at the PC's own console.
+- **Decided by you today:** search, editor, database, packaging, scope and test machine ([D1 to D6](#decisions)). **Gate A passed (you, 2026-11-12):** the core, the sidecar search, the WebView2 preview, the corpus on `main` (D10) and the toolchain pins (D7). **Waiting on you:** the signing route (W4, unchanged), and the app's name and identity (D11).
 
 ## Goals and non-goals
 
@@ -166,7 +166,7 @@ flowchart TB
   CORE --> MEILI
 ```
 
-**Layout (proposed):** `apps/windows/`, beside `apps/ios` and `apps/linux`: `Composition.Core` and its tests (a plain .NET solution that builds on any OS), `Composition.App` (the WinUI 3 project, Windows only), `preview/` (the bundle build), `spikes/` (this branch's, deleted or promoted at Gate A).
+**Layout (decided at Gate A):** `apps/windows/`, beside `apps/ios` and `apps/linux`: `Composition.Core` and its tests (a plain .NET solution that builds on any OS), `Composition.App` (the WinUI 3 project, Windows only), `preview/` (the bundle build), `spikes/` (this branch's, deleted or promoted at Gate A).
 `Composition.Core` references nothing from `Microsoft.UI` or `Windows.*`, so `dotnet test` runs on a Mac and in Linux CI. [C9](#compromise-register): the app project, its XAML compiler and every UI test need Windows.
 
 ### Data
@@ -444,15 +444,15 @@ Recommendations are proposals until the status says *Decided*. **Needs your inpu
 | **D4** | **Packaging** | I recommended MSIX through the Store; **you chose an unpackaged exe plus an installer.** Consequences in [Packaging](#packaging-updates-and-signing) and C5 | **Decided** (you, 2026-11-07) |
 | **D5** | **v1 scope** | Full notes editor, no panels, no plugins | **Decided** (you, 2026-11-07), as recommended |
 | **D6** | **Test machine** | A Windows 11 Arm VM on this Mac, plus a real x64 PC for the final pass | **Decided** (you, 2026-11-07), as recommended |
-| D7 | **Toolchain:** .NET 10 LTS, one pinned Windows App SDK 2.x, C# with nullable on; no trimming or AOT in v1 | .NET 9 ends 2026-11-10. Pin at Gate A after one clean build on Windows | Proposed |
+| D7 | **Toolchain:** .NET 10 LTS, one pinned Windows App SDK 2.x, C# with nullable on; no trimming or AOT in v1 | .NET 9 ends 2026-11-10. Pin at Gate A after one clean build on Windows | **Decided** (Gate A, 2026-11-12): .NET SDK 10.0.404 pinned in `apps/windows/global.json`, Microsoft.Data.Sqlite 10.0.15, Windows App SDK 2.6.5 |
 | D8 | **OS floor and architectures:** Windows 10 22H2 and Windows 11; `win-x64` and `win-arm64` native | The framework supports back to 1809; Arm64 gets Meilisearch under emulation (S8) | Proposed |
 | D9 | **Installer and updater** | Velopack is the lead candidate; S7 decides at Gate C. W2's per-user, no-UAC rule carries | Proposed |
-| D10 | **Where the shared corpus lives** | One shared `fixtures/conformance/` on `main`: it already exists on the PDF branch (PR #267) with committed expected answers; move the iPad's `apps/ios/conformance/` cases into it in that style and add a manifest. The Windows and Linux harnesses take a directory. Until then no Windows port can pass an oracle from `main`. The Linux session raised the same question (its D12) | **Needs you** |
+| D10 | **Where the shared corpus lives** | One shared `fixtures/conformance/` on `main`: it is now on `main` (2026-11-12: frontmatter, store, trash, search, settings and more, with committed expected answers, and S2 ran from it on Windows); move the iPad's `apps/ios/conformance/` cases into it in that style and add a manifest. The Windows and Linux harnesses take a directory. Until then no Windows port can pass an oracle from `main`. The Linux session raised the same question (its D12) | **Decided** (Gate A, 2026-11-12), as recommended |
 | D11 | **App name, identity, icon, folders** | A placeholder id until M3, a distinct display name from the Electron app | **Needs you** |
 | D12 | **Which engine syncs when two apps share a database** | The sync design's question: one engine per database, with a lease | For the sync design |
 | D13 | **No CLI inside the native app in v1** (W5 not applicable) | Electron's bundle or source | Proposed |
 | D14 | **Where things live:** settings `%APPDATA%\Composition (native)\settings.json`; search index and logs `%LOCALAPPDATA%\Composition (native)\`; data stays shared | Never share a Meilisearch folder with the Electron app | Proposed |
-| D15 | **CI:** `dotnet test` of the core on macOS, Linux and Windows; the app on a Windows runner; new Actions pinned to SHAs | An Arm64 runner only once confirmed to exist | Proposed |
+| D15 | **CI:** `dotnet test` of the core on macOS, Linux and Windows; the app on a Windows runner; new Actions pinned to SHAs | An Arm64 runner only once confirmed to exist | **Core leg built** (2026-11-12): `windows-core.yml` runs the conformance round trip on Linux, macOS and Windows. The app leg comes with step 3 |
 
 ## Risks and unknowns
 
@@ -483,11 +483,11 @@ Each spike answers one question before anything is built for real. **Where it ra
 
 | # | Spike | Answers | Where it ran | Result |
 |---|---|---|---|---|
-| **S1** | **Core library vs the desktop's real data layer:** schema pass, uuid pass, backup, FTS5; the real `db.ts` and `backup.ts` as oracle in both directions | R12; D3, D7, C13 | **macOS arm64**, SDK 9.0.200. Windows DLLs of SQLite inspected, not run | **16 of 16 pass** ([note](../apps/windows/spikes/results/S1-core.md)). FTS5 present; sqlite_master byte-identical; no-op both ways; uuids and settings carried through backup both ways; two deliberate corruptions caught |
+| **S1** | **Core library vs the desktop's real data layer:** schema pass, uuid pass, backup, FTS5; the real `db.ts` and `backup.ts` as oracle in both directions | R12; D3, D7, C13 | **macOS arm64**, SDK 9.0.200; **Windows x64** (2026-11-12), SDK 10.0.404 | **16 of 16 pass** on macOS ([note](../apps/windows/spikes/results/S1-core.md)). On Windows the backup and restore tests pass under real file locks; the schema tests fail only because `main` has since added the PDF tables, which the C# port lacks (drift caught by the oracle). FTS5 present; sqlite_master byte-identical; no-op both ways; uuids and settings carried through backup both ways; two deliberate corruptions caught |
 | **S2** | **The shared corpus, and YAML** | R4, R11; D10, C8 | macOS | Nothing is on `main`: the iPad branch has the corpus (`apps/ios/conformance/`), and the PDF branch has since added `fixtures/conformance/` (PDF only, committed answers); YamlDotNet matches js-yaml on 93 of 111 parse and **61 of 123** generate cases ([note](../apps/windows/spikes/results/S2-corpus-and-yaml.md)) |
 | **S3** | **The preview as a standalone page** | R2, R14; O2, C1 | macOS, **Chromium in the Browser pane, not WebView2** | Builds untouched in 3 s (1.1 MB JS, 123 KB CSS); renders the components; re-themes from a message. Render time unmeasured ([note](../apps/windows/spikes/results/S3-preview-bundle.md)) |
 | **S4** | **Meilisearch from .NET, with a Job Object** | R6, R7; D1, C4 | macOS, Meilisearch 1.53.1. **The Job Object never ran** | 2 of 2 pass: healthy in 228 to 645 ms, typo tolerance, filter, hard kill and restart ([note](../apps/windows/spikes/results/S4-search-sidecar.md)) |
-| **S5** | **The WinUI 3 shell:** RichEditBox on 5,000 lines, WebView2 memory and start-up, the preview in WebView2 | R1, R2, R3; D2 | **Windows only. Written, never built, never run** (the XAML compiler does not run on macOS) | Restore of the package graph resolves on macOS; nothing else ([note](../apps/windows/spikes/results/S5-shell-windows.md)) |
+| **S5** | **The WinUI 3 shell:** RichEditBox on 5,000 lines, WebView2 memory and start-up, the preview in WebView2 | R1, R2, R3; D2 | **Windows x64 (2026-11-12), over Remote Desktop.** Needs a console run for Gate B | Builds and publishes with the SDK alone after three fixes (two C# errors, `EnableMsixTooling` for publish). Over RDP: preview loads in about 0.2 s, a 300-line render in under 0.1 s (pass); WebView2 warm start about 0.28 s (pass), cold 1.6 s; **typing p50 34 ms, p95 43 to 46 ms (fails 16 ms)**, about 17 ms per RichEdit call and not repaint; app about 140 MB plus about 430 MB for its 6 WebView2 processes; 242.7 MB folder ([note](../apps/windows/spikes/results/S5-shell-windows.md)) |
 | **S6** | **The native-bar audit:** Narrator, IME, high contrast, snap layouts, Mica, touch, DPI, airspace | R3; N1 to N13 | **Windows, a person** | Not started |
 | **S7** | **Installer and updater:** Velopack (or another) for x64 and Arm64, per user, signed and unsigned, update over a running app with search busy | R8, R9; D9, C5 | **Windows** | Not started |
 | **S8** | **Arm64:** the app natively, Meilisearch under emulation, the Job Object, the S1 backup tests with real file locks | R6, R7, R12; D8, C4, C10 | **Windows 11 Arm** | Not started |
@@ -495,7 +495,7 @@ Each spike answers one question before anything is built for real. **Where it ra
 **Machines.** S1 to S4 needed only a Mac and are done. **S5 to S8 need Windows**, so **no UI gate can pass until you provide the machine from D6**: a Windows 11 Arm VM on this Mac (Parallels, VMware Fusion or UTM) builds and runs every spike and UI gate except real x64 speed and memory, touch and pen, and a real GPU for Mica;
 those need the **physical x64 PC** at Gates B and D. Visual Studio 2022 with the .NET desktop workload, or the .NET 10 SDK, goes on it.
 
-**Gate A** (after S1 to S4, **ready for your review now**): commit to the core (.NET 10, Microsoft.Data.Sqlite, the schema pass and backup as proved), the sidecar search (D1), the WebView2 preview bundle as the working plan, the corpus location (D10) and the toolchain pins (D7, after one clean Windows build); then promote or delete the spikes.
+**Gate A** (after S1 to S4; **passed 2026-11-12**; the clean Windows build D7 waited for happened on 2026-11-12: .NET 10.0.404 with Windows App SDK 2.6.5): commit to the core (.NET 10, Microsoft.Data.Sqlite, the schema pass and backup as proved), the sidecar search (D1), the WebView2 preview bundle as the working plan, the corpus location (D10) and the toolchain pins (D7, after one clean Windows build); then promote or delete the spikes.
 **Gate B** (after S5, S3 in WebView2, on Windows): commit to the editor (RichEditBox or the CodeMirror fallback), the preview in WebView2 with its measured cost, Mica and snap layouts, and the bridge's size.
 **Gate C** (after S7 and S8): the installer, updater, signing route and Arm64 plan. **Gate D**: your by-hand pass on the physical x64 PC and the Arm VM, against the native bar.
 
@@ -503,8 +503,8 @@ those need the **physical x64 PC** at Gates B and D. Visual Studio 2022 with the
 
 Each step ends in something checkable. Steps 1 and 2 are core-only and run on a Mac; from step 3 a Windows machine is required. Nothing below is started.
 
-0. **Gate A** (you). Needs: your answers to D10 and D11, the W4 route, and your read of S1 to S4. Output: the toolchain pins and the folder layout.
-1. **Core.** `apps/windows/Composition.Core` promoted from S1 (retargeted to .NET 10, named, documented); a CI workflow running `dotnet test` on macOS, Linux and Windows; the **conformance harness** taking a corpus directory; the repositories (`notesRepo`, `groupsRepo`, `notebooksRepo`, `trashRepo`) ported with their oracle scripts; frontmatter by a js-yaml-compatible reader and writer (S2); settings carried as they came; the `Pooling=False`/busy/WAL rules. *Check:* the corpus passes both directions, and a copy of your own database opens, takes a hundred operations and still restores on the desktop.
+0. **Gate A** (you). **Passed 2026-11-12.** Needs: your answers to D10 and D11, the W4 route, and your read of S1 to S4. Output: the toolchain pins and the folder layout.
+1. **Core.** *(Started 2026-11-12. Done: the promotion to `apps/windows/` on .NET 10, the PDF tables and `documents/` folder `main` gained since S1, the CI workflow, and a fix for CRLF checkouts writing `\r` into the shared schema; the round trip passes on Windows. Left: the repositories, frontmatter, the corpus harness, and the check on a copy of your own database.)* `apps/windows/Composition.Core` promoted from S1 (retargeted to .NET 10, named, documented); a CI workflow running `dotnet test` on macOS, Linux and Windows; the **conformance harness** taking a corpus directory; the repositories (`notesRepo`, `groupsRepo`, `notebooksRepo`, `trashRepo`) ported with their oracle scripts; frontmatter by a js-yaml-compatible reader and writer (S2); settings carried as they came; the `Pooling=False`/busy/WAL rules. *Check:* the corpus passes both directions, and a copy of your own database opens, takes a hundred operations and still restores on the desktop.
 2. **Search.** `searchQuery.ts` ported and checked by the corpus; the sidecar promoted from S4 (key file, port, log, index sync at start and after writes, the `data_version` poll for foreign writes); `meilisearch.lock.json` reused. *Check:* the corpus's search queries and a hard kill on the real Windows binary (needs Windows).
 3. **Shell on Windows.** A WinUI 3 app, unpackaged self-contained, on the Arm VM: window, Mica, notebooks, groups and notes lists over the core, tabs, state restore, themes in tokens. *Check:* runs on the VM and the physical PC.
 4. **Editor and preview.** The RichEditBox editor with an incremental colourer and the completions; the preview bundle built in CI; the bridge (render, links, highlight, find, scroll). **Gate B.**
@@ -543,6 +543,8 @@ A new dependency gets a row in [Languages and dependencies](#languages-and-depen
 
 - 2026-11-07: first version. Design and five spikes (S1 to S4 on macOS, S5 written and not run). **You decided D1 to D6:** Meilisearch as a sidecar (not my FTS5 recommendation); a native RichEditBox editor gated on a Windows measurement; the same database as Electron and the CLI; an unpackaged exe plus an installer (not my MSIX-through-the-Store recommendation); v1 = the full notes editor with no panels or plugins; a Windows 11 Arm VM on this Mac plus a real x64 PC. Found the shared corpus does not exist on `main`.
 - 2026-11-08: corrected the corpus finding: the PDF branch (PR #267) has since created `fixtures/conformance/` with committed expected answers (PDF cases only), so D10 now chooses between two existing conventions; recommendation updated.
+- 2026-11-12: **first runs on Windows**, on the physical x64 PC (Windows 11 build 26300, reached over Remote Desktop). S5 built and ran after two C# fixes and `EnableMsixTooling` (without it the published exe crashed at start for want of its `.pri`); this is the clean .NET 10 + Windows App SDK 2.6.5 build D7 needed. Over RDP the preview path passes and RichEditBox typing on 5,000 lines fails the proposed line (R1 open until a console run). S1's backup and restore pass on Windows; its schema tests found `main`'s PDF tables missing from the C# port. S2 reproduced from `fixtures/conformance/`, which is now on `main` (D10's premise changed). S5 now counts only its own WebView2 processes. Visual Studio is not needed to build.
+- 2026-11-12: **Gate A passed** (you): D7 and D10 decided as recommended; build step 1 started, the S1 core and its oracle promoted out of `spikes/` (the S2 probe deleted). The promoted core follows `main`'s PDF schema (`documents`, `pdf_annotations`, `pdf_bookmarks`, nine uuid tables) and backup (`documents/`). **Found on Windows:** C# raw string literals take the checkout's line endings, so a CRLF checkout wrote `\r\n` into `sqlite_master`; the DDL is now normalised to LF and a test guards it. CI: `windows-core.yml` on three systems (D15).
 
 ## Sources
 
