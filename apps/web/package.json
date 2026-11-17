@@ -33,7 +33,7 @@
     "lowlight": "^3.3.0",
     "lucide-react": "^1.62.0",
     "meilisearch": "^0.62.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "pdfjs-dist": "6.5.438",
     "radix-ui": "^1.8.1",
     "react": "19.3.1",
