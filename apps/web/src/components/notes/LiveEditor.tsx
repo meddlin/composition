@@ -7,8 +7,10 @@ import { Decoration, drawSelection, EditorView, keymap, placeholder, type Decora
 import { useEffect, useMemo, useRef } from "react";
 import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
+import { noteLinksFacet } from "./liveLinks";
 import { liveMarkdown } from "./liveMarkdown";
 import { liveReflow } from "./liveReflow";
+import { NO_NOTE_LINKS, type NoteLinks } from "./noteLinkActions";
 import { changedSpan } from "./reflowText";
 
 /** Marks a change that came from the note changing underneath the editor, which is not the user typing. */
@@ -112,6 +114,8 @@ type Props = {
    * shows again: its steps were made against a text that is no longer there.
    */
   active?: boolean;
+  /** Which notes and PDFs exist, and how to open them, for the note's links (the preview's `NoteLinksProvider`). */
+  links?: NoteLinks;
 };
 
 const NO_OPTIONS: FindOptions = { matchCase: false, wholeWord: false };
@@ -135,6 +139,7 @@ export function LiveEditor({
   onFindCount,
   "aria-label": label = "Markdown editor",
   active = true,
+  links = NO_NOTE_LINKS,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -142,6 +147,7 @@ export function LiveEditor({
   const attributesFacet = useRef(new Compartment());
   const reflowFacet = useRef(new Compartment());
   const historyFacet = useRef(new Compartment());
+  const linksFacet = useRef(new Compartment());
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
   const eventsRef = useRef(events);
@@ -151,10 +157,10 @@ export function LiveEditor({
     eventsRef.current = events;
     onViewRef.current = onView;
   });
-  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {}, reflow });
+  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {}, reflow, links });
 
   useEffect(() => {
-    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes, reflow: initialReflow } = initial.current;
+    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes, reflow: initialReflow, links: initialLinks } = initial.current;
     const editor = new EditorView({
       parent: host.current!,
       state: EditorState.create({
@@ -191,6 +197,7 @@ export function LiveEditor({
           readOnlyFacet.current.of(EditorState.readOnly.of(locked)),
           attributesFacet.current.of(contentAttributes(ariaLabel, ariaAttributes)),
           reflowFacet.current.of(reflowExtension(initialReflow)),
+          linksFacet.current.of(noteLinksFacet.of(initialLinks)),
           EditorView.updateListener.of((update) => {
             const typed = update.docChanged && !update.transactions.some((t) => t.annotation(fromNote));
             if (typed) {
@@ -225,6 +232,10 @@ export function LiveEditor({
   useEffect(() => {
     view.current?.dispatch({ effects: attributesFacet.current.reconfigure(contentAttributes(label, JSON.parse(attributesKey) as Attributes)) });
   }, [label, attributesKey]);
+
+  useEffect(() => {
+    view.current?.dispatch({ effects: linksFacet.current.reconfigure(noteLinksFacet.of(links)) });
+  }, [links]);
 
   useEffect(() => {
     view.current?.dispatch({ effects: readOnlyFacet.current.reconfigure(EditorState.readOnly.of(readOnly)) });

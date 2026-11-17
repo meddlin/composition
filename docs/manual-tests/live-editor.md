@@ -20,8 +20,27 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Click on bold text: the marks appear and the text shifts a little to the right; the caret stays where you clicked.
 - [ ] Select from the middle of one bold word to the middle of another: both words show their marks. Copy and paste into the Markdown tab: the marks are in the text.
 - [ ] Frontmatter at the top is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading.
-- [ ] Code fences, links, lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
+- [ ] Code fences, lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
 - [ ] A long note (several thousand lines) types without lag, and scrolling is smooth.
+
+## 1a. Links
+
+Make a second note to link to, and a note with: `[the docs](https://example.com "Docs")`, a note link from `[[`, a
+note link to a note you then delete for good (empty the Trash Can), `<https://example.com>`, a bare `https://example.com`,
+`## Next Steps` with `[jump](#next-steps)` above it, and (desktop) a `pdf:` link from a PDF's **Cite this page**.
+
+- [ ] Away from the caret each link reads as its text, underlined in the link colour, with no brackets or address. Put Live and Preview side by side (Split in one pane, Live in another): the links read the same.
+- [ ] Hover a link: the tooltip shows its address (and its title, for the first one), with "⌘-click to follow" (Mac) or "Ctrl+click to follow".
+- [ ] The link to the deleted note is struck through and muted, with "This note no longer exists"; Cmd/Ctrl+click on it does nothing. In the web app, the `pdf:` link is struck through with "PDF not on this device".
+- [ ] Click in a link's text: the caret lands where you clicked and the source shows, `[` `]` `(` `)` dimmed. Nothing opens.
+- [ ] Edit the link's text, then its address, with the keyboard: arrow in from either side, type, delete, select a word in the address and retype it. Move away: it is drawn again with the new text, and following it goes to the new address.
+- [ ] Do the same with the mouse: click into the address, double-click a word in the text, drag a selection from before the link into it.
+- [ ] Hold Cmd (Mac) or Ctrl (Windows, Linux) over a link: the pointer is a hand. Let go: the text cursor is back. Ctrl on a Mac does not change it.
+- [ ] Cmd/Ctrl+click the note link: the linked note opens in this pane. Back (Cmd/Ctrl+[) returns. Cmd/Ctrl+Shift+click it: it opens beside.
+- [ ] Cmd/Ctrl+click `https://example.com` (each of the three forms): it opens in a new browser tab (web) or your browser (desktop); the app stays put.
+- [ ] Cmd/Ctrl+click `[jump](#next-steps)`: Live scrolls to the heading; the caret does not move.
+- [ ] Desktop: Cmd/Ctrl+click the `pdf:` link: the PDF opens at that page, beside the note if it was not showing.
+- [ ] In Preview: a plain click on the note link follows it, Cmd/Ctrl+click opens it beside, and Cmd/Ctrl+Shift+click opens it beside too.
 
 ## 2. Highlights
 

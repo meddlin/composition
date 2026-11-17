@@ -4,6 +4,7 @@ import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate
 import { parse } from "@/lib/composition/frontmatter";
 import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
 import { InkWidget } from "./liveInk";
+import { drawLink, linkContext, liveLinks, noteLinksFacet } from "./liveLinks";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
 import { tokenizeMarkdown, type TokenKind } from "./markdownTokens";
 import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
@@ -18,6 +19,8 @@ import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
  *
  * "Touches" includes the caret sitting right after the closing mark, so `**some text**|` still shows its marks and
  * `**some text** |`, the next word begun, does not.
+ *
+ * Links are drawn the same way, as their text; following one is Cmd/Ctrl+click (see `liveLinks`).
  */
 
 /** The inline constructs that hide their marks, by the syntax-tree node that holds them → the node of their marks. */
@@ -141,6 +144,7 @@ export function liveDecorations(
 ): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
+  const links = linkContext(state);
 
   for (const { from, to } of ranges) {
     syntaxTree(state).iterate({
@@ -178,6 +182,12 @@ export function liveDecorations(
           if (!image) return;
           drawImage(decorations, image, node.from, node.to, touches(state, node.from, node.to));
           return false;
+        }
+
+        if (node.name === "Link" || node.name === "Autolink" || node.name === "URL") {
+          // Its text is still walked, so a bold word in a link's text is bold.
+          drawLink(state, node.node, links, decorations);
+          return;
         }
 
         const inline = INLINE[node.name];
@@ -247,6 +257,8 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
+        // Which notes and PDFs exist (a link to a deleted one is drawn struck through).
+        update.startState.facet(noteLinksFacet) !== update.state.facet(noteLinksFacet) ||
         syntaxTree(update.state) !== syntaxTree(update.startState)
       ) {
         this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.scan);
@@ -295,4 +307,4 @@ const liveTheme = EditorView.baseTheme({
 });
 
 /** Everything the live editor needs to draw Markdown: put it in an editor that has the Markdown language. */
-export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme];
+export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks];

@@ -81,6 +81,14 @@ describe("following a note link in the preview", () => {
     expect(screen.getByRole("region", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
   });
 
+  it("opens it beside with Cmd/Ctrl+Shift held too, which is beside in Live", () => {
+    renderApp();
+
+    fireEvent.click(link("Alpha", "Beta"), { metaKey: true, shiftKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+  });
+
   it("focuses a linked note that is already open instead of opening it twice", () => {
     renderApp();
     fireEvent.click(link("Alpha", "Beta"), { metaKey: true });
@@ -97,5 +105,45 @@ describe("following a note link in the preview", () => {
     renderApp();
 
     expect(within(screen.getByRole("region", { name: "Alpha" })).queryByRole("link", { name: "Gone" })).toBeNull();
+  });
+});
+
+describe("following a note link in Live", () => {
+  afterEach(cleanup);
+
+  /** Alpha, shown in its Live tab, and its drawn link to `href`. */
+  function liveLink(href: string) {
+    render(<NotesApp initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    const pane = screen.getByRole("region", { name: "Alpha" });
+    fireEvent.click(within(pane).getByRole("tab", { name: "Live" }));
+    const drawn = pane.querySelector<HTMLElement>(`.cm-live-link[data-href="${href}"]`);
+    expect(drawn).not.toBeNull();
+    return drawn!;
+  }
+
+  // A plain click is CodeMirror's own (it places the caret), which jsdom can't lay out: checked in the browser
+  // (docs/manual-tests/live-editor.md).
+
+  it("shows the linked note in the same pane with Ctrl held (Cmd on a Mac)", () => {
+    fireEvent.mouseDown(liveLink("note:2"), { button: 0, ctrlKey: true });
+
+    expect(paneTitles()).toEqual(["Beta"]);
+  });
+
+  it("opens it beside with Ctrl+Shift held", () => {
+    fireEvent.mouseDown(liveLink("note:2"), { button: 0, ctrlKey: true, shiftKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+    expect(screen.getByRole("region", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("strikes through a link to a note that no longer exists, and following it does nothing", () => {
+    const dead = liveLink("note:99");
+    expect(dead.classList.contains("cm-live-link-dead")).toBe(true);
+    expect(dead.getAttribute("title")).toBe("This note no longer exists");
+
+    fireEvent.mouseDown(dead, { button: 0, ctrlKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha"]);
   });
 });
