@@ -1,6 +1,7 @@
 import { DOCK_MIN_WIDTH } from "../notes/assistantDock";
 import type { PaneView } from "../notes/panes";
 import type { PluginId } from "@/lib/composition/plugins";
+import { NOTE_VIEWS } from "@/lib/composition/writing";
 import type { KindId, PanelRecord } from "./panelsState";
 
 /** What a note panel saves: the note it shows (none yet, for one just made from the empty panel) and its tab. */
@@ -74,7 +75,7 @@ export type RestoreContext = {
 /** The width a panel can be dragged down to unless its kind needs more. The same as the web app's note pane. */
 const MIN_PANEL_WIDTH = 240;
 
-const VIEWS: readonly unknown[] = ["split", "markdown", "preview", "live"] satisfies PaneView[];
+const VIEWS: readonly unknown[] = NOTE_VIEWS;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -204,12 +205,6 @@ export const KINDS: Record<
   },
 };
 
-/**
- * The view a note panel added beside another starts on. A lone note starts on "split", but notes open together are
- * there to be written in, and each has only a share of the room, so the editor is the default and the preview is a
- * tab away. (The same choice `panes.ts` makes for the web app's row.)
- */
-export const BESIDE_VIEW: PaneView = "markdown";
 
 /** The PDF a panel shows; null for a panel of another kind, or a PDF panel not showing one. */
 export function pdfDocumentIdOf(panel: PanelRecord): number | null {

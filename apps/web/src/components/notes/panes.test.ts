@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  besideView,
   closePane,
   dragPaneSizes,
   dropNote,
@@ -36,6 +37,25 @@ describe("initialPanes", () => {
 
   it("starts empty without a note", () => {
     expect(initialPanes(null)).toEqual({ panes: [], focusedId: null });
+  });
+});
+
+describe("the view notes open in", () => {
+  it("is the first pane's view", () => {
+    expect(initialPanes(4, "live").panes[0].view).toBe("live");
+    expect(openNote(initialPanes(null), 4, "preview").panes[0].view).toBe("preview");
+  });
+
+  it("is a pane beside's view, but Split opens beside on the editor tab, as each pane has only a share of the row", () => {
+    expect(besideView("split")).toBe("markdown");
+    expect(besideView("live")).toBe("live");
+    expect(viewOf(openNoteBeside(state([1]), 2, "live"), 2)).toBe("live");
+    expect(viewOf(dropNote(state([1]), 2, 1, "left", "preview"), 2)).toBe("preview");
+    expect(viewOf(dropNote(state([1]), 2, 1, "right"), 2)).toBe("markdown");
+  });
+
+  it("does not change the view of a pane another note opens in", () => {
+    expect(viewOf(openNote(withViews(state([1]), "preview"), 2, "live"), 2)).toBe("preview");
   });
 });
 

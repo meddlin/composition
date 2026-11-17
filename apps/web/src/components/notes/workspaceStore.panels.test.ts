@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createChatsStore } from "@/lib/composition/assistant/chatsStore";
+import { DEFAULT_WRITING_SETTINGS, type NoteView } from "@/lib/composition/writing";
 import { panelIds } from "../panels/layoutTree";
 import type { NotePanelState } from "../panels/kinds";
 import { assistantSubject, focusedPanelId } from "../panels/panelsState";
@@ -224,6 +225,60 @@ describe("opening a note to the side", () => {
     store.openNoteBeside(1);
 
     expect(notesShown(store)).toEqual([1, 1]);
+  });
+});
+
+describe("the view notes open in (Settings › Writing › \"Open notes in\")", () => {
+  const notes = [note(1), note(2)];
+  const storeOpeningIn = (openNotesIn: NoteView) =>
+    createWorkspaceStore({ notes, groups: [], writing: { ...DEFAULT_WRITING_SETTINGS, openNotesIn } }, {} as WorkspaceDeps, undefined, { panels: {} });
+
+  it("is the view of the panel a picked note fills", () => {
+    const store = storeOpeningIn("live");
+    const [only] = panelIds(mainWindow(store).layout);
+
+    store.openNote(1);
+
+    expect(stateOf(store, only)).toEqual({ noteId: 1, view: "live" });
+  });
+
+  it("is the view of a new panel beside, except that Split opens beside on the editor tab", () => {
+    const preview = storeOpeningIn("preview");
+    preview.openNote(1);
+    preview.openNoteBeside(2);
+    expect(stateOf(preview, panelIds(mainWindow(preview).layout)[1]).view).toBe("preview");
+
+    const split = storeOpeningIn("split");
+    split.openNote(1);
+    split.openNoteBeside(2);
+    expect(stateOf(split, panelIds(mainWindow(split).layout)[1]).view).toBe("markdown");
+  });
+
+  it("leaves alone a panel whose tab was chosen, when another note opens in it", () => {
+    const store = storeOpeningIn("live");
+    store.openNote(1);
+    const [only] = panelIds(mainWindow(store).layout);
+    store.setPanelState(only, { noteId: 1, view: "preview" });
+
+    store.openNote(2);
+
+    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "preview" });
+  });
+
+  it("takes on a change made in Settings for the notes opened after it", () => {
+    const store = storeOpeningIn("split");
+    expect(store.openNotesIn()).toBe("split");
+
+    store.setOpenNotesIn("live");
+    store.openNote(1);
+
+    expect(stateOf(store, panelIds(mainWindow(store).layout)[0]).view).toBe("live");
+  });
+
+  it("is the view of the web app's first pane", () => {
+    const store = createWorkspaceStore({ notes, groups: [], writing: { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "live" } }, {} as WorkspaceDeps);
+
+    expect(store.getSnapshot().panes.panes).toEqual([{ noteId: 1, size: 1, view: "live" }]);
   });
 });
 

@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { undoDepth } from "@codemirror/commands";
+import { EditorView } from "@codemirror/view";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarkdownEditor } from "./MarkdownEditor";
@@ -166,5 +168,42 @@ describe("MarkdownEditor spellcheck", () => {
     renderPreview("Hello");
     // jsdom has no `spellcheck` property, so check the attribute the browser reads.
     expect(screen.getByLabelText("Markdown editor").getAttribute("spellcheck")).toBe("true");
+  });
+});
+
+describe("the live editor across notes and tabs", () => {
+  afterEach(cleanup);
+
+  const editor = (noteId: number, value: string, view: "live" | "preview") => (
+    <MarkdownEditor noteId={noteId} value={value} view={view} onChange={vi.fn()} ratio={0.5} onRatioChange={vi.fn()} onRatioCommit={vi.fn()} />
+  );
+  const liveView = (container: HTMLElement) => EditorView.findFromDOM(container.querySelector<HTMLElement>(".cm-editor")!)!;
+
+  it("keeps Live's undo history through a look at Preview", () => {
+    const { container, rerender } = render(editor(1, "one", "live"));
+    liveView(container).dispatch({ changes: { from: 3, insert: " two" }, userEvent: "input.type" });
+
+    rerender(editor(1, "one two", "preview"));
+    rerender(editor(1, "one two", "live"));
+
+    expect(undoDepth(liveView(container).state)).toBe(1);
+  });
+
+  it("gives another note a history of its own, so undo never brings back the note shown before", () => {
+    const { container, rerender } = render(editor(1, "one", "live"));
+    liveView(container).dispatch({ changes: { from: 3, insert: " two" }, userEvent: "input.type" });
+
+    rerender(editor(2, "another note", "live"));
+
+    expect(liveView(container).state.doc.toString()).toBe("another note");
+    expect(undoDepth(liveView(container).state)).toBe(0);
+  });
+
+  it("is not kept for a note that was never shown in Live", () => {
+    const { container, rerender } = render(editor(1, "one", "live"));
+
+    rerender(editor(2, "another note", "preview"));
+
+    expect(container.querySelector(".cm-editor")).toBeNull();
   });
 });

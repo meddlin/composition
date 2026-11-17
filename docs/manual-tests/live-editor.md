@@ -60,6 +60,10 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Cmd/Ctrl+F with a word selected in the Live tab opens the find bar with that word; matches are highlighted and **Next** scrolls to them; Escape returns the caret to the editor.
 - [ ] Cmd/Ctrl+\ and Cmd+Ctrl+Left/Right step Markdown → Preview → Split → Live → Markdown and put the caret back in the editor.
 - [ ] Switch tabs while typing: nothing typed is lost, and the Live tab shows what the Markdown tab shows.
+- [ ] Type a few words in Live, switch to Preview, then back to Live: Cmd/Ctrl+Z still undoes those words.
+- [ ] Type in Live, switch to Markdown and type there, then back to Live: Cmd/Ctrl+Z does nothing (Live's history started again), and the text is what the Markdown tab shows.
+- [ ] Type in Live, then pick another note in the sidebar so it opens in the same pane: Cmd/Ctrl+Z does nothing, and the other note's text is never brought back.
+- [ ] Settings → Writing → **Open notes in**: choose Live and go back to your notes. Pick a note in an empty panel and open one to the side: both start on Live. A panel you switched to Preview stays on Preview when you pick another note into it. Choose Split again: a note opened to the side starts on Markdown.
 - [ ] A note deleted while it is open is read only: you can select and copy but not type.
 
 ## 7. Layout and accessibility

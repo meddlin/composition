@@ -32,9 +32,9 @@ Each pane has its own tabs: **Markdown** (the editor), **Preview**, **Split** (b
 other, with the divider between them shared by every pane) and **Live** (the two in one place: the Markdown drawn as it
 will read, with its syntax showing only under the caret; see [live-editor.md](live-editor.md)).
 
-- The first note opened starts on **Split**.
-- A pane added *beside* another starts on **Markdown**: notes open together are there to be written
-  in, and each has only part of the row. Switch that pane to **Split** from its own tabs.
+- The first note opened starts on the view chosen in **Settings › Writing › Open notes in** (Split unless changed).
+- A pane added *beside* another starts on that view too, except Split: then it starts on **Markdown**, as notes open
+  together are there to be written in, and each has only part of the row. Switch that pane to **Split** from its own tabs.
 - The other panes keep whatever they were showing, so opening a note beside a pane never changes it.
 - A pane narrower than 480px has no Split tab and shows the editor if it was on Split; widening it
   brings Split back.

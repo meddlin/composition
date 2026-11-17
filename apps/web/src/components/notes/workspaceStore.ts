@@ -54,7 +54,7 @@ import {
 } from "../panels/panelsState";
 import { createNoteFromAnswer, createNoteWith } from "./createNoteFromAnswer";
 import { appendMarkdown, insertIntoOpenNote, type Insertion } from "./noteInsertions";
-import { closePane, dropNote, initialPanes, openNote, type PaneState } from "./panes";
+import { closePane, dropNote, initialPanes, openNote, type PaneState, type PaneView } from "./panes";
 import { applySavedNote, noteTitle, type Group, type Note, type Notebook } from "./types";
 
 /** How long after the last keystroke a note is saved. */
@@ -198,6 +198,10 @@ export type WorkspaceStore = {
    * in `panelsState.ts`). Null, and nothing changes, for a kind whose plugin is off or a window that is gone.
    */
   openKind(kind: LauncherKind, windowId?: WindowId): PanelId | null;
+  /** The view a note starts on when it gets a new pane or panel (Settings › Writing › "Open notes in"). */
+  openNotesIn(): PaneView;
+  /** Takes on a changed "Open notes in": on the desktop the workspace outlives a visit to Settings. */
+  setOpenNotesIn(view: PaneView): void;
   /**
    * Shows a note the way picking it in the sidebar does (see `openNote` in `panelsState.ts`); a note that owns a PDF opens
    * with its PDF beside it (see `openPdfPair`).
@@ -323,6 +327,8 @@ export function createWorkspaceStore(
   const newPanelId = () => `p${++panelCount}`;
   let windowCount = 0;
   const newWindowId = () => `w${++windowCount}`;
+  // The view notes open in; read when a note gets a new pane or panel, not when one is already showing it.
+  let openIn: PaneView = initial.writing?.openNotesIn ?? "split";
   const emptyPanel = (): PanelRecord => ({ id: newPanelId(), kind: "empty", state: null });
   const knownNotes = new Set([...initial.notes, ...(options.panels?.trashed ?? [])].map((n) => n.id));
   const knownNotebooks = new Set((initial.notebooks ?? NO_NOTEBOOKS).map((n) => n.id));
@@ -341,7 +347,7 @@ export function createWorkspaceStore(
     notebooks: initial.notebooks ?? NO_NOTEBOOKS,
     favorites: initial.favorites ?? NO_FAVORITES,
     home: initial.home ?? DEFAULT_HOME_SETTINGS,
-    panes: initialPanes(grid ? null : (initial.notes[0]?.id ?? null)),
+    panes: initialPanes(grid ? null : (initial.notes[0]?.id ?? null), openIn),
     panels: restored ?? initialPanels(newPanelId),
     deleted: (options.panels?.trashed ?? []).filter((n) => shownAtStart.has(n.id) && !initial.notes.some((m) => m.id === n.id)),
   };
@@ -433,8 +439,8 @@ export function createWorkspaceStore(
     set({
       notes: [created, ...state.notes],
       ...(grid
-        ? { panels: openNoteIn(state.panels, windowId, created.id, newPanelId) }
-        : { panes: openNote(state.panes, created.id) }),
+        ? { panels: openNoteIn(state.panels, windowId, created.id, newPanelId, openIn) }
+        : { panes: openNote(state.panes, created.id, openIn) }),
     });
     return created;
   }
@@ -464,7 +470,7 @@ export function createWorkspaceStore(
     if (note && document) {
       set({
         notes: [note, ...state.notes],
-        ...(grid ? { panels: openPdfPairIn(state.panels, windowId, note.id, document.id, newPanelId) } : {}),
+        ...(grid ? { panels: openPdfPairIn(state.panels, windowId, note.id, document.id, newPanelId, undefined, openIn) } : {}),
       });
     }
     return result;
@@ -495,8 +501,8 @@ export function createWorkspaceStore(
     set({
       notes: [created, ...state.notes],
       ...(grid
-        ? { panels: openNoteBesideNoteIn(state.panels, fromNoteId, created.id, newPanelId) }
-        : { panes: dropNote(state.panes, created.id, fromNoteId, "right") }),
+        ? { panels: openNoteBesideNoteIn(state.panels, fromNoteId, created.id, newPanelId, openIn) }
+        : { panes: dropNote(state.panes, created.id, fromNoteId, "right", openIn) }),
     });
     return created;
   }
@@ -724,10 +730,16 @@ export function createWorkspaceStore(
     openNote: (noteId, windowId = MAIN_WINDOW, pdfPlace) => {
       const pdf = grid ? documents.forNote(noteId) : undefined;
       const goTo = pdf && pdfPlace ? { page: pdfPlace.page, mark: null, find: pdfPlace.find, seq: ++goToCount } : undefined;
-      updatePanels((panels) => (pdf ? openPdfPairIn(panels, windowId, noteId, pdf.id, newPanelId, goTo) : openNoteIn(panels, windowId, noteId, newPanelId)));
+      updatePanels((panels) =>
+        pdf ? openPdfPairIn(panels, windowId, noteId, pdf.id, newPanelId, goTo, openIn) : openNoteIn(panels, windowId, noteId, newPanelId, openIn),
+      );
     },
     openNoteBeside: (noteId, windowId = MAIN_WINDOW) =>
-      updatePanels((panels) => openNoteBesideIn(panels, windowId, noteId, newPanelId)),
+      updatePanels((panels) => openNoteBesideIn(panels, windowId, noteId, newPanelId, openIn)),
+    openNotesIn: () => openIn,
+    setOpenNotesIn: (view) => {
+      openIn = view;
+    },
     movePanelToNewWindow: (panelId) => {
       const id = newWindowId();
       const before = state.panels;
@@ -742,7 +754,7 @@ export function createWorkspaceStore(
     openLinkedNote: (noteId, fromPanelId, beside) => {
       if (!state.notes.some((n) => n.id === noteId)) return;
       flushSaves();
-      updatePanels((panels) => openLinkedNoteIn(panels, fromPanelId, noteId, beside, newPanelId));
+      updatePanels((panels) => openLinkedNoteIn(panels, fromPanelId, noteId, beside, newPanelId, openIn));
     },
     openLinkedPdf: (ref, fromPanelId) => {
       const document = documents.getSnapshot().documents.find((d) => d.uuid === ref.uuid);
@@ -755,7 +767,7 @@ export function createWorkspaceStore(
     openNoteForPdf: (panelId, noteId) => {
       if (!state.notes.some((n) => n.id === noteId)) return;
       flushSaves();
-      updatePanels((panels) => openNoteForPdfIn(panels, panelId, noteId, newPanelId));
+      updatePanels((panels) => openNoteForPdfIn(panels, panelId, noteId, newPanelId, openIn));
     },
     newNoteForPdf: async (documentId, panelId) => {
       const document = documents.byId(documentId);
@@ -768,7 +780,7 @@ export function createWorkspaceStore(
         saveNoteContent: deps.saveNoteContent,
       });
       set({ notes: [created, ...state.notes] });
-      updatePanels((panels) => openNoteForPdfIn(panels, panelId, created.id, newPanelId));
+      updatePanels((panels) => openNoteForPdfIn(panels, panelId, created.id, newPanelId, openIn));
       return created;
     },
     retitleFromPdf: (documentId, pdfTitle) => {
@@ -802,7 +814,7 @@ export function createWorkspaceStore(
     resizePanels: (path, sizes, windowId = MAIN_WINDOW) =>
       updatePanels((panels) => resizePanelsIn(panels, windowId, path, sizes), false),
     commitPanels: () => options.panels?.save?.(toDocument(state.panels)),
-    dropNote: (noteId, panelId, zone) => updatePanels((panels) => dropNoteIn(panels, noteId, panelId, zone, newPanelId)),
+    dropNote: (noteId, panelId, zone) => updatePanels((panels) => dropNoteIn(panels, noteId, panelId, zone, newPanelId, openIn)),
     createNote,
     removeNote,
     moveNoteToGroup,

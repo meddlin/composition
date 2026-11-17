@@ -1,12 +1,20 @@
 import Foundation
 
 // How the Markdown editor helps with the shape of the text: the ruler (a vertical guide at a column), reflow (a line that grows past its column is broken as it
-// is typed), the word count and the heading rail. The desktop keeps them as the `writing` object of `settings.json`; this reads and writes the same one
+// is typed), the word count, the heading rail, and the view notes open in. The desktop keeps them as the `writing` object of `settings.json`; this reads and writes the same one
 // (`parseWritingSettings` and `validateWritingSettings` in `writing.ts`, checked by `ReflowConformanceTests`). Reflow and the ruler are off until switched on.
 
 public enum HeadingRailSide: String, CaseIterable, Sendable {
     case left
     case right
+}
+
+/// The views a note can be shown in, by the desktop's tabs (`NOTE_VIEWS` in `writing.ts`).
+public enum NoteView: String, CaseIterable, Sendable {
+    case live
+    case markdown
+    case preview
+    case split
 }
 
 public struct WritingSettings: Equatable, Sendable {
@@ -27,6 +35,9 @@ public struct WritingSettings: Equatable, Sendable {
     /// A rail of ticks beside the text, one per heading. A look rather than a writing aid, so it is on unless switched off.
     public var headingRailEnabled = true
     public var headingRailSide = HeadingRailSide.left
+    /// The view a note opens in when it gets a new pane (Settings › Writing › "Open notes in" on the desktop). Kept here so the file round-trips; the iPad
+    /// does not read it yet (docs/live-default-plan.md, D8).
+    public var openNotesIn = NoteView.split
 
     public init() {}
 
@@ -59,6 +70,7 @@ public struct WritingSettings: Equatable, Sendable {
         settings.wordCountEnabled = flag(object["wordCountEnabled"], settings.wordCountEnabled)
         settings.headingRailEnabled = flag(object["headingRailEnabled"], settings.headingRailEnabled)
         settings.headingRailSide = (object["headingRailSide"] as? String).flatMap(HeadingRailSide.init(rawValue:)) ?? settings.headingRailSide
+        settings.openNotesIn = (object["openNotesIn"] as? String).flatMap(NoteView.init(rawValue:)) ?? settings.openNotesIn
         return settings
     }
 
@@ -75,6 +87,7 @@ public struct WritingSettings: Equatable, Sendable {
             guard let number = object[key] as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { return .invalid("Unknown writing setting.") }
         }
         guard let side = object["headingRailSide"] as? String, HeadingRailSide(rawValue: side) != nil else { return .invalid("Unknown writing setting.") }
+        guard let view = object["openNotesIn"] as? String, NoteView(rawValue: view) != nil else { return .invalid("Unknown writing setting.") }
         for key in ["rulerColumn", "reflowColumn"] where !isColumn(object[key]) {
             return .invalid("Use a whole number of characters from \(minColumn) to \(maxColumn).")
         }
@@ -86,7 +99,7 @@ public struct WritingSettings: Equatable, Sendable {
         [
             "rulerEnabled": rulerEnabled, "rulerColumn": rulerColumn, "reflowEnabled": reflowEnabled, "reflowColumn": reflowColumn,
             "reflowKeepsTables": reflowKeepsTables, "wordCountEnabled": wordCountEnabled, "headingRailEnabled": headingRailEnabled,
-            "headingRailSide": headingRailSide.rawValue,
+            "headingRailSide": headingRailSide.rawValue, "openNotesIn": openNotesIn.rawValue,
         ]
     }
 }

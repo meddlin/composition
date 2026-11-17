@@ -106,6 +106,12 @@ type Props = {
   /** Told how many matches there are whenever that changes. */
   onFindCount?: (count: number) => void;
   "aria-label"?: string;
+  /**
+   * False while another of the note's tabs is showing and this editor is kept, hidden, so its undo history outlives a
+   * look at that tab. If the text changed meanwhile (typed in the Markdown tab, say), the history is cleared when it
+   * shows again: its steps were made against a text that is no longer there.
+   */
+  active?: boolean;
 };
 
 const NO_OPTIONS: FindOptions = { matchCase: false, wholeWord: false };
@@ -128,12 +134,14 @@ export function LiveEditor({
   findCurrent = 0,
   onFindCount,
   "aria-label": label = "Markdown editor",
+  active = true,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const readOnlyFacet = useRef(new Compartment());
   const attributesFacet = useRef(new Compartment());
   const reflowFacet = useRef(new Compartment());
+  const historyFacet = useRef(new Compartment());
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
   const eventsRef = useRef(events);
@@ -152,7 +160,7 @@ export function LiveEditor({
       state: EditorState.create({
         doc,
         extensions: [
-          history(),
+          historyFacet.current.of(history()),
           drawSelection(),
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
@@ -232,6 +240,23 @@ export function LiveEditor({
     const { start, end, insert } = changedSpan(current, value);
     editor.dispatch({ changes: { from: start, to: end, insert }, annotations: fromNote.of(true) });
   }, [value]);
+
+  // The text as it was when another tab took over; null while this one is showing.
+  const textWhenHidden = useRef<string | null>(null);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor) return;
+    if (!active) {
+      textWhenHidden.current = editor.state.doc.toString();
+      return;
+    }
+    const was = textWhenHidden.current;
+    textWhenHidden.current = null;
+    if (was === null || was === editor.state.doc.toString()) return;
+    // Taking the history out and putting it back starts it empty.
+    editor.dispatch({ effects: historyFacet.current.reconfigure([]) });
+    editor.dispatch({ effects: historyFacet.current.reconfigure(history()) });
+  }, [active]);
 
   const matches = useMemo(() => findMatches(value, findQuery, findOptions), [value, findQuery, findOptions]);
   useEffect(() => onFindCount?.(matches.length), [onFindCount, matches.length]);

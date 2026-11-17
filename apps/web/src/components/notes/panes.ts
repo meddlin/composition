@@ -7,11 +7,13 @@
  * a reload starts again with one pane.
  */
 
+import type { NoteView } from "@/lib/composition/writing";
+
 /**
  * What a pane shows of its note: the editor, the preview, both beside each other, or the live editor, which is the
  * two in one (the Markdown drawn as it will read, with its syntax showing only where the caret is).
  */
-export type PaneView = "split" | "markdown" | "preview" | "live";
+export type PaneView = NoteView;
 
 export type Pane = {
   noteId: number;
@@ -39,16 +41,19 @@ export const SIDE_BY_SIDE_MIN_WIDTH = 480;
 const EDGE_FRACTION = 0.3;
 
 /**
- * What a pane added beside another one shows. A lone note starts on "split", but
- * notes open together are there to be written in, and each has only a share of the
- * row, so the editor is the default and the preview is a tab away.
+ * What a pane added beside another one shows, given the view notes open in (Settings › Writing › "Open notes in").
+ * Notes open together are there to be written in, and each has only a share of the row, so where notes open in Split
+ * the editor is shown instead and the preview is a tab away. Any other choice is kept.
  */
-const BESIDE_VIEW: PaneView = "markdown";
+export function besideView(openIn: PaneView): PaneView {
+  return openIn === "split" ? "markdown" : openIn;
+}
 
-export function initialPanes(noteId: number | null): PaneState {
+/** The first pane, showing `noteId` in `openIn`, the view notes open in. */
+export function initialPanes(noteId: number | null, openIn: PaneView = "split"): PaneState {
   return noteId === null
     ? { panes: [], focusedId: null }
-    : { panes: [{ noteId, size: 1, view: "split" }], focusedId: noteId };
+    : { panes: [{ noteId, size: 1, view: openIn }], focusedId: noteId };
 }
 
 export function setPaneView(state: PaneState, noteId: number, view: PaneView): PaneState {
@@ -84,9 +89,9 @@ export function focusPane(state: PaneState, noteId: number): PaneState {
  * already in, otherwise put it in the focused pane (or a first pane). A pane
  * keeps its size and view when its note changes.
  */
-export function openNote(state: PaneState, noteId: number): PaneState {
+export function openNote(state: PaneState, noteId: number, openIn: PaneView = "split"): PaneState {
   if (state.panes.some((p) => p.noteId === noteId)) return focusPane(state, noteId);
-  if (state.panes.length === 0) return initialPanes(noteId);
+  if (state.panes.length === 0) return initialPanes(noteId, openIn);
 
   const at = Math.max(0, state.panes.findIndex((p) => p.noteId === state.focusedId));
   return {
@@ -101,10 +106,10 @@ export function openNote(state: PaneState, noteId: number): PaneState {
  * pane there is; and a note that is already open moves beside the focused pane
  * instead of duplicating (see `dropNote`).
  */
-export function openNoteBeside(state: PaneState, noteId: number): PaneState {
-  if (state.panes.length === 0) return initialPanes(noteId);
+export function openNoteBeside(state: PaneState, noteId: number, openIn: PaneView = "split"): PaneState {
+  if (state.panes.length === 0) return initialPanes(noteId, openIn);
   const target = state.panes.find((p) => p.noteId === state.focusedId) ?? state.panes[state.panes.length - 1];
-  return dropNote(state, noteId, target.noteId, "right");
+  return dropNote(state, noteId, target.noteId, "right", openIn);
 }
 
 /** Closes a pane; its width goes to the pane after it (or before it, for the last). */
@@ -125,13 +130,13 @@ export function closePane(state: PaneState, noteId: number): PaneState {
 
 /**
  * Drops a note on the pane showing `targetId`. Beside it, the note gets a new
- * pane that takes half the target's width and shows the editor. Onto it, the note replaces the
+ * pane that takes half the target's width and shows `besideView(openIn)`. Onto it, the note replaces the
  * target's (keeping that pane's view). A note that was already open elsewhere
  * moves instead of duplicating, view and all: its pane is reordered beside the
  * target (every pane keeps its width), or, when dropped onto another pane,
  * trades places with it.
  */
-export function dropNote(state: PaneState, noteId: number, targetId: number, zone: DropZone): PaneState {
+export function dropNote(state: PaneState, noteId: number, targetId: number, zone: DropZone, openIn: PaneView = "split"): PaneState {
   if (noteId === targetId) return focusPane(state, noteId);
   if (!state.panes.some((p) => p.noteId === targetId)) return state;
 
@@ -161,7 +166,7 @@ export function dropNote(state: PaneState, noteId: number, targetId: number, zon
 
   const half = others[at].size / 2;
   const panes = others.map((p, i) => (i === at ? { ...p, size: half } : p));
-  panes.splice(beside, 0, { noteId, size: half, view: BESIDE_VIEW });
+  panes.splice(beside, 0, { noteId, size: half, view: besideView(openIn) });
   return { panes, focusedId: noteId };
 }
 

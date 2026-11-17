@@ -684,14 +684,20 @@ describe("viewing a note as tabs", () => {
     expect(pane("Alpha").querySelector(".cm-content")?.textContent).toContain("body of Alpha");
   });
 
-  it("takes the live editor away again on another tab, leaving the plain editor's text as it was", () => {
+  it("keeps the live editor, hidden, on another tab, leaving the plain editor's text as it was", () => {
     renderApp();
+    expect(pane("Alpha").querySelector(".cm-content")).toBeNull();
     fireEvent.click(tab("Alpha", "Live"));
 
     fireEvent.click(tab("Alpha", "Markdown"));
 
-    expect(pane("Alpha").querySelector(".cm-content")).toBeNull();
-    expect(editorIn("Alpha").value).toContain("body of Alpha");
+    const live = pane("Alpha").querySelector(".cm-content");
+    expect(live).not.toBeNull();
+    expect(live!.closest('[role="tabpanel"]')!.hasAttribute("hidden")).toBe(true);
+    // The hidden live editor is left out of what can be reached, so the only editor there is the plain one.
+    const editor = within(pane("Alpha")).getByRole<HTMLTextAreaElement>("textbox", { name: "Markdown editor" });
+    expect(editor.tagName).toBe("TEXTAREA");
+    expect(editor.value).toContain("body of Alpha");
   });
 
   it("chooses the view for each note's pane on its own", () => {

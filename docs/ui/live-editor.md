@@ -59,8 +59,10 @@ same scenario on each:
 
 ## How it differs
 
-- **Undo history** belongs to the Live editor and starts again when you switch to it from another tab (the Markdown
-  tab keeps its own, in the browser).
+- **Undo history** belongs to the Live editor. Once a note has been shown in Live, the editor is kept, hidden, while
+  another tab shows, so a look at Preview or Split and back keeps it. If the text changed meanwhile (typed in the
+  Markdown tab, or a sheet edited from Preview), the history starts again, since its steps no longer fit the text. A
+  note opened in the same pane gets a history of its own. The Markdown tab keeps its own, in the browser.
 - **Reflow's break** is part of the typed character's undo step; in the Markdown tab it is a step of its own.
 - **The ruler** is drawn in the preview font, which is not monospaced, so a column is that many widths of a `0`: a
   guide. Reflow counts characters exactly, hidden marks included, because that is what the file holds.
