@@ -7,7 +7,7 @@
  * a reload starts again with one pane.
  */
 
-import type { NoteView } from "@/lib/composition/writing";
+import type { NoteView } from "../../lib/composition/writing";
 
 /**
  * What a pane shows of its note: the editor, the preview, both beside each other, or the live editor, which is the
