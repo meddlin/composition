@@ -6,6 +6,7 @@ import { liveCode } from "./liveCode";
 import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
 import { InkWidget } from "./liveInk";
 import { drawLink, linkContext, liveLinks, noteLinksFacet } from "./liveLinks";
+import { listDecorations, liveListsTheme } from "./liveLists";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
 import { fenceOpenedBy, tokenizeMarkdown, type Fence, type TokenizeFrom, type TokenKind } from "./markdownTokens";
 import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
@@ -287,6 +288,8 @@ export function liveDecorations(
     }
   }
 
+  for (const decoration of listDecorations(state, ranges, frontmatterEnd)) decorations.push(decoration);
+
   if (frontmatterEnd > 0) {
     const last = doc.lineAt(Math.min(frontmatterEnd - 1, doc.length)).number;
     for (let number = 1; number <= last; number++) decorations.push(frontmatterLine.range(doc.line(number).from));
@@ -374,4 +377,4 @@ const liveTheme = EditorView.baseTheme({
 });
 
 /** Everything the live editor needs to draw Markdown: put it in an editor that has the Markdown language. */
-export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks, liveCode];
+export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks, liveCode, liveListsTheme];

@@ -3,6 +3,7 @@
 Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveMarkdown.ts`](../../apps/web/src/components/notes/liveMarkdown.ts),
 [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts),
+[`liveLists.ts`](../../apps/web/src/components/notes/liveLists.ts),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
@@ -41,13 +42,45 @@ it will read, with the syntax showing only where the caret is. The other three t
   `note:` link to a note that no longer exists, and a `pdf:` link to a PDF that is not on this device (every PDF
   link, in the web app), are struck through and muted, as in Preview, and go nowhere. See
   [Following a link](#following-a-link).
+- **Lists, task lists and quotes**: see [below](#lists-task-lists-and-quotes).
 - **Code blocks** (fenced and indented) are drawn as Preview draws them: on the block background, in the code
   font, with rounded corners, and coloured by language with Preview's highlighter (`lowlight`) and Preview's colours.
   See [Code blocks](#code-blocks).
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
 - **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
-- Everything else (lists, quotes, other MDX tags) is shown as the Markdown you wrote, coloured
+- Everything else (other MDX tags, tables) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
+
+### Lists, task lists and quotes
+
+Built in Step 4 of the [live-default plan](../live-default-plan.md#step-4-lists-task-lists-quotes-m)
+([`liveLists.ts`](../../apps/web/src/components/notes/liveLists.ts)). Each is a line or inline decoration, worked out
+for what is on screen, and the reveal rule is per line: on the line the caret (or a selection) is on, the marks are
+shown as written; the line keeps its indent, so only its text shifts a little while the marks show.
+
+- **Bullet lists**: the `-`, `*` or `+` and the indentation before it are drawn as a bullet, the same disc at every
+  level as in Preview. Each level is indented 2em, as Preview's `prose` indents it, and a long item's wrapped rows hang
+  under its text, not under the bullet. A continued line of an item (a second paragraph, or a line you broke by hand)
+  is indented to the item's text, with its source indentation hidden up to that column and no further, so an
+  indented code block inside an item keeps its own.
+- **Ordered lists** keep their numbers **as written**: `1.`, `3.`, `7)` show as `1.`, `3.`, `7)`. Preview renumbers
+  (`1. 2. 7.` reads 1, 2, 3 there), because HTML only keeps the first number.
+- **Task lists** (`- [ ]`, `- [x]`, `- [X]`): the box is drawn as a checkbox after the item's bullet, as in Preview.
+  **Clicking it toggles the `x` in the source** (decision D4): one undo step of its own (never joined to typing just
+  before it), the caret stays where it was, the editor keeps or lacks focus as before, and no menu opens. A read-only
+  note ignores the click. Preview's checkboxes stay read-only. From the keyboard, put the caret on the line and type
+  the `x`.
+- **Quotes**: each line of a quote, a lazy continuation line included, gets a bar down its left side and an indent;
+  a nested quote gets a bar per level. The `> ` is hidden away from the caret's line. Quotes are italic, as in Preview;
+  Preview's curly quotation marks around the quote are not drawn. A quote inside a list item sits at the item's text,
+  and a list inside a quote sits after the bar.
+- **Enter** is the Markdown keymap's (`insertNewlineContinueMarkup`), unchanged: it continues a bullet, a number (the
+  next one), a task (with an empty box), a nested item at its own level and a quote. On an empty item it ends the list
+  (or steps a nested item out a level). One CodeMirror rule to know: Enter on an empty **second** item of a tight list
+  puts a blank line above it, making the list loose, and only a second Enter ends it.
+- **Screen readers**: the bullet, the checkbox and a hidden `>` keep their source in visually hidden text, so the
+  line still reads as written. A checkbox is a `role="checkbox"` with `aria-checked`, named by its source (`[ ]` or
+  `[x]`). The editor's hidden indentation is not read.
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
 shows all their marks.
@@ -133,8 +166,8 @@ same scenario on each:
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
 - **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
-- Not in the Live tab yet (see [live-default-plan.md](../live-default-plan.md)): rendered lists, diagrams, and a preview of MDX components. Use
-  **Split** for those.
+- Not in the Live tab yet: tables, diagrams, and a preview of MDX components (Steps 5 and 6 of the
+  [live-default plan](../live-default-plan.md)). Use **Split** for those.
 
 ## Long notes
 
