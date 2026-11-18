@@ -469,26 +469,11 @@ struct NoteReader: View {
         }
     }
 
-    @ViewBuilder private var header: some View {
-        if !live.updated.isEmpty { Label(live.updated, systemImage: "clock").fixedSize(horizontal: false, vertical: true) }
-        if !live.tags.isEmpty { Text(live.tags) }
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // The picture above the title, from the frontmatter's `headerImage`.
-                    if let headerImage = live.headerImage { HeaderImageBanner(header: headerImage) }
-                    Text(live.title.isEmpty ? "Untitled" : live.title).font(.largeTitle.bold())
-                    // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { header }
-                        VStack(alignment: .leading, spacing: 4) { header }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(look.mutedText)
-                    Divider()
+                    NoteReaderHeader(title: live.title, updated: live.updated, tags: live.tags, headerImage: live.headerImage)
                     if let preview = live.preview { NotePreviewView(preview: preview) } else { ProgressView() }
                 }
                 .padding()
@@ -525,6 +510,38 @@ struct NoteReader: View {
             .fullScreenCover(item: $editingInk) { editing in
                 InkCanvasScreen(editing: editing, look: look) { saved in saveEdited(editing, saved: saved) } cancelled: { editingInk = nil }
             }
+        }
+    }
+}
+
+/// What the preview shows above a note's body, from its frontmatter: the header image, the title, the date and the tags, and a divider. The Live tab draws the same view
+/// in place of the frontmatter (docs/ipad-live-default-plan.md, Step 7, D5), with the header image already read (`loadedImage`), since its picture is taken before any task runs.
+struct NoteReaderHeader: View {
+    let title: String
+    let updated: String
+    let tags: String
+    let headerImage: HeaderImage?
+    var loadedImage: (image: UIImage, pixels: CGSize)? = nil
+    @Environment(\.look) private var look
+
+    @ViewBuilder private var dateAndTags: some View {
+        if !updated.isEmpty { Label(updated, systemImage: "clock").fixedSize(horizontal: false, vertical: true) }
+        if !tags.isEmpty { Text(tags) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // The picture above the title, from the frontmatter's `headerImage`.
+            if let headerImage { HeaderImageBanner(header: headerImage, loaded: loadedImage) }
+            Text(title.isEmpty ? "Untitled" : title).font(.largeTitle.bold())
+            // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { dateAndTags }
+                VStack(alignment: .leading, spacing: 4) { dateAndTags }
+            }
+            .font(.subheadline)
+            .foregroundStyle(look.mutedText)
+            Divider()
         }
     }
 }

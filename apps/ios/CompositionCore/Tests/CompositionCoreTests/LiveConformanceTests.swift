@@ -97,6 +97,8 @@ private struct Fixture: Decodable {
         /// Each `<Ink … />` the desktop draws from its strokes (InkWidget), in the form of a picture. Optional, so that a folder written before Step 1 still reads.
         let inks: [Picture]?
         let tints: [Tint]
+        /// Step 7 (docs/ipad-live-default-plan.md): footnote citations drawn as their number, `[from, to, number]`; missing from a fixture written before it.
+        let footnoteRefs: [[Int]]?
         /// Lists, task lists and quotes (docs/ipad-live-default-plan.md, Step 4): only in a fixture written by a desktop that draws them (its Step 4, PR #325, with the
         /// writer's `lists` and `listDrawn`). Without them, lists are not compared.
         let lists: [ListRow]?
@@ -144,6 +146,7 @@ private func lines(_ expected: Fixture.Expected, text: String) -> [String] {
     out += expected.pictures.map { line("picture", $0) }
     out += (expected.inks ?? []).map { line("ink", $0) }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
+    out += (expected.footnoteRefs ?? []).map { "footnote \($0[0])-\($0[1]) drawn as \($0[2])" }
     out += expected.links.filter { !isFootnoteDefinitionWord($0.from, in: text) }.map { "link \($0.from)-\($0.to) \(unified($0.href))" }
     out += (expected.lists ?? []).map { "list line at \($0.from): \($0.kinds)\($0.starts ? " starts" : "")" }
     out += (expected.listDrawn ?? []).map { "list \($0.kind) \($0.from)-\($0.to)\($0.extra.isEmpty ? "" : " " + $0.extra)" }
@@ -166,6 +169,7 @@ private func lines(_ decorations: LiveDecorations, lists: Bool) -> [String] {
         return "\(name) \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
+    out += decorations.footnoteRefs.map { "footnote \($0.range.location)-\(NSMaxRange($0.range)) drawn as \($0.number)" }
     out += decorations.links.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \(unified($0.href))" }
     guard lists else { return out.sorted() }
     for line in decorations.lists {
@@ -189,6 +193,12 @@ struct LiveConformanceTests {
         // A bare address with a space in it is not a link, and lezer's autolink takes `https://x.test/*not` before it looks for emphasis, so the
         // `*` inside is not an opener. cmark reads emphasis first and finds `*not italic*`. Only an address written with a space in it does this.
         "inline|[a link](https://x.test/*not italic*) done": "autolinks are read before emphasis by lezer, after it by cmark",
+        // Step 7: the desktop's setext headings take the frontmatter's end from `bodyStart`, which does not count a frontmatter whose YAML does not parse, while its
+        // frontmatter look does; so it draws `title: [unclosed` over `---` as a heading inside what it shows as frontmatter. The iPad keeps it frontmatter for both.
+        "frontmatter|---\ntitle: [unclosed\n---\n# Body **bold**": "the desktop reads a heading inside a frontmatter whose YAML does not parse",
+        // Step 7 meets Step 4: on a setext heading's underline inside a quote (`> ===`), the desktop's lists draw no quote bar over its `> ` (lezer's underline line
+        // carries no QuoteMark the lists read), while the iPad draws the bar on every quoted line, this one too.
+        "rest|> Quoted\n> ===\n\nx": "the desktop draws no quote bar on a quoted setext underline's line",
         // lezer makes a link of `[brackets]` whether or not it is defined, and a link may not hold another, so the outer `[…](u)` is not one; drawLink
         // then draws nothing, `[brackets]` having no definition. CommonMark (cmark) makes the outer one a link, and so does the iPad's Preview.
         "links|[nested [brackets]](u)": "lezer takes the inner `[brackets]` as a link even with no definition; cmark makes the outer one the link",

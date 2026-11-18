@@ -43,19 +43,52 @@ struct MarkColorDots: View {
     }
 }
 
+/// The five colours as one menu, where there is no room for them side by side: the button is a disc of the colour in use.
+struct MarkColorMenu: View {
+    let current: String
+    let choose: (String) -> Void
+
+    var body: some View {
+        let paint = PdfMarkPaint.paint(for: current)
+        Menu {
+            Picker("Colour", selection: Binding(get: { current }, set: { choose($0) })) {
+                ForEach(PdfMarkup.markColors, id: \.self) { name in Text(colorNames[name] ?? name).tag(name) }
+            }
+        } label: {
+            Circle()
+                .fill(paint.swiftUIFill)
+                .frame(width: 26, height: 26)
+                .overlay(Circle().stroke(paint.swiftUILine, lineWidth: 1.5))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("Colour: \(colorNames[current] ?? current)")
+        .accessibilityIdentifier("pdf-color-menu")
+    }
+}
+
 /// Over the pages while words are selected: the colour, then highlight, underline or strikethrough.
 struct PdfSelectionBar: View {
     let reader: PdfReader
     @Environment(\.look) private var look
 
     var body: some View {
+        // The five colours side by side need about 430 points; on a phone (or the closed iPhone Duo) they become one menu, its disc the colour in use.
+        ViewThatFits(in: .horizontal) {
+            bar { MarkColorDots(current: reader.color) { reader.color = $0 } }
+            bar { MarkColorMenu(current: reader.color) { reader.color = $0 } }
+        }
+    }
+
+    private func bar(@ViewBuilder colors: () -> some View) -> some View {
         HStack(spacing: 4) {
-            MarkColorDots(current: reader.color) { reader.color = $0 }
+            colors()
             Divider().frame(height: 28)
             tool("Highlight", "highlighter", .highlight, id: "pdf-highlight")
             tool("Underline", "underline", .underline, id: "pdf-underline")
             tool("Strikethrough", "strikethrough", .strikethrough, id: "pdf-strikethrough")
         }
+        .fixedSize()
         .padding(.horizontal, 10)
         .padding(.vertical, 2)
         .background(.regularMaterial, in: Capsule())
@@ -317,23 +350,36 @@ struct PdfInkBanner: View {
     @Environment(\.look) private var look
 
     var body: some View {
-        HStack(spacing: 12) {
+        // Where there is no room for the sentence and the switch's words (a phone, the closed iPhone Duo), "Drawing" and a hand by the switch.
+        ViewThatFits(in: .horizontal) {
+            banner(compact: false)
+            banner(compact: true)
+        }
+    }
+
+    private func banner(compact: Bool) -> some View {
+        HStack(spacing: compact ? 8 : 12) {
             Image(systemName: "pencil.tip").accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
-                Text(reader.fingerDraws ? "Drawing with a finger or the Pencil" : "Drawing with the Pencil").font(.subheadline.weight(.semibold))
+                Text(compact ? "Drawing" : reader.fingerDraws ? "Drawing with a finger or the Pencil" : "Drawing with the Pencil")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityLabel(reader.fingerDraws ? "Drawing with a finger or the Pencil" : "Drawing with the Pencil")
                 Text(reader.inkPages.isEmpty ? "No ink yet" : "Ink on \(reader.inkPages.count) \(reader.inkPages.count == 1 ? "page" : "pages")")
                     .font(.caption).foregroundStyle(look.mutedText)
                     .accessibilityIdentifier("pdf-ink-count")
             }
-            Toggle("Finger draws", isOn: Binding(get: { reader.fingerDraws }, set: { reader.setFingerDraws($0) }))
-                .toggleStyle(.switch)
-                .fixedSize()
-                .accessibilityIdentifier("pdf-ink-finger")
+            Toggle(isOn: Binding(get: { reader.fingerDraws }, set: { reader.setFingerDraws($0) })) {
+                if compact { Image(systemName: "hand.point.up.left") } else { Text("Finger draws") }
+            }
+            .toggleStyle(.switch)
+            .accessibilityLabel("Finger draws")
+            .accessibilityIdentifier("pdf-ink-finger")
             Button("Done") { reader.setInking(false) }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("pdf-ink-done")
         }
-        .padding(.horizontal, 14).padding(.vertical, 8)
+        .fixedSize()
+        .padding(.horizontal, compact ? 10 : 14).padding(.vertical, 8)
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().stroke(look.border, lineWidth: 1))
         .padding(.top, 10)

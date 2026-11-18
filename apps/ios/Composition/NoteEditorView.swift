@@ -734,7 +734,9 @@ struct NoteEditorView: UIViewRepresentable {
             guard let view = textView, let label = geometryLabel, let layout = view.textLayoutManager, let content = layout.textContentManager else { return }
             var found: Int?
             view.textStorage.enumerateAttribute(.liveDraw, in: NSRange(location: 0, length: view.textStorage.length)) { value, range, stop in
-                if let drawing = value as? LiveDrawing, drawing.kind == .block { found = range.location; stop.pointee = true }
+                // The frontmatter's header (Step 7) is left out: the first block drawn in the note's body.
+                let block = view.textStorage.attribute(.liveBlock, at: range.location, effectiveRange: nil) as? LiveBlockMark
+                if let drawing = value as? LiveDrawing, drawing.kind == .block, block?.kind != LiveBlockKinds.frontmatter { found = range.location; stop.pointee = true }
             }
             guard let offset = found, let location = content.location(content.documentRange.location, offsetBy: offset),
                 let fragment = layout.textLayoutFragment(for: location)
@@ -787,10 +789,16 @@ struct NoteEditorView: UIViewRepresentable {
             #endif
         }
 
+        /// The frontmatter's header gives way to its YAML when the note is written in (Step 7, D5).
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            styler?.focusChanged()
+        }
+
         /// Leaving the field is a good moment to write: it is cheap, and the keyboard going away often means the app is too.
         func textViewDidEndEditing(_ textView: UITextView) {
             session.autosaver.flush()
             assist?.focusLost()
+            styler?.focusChanged()
         }
 
         #if DEBUG || EDITOR_TEST_HOOKS

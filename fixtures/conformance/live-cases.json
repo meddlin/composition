@@ -1244,6 +1244,66 @@
   {
    "group": "links",
    "text": "[a](u(1)) parens"
+  },
+  {
+   "group": "rest",
+   "text": "Title\n=====\n\nSub\n---\n\nbody"
+  },
+  {
+   "group": "rest",
+   "text": "One\ntwo\n  ===  \n\nx"
+  },
+  {
+   "group": "rest",
+   "text": "Para\n\n---\n\nafter a blank, a rule"
+  },
+  {
+   "group": "rest",
+   "text": "---\ntitle: A\n---\nText\n---\n"
+  },
+  {
+   "group": "rest",
+   "text": "---\ntitle: A\n---\n\nHeading\n=\n"
+  },
+  {
+   "group": "rest",
+   "text": "> Quoted\n> ===\n\nx"
+  },
+  {
+   "group": "rest",
+   "text": "- item\n  Under\n  ---\n"
+  },
+  {
+   "group": "rest",
+   "text": "Has **bold** in it\n====\n"
+  },
+  {
+   "group": "rest",
+   "text": "Setext\r\n------\r\n\r\nafter"
+  },
+  {
+   "group": "rest",
+   "text": "Words[^a] and more[^b].\n\n[^b]: Second.\n[^a]: First."
+  },
+  {
+   "group": "rest",
+   "text": "One[^x] `[^a]` \\[^a] and[^a].\n\n[^a]: Note."
+  },
+  {
+   "group": "rest",
+   "text": "A[^two] B[^one] C[^two].\n\n[^one]: 1\n[^two]: 2"
+  },
+  {
+   "group": "rest",
+   "text": "---\ntitle: T\n---\nA[^n]\n\n[^n]: N"
+  },
+  {
+   "group": "rest",
+   "text": "# Head[^h]\n\n**bold[^h]**\n\n[^h]: In a heading."
+  },
+  {
+   "group": "rest",
+   "text": "Cite[^1]\r\n\r\n[^1]: CRLF note\r\n"
   }
  ]
 }

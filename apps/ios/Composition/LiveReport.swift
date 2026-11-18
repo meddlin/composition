@@ -9,6 +9,11 @@ import UIKit
 /// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`. A block drawn as a picture (Step 5) adds `draw-block`,
 /// `draw-blockAfter`, `block-<kind>`, `block-revealed`, `block-pictured` and `block-stale` (drawn with its last good picture).
 enum LiveReport {
+    /// A superscript digit as its plain one (`¹` is 1).
+    private static func digit(_ scalar: Unicode.Scalar) -> Int {
+        Array("⁰¹²³⁴⁵⁶⁷⁸⁹".unicodeScalars).firstIndex(of: scalar) ?? -1
+    }
+
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
         var classes: [String: [NSRange]] = [:]
         func note(_ name: String, _ range: NSRange) {
@@ -58,7 +63,10 @@ enum LiveReport {
                 if block.pictured { note("block-pictured", run) }
                 if block.stale { note("block-stale", run) }
             }
-            if LiveOverlay.isHidden(font) { return note("hidden", run) }
+            // Step 7: a footnote citation drawn as its number (`footnote1` over its hidden source), and a line drawn with no height (a setext heading's underline).
+            if let number = attributes[.liveFootnoteRef] as? LiveFootnoteNumber { note("footnote\(number.text.unicodeScalars.map { String(Self.digit($0)) }.joined())", run) }
+            if let style = attributes[.paragraphStyle] as? NSParagraphStyle, style.maximumLineHeight > 0, style.maximumLineHeight < 1 { note("flat", run) }
+            if LiveOverlay.isHidden(attributes) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }
             if traits.contains(.traitBold) { note("bold", run) }

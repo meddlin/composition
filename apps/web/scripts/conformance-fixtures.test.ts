@@ -12,6 +12,8 @@ import { ImageWidget } from "../src/components/notes/liveImages";
 import { InkWidget } from "../src/components/notes/liveInk";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
 import { listDecorations } from "../src/components/notes/liveLists";
+import { footnoteDecorations, footnoteMarksField, footnotesOf } from "../src/components/notes/liveFootnotes";
+import { setextDecorations } from "../src/components/notes/liveSetext";
 
 /**
  * The desktop's side of the conformance checks the native cores run (fixtures/conformance/README.md; for the iPad,
@@ -1066,7 +1068,11 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
 
     function decorate(raw: string, from: number, to: number) {
       const text = raw.replace(/\r\n?/g, "\n");
-      let state = EditorState.create({ doc: text, selection: EditorSelection.range(from, to), extensions: [markdown({ base: markdownLanguage })] });
+      let state = EditorState.create({
+        doc: text,
+        selection: EditorSelection.range(from, to),
+        extensions: [markdown({ base: markdownLanguage }), footnoteMarksField],
+      });
       // The state holds only the first screenful of a long text's tree; `ensureSyntaxTree` parses the rest, and an update moves it into the state.
       ensureSyntaxTree(state, state.doc.length, 60_000);
       state = state.update({}).state;
@@ -1107,6 +1113,8 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         links: [] as [number, number, string][],
         lists,
         listDrawn,
+        // Step 7 (iPad plan docs/ipad-live-default-plan.md): footnote citations drawn as their number, `[from, to, number]`.
+        footnoteRefs: [] as [number, number, number][],
       };
       set.between(0, state.doc.length, (start, end, value) => {
         const spec = value.spec as { class?: string; widget?: ImageWidget | InkWidget; attributes?: Record<string, string> };
@@ -1130,6 +1138,25 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
           if (!listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
         }
       });
+      // Step 7 (liveSetext, liveFootnotes): setext headings and footnote citations, which the iPad draws in its model too. A setext
+      // heading's lines are headings, its underline shown dimmed by the caret or, away from it, its whole line hidden. A
+      // citation away from the caret is drawn as its number (`footnoteRefs`), and by it is shown dimmed. A definition the iPad
+      // draws as a block of the Preview's list instead (its `[^label]:` as a number is the desktop's own), so it is left out.
+      const whole = [{ from: 0, to: state.doc.length }];
+      for (const range of setextDecorations(state, whole, bodyStart(text))) {
+        const cls = (range.value.spec as { class?: string }).class ?? "";
+        const heading = /cm-live-h([12])/.exec(cls);
+        if (heading) out.headings.push([range.from, Number(heading[1])]);
+        else if (cls === "cm-live-setext-hidden") out.hidden.push([range.from, state.doc.lineAt(range.from).to]);
+        else if (cls === "cm-live-syntax") out.shown.push([range.from, range.to]);
+      }
+      const references = new Map(footnotesOf(state).references.map((reference) => [`${reference.from}:${reference.to}`, reference.number]));
+      for (const range of footnoteDecorations(state, whole)) {
+        const number = references.get(`${range.from}:${range.to}`);
+        if (number === undefined) continue;
+        if (range.value.spec.widget) out.footnoteRefs.push([range.from, range.to, number]);
+        else out.shown.push([range.from, range.to]);
+      }
       // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
       const at = rawOffsets(raw);
       out.frontmatterLines = out.frontmatterLines.map((n) => at[n]);
@@ -1140,6 +1167,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
       out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
       out.links = out.links.map(([a, b, href]) => [at[a], at[b], href]);
+      out.footnoteRefs = out.footnoteRefs.map(([a, b, number]) => [at[a], at[b], number]);
       out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       out.inks = out.inks.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       out.lists = out.lists.map(([a, kinds, starts]) => [at[a], kinds, starts]);
@@ -1170,6 +1198,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.pictures)).toBe(true);
     expect(seen((e) => e.inks)).toBe(true);
     expect(seen((e) => e.tints)).toBe(true);
+    expect(seen((e) => e.footnoteRefs)).toBe(true);
     expect(seen((e) => e.frontmatterLines)).toBe(true);
     expect(seen((e) => e.links)).toBe(true);
   }, 600_000);

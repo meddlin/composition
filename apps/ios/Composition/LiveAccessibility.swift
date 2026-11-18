@@ -34,11 +34,13 @@ enum LiveAccessibility {
         set { UserDefaults.standard.set(newValue.rawValue, forKey: key) }
     }
 
-    /// The runs the Live look has hidden: characters in the tiny font, which nothing else uses.
+    /// The runs the Live look has hidden: characters in the tiny font, which nothing else uses, and the frontmatter concealed under its header (Step 7).
     static func hiddenRuns(in text: NSAttributedString) -> [NSRange] {
         var runs: [NSRange] = []
-        text.enumerateAttribute(.font, in: NSRange(location: 0, length: text.length)) { value, range, _ in
-            if let font = value as? UIFont, LiveOverlay.isHidden(font) { runs.append(range) }
+        text.enumerateAttributes(in: NSRange(location: 0, length: text.length)) { attributes, range, _ in
+            if LiveOverlay.isHidden(attributes) {
+                if let last = runs.last, NSMaxRange(last) == range.location { runs[runs.count - 1] = NSUnionRange(last, range) } else { runs.append(range) }
+            }
         }
         return runs
     }

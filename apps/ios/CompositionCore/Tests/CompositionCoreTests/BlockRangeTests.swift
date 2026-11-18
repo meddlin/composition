@@ -157,4 +157,60 @@ struct BlockRangeTests {
         #expect(preview.located.map { whole.substring(with: $0.range) } == ["a", "<Info>\n\n| x |\n|---|\n| 1 |\n\n</Info>", "<Image src=\"app_data/a.png\" />"])
         guard case .panel(.info, _) = preview.located[1].block else { Issue.record("the panel is the second block"); return }
     }
+
+    @Test("each component the Live tab draws (Step 6) is located whole, one block each: panels, a block Mark, charts, cards and a notice")
+    func everyComponentDrawnInLive() throws {
+        let parts = [
+            "<Info>\n\nSome **words**.\n\n</Info>",
+            "<Warning>\n\n- one\n- two\n\n</Warning>",
+            "<Mark color=\"green\">\n\nA tinted block.\n\n</Mark>",
+            "<Chart type=\"bar\" x=\"k\" y=\"v\">\n\n```csv\nk,v\na,1\nb,2\n```\n\n</Chart>",
+            "<YouTube url=\"https://youtu.be/dQw4w9WgXcQ\" title=\"A video\" />",
+            "<Repo url=\"https://github.com/meddlin/composition\" />",
+            "<Repo url=\"not a repository\" />",
+        ]
+        let note = "a\n\n" + parts.joined(separator: "\n\n") + "\n\nb\n"
+        let preview = NotePreview.make(content: note)
+        #expect(preview.error == nil)
+        let whole = note as NSString
+        #expect(preview.located.map { whole.substring(with: $0.range) } == ["a"] + parts + ["b"])
+        let kinds = preview.located.dropFirst().dropLast().map { located -> String in
+            switch located.block {
+            case .panel(let tone, _): tone == .info ? "info" : "warning"
+            case .highlight: "mark"
+            case .chart: "chart"
+            case .youtube: "youtube"
+            case .repo: "repo"
+            case .notice: "notice"
+            default: "other"
+            }
+        }
+        #expect(kinds == ["info", "warning", "mark", "chart", "youtube", "repo", "notice"])
+    }
+
+    @Test("a note that stops being valid MDX loses its located components (why the Live tab keeps its last good pictures then, Step 6)")
+    func invalidNoteLosesComponents() throws {
+        let valid = "<Info>\n\nx\n\n</Info>\n\nan open"
+        #expect(NotePreview.make(content: valid).error == nil)
+        let broken = NotePreview.make(content: valid.replacingOccurrences(of: "an open", with: "an <Mark>open"))
+        #expect(broken.error != nil)
+        #expect(!broken.located.contains { if case .panel = $0.block { true } else { false } }, "the panel is plain Markdown while the note is not valid")
+    }
+
+    @Test("a long note's blocks are located in time that grows with its length, not its square (Step 6: a run of 8,000 blocks took 96 s)")
+    func longNoteIsLocatedQuickly() throws {
+        var lines: [String] = []
+        for section in 0..<4000 { lines += ["## Section \(section)", "", "Some <Mark color=\"yellow\">highlighted</Mark> and **bold** words, é😀, in a paragraph.", ""] }
+        let note = lines.joined(separator: "\n")
+        let started = ContinuousClock.now
+        let preview = NotePreview.make(content: note)
+        let spent = ContinuousClock.now - started
+        #expect(preview.located.count == 8000)
+        let whole = note as NSString
+        #expect(whole.substring(with: preview.located[7999].range).hasSuffix("in a paragraph."))
+        #expect(whole.substring(with: preview.located[7998].range) == "## Section 3999")
+        // Debug build, on a loaded Mac: about 0.5 s; quadratic, it was 96 s.
+        #expect(spent < .seconds(15), "\(spent)")
+    }
 }
+

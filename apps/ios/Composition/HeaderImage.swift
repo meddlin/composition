@@ -38,6 +38,12 @@ struct HeaderImageBanner: View {
     /// The file was tried and could not be read.
     @State private var gaveUp = false
 
+    /// `loaded`: the picture already read (the Live tab's picture of the header, Step 7, which is drawn before a task could read it).
+    init(header: HeaderImage, loaded: (image: UIImage, pixels: CGSize)? = nil) {
+        self.header = header
+        _loaded = State(initialValue: loaded)
+    }
+
     private static var exposedToTests: Bool {
         #if DEBUG || EDITOR_TEST_HOOKS
         UserDefaults.standard.bool(forKey: "exposeDecorative")
@@ -202,7 +208,7 @@ struct HeaderImageSheet: View {
             if let problem { Text(problem).font(.footnote).foregroundStyle(look.error).accessibilityIdentifier("header-image-problem") }
             if let header, HeaderImageSource.storedName(of: header.image) == nil {
                 // A web address typed into the frontmatter: kept as it is, and not drawn, because the iPad fetches nothing from the network.
-                Text("Currently \(header.image). It is a web address, which this iPad does not load, so it is not shown.").font(.footnote).foregroundStyle(look.mutedText)
+                Text("Currently \(header.image). It is a web address, which this app does not load, so it is not shown.").font(.footnote).foregroundStyle(look.mutedText)
             }
             if failed {
                 Text("Could not load the images.").foregroundStyle(look.error)

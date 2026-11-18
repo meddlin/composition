@@ -18,7 +18,7 @@ struct AppearanceView: View {
         NavigationStack {
             Form {
                 Section {
-                    row("System", detail: "Light by day and dark at night, as the iPad is set", choice: .system, id: "system") { SystemSwatch() }
+                    row("System", detail: "Light by day and dark at night, as this device is set", choice: .system, id: "system") { SystemSwatch() }
                     ForEach(Theme.all, id: \.name) { theme in
                         row(theme.label, detail: nil, choice: .theme(theme.name), id: theme.name) { SchemeSwatch(theme: theme) }
                     }
@@ -44,7 +44,7 @@ struct AppearanceView: View {
                 } header: {
                     Text("Fonts").foregroundStyle(look.mutedText)
                 } footer: {
-                    Text("The iPad's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not on the iPad yet.").foregroundStyle(look.mutedText)
+                    Text("The system's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not in this app yet.").foregroundStyle(look.mutedText)
                 }
                 .listRowBackground(look.surface)
 
@@ -151,7 +151,7 @@ struct AppearanceView: View {
         } header: {
             Text("When it changes").foregroundStyle(look.mutedText)
         } footer: {
-            Text("Times on this iPad's own clock, so they follow it if it changes zone. They go once round the clock in order, starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before. The defaults are 05:45, 07:15, 17:45 and 19:15. Nothing is looked up: there is no city, no location and no network request.")
+            Text("Times on this device's own clock, so they follow it if it changes zone. They go once round the clock in order, starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before. The defaults are 05:45, 07:15, 17:45 and 19:15. Nothing is looked up: there is no city, no location and no network request.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
