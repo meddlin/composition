@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { service } from "./backend";
-import { createSandbox, foregroundAt, frame, press, settle, type Rendered, type Sandbox } from "./testing";
-import { PALETTES } from "./theme";
+import { CODE_LINE_TINT } from "./components/Preview";
+import { backgroundAt, createSandbox, foregroundAt, frame, press, settle, type Rendered, type Sandbox } from "./testing";
+import { mix, PALETTES } from "./theme";
 
 let sandbox: Sandbox;
 beforeEach(() => {
@@ -65,5 +66,37 @@ describe("code blocks in the preview", () => {
     const app = await open("<Info>\n\n```js\nconst a = 1;\n```\n\n</Info>");
 
     expect(colorOf(app, "const a")).toBe(dark.syntax.keyword);
+  });
+});
+
+describe("line numbers and highlighted lines (docs/ui/code-blocks.md)", () => {
+  /** The screen row holding `text`, and the column it starts at. */
+  function at(app: Rendered, text: string): [number, number] {
+    const rows = frame(app).split("\n");
+    const row = rows.findIndex((line) => line.includes(text));
+    if (row < 0) throw new Error(`"${text}" is not on screen:\n${frame(app)}`);
+    return [row, rows[row].indexOf(text)];
+  }
+
+  it("numbers the lines from the start line, tints the highlighted ones, and still colors the code", async () => {
+    const app = await open("```ts showLineNumbers=107 {50,109}\nconst first = 1;\nconst second = 2;\nconst third = 3;\n```");
+    const rows = frame(app).split("\n");
+
+    expect(rows[at(app, "const first")[0]]).toMatch(/107\s+const first = 1;/);
+    expect(rows[at(app, "const third")[0]]).toMatch(/109\s+const third = 3;/);
+    expect(frame(app)).not.toContain("showLineNumbers");
+    expect(colorOf(app, "const first")).toBe(dark.syntax.keyword);
+    const band = mix(dark.background, dark.accent, CODE_LINE_TINT);
+    expect(backgroundAt(app, ...at(app, "third"))).toBe(band);
+    expect(backgroundAt(app, ...at(app, "second"))).not.toBe(band);
+  });
+
+  it("tints without numbers, and a fence with no language is not colored as one", async () => {
+    const app = await open("``` {2}\nconst one = 1;\nconst two = 2;\n```");
+    const rows = frame(app).split("\n");
+
+    expect(rows[at(app, "const one")[0]]).not.toMatch(/\d\s+const one/);
+    expect(backgroundAt(app, ...at(app, "const two"))).toBe(mix(dark.background, dark.accent, CODE_LINE_TINT));
+    expect(colorOf(app, "const one")).toBe(dark.foreground);
   });
 });

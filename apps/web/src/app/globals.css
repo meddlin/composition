@@ -683,6 +683,47 @@
 }
 
 /*
+ * Line numbers and highlighted lines in code blocks (docs/ui/code-blocks.md): Preview's from rehypeCodeLines.ts, one
+ * `.code-line` per line; the Live tab's from liveCode.ts, as line classes. A highlighted line gets a band of the
+ * scheme's --highlight mixed into the code background, and a bar of it at the left edge, so it shows without telling
+ * colours apart. The numbers are drawn by CSS, so copying code never copies them.
+ */
+.prose pre code[data-code-lines] {
+  /* As wide as its longest line, so a band runs the whole width when the block scrolls sideways. */
+  display: block;
+  width: max-content;
+  min-width: 100%;
+}
+.prose pre code[data-code-lines] .code-line {
+  display: block;
+  /* Out to the block's edges (prose's pre padding), so a band runs its whole width. */
+  margin-inline: -1.1428571em;
+  padding-inline: 1.1428571em;
+}
+.prose pre code[data-code-lines] .code-line[data-highlighted] {
+  background-color: color-mix(in srgb, var(--highlight) 16%, var(--surface));
+  box-shadow: inset 3px 0 var(--highlight);
+}
+.prose pre code[data-line-numbers] .code-line::before {
+  content: attr(data-line);
+  display: inline-block;
+  width: calc(var(--code-digits, 1) * 1ch);
+  margin-right: 1.5em;
+  text-align: right;
+  color: var(--muted-foreground);
+  user-select: none;
+}
+[data-digits="1"] { --code-digits: 1; }
+[data-digits="2"] { --code-digits: 2; }
+[data-digits="3"] { --code-digits: 3; }
+[data-digits="4"] { --code-digits: 4; }
+[data-digits="5"] { --code-digits: 5; }
+[data-digits="6"] { --code-digits: 6; }
+[data-digits="7"] { --code-digits: 7; }
+[data-digits="8"] { --code-digits: 8; }
+[data-digits="9"] { --code-digits: 9; }
+
+/*
  * Markdown syntax colors in the editor (components/notes/MarkdownHighlight.tsx). Color only:
  * the layer must stay glyph-for-glyph in line with the textarea above it.
  */
