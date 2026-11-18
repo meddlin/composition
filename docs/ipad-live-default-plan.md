@@ -467,6 +467,13 @@ On an 11-inch Simulator in landscape with the sidebar and list showing, the mode
 full-screen button and the six tests that tap it fail: use a 13-inch one. The 16 ms budget on the showcase note (which has footnotes,
 `<Toc />` and a frontmatter): the styler's part of a keystroke p95 1.2 ms, a whole keystroke p95 6.4 ms, 2 of 200 over 16 ms.
 
+After merging this plan's branch (Steps 1 to 5) into Step 7, every Live suite was run again on the same Simulator: `LiveRestUITests`,
+`LiveBlockUITests`, `LiveCodeUITests`, `LiveDrawingsUITests`, `LiveListsUITests` and `LiveLinksUITests` all pass, `LiveUITests`
+all but the taps test above (as on `main`), and `AccessibilityUITests` 14 of 14 once its largest-text Live audit leaves out one
+finding: at that size the drawn header's title and date are "potentially inaccessible text" with no element. The picture adds no
+element (Step 5's rule) and its words are the YAML's, read from the value; whether the header should be an element of its own is the
+owner's (item 366). The plan branch alone passes that audit; Step 7 on `main` did too, so it is the two together.
+
 ### Step 8: Live by default (S)
 
 - The setting's default becomes **Live** (D1). A choice already made stays.
