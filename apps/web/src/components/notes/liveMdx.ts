@@ -37,7 +37,12 @@ export const BLOCK_COMPONENTS: readonly string[] = COMPONENTS.map(([name]) => na
 /** A tag of one of `names` in some text: where it starts and ends, and what it is. */
 export type Tag = { name: string; at: number; end: number; close: boolean; selfClosing: boolean };
 
-const tagPattern = (names: readonly string[]) => new RegExp(`<(/?)(${names.join("|")})(?=[\\s/>]|$)`, "g");
+/** Only the component names above go into a pattern: letters, never text from the note. */
+const knownNames = (names: readonly string[]) => names.filter((name) => BLOCK_COMPONENTS.includes(name)).join("|");
+
+// Built from `knownNames` only, which are fixed identifiers, so nothing typed can change the pattern.
+// nosemgrep: detect-non-literal-regexp
+const tagPattern = (names: readonly string[]) => new RegExp(`<(/?)(${knownNames(names)})(?=[\\s/>]|$)`, "g");
 
 /**
  * Where the tag whose name ends at `from` ends (past its `>`), and whether it closes itself; "more" when `text` ends
@@ -121,7 +126,9 @@ export function elementEnd(state: EditorState, name: string, start: number): num
   }
 }
 
-const openingAt = (names: readonly string[]) => new RegExp(`^ {0,3}<(${names.join("|")})(?=[\\s/>]|$)`);
+// Built from `knownNames` only (see `tagPattern`).
+// nosemgrep: detect-non-literal-regexp
+const openingAt = (names: readonly string[]) => new RegExp(`^ {0,3}<(${knownNames(names)})(?=[\\s/>]|$)`);
 
 /** The end of the component of `name` that starts at a top-level node (see `BlockKind.reach`). */
 function reachOf(name: string) {
