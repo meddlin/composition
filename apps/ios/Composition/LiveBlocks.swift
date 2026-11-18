@@ -18,7 +18,10 @@ enum LiveBlockKinds {
         case .markdown(let blocks):
             guard blocks.count == 1, case .table = blocks[0] else { return nil }
             return "table"
-        // Step 6: .panel, .chart, .repo, .youtube, .highlight, .notice (and .image for a component the picture layer does not draw). Step 7: .toc, .footnotes.
+        // Step 6: .panel, .chart, .repo, .youtube, .highlight, .notice (and .image for a component the picture layer does not draw).
+        // Step 7: `<Toc />`, and `<Footnotes />` or a run of footnote definitions (`NotePreview.footnoteDefinitions`), both drawn as the Preview's list.
+        case .toc: return "toc"
+        case .footnotes: return "footnotes"
         default:
             return nil
         }
@@ -28,8 +31,18 @@ enum LiveBlockKinds {
     /// than across the text's width, as a panel or a chart is.
     static func sizesToContent(_ block: PreviewBlock) -> Bool { kind(of: block) == "table" }
 
-    /// Whether a note may hold a block that is drawn, so that a note that cannot is not read a second time in the pause (a table needs a pipe).
-    static func mayHold(_ text: String) -> Bool { text.contains("|") }
+    /// Whether a note may hold a block that is drawn, so that a note that cannot is not read a second time in the pause (a table needs a pipe; Step 7's need `<Toc`,
+    /// `<Footnotes`, a footnote's `[^` or a frontmatter).
+    static func mayHold(_ text: String) -> Bool { mayHoldInBody(text) || text.hasPrefix("---") || text.hasPrefix("\u{FEFF}---") }
+
+    /// Whether the note's body may hold a block, so that the note is read as the Preview reads it (a note with only a frontmatter, which most have, is not).
+    static func mayHoldInBody(_ text: String) -> Bool { text.contains("|") || text.contains("<Toc") || text.contains("<Footnotes") || text.contains("[^") }
+
+    /// The frontmatter's header (Step 7, D5): drawn in place of the YAML away from the caret, and while the caret is in it only the YAML shows, with no picture under it.
+    static let frontmatter = "frontmatter"
+
+    /// Whether a block shows its last picture after its source while the selection is in it (D3). The frontmatter does not (D5).
+    static func picturedWhileEditing(_ kind: String) -> Bool { kind != frontmatter }
 }
 
 /// A block the Live tab draws: where its source is, what it is, and the text of that source (what its picture is cached by).
@@ -38,15 +51,52 @@ struct LiveBlock: Sendable {
     var block: PreviewBlock
     var kind: String
     var source: String
+    /// The frontmatter's header (Step 7): what `NoteReader` shows above the body, drawn in place of the YAML. `block` is then an empty `.markdown([])`.
+    var header: LiveHeader? = nil
 
     /// The blocks of a note that are drawn, from its preview (`NotePreview.located`); made off the main thread, in the pause pass.
     static func blocks(of text: String) -> [LiveBlock] {
         guard LiveBlockKinds.mayHold(text) else { return [] }
         let whole = text as NSString
-        return NotePreview.make(content: text).located.compactMap { located in
+        var found: [LiveBlock] = []
+        // The frontmatter, drawn as the Preview's header (D5).
+        if let header = LiveHeader.of(text) {
+            found.append(LiveBlock(range: header.range, block: .markdown([]), kind: LiveBlockKinds.frontmatter, source: whole.substring(with: header.range), header: header))
+        }
+        guard LiveBlockKinds.mayHoldInBody(text) else { return found }
+        let preview = NotePreview.make(content: text)
+        found += preview.located.compactMap { located in
             guard let kind = LiveBlockKinds.kind(of: located.block), NSMaxRange(located.range) <= whole.length else { return nil }
             return LiveBlock(range: located.range, block: located.block, kind: kind, source: whole.substring(with: located.range))
         }
+        // Step 7: the footnotes' definitions, each run of them drawn as the Preview's list of their entries. One inside a component is that component's to draw.
+        for run in preview.footnoteDefinitions where NSMaxRange(run.range) <= whole.length {
+            guard !preview.located.contains(where: { NSIntersectionRange($0.range, run.range).length > 0 }) else { continue }
+            found.append(LiveBlock(range: run.range, block: run.block, kind: "footnotes", source: whole.substring(with: run.range)))
+        }
+        return found.sorted { $0.range.location < $1.range.location }
+    }
+}
+
+/// What the Preview shows above a note's body, from its frontmatter (`NoteReader`'s header: the header image, the title, the date and the tags), and where the frontmatter
+/// is written. Only for a frontmatter that reads: one that does not stays its YAML, so nothing typed wrongly is hidden behind a header that says "Untitled".
+struct LiveHeader: Sendable, Equatable {
+    var range: NSRange
+    var title: String
+    var updated: String
+    var tags: String
+    var headerImage: HeaderImage?
+
+    static func of(_ text: String) -> LiveHeader? {
+        let body = NoteFrontmatter.split(text).body
+        guard text.hasSuffix(body) else { return nil }
+        var end = text.utf16.count - body.utf16.count
+        guard end > 0, let frontmatter = NoteFrontmatter.parse(text).frontmatter else { return nil }
+        // To the end of the closing `---`'s line: its line break is the body's.
+        let units = Array(text.utf16.prefix(end))
+        while end > 0, units[end - 1] == 0x0A || units[end - 1] == 0x0D { end -= 1 }
+        return LiveHeader(range: NSRange(location: 0, length: end), title: frontmatter.title, updated: frontmatter.updatedAt,
+                          tags: NoteFrontmatter.tagsToString(frontmatter.tags).tagLine, headerImage: frontmatter.headerImage)
     }
 }
 
@@ -153,7 +203,7 @@ final class LiveBlocks {
         }) else { return nil }
         let block = entries[index].block
         let key = Self.key(block, width: width)
-        let picture = cache.object(forKey: key) ?? LiveBlockRenderer.render(block.block, width: width, look: look, traits: traits, imageFolder: imageFolder).map { LiveBlockPicture(image: $0) }
+        let picture = cache.object(forKey: key) ?? LiveBlockRenderer.render(block, width: width, look: look, traits: traits, imageFolder: imageFolder).map { LiveBlockPicture(image: $0) }
         if let picture { cache.setObject(picture, forKey: key) }
         entries[index].picture = picture ?? entries[index].picture
         entries[index].stale = false
@@ -171,6 +221,18 @@ enum LiveBlockRenderer {
     /// (`previewScrolls`): `ImageRenderer` does not draw a `ScrollView`'s content. A table (`sizesToContent`) is drawn at its own width, as in the Preview; one wider than
     /// the text is offered the text's width, so its cells wrap, and one still wider (columns that cannot wrap) comes back wider and is drawn scaled down to fit
     /// (`LiveBlockPicture.size`). It is never clipped.
+    /// A Live block: the Preview's view of its `PreviewBlock`, or for the frontmatter the Preview's header (`NoteReaderHeader`).
+    static func render(_ block: LiveBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
+        guard let header = block.header else { return render(block.block, width: width, look: look, traits: traits, imageFolder: imageFolder) }
+        // The header image is read here, at once: `ImageRenderer` draws a view as it first is, before any task of its own has run.
+        var picture: (image: UIImage, pixels: CGSize)?
+        if let headerImage = header.headerImage, let folder = imageFolder, case .stored(let name)? = HeaderImageSource.resolve(headerImage.image) {
+            picture = DownsampledPicture.load(folder.appendingPathComponent(name), maxPixel: 2048)
+        }
+        let content = NoteReaderHeader(title: header.title, updated: header.updated, tags: header.tags, headerImage: header.headerImage, loadedImage: picture)
+        return draw(content, proposing: max(width, 100), look: look, traits: traits, imageFolder: imageFolder)
+    }
+
     static func render(_ block: PreviewBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
         if LiveBlockKinds.sizesToContent(block), let own = render(block, proposing: nil, look: look, traits: traits, imageFolder: imageFolder), own.size.width <= width {
             return own
@@ -179,8 +241,13 @@ enum LiveBlockRenderer {
     }
 
     private static func render(_ block: PreviewBlock, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
-        let content = PreviewBlockView(block: block)
+        draw(PreviewBlockView(block: block), proposing: width, look: look, traits: traits, imageFolder: imageFolder)
+    }
+
+    private static func draw(_ view: some View, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
+        let content = view
             .environment(\.previewScrolls, false)
+            .environment(\.horizontalSizeClass, UserInterfaceSizeClass(traits.horizontalSizeClass))
             .environment(\.look, look)
             .environment(\.imageFolder, imageFolder)
             .environment(\.colorScheme, look.colorScheme)

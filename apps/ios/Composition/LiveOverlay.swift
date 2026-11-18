@@ -23,6 +23,9 @@ enum LiveOverlay {
         /// is in it (D3).
         var blocks: [LiveBlocks.Entry] = []
         var selection = NSRange(location: 0, length: 0)
+        /// The text view is being edited (it has the keyboard's focus). The frontmatter counts as "the caret in it" only then (Step 7, D5, as on the desktop): a note
+        /// opens with the caret at its start, and shows its header, not its YAML, until it is written in.
+        var editing = true
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -89,6 +92,8 @@ enum LiveOverlay {
             guard let part = inside(mark) else { continue }
             hide(part, in: storage)
         }
+        collapse(decorations.collapsedLines, in: range, of: storage)
+        drawFootnoteRefs(decorations.footnoteRefs, in: range, of: storage, look: look)
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
         drawBlocks(in: range, of: storage, context: context)
     }
@@ -101,6 +106,33 @@ enum LiveOverlay {
     static let revealsBlocks = true
     #endif
 
+    /// A setext heading's underline away from the caret (Step 7): its line, line break and all, hidden and with no height, as the desktop's `cm-live-setext-hidden` is.
+    private static func collapse(_ lines: [Int], in range: NSRange, of storage: NSTextStorage) {
+        let text = storage.mutableString
+        for line in lines where line >= range.location && line < NSMaxRange(range) && line < text.length {
+            let paragraph = text.paragraphRange(for: NSRange(location: line, length: 0))
+            hide(paragraph, in: storage)
+            let flat = NSMutableParagraphStyle()
+            flat.maximumLineHeight = 0.5
+            storage.addAttribute(.paragraphStyle, value: flat, range: paragraph)
+        }
+    }
+
+    /// Each footnote citation away from the caret (Step 7): `[^label]` hidden, and room kept after it (a kern on its last character) for the Preview's superscript
+    /// number, which the paragraph's layout fragment draws there (`LiveDrawingFragment`), in the font and colour the citation had. The text is not changed.
+    private static func drawFootnoteRefs(_ refs: [LiveDecorations.FootnoteRef], in range: NSRange, of storage: NSTextStorage, look: Look) {
+        for ref in refs {
+            guard ref.range.length > 0, NSIntersectionRange(ref.range, range).length == ref.range.length else { continue }
+            var effective = NSRange()
+            let font = storage.attribute(.font, at: ref.range.location, effectiveRange: &effective) as? UIFont ?? UIFont.systemFont(ofSize: 16)
+            let color = storage.attribute(.foregroundColor, at: ref.range.location, effectiveRange: nil) as? UIColor ?? look.uiForeground
+            let number = LiveFootnoteNumber(text: NoteScanner.superscript(ref.number), font: isHidden(font) ? UIFont.systemFont(ofSize: 16) : font, color: color)
+            hide(ref.range, in: storage)
+            storage.addAttribute(.liveFootnoteRef, value: number, range: ref.range)
+            storage.addAttribute(.kern, value: number.width, range: NSRange(location: NSMaxRange(ref.range) - 1, length: 1))
+        }
+    }
+
     /// Each block drawn as a picture (Step 5). Away from the selection every character of it is hidden, its first paragraph is made as tall as its picture and marked
     /// for the fragment to draw the picture in (`.block`), and its other lines are made as short as they go; while the selection is in it (ends included, as a construct)
     /// its source shows, as the rest of the Live look draws it, with the last good picture after its last line (`.blockAfter`). `range` is whole paragraphs and holds
@@ -112,7 +144,8 @@ enum LiveOverlay {
             let block = NSIntersectionRange(entry.block.range, NSRange(location: 0, length: text.length))
             guard block.length > 0, NSIntersectionRange(block, range).length > 0 else { continue }
             let selection = context.selection
-            let revealed = revealsBlocks && selection.location <= NSMaxRange(block) && NSMaxRange(selection) >= block.location
+            let frontmatter = entry.block.kind == LiveBlockKinds.frontmatter
+            let revealed = revealsBlocks && (!frontmatter || context.editing) && selection.location <= NSMaxRange(block) && NSMaxRange(selection) >= block.location
             let first = text.paragraphRange(for: NSRange(location: block.location, length: 0))
             let lines = text.paragraphRange(for: block)
             let last = text.paragraphRange(for: NSRange(location: NSMaxRange(block) - 1, length: 0))
@@ -121,14 +154,15 @@ enum LiveOverlay {
             let size = LiveDrawing.size(of: picture, available: context.textWidth)
             storage.addAttribute(.liveBlock, value: LiveBlockMark(kind: entry.block.kind, revealed: revealed, pictured: entry.picture != nil, stale: entry.stale, source: block), range: block)
             if revealed {
-                // The source, and under it the picture it last made (none yet: nothing, rather than a stand-in that would come and go while it is typed).
-                guard entry.picture != nil else { continue }
+                // The source, and under it the picture it last made (none yet: nothing, rather than a stand-in that would come and go while it is typed). The frontmatter's
+                // YAML alone (D5).
+                guard entry.picture != nil, LiveBlockKinds.picturedWhileEditing(entry.block.kind) else { continue }
                 let style = NSMutableParagraphStyle()
                 style.paragraphSpacing = LiveDrawing.reserved(for: size.height)
                 storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
                 continue
             }
-            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw] { storage.removeAttribute(key, range: lines) }
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveFootnoteRef, .kern] { storage.removeAttribute(key, range: lines) }
             hide(lines, in: storage)
             let tall = NSMutableParagraphStyle()
             tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)
@@ -250,6 +284,28 @@ extension NSAttributedString.Key {
     /// On every character of a block the Live tab draws as a picture (`LiveBlocks`): what kind it is and whether it shows its source now. For the report (`LiveReport`) and
     /// a tap on the picture.
     static let liveBlock = NSAttributedString.Key("liveBlock")
+}
+
+extension NSAttributedString.Key {
+    /// On the characters of a footnote citation drawn as its number (Step 7): a `LiveFootnoteNumber`, which `LiveDrawingFragment` draws where the citation is.
+    static let liveFootnoteRef = NSAttributedString.Key("liveFootnoteRef")
+}
+
+/// A footnote's number as the Preview writes it (superscript digits, `¹²`, in the text's own font and colour), drawn in place of its hidden citation.
+final class LiveFootnoteNumber: NSObject {
+    let text: String
+    let font: UIFont
+    let color: UIColor
+
+    init(text: String, font: UIFont, color: UIColor) {
+        self.text = text
+        self.font = font
+        self.color = color
+    }
+
+    var attributed: NSAttributedString { NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color]) }
+    /// The room it takes in the line.
+    var width: CGFloat { ceil(attributed.size().width) }
 }
 
 /// What `.liveBlock` says of a block's characters.

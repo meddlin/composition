@@ -61,6 +61,8 @@ private struct Fixture: Decodable {
         let shown: [[Int]]
         let pictures: [Picture]
         let tints: [Tint]
+        /// Step 7 (docs/ipad-live-default-plan.md): footnote citations drawn as their number, `[from, to, number]`; missing from a fixture written before it.
+        let footnoteRefs: [[Int]]?
     }
 
     let texts: [Text]
@@ -85,6 +87,7 @@ private func lines(_ expected: Fixture.Expected) -> [String] {
         return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
+    out += (expected.footnoteRefs ?? []).map { "footnote \($0[0])-\($0[1]) drawn as \($0[2])" }
     return out.sorted()
 }
 
@@ -101,6 +104,7 @@ private func lines(_ decorations: LiveDecorations) -> [String] {
         return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
+    out += decorations.footnoteRefs.map { "footnote \($0.range.location)-\(NSMaxRange($0.range)) drawn as \($0.number)" }
     return out.sorted()
 }
 
@@ -112,6 +116,9 @@ struct LiveConformanceTests {
         // A bare address with a space in it is not a link, and lezer's autolink takes `https://x.test/*not` before it looks for emphasis, so the
         // `*` inside is not an opener. cmark reads emphasis first and finds `*not italic*`. Only an address written with a space in it does this.
         "inline|[a link](https://x.test/*not italic*) done": "autolinks are read before emphasis by lezer, after it by cmark",
+        // Step 7: the desktop's setext headings take the frontmatter's end from `bodyStart`, which does not count a frontmatter whose YAML does not parse, while its
+        // frontmatter look does; so it draws `title: [unclosed` over `---` as a heading inside what it shows as frontmatter. The iPad keeps it frontmatter for both.
+        "frontmatter|---\ntitle: [unclosed\n---\n# Body **bold**": "the desktop reads a heading inside a frontmatter whose YAML does not parse",
     ]
 
     @Test("every text, with every selection tried, is hidden, shown, styled, drawn and tinted as the desktop does")

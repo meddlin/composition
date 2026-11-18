@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Step 5 (the block layer and tables) was built 2026-11-17; see its section.
+[Decisions](#decisions)). Step 5 (the block layer and tables) was built 2026-11-17 and Step 7 (the rest) 2026-11-18; see their sections.
 
 ## Goal and rule
 
@@ -328,6 +328,44 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
 - **The frontmatter (D5):** away from the caret, the Preview's header (header image, title, date, tags) drawn as a
   block in place of the YAML; the YAML alone while the caret is in it.
 - **Gate LD7 (iPad):** items 363 to 366.
+
+**Status: built 2026-11-18** (on `main` after Step 5's merge). Gate LD7 is the owner's.
+
+- **Setext headings** (`LiveReader.setext`): each line of the heading's text drawn at its level, the same sizes as ATX headings;
+  the underline's mark is from its first `=` or `-` to its last (lezer's `HeaderMark`), shown dimmed while the selection is anywhere
+  in the heading; away from it the underline's whole line is hidden and drawn with no height (`LiveDecorations.collapsedLines`, a
+  `maximumLineHeight` of half a point, the desktop's `cm-live-setext-hidden`). The `---` ambiguity is swift-markdown's, which agrees
+  with lezer: under a paragraph it is an underline, after a blank line a rule, and the frontmatter's fences are blanked before the read.
+  cmark's range for `text\n---\nmore` runs on into `more`, so the underline is the first underline-shaped line after the heading's first.
+- **Footnote citations:** `NoteScanner` now gives `footnoteCitations` (every `[^label]` with a definition, outside code, in the note
+  and in footnotes' own text) with the Preview's numbers. `LiveModel` reads them from the whole note (like highlights, they pair across
+  blocks: moved with the edits between full reads, made right by the next; `differences(from:)` redraws every citation whose number
+  changed). Away from the selection the `[^label]` is hidden and a kern on its last character keeps room for the number; the
+  paragraph's layout fragment (`LiveDrawingFragment`, now also given to a paragraph with no other drawing) draws the Preview's
+  superscript digits (`NoteScanner.superscript`, `¹²`) there, in the font and colour the citation had. The text is never changed.
+- **Definitions and `<Footnotes />`:** `<Toc />` and `<Footnotes />` are `LiveBlockKinds` (`toc`, `footnotes`). Definitions are
+  `NotePreview.footnoteDefinitions`: each run of cited definitions with only blank lines between them is one `.footnotes` block of
+  their entries (in the order written, with the Preview's numbers), drawn in place of them through Step 5's layer. **The list the
+  Preview adds at the end of a note with no tag is not drawn as a block of its own**: it is written nowhere, so it would be drawn
+  on no text. Since definitions are usually written at the end, the run drawn in place of them reads as that list; definitions
+  written in the middle are drawn where they are (the desktop draws them in place too). A definition inside a component is that
+  component's.
+- **`<Toc />`:** the Preview's "Contents" box; a tap puts the caret at the tag's start (I6: its entries are reached through the
+  Outline button, which already lists setext headings, as `MarkdownHighlighter` and `NoteScanner` read them).
+- **The frontmatter (D5):** `LiveHeader` (a frontmatter that parses: title, date, tags, header image) is a block of kind
+  `frontmatter` over the YAML, drawn as `NoteReaderHeader`, the view now shared with `NoteReader` (one renderer), with the header
+  image read before rendering (`HeaderImageBanner(loaded:)`: `ImageRenderer` draws a view before its task runs). As on the desktop,
+  it counts as "the caret in it" only while the text view is being edited (a note opens with the caret at 0 and shows its header);
+  `MarkdownStyler.focusChanged` redraws it on focus. Revealed, only the YAML shows, in L4's smaller muted look, with no picture
+  under it (`LiveBlockKinds.picturedWhileEditing`). A frontmatter that does not parse stays YAML.
+- **Oracle:** the fixture writer adds the desktop's `setextDecorations` (headings, shown underline, hidden underline line) and its
+  footnote citations (`footnoteRefs`: drawn as a number, or shown dimmed) to `live-expected.json`; 15 hand cases in `live-cases.json`
+  (group `rest`). All 390 texts agree but one, listed in `LiveConformanceTests.known`: the desktop draws a setext heading inside a
+  frontmatter whose YAML does not parse (its setext code takes the body's start from `bodyStart`, its frontmatter look does not).
+  The desktop's definition look (its `[^label]:` as a number) is the desktop's own and is left out.
+- **Report and tests:** `live-report` gains `footnote<n>` over a citation drawn as its number and `flat` on a line with no height;
+  `LiveReportReading` (UI tests) leaves the frontmatter's block out of what a test reads, since every test note has a frontmatter,
+  and L4's frontmatter test now checks D5. Core: `LiveRestTests`. VoiceOver: the value stays the source (candidate B).
 
 ### Step 8: Live by default (S)
 

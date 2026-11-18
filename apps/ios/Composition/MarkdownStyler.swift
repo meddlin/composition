@@ -77,7 +77,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveBlock]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveBlock, .liveFootnoteRef, .kern]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -206,6 +206,12 @@ final class MarkdownStyler {
         for range in ranges { applyColours(to: range, using: model) }
     }
 
+    /// The text view gained or lost the keyboard's focus: the frontmatter shows its YAML only while it is being edited (Step 7, D5), so its block is drawn again.
+    func focusChanged() {
+        guard isLive, let model, let storage = textView?.textStorage, model.length == storage.length else { return }
+        for entry in blocks.entries where entry.block.kind == LiveBlockKinds.frontmatter { applyColours(to: entry.block.range, using: model) }
+    }
+
     // MARK: Quick reads
 
     private func storageProcessedEditing() {
@@ -257,7 +263,8 @@ final class MarkdownStyler {
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
             LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage,
-                              context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, blocks: touched, selection: selection))
+                              context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, blocks: touched, selection: selection,
+                                             editing: textView?.isFirstResponder ?? false))
         }
         storage.endEditing()
         didApply?()

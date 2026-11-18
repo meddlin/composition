@@ -36,8 +36,43 @@ struct LiveReader: MarkupWalker {
     // MARK: Headings and rules
 
     mutating func visitHeading(_ heading: Heading) {
-        if let node = atx(heading) { headings.append(node) }  // a setext heading is not drawn: the desktop's `ATXHeading` is the only one it reads
+        if let node = atx(heading) ?? setext(heading) { headings.append(node) }
         descendInto(heading)
+    }
+
+    /// A setext heading (docs/ipad-live-default-plan.md, Step 7; the desktop's `liveSetext`): a paragraph underlined with `===` (level 1) or `---` (level 2). Each of its
+    /// lines is drawn as a heading; the underline is its mark, from its first `=` or `-` to its last (lezer's `HeaderMark`), shown dimmed while the selection is in the
+    /// heading, and otherwise its whole line hidden and drawn with no height.
+    private func setext(_ heading: Heading) -> LiveModel.HeadingNode? {
+        guard heading.level <= 2, let range = map.range(of: heading), range.count > 0 else { return nil }
+        let firstLine = lines.line(containing: range.lowerBound)
+        let character: UInt16 = heading.level == 1 ? 0x3D : 0x2D
+        /// The underline's mark on line `index`, if the line is one: `=` or `-` alone, after space or a quote's `>`, with nothing but space after.
+        func underline(_ index: Int) -> (line: NSRange, mark: NSRange)? {
+            let start = lines.starts[index], end = lineEnd(from: start)
+            var markEnd = end
+            while markEnd > start, isSpace(chars[markEnd - 1]) { markEnd -= 1 }
+            var markStart = markEnd
+            while markStart > start, chars[markStart - 1] == character { markStart -= 1 }
+            guard markStart < markEnd, markStart == start || isSpace(chars[markStart - 1]) || chars[markStart - 1] == 0x3E else { return nil }
+            return (NSRange(location: start, length: end - start), NSRange(location: markStart, length: markEnd - markStart))
+        }
+        // The underline is the first such line after the heading's first: cmark's range can run on into the line after it (`text\n---\nmore` ends on `more`).
+        let lastReached = lines.line(containing: max(range.lowerBound, range.upperBound - 1))
+        guard let lastLine = (firstLine + 1..<min(lines.starts.count, max(lastReached, firstLine + 1) + 1)).first(where: { underline($0) != nil }),
+            let found = underline(lastLine)
+        else { return nil }
+        let underlineStart = found.line.location, underlineEnd = NSMaxRange(found.line)
+        let markStart = found.mark.location, markEnd = NSMaxRange(found.mark)
+
+        var start = range.lowerBound
+        while start < underlineStart, isSpace(chars[start]) { start += 1 }
+        let textLines = (firstLine..<lastLine).map { index -> NSRange in
+            let lineStart = lines.starts[index]
+            return NSRange(location: lineStart, length: lineEnd(from: lineStart) - lineStart)
+        }
+        return LiveModel.HeadingNode(line: lines.starts[firstLine], level: heading.level, node: NSRange(location: start, length: underlineEnd - start),
+                                     marks: [(NSRange(location: markStart, length: markEnd - markStart), found.line)], setextLines: textLines)
     }
 
     /// An ATX heading as lezer's `parseATXHeading` reads it: the opening `#`s and, when they are preceded by a space and are not the whole line, the closing ones.

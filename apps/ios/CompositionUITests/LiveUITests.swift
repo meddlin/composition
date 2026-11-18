@@ -35,13 +35,8 @@ final class LiveUITests: XCTestCase {
 
     /// What the Live tab has made of the text, as `class → ranges` (`hidden`, `italic`, `bold`, `size32`, `struck`), for the text now, or `markdown` as a word.
     private func drawn() -> [String: String] {
-        let label = report.exists ? report.label : ""
-        var out: [String: String] = [:]
-        for part in label.split(separator: ";") {
-            let pair = part.split(separator: ":", maxSplits: 1)
-            if pair.count == 2 { out[String(pair[0])] = String(pair[1]) }
-        }
-        return out
+        // The frontmatter's header block (Step 7) left out: see `LiveReportReading`.
+        LiveReportReading.parse(report.exists ? report.label : "")
     }
 
     private func text() -> String { (editor.value as? String) ?? "" }
@@ -150,10 +145,16 @@ final class LiveUITests: XCTestCase {
 
     // MARK: Rules, pictures, highlights and the frontmatter (step L4)
 
-    func testTheFrontmatterIsSetApartAndNeverHidden() throws {
+    /// Since Step 7 of docs/ipad-live-default-plan.md (D5) the frontmatter is drawn as the Preview's header away from the caret; while the caret is in it, its YAML shows,
+    /// set apart as step L4 drew it (smaller), with none of it hidden.
+    func testTheFrontmatterIsSetApartAndNeverHiddenWhileItIsEdited() throws {
         try launch()
-        XCTAssertTrue(eventually { drawn()["small"]?.hasPrefix("0-") == true }, "the frontmatter, from the first character, is drawn smaller: \(drawn())")
-        XCTAssertNil(drawn()["hidden"], "and none of it is hidden")
+        let whole = { LiveReportReading.parse(self.report.exists ? self.report.label : "", keepingFrontmatter: true) }
+        XCTAssertTrue(eventually { whole()["block-frontmatter"]?.hasPrefix("0-") == true }, "away from the caret the frontmatter is the header: \(whole())")
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
+        app.typeKey(.upArrow, modifierFlags: .command)
+        XCTAssertTrue(eventually { whole()["small"]?.hasPrefix("0-") == true }, "the frontmatter, from the first character, is drawn smaller: \(whole())")
+        XCTAssertFalse((whole()["hidden"] ?? "").hasPrefix("0-"), "and none of it is hidden: \(whole())")
     }
 
     func testARuleIsALineAndItsDashesShowWhileTheCaretIsOnThem() throws {

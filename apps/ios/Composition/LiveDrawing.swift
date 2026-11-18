@@ -84,15 +84,20 @@ final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
         {
             return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: drawing)
         }
+        // A paragraph with a footnote citation drawn as its number (Step 7) draws the number itself.
+        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0, LiveDrawingFragment.footnoteNumbers(in: paragraph.attributedString).isEmpty == false {
+            return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: nil)
+        }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }
 
 /// A paragraph's layout fragment that also draws a rule across the page or a picture, in the room the paragraph was made tall enough for.
 final class LiveDrawingFragment: NSTextLayoutFragment {
-    let drawing: LiveDrawing
+    /// What is drawn on the paragraph; nil for one that only has footnote numbers to draw.
+    let drawing: LiveDrawing?
 
-    init(textElement: NSTextElement, range: NSTextRange?, drawing: LiveDrawing) {
+    init(textElement: NSTextElement, range: NSTextRange?, drawing: LiveDrawing?) {
         self.drawing = drawing
         super.init(textElement: textElement, range: range)
     }
@@ -106,8 +111,33 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
     }
 
     private var pictureSize: CGSize? {
-        if let block = drawing.block { return LiveDrawing.size(of: block, available: lineWidth) }
-        return drawing.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
+        if let block = drawing?.block { return LiveDrawing.size(of: block, available: lineWidth) }
+        return drawing?.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
+    }
+
+    /// The footnote numbers to draw in a paragraph, and where their citations are in it.
+    static func footnoteNumbers(in paragraph: NSAttributedString) -> [(range: NSRange, number: LiveFootnoteNumber)] {
+        var found: [(NSRange, LiveFootnoteNumber)] = []
+        paragraph.enumerateAttribute(.liveFootnoteRef, in: NSRange(location: 0, length: paragraph.length)) { value, run, _ in
+            if let number = value as? LiveFootnoteNumber { found.append((run, number)) }
+        }
+        return found
+    }
+
+    /// Each footnote number where its hidden citation is: on the citation's line, at its first character, on the line's baseline (the Preview's superscript digits sit
+    /// raised by their own shape).
+    private func drawFootnoteNumbers(at point: CGPoint, in context: CGContext) {
+        guard let paragraph = (textElement as? NSTextParagraph)?.attributedString else { return }
+        let numbers = Self.footnoteNumbers(in: paragraph)
+        guard !numbers.isEmpty else { return }
+        UIGraphicsPushContext(context)
+        defer { UIGraphicsPopContext() }
+        for (range, number) in numbers {
+            guard let line = textLineFragments.first(where: { NSLocationInRange(range.location, $0.characterRange) }) else { continue }
+            let x = line.locationForCharacter(at: range.location).x
+            let baseline = line.typographicBounds.minY + line.glyphOrigin.y
+            number.attributed.draw(at: CGPoint(x: point.x + line.typographicBounds.minX + x, y: point.y + baseline - number.font.ascender))
+        }
     }
 
     /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to a sliver
@@ -117,7 +147,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
         let width = max(lineWidth, base.width - 2 * padding)
         var height = max(base.height, layoutFragmentFrame.height)
-        if drawing.kind == .pictureAfter || drawing.kind == .blockAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
+        if drawing?.kind == .pictureAfter || drawing?.kind == .blockAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
         return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
     }
 
@@ -126,6 +156,8 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         let frame = layoutFragmentFrame
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
         let left = point.x + padding
+        drawFootnoteNumbers(at: point, in: context)
+        guard let drawing else { return }
         switch drawing.kind {
         case .rule:
             context.setStrokeColor(drawing.ruleColor.cgColor)
@@ -154,6 +186,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
     private func drawBlock(in rect: CGRect, context: CGContext) {
         UIGraphicsPushContext(context)
         defer { UIGraphicsPopContext() }
+        guard let drawing else { return }
         if let image = drawing.block?.picture?.image {
             image.draw(in: rect)
         } else if drawing.kind == .block {
@@ -164,7 +197,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
     }
 
     private func drawPicture(in rect: CGRect, context: CGContext) {
-        guard let picture = drawing.picture else { return }
+        guard let drawing, let picture = drawing.picture else { return }
         UIGraphicsPushContext(context)
         defer { UIGraphicsPopContext() }
         guard picture.pixels != nil else {
