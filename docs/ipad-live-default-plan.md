@@ -357,7 +357,10 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
   image read before rendering (`HeaderImageBanner(loaded:)`: `ImageRenderer` draws a view before its task runs). As on the desktop,
   it counts as "the caret in it" only while the text view is being edited (a note opens with the caret at 0 and shows its header);
   `MarkdownStyler.focusChanged` redraws it on focus. Revealed, only the YAML shows, in L4's smaller muted look, with no picture
-  under it (`LiveBlockKinds.picturedWhileEditing`). A frontmatter that does not parse stays YAML.
+  under it (`LiveBlockKinds.picturedWhileEditing`). A frontmatter that does not parse stays YAML. Its characters are hidden
+  by colour in their own Dynamic Type font (`.liveConcealed`, counted as hidden by the report and by VoiceOver's silencing), not by
+  the half-point font of the other blocks: Xcode's accessibility audit reads the text at the top of the note and said a half-point
+  font "does not support Dynamic Type".
 - **Oracle:** the fixture writer adds the desktop's `setextDecorations` (headings, shown underline, hidden underline line) and its
   footnote citations (`footnoteRefs`: drawn as a number, or shown dimmed) to `live-expected.json`; 15 hand cases in `live-cases.json`
   (group `rest`). All 390 texts agree but one, listed in `LiveConformanceTests.known`: the desktop draws a setext heading inside a

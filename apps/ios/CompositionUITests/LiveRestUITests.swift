@@ -87,7 +87,12 @@ final class LiveRestUITests: XCTestCase {
     /// Gives the editor the keyboard, with the caret at the end of the note.
     private func focusAtTheEnd() {
         editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
-        app.typeKey(.downArrow, modifierFlags: .command)
+        // The tap may land on a drawn block, which puts the caret at its start for a moment after a touch (0.8 s): ⌘↓ after that.
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+        for _ in 0..<3 where selection() != (text() as NSString).length {
+            app.typeKey(.downArrow, modifierFlags: .command)
+            _ = eventually(3) { self.selection() == (self.text() as NSString).length }
+        }
         XCTAssertTrue(eventually { selection() == (text() as NSString).length }, "the caret is at the end: \(selection())")
     }
 

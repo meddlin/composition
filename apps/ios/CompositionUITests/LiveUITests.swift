@@ -152,7 +152,13 @@ final class LiveUITests: XCTestCase {
         let whole = { LiveReportReading.parse(self.report.exists ? self.report.label : "", keepingFrontmatter: true) }
         XCTAssertTrue(eventually { whole()["block-frontmatter"]?.hasPrefix("0-") == true }, "away from the caret the frontmatter is the header: \(whole())")
         editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
-        app.typeKey(.upArrow, modifierFlags: .command)
+        // A tap on a drawn block puts the caret at its start for a moment after the touch (0.8 s): ⌘↑ after that.
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+        // The first key after the on-screen keyboard comes up is sometimes lost in the Simulator: pressed again until the caret is at the top.
+        for _ in 0..<3 where caret()?.location != 0 {
+            app.typeKey(.upArrow, modifierFlags: .command)
+            _ = eventually(3) { self.caret()?.location == 0 }
+        }
         XCTAssertTrue(eventually { whole()["small"]?.hasPrefix("0-") == true }, "the frontmatter, from the first character, is drawn smaller: \(whole())")
         XCTAssertFalse((whole()["hidden"] ?? "").hasPrefix("0-"), "and none of it is hidden: \(whole())")
     }
