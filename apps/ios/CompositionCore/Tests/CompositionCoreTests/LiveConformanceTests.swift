@@ -63,7 +63,6 @@ private struct Fixture: Decodable {
         let tints: [Tint]
     }
 
-    let limit: Int
     let texts: [Text]
     let states: [State]
     let expected: [Expected]
@@ -119,7 +118,6 @@ struct LiveConformanceTests {
     func agreement() throws {
         let directory = try #require(conformanceDirectory)
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: directory.appendingPathComponent("live-expected.json")))
-        #expect(fixture.limit == LiveModel.desktopExtrasLimit)
 
         var models: [Int: LiveModel] = [:]
         var different: [Int: (count: Int, first: String)] = [:]

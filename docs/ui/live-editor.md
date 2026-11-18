@@ -41,6 +41,7 @@ it will read, with the syntax showing only where the caret is. The other three t
   link, in the web app), are struck through and muted, as in Preview, and go nowhere. See
   [Following a link](#following-a-link).
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
+- **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
 - Everything else (lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
@@ -100,6 +101,32 @@ same scenario on each:
 - **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
 - Not in the Live tab, by design: rendered lists, diagrams, and a preview of MDX components. Use
   **Split** for those.
+
+## Long notes
+
+The Live tab draws a note of any length in full: tints, tags hidden, pictures, drawings and colours, at the end of a
+3 MB note as at the start of a short one. The Markdown tab's colour layer still stops at 100,000 characters
+(`MAX_HIGHLIGHT_CHARS`, [markdown-editor-highlighting.md](markdown-editor-highlighting.md)), because it re-reads the
+whole note on every keystroke; Live used to share that limit and no longer does.
+
+What makes that possible is that nothing Live does on a keystroke reads the whole note:
+
+- **Colours, highlights, `<Image>` and `<Ink>` are read only around the screen** (`scanAround`): from 10,000
+  characters above what is on screen to 10,000 below it (`SCAN_MARGIN`), read again as the note changes or scrolls.
+  The reading goes a line at a time and needs to know only whether a line is in a code fence, which the read takes
+  from CodeMirror's syntax tree (kept up to date as you type, without re-reading the note). So tags inside a code block
+  that opened far above the screen are still not highlights, and a keystroke costs the same in a note of any length.
+- **The frontmatter's end** is worked out again only when an edit is in the frontmatter, or could close one
+  (`frontmatterEndAfter`); typing in the body never re-reads it.
+
+One thing that follows: a highlight is tinted while both its tags are within that margin, so a highlight whose
+opening tag is more than 10,000 characters above the screen is drawn untinted, its tags showing, until you scroll
+up to it. Highlights that long are not something the highlight menu makes.
+
+Measured in a production build (stress-test notes, 2026-11-17; the numbers are in
+[live-default-plan.md](../live-default-plan.md#step-1-lift-the-100000-character-limit-s-to-m)): a keystroke's work in
+the editor is about 4 ms at 400,000 characters and 6 ms at 1,000,000, the same as before when those notes were drawn
+with nothing tinted.
 
 ## Keeping it level with the Markdown tab
 

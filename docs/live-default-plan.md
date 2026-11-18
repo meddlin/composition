@@ -8,7 +8,8 @@ Markdown, Preview and Split stay available.
 
 Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** (see
 [Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (PR #321); Gate 0 is the
-owner's. **Step 2 (links) built 2026-11-17** on its own branch; Gate B is the owner's.
+owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
+built 2026-11-17** (PR #322); Gate B is the owner's.
 
 ## Goal and rule
 
@@ -41,7 +42,7 @@ What Preview draws and Live does not, as of `ad9701a`:
 | `<Toc>`, `<Footnotes>`, footnote refs `[^1]` | Source | A linked table of contents; numbered notes | 7 |
 | Setext headings (`Title` / `===`) | Text (only `#` headings are drawn) | A heading | 7 |
 | Frontmatter | Muted monospaced YAML | `FrontmatterCard` | 7 |
-| Notes over 100,000 characters | Tints, pictures, ink and colours are dropped | Drawn (slowly: see [stress-test findings #7](stress-test-findings.md)) | 1 |
+| Notes over 100,000 characters | Tints, pictures, ink and colours are dropped (drawn since Step 1) | Drawn (slowly: see [stress-test findings #7](stress-test-findings.md)) | 1 |
 
 Already drawn, and left alone: headings with `#`, bold, italic, strikethrough, inline code, rules, Markdown and
 `<Image />` pictures, `<Ink>`, `<Mark>` highlights, and the syntax colours.
@@ -145,6 +146,43 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   `<Ink>` reads only over the viewport plus the blocks around it.
 - **Gate A (mine):** a 400k note with highlights at its end types under 16 ms a key in a production build, and
   draws its last highlight tinted.
+- **Built (2026-11-17): the second way.** Dropping the limit alone was over budget at 1M (below), so Live now reads
+  colours, highlights, `<Image>` and `<Ink>` only from 10,000 characters above the screen to 10,000 below it
+  (`scanAround`, `SCAN_MARGIN`), starting in whichever code fence the syntax tree says that first line is in
+  (`fenceAt`; `tokenizeMarkdown` can now start at any line). The frontmatter's end is read again only for an edit
+  that could move it (`frontmatterEndAfter`). The Markdown tab keeps `MAX_HIGHLIGHT_CHARS`. A test checks that the
+  read around the screen finds exactly what a read of the whole note finds, at screens every 5,000 characters through a
+  note with fences of both kinds, a fenced block in a quote and in a list, and frontmatter. Docs:
+  [ui/live-editor.md § Long notes](ui/live-editor.md#long-notes), [manual-tests/live-editor.md](manual-tests/live-editor.md) §8.
+  Accepted: a highlight whose opening tag is more than 10,000 characters above the screen is drawn untinted until
+  scrolled to.
+- **Measured** (2026-11-17, production build, Apple silicon, the browser pane at 800×600). Notes: the `LINES:` notes of
+  the stress generator (`--notes 100 --no-huge --line-notes 2600,10000,26000`, `mixed` profile) with three highlights
+  appended, plus the 1M one tripled for 3 MB. 30 keys typed at the end of each through the editor's own input path
+  (`execCommand("insertText")`), 40 ms apart. *Editor* is the keystroke up to CodeMirror having updated, drawn and
+  measured (`view.measure()`); *whole key* adds the app's React update that follows (the note's state, the panes,
+  the sidebar), up to the next task. Median / 95th percentile, in ms.
+
+  | Note | As it was (limit: nothing drawn past 100k) | No limit, whole-note scan | Read around the screen (built) |
+  |---|---|---|---|
+  | 97,500 chars, editor | 3.4 / 4.6 | 2.8 / 3.8 | 2.6 / 4.7 |
+  | 97,500 chars, whole key | 14.2 / 17.5 | 13.2 / 38.1 | 13.1 / 16.5 |
+  | 397,000 chars, editor | 4.3 / 6.1 | 6.2 / **18.4** | **3.7 / 4.4** |
+  | 397,000 chars, whole key | 16.8 / 22.5 | 17.6 / 33.9 | **15.6** / 17.9 |
+  | 1,022,000 chars, editor | 7.5 / 9.7 | 12.3 / **32.2** | 6.1 / 7.8 |
+  | 1,022,000 chars, whole key | 25.2 / 28.6 | 29.6 / 50.3 | 23.5 / 28.8 |
+  | 3,066,000 chars, editor | | | 14.1 / 34.2 |
+  | 1,000-char note, whole key | 10.5 / 14.3 | | |
+
+  The whole-note scan itself (Node, same notes): 0.6 ms at 100k, 2.5 ms at 400k, 7.2 ms at 1M, and the garbage it
+  makes shows as the 95th-percentile spikes above. Read around the screen, Live's own work is at or below what it was
+  when these notes were drawn with nothing tinted, and the last highlight is drawn tinted at every size. **Gate A:** at
+  400k the editor's work is 3.7 ms a key (4.4 at the 95th percentile), and the whole key 15.6 ms at the median. What is
+  left of the whole key is not Live's: a 1,000-character note already costs 10.5 ms, the app's React update after
+  every key, and it grows with the note's length (about 1 ms per 100k; not profiled: on each key the note's text is taken
+  out of the editor and passed around, and `MarkdownEditor` parses its frontmatter, for example). That is stress-test territory (findings 1 and 7, out of scope here) and
+  a follow-up of its own. Not measured: the 3 MB note's editor time is CodeMirror's own (no scan runs over the note),
+  and notes of 1M and over are not saved (finding 1).
 
 ### Step 2: links (S)
 

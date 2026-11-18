@@ -93,6 +93,18 @@ note link to a note you then delete for good (empty the Trash Can), `<https://ex
 - [ ] With a screen reader (VoiceOver or NVDA): the editor is announced as a multi-line text box named "Markdown editor". Hidden marks are not read, which is expected; open a menu and its options are announced as you arrow through them.
 - [ ] Windows high-contrast mode: the text, caret and selection are visible.
 
+## 8. Long notes
+
+Make the stress-test notes (`pnpm --dir apps/web stress:db --notes 100 --no-huge --line-notes 2600,10000,26000 --out <folder>`,
+see [stress-databases.md](stress-databases.md)) and add a line with three highlights at the end of each `LINES:` note
+(on the Markdown tab, or with the highlight menu). Use a production build (`pnpm --dir apps/web build` and `start`).
+
+- [ ] Open `LINES: 10,000 lines` (about 400,000 characters) on Live and press Cmd/Ctrl+End: the last highlights are tinted, their tags hidden, and the code blocks above are coloured.
+- [ ] Type a sentence there with a real keyboard: no lag, the tints stay, and putting the caret in a highlight shows its tags.
+- [ ] Scroll up through a long code block and back down: tags inside the code are never tinted; the text after the block is coloured as Markdown again.
+- [ ] Do the same on `LINES: 26,000 lines` (about 1,000,000 characters). (A note this long is not saved yet: stress-test finding 1. Look, don't keep.)
+- [ ] On the Markdown tab the same notes are left uncoloured past 100,000 characters, as before.
+
 ## Known and accepted
 
 The ruler is a guide in a proportional font; undo history starts afresh when you switch to the Live tab; reflow's break joins the

@@ -972,16 +972,16 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     const mdx = JSON.parse(fs.readFileSync(path.join(conformance, "mdx-notes.json"), "utf8")) as { notes: { name: string; body: string }[] };
     const showcase = fs.readFileSync(path.join(conformance, "preview-showcase/note.md"), "utf8");
 
-    // Past this many characters the desktop draws only what the syntax tree gives (no tints, no `<Image />`, no highlight tags).
-    const LIMIT = 100_000;
+    // Long notes: the desktop's Live tab has no length limit (it used to stop reading tints and `<Image />` at 100,000 characters).
+    const LONG = 100_000;
     const filler = '# Heading\n\n**bold** <Mark color="green">tint</Mark> ![a](b.png) <Image src="c.png" /> *it* `code`\n\n';
     const sized = (length: number) => filler.repeat(Math.ceil(length / filler.length)).slice(0, length);
     const texts = [
       ...committed.cases,
       ...mdx.notes.map((note) => ({ group: `corpus:${note.name}`, text: note.body })),
       { group: "corpus:showcase", text: showcase },
-      { group: "limit:at", text: sized(LIMIT) },
-      { group: "limit:over", text: sized(LIMIT + 1) },
+      { group: "long:at", text: sized(LONG) },
+      { group: "long:over", text: sized(LONG + 1) },
     ];
 
     // A seeded generator, so that the same selections are tried every run (the Swift side reads them from the file).
@@ -1109,7 +1109,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     });
     fs.writeFileSync(
       path.join(outDir!, "live-expected.json"),
-      JSON.stringify({ limit: LIMIT, texts: texts.map(({ group, text }) => ({ group, text })), states, expected }),
+      JSON.stringify({ texts: texts.map(({ group, text }) => ({ group, text })), states, expected }),
     );
     expect(expected.length).toBeGreaterThan(5000);
     // The check has teeth only if the desktop does something to the texts: bold is styled, headings drawn, a picture drawn, a tint put on.
