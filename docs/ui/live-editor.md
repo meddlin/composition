@@ -7,6 +7,7 @@ Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
 [`liveBlocks.ts`](../../apps/web/src/components/notes/liveBlocks.ts),
 [`liveBlockWidget.tsx`](../../apps/web/src/components/notes/liveBlockWidget.tsx),
+[`liveRest.ts`](../../apps/web/src/components/notes/liveRest.ts) (setext headings, footnotes, `<Toc>`, the frontmatter card),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
 [`editorSurface.ts`](../../apps/web/src/components/notes/editorSurface.ts),
@@ -25,6 +26,8 @@ it will read, with the syntax showing only where the caret is. The other three t
   and the marks stay while you are at the end of it; type a space and start the next word, and "some text" turns
   bold. A mark with no partner yet (`**some text`) is left alone.
 - **Headings** are drawn large with their `# ` hidden, and the `#` comes back while the caret is on the heading's line.
+  A setext heading (a line underlined with `===` or `---`) is drawn the same, its underline hidden. See
+  [Setext headings, footnotes, `<Toc>` and the frontmatter](#setext-headings-footnotes-toc-and-the-frontmatter).
 - **Highlights** (`<Mark color="…">`, from the [highlight menu](text-highlighting.md)) are drawn tinted with their
   tags hidden, and the tags come back while the caret or a selection is anywhere from the opening tag to the closing
   one. A tag with no partner, one in code or in frontmatter, and one that runs over a line break are left showing.
@@ -50,9 +53,11 @@ it will read, with the syntax showing only where the caret is. The other three t
   See [Code blocks](#code-blocks).
 - **Tables** (GFM) are drawn as Preview draws them: the same markup and `prose` styles, column alignment included.
   See [Blocks](#blocks) below.
-- **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
+- **Frontmatter** is drawn as Preview's card (title, description, tags, dates) away from the caret, and as its YAML,
+  in a small monospaced face, while the caret is in it. It is not read as Markdown (its closing `---` is not a heading).
+- **Footnotes** (`[^1]`) are drawn as raised numbers, and `<Toc />` and `<Footnotes />` as Preview draws them.
 - **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
-- Everything else (MDX tags, and tables inside a list or a quote) is shown as the Markdown you wrote, coloured
+- Everything else (MDX tags other than `<Toc />` and `<Footnotes />`, and tables inside a list or a quote) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 ### Lists, task lists and quotes
@@ -139,9 +144,9 @@ Source: [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts). Plan: 
 
 ## Blocks
 
-A block is a part of the note drawn whole, in place of its source: for now a table (Step 5 of
-[live-default-plan.md](../live-default-plan.md); MDX components, the frontmatter card, `<Toc>` and `<Footnotes>` come
-in Steps 6 and 7 through the same layer).
+A block is a part of the note drawn whole, in place of its source: a table (Step 5 of
+[live-default-plan.md](../live-default-plan.md)), `<Toc />` and `<Footnotes />` (Step 7, [below](#setext-headings-footnotes-toc-and-the-frontmatter));
+MDX components come in Step 6 through the same layer.
 
 - **Drawn by Preview's own code.** Each block is a React root that renders `NoteMarkdown` for the block's source, inside
   the providers Preview has (note links, the diagram and sheet editors), so it looks and behaves as it does in Preview.
@@ -169,6 +174,47 @@ change touched, before and after it (so a code fence opened above a table swallo
 Where the parser has not reached yet (a long note just opened), the stretch is kept to read when it does. A widget's
 `eq` compares its source, so typing elsewhere redraws nothing. `liveBlockKinds` is the list of kinds; Step 6 adds MDX
 components to it.
+
+## Setext headings, footnotes, `<Toc>` and the frontmatter
+
+Built in Step 7 of the [live-default plan](../live-default-plan.md#step-7-the-rest-s-to-m).
+
+- **Setext headings.** A paragraph underlined with `===` is drawn as a level 1 heading, one underlined with `---` as a
+  level 2, with the look of `#` headings. Away from the caret the underline's line is collapsed to nothing (its text is
+  still there, as a code block's fences are); with the caret anywhere on the heading it shows, dimmed. A `---` after a
+  blank line, a list or a quote is a rule, as in Preview. The heading rail, `#heading` links and `<Toc>` now count
+  setext headings too, in every tab (`extractHeadings`).
+- **Footnote references.** `[^label]` is drawn as its number, raised and in the link colour, numbered by the order the
+  notes are first cited in, as Preview numbers them (a label matches whatever its case). Its tooltip is the start of
+  the note. Cmd/Ctrl+click goes to the definition, as following a link does; a plain click edits it, and with the caret
+  on it the source shows, dimmed. A reference with no definition is left as written, as in Preview.
+- **Footnote definitions.** `[^label]: text` has its `[^label]: ` drawn as its number (`1.`), and its lines (the
+  lines that carry it on, and indented ones after a blank line) in Preview's smaller type. Cmd/Ctrl+click on the
+  number goes back to where it is first cited. With the caret on its first line the label shows. A definition nothing
+  cites is left as written (Preview leaves it out).
+- **`<Footnotes />`** (on a line of its own) is drawn as Preview's list: numbered, worded and linked as Preview's, by
+  Preview's own renderer. A click on a ↩ scrolls Live to that citation (the second ↩ of a note cited twice, to the
+  second citation). Its drawing follows the note once typing pauses.
+- **`<Toc />`** (on a line of its own, `maxDepth` honoured) is drawn by Preview's `Toc` from the note's headings, re-read
+  once typing pauses. A click on an entry scrolls Live to that heading; the caret stays where it was.
+- `<Toc>` and `<Footnotes>` handle their own clicks, so each has an **Edit source** button, as a sheet will. With the
+  caret in one, its source shows with the drawing under it, as for any block.
+- **The frontmatter** (decision D5) is drawn as Preview's `FrontmatterCard` away from the caret, through the block
+  layer's widget. With the caret in it, **only the YAML** shows, with no card under it: the one exception to the rule
+  above, since the card would repeat it word for word. A click on the card, or Up from the line under it, puts the
+  caret in the YAML. The caret counts only while the editor has focus, so a note that opens with the caret at its top
+  still shows the card. A YAML that does not read (being typed) shows as YAML.
+
+How it works: setext headings and footnote marks are line and inline decorations in view plugins
+(`liveSetext.ts`, `liveFootnotes.tsx`), worked out for what is on screen. Lezer's Markdown has no footnote node, so
+`footnoteMarksField` keeps every `[^label]` in the note, reading again only the lines a change touches, and
+`footnotesOf` numbers them, leaving out those in code or the frontmatter (from the syntax tree). `<Toc>` and
+`<Footnotes>` are block kinds (`liveToc.tsx`, `FOOTNOTES`) that draw with a component of their own (`BlockKind.Drawing`)
+rather than the block's source alone: `<Footnotes>` hands Preview's `NoteMarkdown` the note's references, the tag and its
+definitions, so the list comes out as Preview's; `<Toc>` hands `Toc` the headings. Both read the note again through
+`useSettledNote` after each pause in typing, and only while one is drawn. Lezer reads a self-closing tag on its own line
+as a paragraph, so these kinds match a `Paragraph` node whose text is the tag. The frontmatter card is a state field of
+its own (`liveFrontmatter.tsx`), since the frontmatter is not a node of the syntax tree.
 
 ## What it shares with the Markdown tab
 

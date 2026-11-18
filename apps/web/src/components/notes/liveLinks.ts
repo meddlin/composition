@@ -31,7 +31,7 @@ function followKeyHeld(event: { metaKey: boolean; ctrlKey: boolean }): boolean {
   return isMac ? event.metaKey : event.ctrlKey;
 }
 
-const FOLLOW_HINT = isMac ? "⌘-click to follow" : "Ctrl+click to follow";
+export const FOLLOW_HINT = isMac ? "⌘-click to follow" : "Ctrl+click to follow";
 
 function touches(state: EditorState, from: number, to: number): boolean {
   return state.selection.ranges.some((range) => range.from <= to && range.to >= from);

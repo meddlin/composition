@@ -19,7 +19,7 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Walk the caret with the arrow keys across `**bold**`: the marks show when the caret reaches the character before it and hide the character after the end. Nothing jumps or skips a character.
 - [ ] Click on bold text: the marks appear and the text shifts a little to the right; the caret stays where you clicked.
 - [ ] Select from the middle of one bold word to the middle of another: both words show their marks. Copy and paste into the Markdown tab: the marks are in the text.
-- [ ] Frontmatter at the top is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading.
+- [ ] Frontmatter at the top, with the caret in it, is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading. (Away from the caret it is a card: §4c.)
 - [ ] Code blocks (Gate C): make a note with a ```` ```js ````, a ```` ```python ````, a ```` ```sh ```` and an untagged ```` ``` ```` block, and an indented block. Away from the caret each looks as it does in Preview (open Split to compare): the same background, rounded corners, font, size and colours; no fences; the untagged and indented blocks plain.
 - [ ] Click into a code block: both its fences appear, dimmed, and the text you clicked keeps the caret. Click outside: they collapse again. Arrow down into a block from the line above and up into one from the line below: the caret lands on the code, then the fences appear; arrowing on reaches each fence.
 - [ ] Type inside a long code block (a couple of hundred lines): the colours follow as you type, with no lag. Type a new ```` ```js ```` block from scratch: it is drawn as a block once its closing fence is typed and the caret leaves it.
@@ -127,6 +127,27 @@ open it in **Split** beside **Live** in another panel to compare.
 - [ ] A note with 50 tables types smoothly above, between and inside them.
 - [ ] With VoiceOver, a drawn table is read as a table (rows, columns, cell text). Put the caret in it: the source lines are read, not the table twice.
 - [ ] A table inside a list item or a quote is left as written.
+
+## 4c. Setext headings, footnotes, `<Toc>` and the frontmatter (Gate G)
+
+Use a note with frontmatter (a title, a description, two tags, and a `headerImage` if you have one), then `<Toc />`
+on a line of its own, a heading underlined with `===`, one with `---`, a `## Heading`, a paragraph citing `[^a]`,
+`[^b]` and `[^a]` again plus a `[^missing]` with no definition, the two definitions (one with **bold** and a link,
+one carried onto a second line), a definition nothing cites, and `<Footnotes />` last. Open it in **Split** beside
+**Live** in another panel to compare.
+
+- [ ] Open the note on Live: the frontmatter is the card, as in Preview (header image, title, description, tags, dates), not YAML, even though the caret starts at the top.
+- [ ] Click the card: the YAML shows, the caret at its start, and no card under it. Change the title and click below: the card shows the new title. From the first line under the card press Up: the caret lands on the closing `---` and the YAML shows.
+- [ ] The two setext headings are drawn as a level 1 and a level 2 heading, the size of `#` and `##`, with no underline. Click into one: its underline shows, dimmed. Delete the underline: it is a paragraph again. A `---` after a blank line is still a rule.
+- [ ] The heading rail (Settings › Writing) lists the setext headings too, on the Markdown and Live tabs as on Preview.
+- [ ] The references read `1`, `2`, `1`, raised, in the link colour, as in Preview; `[^missing]` stays as written. Hover one: the tooltip is the start of its note. Cmd/Ctrl+click one: Live scrolls to its definition. Click one plainly: the caret goes into it and `[^a]` shows.
+- [ ] Each cited definition starts with its number (`1.`, `2.`) in place of `[^a]:`, in smaller type, its second line too. Cmd/Ctrl+click the number: Live scrolls back to the first citation. The definition nothing cites is left as written.
+- [ ] `<Footnotes />` reads as Preview's list: the same numbers, the bold and the link drawn, `↩ ↩2` after the note cited twice. Click the `↩2`: Live scrolls to the second citation, and the caret stays put.
+- [ ] Add a citation of `[^b]` above the first one: the numbers swap in the text and in the list (the list a moment after you stop typing).
+- [ ] `<Toc />` reads as Preview's table of contents, the setext headings included. Click an entry: Live scrolls to that heading and the caret stays put. Add a heading and pause: it appears in the list. `<Toc maxDepth="1" />` lists only the level 1 headings.
+- [ ] Hover `<Toc>` or `<Footnotes>`: an **Edit source** button shows; it puts the caret in the tag, the source shows with the drawing under it. Arrow down onto the tag from the line above: the same.
+- [ ] Footnote marks inside a code block or inline code are left as written, and do not count in the numbering.
+- [ ] In a light and a dark scheme, the card, the list and the table of contents look as they do in Preview.
 
 ## 5. Ruler and reflow
 

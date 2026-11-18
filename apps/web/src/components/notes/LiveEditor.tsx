@@ -12,6 +12,7 @@ import { liveBlocks, revealBlocks } from "./liveBlocks";
 import { noteLinksFacet } from "./liveLinks";
 import { liveMarkdown } from "./liveMarkdown";
 import { liveReflow } from "./liveReflow";
+import { liveRest } from "./liveRest";
 import { NO_NOTE_LINKS, type NoteLinks } from "./noteLinkActions";
 import { changedSpan } from "./reflowText";
 
@@ -179,6 +180,7 @@ export function LiveEditor({
           markdown({ base: markdownLanguage }),
           liveMarkdown,
           liveBlocks(blockHost),
+          liveRest,
           findHighlights,
           editorTheme,
           placeholder("Start writing in Markdown…"),

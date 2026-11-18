@@ -145,14 +145,16 @@ function mapSpan(span: Span, changes: ChangeDesc): Span {
 /** The block a top-level node writes, if it is one of `kinds`. */
 function blockOf(state: EditorState, node: SyntaxNode, kinds: readonly BlockKind[], frontmatterEnd: number): Block | null {
   if (node.from < frontmatterEnd) return null;
-  const kind = kinds.find((candidate) => candidate.node === node.name);
-  if (!kind) return null;
+  if (!kinds.some((candidate) => candidate.node === node.name)) return null;
   const doc = state.doc;
   // A node ends at its last character; one that ends on a line break ends on the line before.
   const last = node.to > node.from && doc.sliceString(node.to - 1, node.to) === "\n" ? node.to - 1 : node.to;
   const from = doc.lineAt(node.from).from;
   const to = doc.lineAt(last).to;
-  if (kind.accepts && !kind.accepts(doc.sliceString(from, to))) return null;
+  // Several kinds can share a node (an HTML block that is a `<Toc>`, or a `<Sheet>`): the first that takes it.
+  const source = doc.sliceString(from, to);
+  const kind = kinds.find((candidate) => candidate.node === node.name && (!candidate.accepts || candidate.accepts(source)));
+  if (!kind) return null;
   return { from, to, kind, active: false, drawn: null };
 }
 
@@ -409,7 +411,8 @@ const blockTheme = EditorView.baseTheme({
   // Under its own source while it is edited: set off a little from the text being typed.
   ".cm-live-block-beside": { opacity: "0.75" },
   ".cm-live-block-owns-clicks": { cursor: "auto" },
-  ".cm-live-block-body": { fontSize: "inherit", lineHeight: "1.7" },
+  // The editor's text keeps its white space (`pre-wrap`); a drawing's markup, like Preview's page, does not.
+  ".cm-live-block-body": { fontSize: "inherit", lineHeight: "1.7", whiteSpace: "normal" },
   // In Live a table sits with the text, not two lines away from it as in Preview's flowing page.
   ".cm-live-block-body > :first-child": { marginTop: "0" },
   ".cm-live-block-body > :last-child": { marginBottom: "0" },
