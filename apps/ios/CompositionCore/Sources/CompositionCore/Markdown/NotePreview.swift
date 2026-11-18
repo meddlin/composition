@@ -141,11 +141,12 @@ public struct NotePreview: Sendable {
                 case .markdown(let source):
                     let document = Document(parsing: source)
                     let map = SourceMap(text: source)
+                    let locator = scanned.locator(ofRun: index, text: source)
                     var all: [MdBlock] = []
                     for child in document.children {
                         guard let converted = converter.block(child) else { continue }
                         all.append(converted)
-                        if let written = map.range(of: child), let range = scanned.noteRange(ofRun: index, text: source, written) {
+                        if let written = map.range(of: child), let range = locator?.noteRange(written) {
                             located.append(LocatedBlock(range: range, block: .markdown([converted])))
                         }
                     }

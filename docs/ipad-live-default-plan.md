@@ -402,8 +402,40 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
 - **Oracle:** `component-cases.json` already checks `NotePreview`'s component decisions against the desktop; Live
   draws those same blocks, so it inherits that check. A UI test opens the preview showcase in Live and checks, from
   the report, that every `PreviewBlock` kind the Preview shows has a drawn block in Live.
-- **Gate LD6 (iPad):** items 359 to 362 (the showcase note in Live beside the Preview, every scheme; a chart at the
-  largest text size; the actions).
+- **Gate LD6 (iPad):** items 367 to 370 (the showcase note in Live beside the Preview, every scheme; a chart at the
+  largest text size; the actions; typing a component, and VoiceOver). Numbered 367 on because 359 to 362 went to
+  Return in a list (`ListContinuation`) and 363 to 366 are Step 7's.
+
+**Status: built 2026-11-18** (branch `claude/ipad-live-step6-components`, on Step 5's branch with this plan's branch,
+Steps 1 to 4, merged in for Step 2's ↗). Gate LD6 is the owner's.
+
+- **Which blocks:** `LiveBlockKinds.kind(of:)` names `info`, `warning`, `chart`, `youtube`, `repo`, `mark` (a block
+  `<Mark>`) and `notice`, beside Step 5's `table`; `mayHold` is now "a `|` or a `<`". `<Image>`, `<Ink>` and
+  `<Drawio>` stay with the picture layer (Step 1), which already draws them at the Preview's size; `<Toc />` and the
+  footnotes are Step 7's. Everything else (hiding, D3's reveal, the cache, a tap to the block's start, VoiceOver's
+  silenced marks, the report) is Step 5's, unchanged. A hidden block now also drops what Steps 2 to 4 put on its lines
+  (a code block's fill inside a `<Chart>`, a list's lines inside a panel, a link's attributes), so the picture is the
+  only thing drawn there.
+- **`<Chart>` in `ImageRenderer`:** Swift Charts draws in the picture, static (an `ImageRenderer` snapshot has no
+  animation), as Step 5's spike found; checked again with a bar chart and the showcase's line and pie.
+- **Actions (I6):** a tap on a drawn component edits (Step 5's tap to its start). While the selection is in a
+  `<YouTube>` or `<Repo>` block, `MarkdownStyler.activeLink()` gives `LiveLinks` the block as a link (`node` = the
+  block's source, `href` = `LiveBlockKinds.address(of:)`: the video's youtube.com address or the repository's, as the
+  Preview's cards open), so Step 2's ↗ sits after the tag and opens it through `LinkFollower`. ⌘-tap follows only a
+  link's words, not a card. A drawing is still edited in the Preview.
+- **Not valid MDX:** `LiveBlock.blocks(of:)` returns nil when `NotePreview.error` is set, and the pause pass then
+  leaves the blocks as they are: they keep their last good pictures, moved with the edits as between any two passes,
+  and the Live tab shows no notice; the Preview keeps its own. A component typed while the note is not valid is drawn
+  once it is.
+- **Speed (found here):** `NotePreview.located` was quadratic in the number of blocks in a run of Markdown
+  (`noteRange(ofRun:)` re-read the whole run for each block): 96 s for a 500,000-character note of 8,000 blocks in a
+  Debug build. With `mayHold` now true for any note with a `<` (every `<Mark>`), that would have been every long note's
+  pause pass. `ScannedNote.RunLocator` reads a run once: 0.5 s for the same note, linear (a new `BlockRangeTests`
+  case keeps it so).
+- **Preview probe:** with `-liveReport 1` the Preview has an element `preview-blocks` naming the kinds of block it
+  draws (from its own `PreviewBlock`s), for the showcase test.
+
+SIMULATOR_RESULTS
 
 ### Step 7: the rest (M)
 
