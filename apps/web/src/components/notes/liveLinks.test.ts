@@ -96,6 +96,13 @@ describe("a Markdown link", () => {
     ]);
   });
 
+  it("leaves a footnote reference and its definition alone: they are footnotes, not a link and its definition", () => {
+    const doc = "Cite[^a] and [^b].\n\n[^a]: https://example.com\n";
+    const { shown, links } = draw(doc, doc.length);
+    expect(shown).toBe(doc);
+    expect(links).toEqual([expect.objectContaining({ text: "https://example.com" })]);
+  });
+
   it("keeps a link whose text runs over a line break showing its marks, which a plugin may not hide", () => {
     const doc = "[two\nlines](https://a.b) tail\n\nend";
     const { links } = draw(doc, doc.length);
