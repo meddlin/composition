@@ -37,6 +37,7 @@ describe("VALIDATORS", () => {
     };
     expect(VALIDATORS.saveHomeSettings([{ ...home, extra: 1 }])).toEqual([home]);
     const writing = {
+      openNotesIn: "live",
       rulerEnabled: true,
       rulerColumn: 72,
       reflowEnabled: false,
@@ -187,6 +188,7 @@ describe("VALIDATORS", () => {
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],
     ["saveWritingSettings", [{ headingRailSide: 3 }]],
+    ["saveWritingSettings", [{ openNotesIn: 3 }]],
     ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["savePluginSettings", [null]],

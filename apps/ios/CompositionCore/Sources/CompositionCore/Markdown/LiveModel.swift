@@ -9,13 +9,20 @@ import Markdown
 // does too. Offsets are UTF-16 units, as in the text view. The desktop works on text with one `\n` for each line break (CodeMirror reads `\r\n` as
 // one); this reads the text as it is, and its offsets are the text's.
 //
-// Two parts are the iPad's own and are not in the check, because the desktop has nothing to compare: a fenced code block's two fences are hidden
-// while the selection is elsewhere and both shown while it is anywhere in the block (decision V2), and colours (code, links, tags, list and quote
-// marks) are the Markdown tab's, so they are not here at all.
+// Code blocks (docs/ipad-live-default-plan.md, Step 3) are drawn as the desktop's `liveCode` draws them, and checked against it the same way
+// (`live-code-expected.json`): a fenced block's two fences are hidden while the selection is elsewhere and both shown while it is anywhere in the
+// block (the iPad's decision V2, which the desktop's Step 3 took too), a block with no code keeps its fences, and a top-level indented block's
+// indent is hidden like a fence. Colours (code, links, tags, list and quote marks) are the Markdown tab's, so they are not here at all.
 
 /// How the Live view draws a styled run of text.
 public enum LiveStyle: String, Equatable, Sendable {
     case strong, emphasis, strike, code
+}
+
+/// Which tag writes a picture, which says how it is drawn: `![…](…)` and `<Image />` as the picture, `<Ink />` from the drawing's strokes in the scheme's colours
+/// (its PNG when it carries none), and `<Drawio />` at half its pixel size unless the tag gives a width, as the Preview draws each (docs/ipad-live-default-plan.md, Step 1).
+public enum LivePictureKind: String, Equatable, Sendable {
+    case image, ink, drawio
 }
 
 /// What the Live view does to a note for one selection. Ranges are in the note's text; each list is in the order the note holds them.
@@ -34,7 +41,7 @@ public struct LiveDecorations: Equatable, Sendable {
     }
 
     public struct Picture: Equatable, Sendable {
-        /// The text that writes the picture: `![alt](src "title")` or `<Image … />`.
+        /// The text that writes the picture: `![alt](src "title")`, `<Image … />`, `<Ink … />` or `<Drawio … />`.
         public var range: NSRange
         /// Nothing but space is on its line with it: such a picture is drawn in place of its text. One in the middle of a sentence (the desktop draws it inline) is
         /// left as its text, because drawing it in the line would need something in the text that is not its characters.
@@ -45,12 +52,67 @@ public struct LiveDecorations: Equatable, Sendable {
         public var alt: String
         public var title: String
         public var width: String
+        public var kind: LivePictureKind = .image
     }
 
     public struct Tint: Equatable, Sendable {
         public var range: NSRange
         /// One of `MdxProps.highlightColors`.
         public var color: String
+    }
+
+    /// A line of a list or a quote (docs/ipad-live-default-plan.md, Step 4; the desktop's `listDecorations`, liveLists.ts). Every such line is indented one
+    /// level for each list and quote it is in, and has a bar down its left side for each quote. Away from the selection the marks at its start (`> `, `- `,
+    /// `1. `, and the indentation that carries an item on) are hidden, and a bullet, a number or a checkbox is drawn in their place.
+    public struct ListLine: Equatable, Sendable {
+        public enum Container: Hashable, Sendable {
+            case quote
+            /// A list item: `starts` on the line the item starts on, and `column` is how far into that line its text starts.
+            case list(starts: Bool, column: Int)
+        }
+
+        /// What is drawn in place of an item's mark: its number as written (`3.`, `3)`), or a bullet.
+        public struct Marker: Hashable, Sendable {
+            public var text: String
+            public var ordered: Bool
+        }
+
+        /// A task's `[ ]` or `[x]`.
+        public struct Task: Hashable, Sendable {
+            /// The box and the space after it: what is hidden.
+            public var range: NSRange
+            /// The three characters of the box, `[`, the space or `x`, `]`.
+            public var box: NSRange
+            public var checked: Bool
+
+            /// What ticking or unticking the box writes: its middle character becomes `x`, or a space (the desktop's `toggleTask`).
+            public var toggle: (range: NSRange, text: String) { (NSRange(location: box.location + 1, length: 1), checked ? " " : "x") }
+        }
+
+        /// The line, from its start to the end of its text.
+        public var range: NSRange
+        /// The lists and quotes the line is in, outermost first.
+        public var containers: [Container]
+        /// The selection reaches the line (ends included): its marks show as they are written, and nothing is drawn in their place.
+        public var active: Bool
+        /// Away from the selection, the marks and the indentation at the line's start, when there are any.
+        public var hidden: NSRange?
+        /// Away from the selection, on the line an item starts on (when that item is the innermost thing the line is in): its marker.
+        public var marker: Marker?
+        /// Away from the selection, a task's box, drawn as a checkbox; a tap on it ticks or unticks it (decision D4).
+        public var task: Task?
+    }
+
+    /// A link (Step 2 of docs/ipad-live-default-plan.md): `[text](url "title")`, `[text][label]`, `<url>` or a bare address.
+    public struct Link: Equatable, Sendable {
+        /// What is drawn as the link: a link's words, or an address (an autolink's, without its `<` `>`, or a bare one).
+        public var range: NSRange
+        /// The whole construct, marks and address included.
+        public var node: NSRange
+        /// The address to follow, as the desktop's `hrefOf` makes it (`www.…` given `http://`, an email `mailto:`).
+        public var href: String
+        /// The selection touches it: its marks show, dimmed, and it can be followed with the ↗ beside it.
+        public var active: Bool
     }
 
     /// The start of each line of the frontmatter (it is drawn set apart, and never hidden).
@@ -67,15 +129,33 @@ public struct LiveDecorations: Equatable, Sendable {
     public var shown: [NSRange] = []
     public var pictures: [Picture] = []
     public var tints: [Tint] = []
-    /// The iPad's own (decision V2): a fenced block's fences, hidden while the selection is outside the block, and shown while it is in it.
+    /// A fenced block's fences (each its whole line), hidden while the selection is outside the block, and shown while it is in it (decision V2). A block
+    /// with nothing between its fences keeps them, as on the desktop: hidden, it would be nothing at all.
     public var fencesHidden: [NSRange] = []
     public var fencesShown: [NSRange] = []
+
+    /// A code block, drawn as the Preview draws one: its lines in the code font on one rounded fill (Step 3).
+    public struct CodeBlock: Equatable, Sendable {
+        /// The block, from the start of its first line to the end of its last.
+        public var range: NSRange
+        /// The start of each line drawn on the fill, in order: the fences' lines too while they show, but not while they are hidden. The first and the last
+        /// are the fill's rounded ends.
+        public var lines: [Int]
+        /// The lines among `lines` that are fences (they show only while the selection is in the block).
+        public var fences: [Int]
+        /// The selection is in the block.
+        public var active: Bool
+    }
+
+    public var codeBlocks: [CodeBlock] = []
+    /// A top-level indented block's indent on each line (four columns), hidden while the selection is outside the block, as the desktop hides it.
+    public var codeIndentsHidden: [NSRange] = []
+    public var links: [Link] = []
+    /// The lines of lists and quotes (Step 4 of docs/ipad-live-default-plan.md). What they hide is here and not in `hidden`, because it is drawn over.
+    public var lists: [ListLine] = []
 }
 
 public struct LiveModel: Sendable {
-    /// The desktop reads highlights and `<Image />` tags only in a note this long or shorter (`MAX_HIGHLIGHT_CHARS`).
-    public static let desktopExtrasLimit = 100_000
-
     struct HeadingNode: Sendable {
         var line: Int
         var level: Int
@@ -102,9 +182,39 @@ public struct LiveModel: Sendable {
         var title: String
     }
 
+    /// A code block, fenced or indented.
     struct FenceNode: Sendable {
         var node: NSRange
+        /// The fences' whole lines (none for an indented block).
         var fences: [NSRange]
+        /// The start of each of the block's lines, fences included.
+        var lines: [Int]
+        var fenceLines: [Int]
+        /// A line that is not a fence: what is left to show when the fences are hidden.
+        var hasCode: Bool
+        /// A top-level indented block's indent on each line.
+        var indents: [NSRange]
+    }
+
+    struct LinkNode: Sendable {
+        var node: NSRange
+        /// What is drawn in the link colour.
+        var text: NSRange
+        var href: String
+        /// The marks that show, dimmed, while the selection touches the link (`[`, `]`, `(`, `)`; `<` `>`).
+        var marks: [NSRange]
+        /// What is hidden while it does not (`[`, and `](url "title")` or `][label]`; `<` `>`). A part that runs over a line break is dimmed instead.
+        var hide: [NSRange]
+    }
+
+    /// A line of a list or a quote, as the desktop's `readLines` (liveLists.ts) makes it: `node` is the line, from its start to the end of its text.
+    struct ListLineNode: Hashable, Sendable {
+        var node: NSRange
+        var containers: [LiveDecorations.ListLine.Container]
+        /// Where the marks and indentation at the line's start end (the desktop's `prefixEnd`): what is hidden away from the selection.
+        var prefixEnd: Int
+        var marker: LiveDecorations.ListLine.Marker?
+        var task: LiveDecorations.ListLine.Task?
     }
 
     /// Everything in the note that the selection can reveal, in one list ordered by where it starts.
@@ -114,6 +224,8 @@ public struct LiveModel: Sendable {
         case style(StyleNode)
         case picture(PictureNode)
         case fenced(FenceNode)
+        case listLine(ListLineNode)
+        case link(LinkNode)
 
         var node: NSRange {
             switch self {
@@ -122,6 +234,8 @@ public struct LiveModel: Sendable {
             case .style(let value): value.node
             case .picture(let value): value.node
             case .fenced(let value): value.node
+            case .listLine(let value): value.node
+            case .link(let value): value.node
             }
         }
 
@@ -148,7 +262,25 @@ public struct LiveModel: Sendable {
             case .fenced(var value):
                 value.node = move(value.node)
                 value.fences = value.fences.map(move)
+                value.lines = value.lines.map { $0 + delta }
+                value.fenceLines = value.fenceLines.map { $0 + delta }
+                value.indents = value.indents.map(move)
                 return .fenced(value)
+            case .listLine(var value):
+                value.node = move(value.node)
+                value.prefixEnd += delta
+                if var task = value.task {
+                    task.range = move(task.range)
+                    task.box = move(task.box)
+                    value.task = task
+                }
+                return .listLine(value)
+            case .link(var value):
+                value.node = move(value.node)
+                value.text = move(value.text)
+                value.marks = value.marks.map(move)
+                value.hide = value.hide.map(move)
+                return .link(value)
             }
         }
     }
@@ -163,8 +295,8 @@ public struct LiveModel: Sendable {
     private var scan: LiveScan.Result
     private let extrasLimit: Int?
 
-    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read, as on the desktop; nil reads them in any note.
-    public init(text: String, extrasLimit: Int? = LiveModel.desktopExtrasLimit) {
+    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read; nil (the default, as on the desktop) reads them in any note.
+    public init(text: String, extrasLimit: Int? = nil) {
         chars = Array(text.utf16)
         length = chars.count
         self.extrasLimit = extrasLimit
@@ -201,7 +333,9 @@ public struct LiveModel: Sendable {
         constructs += reader.rules.map { .rule($0) }
         constructs += reader.styles.map { .style($0) }
         constructs += reader.pictures.map { .picture($0) }
-        constructs += reader.fenced.map { .fenced($0) }
+        constructs += reader.codeBlocks.map { .fenced($0) }
+        constructs += reader.links.map { .link($0) }
+        constructs += reader.listLines().map { .listLine($0) }
         constructs.sort { $0.node.location < $1.node.location }
         return (constructs, frontmatterLines)
     }
@@ -312,12 +446,31 @@ public struct LiveModel: Sendable {
             case .picture(let picture):
                 out.pictures.append(.init(range: picture.node, ownLine: isOwnLine(picture.node), active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
             case .fenced(let block):
-                if touches(block.node) { out.fencesShown += block.fences } else { out.fencesHidden += block.fences }
+                let active = touches(block.node)
+                let hideFences = !active && block.hasCode
+                if hideFences { out.fencesHidden += block.fences } else { out.fencesShown += block.fences }
+                if !active { out.codeIndentsHidden += block.indents }
+                let drawn = hideFences ? block.lines.filter { !block.fenceLines.contains($0) } : block.lines
+                let from = block.lines.first ?? block.node.location
+                out.codeBlocks.append(.init(range: NSRange(location: from, length: NSMaxRange(block.node) - from), lines: drawn,
+                    fences: hideFences ? [] : block.fenceLines, active: active))
+            case .link(let link):
+                let active = touches(link.node)
+                out.links.append(.init(range: link.text, node: link.node, href: link.href, active: active))
+                if active {
+                    out.shown += link.marks
+                } else {
+                    for part in link.hide where part.length > 0 {
+                        if containsLineBreak(part) { out.shown.append(part) } else { out.hidden.append(part) }
+                    }
+                }
+            case .listLine(let line):
+                out.lists.append(Self.listLine(line, active: touches(line.node)))
             }
         }
 
         for image in scan.images where inWindow(image.range) {
-            out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width))
+            out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width, kind: image.kind))
         }
         out.tints += scan.tints.filter { inWindow($0.range) }.map { .init(range: $0.range, color: $0.color) }
         for element in scan.elements {
@@ -330,6 +483,27 @@ public struct LiveModel: Sendable {
             }
         }
         return out
+    }
+
+    /// What a line of a list or a quote looks like with the selection on it (`active`) or away from it, as the desktop's `listDecorations` decides.
+    private static func listLine(_ line: ListLineNode, active: Bool) -> LiveDecorations.ListLine {
+        var out = LiveDecorations.ListLine(range: line.node, containers: line.containers, active: active)
+        guard !active else { return out }
+        if line.prefixEnd > line.node.location { out.hidden = NSRange(location: line.node.location, length: line.prefixEnd - line.node.location) }
+        if let marker = line.marker, case .list(starts: true, _) = line.containers.last { out.marker = marker }
+        out.task = line.task
+        return out
+    }
+
+    /// The task box drawn at `position` (a box's three characters, or the space after it), with the selection where it is: what a tap on the box ticks or
+    /// unticks. Nil when no box is drawn there (the selection is on its line, or there is no task).
+    public func task(at position: Int, selection: NSRange) -> LiveDecorations.ListLine.Task? {
+        var found: LiveDecorations.ListLine.Task?
+        forEachConstruct(startingAtOrBefore: position, reaching: position) { construct in
+            guard case .listLine(let line) = construct, let task = line.task, NSLocationInRange(position, task.range) || position == task.box.location else { return }
+            if Self.listLine(line, active: selection.location <= NSMaxRange(line.node) && NSMaxRange(selection) >= line.node.location).task != nil { found = task }
+        }
+        return found
     }
 
     /// The places of the constructs `selection` touches (ends included): the text whose look changes when the selection moves in or out of them.
@@ -357,8 +531,16 @@ public struct LiveModel: Sendable {
     /// frontmatter. The Markdown's own constructs are what `HighlightModel.differences(from:)` compares.
     public func differences(from older: LiveModel) -> [NSRange] {
         var found = scan.differences(from: older.scan)
+        // The lines of lists and quotes: a quick read of a window can end an item or a quote early (a line it takes in lazily, below the window), and the colours,
+        // which `HighlightModel` compares, do not show it.
+        let lines = Set(listLineNodes), olderLines = Set(older.listLineNodes)
+        found += lines.symmetricDifference(olderLines).map(\.node)
         if frontmatterRange != older.frontmatterRange { found += [frontmatterRange, older.frontmatterRange].compactMap { $0 } }
         return found
+    }
+
+    private var listLineNodes: [ListLineNode] {
+        constructs.compactMap { if case .listLine(let line) = $0 { line } else { nil } }
     }
 
     /// The whole frontmatter, from its first character to the end of its last line.

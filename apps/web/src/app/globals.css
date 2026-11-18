@@ -603,53 +603,82 @@
   margin-block: 0;
 }
 
-/* Code block token colors (highlight.js scopes, emitted by rehype-highlight). */
+/* Code block token colors (highlight.js scopes): Preview's from rehype-highlight, the live editor's from liveCode.ts. */
 .prose pre code .hljs-comment,
-.prose pre code .hljs-quote {
+.cm-live-codeblock .hljs-comment,
+.prose pre code .hljs-quote,
+.cm-live-codeblock .hljs-quote {
   color: var(--syntax-comment);
   font-style: italic;
 }
 .prose pre code .hljs-keyword,
+.cm-live-codeblock .hljs-keyword,
 .prose pre code .hljs-selector-tag,
+.cm-live-codeblock .hljs-selector-tag,
 .prose pre code .hljs-doctag,
+.cm-live-codeblock .hljs-doctag,
 .prose pre code .hljs-name,
+.cm-live-codeblock .hljs-name,
 .prose pre code .hljs-meta,
-.prose pre code .hljs-deletion {
+.cm-live-codeblock .hljs-meta,
+.prose pre code .hljs-deletion,
+.cm-live-codeblock .hljs-deletion {
   color: var(--syntax-keyword);
 }
 .prose pre code .hljs-string,
-.prose pre code .hljs-regexp {
+.cm-live-codeblock .hljs-string,
+.prose pre code .hljs-regexp,
+.cm-live-codeblock .hljs-regexp {
   color: var(--syntax-string);
 }
 .prose pre code .hljs-number,
+.cm-live-codeblock .hljs-number,
 .prose pre code .hljs-literal,
+.cm-live-codeblock .hljs-literal,
 .prose pre code .hljs-symbol,
-.prose pre code .hljs-bullet {
+.cm-live-codeblock .hljs-symbol,
+.prose pre code .hljs-bullet,
+.cm-live-codeblock .hljs-bullet {
   color: var(--syntax-number);
 }
 .prose pre code .hljs-title,
-.prose pre code .hljs-section {
+.cm-live-codeblock .hljs-title,
+.prose pre code .hljs-section,
+.cm-live-codeblock .hljs-section {
   color: var(--syntax-function);
 }
 .prose pre code .hljs-type,
+.cm-live-codeblock .hljs-type,
 .prose pre code .hljs-built_in,
-.prose pre code .hljs-title.class_ {
+.cm-live-codeblock .hljs-built_in,
+.prose pre code .hljs-title.class_,
+.cm-live-codeblock .hljs-title.class_ {
   color: var(--syntax-type);
 }
 .prose pre code .hljs-attr,
+.cm-live-codeblock .hljs-attr,
 .prose pre code .hljs-attribute,
+.cm-live-codeblock .hljs-attribute,
 .prose pre code .hljs-variable,
+.cm-live-codeblock .hljs-variable,
 .prose pre code .hljs-template-variable,
+.cm-live-codeblock .hljs-template-variable,
 .prose pre code .hljs-property,
+.cm-live-codeblock .hljs-property,
 .prose pre code .hljs-selector-class,
+.cm-live-codeblock .hljs-selector-class,
 .prose pre code .hljs-selector-id,
-.prose pre code .hljs-addition {
+.cm-live-codeblock .hljs-selector-id,
+.prose pre code .hljs-addition,
+.cm-live-codeblock .hljs-addition {
   color: var(--syntax-attr);
 }
-.prose pre code .hljs-emphasis {
+.prose pre code .hljs-emphasis,
+.cm-live-codeblock .hljs-emphasis {
   font-style: italic;
 }
-.prose pre code .hljs-strong {
+.prose pre code .hljs-strong,
+.cm-live-codeblock .hljs-strong {
   font-weight: 700;
 }
 

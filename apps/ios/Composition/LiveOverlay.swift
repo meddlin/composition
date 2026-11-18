@@ -23,6 +23,8 @@ enum LiveOverlay {
         /// is in it (D3).
         var blocks: [LiveBlocks.Entry] = []
         var selection = NSRange(location: 0, length: 0)
+        /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
+        var isLinkHere: (String) -> Bool = { _ in true }
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -54,6 +56,8 @@ enum LiveOverlay {
             // Set apart: smaller (the palette's font for it), and muted, and never hidden (the desktop's `.cm-live-frontmatter`).
             storage.addAttribute(.foregroundColor, value: look.uiMutedText, range: part)
         }
+        // Lists, task lists and quotes (Step 4 of docs/ipad-live-default-plan.md): their indents, muted quotes and hidden marks, and what their lines draw.
+        LiveLists.apply(decorations.lists, to: range, in: storage, look: look)
         for tint in decorations.tints {
             guard let part = inside(tint.range) else { continue }
             // Behind the words, but not over the faint fill of code, which has its own.
@@ -89,7 +93,9 @@ enum LiveOverlay {
             guard let part = inside(mark) else { continue }
             hide(part, in: storage)
         }
+        applyLinks(decorations, to: range, in: storage, look: look, isHere: context.isLinkHere)
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
+        LiveCode.apply(decorations, to: range, in: storage, look: look)
         drawBlocks(in: range, of: storage, context: context)
     }
 
@@ -128,7 +134,7 @@ enum LiveOverlay {
                 storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
                 continue
             }
-            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw] { storage.removeAttribute(key, range: lines) }
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveCode, .liveList, .liveLink, .liveLinkSuffix] { storage.removeAttribute(key, range: lines) }
             hide(lines, in: storage)
             let tall = NSMutableParagraphStyle()
             tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)
@@ -166,7 +172,18 @@ enum LiveOverlay {
             // A stored picture only: nothing is fetched from the network, as in the Preview, so another address stays its text.
             guard let name = NoteImage.name(fromRef: picture.src), let folder = context.imageFolder else { continue }
             let url = folder.appendingPathComponent(name)
-            let drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            var drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            // Drawings as the Preview draws them (`PreviewImageView`): `<Ink />` from its strokes at its canvas's size, `<Drawio />` at half its pixels (stored at twice
+            // the size it is shown), each unless the tag gives a width.
+            drawn.kind = picture.kind
+            switch picture.kind {
+            case .ink:
+                drawn.theme = look.theme
+                drawn.natural = drawn.pixels == nil ? nil : LiveImages.shared.drawingSize(at: url)
+            case .drawio:
+                drawn.natural = drawn.pixels.map { CGSize(width: $0.width / 2, height: $0.height / 2) }
+            case .image: break
+            }
             let size = LiveDrawing.size(of: drawn, available: context.textWidth)
             let style = NSMutableParagraphStyle()
             if picture.active {

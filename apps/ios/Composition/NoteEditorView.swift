@@ -17,6 +17,10 @@ final class EditorHandle {
     var noteID: Int64?
     /// Opens the list of images already stored (⌘⇧M, and the Image menu's *Stored Image…*): the screen owns the sheet.
     var openStoredImages: () -> Void = {}
+    /// Follows a link of the Live tab (its ↗, and ⌘-tap): the screen's `LinkFollower`. False when there was nothing to follow.
+    var followLink: (String) -> Bool = { _ in false }
+    /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through, as the Preview draws it.
+    var isLinkHere: (String) -> Bool = { _ in true }
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -473,6 +477,9 @@ struct NoteEditorView: UIViewRepresentable {
         private var lastLength = 0
         private var breaking = false
         private(set) var styler: MarkdownStyler?
+        private var taskTap: LiveTaskTap?
+        /// The ↗ beside a link in the Live tab, and ⌘-tap on one.
+        private var liveLinks: LiveLinks?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
 
@@ -487,8 +494,18 @@ struct NoteEditorView: UIViewRepresentable {
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
             styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): a dead `pdf:` link drawn as the Preview draws it, the ↗ beside the link the selection is in, and ⌘-tap.
+            styler.isLinkHere = { [weak self] in self?.handle?.isLinkHere($0) ?? true }
+            let links = LiveLinks(textView: view)
+            links.activeLink = { [weak styler] in styler?.activeLink() }
+            links.follow = { [weak self] in self?.handle?.followLink($0) ?? false }
+            links.tint = { [weak view] in ((view as? NoteTextView)?.look ?? .standard).uiLink }
+            styler.afterApply = { [weak links] in links?.update() }
+            liveLinks = links
             (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
             if live { styler.setLive(true) } else { styler.reload() }
+            // A tap on a task box the Live tab draws ticks it (Step 4 of docs/ipad-live-default-plan.md).
+            taskTap = LiveTaskTap(textView: view, isLive: { [weak styler] in styler?.isLive ?? false }, drawnTask: { [weak styler] in styler?.drawnTask(at: $0) })
             #if DEBUG || EDITOR_TEST_HOOKS
             // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
             if UserDefaults.standard.bool(forKey: "liveReport") {
@@ -513,6 +530,15 @@ struct NoteEditorView: UIViewRepresentable {
                 view.addSubview(geometry)
                 geometryLabel = geometry
                 updateSelectionLabel()
+                // `live-boxes`: the screen centres of the task boxes the Live tab draws, `x,y;x,y` (Step 4).
+                let boxes = LiveProbe(frame: CGRect(x: 0, y: 6, width: 2, height: 2))
+                boxes.isAccessibilityElement = true
+                boxes.accessibilityIdentifier = "live-boxes"
+                boxes.alpha = 0.02
+                boxes.describe = { [weak self] in
+                    (self?.taskTap?.boxCenters() ?? []).map { String(format: "%.0f,%.0f", $0.x, $0.y) }.joined(separator: ";")
+                }
+                view.addSubview(boxes)
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
@@ -601,8 +627,31 @@ struct NoteEditorView: UIViewRepresentable {
         }
 
         /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
+        /// Otherwise Return continues a Markdown list or quote, and Backspace just after an item's marker takes the marker away, as the desktop's
+        /// Markdown keys do (`ListContinuation`, Step 4 of docs/ipad-live-default-plan.md): in both tabs, since the text is the same Markdown in each.
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            !(text == "\n" && assist?.accept() == true)
+            if text == "\n" && assist?.accept() == true { return false }
+            guard let view = textView as? NoteTextView, let edit = listEdit(view, range: range, replacement: text) else { return true }
+            view.apply(edit)
+            return false
+        }
+
+        /// What Return or Backspace does to a list or a quote at the caret, or nil when the key should do what it always does: not over a selection, not
+        /// while an input method is composing (its text is not settled), and for Backspace only when it takes the one character before the caret (not a
+        /// word, a line or a selection).
+        private func listEdit(_ view: NoteTextView, range: NSRange, replacement: String) -> LineEdit? {
+            let selection = view.selectedRange
+            guard selection.length == 0, view.markedTextRange == nil, !view.isPasting else { return nil }
+            if let undo = view.undoManager, undo.isUndoing || undo.isRedoing { return nil }
+            if replacement == "\n", range.length == 0, range.location == selection.location {
+                return ListContinuation.newline(view.nativeText, at: selection.location)
+            }
+            if replacement.isEmpty, range.length > 0, NSMaxRange(range) == selection.location {
+                let text = view.nativeText
+                guard range == (text as NSString).rangeOfComposedCharacterSequence(at: range.location) else { return nil }
+                return ListContinuation.deleteBackward(text, at: selection.location)
+            }
+            return nil
         }
 
         /// A line the keystroke pushed past the column is broken at the last space before it (`LiveReflow`, the desktop's `reflowAtCaret` behind it), and the caret
@@ -715,6 +764,7 @@ struct NoteEditorView: UIViewRepresentable {
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
             styler?.selectionChanged()
+            liveLinks?.update()
             #if DEBUG || EDITOR_TEST_HOOKS
             updateSelectionLabel()
             #endif

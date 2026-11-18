@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Step 5 (the block layer and tables) was built 2026-11-17; see its section.
+[Decisions](#decisions)). Steps 1 to 4 are built (their status is under each); Step 5 (the block layer and tables) was built 2026-11-17; see its section.
 
 ## Goal and rule
 
@@ -161,6 +161,17 @@ feel, VoiceOver, speed on the device).
 - **Simulator:** a drawing made with *Drawing…* is drawn in Live in all five schemes (pixel check, as L4's tint test);
   the caret on it shows its tag with the drawing after it.
 - **Gate LD1 (iPad):** item 344.
+- **Status (2026-11-17): built; the Simulator checks pass; Gate LD1 is the owner's.** `LiveScan` reads the three
+  tags in one pass and `LiveDecorations.Picture` carries a `kind` (`image`, `ink`, `drawio`). `LiveImages` reads a
+  drawing's strokes off the main thread and renders them with `InkRenderer` in the scheme's `InkPalette`, cached by
+  file, scheme and scale; until they are in, the drawing is sized from its PNG's pixels and `pHYs` density (the same
+  size), so nothing jumps; a PNG with no strokes is drawn as its pixels. A `<Drawio>` is drawn at half its pixels
+  unless the tag gives a width. The fixture writer emits the desktop's `InkWidget`s as `inks`; `LiveConformanceTests`
+  compares them (24 new texts in `live-cases.json`, group `drawings`) and leaves `<Drawio>` out, since the desktop's
+  Live tab does not draw it (checked by `LiveModelTests` instead). UI tests: `LiveDrawingsUITests` (a finger's line
+  drawn in Live in all five schemes, its pixels the scheme's ink colour; the tag shown with the drawing after it
+  under the caret; a diagram at 440 points from its 880-pixel PNG). `live-report` gains `picture-ink`,
+  `picture-drawio`, `natural<width>` and `ink-strokes`.
 
 ### Step 2: links (S to M)
 
@@ -175,6 +186,23 @@ feel, VoiceOver, speed on the device).
   modifier opens it (XCUITest can hold ⌘ on a tap); a plain tap puts the caret in the link; editing a link's text
   and URL from the keyboard.
 - **Gate LD2 (iPad):** items 345 to 348 (↗ with a finger, ⌘-tap on the Magic Keyboard, a trackpad, VoiceOver on a link).
+- **Status (2026-11-17): built, Simulator only; LD2 is yours.** `LiveModel` reads `[text](url "title")`, `[text][label]` /
+  `[text][]` / `[text]` with a definition, `<url>` and bare addresses (found in the text as lezer's GFM `Autolink` finds
+  them: cmark here has no autolink extension). `LiveOverlay` draws the words in the link colour, underlined; a dead
+  `pdf:` link is struck through and muted, and `LiveLinkFragment` draws "(PDF not on this device)" in room made by
+  kerning the character after the words. `LiveLinks` keeps the ↗ (`live-follow-link`) after the link the selection is
+  in and takes ⌘-tap; both call `LinkFollower`, which the Preview's `openURL` now calls too. **Oracle:** the fixture
+  writer no longer leaves link marks out of `live-expected.json` and writes each link's range and address;
+  `LiveConformanceTests` compares them, and 404 of 405 texts agree. Left out: `[nested [brackets]](u)` (lezer takes the
+  inner `[brackets]` as a link even undefined, so the desktop draws none; cmark and the Preview make the outer one the
+  link), in `known`; and the desktop's link on a footnote definition's first word (`[^a]: A.` drawn as a link to
+  `http://A.`), not compared, since footnotes are Step 7's. A reference link whose definition is in another block is
+  found by the full read a pause after typing, not by the quick read of the edited block. **Simulator:**
+  `LiveLinksUITests` (hidden and dimmed marks, the ↗ and following it, ⌘-tap, a plain tap, editing a link, the dead
+  `pdf:` link). XCUITest's held ⌘ does not reach a touch's `modifierFlags` in the Simulator (they arrive as 0), so the
+  ⌘-tap tests launch with `-liveCommandHeld 1` (Debug and test builds), which stands in for it; the real ⌘ on a
+  keyboard is item 346. The ↗ sits on the line after the link's `)`, so it covers the start of a word that follows:
+  your look in LD2.
 
 ### Step 3: code blocks (S)
 
@@ -182,6 +210,23 @@ feel, VoiceOver, speed on the device).
   `surface` fill behind the block (first and last line rounded). Fences as V2. Colours per I7.
 - **Simulator:** pixel check of the fill in five schemes; typing in a block keeps the 16 ms budget (`LiveBench`).
 - **Gate LD3 (iPad):** item 349.
+- **Status (2026-11-17): built, Simulator only.** `LiveModel` gives each block (`LiveDecorations.codeBlocks`): its range, the lines drawn on
+  the fill (first and last are the rounded ends) and which of them are fences, and the indents hidden (`codeIndentsHidden`). The app
+  (`LiveCode.swift`) puts each line in the Preview's code font (`.callout` monospaced, as Dynamic Type sizes it), 12 points in from the fill,
+  and `LiveDrawingFragment` paints the line's share of one `surface` fill behind it. Away from the caret a fence line collapses to nothing
+  (the desktop's Step 3 does the same), and a **top-level indented block's four-column indent is hidden**, as the desktop hides it; a block
+  with nothing between its fences keeps them, also as the desktop. A long line wraps (the Preview scrolls it sideways).
+  **Oracle:** the fixture writer emits the desktop's `codeDecorations` facts (`live-code-expected.json`) whenever `liveCode.ts` is in the
+  tree, and `LiveConformanceTests.codeBlocks` compares lines, ends, fences, collapsed fences and hidden indents for every selection: run
+  against the desktop's Step 3 branch, **all 375 texts agree, with nothing in `knownCode`**; since the plan branch took main (with the
+  desktop's Step 3, through Step 2), it runs here too: all 429 texts and 64,839 selections agree. On a tree without `liveCode.ts` the file
+  is not written and the comparison is skipped with a message. The V2 difference in the fixtures table is gone.
+  **Simulator (iPad Pro 13-inch):** `LiveCodeUITests` (8) and `LiveUITests` (36) pass; the fill's pixels are checked in all five schemes.
+  **`LiveBench`** (Release, `EDITOR_TEST_HOOKS`, 200 keystrokes, two alternating rounds each; the Mac's load average was 190 to 810, so
+  the whole-keystroke times are mostly that): the Live pass per keystroke (the styler) is 0.5 to 1.2 ms before and after, typing in a
+  block or in a paragraph. In a 5,000-line note a keystroke in a block took a median of 5 to 10 ms before (p95 16 to 21, 7 and 13 of 200
+  over 16 ms) and 8 to 10 ms after (p95 11 to 33, 4 and 26 over, the 26 at a load of 786); in a 20,000-line note every keystroke is over 16 ms before and after alike (median 25
+  to 30 ms, nearly all of it TextKit's layout, which this step does not change). No regression to see; the iPad's own numbers are LD3's.
 
 ### Step 4: lists, task lists, quotes (M)
 
@@ -197,6 +242,48 @@ feel, VoiceOver, speed on the device).
 - **Simulator:** UI tests for each, including Return, Tab/Shift-Tab over list lines (L5's test extended) and the
   toggle's undo.
 - **Gate LD4 (iPad):** items 350 to 353 (a finger on a checkbox, the Pencil and Scribble in a list).
+
+**Status (2026-11-17): built; Simulator checked; Gate LD4 is yours.** Branch `claude/ipad-live-step4-lists-26edbb`.
+
+- **Core:** `LiveModel` gives each line of a list or a quote (`LiveDecorations.lists`): its lists and quotes outermost first, whether an item starts
+  on it, and, away from the selection, the marks and indentation to hide, the marker (a bullet, or the number as written) and the task box.
+  `LiveReader` reads them from cmark's quotes and items and finds the marks in the text as lezer does (the desktop's `readLines` and `prefixEnd`,
+  liveLists.ts). What they hide is kept apart from `hidden`, so the fixture made by a desktop without its Step 4 still compares as before.
+  `differences(from:)` now also returns list lines, because a quick re-read of a window can end an item early (a lazy line below the window) and the
+  colours do not show it.
+- **Oracle:** the fixture writer (`apps/web/scripts/conformance-fixtures.test.ts`) gives the desktop's list facts from its real
+  `listDecorations` (`lists`: each line's lists and quotes and whether an item starts on it; `listDrawn`: the bullets, numbers, boxes and hidden
+  marks), and `LiveConformanceTests` compares them (only when a fixture has them, so an older one still reads). **All 21,613 selections over
+  429 texts agree** (2,273 with list or quote lines, 334 with a drawn box), with Steps 1 to 3's facts beside them. Hand cases in `LiveListTests`
+  cover the same and the iPad's own parts (the box a tap finds, edits followed against a fresh read).
+- **Beside Steps 2 and 3:** a line that is also a code block's (a code block in a quote or an item) or that holds a dead `pdf:` link is given that
+  step's layout fragment, so it draws no quote bar or bullet of its own; its indent and hidden marks are still right. Joining the fragments is a
+  follow-up.
+- **App:** `LiveLists` puts on each line's indent (2 em a list level; the Preview's 3-point bar and 10 points a quote level; `headIndent` the same
+  as the first line's, so a wrapped line hangs under the text), the hidden marks and the quote's muted words; `LiveListFragment` draws the bars and,
+  in the level left of the text, the Preview's muted `•` or number, or its `square` / `checkmark.square.fill` (in place of the bullet, as the Preview
+  does; the desktop draws both). On the caret's line the marks show as written, starting a level further out. `LiveTaskTap` ticks or unticks a drawn box
+  through the text view (`replace(_:withText:)`), leaving the selection; the target is 44 points round the box, cut off where the item's text starts.
+- **Simulator (2026-11-18):** `LiveListsUITests` (7, from `live-report`, with the boxes tapped where the Debug-only `live-boxes` element says they are):
+  bullets, numbers and a nested item drawn and their marks shown on the caret's line; a quote's bars, hidden `> ` and muted words; two box taps
+  each undone on its own by ⌘Z, the selection left where it was; a tap on an item's words edits and draws no box on that line; Return and Backspace
+  in a list; Tab and Shift+Tab nesting and un-nesting two items. All 36 `LiveUITests` pass (some re-run alone: the Mac was very loaded, and on an
+  11-inch iPad the crowded toolbar covers the view picker's *Markdown*, so the tab-switching and scheme tests were run on a 13-inch). Screenshots
+  showed the bullets, numbers and boxes in the level left of the words.
+- **Not built (as of the Step 4 PR):** Return did not continue a list or a quote in either tab. The plan said "as the Markdown tab does (`EditorAssist`)", but
+  the iPad's Markdown tab never had: Return was a plain line break in both, and that is what Step 4 checked. VoiceOver says nothing of a box's state yet
+  (item 353).
+- **Return and Backspace in lists, built after Step 4 (2026-11-18, its own PR on top of Step 4's):** `ListContinuation` (CompositionCore/Editing) ports
+  the desktop's CodeMirror `insertNewlineContinueMarkup` and `deleteMarkupBackward` (@codemirror/lang-markdown 6.5.2) to answer a `LineEdit`, which
+  `NoteTextView.apply` puts in as one edit through the text view; the editor's delegate asks it in both tabs (after the list at the caret has had Return,
+  not over a selection, not while an input method is composing, and for Backspace only when it takes the one character before the caret). The commands read
+  lezer's tree, and where lezer ends an item or a quote is not where cmark does, so `MarkdownBlocks` ports the part of @lezer/markdown 1.8.1's block parser
+  they look at (containers, their marks and where each block ends; HTML blocks and tags, where the desktop's Markdown is not active). **Oracle:**
+  fixtures/conformance/list-continuation-cases.json, 124 texts with Return and Backspace tried at every caret place by the real commands
+  (conformance-fixtures.test.ts writes list-continuation-expected.json); `ListContinuationConformanceTests` agrees at all 2,104 places (1,206 where Return changes the text, 285 where Backspace does), and
+  `ListContinuationTests` has hand cases. It is the desktop's behaviour, quirks included: Return on the empty second item of a tight two-item list adds a
+  blank line first (the list becomes loose), and Backspace after any item's `- ` (not only an empty one) turns it into spaces. Not ported: GFM tables
+  and link reference definitions (leaf blocks either way). **Simulator:** see the UI tests in the PR; items 359 to 362 are yours.
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 

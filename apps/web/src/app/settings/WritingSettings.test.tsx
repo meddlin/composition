@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { saveWritingSettings } from "@/lib/composition/client";
 import { DEFAULT_WRITING_SETTINGS } from "@/lib/composition/writing";
@@ -59,9 +59,11 @@ describe("writing settings", () => {
     fireEvent.click(checkbox("Break lines as I type"));
     fireEvent.change(field("Reflow column"), { target: { value: "72" } });
     fireEvent.click(checkbox("Keep Markdown tables intact"));
+    fireEvent.click(within(screen.getByRole("radiogroup", { name: "Open notes in" })).getByRole("radio", { name: /^Live/ }));
     await save();
 
     expect(saveWritingSettings).toHaveBeenCalledWith({
+      openNotesIn: "live",
       rulerEnabled: true,
       rulerColumn: 100,
       reflowEnabled: true,
@@ -70,6 +72,14 @@ describe("writing settings", () => {
       wordCountEnabled: false,
     });
     expect(screen.getByRole("status").textContent).toContain("Saved");
+  });
+
+  it("offers each view to open notes in, with the saved one chosen", () => {
+    render(<WritingSettings initial={{ ...DEFAULT_WRITING_SETTINGS, openNotesIn: "preview" }} />);
+
+    const group = screen.getByRole("radiogroup", { name: "Open notes in" });
+    expect(within(group).getAllByRole("radio")).toHaveLength(4);
+    expect(within(group).getByRole("radio", { name: "Preview" }).getAttribute("aria-checked")).toBe("true");
   });
 
   it("says what is wrong with a column instead of saving it", async () => {

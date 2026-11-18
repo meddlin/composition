@@ -1028,6 +1028,222 @@
   {
    "group": "pictures",
    "text": "<Image alt=\"first\" alt=\"second\" src=\"a.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"app_data/note-drawing-0123456789ab.png\" alt=\"Drawing\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\" alt=\"A sketch\" width=\"50%\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src='drawing.png' alt='single' title='T' />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src={\"drawing.png\"} alt={\"braced\"} />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink alt=\"no src\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"\" alt=\"empty\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\">"
+  },
+  {
+   "group": "drawings",
+   "text": "<Inkwell src=\"drawing.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\"\n  alt=\"two lines\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "before <Ink src=\"a.png\" /> and <Image src=\"b.png\" /> after"
+  },
+  {
+   "group": "drawings",
+   "text": "text\n\n<Ink src=\"app_data/a.png\" alt=\"Drawing\" />\n\ntext"
+  },
+  {
+   "group": "drawings",
+   "text": "`<Ink src=\"code.png\" />`"
+  },
+  {
+   "group": "drawings",
+   "text": "```\n<Ink src=\"fence.png\" />\n```"
+  },
+  {
+   "group": "drawings",
+   "text": "---\nimage: <Ink src=\"front.png\" />\n---\n\n<Ink src=\"body.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "> <Ink src=\"q.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "- <Ink src=\"l.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"a.png\" /><Ink src=\"b.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"a.png\" alt=\"x\" /> <Mark>tint</Mark> **bold**"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio src=\"app_data/diagram-0123456789ab.png\" alt=\"Request flow\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio src=\"diagram.png\" alt=\"Flow\" width=\"300\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio alt=\"no src\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawiox src=\"d.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "```\n<Drawio src=\"fence.png\" />\n```"
+  },
+  {
+   "group": "drawings",
+   "text": "text\n\n<Drawio src=\"d.png\" />\n\n<Ink src=\"i.png\" />\n\n<Image src=\"p.png\" />"
+  },
+  {
+   "group": "links",
+   "text": "[a link](https://x.test)"
+  },
+  {
+   "group": "links",
+   "text": "before [a link](https://x.test) after"
+  },
+  {
+   "group": "links",
+   "text": "[a note](note:12) and [a pdf](pdf:3f2a1b4c-0000-4000-8000-000000000000#page=4)"
+  },
+  {
+   "group": "links",
+   "text": "[titled](https://x.test \"A title\") and [single](u 't') and [paren](u (t))"
+  },
+  {
+   "group": "links",
+   "text": "[spaces](<a b.md>) here"
+  },
+  {
+   "group": "links",
+   "text": "[](https://x.test) empty text"
+  },
+  {
+   "group": "links",
+   "text": "[text]() empty address"
+  },
+  {
+   "group": "links",
+   "text": "[unclosed](https://x.test"
+  },
+  {
+   "group": "links",
+   "text": "[a](u)[b](v)"
+  },
+  {
+   "group": "links",
+   "text": "**[bold link](u)** and [**bold** in it](v)"
+  },
+  {
+   "group": "links",
+   "text": "[`code` in a link](u)"
+  },
+  {
+   "group": "links",
+   "text": "<https://x.test/path> autolink"
+  },
+  {
+   "group": "links",
+   "text": "<mailto:a@b.test> and <a@b.test>"
+  },
+  {
+   "group": "links",
+   "text": "bare https://x.test/a?b=1 address"
+  },
+  {
+   "group": "links",
+   "text": "bare www.x.test address and http://y.test."
+  },
+  {
+   "group": "links",
+   "text": "[ref link][one] and [one] and [One][]\n\n[one]: https://x.test \"T\""
+  },
+  {
+   "group": "links",
+   "text": "[no definition][nope] here"
+  },
+  {
+   "group": "links",
+   "text": "a footnote[^1] here\n\n[^1]: the note"
+  },
+  {
+   "group": "links",
+   "text": "[multi\nline](u) link"
+  },
+  {
+   "group": "links",
+   "text": "[a](u\n\"title\") split"
+  },
+  {
+   "group": "links",
+   "text": "\\[not a link](u)"
+  },
+  {
+   "group": "links",
+   "text": "`[code](u)` span"
+  },
+  {
+   "group": "links",
+   "text": "[![pic](p.png)](u)"
+  },
+  {
+   "group": "links",
+   "text": "# Heading [link](u)"
+  },
+  {
+   "group": "links",
+   "text": "- [item link](u)\n- text"
+  },
+  {
+   "group": "links",
+   "text": "> [quoted](u)"
+  },
+  {
+   "group": "links",
+   "text": "[a](#heading) to a heading"
+  },
+  {
+   "group": "links",
+   "text": "[nested [brackets]](u)"
+  },
+  {
+   "group": "links",
+   "text": "[esc \\] bracket](u)"
+  },
+  {
+   "group": "links",
+   "text": "[a](u(1)) parens"
   }
  ]
 }
