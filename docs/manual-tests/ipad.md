@@ -345,6 +345,15 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
 
 **Gate L passed (you, 2026-11-09):** you tried the Live tab on the iPad and it works well. Items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter) and 125 to 136 above were not recorded one by one, so none of them is ticked here.
 
+## Where notes open, and undo across the tabs (Live default plan, Step 0)
+
+From [ipad-live-default-plan.md](../ipad-live-default-plan.md), Step 0. The Appearance sheet's *Writing* section has **Open notes in** (Live, Markdown, Preview, Split; Preview until Live becomes the default at the plan's last step). It is kept on this iPad only: restoring a desktop backup does not change it. Every note opens in it; a tab you switch to lasts until you open another note. The text view now stays alive under the Preview and Split tabs, so its undo history survives a look at them. The UI tests (`OpenNotesInUITests`) check all four items in the Simulator with a hardware keyboard's ⌘Z; the finger, the on-screen keyboard and undo by gesture are yours.
+
+340. **Open notes in.** Appearance (the button at the foot of the first column) ▸ Writing ▸ Open notes in: choose Live. Open three notes: each opens in Live. Switch one to Preview, then open another: it opens in Live again. Choose Preview again: notes open in the Preview, as before. End the app with a note open in Split and launch it again: that note comes back in Split.
+341. **A new note.** With the setting on Preview, the + button makes a note that opens in Markdown with the keyboard up (as before). With it on Live, the new note opens in Live with the keyboard up; on Split, in Split.
+342. **Undo after a look at the Preview.** In a note in Live, type a sentence. Go to Preview (the keyboard goes away), read, come back to Live, then undo: ⌘Z on the Magic Keyboard, and on the glass the three-finger swipe left (or shake). The sentence goes, and redo brings it back. Do the same going through Split and Markdown. The caret and the scroll are where you left them, in a long note too. With VoiceOver on, in the Preview: nothing of the hidden editor is read (swipe through the whole note), only the Preview's text.
+343. **An edit from outside leaves nothing to undo.** In Live, type a word. Go to Preview, tap a drawing and change it on the canvas (or, in a note with a PDF beside it, quote from the PDF while the Preview shows: the quote goes at the end of the note, not at the caret). Back in Live, undo does nothing to the word you typed, and nothing breaks.
+
 ## PDFs: import and the reader (M2, first step)
 
 The reader beside the note a PDF belongs to. **Tried in the Simulator only; this is its first time on the iPad.** You need a small PDF (a few pages, with a table of contents if you can), a book of a few hundred pages, and ideally a password-protected one. Marks, the Notes tab, quoting, search, export and the Pencil lab came after this and are in the next section (items 180 on; Gate P2). (These items are numbered from 140 to leave room for the Live view's.)

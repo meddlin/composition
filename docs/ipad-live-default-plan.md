@@ -152,6 +152,31 @@ feel, VoiceOver, speed on the device).
   scroll survive Preview and back. The existing suites pass (Split's divider tests especially).
 - **Gate LD0 (iPad, yours):** items 340 to 343.
 
+**Built, 2026-11-18, in the Simulator.**
+- **The setting:** *Open notes in* is the first row of the Appearance sheet's *Writing* section (`@AppStorage("openNotesIn")`,
+  Preview by default). `NoteDetailView` opens every note in it; `@SceneStorage("modeNote")` remembers which note the tab was
+  chosen for, so only the note open when the app was ended comes back in its own tab. A new note opens in the setting's
+  view, or Markdown when that is Preview. `-openMode` (Debug) still overrides it.
+- **One layout for the four tabs:** `noteContent` is always a `SplitLayout`, which now takes `showing` (`.both`, `.leading`,
+  `.trailing`) and lays the same two views out with `AnyLayout` (side by side, stacked, or one over the other), so the text
+  view keeps its identity across every tab: undo survives Preview and Split. Under the Preview the text view is hidden
+  (`isHidden`) and takes nothing a caller can put at the end of the note instead (`EditorHandle.isShowing`: a PDF quote while
+  the Preview shows still goes to the end).
+- **An edit from outside the text view clears its undo** (`Coordinator.show` calls `removeAllActions()`), as D7 asks.
+- **Found on the way:** giving up the keyboard inside `updateUIView` (directly, or by hiding the view or turning its touches
+  off) made the keyboard's tracking ask SwiftUI to render inside the same update: an AttributeGraph cycle that held the main
+  thread (seen by sampling the app while a UI test stalled). The hide now happens on the next turn of the run loop.
+- **Checked:** `OpenNotesInUITests`, five tests: every note opens in the setting's view and a tab chosen lasts until another
+  note opens; the setting chosen in the sheet is kept across launches; ⌘Z undoes typing after a look at the Preview, and
+  after Split and Markdown; an edit from outside (a test-only button in the Preview, the path a PDF quote takes) leaves
+  nothing to undo. Also run: `LayoutUITests` (the Split divider), `PdfMarksUITests` (a quote and a citation while the
+  Preview shows still go to the end of the note), `PolishUITests`, all of `AccessibilityUITests` (two audits failed once
+  because a tap on the restore alert was lost under load and the audit saw the alert; both pass on a rerun, and on the base
+  commit) and the picker-order test of `LiveUITests`. `LiveUITests.testSwitchingTabsKeepsTheCaretAndTheTextAndTheLiveLookComesBack`
+  failed, and **fails the same way on the base commit** under this load (its Markdown tab tap is not retried). All of it on a
+  Mac at a load of 300 to 800 shared with five other Simulator sessions; the rest of the UI suite was not rerun here. **XCUITest still lists the hidden text view** (a representable's view), so whether VoiceOver skips it
+  under the Preview is item 342's to say.
+
 ### Step 1: `<Ink>` and `<Drawio>` as pictures (S)
 
 - `LiveScan` reads `<Ink … />` and `<Drawio … />` as it reads `<Image … />`; `LiveImages` draws an `<Ink>` from its
