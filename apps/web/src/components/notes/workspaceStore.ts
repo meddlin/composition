@@ -54,7 +54,7 @@ import {
 } from "../panels/panelsState";
 import { createNoteFromAnswer, createNoteWith } from "./createNoteFromAnswer";
 import { appendMarkdown, insertIntoOpenNote, type Insertion } from "./noteInsertions";
-import { closePane, dropNote, initialPanes, openNote, type PaneState, type PaneView } from "./panes";
+import { closePane, DEFAULT_OPEN_IN, dropNote, initialPanes, openNote, type PaneState, type PaneView } from "./panes";
 import { applySavedNote, noteTitle, type Group, type Note, type Notebook } from "./types";
 
 /** How long after the last keystroke a note is saved. */
@@ -328,7 +328,7 @@ export function createWorkspaceStore(
   let windowCount = 0;
   const newWindowId = () => `w${++windowCount}`;
   // The view notes open in; read when a note gets a new pane or panel, not when one is already showing it.
-  let openIn: PaneView = initial.writing?.openNotesIn ?? "split";
+  let openIn: PaneView = initial.writing?.openNotesIn ?? DEFAULT_OPEN_IN;
   const emptyPanel = (): PanelRecord => ({ id: newPanelId(), kind: "empty", state: null });
   const knownNotes = new Set([...initial.notes, ...(options.panels?.trashed ?? [])].map((n) => n.id));
   const knownNotebooks = new Set((initial.notebooks ?? NO_NOTEBOOKS).map((n) => n.id));

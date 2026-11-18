@@ -118,7 +118,7 @@ describe("web settings layout", () => {
       wordCountEnabled: false,
       headingRailEnabled: true,
       headingRailSide: "left",
-      openNotesIn: "split",
+      openNotesIn: "live",
     });
   });
 

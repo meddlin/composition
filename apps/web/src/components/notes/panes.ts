@@ -7,13 +7,19 @@
  * a reload starts again with one pane.
  */
 
-import type { NoteView } from "../../lib/composition/writing";
+import { DEFAULT_WRITING_SETTINGS, type NoteView } from "../../lib/composition/writing";
 
 /**
  * What a pane shows of its note: the editor, the preview, both beside each other, or the live editor, which is the
  * two in one (the Markdown drawn as it will read, with its syntax showing only where the caret is).
  */
 export type PaneView = NoteView;
+
+/**
+ * The view a note opens in when nothing says otherwise: the default of Settings › Writing › "Open notes in". The web
+ * app and desktop pass the setting itself; the CLI, which has no Live, passes Split.
+ */
+export const DEFAULT_OPEN_IN: PaneView = DEFAULT_WRITING_SETTINGS.openNotesIn;
 
 export type Pane = {
   noteId: number;
@@ -50,7 +56,7 @@ export function besideView(openIn: PaneView): PaneView {
 }
 
 /** The first pane, showing `noteId` in `openIn`, the view notes open in. */
-export function initialPanes(noteId: number | null, openIn: PaneView = "split"): PaneState {
+export function initialPanes(noteId: number | null, openIn: PaneView = DEFAULT_OPEN_IN): PaneState {
   return noteId === null
     ? { panes: [], focusedId: null }
     : { panes: [{ noteId, size: 1, view: openIn }], focusedId: noteId };
@@ -71,11 +77,11 @@ export function shownView(view: PaneView, wideEnough: boolean): PaneView {
 }
 
 /**
- * The view `delta` steps from the one shown, in the tabs' order (Markdown, Preview,
- * Split, Live) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
+ * The view `delta` steps from the one shown, in the tabs' order (Live, Markdown, Preview,
+ * Split) and wrapping round. A pane too narrow for Split skips it, as its tabs do.
  */
 export function stepView(shown: PaneView, canSplit: boolean, delta: 1 | -1): PaneView {
-  const order: PaneView[] = canSplit ? ["markdown", "preview", "split", "live"] : ["markdown", "preview", "live"];
+  const order: PaneView[] = canSplit ? ["live", "markdown", "preview", "split"] : ["live", "markdown", "preview"];
   return order[(order.indexOf(shown) + delta + order.length) % order.length];
 }
 
@@ -89,7 +95,7 @@ export function focusPane(state: PaneState, noteId: number): PaneState {
  * already in, otherwise put it in the focused pane (or a first pane). A pane
  * keeps its size and view when its note changes.
  */
-export function openNote(state: PaneState, noteId: number, openIn: PaneView = "split"): PaneState {
+export function openNote(state: PaneState, noteId: number, openIn: PaneView = DEFAULT_OPEN_IN): PaneState {
   if (state.panes.some((p) => p.noteId === noteId)) return focusPane(state, noteId);
   if (state.panes.length === 0) return initialPanes(noteId, openIn);
 
@@ -106,7 +112,7 @@ export function openNote(state: PaneState, noteId: number, openIn: PaneView = "s
  * pane there is; and a note that is already open moves beside the focused pane
  * instead of duplicating (see `dropNote`).
  */
-export function openNoteBeside(state: PaneState, noteId: number, openIn: PaneView = "split"): PaneState {
+export function openNoteBeside(state: PaneState, noteId: number, openIn: PaneView = DEFAULT_OPEN_IN): PaneState {
   if (state.panes.length === 0) return initialPanes(noteId, openIn);
   const target = state.panes.find((p) => p.noteId === state.focusedId) ?? state.panes[state.panes.length - 1];
   return dropNote(state, noteId, target.noteId, "right", openIn);
@@ -136,7 +142,7 @@ export function closePane(state: PaneState, noteId: number): PaneState {
  * target (every pane keeps its width), or, when dropped onto another pane,
  * trades places with it.
  */
-export function dropNote(state: PaneState, noteId: number, targetId: number, zone: DropZone, openIn: PaneView = "split"): PaneState {
+export function dropNote(state: PaneState, noteId: number, targetId: number, zone: DropZone, openIn: PaneView = DEFAULT_OPEN_IN): PaneState {
   if (noteId === targetId) return focusPane(state, noteId);
   if (!state.panes.some((p) => p.noteId === targetId)) return state;
 

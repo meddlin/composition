@@ -37,7 +37,7 @@ public struct WritingSettings: Equatable, Sendable {
     public var headingRailSide = HeadingRailSide.left
     /// The view a note opens in when it gets a new pane (Settings › Writing › "Open notes in" on the desktop). Kept here so the file round-trips; the iPad
     /// does not read it yet (docs/live-default-plan.md, D8).
-    public var openNotesIn = NoteView.split
+    public var openNotesIn = NoteView.live
 
     public init() {}
 

@@ -196,7 +196,7 @@ const VIEWS: Json[] = ["live", "markdown", "preview", "split", "Live", "", "both
 function writingCases(): { parse: Json[]; validate: Json[] } {
   const inputs: Json[] = [
     {}, null, [], "text", 5, true,
-    { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 72, reflowKeepsTables: false, wordCountEnabled: true, headingRailEnabled: false, headingRailSide: "right", openNotesIn: "live" },
+    { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 72, reflowKeepsTables: false, wordCountEnabled: true, headingRailEnabled: false, headingRailSide: "right", openNotesIn: "preview" },
     ...COLUMNS.flatMap((c): Json[] => [{ rulerColumn: c }, { reflowColumn: c }]),
     ...FLAGS.flatMap((f): Json[] => [{ rulerEnabled: f }, { reflowEnabled: f }, { reflowKeepsTables: f }, { wordCountEnabled: f }, { headingRailEnabled: f }]),
     ...SIDES.map((side): Json => ({ headingRailSide: side })),

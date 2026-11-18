@@ -5876,7 +5876,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5890,7 +5890,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5904,7 +5904,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5918,7 +5918,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5932,7 +5932,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5946,7 +5946,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5959,7 +5959,7 @@
         "wordCountEnabled": true,
         "headingRailEnabled": false,
         "headingRailSide": "right",
-        "openNotesIn": "live"
+        "openNotesIn": "preview"
       },
       "settings": {
         "rulerEnabled": true,
@@ -5970,7 +5970,7 @@
         "wordCountEnabled": true,
         "headingRailEnabled": false,
         "headingRailSide": "right",
-        "openNotesIn": "live"
+        "openNotesIn": "preview"
       }
     },
     {
@@ -5984,7 +5984,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -5998,7 +5998,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6012,7 +6012,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6026,7 +6026,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6040,7 +6040,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6054,7 +6054,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6068,7 +6068,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6082,7 +6082,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6096,7 +6096,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6110,7 +6110,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6124,7 +6124,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6138,7 +6138,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6152,7 +6152,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6166,7 +6166,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6180,7 +6180,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6194,7 +6194,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6208,7 +6208,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6222,7 +6222,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6236,7 +6236,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6250,7 +6250,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6264,7 +6264,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6278,7 +6278,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6292,7 +6292,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6306,7 +6306,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6320,7 +6320,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6334,7 +6334,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6348,7 +6348,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6362,7 +6362,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6376,7 +6376,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6390,7 +6390,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6404,7 +6404,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6418,7 +6418,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6432,7 +6432,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6446,7 +6446,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6460,7 +6460,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6474,7 +6474,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6488,7 +6488,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6502,7 +6502,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6516,7 +6516,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6530,7 +6530,7 @@
         "wordCountEnabled": true,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6544,7 +6544,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6558,7 +6558,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6572,7 +6572,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6586,7 +6586,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6600,7 +6600,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6614,7 +6614,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": false,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6628,7 +6628,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6642,7 +6642,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6656,7 +6656,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6670,7 +6670,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6684,7 +6684,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6698,7 +6698,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6712,7 +6712,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6726,7 +6726,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6740,7 +6740,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6754,7 +6754,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6768,7 +6768,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6782,7 +6782,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6796,7 +6796,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6810,7 +6810,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6824,7 +6824,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6838,7 +6838,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6852,7 +6852,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6866,7 +6866,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6880,7 +6880,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6894,7 +6894,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6908,7 +6908,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6922,7 +6922,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6936,7 +6936,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6950,7 +6950,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6964,7 +6964,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6978,7 +6978,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -6992,7 +6992,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7006,7 +7006,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7020,7 +7020,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7034,7 +7034,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7048,7 +7048,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7062,7 +7062,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "right",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7076,7 +7076,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7090,7 +7090,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7104,7 +7104,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7118,7 +7118,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7132,7 +7132,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7146,7 +7146,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7216,7 +7216,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7230,7 +7230,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7244,7 +7244,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7258,7 +7258,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7272,7 +7272,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     },
     {
@@ -7286,7 +7286,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
-        "openNotesIn": "split"
+        "openNotesIn": "live"
       }
     }
   ],

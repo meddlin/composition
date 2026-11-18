@@ -13,7 +13,8 @@ built 2026-11-17** (PR #322); Gate B is the owner's. **Step 3 (code blocks) buil
 the owner's. **Step 4 (lists, task lists, quotes) built 2026-11-17** (PR #325); Gate D is the owner's. **Step 5 (the block layer and tables)
 built 2026-11-17** (PR #326); Gate E is the owner's. **Step 6 (MDX components) built 2026-11-17** (PR #327); Gate F
 is the owner's. **Step 7 (setext headings, footnotes, `<Toc>`, the frontmatter card) built 2026-11-17** (PR #328);
-Gate G is the owner's.
+Gate G is the owner's. **Step 8 (Live the default) built 2026-11-17**; Gate H, a week of writing with it in the desktop
+app, is the owner's.
 
 ## Goal and rule
 
@@ -403,6 +404,19 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Docs: [ui/live-editor.md](ui/live-editor.md), [ui/panels.md](ui/panels.md), [ui/web-side-by-side.md](ui/web-side-by-side.md),
   [feature-matrix.md](feature-matrix.md), [index.md](index.md).
 - **Gate H (the owner's):** a week of writing with Live as the default, desktop app.
+- **Built (2026-11-17).**
+  - `DEFAULT_WRITING_SETTINGS.openNotesIn` is `"live"`, and the Swift core's `WritingSettings.openNotesIn` is `.live`
+    to match (the reflow conformance fixture records it; the iPad still does not read it, D8). A value in
+    `settings.json` is kept.
+  - Every fallback for a new pane or panel (`panes.ts`, `panelsState.ts`, a note panel's first state in `kinds.ts`, the
+    workspace store's `openIn`) is `DEFAULT_OPEN_IN` in `panes.ts`, which is the setting's default, not a literal. The
+    terminal app shares `panes.ts` but has no Live tab, so it passes Split itself.
+  - `TABS` and `stepView` put Live first: Live, Markdown, Preview, Split. Ctrl/Cmd+\ and Home start from Live.
+  - The app tests that type in the Markdown tab and read the preview beside it now say they open in Split; new tests
+    check that a fresh store and a fresh app open in Live, beside too, and that a saved Split is kept.
+  - **For the owner:** the Step 0 Settings page saves `openNotesIn` with every save of Settings › Writing, so a settings
+    file saved there before Step 8 holds `"split"` though nobody chose it, and keeps it. Nothing had shipped, so this
+    should be only the owner's own file; choosing Live once in Settings fixes it. No migration was added.
 
 Step 0 comes first. Steps 1 to 4 are independent of each other and of Step 5. Steps 6 and 7 need Step 5's block
 layer. Step 8 comes last (D1).

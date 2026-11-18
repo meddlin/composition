@@ -16,9 +16,16 @@ Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 Plan and decisions: [live-editor-parity-plan.md](../live-editor-parity-plan.md). Checking it by hand:
 [manual-tests/live-editor.md](../manual-tests/live-editor.md).
 
-A fourth tab beside **Markdown**, **Preview** and **Split**: the editor and the preview in one place. It is
-the same Markdown source, character for character (switch to the Markdown tab and it is what you typed), drawn as
-it will read, with the syntax showing only where the caret is. The other three tabs are unchanged.
+The view a note opens in, and the first of its four tabs (**Live**, **Markdown**, **Preview**, **Split**): the editor
+and the preview in one place. It is the same Markdown source, character for character (switch to the Markdown tab and
+it is what you typed), drawn as it will read, with the syntax showing only where the caret is. The other three tabs are
+unchanged and a click or Ctrl/Cmd+\ away.
+
+Notes open in Live unless **Settings › Writing › Open notes in** says otherwise (Live, Markdown, Preview or Split);
+the setting decides the tab of a **new** pane or panel only, and a view chosen there before Live became the default
+is kept. Live is the default since Step 8 of the [live-default plan](../live-default-plan.md#step-8-make-live-the-default-s)
+(decisions D1 and D6). The terminal app has no Live tab and still opens notes in Split; the iPad keeps its own setting
+and plan (D8).
 
 ## What it does
 
@@ -281,8 +288,6 @@ same scenario on each:
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
 - **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
-- Not in the Live tab yet: `<Toc>`, `<Footnotes>` and the frontmatter card (Step 7 of the
-  [live-default plan](../live-default-plan.md)). Use **Split** for those.
 
 ## Long notes
 

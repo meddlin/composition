@@ -1,5 +1,5 @@
 import { DOCK_MIN_WIDTH } from "../notes/assistantDock";
-import type { PaneView } from "../notes/panes";
+import { DEFAULT_OPEN_IN, type PaneView } from "../notes/panes";
 import type { PluginId } from "@/lib/composition/plugins";
 import { NOTE_VIEWS } from "@/lib/composition/writing";
 import type { KindId, PanelRecord } from "./panelsState";
@@ -101,7 +101,7 @@ export const KINDS: Record<
   empty: { minWidth: MIN_PANEL_WIDTH, initialState: () => null, restore: () => null },
   note: {
     minWidth: MIN_PANEL_WIDTH,
-    initialState: (): NotePanelState => ({ noteId: null, view: "split" }),
+    initialState: (): NotePanelState => ({ noteId: null, view: DEFAULT_OPEN_IN }),
     restore(saved, context) {
       if (!isRecord(saved) || !VIEWS.includes(saved.view)) return null;
       const { noteId, view } = saved;

@@ -175,7 +175,7 @@ one carried onto a second line), a definition nothing cites, and `<Footnotes />`
 ## 6. Find, undo, switching
 
 - [ ] Cmd/Ctrl+F with a word selected in the Live tab opens the find bar with that word; matches are highlighted and **Next** scrolls to them; Escape returns the caret to the editor.
-- [ ] Cmd/Ctrl+\ and Cmd+Ctrl+Left/Right step Markdown → Preview → Split → Live → Markdown and put the caret back in the editor.
+- [ ] Cmd/Ctrl+\ and Cmd+Ctrl+Left/Right step Live → Markdown → Preview → Split → Live and put the caret back in the editor.
 - [ ] Switch tabs while typing: nothing typed is lost, and the Live tab shows what the Markdown tab shows.
 - [ ] Type a few words in Live, switch to Preview, then back to Live: Cmd/Ctrl+Z still undoes those words.
 - [ ] Type in Live, switch to Markdown and type there, then back to Live: Cmd/Ctrl+Z does nothing (Live's history started again), and the text is what the Markdown tab shows.
@@ -202,6 +202,26 @@ see [stress-databases.md](stress-databases.md)) and add a line with three highli
 - [ ] Scroll up through a long code block and back down: tags inside the code are never tinted; the text after the block is coloured as Markdown again.
 - [ ] Do the same on `LINES: 26,000 lines` (about 1,000,000 characters). (A note this long is not saved yet: stress-test finding 1. Look, don't keep.)
 - [ ] On the Markdown tab the same notes are left uncoloured past 100,000 characters, as before.
+
+## 9. Live as the default (Gate H)
+
+Gate H is the owner's: **a week of writing with Live as the default, in the desktop app** (Step 8 of the
+[live-default plan](../live-default-plan.md#step-8-make-live-the-default-s)). Start with the checks below on a scratch
+home, then write in your own notes for the week and note anything that sends you back to Markdown or Split.
+
+- [ ] On a fresh settings file (a scratch home), Settings → Writing → **Open notes in** shows **Live** chosen.
+- [ ] Pick a note in an empty panel: it opens on Live, and Live is the first of its tabs (Live, Markdown, Preview, Split).
+- [ ] Open a note to the side (its menu, or drag it to a panel's edge): the new panel starts on Live too.
+- [ ] Cmd/Ctrl+\ from Live goes to Markdown; Home on the focused tab goes to Live, End to Split.
+- [ ] Choose **Split** in Settings and go back: a note picked into an empty panel opens on Split, one opened beside on Markdown.
+  Quit and reopen the app: the setting is still Split.
+- [ ] A settings file written before this step, with `"openNotesIn": "split"` in its `writing`, still opens notes on
+  Split. (Saving Settings › Writing before Step 8 stored Split even if you never chose it: choose Live there to get the
+  new default.)
+- [ ] A saved panel layout comes back with each note panel on the tab it had, whatever the setting.
+- [ ] The terminal app (`pnpm --dir apps/cli dev`) still opens a note in Split.
+- [ ] The week of writing: new notes, long notes, notes with tables, code, MDX components and footnotes, all from Live.
+  Anything that made you switch tab is a finding for the plan.
 
 ## Known and accepted
 

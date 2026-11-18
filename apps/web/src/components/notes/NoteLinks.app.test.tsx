@@ -2,8 +2,13 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
+
+// These tests type into the Markdown tab's editor and read the preview beside it, so notes open in Split here; Live,
+// the default, has tests of its own.
+const OPEN_IN_SPLIT: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 // Every open note shows its Attachments below the editor; none of these tests are about them.
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -60,7 +65,7 @@ describe("following a note link in the preview", () => {
   afterEach(cleanup);
 
   function renderApp() {
-    render(<NotesApp initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
   }
 
   it("shows the linked note in the pane the link was in", () => {
@@ -113,7 +118,7 @@ describe("following a note link in Live", () => {
 
   /** Alpha, shown in its Live tab, and its drawn link to `href`. */
   function liveLink(href: string) {
-    render(<NotesApp initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
     const pane = screen.getByRole("region", { name: "Alpha" });
     fireEvent.click(within(pane).getByRole("tab", { name: "Live" }));
     const drawn = pane.querySelector<HTMLElement>(`.cm-live-link[data-href="${href}"]`);

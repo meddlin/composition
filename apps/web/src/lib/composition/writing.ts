@@ -48,8 +48,7 @@ export type WritingSettings = {
   headingRailSide: HeadingRailSide;
   /**
    * The view a note opens in when it gets a new pane or panel. A pane whose tab was changed keeps it when another note
-   * opens in it. Split by default for now; Live becomes the default once it draws everything Preview does (see
-   * docs/live-default-plan.md).
+   * opens in it. Live by default (docs/live-default-plan.md, D1); a view already saved is kept.
    */
   openNotesIn: NoteView;
 };
@@ -63,7 +62,7 @@ export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
   wordCountEnabled: false,
   headingRailEnabled: true,
   headingRailSide: "left",
-  openNotesIn: "split",
+  openNotesIn: "live",
 };
 
 /** Whether `value` is a whole number of columns the editor can use. */

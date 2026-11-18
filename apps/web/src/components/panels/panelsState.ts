@@ -1,4 +1,4 @@
-import { besideView, type PaneView } from "../notes/panes";
+import { besideView, DEFAULT_OPEN_IN, type PaneView } from "../notes/panes";
 import { KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfGoTo, type PdfPanelState } from "./kinds";
 import { launcherFor, type LauncherKind } from "./launchers";
 import {
@@ -180,7 +180,7 @@ function showNote(panels: PanelsState, panelId: PanelId, noteId: number, openIn:
  * the focused panel if that is a note or empty one, or else in the note panel used last, or else in a new note
  * panel to the right of the focused one.
  */
-export function openNote(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function openNote(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const window = panels.windows[windowId];
   if (!window) return panels;
 
@@ -210,7 +210,7 @@ export function openPdfPair(
   documentId: number,
   newId: () => PanelId,
   goTo?: PdfGoTo,
-  openIn: PaneView = "split",
+  openIn: PaneView = DEFAULT_OPEN_IN,
 ): PanelsState {
   const withNote = openNote(panels, windowId, noteId, newId, openIn);
   const window = withNote.windows[windowId];
@@ -269,7 +269,7 @@ function noteBeside(panels: PanelsState, panelId: PanelId, edge: Edge, noteId: n
  * The sidebar's "Open to the side": a new note panel to the right of the focused one, even if the note is open in
  * another, since it was asked for. Like picking a note when nothing is open, it takes a lone empty panel.
  */
-export function openNoteBeside(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function openNoteBeside(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const window = panels.windows[windowId];
   if (!window) return panels;
 
@@ -282,7 +282,7 @@ export function openNoteBeside(panels: PanelsState, windowId: WindowId, noteId: 
  * A note dropped on a panel: on its middle it fills an empty panel or replaces a note panel's note (a panel of
  * another kind can't show it, so nothing happens), and on a side it makes a new note panel there.
  */
-export function dropNote(panels: PanelsState, noteId: number, panelId: PanelId, zone: DropZone, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function dropNote(panels: PanelsState, noteId: number, panelId: PanelId, zone: DropZone, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const panel = panels.byId[panelId];
   if (!panel) return panels;
   if (zone !== "center") return noteBeside(panels, panelId, zone, noteId, newId, openIn);
@@ -293,7 +293,7 @@ export function dropNote(panels: PanelsState, noteId: number, panelId: PanelId, 
  * A note made from another one (an AI answer), opened to the right of the panel showing that other note, or, if
  * none does, the way "Open to the side" would.
  */
-export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, noteId: number, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const source = Object.values(panels.byId).find((panel) => noteIdOf(panel) === fromNoteId);
   if (source) return noteBeside(panels, source.id, "right", noteId, newId, openIn);
   return openNoteBeside(panels, MAIN_WINDOW, noteId, newId, openIn);
@@ -304,7 +304,7 @@ export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, note
  * focused (a link never makes a second panel for it); otherwise the note opens to the right of the panel, or, when
  * not asked to open beside, replaces the note in it.
  */
-export function openLinkedNote(panels: PanelsState, fromPanelId: PanelId, noteId: number, beside: boolean, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function openLinkedNote(panels: PanelsState, fromPanelId: PanelId, noteId: number, beside: boolean, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const windowId = windowOf(panels, fromPanelId);
   if (windowId === undefined) return panels;
 
@@ -392,7 +392,7 @@ export function setPdfFollow(panels: PanelsState, panelId: PanelId, follow: bool
  * Shows a note in the PDF panel's paired note panel and pins the PDF to it (what picking a note in the reader's Notes tab
  * does). With no panel showing the paired note, the note opens to the right of the PDF.
  */
-export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: number, newId: () => PanelId, openIn: PaneView = "split"): PanelsState {
+export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const windowId = windowOf(panels, panelId);
   const panel = panels.byId[panelId];
   if (windowId === undefined || !panel || panel.kind !== "pdf") return panels;
