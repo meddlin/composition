@@ -55,6 +55,15 @@ describe("extractHeadings", () => {
     }
   });
 
+  it("takes a thematic break, spaced or not, for the end of a list or a quote", () => {
+    for (const rule of ["***", "* * *", " _ _ _ ", "- - -", "-\t-\t-"]) {
+      const text = `- item\n${rule}\nAfter\n===`;
+      expect(extractHeadings(text), rule).toEqual([{ level: 1, label: "After", offset: text.indexOf("After") }]);
+    }
+    // Not a rule: two marks, mixed marks, or four spaces in front.
+    for (const line of ["**", "*-*", "    ***"]) expect(extractHeadings(`- item\n${line}\nAfter\n===`), line).toEqual([]);
+  });
+
   it("leaves a setext underline inside fenced code and the frontmatter alone", () => {
     const text = "---\ntitle: x\n---\n```\nnot\n---\n```\nBody\n===";
     expect(extractHeadings(text, text.indexOf("```"))).toEqual([{ level: 1, label: "Body", offset: text.indexOf("Body") }]);
