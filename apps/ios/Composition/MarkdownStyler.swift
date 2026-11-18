@@ -224,7 +224,15 @@ final class MarkdownStyler {
         guard isLive, let textView, let live, live.length == textView.textStorage.length else { return nil }
         let selection = textView.selectedRange
         let around = NSIntersectionRange(NSRange(location: max(0, selection.location - 1), length: selection.length + 2), NSRange(location: 0, length: live.length))
-        return live.decorations(in: around, selection: selection).links.first { $0.active && isLinkHere($0.href) }
+        if let link = live.decorations(in: around, selection: selection).links.first(where: { $0.active && isLinkHere($0.href) }) { return link }
+        // Step 6 (owner decision I6): a `<YouTube>` or `<Repo>` block the selection is in shows its source, and the same ↗ opens its address, after its tag.
+        guard LiveOverlay.revealsBlocks else { return nil }
+        for entry in blocks.entries(touching: selection) {
+            if let href = LiveBlockKinds.address(of: entry.block.block) {
+                return LiveDecorations.Link(range: entry.block.range, node: entry.block.range, href: href, active: true)
+            }
+        }
+        return nil
     }
 
     // MARK: Quick reads
@@ -314,6 +322,7 @@ final class MarkdownStyler {
             // that here neither they nor the rest of the look need it.
             let freshLive = wantsLive ? LiveModel(text: snapshot, extrasLimit: nil) : nil
             // The blocks drawn as pictures (Step 5), from the note read as the Preview reads it.
+            // Nil while the note is not valid MDX (Step 6): the blocks keep the pictures they have.
             let freshBlocks = wantsLive ? LiveBlock.blocks(of: snapshot) : []
             let dirty = known.map { fresh.differences(from: $0) } ?? [NSRange(location: 0, length: fresh.length)]
             let spent = ContinuousClock.now - started
@@ -326,7 +335,7 @@ final class MarkdownStyler {
                     // Highlights, `<Image />` tags and the frontmatter pair across blocks: what the quick reads had moved and what the full read says differ there.
                     if let freshLive, let current = self.live { dirty = Self.joined(dirty + freshLive.differences(from: current)) }
                     // The blocks found replace the ones the quick reads moved; those that changed are drawn again.
-                    if freshLive != nil { dirty = Self.joined(dirty + self.blocks.replace(with: freshBlocks, width: self.textWidth)) }
+                    if freshLive != nil, let freshBlocks { dirty = Self.joined(dirty + self.blocks.replace(with: freshBlocks, width: self.textWidth)) }
                     if known != nil, !dirty.isEmpty { self.measurements.corrections += 1 }
                     self.beginPuttingOn(fresh, live: freshLive, dirty: dirty)
                 }

@@ -134,7 +134,8 @@ enum LiveOverlay {
                 storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
                 continue
             }
-            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw] { storage.removeAttribute(key, range: lines) }
+            // What Steps 2 to 4 put on the lines goes too (a list or a link in a panel, a chart's CSV on a code fill: Step 6), so that the picture is all that is drawn.
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveCode, .liveList] + linkKeys { storage.removeAttribute(key, range: lines) }
             hide(lines, in: storage)
             let tall = NSMutableParagraphStyle()
             tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)

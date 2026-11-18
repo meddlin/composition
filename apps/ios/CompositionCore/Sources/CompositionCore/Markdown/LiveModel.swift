@@ -113,6 +113,13 @@ public struct LiveDecorations: Equatable, Sendable {
         public var href: String
         /// The selection touches it: its marks show, dimmed, and it can be followed with the ↗ beside it.
         public var active: Bool
+
+        public init(range: NSRange, node: NSRange, href: String, active: Bool) {
+            self.range = range
+            self.node = node
+            self.href = href
+            self.active = active
+        }
     }
 
     /// The start of each line of the frontmatter (it is drawn set apart, and never hidden).
