@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The keys Xcode cannot generate from INFOPLIST_KEY_ build settings; it merges this with the generated ones.
+	     Kept beside the project, not in the synchronized Composition folder, so it is not also copied in as a resource.
+	     NSAllowsArbitraryLoadsInWebContent: the Reading List's page view (ReadingPage.swift) may show plain http:// pages, as the
+	     desktop's does. It applies to web views only; the app's own connections keep App Transport Security's defaults. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

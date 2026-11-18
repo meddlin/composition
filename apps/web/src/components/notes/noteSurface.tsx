@@ -23,8 +23,8 @@ export function useNoteSurface(store: WorkspaceStore, _windowId?: string, _optio
   const { panes } = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   return {
     focusedNoteId: panes.focusedId,
-    openNote: (noteId) => store.updatePanes((prev) => openNote(prev, noteId)),
-    openNoteBeside: (noteId) => store.updatePanes((prev) => openNoteBeside(prev, noteId)),
+    openNote: (noteId) => store.updatePanes((prev) => openNote(prev, noteId, store.openNotesIn())),
+    openNoteBeside: (noteId) => store.updatePanes((prev) => openNoteBeside(prev, noteId, store.openNotesIn())),
     // The row's panes take drops themselves.
     dropNote: () => {},
     dialog: null,
@@ -42,7 +42,7 @@ export function NoteArea({ store, surface, layout, onCreateNote, onNewNoteFromTe
     if (!notes.some((n) => n.id === noteId)) return;
     store.flushSaves();
     store.updatePanes((prev) =>
-      beside ? dropNote(prev, noteId, fromId, "right") : openNote(focusPane(prev, fromId), noteId),
+      beside ? dropNote(prev, noteId, fromId, "right", store.openNotesIn()) : openNote(focusPane(prev, fromId), noteId, store.openNotesIn()),
     );
   }
 
@@ -62,7 +62,7 @@ export function NoteArea({ store, surface, layout, onCreateNote, onNewNoteFromTe
       onClose={(id) => store.updatePanes((prev) => closePane(prev, id))}
       onChange={store.editNote}
       onDropNote={(noteId: number, targetId: number, zone: DropZone) =>
-        store.updatePanes((prev) => dropNote(prev, noteId, targetId, zone))
+        store.updatePanes((prev) => dropNote(prev, noteId, targetId, zone, store.openNotesIn()))
       }
       onOpenNote={openLinkedNote}
       onNewNoteFromText={onNewNoteFromText}

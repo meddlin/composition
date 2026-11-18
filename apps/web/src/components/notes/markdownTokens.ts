@@ -90,19 +90,21 @@ function inline(line: string, out: Segment[]) {
  * textarea and any difference would put the colours out of line with the caret.
  *
  * This is deliberately not a full parse: it must run on every keystroke, so it
- * reads line by line, remembering only whether it is inside a code fence.
+ * reads line by line, remembering only whether it is inside a code fence. That
+ * also lets it start at any line: `from` says whether `text` is a note's start
+ * or a stretch from the middle of one, and which fence that stretch begins in.
  */
-export function tokenizeMarkdown(text: string): Segment[] {
+export function tokenizeMarkdown(text: string, from: TokenizeFrom = NOTE_START): Segment[] {
   const out: Segment[] = [];
   let pos = 0;
 
-  const frontmatter = FRONTMATTER.exec(text);
+  const frontmatter = from.frontmatter ? FRONTMATTER.exec(text) : null;
   if (frontmatter) {
     push(out, frontmatter[0], "frontmatter");
     pos = frontmatter[0].length;
   }
 
-  let fence: Fence | null = null;
+  let fence: Fence | null = from.fence;
   while (pos < text.length) {
     const newline = text.indexOf("\n", pos);
     const end = newline === -1 ? text.length : newline;
@@ -116,7 +118,25 @@ export function tokenizeMarkdown(text: string): Segment[] {
   return out;
 }
 
-type Fence = { char: string; length: number };
+/** The code fence a line is inside: its character (`` ` `` or `~`) and how many of them opened it. */
+export type Fence = { char: string; length: number };
+
+/**
+ * Where `tokenizeMarkdown` starts reading: at a note's start (the default), where a frontmatter block may open it, or
+ * at a line in the middle of one (the live editor reads only around what is on screen), where it may not and a code
+ * fence may already be open.
+ */
+export type TokenizeFrom = { frontmatter: boolean; fence: Fence | null };
+
+const NOTE_START: TokenizeFrom = { frontmatter: true, fence: null };
+
+/** The fence `line` opens, read as `tokenizeMarkdown` reads it, or null if it opens none. */
+export function fenceOpenedBy(line: string): Fence | null {
+  const open = FENCE_OPEN.exec(line);
+  // An info string can't hold a backtick; ```like this``` is inline code.
+  if (!open || (open[1][0] === "`" && open[2].includes("`"))) return null;
+  return { char: open[1][0], length: open[1].length };
+}
 
 /** Colours one line and returns the fence the next line is inside, if any. */
 function tokenizeLine(line: string, out: Segment[], fence: Fence | null): Fence | null {
@@ -130,11 +150,10 @@ function tokenizeLine(line: string, out: Segment[], fence: Fence | null): Fence 
     return fence;
   }
 
-  const open = FENCE_OPEN.exec(line);
-  // An info string can't hold a backtick; ```like this``` is inline code.
-  if (open && !(open[1][0] === "`" && open[2].includes("`"))) {
+  const opened = fenceOpenedBy(line);
+  if (opened) {
     push(out, line, "fence");
-    return { char: open[1][0], length: open[1].length };
+    return opened;
   }
   if (HEADING.test(line)) push(out, line, "heading");
   else if (isThematicBreak(line)) push(out, line, "rule");

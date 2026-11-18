@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { undoDepth } from "@codemirror/commands";
 import { EditorView } from "@codemirror/view";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -87,6 +88,32 @@ describe("LiveEditor", () => {
     editorIn(container).dispatch({ changes: { from: 3, insert: " two" } });
 
     expect(onChange).toHaveBeenCalledWith("one two");
+  });
+
+  it("keeps its undo history while hidden behind another tab, if the text did not change meanwhile", () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(<LiveEditor value="one" onChange={onChange} />);
+    editorIn(container).dispatch({ changes: { from: 3, insert: " two" }, userEvent: "input.type" });
+
+    rerender(<LiveEditor value="one two" onChange={onChange} active={false} />);
+    rerender(<LiveEditor value="one two" onChange={onChange} active />);
+
+    expect(undoDepth(editorIn(container).state)).toBe(1);
+  });
+
+  it("starts its undo history again when the text was changed while it was hidden", () => {
+    const onChange = vi.fn();
+    const { container, rerender } = render(<LiveEditor value="one" onChange={onChange} />);
+    editorIn(container).dispatch({ changes: { from: 3, insert: " two" }, userEvent: "input.type" });
+
+    rerender(<LiveEditor value="one two" onChange={onChange} active={false} />);
+    // Typed in the Markdown tab meanwhile.
+    rerender(<LiveEditor value="one two three" onChange={onChange} active={false} />);
+    rerender(<LiveEditor value="one two three" onChange={onChange} active />);
+
+    const view = editorIn(container);
+    expect(view.state.doc.toString()).toBe("one two three");
+    expect(undoDepth(view.state)).toBe(0);
   });
 
   it("refuses typing when read only", () => {

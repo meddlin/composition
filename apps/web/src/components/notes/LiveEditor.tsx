@@ -4,11 +4,17 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Annotation, Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, drawSelection, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
+import { LiveBlockHost, type LiveBlockContext } from "./liveBlockWidget";
+import { liveBlocks, revealBlocks } from "./liveBlocks";
+import { liveMdxBlocks } from "./liveMdx";
+import { noteLinksFacet } from "./liveLinks";
 import { liveMarkdown } from "./liveMarkdown";
 import { liveReflow } from "./liveReflow";
+import { liveRest } from "./liveRest";
+import { NO_NOTE_LINKS, type NoteLinks } from "./noteLinkActions";
 import { changedSpan } from "./reflowText";
 
 /** Marks a change that came from the note changing underneath the editor, which is not the user typing. */
@@ -106,6 +112,16 @@ type Props = {
   /** Told how many matches there are whenever that changes. */
   onFindCount?: (count: number) => void;
   "aria-label"?: string;
+  /**
+   * False while another of the note's tabs is showing and this editor is kept, hidden, so its undo history outlives a
+   * look at that tab. If the text changed meanwhile (typed in the Markdown tab, say), the history is cleared when it
+   * shows again: its steps were made against a text that is no longer there.
+   */
+  active?: boolean;
+  /** What tables and other blocks drawn whole need from the editor around them (see `LiveBlockContext`). */
+  blocks?: LiveBlockContext;
+  /** Which notes and PDFs exist, and how to open them, for the note's links (the preview's `NoteLinksProvider`). */
+  links?: NoteLinks;
 };
 
 const NO_OPTIONS: FindOptions = { matchCase: false, wholeWord: false };
@@ -128,12 +144,19 @@ export function LiveEditor({
   findCurrent = 0,
   onFindCount,
   "aria-label": label = "Markdown editor",
+  active = true,
+  blocks,
+  links = NO_NOTE_LINKS,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const readOnlyFacet = useRef(new Compartment());
   const attributesFacet = useRef(new Compartment());
   const reflowFacet = useRef(new Compartment());
+  const historyFacet = useRef(new Compartment());
+  const [blockHost] = useState(() => new LiveBlockHost());
+  useEffect(() => blockHost.set(blocks ?? {}), [blockHost, blocks]);
+  const linksFacet = useRef(new Compartment());
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
   const eventsRef = useRef(events);
@@ -143,20 +166,23 @@ export function LiveEditor({
     eventsRef.current = events;
     onViewRef.current = onView;
   });
-  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {}, reflow });
+  const initial = useRef({ value, readOnly, label, attributes: attributes ?? {}, reflow, links });
 
   useEffect(() => {
-    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes, reflow: initialReflow } = initial.current;
+    const { value: doc, readOnly: locked, label: ariaLabel, attributes: ariaAttributes, reflow: initialReflow, links: initialLinks } = initial.current;
     const editor = new EditorView({
       parent: host.current!,
       state: EditorState.create({
         doc,
         extensions: [
-          history(),
+          historyFacet.current.of(history()),
           drawSelection(),
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
           liveMarkdown,
+          liveBlocks(blockHost),
+          liveMdxBlocks,
+          liveRest,
           findHighlights,
           editorTheme,
           placeholder("Start writing in Markdown…"),
@@ -183,6 +209,7 @@ export function LiveEditor({
           readOnlyFacet.current.of(EditorState.readOnly.of(locked)),
           attributesFacet.current.of(contentAttributes(ariaLabel, ariaAttributes)),
           reflowFacet.current.of(reflowExtension(initialReflow)),
+          linksFacet.current.of(noteLinksFacet.of(initialLinks)),
           EditorView.updateListener.of((update) => {
             const typed = update.docChanged && !update.transactions.some((t) => t.annotation(fromNote));
             if (typed) {
@@ -204,7 +231,7 @@ export function LiveEditor({
       editor.destroy();
       view.current = null;
     };
-  }, []);
+  }, [blockHost]);
 
   const { enabled: reflowEnabled, column: reflowColumn, keepTables: reflowKeepsTables } = reflow;
   useEffect(() => {
@@ -217,6 +244,10 @@ export function LiveEditor({
   useEffect(() => {
     view.current?.dispatch({ effects: attributesFacet.current.reconfigure(contentAttributes(label, JSON.parse(attributesKey) as Attributes)) });
   }, [label, attributesKey]);
+
+  useEffect(() => {
+    view.current?.dispatch({ effects: linksFacet.current.reconfigure(noteLinksFacet.of(links)) });
+  }, [links]);
 
   useEffect(() => {
     view.current?.dispatch({ effects: readOnlyFacet.current.reconfigure(EditorState.readOnly.of(readOnly)) });
@@ -233,6 +264,23 @@ export function LiveEditor({
     editor.dispatch({ changes: { from: start, to: end, insert }, annotations: fromNote.of(true) });
   }, [value]);
 
+  // The text as it was when another tab took over; null while this one is showing.
+  const textWhenHidden = useRef<string | null>(null);
+  useEffect(() => {
+    const editor = view.current;
+    if (!editor) return;
+    if (!active) {
+      textWhenHidden.current = editor.state.doc.toString();
+      return;
+    }
+    const was = textWhenHidden.current;
+    textWhenHidden.current = null;
+    if (was === null || was === editor.state.doc.toString()) return;
+    // Taking the history out and putting it back starts it empty.
+    editor.dispatch({ effects: historyFacet.current.reconfigure([]) });
+    editor.dispatch({ effects: historyFacet.current.reconfigure(history()) });
+  }, [active]);
+
   const matches = useMemo(() => findMatches(value, findQuery, findOptions), [value, findQuery, findOptions]);
   useEffect(() => onFindCount?.(matches.length), [onFindCount, matches.length]);
 
@@ -248,6 +296,8 @@ export function LiveEditor({
     editor.dispatch({
       effects: [
         setFind.of({ matches, current: currentMatch }),
+        // A match in a table is shown in its source, so it can be seen and highlighted.
+        revealBlocks.of(currentMatch === -1 ? [] : [{ from: matches[currentMatch].start, to: matches[currentMatch].end }]),
         ...(scroll ? [EditorView.scrollIntoView(matches[currentMatch].start, { y: "center" })] : []),
       ],
     });

@@ -201,7 +201,8 @@ desktop restores on the iPad and the reverse, **favorites included**; every M1 r
 
 **Decided 2026-11-12 (you), designed the same day with you.** The scheme no longer asks where the sun is. The person sets by hand the
 hours at which the app moves from step to step of the blend, on every platform that has it (web, desktop, the CLI and the iPad now; the Windows and Linux
-ports when they come). The saved city, the lookup and every network request are gone, so the iPad app has no network use at all.
+ports when they come). The saved city, the lookup and every network request are gone, so the iPad app has no network use at all
+(until the Reading List, 2026-11-13, which loads the pages the person opens, and only while that plugin is on).
 
 **What was agreed (you, 2026-11-12):**
 
@@ -241,6 +242,37 @@ level over them and the wall clock in fourteen zones; `sunConformance.test.ts` w
 say they port the hours, not `sunTimes.ts`.
 
 **Status: done 2026-11-12** (design agreed with you, then built the same day on the web, desktop, CLI and iPad; Simulator only on the iPad, so manual items 172 to 177 and the App Store Connect answers are yours). See [the design's log](ipad-app-design.md). The Windows and Linux ports follow later.
+
+## Ahead of M3: the Reading List
+
+**Asked for by you on 2026-11-13, and built the same day (Simulator only).** The first of the desktop's plugins on the iPad, and the
+cheapest ([C6](ipad-app-design.md#compromise-register)); **To-do waits until sync works** (you, the same day). The desktop's plan and
+decisions are [reading-list-plan.md](reading-list-plan.md); this is how the iPad keeps them.
+
+| Desktop | iPad |
+|---|---|
+| Settings ▸ Plugins, off until ticked | More ▸ *Plugins…*, off until switched on. The same `plugins["reading-list"]` key in `settings.json`, so a backup carries the choice both ways |
+| A panel kind: links on the left, the page on the right, a divider | A **Reading List** row in the sidebar (with the unread count) while the plugin is on; the links in the second column, the page in the third, as Mail does it. No panels on the iPad ([C5](ipad-app-design.md#compromise-register)) |
+| Paste a link and press Enter | The same box (a refused link stays in it with the reason under it), the system Paste button, and a link dragged in from Safari onto the list or the sidebar row |
+| Row menu: Open in browser, Copy link, Mark read, Delete (asks first) | Swipe right to mark read or unread, swipe left to delete (asks first); the context menu has Open in Safari, Copy Link, Share, Mark as Read, Delete |
+| Toolbar: Back, Forward, Reload, address, Open in browser, Mark read | The same in the navigation bar, plus Share; the address under it with the load's progress; ⌘R reloads |
+| `<webview>` in the `persist:reading-list` partition, no preload, every permission denied, new windows to the browser, no downloads | `WKWebView` with its own persistent `WKWebsiteDataStore(forIdentifier:)`, no script message handlers, only `http:` and `https:` in the main frame, a new window opened in Safari, camera, microphone and motion refused, a file to download shown as a reason with Open in Safari |
+| Clear browsing data (asks first) | More ▸ *Plugins…* ▸ *Clear Browsing Data…* (asks first) |
+| The page's title names the link once | The same, from the web view's `title` |
+
+**The rules are the desktop's, checked against its code.** `ReadingLinks`, `WebAddress` and `ReadingListStore` (in
+`CompositionCore/ReadingList`) replay `fixtures/conformance/reading-list.json`, which the desktop's `readingListConformance.test.ts`
+writes from the real `readingList.ts`, `webSettings.ts` and `readingListService.ts`. A link is stored as the exact string the desktop would
+store, so the same link is the same row on both. `WebAddress` is the part of the WHATWG URL Standard that `new URL()` gives the desktop;
+an international host name goes through Foundation's IDNA, which matched Node on every name in the corpus.
+
+**Plain `http:` pages** load through `NSAllowsArbitraryLoadsInWebContent` in `apps/ios/Composition-Info.plist` (merged with the generated
+Info.plist; it covers web views only, not the app's own connections).
+
+**Checked:** the Swift tests; `ReadingListUITests` (two tests, in an iPad Simulator, against a web server inside the test). **Yours:**
+manual items 323 to 336 in [manual-tests/ipad.md](manual-tests/ipad.md), on the iPad with real sites. **Not built:** a share-sheet
+extension to add a link from Safari's Share button (the desktop has no such thing either; it needs an app group so the extension can reach
+the database), importing links from a note, reader mode.
 
 ## Risks
 

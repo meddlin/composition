@@ -20,8 +20,9 @@ type Props = {
 const markdownComponents = { ...imageComponents, a: NoteAnchor };
 const noteComponents = { ...markdownComponents, ...mdxComponentsByKey };
 
-// remarkHeadings goes after remarkRestrictMdx, whose renamed tags it looks for.
-const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"]> => [
+// remarkHeadings goes after remarkRestrictMdx, whose renamed tags it looks for. Exported for the Live tab, which
+// checks a component block parses (`liveMdx.ts`) before drawing it.
+export const mdxRemarkPlugins = (idPrefix: string): NonNullable<Options["remarkPlugins"]> => [
   remarkGfm,
   remarkMdx,
   // A note is Markdown first: keep its indented code as code.

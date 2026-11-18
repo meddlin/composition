@@ -20,7 +20,8 @@ export const HEADINGS_PROP = "headings";
 
 const plainText = (node: Node): string => node.value ?? node.alt ?? node.children?.map(plainText).join("") ?? "";
 
-const slugify = (text: string) =>
+/** A heading's id, before the preview's prefix and any `-1` for a repeat. */
+export const slugify = (text: string) =>
   text
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s-]/gu, "")

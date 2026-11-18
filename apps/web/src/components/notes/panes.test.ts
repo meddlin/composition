@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  besideView,
   closePane,
   dragPaneSizes,
   dropNote,
@@ -30,12 +31,32 @@ function withViews(base: PaneState, ...views: PaneView[]): PaneState {
 }
 
 describe("initialPanes", () => {
-  it("opens the given note in one pane", () => {
-    expect(initialPanes(4)).toEqual({ panes: [{ noteId: 4, size: 1, view: "split" }], focusedId: 4 });
+  it("opens the given note in one pane, in Live unless told otherwise", () => {
+    expect(initialPanes(4)).toEqual({ panes: [{ noteId: 4, size: 1, view: "live" }], focusedId: 4 });
   });
 
   it("starts empty without a note", () => {
     expect(initialPanes(null)).toEqual({ panes: [], focusedId: null });
+  });
+});
+
+describe("the view notes open in", () => {
+  it("is the first pane's view", () => {
+    expect(initialPanes(4, "live").panes[0].view).toBe("live");
+    expect(openNote(initialPanes(null), 4, "preview").panes[0].view).toBe("preview");
+  });
+
+  it("is a pane beside's view, but Split opens beside on the editor tab, as each pane has only a share of the row", () => {
+    expect(besideView("split")).toBe("markdown");
+    expect(besideView("live")).toBe("live");
+    expect(viewOf(openNoteBeside(state([1]), 2, "live"), 2)).toBe("live");
+    expect(viewOf(dropNote(state([1]), 2, 1, "left", "preview"), 2)).toBe("preview");
+    expect(viewOf(dropNote(state([1]), 2, 1, "right", "split"), 2)).toBe("markdown");
+    expect(viewOf(dropNote(state([1]), 2, 1, "right"), 2)).toBe("live");
+  });
+
+  it("does not change the view of a pane another note opens in", () => {
+    expect(viewOf(openNote(withViews(state([1]), "preview"), 2, "live"), 2)).toBe("preview");
   });
 });
 
@@ -73,7 +94,7 @@ describe("shownView", () => {
 });
 
 describe("stepView", () => {
-  it("steps through Markdown, Preview, Split and Live, then wraps", () => {
+  it("steps through Live, Markdown, Preview and Split, then wraps", () => {
     expect(stepView("markdown", true, 1)).toBe("preview");
     expect(stepView("preview", true, 1)).toBe("split");
     expect(stepView("split", true, 1)).toBe("live");
@@ -166,8 +187,8 @@ describe("closePane", () => {
 });
 
 describe("openNoteBeside", () => {
-  it("opens the note in a new editor pane to the right of the focused one", () => {
-    const next = openNoteBeside(state([1, 2], 1), 3);
+  it("opens the note in a new editor pane to the right of the focused one, where notes open in Split", () => {
+    const next = openNoteBeside(state([1, 2], 1), 3, "split");
     expect(ids(next)).toEqual([1, 3, 2]);
     expect(viewOf(next, 3)).toBe("markdown");
     expect(next.focusedId).toBe(3);
@@ -195,7 +216,7 @@ describe("openNoteBeside", () => {
 
 describe("dropNote beside a pane", () => {
   it("opens a new pane to the right, splitting the target's width", () => {
-    const next = dropNote(state([1, 2]), 3, 1, "right");
+    const next = dropNote(state([1, 2]), 3, 1, "right", "split");
     expect(next.panes).toEqual([
       { noteId: 1, size: 0.5, view: "split" },
       { noteId: 3, size: 0.5, view: "markdown" },
@@ -215,8 +236,8 @@ describe("dropNote beside a pane", () => {
     expect(next.focusedId).toBe(1);
   });
 
-  it("opens a new pane on the editor, whatever the target pane shows", () => {
-    const next = dropNote(withViews(state([1, 2]), "preview", "preview"), 3, 1, "right");
+  it("opens a new pane on the editor where notes open in Split, whatever the target pane shows", () => {
+    const next = dropNote(withViews(state([1, 2]), "preview", "preview"), 3, 1, "right", "split");
     expect(viewOf(next, 3)).toBe("markdown");
   });
 
