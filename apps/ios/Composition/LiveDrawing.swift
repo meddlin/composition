@@ -132,7 +132,10 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
                 .draw(in: CGRect(x: rect.minX, y: rect.minY + 2, width: rect.width, height: rect.height))
             return
         }
-        let scale = textLayoutManager?.textContainer.map { _ in UIScreen.main.scale } ?? 2
+        // Pixels per point of what is being drawn into: the screen the text view is on now (the iPhone Duo's two screens, an external display), not
+        // the device's main screen.
+        let toDevice = context.userSpaceToDeviceSpaceTransform
+        let scale = max(hypot(toDevice.a, toDevice.b), 1)
         if let image = LiveImages.shared.thumbnail(at: picture.url, maxPixel: Int(max(rect.width, rect.height) * scale)) {
             image.draw(in: rect)
         } else {
