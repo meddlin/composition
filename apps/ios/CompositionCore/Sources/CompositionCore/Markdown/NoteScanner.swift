@@ -98,15 +98,41 @@ public struct ScannedNote: Sendable {
         }
     }
 
-    /// Where `range` (UTF-16 units of the text of `blocks[block]`, a run of Markdown) is in the note. Nil for a component.
+    /// Where `range` (UTF-16 units of the text of `blocks[block]`, a run of Markdown) is in the note. Nil for a component. To locate many places in one run, make
+    /// its `RunLocator` once (`locator(ofRun:text:)`): this makes one for each call.
     func noteRange(ofRun block: Int, text: String, _ range: Range<Int>) -> NSRange? {
+        locator(ofRun: block, text: text)?.noteRange(range)
+    }
+
+    /// What turns places in the text of `blocks[block]` (a run of Markdown) into places in the note, made once for the run: its scalars' UTF-16 offsets are read
+    /// once, not once for each of its blocks (a run of thousands of blocks was quadratic, found in Step 6 on a long note).
+    func locator(ofRun block: Int, text: String) -> RunLocator? {
         guard block < runPieces.count, !runPieces[block].isEmpty else { return nil }
-        let pieces = runPieces[block]
-        // UTF-16 offsets of the run's text to its scalars.
-        var utf16: [Int] = [0]
-        utf16.reserveCapacity(text.unicodeScalars.count + 1)
-        for scalar in text.unicodeScalars { utf16.append(utf16[utf16.count - 1] + (scalar.value > 0xFFFF ? 2 : 1)) }
-        func scalar(at offset: Int) -> Int {
+        return RunLocator(pieces: runPieces[block], text: text, index: index)
+    }
+
+    struct RunLocator {
+        let pieces: [Range<Int>]
+        let index: SourceIndex
+        /// UTF-16 offsets of the run's text to its scalars.
+        private let utf16: [Int]
+        /// How many scalars of the run come before each piece.
+        private let before: [Int]
+
+        init(pieces: [Range<Int>], text: String, index: SourceIndex) {
+            self.pieces = pieces
+            self.index = index
+            var utf16: [Int] = [0]
+            utf16.reserveCapacity(text.utf16.count + 1)
+            for scalar in text.unicodeScalars { utf16.append(utf16[utf16.count - 1] + (scalar.value > 0xFFFF ? 2 : 1)) }
+            self.utf16 = utf16
+            var before: [Int] = []
+            var count = 0
+            for piece in pieces { before.append(count); count += piece.count }
+            self.before = before
+        }
+
+        private func scalar(at offset: Int) -> Int {
             var low = 0, high = utf16.count - 1
             while low < high {
                 let middle = (low + high + 1) / 2
@@ -114,19 +140,27 @@ public struct ScannedNote: Sendable {
             }
             return low
         }
+
         /// A scalar of the run's text as a scalar of the scanned text; an end that falls where one piece stops and the next starts belongs to the first.
-        func source(_ k: Int, end: Bool) -> Int {
-            var before = 0
-            for piece in pieces {
-                let count = piece.count
-                if k < before + count || (end && k == before + count) { return piece.lowerBound + (k - before) }
-                before += count
+        private func source(_ k: Int, end: Bool) -> Int {
+            // The first piece that holds k (or ends at it, for an end): the last piece starting at or before k, stepped back for an end on a boundary.
+            var low = 0, high = pieces.count - 1
+            while low < high {
+                let middle = (low + high + 1) / 2
+                if before[middle] <= k { low = middle } else { high = middle - 1 }
             }
+            // An end on a boundary belongs to the piece before it (the first piece it is the end of, as the scan of every piece in order had it).
+            while end, low > 0, k <= before[low] { low -= 1 }
+            let piece = pieces[low]
+            if k - before[low] <= piece.count { return piece.lowerBound + (k - before[low]) }
             return pieces[pieces.count - 1].upperBound
         }
-        let start = index.utf16(source(scalar(at: range.lowerBound), end: false))
-        let stop = index.utf16(source(scalar(at: range.upperBound), end: true))
-        return NSRange(location: start, length: max(0, stop - start))
+
+        func noteRange(_ range: Range<Int>) -> NSRange {
+            let start = index.utf16(source(scalar(at: range.lowerBound), end: false))
+            let stop = index.utf16(source(scalar(at: range.upperBound), end: true))
+            return NSRange(location: start, length: max(0, stop - start))
+        }
     }
 }
 

@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Steps 1 to 5 and 7 are built (each step's status is under it).
+[Decisions](#decisions)). Steps 1 to 7 are built (each step's status is under it).
 
 ## Goal and rule
 
@@ -403,7 +403,56 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
   draws those same blocks, so it inherits that check. A UI test opens the preview showcase in Live and checks, from
   the report, that every `PreviewBlock` kind the Preview shows has a drawn block in Live.
 - **Gate LD6 (iPad):** items 359 to 362 (the showcase note in Live beside the Preview, every scheme; a chart at the
-  largest text size; the actions).
+  largest text size; the actions; typing a component, and VoiceOver).
+
+**Status: built 2026-11-18** (branch `claude/ipad-live-step6-components`, on this plan's branch with Steps 1 to 5). Gate LD6 is the owner's.
+
+- **Which blocks:** `LiveBlockKinds.kind(of:)` names `info`, `warning`, `chart`, `youtube`, `repo`, `mark` (a block
+  `<Mark>`) and `notice`, beside Step 5's `table`; `mayHold` is now "a `|` or a `<`". `<Image>`, `<Ink>` and
+  `<Drawio>` stay with the picture layer (Step 1), which already draws them at the Preview's size; `<Toc />` and the
+  footnotes are Step 7's. Everything else (hiding, D3's reveal, the cache, a tap to the block's start, VoiceOver's
+  silenced marks, the report) is Step 5's, unchanged. A hidden block now also drops what Steps 2 to 4 put on its lines
+  (a code block's fill inside a `<Chart>`, a list's lines inside a panel, a link's attributes), so the picture is the
+  only thing drawn there.
+- **`<Chart>` in `ImageRenderer`:** Swift Charts draws in the picture, static (an `ImageRenderer` snapshot has no
+  animation), as Step 5's spike found; checked again with a bar chart and the showcase's line and pie.
+- **Actions (I6):** a tap on a drawn component edits (Step 5's tap to its start). While the selection is in a
+  `<YouTube>` or `<Repo>` block, `MarkdownStyler.activeLink()` gives `LiveLinks` the block as a link (`node` = the
+  block's source, `href` = `LiveBlockKinds.address(of:)`: the video's youtube.com address or the repository's, as the
+  Preview's cards open), so Step 2's ↗ sits after the tag and opens it through `LinkFollower`. ⌘-tap follows only a
+  link's words, not a card. A drawing is still edited in the Preview.
+- **Not valid MDX:** `LiveBlock.blocks(of:)` returns nil when `NotePreview.error` is set, and the pause pass then
+  leaves the blocks as they are: they keep their last good pictures, moved with the edits as between any two passes,
+  and the Live tab shows no notice; the Preview keeps its own. A component typed while the note is not valid is drawn
+  once it is.
+- **Speed (found here):** `NotePreview.located` was quadratic in the number of blocks in a run of Markdown
+  (`noteRange(ofRun:)` re-read the whole run for each block): 96 s for a 500,000-character note of 8,000 blocks in a
+  Debug build. With `mayHold` now true for any note with a `<` (every `<Mark>`), that would have been every long note's
+  pause pass. `ScannedNote.RunLocator` reads a run once: 0.5 s for the same note, linear (a new `BlockRangeTests`
+  case keeps it so).
+- **Preview probe:** with `-liveReport 1` the Preview has an element `preview-blocks` naming the kinds of block it
+  draws (from its own `PreviewBlock`s), for the showcase test.
+
+**Simulator** (`LiveComponentsUITests`, own Simulator, `-parallel-testing-enabled NO`, the Mac's load average 15 to
+300): all seven pass. The showcase opened in the Preview says it draws `toc, markdown, info, warning, image, chart,
+repo, youtube, notice, table, footnotes` (`preview-blocks`); in Live every one has its drawn block from its first line
+(`block-<kind>` with `draw-block`), the pictures through the picture layer, and `toc` and `footnotes` are reported as
+Step 7's. A note with each component (both panels, a block `<Mark>`, a bar chart, a video, a repository, a notice) has
+each drawn as one picture with every character hidden. An `<Info>` panel's fill (the brand at 12% over the page) and
+its bar of the brand are on screen in Dark and in Light, and not in the Markdown tab. The ↗ is beside a video's tag
+with its youtube.com address while the caret is in it, goes when the caret leaves, and beside a repository's tag (the
+caret put there by a tap on its picture) opens Safari. Typing ` an <Mark>open` leaves the panel drawn with its picture
+for three seconds of passes, with no notice in Live, and closing the tag leaves it drawn. The 16 ms budget on the
+showcase, now with its panels, charts and cards drawn (`LiveBench`, Debug): styler p95 1.6 ms, whole keystroke p95
+7.9 ms, 1 of 200 over 16 ms. The existing Live tests (`LiveBlockUITests`, `LiveUITests`, `LiveLinksUITests`,
+`LiveCodeUITests`, `LiveListsUITests`, `LiveDrawingsUITests`, `AccessibilityUITests`) with the new ones, 92 in one
+run: 90 passed. `AccessibilityUITests.testTheListOfStoredImages` lost the restore's alert and passed alone;
+`LiveDrawingsUITests.testADiagramIsDrawnAtHalfItsPixels` fails alone too, and fails the same way on the plan branch
+without Step 6 (the first diagram is drawn revealed, as if the caret opened on its line): not this step's.
+
+Found on the way, not changed here: arrowing up or down into a component's tag can stop in its name (`<Yo|uTube`),
+where the `<` list (`EditorAssist`) opens and takes ↑ and ↓ until Escape. It is the typing aid's, in both tabs, and is
+more likely in Live now that whole components reveal under the caret.
 
 ### Step 7: the rest (M)
 

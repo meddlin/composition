@@ -173,7 +173,11 @@ enum LiveOverlay {
                 storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
                 continue
             }
-            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveFootnoteRef, .kern] { storage.removeAttribute(key, range: lines) }
+            // What Steps 2 to 4 put on the lines goes too (a list or a link in a panel, a chart's CSV on a code fill: Step 6), and Step 7's footnote numbers (`linkKeys`
+            // holds `.kern`), so that the picture is all that is drawn.
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveCode, .liveList, .liveFootnoteRef] + linkKeys {
+                storage.removeAttribute(key, range: lines)
+            }
             if entry.block.kind == LiveBlockKinds.frontmatter {
                 // The frontmatter keeps its own font, in no colour (`.liveConcealed`), rather than the hidden marks' half-point one: it is the top of the note, and Xcode's
                 // accessibility audit reads the text there and says a half-point font does not grow with Dynamic Type. Its lines are as flat as any block's.

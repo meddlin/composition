@@ -2,8 +2,8 @@ import CompositionCore
 import SwiftUI
 import UIKit
 
-// The block layer of the Live tab (docs/ipad-live-default-plan.md, Step 5). A block (a table now; components, `<Toc />`, footnotes and the frontmatter's header in Steps 6
-// and 7) is "this range of the note's text, drawn as this `PreviewBlock`": the range and the block come from the whole-note `NotePreview` the styler makes in its pause
+// The block layer of the Live tab (docs/ipad-live-default-plan.md, Step 5). A block (a table, and the components of Step 6; `<Toc />`, footnotes and the frontmatter's
+// header in Step 7) is "this range of the note's text, drawn as this `PreviewBlock`": the range and the block come from the whole-note `NotePreview` the styler makes in its pause
 // pass, off the main thread, as the Preview makes its own (`LivePreview`); the picture is the Preview's own SwiftUI view for that block (`PreviewBlockView`), rendered by
 // `ImageRenderer`. Away from the selection every character of the block is hidden, its first paragraph is made as tall as the picture and the picture drawn there
 // (`LiveDrawing.Kind.block`); while the selection is in it (decision D3) its source shows, with the last good picture under it (`.blockAfter`), redrawn after the pause.
@@ -18,7 +18,14 @@ enum LiveBlockKinds {
         case .markdown(let blocks):
             guard blocks.count == 1, case .table = blocks[0] else { return nil }
             return "table"
-        // Step 6: .panel, .chart, .repo, .youtube, .highlight, .notice (and .image for a component the picture layer does not draw).
+        // Step 6: the components, each the Preview's own view of it (its children drawn inside a panel or a block `<Mark>`). `<Image>`, `<Ink>` and `<Drawio>` are not
+        // here: the picture layer (`LiveScan`, Step 1) already draws them where their tag is, at the Preview's size.
+        case .panel(let tone, _): return tone == .info ? "info" : "warning"
+        case .chart: return "chart"
+        case .youtube: return "youtube"
+        case .repo: return "repo"
+        case .highlight: return "mark"
+        case .notice: return "notice"
         // Step 7: `<Toc />`, and `<Footnotes />` or a run of footnote definitions (`NotePreview.footnoteDefinitions`), both drawn as the Preview's list.
         case .toc: return "toc"
         case .footnotes: return "footnotes"
@@ -27,16 +34,26 @@ enum LiveBlockKinds {
         }
     }
 
+    /// Where a block's ↗ goes while the selection is in it (owner decision I6): a `<YouTube>` video on youtube.com, a `<Repo>` at its address, the same places the
+    /// Preview's cards open. Nil for every other block, which a tap only edits.
+    static func address(of block: PreviewBlock) -> String? {
+        switch block {
+        case .youtube(let ref, _): return ref.watchURL
+        case .repo(let ref, _): return ref.href
+        default: return nil
+        }
+    }
+
     /// Whether the block is drawn at its own width, as the Preview's sideways scroll view lets a table be (and offered the text's width only when it is wider), rather
     /// than across the text's width, as a panel or a chart is.
     static func sizesToContent(_ block: PreviewBlock) -> Bool { kind(of: block) == "table" }
 
-    /// Whether a note may hold a block that is drawn, so that a note that cannot is not read a second time in the pause (a table needs a pipe; Step 7's need `<Toc`,
-    /// `<Footnotes`, a footnote's `[^` or a frontmatter).
+    /// Whether a note may hold a block that is drawn, so that a note that cannot is not read a second time in the pause (a table needs a pipe, a component a `<`;
+    /// Step 7's need `<Toc`, `<Footnotes`, a footnote's `[^` or a frontmatter).
     static func mayHold(_ text: String) -> Bool { mayHoldInBody(text) || text.hasPrefix("---") || text.hasPrefix("\u{FEFF}---") }
 
     /// Whether the note's body may hold a block, so that the note is read as the Preview reads it (a note with only a frontmatter, which most have, is not).
-    static func mayHoldInBody(_ text: String) -> Bool { text.contains("|") || text.contains("<Toc") || text.contains("<Footnotes") || text.contains("[^") }
+    static func mayHoldInBody(_ text: String) -> Bool { text.contains("|") || text.contains("<") || text.contains("[^") }
 
     /// The frontmatter's header (Step 7, D5): drawn in place of the YAML away from the caret, and while the caret is in it only the YAML shows, with no picture under it.
     static let frontmatter = "frontmatter"
@@ -54,8 +71,10 @@ struct LiveBlock: Sendable {
     /// The frontmatter's header (Step 7): what `NoteReader` shows above the body, drawn in place of the YAML. `block` is then an empty `.markdown([])`.
     var header: LiveHeader? = nil
 
-    /// The blocks of a note that are drawn, from its preview (`NotePreview.located`); made off the main thread, in the pause pass.
-    static func blocks(of text: String) -> [LiveBlock] {
+    /// The blocks of a note that are drawn, from its preview (`NotePreview.located`); made off the main thread, in the pause pass. Nil while the note is not valid MDX
+    /// (Step 6): the Preview then draws it as plain Markdown under its notice, and the Live tab keeps the pictures it last drew, with no notice of its own, until the
+    /// note is valid again (a tag half typed should not un-draw every panel and chart in the note).
+    static func blocks(of text: String) -> [LiveBlock]? {
         guard LiveBlockKinds.mayHold(text) else { return [] }
         let whole = text as NSString
         var found: [LiveBlock] = []
@@ -65,6 +84,7 @@ struct LiveBlock: Sendable {
         }
         guard LiveBlockKinds.mayHoldInBody(text) else { return found }
         let preview = NotePreview.make(content: text)
+        guard preview.error == nil else { return nil }
         found += preview.located.compactMap { located in
             guard let kind = LiveBlockKinds.kind(of: located.block), NSMaxRange(located.range) <= whole.length else { return nil }
             return LiveBlock(range: located.range, block: located.block, kind: kind, source: whole.substring(with: located.range))
