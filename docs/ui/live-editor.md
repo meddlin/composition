@@ -2,7 +2,13 @@
 
 Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveMarkdown.ts`](../../apps/web/src/components/notes/liveMarkdown.ts),
+[`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts),
+[`liveLists.ts`](../../apps/web/src/components/notes/liveLists.ts),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
+[`liveBlocks.ts`](../../apps/web/src/components/notes/liveBlocks.ts),
+[`liveBlockWidget.tsx`](../../apps/web/src/components/notes/liveBlockWidget.tsx),
+[`liveMdx.ts`](../../apps/web/src/components/notes/liveMdx.ts),
+[`liveRest.ts`](../../apps/web/src/components/notes/liveRest.ts) (setext headings, footnotes, `<Toc>`, the frontmatter card),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
 [`editorSurface.ts`](../../apps/web/src/components/notes/editorSurface.ts),
@@ -10,9 +16,16 @@ Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 Plan and decisions: [live-editor-parity-plan.md](../live-editor-parity-plan.md). Checking it by hand:
 [manual-tests/live-editor.md](../manual-tests/live-editor.md).
 
-A fourth tab beside **Markdown**, **Preview** and **Split**: the editor and the preview in one place. It is
-the same Markdown source, character for character (switch to the Markdown tab and it is what you typed), drawn as
-it will read, with the syntax showing only where the caret is. The other three tabs are unchanged.
+The view a note opens in, and the first of its four tabs (**Live**, **Markdown**, **Preview**, **Split**): the editor
+and the preview in one place. It is the same Markdown source, character for character (switch to the Markdown tab and
+it is what you typed), drawn as it will read, with the syntax showing only where the caret is. The other three tabs are
+unchanged and a click or Ctrl/Cmd+\ away.
+
+Notes open in Live unless **Settings › Writing › Open notes in** says otherwise (Live, Markdown, Preview or Split);
+the setting decides the tab of a **new** pane or panel only, and a view chosen there before Live became the default
+is kept. Live is the default since Step 8 of the [live-default plan](../live-default-plan.md#step-8-make-live-the-default-s)
+(decisions D1 and D6). The terminal app has no Live tab and still opens notes in Split; the iPad keeps its own setting
+and plan (D8).
 
 ## What it does
 
@@ -21,6 +34,8 @@ it will read, with the syntax showing only where the caret is. The other three t
   and the marks stay while you are at the end of it; type a space and start the next word, and "some text" turns
   bold. A mark with no partner yet (`**some text`) is left alone.
 - **Headings** are drawn large with their `# ` hidden, and the `#` comes back while the caret is on the heading's line.
+  A setext heading (a line underlined with `===` or `---`) is drawn the same, its underline hidden. See
+  [Setext headings, footnotes, `<Toc>` and the frontmatter](#setext-headings-footnotes-toc-and-the-frontmatter).
 - **Highlights** (`<Mark color="…">`, from the [highlight menu](text-highlighting.md)) are drawn tinted with their
   tags hidden, and the tags come back while the caret or a selection is anywhere from the opening tag to the closing
   one. A tag with no partner, one in code or in frontmatter, and one that runs over a line break are left showing.
@@ -31,13 +46,214 @@ it will read, with the syntax showing only where the caret is. The other three t
   loaded shows "Image not found: alt" in place of the text (beside the text, while the caret is on it, it is left out).
   Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
 - **Drawings** (`<Ink src="…" />`, from the iPad) are drawn the same way: in place of the tag, from the strokes the stored PNG carries, in the colour scheme in force
-  (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is still left as written.
-- **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
-- Everything else (links, lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
+  (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is a block: see [MDX components](#mdx-components).
+- **Links** (`[text](url "title")`) are drawn as their text, underlined in the link colour, with `[` and
+  `](url "title")` hidden; hover one to see its address (and title) as a tooltip. While the caret or a selection is
+  in a link its source shows, the brackets dimmed, so its text and its address are edited like any Markdown.
+  Reference links (`[text][label]`, `[label]`) are drawn the same way when the note defines the label. Autolinks
+  (`<https://…>`, the brackets hidden) and bare addresses (`https://…`, `www.…`) are drawn as links too. A
+  `note:` link to a note that no longer exists, and a `pdf:` link to a PDF that is not on this device (every PDF
+  link, in the web app), are struck through and muted, as in Preview, and go nowhere. See
+  [Following a link](#following-a-link).
+- **Lists, task lists and quotes**: see [below](#lists-task-lists-and-quotes).
+- **Code blocks** (fenced and indented) are drawn as Preview draws them: on the block background, in the code
+  font, with rounded corners, and coloured by language with Preview's highlighter (`lowlight`) and Preview's colours.
+  See [Code blocks](#code-blocks).
+- **Tables** (GFM) are drawn as Preview draws them: the same markup and `prose` styles, column alignment included.
+  See [Blocks](#blocks) below.
+- **MDX components** (`<Info>`, `<Warning>`, `<Drawio>`, `<Chart>`, `<Repo>`, `<Sheet>`, `<YouTube>`) are drawn by
+  Preview's own code, Edit buttons included. See [MDX components](#mdx-components).
+- **Frontmatter** is drawn as Preview's card (title, description, tags, dates) away from the caret, and as its YAML,
+  in a small monospaced face, while the caret is in it. It is not read as Markdown (its closing `---` is not a heading).
+- **Footnotes** (`[^1]`) are drawn as raised numbers, and `<Toc />` and `<Footnotes />` as Preview draws them.
+- **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
+- Everything else (a component or a table inside a list or a quote) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
+
+### Lists, task lists and quotes
+
+Built in Step 4 of the [live-default plan](../live-default-plan.md#step-4-lists-task-lists-quotes-m)
+([`liveLists.ts`](../../apps/web/src/components/notes/liveLists.ts)). Each is a line or inline decoration, worked out
+for what is on screen, and the reveal rule is per line: on the line the caret (or a selection) is on, the marks are
+shown as written; the line keeps its indent, so only its text shifts a little while the marks show.
+
+- **Bullet lists**: the `-`, `*` or `+` and the indentation before it are drawn as a bullet, the same disc at every
+  level as in Preview. Each level is indented 2em, as Preview's `prose` indents it, and a long item's wrapped rows hang
+  under its text, not under the bullet. A continued line of an item (a second paragraph, or a line you broke by hand)
+  is indented to the item's text, with its source indentation hidden up to that column and no further, so an
+  indented code block inside an item keeps its own.
+- **Ordered lists** keep their numbers **as written**: `1.`, `3.`, `7)` show as `1.`, `3.`, `7)`. Preview renumbers
+  (`1. 2. 7.` reads 1, 2, 3 there), because HTML only keeps the first number.
+- **Task lists** (`- [ ]`, `- [x]`, `- [X]`): the box is drawn as a checkbox after the item's bullet, as in Preview.
+  **Clicking it toggles the `x` in the source** (decision D4): one undo step of its own (never joined to typing just
+  before it), the caret stays where it was, the editor keeps or lacks focus as before, and no menu opens. A read-only
+  note ignores the click. Preview's checkboxes stay read-only. From the keyboard, put the caret on the line and type
+  the `x`.
+- **Quotes**: each line of a quote, a lazy continuation line included, gets a bar down its left side and an indent;
+  a nested quote gets a bar per level. The `> ` is hidden away from the caret's line. Quotes are italic, as in Preview;
+  Preview's curly quotation marks around the quote are not drawn. A quote inside a list item sits at the item's text,
+  and a list inside a quote sits after the bar.
+- **Enter** is the Markdown keymap's (`insertNewlineContinueMarkup`), unchanged: it continues a bullet, a number (the
+  next one), a task (with an empty box), a nested item at its own level and a quote. On an empty item it ends the list
+  (or steps a nested item out a level). One CodeMirror rule to know: Enter on an empty **second** item of a tight list
+  puts a blank line above it, making the list loose, and only a second Enter ends it.
+- **Screen readers**: the bullet, the checkbox and a hidden `>` keep their source in visually hidden text, so the
+  line still reads as written. A checkbox is a `role="checkbox"` with `aria-checked`, named by its source (`[ ]` or
+  `[x]`). The editor's hidden indentation is not read.
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
 shows all their marks.
+
+## Following a link
+
+The Live tab is for writing, so a click in a link is a click in text (decision D2 of the
+[plan](../live-default-plan.md#decided-by-the-owner-2026-11-17)):
+
+| Do | What happens |
+|---|---|
+| Click | The caret goes into the link, which shows its source, to edit |
+| Cmd+click (Mac), Ctrl+click (elsewhere) | Follows it: opens the note in this pane, shows the PDF's page, scrolls to the `#heading`, or opens a web address in a new tab (the desktop app hands it to your browser) |
+| Cmd/Ctrl+Shift+click | Opens a linked note beside this one |
+
+While Cmd/Ctrl is held the pointer turns to a hand over a link. A `#heading` link scrolls Live to the heading the
+preview would give that id (`#next-steps` for `## Next Steps`, `#next-steps-1` for a second one); `#fn-1` and
+`#fnref-1` go to a footnote's definition and its reference. Only `http:`, `https:` and `mailto:` addresses are
+opened. Following is the same code as Preview's (`followLink` in `noteLinkActions.ts`), so a dead link is dead in
+both. Preview keeps a plain click to follow and Cmd/Ctrl+click to open a note beside, and takes Cmd/Ctrl+Shift+click
+for beside as well, so the Live habit works there too. On a Mac, Ctrl+click in Live is left as the context menu.
+
+## Code blocks
+
+Source: [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts). Plan: Step 3 of
+[live-default-plan.md](../live-default-plan.md).
+
+- **The block.** Every line of a fenced (```` ``` ````, `~~~`) or indented block gets a line decoration that draws
+  Preview's `pre`: the `--surface` background, the code font at 0.875em, its padding, and rounded corners on the
+  first and last line that show. The font, size, line height, padding and radius match Preview's computed style.
+- **The fences.** While the caret is outside the block, the ```` ```lang ```` and ```` ``` ```` lines are collapsed to
+  no height (a line class, `cm-live-codeblock-hidden`); their text stays in the document. While the caret or a
+  selection is anywhere in the block, fences included, both show, dimmed, and the corners move onto them. The iPad
+  decided the same rule (its V2). Arrowing down into a block steps over the hidden opening fence onto the first line
+  of code, and the fences then show; arrowing up into one lands on its last line of code the same way. An empty
+  block, and the opening fence of one that is never closed, keep their fences showing.
+- **An indented block's** four-space indent is hidden the same way, and shows while the caret is in the block.
+- **Colours.** For each fenced block on screen, the code (without the fences, a quote's `>` or a list item's
+  indent) goes through `lowlight.highlight(lang, code)`, and the `hljs-*` spans become mark decorations with the
+  same class names. `globals.css` gives `.cm-live-codeblock .hljs-*` the rules `.prose pre code .hljs-*` has, so
+  the two tabs colour code alike (a unit test compares them character by character). The language is the info
+  string's first word, as remark reads it. An untagged fence, an indented block and a language highlight.js does
+  not know stay plain, as in Preview. Results are kept by language and text (the last 256 blocks), so moving the
+  caret or scrolling highlights nothing again; typing in a block highlights that block once per keystroke.
+- **Loading.** `lowlight` with every language is a large chunk, fetched the first time a block with a language
+  shows (the chunk Preview loads too). Until it arrives the block is drawn uncoloured.
+- **Typing cost** (dev build, 2026-11-17): about 2 ms a key in plain text and 7.6 ms (median; 10.9 ms p90) inside a
+  600-line JavaScript block, nearly all of it highlighting that block. A block of a few dozen lines costs well under
+  a millisecond.
+- **Not like Preview:** long code lines wrap, where Preview scrolls the block sideways; a block in a quote or a list
+  item puts the background behind the line's `>` or indent too.
+
+## Blocks
+
+A block is a part of the note drawn whole, in place of its source: a table (Step 5 of
+[live-default-plan.md](../live-default-plan.md)), an MDX component (Step 6, [below](#mdx-components)), or `<Toc />`,
+`<Footnotes />` and the frontmatter card (Step 7, [below](#setext-headings-footnotes-toc-and-the-frontmatter)).
+
+- **Drawn by Preview's own code.** Each block is a React root that renders `NoteMarkdown` for the block's source, inside
+  the providers Preview has (note links, the diagram and sheet editors), so it looks and behaves as it does in Preview.
+- **The caret in a block shows its source**, with the drawing under it, as a picture's Markdown shows beside the
+  picture. "In" means anywhere from the start of the block's first line to the end of its last; the line before and
+  the line after are not the block. A selection that reaches into it counts too.
+- **The drawing under the source is redrawn once typing pauses** (300 ms), not on every key. Until then it shows the
+  block as it was, so a half-typed row never flashes. A table that stops being one while it is typed (a cell typed in
+  the header row before the delimiter row has it) keeps its drawing until the pause, then lets go of it if it is still
+  not a table. Leaving the block draws it as it is at once.
+- **Clicking a drawn table** puts the caret at the start of its source. Cmd/Ctrl+click on a link in it is the link's
+  (Preview's behaviour), and a click on a button in a drawing (a diagram's **Edit diagram**) is the button's. A block
+  whose drawing handles its own clicks (a sheet's grid, a video player) has a small **Edit source** button instead,
+  shown on hover and reachable from the keyboard.
+- **Up and down arrows step into a block**, onto its first line going down and its last going up, at the caret's
+  column; CodeMirror on its own would jump over the drawing in one go.
+- **Find** shows the source of the table holding the current match, so the match is seen and highlighted there.
+- **Undo** works across a block as across any text; the block is read again from what comes back.
+- **Screen readers** read a drawn table as a table, cells and all. While the caret is in a block, the drawing under
+  the source is hidden from them (`aria-hidden`), so the source is what they read.
+- **Not drawn:** a table inside a list item or a blockquote (it is shown as written), and anything in the frontmatter.
+
+How it works: a `StateField` (`liveBlocksField`), since CodeMirror takes block widgets only from a field. It keeps the
+blocks it found and, on a change, maps them through it and reads again only the top-level nodes of the syntax tree the
+change touched, before and after it (so a code fence opened above a table swallows it, and closing it brings it back).
+Where the parser has not reached yet (a long note just opened), the stretch is kept to read when it does. A widget's
+`eq` compares its source, so typing elsewhere redraws nothing. `liveBlockKinds` is the list of kinds. A kind can run
+over several top-level nodes (`reach`, with `startAbove` for a closing tag typed below its opening one), and can say its
+source can't be drawn yet (`problem`); a re-read takes in the whole of any block it touches.
+
+## MDX components
+
+Source: [`liveMdx.ts`](../../apps/web/src/components/notes/liveMdx.ts). Plan: Step 6 of
+[live-default-plan.md](../live-default-plan.md).
+
+- **Which.** `<Info>`, `<Warning>`, `<Drawio>`, `<Chart>`, `<Repo>`, `<Sheet>` and `<YouTube>` are blocks, drawn by
+  Preview's `NoteMarkdown` with Preview's providers, so each looks and acts as it does there. `<Mark>`, `<Image>` and
+  `<Ink>` keep their inline drawing (above). `<Toc>` and `<Footnotes>` need the whole note and come in Step 7.
+- **Where one starts and ends.** A component starts at a line that opens with its tag (an opening tag may run over
+  several lines) and ends at the line with its matching closing tag, the blank lines and Markdown inside it included,
+  as MDX reads it: a tag of the same name inside it nests, and a tag in code is not a tag. A self-closing tag
+  (`<YouTube … />`) is its own block. A component inside a list item or a quote is left as written.
+- **The caret in it** shows its source as Markdown, drawn as Live draws any Markdown (the list bullets, the CSV fence
+  as a code block), with the drawing under it, redrawn once typing pauses, as for a [table](#blocks).
+- **Not valid yet.** While a component is typed it is often not valid MDX (a quote not closed, an `{expression}`, an
+  unknown tag). Its source then shows, with a small grey line under it, "Not rendered yet:" and MDX's reason, in place
+  of the drawing: never Preview's banner. That holds away from the caret too, so a broken component is left showing
+  to be fixed. An opening tag with no closing tag yet is a block of its own line, with the same note; type the
+  closing tag below it and the whole stretch becomes the component. (The `<` menu inserts both tags at once.)
+- **Clicks.** A click on a callout, a chart, a repository card or a diagram's picture puts the caret at the start of
+  its source; Cmd/Ctrl+click on a link in one follows it. A diagram's **Edit diagram** and a sheet's **Edit sheet**,
+  **Re-import** and **Export…** work as in Preview. A sheet and a video take their own clicks, so they have the
+  **Edit source** button, at their top left (a sheet keeps its tools at the top right).
+- **Loading.** Code in a component is coloured by Preview's highlighter, fetched the first time a component with a
+  code fence is drawn (the same chunk Preview fetches). The Excel reader and writer load when they are used, as in
+  Preview.
+
+## Setext headings, footnotes, `<Toc>` and the frontmatter
+
+Built in Step 7 of the [live-default plan](../live-default-plan.md#step-7-the-rest-s-to-m).
+
+- **Setext headings.** A paragraph underlined with `===` is drawn as a level 1 heading, one underlined with `---` as a
+  level 2, with the look of `#` headings. Away from the caret the underline's line is collapsed to nothing (its text is
+  still there, as a code block's fences are); with the caret anywhere on the heading it shows, dimmed. A `---` after a
+  blank line, a list or a quote is a rule, as in Preview. The heading rail, `#heading` links and `<Toc>` now count
+  setext headings too, in every tab (`extractHeadings`).
+- **Footnote references.** `[^label]` is drawn as its number, raised and in the link colour, numbered by the order the
+  notes are first cited in, as Preview numbers them (a label matches whatever its case). Its tooltip is the start of
+  the note. Cmd/Ctrl+click goes to the definition, as following a link does; a plain click edits it, and with the caret
+  on it the source shows, dimmed. A reference with no definition is left as written, as in Preview.
+- **Footnote definitions.** `[^label]: text` has its `[^label]: ` drawn as its number (`1.`), and its lines (the
+  lines that carry it on, and indented ones after a blank line) in Preview's smaller type. Cmd/Ctrl+click on the
+  number goes back to where it is first cited. With the caret on its first line the label shows. A definition nothing
+  cites is left as written (Preview leaves it out).
+- **`<Footnotes />`** (on a line of its own) is drawn as Preview's list: numbered, worded and linked as Preview's, by
+  Preview's own renderer. A click on a ↩ scrolls Live to that citation (the second ↩ of a note cited twice, to the
+  second citation). Its drawing follows the note once typing pauses.
+- **`<Toc />`** (on a line of its own, `maxDepth` honoured) is drawn by Preview's `Toc` from the note's headings, re-read
+  once typing pauses. A click on an entry scrolls Live to that heading; the caret stays where it was.
+- `<Toc>` and `<Footnotes>` handle their own clicks, so each has an **Edit source** button, as a sheet will. With the
+  caret in one, its source shows with the drawing under it, as for any block.
+- **The frontmatter** (decision D5) is drawn as Preview's `FrontmatterCard` away from the caret, through the block
+  layer's widget. With the caret in it, **only the YAML** shows, with no card under it: the one exception to the rule
+  above, since the card would repeat it word for word. A click on the card, or Up from the line under it, puts the
+  caret in the YAML. The caret counts only while the editor has focus, so a note that opens with the caret at its top
+  still shows the card. A YAML that does not read (being typed) shows as YAML.
+
+How it works: setext headings and footnote marks are line and inline decorations in view plugins
+(`liveSetext.ts`, `liveFootnotes.tsx`), worked out for what is on screen. Lezer's Markdown has no footnote node, so
+`footnoteMarksField` keeps every `[^label]` in the note, reading again only the lines a change touches, and
+`footnotesOf` numbers them, leaving out those in code or the frontmatter (from the syntax tree). `<Toc>` and
+`<Footnotes>` are block kinds (`liveToc.tsx`, `FOOTNOTES`) that draw with a component of their own (`BlockKind.Drawing`)
+rather than the block's source alone: `<Footnotes>` hands Preview's `NoteMarkdown` the note's references, the tag and its
+definitions, so the list comes out as Preview's; `<Toc>` hands `Toc` the headings. Both read the note again through
+`useSettledNote` after each pause in typing, and only while one is drawn. Lezer reads a self-closing tag on its own line
+as a paragraph, so these kinds match a `Paragraph` node whose text is the tag. The frontmatter card is a state field of
+its own (`liveFrontmatter.tsx`), since the frontmatter is not a node of the syntax tree.
 
 ## What it shares with the Markdown tab
 
@@ -59,8 +275,10 @@ same scenario on each:
 
 ## How it differs
 
-- **Undo history** belongs to the Live editor and starts again when you switch to it from another tab (the Markdown
-  tab keeps its own, in the browser).
+- **Undo history** belongs to the Live editor. Once a note has been shown in Live, the editor is kept, hidden, while
+  another tab shows, so a look at Preview or Split and back keeps it. If the text changed meanwhile (typed in the
+  Markdown tab, or a sheet edited from Preview), the history starts again, since its steps no longer fit the text. A
+  note opened in the same pane gets a history of its own. The Markdown tab keeps its own, in the browser.
 - **Reflow's break** is part of the typed character's undo step; in the Markdown tab it is a step of its own.
 - **The ruler** is drawn in the preview font, which is not monospaced, so a column is that many widths of a `0`: a
   guide. Reflow counts characters exactly, hidden marks included, because that is what the file holds.
@@ -69,8 +287,33 @@ same scenario on each:
   background (Settings → Styling) each line is a whole grid square tall (a level 1 or 2 heading, two), so the text
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
-- Not in the Live tab, by design: rendered links and lists, diagrams, and a preview of MDX components. Use
-  **Split** for those.
+- **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
+
+## Long notes
+
+The Live tab draws a note of any length in full: tints, tags hidden, pictures, drawings and colours, at the end of a
+3 MB note as at the start of a short one. The Markdown tab's colour layer still stops at 100,000 characters
+(`MAX_HIGHLIGHT_CHARS`, [markdown-editor-highlighting.md](markdown-editor-highlighting.md)), because it re-reads the
+whole note on every keystroke; Live used to share that limit and no longer does.
+
+What makes that possible is that nothing Live does on a keystroke reads the whole note:
+
+- **Colours, highlights, `<Image>` and `<Ink>` are read only around the screen** (`scanAround`): from 10,000
+  characters above what is on screen to 10,000 below it (`SCAN_MARGIN`), read again as the note changes or scrolls.
+  The reading goes a line at a time and needs to know only whether a line is in a code fence, which the read takes
+  from CodeMirror's syntax tree (kept up to date as you type, without re-reading the note). So tags inside a code block
+  that opened far above the screen are still not highlights, and a keystroke costs the same in a note of any length.
+- **The frontmatter's end** is worked out again only when an edit is in the frontmatter, or could close one
+  (`frontmatterEndAfter`); typing in the body never re-reads it.
+
+One thing that follows: a highlight is tinted while both its tags are within that margin, so a highlight whose
+opening tag is more than 10,000 characters above the screen is drawn untinted, its tags showing, until you scroll
+up to it. Highlights that long are not something the highlight menu makes.
+
+Measured in a production build (stress-test notes, 2026-11-17; the numbers are in
+[live-default-plan.md](../live-default-plan.md#step-1-lift-the-100000-character-limit-s-to-m)): a keystroke's work in
+the editor is about 4 ms at 400,000 characters and 6 ms at 1,000,000, the same as before when those notes were drawn
+with nothing tinted.
 
 ## Keeping it level with the Markdown tab
 

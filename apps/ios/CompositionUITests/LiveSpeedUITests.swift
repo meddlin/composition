@@ -29,15 +29,15 @@ final class LiveSpeedUITests: XCTestCase {
         return out.joined(separator: "\n")
     }
 
-    private func measure(lines: Int, mode: String, highlights: Bool = false, at share: Double? = nil) throws {
+    private func measure(lines: Int, mode: String, highlights: Bool = false, at share: Double? = nil, inCode: Bool = false) throws {
         XCUIDevice.shared.orientation = .landscapeLeft
         let folder = URL(fileURLWithPath: NSTemporaryDirectory())
         let note = folder.appendingPathComponent("speed-note-\(lines).md")
-        let output = folder.appendingPathComponent("live-bench-\(lines)-\(mode)\(highlights ? "-marks" : "")\(share.map { "-at\(Int($0 * 100))" } ?? "").json")
+        let output = folder.appendingPathComponent("live-bench-\(lines)-\(mode)\(highlights ? "-marks" : "")\(share.map { "-at\(Int($0 * 100))" } ?? "")\(inCode ? "-code" : "").json")
         try bigNote(lines: lines, highlights: highlights).write(to: note, atomically: true, encoding: .utf8)
         try? FileManager.default.removeItem(at: output)
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "the backup the app starts from")
-        app.launchArguments = ["-importBackup", backup, "-importText", note.path, "-openMode", mode, "-liveBench", output.path] + (share.map { ["-liveBenchAt", "\($0)"] } ?? [])
+        app.launchArguments = ["-importBackup", backup, "-importText", note.path, "-openMode", mode, "-liveBench", output.path] + (share.map { ["-liveBenchAt", "\($0)"] } ?? []) + (inCode ? ["-liveBenchIn", "code"] : [])
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 120), "the backup did not restore")
@@ -48,9 +48,9 @@ final class LiveSpeedUITests: XCTestCase {
         let result = (try? String(contentsOf: output, encoding: .utf8)) ?? ""
         XCTAssertFalse(result.isEmpty, "the app wrote no result")
         add(XCTAttachment(string: result))
-        print("LIVE_SPEED \(lines) lines, \(mode)\(highlights ? ", highlights" : "")\(share.map { ", at \(Int($0 * 100))%" } ?? ""): \(result)")
+        print("LIVE_SPEED \(lines) lines, \(mode)\(highlights ? ", highlights" : "")\(share.map { ", at \(Int($0 * 100))%" } ?? "")\(inCode ? ", in a code block" : ""): \(result)")
         if let path = ProcessInfo.processInfo.environment["LIVE_SPEED_LOG"] {
-            let block = "== \(lines) lines, \(mode)\(highlights ? ", highlights" : "")\(share.map { ", at \(Int($0 * 100))%" } ?? "")\n\(result)\n\n"
+            let block = "== \(lines) lines, \(mode)\(highlights ? ", highlights" : "")\(share.map { ", at \(Int($0 * 100))%" } ?? "")\(inCode ? ", in a code block" : "")\n\(result)\n\n"
             if let handle = FileHandle(forWritingAtPath: path) {
                 handle.seekToEndOfFile()
                 handle.write(Data(block.utf8))
@@ -76,4 +76,7 @@ final class LiveSpeedUITests: XCTestCase {
     func testMarkdown10000LinesAtNinetyPercent() throws { try measure(lines: 10_000, mode: "Markdown", at: 0.9) }
     /// With highlights and pictures in it, which the desktop reads only up to 100,000 characters and the iPad at any length (decision V5).
     func testLive20000LinesWithHighlights() throws { try measure(lines: 20_000, mode: "Live", highlights: true) }
+    /// Typing in a code block, which the Live tab draws on its fill in the code font (docs/ipad-live-default-plan.md, Step 3).
+    func testLive5000LinesTypingInACodeBlock() throws { try measure(lines: 5_000, mode: "Live", inCode: true) }
+    func testLive20000LinesTypingInACodeBlock() throws { try measure(lines: 20_000, mode: "Live", inCode: true) }
 }

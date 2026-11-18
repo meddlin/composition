@@ -4,7 +4,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { ImageWidget } from "./liveImages";
 import { InkWidget } from "./liveInk";
-import { bodyStart, scanOf, liveDecorations } from "./liveMarkdown";
+import { bodyStart, frontmatterEndAfter, liveDecorations, SCAN_MARGIN, scanAround, scanOf, type NoteScan } from "./liveMarkdown";
 
 type Found = { from: number; to: number; kind: string };
 
@@ -218,9 +218,8 @@ describe("highlighted text", () => {
     expect(scanOf('half <Mark color="blue">open').tints).toEqual([]);
   });
 
-  it("does not look for highlights in a note with none, or in one too long to colour", () => {
+  it("does not look for highlights in a note with none", () => {
     expect(scanOf("nothing here").tints).toEqual([]);
-    expect(scanOf(`${Y("x")}${"a".repeat(100_001)}`).tints).toEqual([]);
   });
 
   it("moves with the text as it is edited (found again on each change, not kept)", () => {
@@ -361,10 +360,6 @@ describe("syntax colours", () => {
     expect(marked.filter((m) => m.kind === "md-tag")).toHaveLength(2);
   });
 
-  it("does not colour a note too long to colour on every keystroke", () => {
-    expect(scanOf(`\`code\`${"a".repeat(100_001)}`).tokens).toEqual([]);
-  });
-
   it("finds the same runs again as the text changes (not kept from before)", () => {
     expect(scanOf("`a`").tokens).toHaveLength(1);
     expect(scanOf("a").tokens).toHaveLength(0);
@@ -490,5 +485,159 @@ describe("images", () => {
       expect(inks(`\`\`\`\n${tag}\n\`\`\``, 0)).toEqual([]);
       expect(inks('<Inkwell src="app_data/x.png" />', 0)).toEqual([]);
     });
+  });
+});
+
+describe("a long note", () => {
+  const Y = (inner: string) => `<Mark color="yellow">${inner}</Mark>`;
+  const B = (inner: string) => `<Mark color="blue">${inner}</Mark>`;
+
+  /** About `length` characters of paragraphs, with some `inline code` and a [link](x) now and then. */
+  function prose(length: number, seed = 0): string {
+    const words = ["lorem", "ipsum", "`dolor`", "sit", "[amet](https://example.com)", "consectetur", "adipiscing", "elit"];
+    const lines: string[] = [];
+    let size = 0;
+    for (let n = seed; size < length; n++) {
+      const line = Array.from({ length: 10 }, (_, i) => words[(n * 7 + i * 3) % words.length]).join(" ");
+      lines.push(n % 5 === 4 ? `${line}\n` : line);
+      size += line.length + 1;
+    }
+    return lines.join("\n");
+  }
+
+  /** The note as the live editor holds it: parsed by the Markdown language, all of it, as it is once it has been open a moment. */
+  function stateOf(text: string): EditorState {
+    const state = EditorState.create({ doc: text, extensions: [markdown({ base: markdownLanguage })] });
+    ensureSyntaxTree(state, state.doc.length, 60_000);
+    // That parses on the side; the next transaction takes the finished tree, as the editor's next update would.
+    return state.update({}).state;
+  }
+
+  /** What `scan` found that lies inside `from`..`to`, as positions. */
+  function inside(scan: NoteScan, from: number, to: number) {
+    const within = ({ start, end }: { start: number; end: number }) => start >= from && end <= to;
+    return {
+      tokens: scan.tokens.filter(within),
+      tints: scan.tints.filter(within),
+      elements: scan.elements.filter(({ open, close }) => within({ start: open.start, end: close.end })),
+      images: scan.images.filter(within),
+      inks: scan.inks.filter(within),
+    };
+  }
+
+  it("tints the last highlight of a 400,000-character note, reading only around the screen", () => {
+    const text = `${Y("first")}\n\n${prose(400_000)}\n\nAt the end: ${B("the last highlight")}.\n`;
+    const state = stateOf(text);
+    const screen = { from: text.length - 2_000, to: text.length };
+    const scan = scanAround(state, screen, bodyStart(text));
+
+    const last = text.indexOf("the last highlight");
+    expect(scan.tints).toEqual([{ start: last, end: last + "the last highlight".length, color: "blue" }]);
+    // The first is 400,000 characters above the screen: not read.
+    expect(scan.tokens.every(({ start }) => start >= screen.from - SCAN_MARGIN - 200)).toBe(true);
+
+    const tinted: string[] = [];
+    liveDecorations(state, [screen], bodyStart(text), scan).between(screen.from, screen.to, (from, to, value) => {
+      if (value.spec.attributes?.["data-color"]) tinted.push(`${state.sliceDoc(from, to)}:${value.spec.attributes["data-color"]}`);
+    });
+    expect(tinted).toEqual(["the last highlight:blue"]);
+  });
+
+  it("finds what reading the whole note finds, wherever the screen is", () => {
+    const image = '<Image src="app_data/a-0123456789ab.png" alt="a" />';
+    const ink = '<Ink src="app_data/i-0123456789ab.png" />';
+    const code = Array.from({ length: 1_500 }, (_, i) => `const x${i} = "${Y("not a highlight")}"; // ${image}`).join("\n");
+    const quoted = Array.from({ length: 1_500 }, (_, i) => `> line ${i} ${Y("quoted")} \`code\``).join("\n");
+    const text = [
+      "---",
+      'title: "<Mark>in the frontmatter</Mark>"',
+      "---",
+      prose(15_000, 1),
+      `Some ${Y("yellow")} and ${B("blue")} text, ${image} and ${ink}.`,
+      "```ts",
+      code,
+      "```",
+      `After the code: ${B("blue")}.`,
+      "> ```",
+      quoted,
+      "> ```",
+      "",
+      `After the quote: ${Y("yellow")} ${ink}.`,
+      "~~~~",
+      code,
+      "~~~~",
+      prose(30_000, 2),
+      `- a list ${Y("item")}`,
+      "  ```",
+      `  ${Y("in a list's fence")}`,
+      "  ```",
+      `The end: ${B("blue")}.`,
+    ].join("\n");
+    const state = stateOf(text);
+    const fm = bodyStart(text);
+    expect(fm).toBeGreaterThan(0);
+    const whole = scanOf(text);
+
+    for (let from = 0; from < text.length; from += 4_999) {
+      const screen = { from, to: Math.min(text.length, from + 3_000) };
+      expect(inside(scanAround(state, screen, fm), screen.from, screen.to)).toEqual(inside(whole, screen.from, screen.to));
+    }
+  });
+
+  it("does not take the tags in a code block that opened far above the screen for highlights", () => {
+    const code = Array.from({ length: 2_000 }, (_, i) => `line ${i} ${Y("in code")}`).join("\n");
+    const text = `intro\n\n\`\`\`\n${code}\n\`\`\`\n\n${B("after")}\n`;
+    const state = stateOf(text);
+    const screen = { from: text.length - 3_000, to: text.length };
+    const scan = scanAround(state, screen, 0);
+
+    expect(scan.tints.map((t) => state.sliceDoc(t.start, t.end))).toEqual(["after"]);
+    expect(scan.tokens.some((t) => t.kind === "code" && t.start < text.indexOf("\n```\n\n"))).toBe(true);
+  });
+
+  it("does not take a rule at the top of what it reads for frontmatter", () => {
+    const before = prose(30_000);
+    const text = `${before}\n\n---\n${Y("between rules")}\n---\n`;
+    const state = stateOf(text);
+    const rule = before.length + 2;
+    const scan = scanAround(state, { from: rule + SCAN_MARGIN, to: text.length }, 0);
+
+    expect(scan.tints.map((t) => state.sliceDoc(t.start, t.end))).toEqual(["between rules"]);
+  });
+
+  it("never reads the frontmatter, and reads one still being typed as one", () => {
+    const text = `---\ntitle: "${Y("x")}"\n---\n${B("body")}`;
+    expect(scanAround(stateOf(text), { from: 0, to: text.length }, bodyStart(text)).tints.map((t) => t.color)).toEqual(["blue"]);
+
+    // Not yet valid YAML (the quote is open), so not frontmatter to the note; still not Markdown to the editor.
+    const typing = `---\ntitle: "${Y("x")}\n---\nbody`;
+    expect(bodyStart(typing)).toBe(0);
+    expect(scanAround(stateOf(typing), { from: 0, to: typing.length }, 0).tints).toEqual([]);
+  });
+});
+
+describe("where the frontmatter ends, as the note is typed", () => {
+  const note = "---\ntitle: x\n---\nbody\n";
+
+  /** The end after replacing `from`..`to` of `text` with `insert`, worked out from the end before. */
+  function after(text: string, from: number, to: number, insert: string): number {
+    const transaction = EditorState.create({ doc: text }).update({ changes: { from, to, insert } });
+    return frontmatterEndAfter(transaction.state.doc, transaction.changes, bodyStart(text));
+  }
+
+  it("stays put while the body is typed", () => {
+    expect(after(note, note.length, note.length, "more")).toBe(bodyStart(note));
+  });
+
+  it("moves with an edit inside it", () => {
+    const edited = note.replace("title: x", "title: xyz");
+    expect(after(note, 11, 11, "yz")).toBe(bodyStart(edited));
+    expect(bodyStart(edited)).toBe(bodyStart(note) + 2);
+  });
+
+  it("appears when its closing line is typed, and goes when its opening one is broken", () => {
+    const open = "---\ntitle: x\nbody\n";
+    expect(after(open, 13, 13, "---\n")).toBe(bodyStart("---\ntitle: x\n---\nbody\n"));
+    expect(after(note, 0, 1, "")).toBe(0);
   });
 });

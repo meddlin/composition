@@ -39,4 +39,33 @@ describe("extractHeadings", () => {
     const text = "---\ntitle: x\n# comment: y\n---\n# Body";
     expect(extractHeadings(text, text.indexOf("# Body")).map((h) => h.label)).toEqual(["Body"]);
   });
+
+  it("finds setext headings: a paragraph underlined with === (level 1) or --- (level 2), at its first line", () => {
+    const text = "Title\n=====\n\nIntro.\n\nTwo *line*\nsection\n---\n\n   Indented\n  ---  ";
+    expect(extractHeadings(text)).toEqual([
+      { level: 1, label: "Title", offset: 0 },
+      { level: 2, label: "Two line section", offset: text.indexOf("Two") },
+      { level: 2, label: "Indented", offset: text.indexOf("   Indented") },
+    ]);
+  });
+
+  it("takes --- for a rule, not an underline, where Preview does", () => {
+    for (const text of ["a\n\n---", "- item\n---", "> quote\n---", "# x\n---", "<div>\n---", "    code\n---", "[a]: /url\n===", "a\n= ="]) {
+      expect(extractHeadings(text).filter((h) => h.label !== "x"), text).toEqual([]);
+    }
+  });
+
+  it("takes a thematic break, spaced or not, for the end of a list or a quote", () => {
+    for (const rule of ["***", "* * *", " _ _ _ ", "- - -", "-\t-\t-"]) {
+      const text = `- item\n${rule}\nAfter\n===`;
+      expect(extractHeadings(text), rule).toEqual([{ level: 1, label: "After", offset: text.indexOf("After") }]);
+    }
+    // Not a rule: two marks, mixed marks, or four spaces in front.
+    for (const line of ["**", "*-*", "    ***"]) expect(extractHeadings(`- item\n${line}\nAfter\n===`), line).toEqual([]);
+  });
+
+  it("leaves a setext underline inside fenced code and the frontmatter alone", () => {
+    const text = "---\ntitle: x\n---\n```\nnot\n---\n```\nBody\n===";
+    expect(extractHeadings(text, text.indexOf("```"))).toEqual([{ level: 1, label: "Body", offset: text.indexOf("Body") }]);
+  });
 });

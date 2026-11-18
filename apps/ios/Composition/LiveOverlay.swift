@@ -19,6 +19,8 @@ enum LiveOverlay {
         /// Where the notes' pictures are kept, and how wide a line of the note's text is (a picture is as tall as that width makes it).
         var imageFolder: URL?
         var textWidth: CGFloat
+        /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
+        var isLinkHere: (String) -> Bool = { _ in true }
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -87,7 +89,9 @@ enum LiveOverlay {
             guard let part = inside(mark) else { continue }
             hide(part, in: storage)
         }
+        applyLinks(decorations, to: range, in: storage, look: look, isHere: context.isLinkHere)
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
+        LiveCode.apply(decorations, to: range, in: storage, look: look)
     }
 
     /// A rule is a line and a picture is a picture, in place of the text that writes it: the text is hidden, and its paragraph is made tall enough, and marked for
