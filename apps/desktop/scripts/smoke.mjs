@@ -227,6 +227,16 @@ try {
   check("Settings link is present", (await page.getByRole("link", { name: "Settings" }).count()) === 1);
   await page.screenshot({ path: path.join(out, "1-empty.png") });
 
+  // ---- Notes open in Live by default (docs/live-default-plan.md, D1). The checks below type into, paste into and read
+  // the plain Markdown editor's textarea, so notes are opened in Split from here on, as the web app's panel tests do.
+  // (Once a note has shown Live, the textarea stays in the page, hidden, beside the live editor, under the same label.)
+  const openNotesIn = (await page.evaluate(() => window.composition.loadSettings())).writing?.openNotesIn;
+  check("notes open in Live by default", openNotesIn === "live", openNotesIn);
+  const splitSaved = await page.evaluate(() => window.composition.saveWritingSettings({ openNotesIn: "split" }));
+  check("the view notes open in can be changed", !splitSaved?.error, splitSaved?.error);
+  await page.reload();
+  await page.waitForSelector('nav[aria-label="Notes"]', { timeout: 30_000 });
+
   // ---- Create and edit a note; it must reach the real SQLite file
   const sidebar = page.getByRole("navigation", { name: "Notes" });
   await sidebar.getByRole("button", { name: "+ New note" }).click();
