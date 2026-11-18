@@ -20,8 +20,71 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Click on bold text: the marks appear and the text shifts a little to the right; the caret stays where you clicked.
 - [ ] Select from the middle of one bold word to the middle of another: both words show their marks. Copy and paste into the Markdown tab: the marks are in the text.
 - [ ] Frontmatter at the top is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading.
-- [ ] Code fences, links, lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
+- [ ] Code blocks (Gate C): make a note with a ```` ```js ````, a ```` ```python ````, a ```` ```sh ```` and an untagged ```` ``` ```` block, and an indented block. Away from the caret each looks as it does in Preview (open Split to compare): the same background, rounded corners, font, size and colours; no fences; the untagged and indented blocks plain.
+- [ ] Click into a code block: both its fences appear, dimmed, and the text you clicked keeps the caret. Click outside: they collapse again. Arrow down into a block from the line above and up into one from the line below: the caret lands on the code, then the fences appear; arrowing on reaches each fence.
+- [ ] Type inside a long code block (a couple of hundred lines): the colours follow as you type, with no lag. Type a new ```` ```js ```` block from scratch: it is drawn as a block once its closing fence is typed and the caret leaves it.
+- [ ] Change the language on a fence (`js` to `python`) and leave the block: the colours change. A made-up language stays plain.
+- [ ] In light and dark schemes the code colours are the ones Preview uses.
+- [ ] `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
 - [ ] A long note (several thousand lines) types without lag, and scrolling is smooth.
+
+## 1a. Links
+
+Make a second note to link to, and a note with: `[the docs](https://example.com "Docs")`, a note link from `[[`, a
+note link to a note you then delete for good (empty the Trash Can), `<https://example.com>`, a bare `https://example.com`,
+`## Next Steps` with `[jump](#next-steps)` above it, and (desktop) a `pdf:` link from a PDF's **Cite this page**.
+
+- [ ] Away from the caret each link reads as its text, underlined in the link colour, with no brackets or address. Put Live and Preview side by side (Split in one pane, Live in another): the links read the same.
+- [ ] Hover a link: the tooltip shows its address (and its title, for the first one), with "⌘-click to follow" (Mac) or "Ctrl+click to follow".
+- [ ] The link to the deleted note is struck through and muted, with "This note no longer exists"; Cmd/Ctrl+click on it does nothing. In the web app, the `pdf:` link is struck through with "PDF not on this device".
+- [ ] Click in a link's text: the caret lands where you clicked and the source shows, `[` `]` `(` `)` dimmed. Nothing opens.
+- [ ] Edit the link's text, then its address, with the keyboard: arrow in from either side, type, delete, select a word in the address and retype it. Move away: it is drawn again with the new text, and following it goes to the new address.
+- [ ] Do the same with the mouse: click into the address, double-click a word in the text, drag a selection from before the link into it.
+- [ ] Hold Cmd (Mac) or Ctrl (Windows, Linux) over a link: the pointer is a hand. Let go: the text cursor is back. Ctrl on a Mac does not change it.
+- [ ] Cmd/Ctrl+click the note link: the linked note opens in this pane. Back (Cmd/Ctrl+[) returns. Cmd/Ctrl+Shift+click it: it opens beside.
+- [ ] Cmd/Ctrl+click `https://example.com` (each of the three forms): it opens in a new browser tab (web) or your browser (desktop); the app stays put.
+- [ ] Cmd/Ctrl+click `[jump](#next-steps)`: Live scrolls to the heading; the caret does not move.
+- [ ] Desktop: Cmd/Ctrl+click the `pdf:` link: the PDF opens at that page, beside the note if it was not showing.
+- [ ] In Preview: a plain click on the note link follows it, Cmd/Ctrl+click opens it beside, and Cmd/Ctrl+Shift+click opens it beside too.
+
+## 1b. Lists, task lists and quotes (Gate D)
+
+Put this in a note, and open the same note in **Split** beside it to compare with Preview:
+
+```markdown
+- First item, long enough to wrap onto a second row when the pane is narrow
+- Second item
+  - Nested
+    - Deeper
+* Star item
++ Plus item
+
+1. One
+3. Three as written
+7) Seven
+
+- [ ] To do
+- [x] Done
+
+> A quote long enough to wrap onto a second row
+> > Nested quote
+lazy line
+
+- Item with a quote
+  > quoted inside
+```
+
+- [ ] Away from the caret, every `-`, `*` and `+` is a bullet; Nested and Deeper step in a level each, as in Preview, and the first item's second row starts under its text, not under the bullet.
+- [ ] The numbers read `1.`, `3.`, `7)` (as written; Preview reads 1, 2, 3 and 1).
+- [ ] Click a line: its marks come back as written (`  - Nested`), dimmed colours as in the Markdown tab, and the bullet goes. Click away: the bullet is back.
+- [ ] Put the caret on the last line and click the **To do** box: it ticks, the caret is still on the last line, no menu opens, and the Markdown tab shows `- [x] To do`. Cmd/Ctrl+Z unticks it in one step; a second Cmd/Ctrl+Z undoes what you typed before, not the box.
+- [ ] Type a word and click a box straight away: one Cmd/Ctrl+Z unticks the box only.
+- [ ] Untick **Done** the same way. Right-click and middle-click a box: nothing changes.
+- [ ] The quote lines have a bar and an indent, the nested one two bars, the lazy line too, and the `>` shows only on the caret's line. The quote inside the list item has its bar at the item's text.
+- [ ] Enter at the end of **Second item**, **Nested**, **Three as written** and **Done**: each continues with `- `, `  - `, `4. ` and `- [ ] `. Enter on an empty item ends the list (an empty second item of a two-item list first adds a blank line; Enter again ends it). Enter at the end of a quote line continues the quote with `> `.
+- [ ] Tab and Shift+Tab, and Backspace right after a new `- `, behave as they did before this step.
+- [ ] With a screen reader, a list line reads with its `-`, a quote line with its `>`, and a task's box is announced as a checkbox, checked or not.
+- [ ] Light and dark schemes, and a translucent window: the bullets, numbers, boxes and bars are visible but quieter than the text.
 
 ## 2. Highlights
 
@@ -89,6 +152,18 @@ open it in **Split** beside **Live** in another panel to compare.
 - [ ] Tab moves focus to and from the **Live** tab, the arrow keys move between tabs, and Shift+Tab leaves the editor; Tab inside it types a tab.
 - [ ] With a screen reader (VoiceOver or NVDA): the editor is announced as a multi-line text box named "Markdown editor". Hidden marks are not read, which is expected; open a menu and its options are announced as you arrow through them.
 - [ ] Windows high-contrast mode: the text, caret and selection are visible.
+
+## 8. Long notes
+
+Make the stress-test notes (`pnpm --dir apps/web stress:db --notes 100 --no-huge --line-notes 2600,10000,26000 --out <folder>`,
+see [stress-databases.md](stress-databases.md)) and add a line with three highlights at the end of each `LINES:` note
+(on the Markdown tab, or with the highlight menu). Use a production build (`pnpm --dir apps/web build` and `start`).
+
+- [ ] Open `LINES: 10,000 lines` (about 400,000 characters) on Live and press Cmd/Ctrl+End: the last highlights are tinted, their tags hidden, and the code blocks above are coloured.
+- [ ] Type a sentence there with a real keyboard: no lag, the tints stay, and putting the caret in a highlight shows its tags.
+- [ ] Scroll up through a long code block and back down: tags inside the code are never tinted; the text after the block is coloured as Markdown again.
+- [ ] Do the same on `LINES: 26,000 lines` (about 1,000,000 characters). (A note this long is not saved yet: stress-test finding 1. Look, don't keep.)
+- [ ] On the Markdown tab the same notes are left uncoloured past 100,000 characters, as before.
 
 ## Known and accepted
 

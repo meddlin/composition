@@ -8,7 +8,10 @@ Markdown, Preview and Split stay available.
 
 Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** (see
 [Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (PR #321); Gate 0 is the
-owner's. **Step 5 built 2026-11-17** (the block layer and tables); Gate E is the owner's.
+owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
+built 2026-11-17** (PR #322); Gate B is the owner's. **Step 3 (code blocks) built 2026-11-17** (PR #324); Gate C is
+the owner's. **Step 4 (lists, task lists, quotes) built 2026-11-17** (PR #325); Gate D is the owner's. **Step 5 (the block layer and tables)
+built 2026-11-17** (PR #326); Gate E is the owner's.
 
 ## Goal and rule
 
@@ -28,7 +31,7 @@ What Preview draws and Live does not, as of `ad9701a`:
 
 | Construct | Live today | Preview | Step |
 |---|---|---|---|
-| Links `[text](url)`, `note:`, `pdf:`, `#heading` | Coloured; the brackets and URL show; clicking does nothing | Text only; clicking follows the link | 2 |
+| Links `[text](url)`, `note:`, `pdf:`, `#heading` | Coloured; the brackets and URL show; clicking does nothing (drawn and followed since Step 2) | Text only; clicking follows the link | 2 |
 | Fenced and indented code blocks | One flat "code" colour; fences show | Language highlighting (`rehype-highlight` over `lowlight`) on a block background | 3 |
 | Lists | The marker is coloured | Bullets, numbers, a hanging indent | 4 |
 | Task lists `- [ ]` | Text | Checkboxes | 4 |
@@ -41,7 +44,7 @@ What Preview draws and Live does not, as of `ad9701a`:
 | `<Toc>`, `<Footnotes>`, footnote refs `[^1]` | Source | A linked table of contents; numbered notes | 7 |
 | Setext headings (`Title` / `===`) | Text (only `#` headings are drawn) | A heading | 7 |
 | Frontmatter | Muted monospaced YAML | `FrontmatterCard` | 7 |
-| Notes over 100,000 characters | Tints, pictures, ink and colours are dropped | Drawn (slowly: see [stress-test findings #7](stress-test-findings.md)) | 1 |
+| Notes over 100,000 characters | Tints, pictures, ink and colours are dropped (drawn since Step 1) | Drawn (slowly: see [stress-test findings #7](stress-test-findings.md)) | 1 |
 
 Already drawn, and left alone: headings with `#`, bold, italic, strikethrough, inline code, rules, Markdown and
 `<Image />` pictures, `<Ink>`, `<Mark>` highlights, and the syntax colours.
@@ -145,6 +148,43 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   `<Ink>` reads only over the viewport plus the blocks around it.
 - **Gate A (mine):** a 400k note with highlights at its end types under 16 ms a key in a production build, and
   draws its last highlight tinted.
+- **Built (2026-11-17): the second way.** Dropping the limit alone was over budget at 1M (below), so Live now reads
+  colours, highlights, `<Image>` and `<Ink>` only from 10,000 characters above the screen to 10,000 below it
+  (`scanAround`, `SCAN_MARGIN`), starting in whichever code fence the syntax tree says that first line is in
+  (`fenceAt`; `tokenizeMarkdown` can now start at any line). The frontmatter's end is read again only for an edit
+  that could move it (`frontmatterEndAfter`). The Markdown tab keeps `MAX_HIGHLIGHT_CHARS`. A test checks that the
+  read around the screen finds exactly what a read of the whole note finds, at screens every 5,000 characters through a
+  note with fences of both kinds, a fenced block in a quote and in a list, and frontmatter. Docs:
+  [ui/live-editor.md § Long notes](ui/live-editor.md#long-notes), [manual-tests/live-editor.md](manual-tests/live-editor.md) §8.
+  Accepted: a highlight whose opening tag is more than 10,000 characters above the screen is drawn untinted until
+  scrolled to.
+- **Measured** (2026-11-17, production build, Apple silicon, the browser pane at 800×600). Notes: the `LINES:` notes of
+  the stress generator (`--notes 100 --no-huge --line-notes 2600,10000,26000`, `mixed` profile) with three highlights
+  appended, plus the 1M one tripled for 3 MB. 30 keys typed at the end of each through the editor's own input path
+  (`execCommand("insertText")`), 40 ms apart. *Editor* is the keystroke up to CodeMirror having updated, drawn and
+  measured (`view.measure()`); *whole key* adds the app's React update that follows (the note's state, the panes,
+  the sidebar), up to the next task. Median / 95th percentile, in ms.
+
+  | Note | As it was (limit: nothing drawn past 100k) | No limit, whole-note scan | Read around the screen (built) |
+  |---|---|---|---|
+  | 97,500 chars, editor | 3.4 / 4.6 | 2.8 / 3.8 | 2.6 / 4.7 |
+  | 97,500 chars, whole key | 14.2 / 17.5 | 13.2 / 38.1 | 13.1 / 16.5 |
+  | 397,000 chars, editor | 4.3 / 6.1 | 6.2 / **18.4** | **3.7 / 4.4** |
+  | 397,000 chars, whole key | 16.8 / 22.5 | 17.6 / 33.9 | **15.6** / 17.9 |
+  | 1,022,000 chars, editor | 7.5 / 9.7 | 12.3 / **32.2** | 6.1 / 7.8 |
+  | 1,022,000 chars, whole key | 25.2 / 28.6 | 29.6 / 50.3 | 23.5 / 28.8 |
+  | 3,066,000 chars, editor | | | 14.1 / 34.2 |
+  | 1,000-char note, whole key | 10.5 / 14.3 | | |
+
+  The whole-note scan itself (Node, same notes): 0.6 ms at 100k, 2.5 ms at 400k, 7.2 ms at 1M, and the garbage it
+  makes shows as the 95th-percentile spikes above. Read around the screen, Live's own work is at or below what it was
+  when these notes were drawn with nothing tinted, and the last highlight is drawn tinted at every size. **Gate A:** at
+  400k the editor's work is 3.7 ms a key (4.4 at the 95th percentile), and the whole key 15.6 ms at the median. What is
+  left of the whole key is not Live's: a 1,000-character note already costs 10.5 ms, the app's React update after
+  every key, and it grows with the note's length (about 1 ms per 100k; not profiled: on each key the note's text is taken
+  out of the editor and passed around, and `MarkdownEditor` parses its frontmatter, for example). That is stress-test territory (findings 1 and 7, out of scope here) and
+  a follow-up of its own. Not measured: the 3 MB note's editor time is CodeMirror's own (no scan runs over the note),
+  and notes of 1M and over are not saved (finding 1).
 
 ### Step 2: links (S)
 
@@ -158,6 +198,20 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   Cmd/Ctrl+Shift+click for beside**, so the Live habit works there too.
 - **Gate B (the owner's):** links read and follow as in Preview; editing a link's text and its URL still works
   from the keyboard and the mouse.
+- **Built (2026-11-17)**, on its own branch from Step 0's (PR #321).
+  - `liveLinks.ts` draws `Link`, `Autolink` and bare `URL` nodes (`drawLink`, called from `liveDecorations`), reference
+    links included when the note defines the label. The tooltip is the address, the title above it, and how to follow.
+    A hidden stretch that would run over a line break (a link's text or title wrapped onto two lines) is dimmed instead,
+    as a plugin may not hide a line break. Which notes and PDFs exist reaches the editor as a facet (`noteLinksFacet`,
+    from `LiveEditor`'s `links`), and a change to it redraws.
+  - Following: `followLink` and its helpers moved out of `NoteAnchor` into `noteLinkActions.ts`; `NoteAnchor` and Live
+    both call them. Live passes its own `scrollTo` (`fragmentOffset`: the heading the preview gives that slug, or a
+    footnote) and opens web addresses (`http:`, `https:`, `mailto:` only) in a new tab. Cmd/Ctrl is the platform's: Cmd
+    on a Mac, where Ctrl+click is the context menu; Ctrl elsewhere. Preview still takes either.
+  - Checks: `liveLinks.test.ts` (decorations), `noteLinkActions.test.ts`, Live and Preview following in
+    `NoteLinks.app.test.tsx`; [ui/live-editor.md](ui/live-editor.md#following-a-link) and §1a of the manual test.
+  - Not done: a link's definition line (`[label]: url`) still shows as written (Preview hides it), and a plain click
+    on a link in Live is checked by hand only (jsdom can't place a caret from a click).
 
 ### Step 3: code blocks (M)
 
@@ -170,6 +224,23 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Language colours via `lowlight`, as under [Approach](#code-highlighting-with-previews-colours).
 - **Gate C (the owner's):** a note with JS, Python, shell and an untagged fence looks the same as in Preview, and
   typing in a code block stays smooth.
+- **Built (2026-11-17).**
+  - In its own module, `liveCode.ts` (a view plugin and its theme), added to `liveMarkdown`'s extension; the only
+    change to `liveMarkdown.ts` is that line and its import. `globals.css` gives `.cm-live-codeblock .hljs-*` the
+    colours of `.prose pre code .hljs-*`.
+  - **The spike went the line-class way, no state field.** A fence line away from the caret is drawn with
+    `height: 0; overflow: hidden`. CodeMirror measures it as a line of no height and does not fight it: a click
+    can't land on it, arrowing down (or up) into a block steps over it onto the code, after which the fences show
+    and the arrows reach them; the height map stays right.
+  - Colours from `lowlight` (every language, `detect` off, as Preview), cached by language and text (256 blocks),
+    lazy-loaded the first time a tagged block shows. A unit test renders the same note through Preview's
+    `rehype-highlight` and checks Live's classes character by character for JS, Python, shell and an untagged
+    fence. The font, size, line height, padding, radius and background match Preview's computed `pre` style.
+  - Measured in a dev build: ~2 ms a key in plain text, 7.6 ms median (10.9 ms p90) inside a 600-line JS block.
+  - Also drawn: indented blocks (their four-space indent hidden away from the caret). Left as they are: long lines
+    wrap (Preview scrolls them), and a block in a quote or list item gets its background behind the `>` or indent
+    as well (Step 4 draws those).
+  - Docs: [ui/live-editor.md](ui/live-editor.md#code-blocks), [manual-tests/live-editor.md](manual-tests/live-editor.md) §1.
 
 ### Step 4: lists, task lists, quotes (M)
 
@@ -181,6 +252,23 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Blockquotes: a bar down the quote's lines and an indent; the `> ` is hidden away from the caret line.
 - The Markdown keymap's Enter (which continues a list or quote) is already in place and is checked again here.
 - **Gate D (the owner's).**
+- **Built (2026-11-17).**
+  - `liveLists.ts`, imported by `liveMarkdown.ts` (which only adds its decorations and theme): one line decoration
+    per line of a list or quote, carrying its indent (2em a list level, `0.25rem + 1.25em` a quote level, as `prose`)
+    and its quote bars (a background per level), with `text-indent: -2em` on an item's first line so wrapped rows hang.
+    Away from the caret's line, the marks and indentation before the text become a bullet or the number as written, a
+    task's `[ ] ` a checkbox, and a quote's `> ` nothing visible.
+  - The checkbox toggles on `mousedown` (with `preventDefault`, so the caret and focus stay) through
+    `toggleTask`, which carries `isolateHistory.of("full")` so the toggle is its own undo step.
+  - Accessibility: the bullet, the checkbox and a hidden `>` keep their source as visually hidden text; the checkbox
+    is `role="checkbox"` with `aria-checked`.
+  - Ordered lists show their numbers as written, which differs from Preview (HTML renumbers from the first). Preview's
+    curly quotation marks around a quote are not drawn.
+  - Enter: CodeMirror's rule for an empty **second** item of a tight list (it makes the list loose rather than ending
+    it) is kept, tested and documented.
+  - Checks: `liveLists.test.tsx` (25 tests: the decorations over an `EditorState`, a click as one undo step, Enter),
+    the browser pane on a scratch database; manual items in
+    [manual-tests/live-editor.md](manual-tests/live-editor.md) §1b.
 
 ### Step 5: the block-widget layer, and tables (M to L)
 

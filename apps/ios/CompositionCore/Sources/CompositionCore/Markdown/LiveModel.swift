@@ -73,9 +73,6 @@ public struct LiveDecorations: Equatable, Sendable {
 }
 
 public struct LiveModel: Sendable {
-    /// The desktop reads highlights and `<Image />` tags only in a note this long or shorter (`MAX_HIGHLIGHT_CHARS`).
-    public static let desktopExtrasLimit = 100_000
-
     struct HeadingNode: Sendable {
         var line: Int
         var level: Int
@@ -163,8 +160,8 @@ public struct LiveModel: Sendable {
     private var scan: LiveScan.Result
     private let extrasLimit: Int?
 
-    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read, as on the desktop; nil reads them in any note.
-    public init(text: String, extrasLimit: Int? = LiveModel.desktopExtrasLimit) {
+    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read; nil (the default, as on the desktop) reads them in any note.
+    public init(text: String, extrasLimit: Int? = nil) {
         chars = Array(text.utf16)
         length = chars.count
         self.extrasLimit = extrasLimit
