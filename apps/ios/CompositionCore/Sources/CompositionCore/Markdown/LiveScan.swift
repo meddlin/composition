@@ -1,7 +1,8 @@
 import Foundation
 
 // What the Live view needs to know of a note's text beyond its Markdown tree: the desktop's `scanOf` (liveMarkdown.ts), which reads the text with
-// `tokenizeMarkdown` (markdownTokens.ts, to tell where code is), `markTints` and `markElements` (markTints.ts) and `imageElements` (liveImages.ts).
+// `tokenizeMarkdown` (markdownTokens.ts, to tell where code is), `markTints` and `markElements` (markTints.ts) and `imageElements` (liveImages.ts, for
+// `<Image />` and `<Ink />`; `<Drawio />` is read the same way, the iPad's own: docs/ipad-live-default-plan.md, Step 1).
 // A port, and checked as one: LiveConformanceTests runs the desktop's real code over the same texts. The regular expressions are the desktop's with
 // JavaScript's `\w`, `\s`, `\S`, `\b` and `.` written out, because ICU's are wider (Unicode word characters and spaces, more line terminators).
 
@@ -17,13 +18,15 @@ enum LiveScan {
         var close: NSRange
     }
 
-    /// An `<Image … />` as the text writes it.
+    /// An `<Image … />`, `<Ink … />` or `<Drawio … />` as the text writes it.
     struct ImageTag: Hashable, Sendable {
         var range: NSRange
         var src: String
         var alt: String
         var title: String
         var width: String
+        /// Which of the three tags it is.
+        var kind: LivePictureKind = .image
     }
 
     struct Result: Equatable, Sendable {
@@ -52,7 +55,11 @@ enum LiveScan {
                 if let open = moved(element.open), let close = moved(element.close) { out.elements.append(MarkElement(open: open, close: close)) }
             }
             for image in images {
-                if let range = moved(image.range) { out.images.append(ImageTag(range: range, src: image.src, alt: image.alt, title: image.title, width: image.width)) }
+                if let range = moved(image.range) {
+                    var image = image
+                    image.range = range
+                    out.images.append(image)
+                }
             }
             return out
         }
@@ -81,15 +88,16 @@ enum LiveScan {
 
     private static let markTag = try! NSRegularExpression(pattern: "<Mark(?![\(word)])[^<>]*>|</Mark[\(space)]*>")
     private static let color = try! NSRegularExpression(pattern: "(?<![\(word)])color=\"([^\"]*)\"")
-    private static let imageTag = try! NSRegularExpression(pattern: "<Image(?![\(word)])[^<>]*/>")
+    /// `<Image … />`, `<Ink … />` or `<Drawio … />`: group 1 is the name.
+    private static let imageTag = try! NSRegularExpression(pattern: "<(Image|Ink|Drawio)(?![\(word)])[^<>]*/>")
     private static let prop = try! NSRegularExpression(
         pattern: "(?<![\(word)])([A-Za-z]+)[\(space)]*=[\(space)]*(?:\"([^\"]*)\"|'([^']*)'|\\{[\(space)]*\"([^\"]*)\"[\(space)]*\\})")
 
-    /// Reads `text`: the highlights' tints and tags, and the `<Image />` tags, outside code and frontmatter.
+    /// Reads `text`: the highlights' tints and tags, and the `<Image />`, `<Ink />` and `<Drawio />` tags, outside code and frontmatter.
     static func read(_ text: String) -> Result {
         let ns = text as NSString
         let hasMark = ns.range(of: "<Mark", options: .literal).location != NSNotFound
-        let hasImage = ns.range(of: "<Image", options: .literal).location != NSNotFound
+        let hasImage = ["<Image", "<Ink", "<Drawio"].contains { ns.range(of: $0, options: .literal).location != NSNotFound }
         guard hasMark || hasImage else { return Result() }
         let literal = Literals(MarkdownLiterals.ranges(in: ns))
         var result = Result()
@@ -131,7 +139,7 @@ enum LiveScan {
         result.elements = elements.sorted { $0.open.location < $1.open.location }
     }
 
-    /// `imageElements`: each complete `<Image … />`, with the props it writes as quoted text. One with no `src` is skipped.
+    /// `imageElements`: each complete `<Image … />` (and `<Ink … />`, `<Drawio … />`), with the props it writes as quoted text. One with no `src` is skipped.
     private static func imagesIn(_ text: NSString, literal: Literals, into result: inout Result) {
         for match in imageTag.matches(in: text as String, range: NSRange(location: 0, length: text.length)) {
             if literal.contains(match.range.location) { continue }
@@ -145,7 +153,12 @@ enum LiveScan {
                 }
             }
             guard let src = props["src"], !src.isEmpty else { continue }
-            result.images.append(ImageTag(range: match.range, src: src, alt: props["alt"] ?? "", title: props["title"] ?? "", width: props["width"] ?? ""))
+            let kind: LivePictureKind = switch text.substring(with: match.range(at: 1)) {
+            case "Ink": .ink
+            case "Drawio": .drawio
+            default: .image
+            }
+            result.images.append(ImageTag(range: match.range, src: src, alt: props["alt"] ?? "", title: props["title"] ?? "", width: props["width"] ?? "", kind: kind))
         }
     }
 
