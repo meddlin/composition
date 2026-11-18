@@ -195,6 +195,8 @@ final class AppModel {
             // Developer shortcut: `-openNote 12` selects that note at launch.
             let forced = UserDefaults.standard.integer(forKey: "openNote")  // launch arguments arrive as text; 0 when absent
             if forced != 0 { selection = Int64(forced) }
+            // `-resetOpenNotesIn 1` forgets the "Open notes in" choice (a UI test that sets it through the sheet starts and ends with it unset).
+            if UserDefaults.standard.bool(forKey: "resetOpenNotesIn") { UserDefaults.standard.removeObject(forKey: NoteDetailView.Mode.openNotesInKey) }
             // `-trashNote 3` and `-restoreNote 3` do what the buttons do, for the script that checks the rows (apps/ios/scripts/editor-flow-test.sh);
             // `-newNote 1` makes a note as the + button does.
             if UserDefaults.standard.bool(forKey: "newNote") { await createNote() }

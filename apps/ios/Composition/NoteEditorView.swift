@@ -17,6 +17,9 @@ final class EditorHandle {
     var noteID: Int64?
     /// Opens the list of images already stored (⌘⇧M, and the Image menu's *Stored Image…*): the screen owns the sheet.
     var openStoredImages: () -> Void = {}
+    /// Whether the text view is the tab showing. Under the Preview tab it stays alive, hidden (so its undo survives), and takes nothing a caller can put at the
+    /// end of the note instead.
+    var isShowing: () -> Bool = { true }
     /// Follows a link of the Live tab (its ↗, and ⌘-tap): the screen's `LinkFollower`. False when there was nothing to follow.
     var followLink: (String) -> Bool = { _ in false }
     /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through, as the Preview draws it.
@@ -64,14 +67,14 @@ final class EditorHandle {
     /// showing (the Preview tab), so that the caller can put it at the end of the note instead.
     func insertBlock(_ markdown: String) -> Bool {
         // A text view that is not on screen (the note is behind the PDF, or in the Preview tab) takes nothing: the caller puts the Markdown at the end of the note.
-        guard let view = textView, view.window != nil else { return false }
+        guard let view = textView, view.window != nil, isShowing() else { return false }
         write(paragraphs: [markdown])
         return true
     }
 
     /// A short piece of Markdown (a link to a page of a PDF) in the words around the caret; False when the editor is not showing.
     func insertInline(_ markdown: String) -> Bool {
-        guard let view = textView, view.window != nil else { return false }
+        guard let view = textView, view.window != nil, isShowing() else { return false }
         view.becomeFirstResponder()
         let whole = view.nativeText as NSString
         let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
@@ -392,12 +395,14 @@ struct NoteEditorView: UIViewRepresentable {
     let focusOnOpen: Bool
     /// The Live tab: the same text view, drawn as the note will read, with the marks hidden away from the selection (`MarkdownStyler.setLive`).
     var live = false
+    /// Under the Preview tab: the text view stays alive (its undo history with it) but is hidden, so that it is neither drawn, touched nor read by VoiceOver.
+    var hidden = false
     let caretMoved: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, caretMoved: caretMoved) }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = NoteTextView(usingTextLayoutManager: true)  // TextKit 2. Never touch `layoutManager`: that falls back to TextKit 1.
+        let view = NoteTextView(usingTextLayoutManager: true)
         view.isFindInteractionEnabled = true
         view.adjustsFontForContentSizeCategory = true
         view.autocapitalizationType = .none
@@ -451,6 +456,16 @@ struct NoteEditorView: UIViewRepresentable {
         context.coordinator.caretMoved = caretMoved
         // The Live tab came to the front, or left it: the same text view, drawn the other way (the caret, the keyboard and the text stay).
         context.coordinator.styler?.setLive(live)
+        // Hidden under the Preview (out of the touches' and VoiceOver's reach; `accessibilityHidden` and `isAccessibilityElement` do not reach a representable's view),
+        // on the next turn of the run loop and never inside SwiftUI's update: giving the keyboard up there (which hiding the view does too) makes the keyboard's
+        // tracking ask SwiftUI to render inside that same update, a cycle that held the main thread (found by sampling the app while a UI test stalled).
+        if view.isHidden != hidden {
+            DispatchQueue.main.async { [weak view] in
+                guard let view, view.isHidden != hidden else { return }
+                if hidden { _ = view.resignFirstResponder() }
+                view.isHidden = hidden
+            }
+        }
         // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
         let look = context.environment.look
         if let editor = view as? NoteTextView { editor.writing = context.environment.writing }
@@ -588,12 +603,14 @@ struct NoteEditorView: UIViewRepresentable {
             }
         }
 
-        /// Another window changed the note: show its text, keeping the caret near where it was.
+        /// Another window, or something outside this text view (a drawing edited from the Preview, a quote put at the end of the note while the Preview shows), changed
+        /// the note: show its text, keeping the caret near where it was. The text view's undo steps were made against the old text, so they are dropped (D7).
         @MainActor
         private func show(_ text: String) {
             guard let view = textView, view.nativeText != text else { return }
             let selection = view.selectedRange
             view.text = text
+            view.undoManager?.removeAllActions()
             lastLength = view.textStorage.length
             view.selectedRange = NSRange(location: min(selection.location, (text as NSString).length), length: 0)
             styler?.reload()
