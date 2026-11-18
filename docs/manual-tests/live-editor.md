@@ -20,7 +20,12 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Click on bold text: the marks appear and the text shifts a little to the right; the caret stays where you clicked.
 - [ ] Select from the middle of one bold word to the middle of another: both words show their marks. Copy and paste into the Markdown tab: the marks are in the text.
 - [ ] Frontmatter at the top is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading.
-- [ ] Code fences, lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
+- [ ] Code blocks (Gate C): make a note with a ```` ```js ````, a ```` ```python ````, a ```` ```sh ```` and an untagged ```` ``` ```` block, and an indented block. Away from the caret each looks as it does in Preview (open Split to compare): the same background, rounded corners, font, size and colours; no fences; the untagged and indented blocks plain.
+- [ ] Click into a code block: both its fences appear, dimmed, and the text you clicked keeps the caret. Click outside: they collapse again. Arrow down into a block from the line above and up into one from the line below: the caret lands on the code, then the fences appear; arrowing on reaches each fence.
+- [ ] Type inside a long code block (a couple of hundred lines): the colours follow as you type, with no lag. Type a new ```` ```js ```` block from scratch: it is drawn as a block once its closing fence is typed and the caret leaves it.
+- [ ] Change the language on a fence (`js` to `python`) and leave the block: the colours change. A made-up language stays plain.
+- [ ] In light and dark schemes the code colours are the ones Preview uses.
+- [ ] Lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
 - [ ] A long note (several thousand lines) types without lag, and scrolling is smooth.
 
 ## 1a. Links

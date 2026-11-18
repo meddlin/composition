@@ -9,7 +9,8 @@ Markdown, Preview and Split stay available.
 Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** (see
 [Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (PR #321); Gate 0 is the
 owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
-built 2026-11-17** (PR #322); Gate B is the owner's.
+built 2026-11-17** (PR #322); Gate B is the owner's. **Step 3 (code blocks) built 2026-11-17** (PR #324); Gate C is
+the owner's.
 
 ## Goal and rule
 
@@ -222,6 +223,23 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Language colours via `lowlight`, as under [Approach](#code-highlighting-with-previews-colours).
 - **Gate C (the owner's):** a note with JS, Python, shell and an untagged fence looks the same as in Preview, and
   typing in a code block stays smooth.
+- **Built (2026-11-17).**
+  - In its own module, `liveCode.ts` (a view plugin and its theme), added to `liveMarkdown`'s extension; the only
+    change to `liveMarkdown.ts` is that line and its import. `globals.css` gives `.cm-live-codeblock .hljs-*` the
+    colours of `.prose pre code .hljs-*`.
+  - **The spike went the line-class way, no state field.** A fence line away from the caret is drawn with
+    `height: 0; overflow: hidden`. CodeMirror measures it as a line of no height and does not fight it: a click
+    can't land on it, arrowing down (or up) into a block steps over it onto the code, after which the fences show
+    and the arrows reach them; the height map stays right.
+  - Colours from `lowlight` (every language, `detect` off, as Preview), cached by language and text (256 blocks),
+    lazy-loaded the first time a tagged block shows. A unit test renders the same note through Preview's
+    `rehype-highlight` and checks Live's classes character by character for JS, Python, shell and an untagged
+    fence. The font, size, line height, padding, radius and background match Preview's computed `pre` style.
+  - Measured in a dev build: ~2 ms a key in plain text, 7.6 ms median (10.9 ms p90) inside a 600-line JS block.
+  - Also drawn: indented blocks (their four-space indent hidden away from the caret). Left as they are: long lines
+    wrap (Preview scrolls them), and a block in a quote or list item gets its background behind the `>` or indent
+    as well (Step 4 draws those).
+  - Docs: [ui/live-editor.md](ui/live-editor.md#code-blocks), [manual-tests/live-editor.md](manual-tests/live-editor.md) §1.
 
 ### Step 4: lists, task lists, quotes (M)
 

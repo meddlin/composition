@@ -2,6 +2,7 @@
 
 Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveMarkdown.ts`](../../apps/web/src/components/notes/liveMarkdown.ts),
+[`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
@@ -40,9 +41,12 @@ it will read, with the syntax showing only where the caret is. The other three t
   `note:` link to a note that no longer exists, and a `pdf:` link to a PDF that is not on this device (every PDF
   link, in the web app), are struck through and muted, as in Preview, and go nowhere. See
   [Following a link](#following-a-link).
+- **Code blocks** (fenced and indented) are drawn as Preview draws them: on the block background, in the code
+  font, with rounded corners, and coloured by language with Preview's highlighter (`lowlight`) and Preview's colours.
+  See [Code blocks](#code-blocks).
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
 - **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
-- Everything else (lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
+- Everything else (lists, quotes, other MDX tags) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
@@ -65,6 +69,36 @@ preview would give that id (`#next-steps` for `## Next Steps`, `#next-steps-1` f
 opened. Following is the same code as Preview's (`followLink` in `noteLinkActions.ts`), so a dead link is dead in
 both. Preview keeps a plain click to follow and Cmd/Ctrl+click to open a note beside, and takes Cmd/Ctrl+Shift+click
 for beside as well, so the Live habit works there too. On a Mac, Ctrl+click in Live is left as the context menu.
+
+## Code blocks
+
+Source: [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts). Plan: Step 3 of
+[live-default-plan.md](../live-default-plan.md).
+
+- **The block.** Every line of a fenced (```` ``` ````, `~~~`) or indented block gets a line decoration that draws
+  Preview's `pre`: the `--surface` background, the code font at 0.875em, its padding, and rounded corners on the
+  first and last line that show. The font, size, line height, padding and radius match Preview's computed style.
+- **The fences.** While the caret is outside the block, the ```` ```lang ```` and ```` ``` ```` lines are collapsed to
+  no height (a line class, `cm-live-codeblock-hidden`); their text stays in the document. While the caret or a
+  selection is anywhere in the block, fences included, both show, dimmed, and the corners move onto them. The iPad
+  decided the same rule (its V2). Arrowing down into a block steps over the hidden opening fence onto the first line
+  of code, and the fences then show; arrowing up into one lands on its last line of code the same way. An empty
+  block, and the opening fence of one that is never closed, keep their fences showing.
+- **An indented block's** four-space indent is hidden the same way, and shows while the caret is in the block.
+- **Colours.** For each fenced block on screen, the code (without the fences, a quote's `>` or a list item's
+  indent) goes through `lowlight.highlight(lang, code)`, and the `hljs-*` spans become mark decorations with the
+  same class names. `globals.css` gives `.cm-live-codeblock .hljs-*` the rules `.prose pre code .hljs-*` has, so
+  the two tabs colour code alike (a unit test compares them character by character). The language is the info
+  string's first word, as remark reads it. An untagged fence, an indented block and a language highlight.js does
+  not know stay plain, as in Preview. Results are kept by language and text (the last 256 blocks), so moving the
+  caret or scrolling highlights nothing again; typing in a block highlights that block once per keystroke.
+- **Loading.** `lowlight` with every language is a large chunk, fetched the first time a block with a language
+  shows (the chunk Preview loads too). Until it arrives the block is drawn uncoloured.
+- **Typing cost** (dev build, 2026-11-17): about 2 ms a key in plain text and 7.6 ms (median; 10.9 ms p90) inside a
+  600-line JavaScript block, nearly all of it highlighting that block. A block of a few dozen lines costs well under
+  a millisecond.
+- **Not like Preview:** long code lines wrap, where Preview scrolls the block sideways; a block in a quote or a list
+  item puts the background behind the line's `>` or indent too.
 
 ## What it shares with the Markdown tab
 
@@ -99,7 +133,7 @@ same scenario on each:
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
 - **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
-- Not in the Live tab, by design: rendered lists, diagrams, and a preview of MDX components. Use
+- Not in the Live tab yet (see [live-default-plan.md](../live-default-plan.md)): rendered lists, diagrams, and a preview of MDX components. Use
   **Split** for those.
 
 ## Long notes

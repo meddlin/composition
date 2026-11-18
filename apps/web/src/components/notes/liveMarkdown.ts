@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import type { ChangeSet, EditorState, Extension, Range, Text } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
+import { liveCode } from "./liveCode";
 import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
 import { InkWidget } from "./liveInk";
 import { drawLink, linkContext, liveLinks, noteLinksFacet } from "./liveLinks";
@@ -373,4 +374,4 @@ const liveTheme = EditorView.baseTheme({
 });
 
 /** Everything the live editor needs to draw Markdown: put it in an editor that has the Markdown language. */
-export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks];
+export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks, liveCode];
