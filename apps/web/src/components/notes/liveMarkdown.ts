@@ -1,12 +1,14 @@
 import { syntaxTree } from "@codemirror/language";
-import type { EditorState, Extension, Range } from "@codemirror/state";
+import type { ChangeSet, EditorState, Extension, Range, Text } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import { parse } from "@/lib/composition/frontmatter";
+import { liveCode } from "./liveCode";
 import { ImageWidget, imageElements, markdownImageSrc, markdownImageTitle, type ImageElement, type NoteImageSpec } from "./liveImages";
 import { InkWidget } from "./liveInk";
+import { drawLink, linkContext, liveLinks, noteLinksFacet } from "./liveLinks";
+import { listDecorations, liveListsTheme } from "./liveLists";
 import { markElements, markTints, type MarkElement, type Tint } from "./markTints";
-import { tokenizeMarkdown, type TokenKind } from "./markdownTokens";
-import { MAX_HIGHLIGHT_CHARS } from "./MarkdownHighlight";
+import { fenceOpenedBy, tokenizeMarkdown, type Fence, type TokenizeFrom, type TokenKind } from "./markdownTokens";
 import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
 
 /**
@@ -18,6 +20,8 @@ import { HIGHLIGHT_COLORS } from "./mdx/highlightColors";
  *
  * "Touches" includes the caret sitting right after the closing mark, so `**some text**|` still shows its marks and
  * `**some text** |`, the next word begun, does not.
+ *
+ * Links are drawn the same way, as their text; following one is Cmd/Ctrl+click (see `liveLinks`).
  */
 
 /** The inline constructs that hide their marks, by the syntax-tree node that holds them → the node of their marks. */
@@ -83,25 +87,88 @@ export type NoteScan = {
 
 const NO_SCAN: NoteScan = { tints: [], elements: [], tokens: [], images: [], inks: [] };
 
+type Positioned = { start: number; end: number };
+
 /**
- * Reads the note the way the plain editor does to colour it: its runs (`tokenizeMarkdown`), the text between each
- * `<Mark color="…">` and its `</Mark>`, and where those tags are. Skipped, as it does, for a note too long to colour
- * on every keystroke.
+ * Reads `text` the way the plain editor does to colour it: its runs (`tokenizeMarkdown`), the text between each
+ * `<Mark color="…">` and its `</Mark>`, where those tags are, and each `<Image />` and `<Ink />`. `text` starts at
+ * `offset` in the note, and every position in the result is the note's.
  */
-export function scanOf(text: string): NoteScan {
-  if (text.length > MAX_HIGHLIGHT_CHARS) return NO_SCAN;
-  const segments = tokenizeMarkdown(text);
+function scanText(text: string, offset: number, from: TokenizeFrom): NoteScan {
+  const segments = tokenizeMarkdown(text, from);
+  const move = <T extends Positioned>(item: T): T => ({ ...item, start: item.start + offset, end: item.end + offset });
 
   const tokens: Token[] = [];
-  let at = 0;
+  let at = offset;
   for (const { text: run, kind } of segments) {
     if (kind && COLOURED.has(kind)) tokens.push({ start: at, end: at + run.length, kind });
     at += run.length;
   }
-  const images = imageElements(text, segments);
-  const inks = imageElements(text, segments, "Ink");
+  const images = imageElements(text, segments).map(move);
+  const inks = imageElements(text, segments, "Ink").map(move);
   if (!text.includes("<Mark")) return { tints: [], elements: [], tokens, images, inks };
-  return { tints: markTints(text, segments), elements: markElements(text, segments), tokens, images, inks };
+  return {
+    tints: markTints(text, segments).map(move),
+    elements: markElements(text, segments).map(({ open, close }) => ({ open: move(open), close: move(close) })),
+    tokens,
+    images,
+    inks,
+  };
+}
+
+/** The whole of `text` read as `scanAround` reads part of a note. */
+export function scanOf(text: string): NoteScan {
+  return scanText(text, 0, { frontmatter: true, fence: null });
+}
+
+/**
+ * How far past what is on screen `scanAround` reads, either way. A highlight is tinted while its opening and closing
+ * tags are both inside that, so one that opens further above the screen than this is drawn untinted, its tags showing.
+ */
+export const SCAN_MARGIN = 10_000;
+
+/**
+ * The code fence the line starting at `pos` is inside, from the syntax tree (which CodeMirror keeps up to date as
+ * the note changes, without reading it all again), as `tokenizeMarkdown` would have found it by reading from the
+ * top. Null outside a fence, on its opening line (which opens it), and for a fence the tokenizer does not take for
+ * one (inside a quote or behind a list marker).
+ */
+function fenceAt(state: EditorState, pos: number): Fence | null {
+  for (let node: SyntaxNode | null = syntaxTree(state).resolveInner(pos, 1); node; node = node.parent) {
+    if (node.name !== "FencedCode") continue;
+    return node.from < pos ? fenceOpenedBy(state.doc.lineAt(node.from).text) : null;
+  }
+  return null;
+}
+
+/**
+ * What `scanOf` finds, for the part of the note around `around` (what is on screen): the lines from `SCAN_MARGIN`
+ * above it to `SCAN_MARGIN` below it, never the frontmatter (which ends at `frontmatterEnd`). The tokenizer reads a
+ * line at a time and remembers only whether it is in a code fence, so starting at a line in the middle with the
+ * fence the syntax tree says it is in gives the same runs as reading from the top, and a keystroke costs the same in
+ * a note of any length.
+ */
+export function scanAround(state: EditorState, around: Span, frontmatterEnd: number): NoteScan {
+  const doc = state.doc;
+  const from = Math.max(frontmatterEnd, doc.lineAt(Math.max(0, Math.min(around.from, doc.length) - SCAN_MARGIN)).from);
+  const to = doc.lineAt(Math.min(doc.length, Math.max(around.to, from) + SCAN_MARGIN)).to;
+  if (from >= to) return NO_SCAN;
+  // At the very top, a block that is not yet valid frontmatter (being typed) is still read as one, as the plain editor reads it.
+  return scanText(doc.sliceString(from, to), from, { frontmatter: from === 0, fence: fenceAt(state, from) });
+}
+
+/**
+ * Where the frontmatter ends once `changes` (which made `doc`) are made, given where it ended before them. It is
+ * read again (see `bodyStart`) only when a change could have moved it: one at or above its end, or anywhere in a note
+ * that starts with `---` and has none yet (the closing line may just have been typed). Typing below it reads nothing.
+ */
+export function frontmatterEndAfter(doc: Text, changes: ChangeSet, before: number): number {
+  if (doc.sliceString(0, 3) !== "---") return 0;
+  let touched = before === 0;
+  changes.iterChangedRanges((fromA) => {
+    if (fromA <= before) touched = true;
+  });
+  return touched ? bodyStart(doc.toString()) : before;
 }
 
 /** What a Markdown `![alt](src "title")` shows, or null when it has no address of its own (`![alt][ref]`). */
@@ -128,7 +195,7 @@ function drawImage(decorations: Range<Decoration>[], image: NoteImageSpec, from:
 
 /**
  * The decorations for the parts of the document inside `ranges` (the viewport, normally). `frontmatterEnd` is where
- * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `scan` (see `scanOf`) is where the
+ * the frontmatter ends (see `bodyStart`); it is left as plain, monospaced text. `scan` (see `scanAround`) is where the
  * text is coloured as the plain editor colours it, and where it is highlighted: tinted behind the text, wherever it
  * is, with the tags hidden as `**` is: shown, dimmed, only while the selection touches the element, from its
  * opening tag to its closing one.
@@ -141,6 +208,7 @@ export function liveDecorations(
 ): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const doc = state.doc;
+  const links = linkContext(state);
 
   for (const { from, to } of ranges) {
     syntaxTree(state).iterate({
@@ -180,6 +248,12 @@ export function liveDecorations(
           return false;
         }
 
+        if (node.name === "Link" || node.name === "Autolink" || node.name === "URL") {
+          // Its text is still walked, so a bold word in a link's text is bold.
+          drawLink(state, node.node, links, decorations);
+          return;
+        }
+
         const inline = INLINE[node.name];
         if (!inline) return;
         decorations.push(styles.get(inline.class)!.range(node.from, node.to));
@@ -214,6 +288,8 @@ export function liveDecorations(
     }
   }
 
+  for (const decoration of listDecorations(state, ranges, frontmatterEnd)) decorations.push(decoration);
+
   if (frontmatterEnd > 0) {
     const last = doc.lineAt(Math.min(frontmatterEnd - 1, doc.length)).number;
     for (let number = 1; number <= last; number++) decorations.push(frontmatterLine.range(doc.line(number).from));
@@ -223,7 +299,10 @@ export function liveDecorations(
   return Decoration.set(decorations, true);
 }
 
-/** Draws the Markdown as above, for what is on screen. */
+/**
+ * Draws the Markdown as above, for what is on screen. Nothing it does on a keystroke reads the whole note, so a note
+ * of any length is drawn in full: the Markdown tab's colours stop at `MAX_HIGHLIGHT_CHARS`, and this does not.
+ */
 const liveMarkdownPlugin = ViewPlugin.fromClass(
   class {
     decorations: DecorationSet;
@@ -231,23 +310,26 @@ const liveMarkdownPlugin = ViewPlugin.fromClass(
     scan: NoteScan;
 
     constructor(view: EditorView) {
-      const text = view.state.doc.toString();
-      this.frontmatterEnd = bodyStart(text);
-      this.scan = scanOf(text);
+      this.frontmatterEnd = bodyStart(view.state.doc.toString());
+      this.scan = scanAround(view.state, view.viewport, this.frontmatterEnd);
       this.decorations = liveDecorations(view.state, view.visibleRanges, this.frontmatterEnd, this.scan);
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged) {
-        const text = update.state.doc.toString();
-        this.frontmatterEnd = bodyStart(text);
-        this.scan = scanOf(text);
+      if (update.docChanged) this.frontmatterEnd = frontmatterEndAfter(update.state.doc, update.changes, this.frontmatterEnd);
+      // The scan covers what is on screen, so scrolling reads again too; the syntax tree changing means more of the
+      // note has been parsed, which can change which fence the read starts in.
+      const treeChanged = syntaxTree(update.state) !== syntaxTree(update.startState);
+      if (update.docChanged || update.viewportChanged || treeChanged) {
+        this.scan = scanAround(update.state, update.view.viewport, this.frontmatterEnd);
       }
       if (
         update.docChanged ||
         update.selectionSet ||
         update.viewportChanged ||
-        syntaxTree(update.state) !== syntaxTree(update.startState)
+        treeChanged ||
+        // Which notes and PDFs exist (a link to a deleted one is drawn struck through).
+        update.startState.facet(noteLinksFacet) !== update.state.facet(noteLinksFacet)
       ) {
         this.decorations = liveDecorations(update.state, update.view.visibleRanges, this.frontmatterEnd, this.scan);
       }
@@ -295,4 +377,4 @@ const liveTheme = EditorView.baseTheme({
 });
 
 /** Everything the live editor needs to draw Markdown: put it in an editor that has the Markdown language. */
-export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme];
+export const liveMarkdown: Extension = [liveMarkdownPlugin, liveTheme, liveLinks, liveCode, liveListsTheme];

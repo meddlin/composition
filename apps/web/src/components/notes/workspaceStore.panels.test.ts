@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createChatsStore } from "@/lib/composition/assistant/chatsStore";
+import { DEFAULT_WRITING_SETTINGS, type NoteView } from "@/lib/composition/writing";
 import { panelIds } from "../panels/layoutTree";
 import type { NotePanelState } from "../panels/kinds";
 import { assistantSubject, focusedPanelId } from "../panels/panelsState";
@@ -139,7 +140,7 @@ describe("picking a note, as in the sidebar", () => {
     store.openNote(2);
 
     expect(kindOf(store, only)).toBe("note");
-    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "split" });
+    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "live" });
   });
 
   it("replaces the note in the focused note panel, keeping how it is viewed", () => {
@@ -203,7 +204,7 @@ describe("opening a note to the side", () => {
     expect(notesShown(store)).toEqual([1]);
   });
 
-  it("makes a new note panel to the right of the focused one, which is on the editor tab", () => {
+  it("makes a new note panel to the right of the focused one, which is on Live, where notes open by default", () => {
     const store = gridStore(notes);
     store.openNote(1);
     const [a] = panelIds(mainWindow(store).layout);
@@ -212,7 +213,7 @@ describe("opening a note to the side", () => {
 
     const [, b] = panelIds(mainWindow(store).layout);
     expect(notesShown(store)).toEqual([1, 2]);
-    expect(stateOf(store, b)).toEqual({ noteId: 2, view: "markdown" });
+    expect(stateOf(store, b)).toEqual({ noteId: 2, view: "live" });
     expect(focused(store)).toBe(b);
     expect(stateOf(store, a).noteId).toBe(1);
   });
@@ -227,6 +228,71 @@ describe("opening a note to the side", () => {
   });
 });
 
+describe("the view notes open in (Settings › Writing › \"Open notes in\")", () => {
+  const notes = [note(1), note(2)];
+  const storeOpeningIn = (openNotesIn: NoteView) =>
+    createWorkspaceStore({ notes, groups: [], writing: { ...DEFAULT_WRITING_SETTINGS, openNotesIn } }, {} as WorkspaceDeps, undefined, { panels: {} });
+
+  it("is the view of the panel a picked note fills", () => {
+    const store = storeOpeningIn("live");
+    const [only] = panelIds(mainWindow(store).layout);
+
+    store.openNote(1);
+
+    expect(stateOf(store, only)).toEqual({ noteId: 1, view: "live" });
+  });
+
+  it("is the view of a new panel beside, except that Split opens beside on the editor tab", () => {
+    const preview = storeOpeningIn("preview");
+    preview.openNote(1);
+    preview.openNoteBeside(2);
+    expect(stateOf(preview, panelIds(mainWindow(preview).layout)[1]).view).toBe("preview");
+
+    const split = storeOpeningIn("split");
+    split.openNote(1);
+    split.openNoteBeside(2);
+    expect(stateOf(split, panelIds(mainWindow(split).layout)[1]).view).toBe("markdown");
+  });
+
+  it("leaves alone a panel whose tab was chosen, when another note opens in it", () => {
+    const store = storeOpeningIn("live");
+    store.openNote(1);
+    const [only] = panelIds(mainWindow(store).layout);
+    store.setPanelState(only, { noteId: 1, view: "preview" });
+
+    store.openNote(2);
+
+    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "preview" });
+  });
+
+  it("takes on a change made in Settings for the notes opened after it", () => {
+    const store = storeOpeningIn("split");
+    expect(store.openNotesIn()).toBe("split");
+
+    store.setOpenNotesIn("live");
+    store.openNote(1);
+
+    expect(stateOf(store, panelIds(mainWindow(store).layout)[0]).view).toBe("live");
+  });
+
+  it("is Live when none was saved, and a view that was saved is kept", () => {
+    const fresh = createWorkspaceStore({ notes, groups: [] }, {} as WorkspaceDeps, undefined, { panels: {} });
+    expect(fresh.openNotesIn()).toBe("live");
+    fresh.openNote(1);
+    expect(stateOf(fresh, panelIds(mainWindow(fresh).layout)[0]).view).toBe("live");
+
+    const saved = storeOpeningIn("split");
+    saved.openNote(1);
+    expect(stateOf(saved, panelIds(mainWindow(saved).layout)[0]).view).toBe("split");
+  });
+
+  it("is the view of the web app's first pane", () => {
+    const store = createWorkspaceStore({ notes, groups: [], writing: { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "live" } }, {} as WorkspaceDeps);
+
+    expect(store.getSnapshot().panes.panes).toEqual([{ noteId: 1, size: 1, view: "live" }]);
+  });
+});
+
 describe("dropping a note on a panel", () => {
   const notes = [note(1), note(2)];
 
@@ -236,7 +302,7 @@ describe("dropping a note on a panel", () => {
 
     store.dropNote(2, only, "center");
 
-    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "split" });
+    expect(stateOf(store, only)).toEqual({ noteId: 2, view: "live" });
   });
 
   it("replaces the note of a note panel when dropped on its middle, keeping its tab", () => {
@@ -490,7 +556,7 @@ describe("saving the panels", () => {
           layout: mainWindow(store).layout,
           panels: {
             [a]: { kind: "empty", state: null },
-            [b]: { kind: "note", state: { noteId: 1, view: "split" } },
+            [b]: { kind: "note", state: { noteId: 1, view: "live" } },
           },
         },
       },
@@ -654,7 +720,7 @@ describe("pop-out windows", () => {
     expect(windowIds(store)).toEqual(["main", popout]);
     expect(panelsIn(store, "main")).toEqual([a]);
     expect(panelsIn(store, popout)).toEqual([b]);
-    expect(stateOf(store, b)).toEqual({ noteId: 2, view: "split" });
+    expect(stateOf(store, b)).toEqual({ noteId: 2, view: "live" });
     expect(focusOrderIn(store, "main")).toEqual([a]);
     expect(focusOrderIn(store, popout)).toEqual([b]);
   });
@@ -703,7 +769,7 @@ describe("pop-out windows", () => {
     expect(panelsIn(store, popout)).toEqual([b, a]);
     expect(focusOrderIn(store, popout)[0]).toBe(a);
     expect(kindOf(store, panelsIn(store, "main")[0])).toBe("empty");
-    expect(stateOf(store, a)).toEqual({ noteId: 1, view: "split" });
+    expect(stateOf(store, a)).toEqual({ noteId: 1, view: "live" });
   });
 
   it("close the pop-out when its last panel is moved back to the main window", () => {

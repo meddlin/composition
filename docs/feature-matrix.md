@@ -60,6 +60,7 @@ Legend: ✅ supported · ❌ not supported · 🚫 left out on purpose (the note
 | Feature | CLI | Web | Desktop | Notes |
 |---|:-:|:-:|:-:|---|
 | Markdown preview | ✅ | ✅ | ✅ | |
+| Live tab: the Markdown drawn as it will read, the syntax showing only under the caret; the view notes open in | ❌ | ✅ | ✅ | Web and desktop open notes in Live, the first of the tabs (Live, Markdown, Preview, Split); **Settings › Writing › Open notes in** picks another, and a view already saved is kept. The CLI has no Live tab and opens notes in Split. [live-editor.md](ui/live-editor.md), [live-default-plan.md](live-default-plan.md) |
 | Syntax highlighting while writing Markdown | ✅ | ✅ | ✅ | The CLI colors the editor with the same palette ([highlight.ts](../apps/cli/src/highlight.ts)). [markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) |
 | Tab types a tab in the editor, to indent nested lists | ✅ | ✅ | ✅ | |
 | Images in notes: shown in the preview | ✅ | ✅ | ✅ | The CLI draws them with the terminal's graphics protocol, or in block characters. [images.md](architecture/images.md) |
