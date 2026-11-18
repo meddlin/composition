@@ -2,6 +2,7 @@ import XCTest
 
 /// Step 0 of docs/ipad-live-default-plan.md: the "Open notes in" setting (every note opens in it; the tab chosen lasts until another note opens) and the text
 /// view kept alive under the Preview and Split tabs, so that its undo survives a look at another tab (D7), while an edit from outside it leaves nothing to undo.
+/// Step 8: Live is the default (D1), first in every list of the tabs (D6), and a new note opens in Live when the setting is Preview (I5).
 /// apps/ios/scripts/ui-test.sh passes the backup in.
 @MainActor
 final class OpenNotesInUITests: XCTestCase {
@@ -107,16 +108,18 @@ final class OpenNotesInUITests: XCTestCase {
         XCTAssertTrue(eventually { self.tab() == "Live" }, "the next note opens in Live again, not in the Preview chosen for the last: \(String(describing: tab()))")
     }
 
-    func testTheSettingIsChosenInTheAppearanceSheetAndKeptOnThisIPad() throws {
-        try launch(["-resetOpenNotesIn", "1"])
+    /// Forgets the choice when the test ends, so that the other suites see the default.
+    private func resetTheChoiceAfterwards() {
         addTeardownBlock { @MainActor in
-            // Leave the choice unset for the other suites, which expect the Preview.
             let reset = XCUIApplication()
             reset.launchArguments = ["-resetOpenNotesIn", "1"]
             reset.launch()
             reset.terminate()
         }
-        XCTAssertTrue(eventually { self.tab() == "Preview" }, "with nothing chosen a note opens in the Preview, as before: \(String(describing: tab()))")
+    }
+
+    /// Opens the Appearance sheet's "Open notes in" menu (the lists must be hidden, as `launch` leaves them).
+    private func openTheSettingsMenu() {
         app.buttons["focus-toggle"].tap()  // the lists, whose foot has the Appearance button
         XCTAssertTrue(app.buttons["sidebar-appearance"].waitForExistence(timeout: 10))
         app.buttons["sidebar-appearance"].tap()
@@ -126,16 +129,49 @@ final class OpenNotesInUITests: XCTestCase {
         for _ in 0..<6 where !(picker.exists && picker.isHittable) { app.buttons["scheme-forest"].swipeUp() }
         XCTAssertTrue(picker.waitForExistence(timeout: 10), "the Writing section has Open notes in")
         picker.tap()
-        app.buttons["Markdown"].firstMatch.tap()
+    }
+
+    /// Step 8 (D1): a setting never chosen is Live, for the note the app opens on and for every note after it.
+    func testWithNothingChosenEveryNoteOpensInLive() throws {
+        try launch(["-resetOpenNotesIn", "1"])
+        resetTheChoiceAfterwards()
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        XCTAssertTrue(eventually { self.tab() == "Live" }, "with nothing chosen a note opens in Live: \(String(describing: tab()))")
+        XCTAssertTrue(eventually { self.report.exists && self.report.label != "markdown" }, "and is drawn as Live: \(report.label)")
+        openAnotherNote()
+        XCTAssertTrue(eventually { self.tab() == "Live" }, "and so does the next: \(String(describing: tab()))")
+    }
+
+    /// The setting is chosen in the sheet, Live first among its choices (D6); a Preview chosen there stays the Preview across a second launch, though the
+    /// default is now Live (a choice already made stays).
+    func testTheSettingIsChosenInTheAppearanceSheetAndAStoredPreviewStays() throws {
+        try launch(["-resetOpenNotesIn", "1"])
+        resetTheChoiceAfterwards()
+        XCTAssertTrue(eventually { self.tab() == "Live" }, "with nothing chosen a note opens in Live: \(String(describing: tab()))")
+        openTheSettingsMenu()
+        // The menu's choices, top to bottom: Live, Markdown, Preview, Split.
+        let choices = ["Live", "Markdown", "Preview", "Split"].map { app.buttons.matching(NSPredicate(format: "label == %@ AND NOT (identifier == 'open-notes-in')", $0)).firstMatch }
+        for choice in choices { XCTAssertTrue(choice.waitForExistence(timeout: 10), "\(choice)") }
+        let tops = choices.map { $0.frame.minY }
+        XCTAssertEqual(tops, tops.sorted(), "Live, Markdown, Preview, Split, in that order: \(tops)")
+        choices[2].tap()
         app.buttons["Done"].tap()
         openAnotherNote()
-        XCTAssertTrue(eventually { self.tab() == "Markdown" }, "the next note opens in Markdown: \(String(describing: tab()))")
-        // A second launch, with nothing said about it: kept.
+        XCTAssertTrue(eventually { self.tab() == "Preview" }, "the next note opens in the Preview: \(String(describing: tab()))")
+        // A second launch, with nothing said about it: the stored Preview is kept, not replaced by the new default.
         app.terminate()
         app.launchArguments = ["-openNote", "25"]
         app.launch()
+        XCTAssertTrue(eventually { self.tab() != nil }, "a note is open")
         openAnotherNote()
-        XCTAssertTrue(eventually { self.tab() == "Markdown" }, "and is kept: \(String(describing: tab()))")
+        XCTAssertTrue(eventually { self.tab() == "Preview" }, "and is kept: \(String(describing: tab()))")
+    }
+
+    /// I5 after Step 8: with the setting on Preview, a note just made opens in Live (it opened in Markdown before), with the keyboard up.
+    func testANewNoteOpensInLiveWhenTheSettingIsPreview() throws {
+        try launch(["-openNotesIn", "Preview", "-newNote", "1"])
+        XCTAssertTrue(eventually(30) { self.tab() == "Live" }, "the new note opens in Live: \(String(describing: tab()))")
+        XCTAssertTrue(eventually { self.app.keyboards.firstMatch.exists || self.editor.hasFocus }, "with the keyboard up")
     }
 
     // MARK: Undo across the tabs (D7)

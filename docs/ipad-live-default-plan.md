@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Steps 1 to 7 are built (each step's status is under it).
+[Decisions](#decisions)). Steps 0 to 8 are built (each step's status is under it); Step 8 made Live the default.
 
 ## Goal and rule
 
@@ -556,6 +556,22 @@ owner's (item 366). The plan branch alone passes that audit; Step 7 on `main` di
 - Docs: [ipad-live-view-plan.md](ipad-live-view-plan.md), the tracker and C12 in
   [ipad-app-design.md](ipad-app-design.md), [manual-tests/ipad.md](manual-tests/ipad.md), [index.md](index.md).
 - **Gate LD8 (iPad, yours):** a week of writing on the iPad with Live as the default, item 367.
+
+**Status (2026-11-18): built, Simulator only; Gate LD8 is yours.** Branch `claude/ipad-live-default-step8`, on the plan branch (Steps 0 to 7).
+- **The default:** `NoteDetailView.Mode.openNotesInDefault` is `.live`. The key `openNotesIn` is written only by the
+  Appearance sheet's picker (`@AppStorage` never stores a default), and `-resetOpenNotesIn` only removes it, so a setting
+  never chosen follows the new default while one chosen before (Preview included) stays. No migration was needed: the
+  desktop's stuck default came from saving the whole settings object, which the iPad does not do.
+- **The order:** the `Mode` enum's cases are `live, markdown, preview, split`; the toolbar's segmented picker, the compact
+  View menu and *Open notes in* all list `Mode.allCases`, so all three follow it.
+- **A new note** (`model.takeFreshNote`) opens in Live when the setting is Preview; *Insert in Open Note* from the Images
+  page switches a Preview to Live. Live and Markdown share one text view, so the picture goes in at the caret either way.
+- **Checked:** see the PR for the Simulator run. UI tests added: `OpenNotesInUITests.testWithNothingChosenEveryNoteOpensInLive`,
+  `…testTheSettingIsChosenInTheAppearanceSheetAndAStoredPreviewStays` (the sheet's choices in the order Live, Markdown,
+  Preview, Split; Preview chosen there stays across a second launch), `…testANewNoteOpensInLiveWhenTheSettingIsPreview`,
+  and `PolishUITests.testInsertInOpenNoteSwitchesAPreviewToLive`; `LiveUITests`' picker test became
+  `testLiveIsTheFirstWordOfTheViewPicker`. The compact View menu's order is not tested on its own (it lists the same
+  `allCases`).
 
 **Order.** Step 0 first. Steps 1 to 4 are independent of each other. Step 5's spike comes before Steps 5 to 7.
 Step 8 last (D1). The iPad can run behind the desktop step for step, so that each step's oracle exists when it
