@@ -52,6 +52,29 @@ private struct Fixture: Decodable {
         }
     }
 
+    /// A line of a list or a quote: where it starts, its lists (`L`) and quotes (`Q`) outermost first, and whether an item starts on it.
+    struct ListRow: Decodable {
+        let from: Int, kinds: String, starts: Bool
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            from = try row.decode(Int.self)
+            kinds = try row.decode(String.self)
+            starts = try row.decode(Bool.self)
+        }
+    }
+
+    /// What is drawn in place of a list's or a quote's marks: `marker` (the number as written, or `bullet`), `task` (`x` or a space) or `hidden`.
+    struct DrawnRow: Decodable {
+        let kind: String, from: Int, to: Int, extra: String
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            kind = try row.decode(String.self)
+            from = try row.decode(Int.self)
+            to = try row.decode(Int.self)
+            extra = try row.decode(String.self)
+        }
+    }
+
     /// A link's drawn text and the address it follows (Step 2 of docs/ipad-live-default-plan.md).
     struct Link: Decodable {
         let from: Int, to: Int, href: String
@@ -74,6 +97,10 @@ private struct Fixture: Decodable {
         /// Each `<Ink … />` the desktop draws from its strokes (InkWidget), in the form of a picture. Optional, so that a folder written before Step 1 still reads.
         let inks: [Picture]?
         let tints: [Tint]
+        /// Lists, task lists and quotes (docs/ipad-live-default-plan.md, Step 4): only in a fixture written by a desktop that draws them (its Step 4, PR #325, with the
+        /// writer's `lists` and `listDrawn`). Without them, lists are not compared.
+        let lists: [ListRow]?
+        let listDrawn: [DrawnRow]?
         let links: [Link]
     }
 
@@ -118,10 +145,12 @@ private func lines(_ expected: Fixture.Expected, text: String) -> [String] {
     out += (expected.inks ?? []).map { line("ink", $0) }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
     out += expected.links.filter { !isFootnoteDefinitionWord($0.from, in: text) }.map { "link \($0.from)-\($0.to) \(unified($0.href))" }
+    out += (expected.lists ?? []).map { "list line at \($0.from): \($0.kinds)\($0.starts ? " starts" : "")" }
+    out += (expected.listDrawn ?? []).map { "list \($0.kind) \($0.from)-\($0.to)\($0.extra.isEmpty ? "" : " " + $0.extra)" }
     return out.sorted()
 }
 
-private func lines(_ decorations: LiveDecorations) -> [String] {
+private func lines(_ decorations: LiveDecorations, lists: Bool) -> [String] {
     var out: [String] = []
     out += decorations.frontmatterLines.map { "frontmatter line at \($0)" }
     out += decorations.headings.map { "heading at \($0.line), level \($0.level)" }
@@ -138,6 +167,17 @@ private func lines(_ decorations: LiveDecorations) -> [String] {
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
     out += decorations.links.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \(unified($0.href))" }
+    guard lists else { return out.sorted() }
+    for line in decorations.lists {
+        let kinds = line.containers.map { if case .quote = $0 { "Q" } else { "L" } }.joined()
+        let starts = line.containers.contains { if case .list(starts: true, _) = $0 { true } else { false } }
+        out.append("list line at \(line.range.location): \(kinds)\(starts ? " starts" : "")")
+        if let hidden = line.hidden {
+            let at = "\(hidden.location)-\(NSMaxRange(hidden))"
+            if let marker = line.marker { out.append("list marker \(at) \(marker.ordered ? marker.text : "bullet")") } else { out.append("list hidden \(at)") }
+        }
+        if let task = line.task { out.append("list task \(task.range.location)-\(NSMaxRange(task.range)) \(task.checked ? "x" : " ")") }
+    }
     return out.sorted()
 }
 
@@ -165,7 +205,7 @@ struct LiveConformanceTests {
             let model = models[state.t] ?? LiveModel(text: fixture.texts[state.t].text)
             models[state.t] = model
             let want = lines(fixture.expected[index], text: fixture.texts[state.t].text)
-            let got = lines(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)))
+            let got = lines(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)), lists: fixture.expected[index].lists != nil)
             guard want != got else { continue }
             let missing = Set(want).subtracting(got).sorted(), extra = Set(got).subtracting(want).sorted()
             let note = "selection \(state.from)-\(state.to): missing \(missing.prefix(4)), extra \(extra.prefix(4))"

@@ -549,7 +549,7 @@ final class LiveUITests: XCTestCase {
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertTrue(eventually { text().hasSuffix("one **two**\t") }, "a tab after the closing mark: \(text().suffix(20).debugDescription)")
         XCTAssertTrue(eventually { drawn()["hidden"] == at((4, 6), (9, 11)) }, "the caret has moved past the word, so its marks hide: \(drawn())")
-        app.typeText("\n- **a**\n- *b*")
+        app.typeText("\n- **a**\n*b*")  // Return writes the second item's `- `
         app.typeKey(.upArrow, modifierFlags: .shift)
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertTrue(eventually { text().hasSuffix("\t- **a**\n\t- *b*") }, "Tab indents both lines: \(text().suffix(30).debugDescription)")

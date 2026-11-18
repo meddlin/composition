@@ -77,7 +77,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode, .liveList]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -196,6 +196,12 @@ final class MarkdownStyler {
             if let last = ranges.last, range.location <= NSMaxRange(last) { ranges[ranges.count - 1] = NSUnionRange(last, range) } else { ranges.append(range) }
         }
         for range in ranges { applyColours(to: range, using: model) }
+    }
+
+    /// The task box drawn at `position` for the selection in force, when there is one (what a tap on a box ticks; `LiveTaskTap`).
+    func drawnTask(at position: Int) -> LiveDecorations.ListLine.Task? {
+        guard isLive, let live, let textView, live.length == textView.textStorage.length, textView.markedTextRange == nil else { return nil }
+        return live.task(at: position, selection: textView.selectedRange)
     }
 
     /// The link the selection is in, in the Live tab, when it can be followed (a `pdf:` link to a PDF not here cannot): what the ↗ beside it follows.

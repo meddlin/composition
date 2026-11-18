@@ -61,6 +61,48 @@ public struct LiveDecorations: Equatable, Sendable {
         public var color: String
     }
 
+    /// A line of a list or a quote (docs/ipad-live-default-plan.md, Step 4; the desktop's `listDecorations`, liveLists.ts). Every such line is indented one
+    /// level for each list and quote it is in, and has a bar down its left side for each quote. Away from the selection the marks at its start (`> `, `- `,
+    /// `1. `, and the indentation that carries an item on) are hidden, and a bullet, a number or a checkbox is drawn in their place.
+    public struct ListLine: Equatable, Sendable {
+        public enum Container: Hashable, Sendable {
+            case quote
+            /// A list item: `starts` on the line the item starts on, and `column` is how far into that line its text starts.
+            case list(starts: Bool, column: Int)
+        }
+
+        /// What is drawn in place of an item's mark: its number as written (`3.`, `3)`), or a bullet.
+        public struct Marker: Hashable, Sendable {
+            public var text: String
+            public var ordered: Bool
+        }
+
+        /// A task's `[ ]` or `[x]`.
+        public struct Task: Hashable, Sendable {
+            /// The box and the space after it: what is hidden.
+            public var range: NSRange
+            /// The three characters of the box, `[`, the space or `x`, `]`.
+            public var box: NSRange
+            public var checked: Bool
+
+            /// What ticking or unticking the box writes: its middle character becomes `x`, or a space (the desktop's `toggleTask`).
+            public var toggle: (range: NSRange, text: String) { (NSRange(location: box.location + 1, length: 1), checked ? " " : "x") }
+        }
+
+        /// The line, from its start to the end of its text.
+        public var range: NSRange
+        /// The lists and quotes the line is in, outermost first.
+        public var containers: [Container]
+        /// The selection reaches the line (ends included): its marks show as they are written, and nothing is drawn in their place.
+        public var active: Bool
+        /// Away from the selection, the marks and the indentation at the line's start, when there are any.
+        public var hidden: NSRange?
+        /// Away from the selection, on the line an item starts on (when that item is the innermost thing the line is in): its marker.
+        public var marker: Marker?
+        /// Away from the selection, a task's box, drawn as a checkbox; a tap on it ticks or unticks it (decision D4).
+        public var task: Task?
+    }
+
     /// A link (Step 2 of docs/ipad-live-default-plan.md): `[text](url "title")`, `[text][label]`, `<url>` or a bare address.
     public struct Link: Equatable, Sendable {
         /// What is drawn as the link: a link's words, or an address (an autolink's, without its `<` `>`, or a bare one).
@@ -109,6 +151,8 @@ public struct LiveDecorations: Equatable, Sendable {
     /// A top-level indented block's indent on each line (four columns), hidden while the selection is outside the block, as the desktop hides it.
     public var codeIndentsHidden: [NSRange] = []
     public var links: [Link] = []
+    /// The lines of lists and quotes (Step 4 of docs/ipad-live-default-plan.md). What they hide is here and not in `hidden`, because it is drawn over.
+    public var lists: [ListLine] = []
 }
 
 public struct LiveModel: Sendable {
@@ -163,6 +207,16 @@ public struct LiveModel: Sendable {
         var hide: [NSRange]
     }
 
+    /// A line of a list or a quote, as the desktop's `readLines` (liveLists.ts) makes it: `node` is the line, from its start to the end of its text.
+    struct ListLineNode: Hashable, Sendable {
+        var node: NSRange
+        var containers: [LiveDecorations.ListLine.Container]
+        /// Where the marks and indentation at the line's start end (the desktop's `prefixEnd`): what is hidden away from the selection.
+        var prefixEnd: Int
+        var marker: LiveDecorations.ListLine.Marker?
+        var task: LiveDecorations.ListLine.Task?
+    }
+
     /// Everything in the note that the selection can reveal, in one list ordered by where it starts.
     enum Construct: Sendable {
         case heading(HeadingNode)
@@ -170,6 +224,7 @@ public struct LiveModel: Sendable {
         case style(StyleNode)
         case picture(PictureNode)
         case fenced(FenceNode)
+        case listLine(ListLineNode)
         case link(LinkNode)
 
         var node: NSRange {
@@ -179,6 +234,7 @@ public struct LiveModel: Sendable {
             case .style(let value): value.node
             case .picture(let value): value.node
             case .fenced(let value): value.node
+            case .listLine(let value): value.node
             case .link(let value): value.node
             }
         }
@@ -210,6 +266,15 @@ public struct LiveModel: Sendable {
                 value.fenceLines = value.fenceLines.map { $0 + delta }
                 value.indents = value.indents.map(move)
                 return .fenced(value)
+            case .listLine(var value):
+                value.node = move(value.node)
+                value.prefixEnd += delta
+                if var task = value.task {
+                    task.range = move(task.range)
+                    task.box = move(task.box)
+                    value.task = task
+                }
+                return .listLine(value)
             case .link(var value):
                 value.node = move(value.node)
                 value.text = move(value.text)
@@ -270,6 +335,7 @@ public struct LiveModel: Sendable {
         constructs += reader.pictures.map { .picture($0) }
         constructs += reader.codeBlocks.map { .fenced($0) }
         constructs += reader.links.map { .link($0) }
+        constructs += reader.listLines().map { .listLine($0) }
         constructs.sort { $0.node.location < $1.node.location }
         return (constructs, frontmatterLines)
     }
@@ -398,6 +464,8 @@ public struct LiveModel: Sendable {
                         if containsLineBreak(part) { out.shown.append(part) } else { out.hidden.append(part) }
                     }
                 }
+            case .listLine(let line):
+                out.lists.append(Self.listLine(line, active: touches(line.node)))
             }
         }
 
@@ -415,6 +483,27 @@ public struct LiveModel: Sendable {
             }
         }
         return out
+    }
+
+    /// What a line of a list or a quote looks like with the selection on it (`active`) or away from it, as the desktop's `listDecorations` decides.
+    private static func listLine(_ line: ListLineNode, active: Bool) -> LiveDecorations.ListLine {
+        var out = LiveDecorations.ListLine(range: line.node, containers: line.containers, active: active)
+        guard !active else { return out }
+        if line.prefixEnd > line.node.location { out.hidden = NSRange(location: line.node.location, length: line.prefixEnd - line.node.location) }
+        if let marker = line.marker, case .list(starts: true, _) = line.containers.last { out.marker = marker }
+        out.task = line.task
+        return out
+    }
+
+    /// The task box drawn at `position` (a box's three characters, or the space after it), with the selection where it is: what a tap on the box ticks or
+    /// unticks. Nil when no box is drawn there (the selection is on its line, or there is no task).
+    public func task(at position: Int, selection: NSRange) -> LiveDecorations.ListLine.Task? {
+        var found: LiveDecorations.ListLine.Task?
+        forEachConstruct(startingAtOrBefore: position, reaching: position) { construct in
+            guard case .listLine(let line) = construct, let task = line.task, NSLocationInRange(position, task.range) || position == task.box.location else { return }
+            if Self.listLine(line, active: selection.location <= NSMaxRange(line.node) && NSMaxRange(selection) >= line.node.location).task != nil { found = task }
+        }
+        return found
     }
 
     /// The places of the constructs `selection` touches (ends included): the text whose look changes when the selection moves in or out of them.
@@ -442,8 +531,16 @@ public struct LiveModel: Sendable {
     /// frontmatter. The Markdown's own constructs are what `HighlightModel.differences(from:)` compares.
     public func differences(from older: LiveModel) -> [NSRange] {
         var found = scan.differences(from: older.scan)
+        // The lines of lists and quotes: a quick read of a window can end an item or a quote early (a line it takes in lazily, below the window), and the colours,
+        // which `HighlightModel` compares, do not show it.
+        let lines = Set(listLineNodes), olderLines = Set(older.listLineNodes)
+        found += lines.symmetricDifference(olderLines).map(\.node)
         if frontmatterRange != older.frontmatterRange { found += [frontmatterRange, older.frontmatterRange].compactMap { $0 } }
         return found
+    }
+
+    private var listLineNodes: [ListLineNode] {
+        constructs.compactMap { if case .listLine(let line) = $0 { line } else { nil } }
     }
 
     /// The whole frontmatter, from its first character to the end of its last line.

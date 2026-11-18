@@ -39,6 +39,17 @@ enum LiveReport {
             // Links (Step 2 of docs/ipad-live-default-plan.md): the words of one that can be followed, and where a dead `pdf:` link's "(PDF not on this device)" is drawn.
             if attributes[.liveLink] != nil { note("link", run) }
             if attributes[.liveLinkSuffix] != nil { note("suffix", run) }
+            // Step 4: a line of a list or a quote, with what it draws (`list-bullet`, `list-number`, `list-box`, `list-ticked`), how many quote bars (`quote1`, `quote2`), and its indent in points.
+            if let line = attributes[.liveList] as? LiveListLine {
+                switch line.mark {
+                case .bullet: note("list-bullet", run)
+                case .number: note("list-number", run)
+                case .box(let checked, _): note(checked ? "list-ticked" : "list-box", run)
+                case nil: note("list-line", run)
+                }
+                if !line.bars.isEmpty { note("quote\(line.bars.count)", run) }
+                if let style = attributes[.paragraphStyle] as? NSParagraphStyle { note("indent\(Int(style.headIndent.rounded()))-\(Int(style.firstLineHeadIndent.rounded()))", run) }
+            }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }

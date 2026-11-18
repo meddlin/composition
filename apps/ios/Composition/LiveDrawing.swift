@@ -77,6 +77,7 @@ final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
         if let paragraph = textElement as? NSTextParagraph, LiveLinkFragment.wanted(for: paragraph.attributedString) {
             return LiveLinkFragment(textElement: textElement, range: textElement.elementRange)
         }
+        if let list = LiveListFragment.make(for: textElement) { return list }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }
