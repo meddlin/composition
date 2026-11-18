@@ -9,6 +9,7 @@ import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageWidget } from "../src/components/notes/liveImages";
+import { InkWidget } from "../src/components/notes/liveInk";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
 
 /**
@@ -1046,15 +1047,20 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         hidden: [] as Pair[],
         shown: [] as Pair[],
         pictures: [] as [number | null, number, string, string, string, string][],
+        // An `<Ink … />`, drawn from its strokes (InkWidget): as a picture, in the same form (docs/ipad-live-default-plan.md, Step 1).
+        inks: [] as [number | null, number, string, string, string, string][],
         tints: [] as [number, number, string][],
       };
       set.between(0, state.doc.length, (start, end, value) => {
-        const spec = value.spec as { class?: string; widget?: ImageWidget; attributes?: Record<string, string> };
+        const spec = value.spec as { class?: string; widget?: ImageWidget | InkWidget; attributes?: Record<string, string> };
         const cls = spec.class ?? "";
         if (spec.widget instanceof ImageWidget) {
           const { src, alt, title, width } = spec.widget.spec;
           // A picture drawn beside its text is a widget at the end of it; one drawn in place of it replaces the text.
           out.pictures.push([start === end ? null : start, end, src, alt, title, width]);
+        } else if (spec.widget instanceof InkWidget) {
+          const { src, alt, title, width } = spec.widget.spec;
+          out.inks.push([start === end ? null : start, end, src, alt, title, width]);
         } else if (cls.startsWith("cm-live-heading")) out.headings.push([start, Number(/cm-live-h([1-6])/.exec(cls)![1])]);
         else if (cls === "cm-live-rule") out.rules.push(start);
         else if (cls === "cm-live-frontmatter") out.frontmatterLines.push(start);
@@ -1074,6 +1080,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
       out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
       out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
+      out.inks = out.inks.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       for (const list of Object.values(out)) (list as unknown[]).sort(byValue);
       return out;
     }
@@ -1098,6 +1105,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.headings)).toBe(true);
     expect(seen((e) => e.rules)).toBe(true);
     expect(seen((e) => e.pictures)).toBe(true);
+    expect(seen((e) => e.inks)).toBe(true);
     expect(seen((e) => e.tints)).toBe(true);
     expect(seen((e) => e.frontmatterLines)).toBe(true);
   }, 600_000);

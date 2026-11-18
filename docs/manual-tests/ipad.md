@@ -345,6 +345,19 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
 
 **Gate L passed (you, 2026-11-09):** you tried the Live tab on the iPad and it works well. Items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter) and 125 to 136 above were not recorded one by one, so none of them is ticked here.
 
+## Drawings and diagrams in the Live tab (Live-default plan, Step 1)
+
+`<Ink … />` (what *Image ▸ Drawing…* writes) and `<Drawio … />` are drawn as pictures in the Live tab, as the Preview draws them ([ipad-live-default-plan.md](../ipad-live-default-plan.md#step-1-ink-and-drawio-as-pictures-s)). This replaces the `<Drawio>` part of item 122: a diagram on a line of its own is no longer left as text. In the Simulator, UI tests (`LiveDrawingsUITests`) draw a line with a finger in each of the five schemes and check its pixels are the scheme's ink colour in Live, that the tag shows with the drawing after it while the caret is on its line, and that a diagram is drawn at 440 points from its 880-pixel PNG; what they cannot say is how a real drawing, made with the Pencil, looks and feels.
+
+344. **A drawing and a diagram in Live (Gate LD1).** In a note in the Live tab, make a drawing with the Pencil (*Image ▸ Drawing…*: a few words of handwriting and a shape, in black and in one colour), and tap *Done*. Then:
+    - It is drawn where its tag was, at the size the Preview draws it, and the tag is gone. Switch to Preview and back: the same size, the same place.
+    - Black ink is the scheme's text colour: white on Dark, Forest and Wine, dark on Light and Cream (change the scheme in the Appearance sheet with the note open). A coloured stroke keeps its colour as in the Preview.
+    - Tap the drawing: its `<Ink … />` tag shows, and the drawing is drawn below it; tap away and it is drawn in its place again. Tapping does not open the canvas in Live (it does in the Preview; editing from Live is decision I6's ↗, a later step).
+    - Add `width="50%"` to the tag: it is drawn half as wide as the text.
+    - A `<Drawio src="app_data/…" />` (a diagram from the desktop, or the Preview showcase's) is drawn at half the size of its picture, as in the Preview, and with a `width` at that width.
+    - A drawing whose file is gone (change a letter of its name) says `Image not found: …`, as a picture does.
+    - Tell me if a drawing ever flashes black on a dark scheme before it turns the right colour, or comes in late when you scroll to it.
+
 ## PDFs: import and the reader (M2, first step)
 
 The reader beside the note a PDF belongs to. **Tried in the Simulator only; this is its first time on the iPad.** You need a small PDF (a few pages, with a table of contents if you can), a book of a few hundred pages, and ideally a password-protected one. Marks, the Notes tab, quoting, search, export and the Pencil lab came after this and are in the next section (items 180 on; Gate P2). (These items are numbered from 140 to leave room for the Live view's.)

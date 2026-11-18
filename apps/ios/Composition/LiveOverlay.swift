@@ -113,7 +113,18 @@ enum LiveOverlay {
             // A stored picture only: nothing is fetched from the network, as in the Preview, so another address stays its text.
             guard let name = NoteImage.name(fromRef: picture.src), let folder = context.imageFolder else { continue }
             let url = folder.appendingPathComponent(name)
-            let drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            var drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            // Drawings as the Preview draws them (`PreviewImageView`): `<Ink />` from its strokes at its canvas's size, `<Drawio />` at half its pixels (stored at twice
+            // the size it is shown), each unless the tag gives a width.
+            drawn.kind = picture.kind
+            switch picture.kind {
+            case .ink:
+                drawn.theme = look.theme
+                drawn.natural = drawn.pixels == nil ? nil : LiveImages.shared.drawingSize(at: url)
+            case .drawio:
+                drawn.natural = drawn.pixels.map { CGSize(width: $0.width / 2, height: $0.height / 2) }
+            case .image: break
+            }
             let size = LiveDrawing.size(of: drawn, available: context.textWidth)
             let style = NSMutableParagraphStyle()
             if picture.active {

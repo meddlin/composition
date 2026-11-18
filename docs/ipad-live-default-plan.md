@@ -161,6 +161,17 @@ feel, VoiceOver, speed on the device).
 - **Simulator:** a drawing made with *Drawing…* is drawn in Live in all five schemes (pixel check, as L4's tint test);
   the caret on it shows its tag with the drawing after it.
 - **Gate LD1 (iPad):** item 344.
+- **Status (2026-11-17): built; the Simulator checks pass; Gate LD1 is the owner's.** `LiveScan` reads the three
+  tags in one pass and `LiveDecorations.Picture` carries a `kind` (`image`, `ink`, `drawio`). `LiveImages` reads a
+  drawing's strokes off the main thread and renders them with `InkRenderer` in the scheme's `InkPalette`, cached by
+  file, scheme and scale; until they are in, the drawing is sized from its PNG's pixels and `pHYs` density (the same
+  size), so nothing jumps; a PNG with no strokes is drawn as its pixels. A `<Drawio>` is drawn at half its pixels
+  unless the tag gives a width. The fixture writer emits the desktop's `InkWidget`s as `inks`; `LiveConformanceTests`
+  compares them (24 new texts in `live-cases.json`, group `drawings`) and leaves `<Drawio>` out, since the desktop's
+  Live tab does not draw it (checked by `LiveModelTests` instead). UI tests: `LiveDrawingsUITests` (a finger's line
+  drawn in Live in all five schemes, its pixels the scheme's ink colour; the tag shown with the drawing after it
+  under the caret; a diagram at 440 points from its 880-pixel PNG). `live-report` gains `picture-ink`,
+  `picture-drawio`, `natural<width>` and `ink-strokes`.
 
 ### Step 2: links (S to M)
 
