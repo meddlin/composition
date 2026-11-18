@@ -100,13 +100,16 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         let width = max(lineWidth, base.width - 2 * padding)
         var height = max(base.height, layoutFragmentFrame.height)
         if drawing?.kind == .pictureAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
-        return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
+        // From the container's left edge (in the fragment's own coordinates, less its frame's origin), so that a code line's fill is not cut at its indent.
+        return base.union(CGRect(x: min(base.minX, -layoutFragmentFrame.minX), y: base.minY, width: width + 2 * padding, height: height))
     }
 
     override func draw(at point: CGPoint, in context: CGContext) {
         let frame = layoutFragmentFrame
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
-        let left = point.x + padding
+        // The start of a line of the note, whatever the paragraph's indent: the container's left edge (`point` is the frame's origin, which an indented
+        // paragraph, such as a code line with its padding, moves right) and the padding inside it.
+        let left = point.x - frame.minX + padding
         // A code line's fill goes under its text, over the whole paragraph (its padding above or below included).
         code?.drawFill(in: CGRect(x: left, y: point.y, width: lineWidth, height: frame.height), context: context)
         super.draw(at: point, in: context)  // the text itself (hidden, except while the selection is in it)
