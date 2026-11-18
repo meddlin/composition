@@ -104,8 +104,9 @@ final class LiveLinkFragment: NSTextLayoutFragment {
 // MARK: - Following
 
 /// The ↗ beside the link the selection is in. A subview of the text view, so it scrolls with the text; placed just after the link's last rect, as the `<`
-/// list is placed at the caret. It takes taps over 44 points; what is drawn is a 22-point badge in the link colour in the middle of them.
-final class LiveFollowButton: UIControl {
+/// list is placed at the caret. It takes taps over 44 points; what is drawn is a 22-point badge in the link colour in the middle of them. A `UIButton`, because
+/// the text view's own tap recognizers give way to a button's tap (not to a plain control's, whose tap would move the caret out of the link first).
+final class LiveFollowButton: UIButton {
     static let size: CGFloat = 44
     static let badge: CGFloat = 22
     /// The address it follows.
@@ -122,11 +123,9 @@ final class LiveFollowButton: UIControl {
         arrow.contentMode = .center
         disc.addSubview(arrow)
         addSubview(disc)
-        isAccessibilityElement = true
-        accessibilityTraits = .button
         accessibilityIdentifier = "live-follow-link"
         accessibilityLabel = "Follow link"
-        addInteraction(UIPointerInteraction(delegate: nil))
+        isPointerInteractionEnabled = true
         addAction(UIAction { [weak self] _ in
             guard let self else { return }
             self.onFollow?(self.href)
@@ -155,7 +154,6 @@ final class LiveFollowButton: UIControl {
         frame = CGRect(x: x, y: rect.midY - side / 2, width: side, height: side)
         if superview !== textView { textView.addSubview(self) }
         textView.bringSubviewToFront(self)
-        isHidden = false
     }
 }
 
@@ -174,12 +172,28 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
     init(textView: UITextView) {
         self.textView = textView
         super.init()
-        button.isHidden = true
         button.onFollow = { [weak self] href in _ = self?.follow(href) }
         tap.addTarget(self, action: #selector(tapped(_:)))
         tap.delegate = self
         textView.addGestureRecognizer(tap)
+        #if DEBUG || EDITOR_TEST_HOOKS
+        // `-liveReport 1`: what the ⌘-tap recognizer last saw, for the UI tests (`live-links-trace`).
+        if UserDefaults.standard.bool(forKey: "liveReport") {
+            traceLabel.isAccessibilityElement = true
+            traceLabel.accessibilityIdentifier = "live-links-trace"
+            traceLabel.frame = CGRect(x: 0, y: 6, width: 2, height: 2)
+            traceLabel.alpha = 0.02
+            textView.addSubview(traceLabel)
+        }
+        #endif
     }
+
+    #if DEBUG || EDITOR_TEST_HOOKS
+    private let traceLabel = UILabel()
+    private func trace(_ step: String) { traceLabel.accessibilityLabel = ((traceLabel.accessibilityLabel ?? "") + " " + step).suffix(300).description }
+    #else
+    private func trace(_ step: String) {}
+    #endif
 
     /// The selection moved, the text changed or was drawn again: the ↗ is put where the link now is, on the next turn of the run loop (once the text is laid out).
     func update() {
@@ -194,7 +208,7 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
 
     private func place() {
         guard let textView, let link = activeLink(), let rect = lastRect(of: link.node, in: textView) else {
-            button.isHidden = true
+            button.removeFromSuperview()
             return
         }
         button.show(href: link.href, after: rect, in: textView, tint: tint())
@@ -223,25 +237,46 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
     }
 
     @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
+        trace("tapped")
         guard recognizer.state == .ended, let href = href(at: recognizer.location(in: textView)) else { return }
-        _ = follow(href)
+        trace("follow=\(follow(href))")
     }
 
     // MARK: ⌘-tap
 
     /// Only a tap with ⌘ held (⌘⇧ too) is this recognizer's: any other tap is the text view's, and edits.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive event: UIEvent) -> Bool {
-        event.modifierFlags.contains(.command)
+        if event.type == .touches { trace("event:\(event.modifierFlags.rawValue)") }
+        return event.modifierFlags.contains(.command) || Self.commandHeldForTests
     }
+
+    /// `-liveCommandHeld 1` (Debug and test builds) stands in for ⌘ held during a tap: XCUITest's held modifiers do not reach a touch's `modifierFlags` in the
+    /// Simulator, so the UI test of ⌘-tap uses this, and the keyboard's real ⌘ is the manual test's (item 346).
+    private static let commandHeldForTests: Bool = {
+        #if DEBUG || EDITOR_TEST_HOOKS
+        UserDefaults.standard.bool(forKey: "liveCommandHeld")
+        #else
+        false
+        #endif
+    }()
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let textView else { return false }
-        return href(at: touch.location(in: textView)) != nil
+        let on = href(at: touch.location(in: textView)) != nil
+        trace("touch:\(on)")
+        return on
     }
 
-    /// While it is deciding, the text view's own taps wait: a ⌘-tap on a link follows it and does not move the caret.
+    /// While it is deciding, the text view's own taps wait (theirs may be on a view inside it): a ⌘-tap on a link follows it and does not move the caret.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
-        other.view === textView
+        guard let textView, let view = other.view else { return false }
+        return view.isDescendant(of: textView)
+    }
+
+    /// And should one of them not wait, both go ahead: the link is still followed.
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith other: UIGestureRecognizer) -> Bool {
+        guard let textView, let view = other.view else { return false }
+        return view.isDescendant(of: textView)
     }
 }
 

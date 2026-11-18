@@ -8,12 +8,12 @@ import XCTest
 final class LiveLinksUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    private func launch() throws {
+    private func launch(_ extra: [String] = []) throws {
         continueAfterFailure = false
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "Run apps/ios/scripts/ui-test.sh: it makes the backup and passes its path.")
         XCUIDevice.shared.orientation = .landscapeLeft
         // Note 25 is "CI/CD pipelines cheat sheet" in the organization backup (no links in it); note 24 is "Thoughts on Rust", which the links here open.
-        app.launchArguments = ["-importBackup", backup, "-openNote", "25", "-openMode", "Live", "-liveReport", "1"]
+        app.launchArguments = ["-importBackup", backup, "-openNote", "25", "-openMode", "Live", "-liveReport", "1"] + extra
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
@@ -51,8 +51,17 @@ final class LiveLinksUITests: XCTestCase {
     private var origin = 0
 
     /// Types `content` at the end of the note, as a paragraph of its own, and leaves the caret at its end.
+    /// Taps the editor until it has the keys: a tap sent while the machine is busy is sometimes lost.
+    private func focusEditor() {
+        for _ in 0..<5 {
+            editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
+            if eventually(5, { (self.editor.value(forKey: "hasKeyboardFocus") as? Bool) == true }) { return }
+        }
+        XCTFail("the editor never took the keys")
+    }
+
     private func write(_ content: String) {
-        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
+        focusEditor()
         app.typeKey(.downArrow, modifierFlags: .command)
         let before = (text() as NSString).length
         app.typeText("\n\n" + content)
@@ -62,7 +71,7 @@ final class LiveLinksUITests: XCTestCase {
 
     /// Makes `lines` the whole note, so that they are at the top of the screen, above the on-screen keyboard; the caret is left at the end.
     private func replaceNote(with content: String) {
-        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
+        focusEditor()
         // ⌘A until all is selected: sent before the text view has the keys (a busy machine), it is lost.
         var all = false
         for _ in 0..<5 where !all {
@@ -109,7 +118,22 @@ final class LiveLinksUITests: XCTestCase {
 
     /// The note "Thoughts on Rust" (24) is the one open.
     private func theOtherNoteIsOpen() -> Bool {
-        eventually { (app.textViews["note-editor"].value as? String ?? "").hasPrefix("---\ntitle: Thoughts on Rust\n") || app.navigationBars["Thoughts on Rust"].exists }
+        let open = eventually { (app.textViews["note-editor"].value as? String ?? "").hasPrefix("---\ntitle: Thoughts on Rust\n") || app.navigationBars["Thoughts on Rust"].exists }
+        if !open {
+            let shot = XCTAttachment(screenshot: app.screenshot())
+            shot.lifetime = .keepAlways
+            add(shot)
+        }
+        return open
+    }
+
+    /// The note's start, on one line, for a failure's message.
+    private var opening: String { String(text().prefix(80)).replacingOccurrences(of: "\n", with: "⏎") }
+
+    /// The ↗ as the tests see it, for a failure's message.
+    private var arrowState: String {
+        let all = app.descendants(matching: .any).matching(identifier: "live-follow-link").allElementsBoundByIndex
+        return "\(all.count) found: " + all.map { "\($0.frame) hittable=\($0.isHittable)" }.joined(separator: "; ") + " selection \(selectionLabel.label) \(drawn())"
     }
 
     /// `see ` 0-4, `[` 4, `the other note` 5-19, `](note:24)` 19-29, ` here` 29-34.
@@ -124,7 +148,8 @@ final class LiveLinksUITests: XCTestCase {
         XCTAssertEqual(drawn()["link"], at((5, 19)), "and the words are drawn as the link")
         go(to: 29)  // right after the `)`: the selection touches the link
         XCTAssertTrue(eventually { drawn()["hidden"] == nil }, "its marks show with the caret at its end: \(drawn())")
-        let dimmed = drawn()["dim64"] ?? ""
+        // The grey text's share depends on the scheme (`dim64`, `dim75`, …): any of them.
+        let dimmed = drawn().filter { $0.key.hasPrefix("dim") }.map(\.value).joined(separator: ",")
         for mark in [at((4, 5)), at((19, 21)), at((28, 29))] {
             XCTAssertTrue(dimmed.contains(mark), "the mark \(mark) is dimmed: \(dimmed)")
         }
@@ -165,33 +190,44 @@ final class LiveLinksUITests: XCTestCase {
         XCTAssertLessThan(abs(follow.frame.midY - (caretAt.screenY + 10)), 22, "on the link's line: \(follow.frame) caret \(caretAt)")
         add(XCTAttachment(screenshot: app.screenshot()))
         go(to: 34)  // back out, at the end of ` here`
-        XCTAssertTrue(eventually { !(self.follow.exists && self.follow.isHittable) }, "and goes when the caret leaves the link")
+        XCTAssertTrue(eventually { !(self.follow.exists && self.follow.isHittable) }, "and goes when the caret leaves the link: \(arrowState)")
         go(to: 26)
         XCTAssertTrue(eventually { self.follow.exists && self.follow.isHittable })
         follow.tap()
-        XCTAssertTrue(theOtherNoteIsOpen(), "the ↗ opened the linked note: \(text().prefix(60))")
+        XCTAssertTrue(theOtherNoteIsOpen(), "the ↗ opened the linked note: \(opening)")
     }
 
-    /// The note made only of a heading line, a blank one and `line`, with the caret at the start of `line` and its place on the screen.
+    /// The note made only of a heading line, a blank one and `line`, with the caret at the end, away from the link, and where the link's line starts on the screen
+    /// (read while it is typed, so that the caret does not have to walk back to it).
     private func noteWithTheLinkAtTheTop() throws -> (location: Int, screenX: Double, screenY: Double) {
-        replaceNote(with: "Links\n\n" + Self.line + "\n\nend")
-        origin = 7
-        XCTAssertTrue(eventually { drawn()["hidden"] == at((4, 5), (19, 29)) }, "\(drawn())")
-        go(to: 0)
-        XCTAssertTrue(eventually { caret()?.location == origin }, "at the start of the link's line: \(selectionLabel.label)")
+        replaceNote(with: "Links\n\n")
+        XCTAssertTrue(eventually { self.caret()?.location == 7 }, "at the start of the link's line: \(selectionLabel.label)")
         let start = try XCTUnwrap(caret())
-        go(to: 36)  // away from the link again: the end of the note
+        app.typeText(Self.line + "\n\nend")
+        origin = 7
+        XCTAssertTrue(eventually { self.text() == "Links\n\n" + Self.line + "\n\nend" }, "the note is the link's: \(opening)")
         XCTAssertTrue(eventually { drawn()["hidden"] == at((4, 5), (19, 29)) }, "\(drawn())")
         return start
     }
 
     func testCommandTapOnALinkOpensItAtOnce() throws {
-        try launch()
+        // `-liveCommandHeld 1` stands in for ⌘ held: XCUITest's `perform(withKeyModifiers:)` does not reach a touch's `modifierFlags` in the Simulator (the trace
+        // said 0). It is still used, so that where it does, the real modifier is what is read; the keyboard's own ⌘ is manual item 346.
+        try launch(["-liveCommandHeld", "1"])
         let start = try noteWithTheLinkAtTheTop()
-        // About the middle of "the other note", which starts some 30 points along the line (after `see `).
+        // About the middle of "the other note", which starts some 40 points along the line (after `see `).
         let point = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: start.screenX + 70, dy: start.screenY + 10))
         XCUIElement.perform(withKeyModifiers: .command) { point.tap() }
-        XCTAssertTrue(theOtherNoteIsOpen(), "⌘-tap opened the linked note: \(text().prefix(60))")
+        XCTAssertTrue(theOtherNoteIsOpen(), "⌘-tap opened the linked note: \(opening); \(selectionLabel.label); trace: \(app.descendants(matching: .any)["live-links-trace"].label)")
+    }
+
+    func testWithCommandHeldATapBesideALinkStillEdits() throws {
+        try launch(["-liveCommandHeld", "1"])
+        let start = try noteWithTheLinkAtTheTop()
+        // On `see`, before the link: not a link, so the tap is the text view's, and the caret goes there.
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: start.screenX + 12, dy: start.screenY + 10)).tap()
+        XCTAssertTrue(eventually { self.caret().map { (self.origin...self.origin + 4).contains($0.location) } ?? false }, "the caret is on `see`: \(selectionLabel.label)")
+        XCTAssertTrue(text().hasPrefix("Links\n"), "and this note is still the one open: \(opening)")
     }
 
     func testAPlainTapOnALinkPutsTheCaretInItAndShowsTheArrow() throws {
@@ -226,6 +262,6 @@ final class LiveLinksUITests: XCTestCase {
         go(to: 24)  // into the address again
         XCTAssertTrue(eventually { self.follow.exists && self.follow.isHittable })
         follow.tap()
-        XCTAssertTrue(theOtherNoteIsOpen(), "the edited address is the one followed: \(text().prefix(60))")
+        XCTAssertTrue(theOtherNoteIsOpen(), "the edited address is the one followed: \(opening)")
     }
 }
