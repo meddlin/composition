@@ -11,7 +11,20 @@ extension NSAttributedString.Key {
 /// picture drawn after its revealed text), and `LiveDrawingFragment` draws in that room. While the selection is on a rule its dashes show and nothing is drawn;
 /// while it is on a picture's Markdown that shows, and the picture is drawn after it, as on the desktop.
 final class LiveDrawing: NSObject {
-    enum Kind: String { case rule, picture, pictureAfter }
+    enum Kind: String {
+        case rule, picture, pictureAfter
+        /// A block's picture (Step 5, `LiveBlocks`) in place of its hidden source, drawn in its first paragraph; and, while the selection is in the block, after its source,
+        /// in its last paragraph's spacing.
+        case block, blockAfter
+    }
+
+    /// A block drawn as a picture: the picture (nil until it is rendered: a faint stand-in of the height it is guessed to be is drawn), and where the block's source is
+    /// (a tap on the picture puts the caret at its start).
+    struct BlockPicture {
+        var picture: LiveBlockPicture?
+        var guessedHeight: CGFloat
+        var source: NSRange
+    }
 
     /// A picture: where its file is and how big it is (nil when there is no such file), the words to show in its place then, and how wide the tag asked for it to be.
     struct Picture {
@@ -25,12 +38,19 @@ final class LiveDrawing: NSObject {
     let ruleColor: UIColor
     let noticeColor: UIColor
     let picture: Picture?
+    let block: BlockPicture?
 
-    init(kind: Kind, ruleColor: UIColor, noticeColor: UIColor, picture: Picture? = nil) {
+    init(kind: Kind, ruleColor: UIColor, noticeColor: UIColor, picture: Picture? = nil, block: BlockPicture? = nil) {
         self.kind = kind
         self.ruleColor = ruleColor
         self.noticeColor = noticeColor
         self.picture = picture
+        self.block = block
+    }
+
+    /// How big a block's picture is drawn in a text `available` points wide.
+    static func size(of block: BlockPicture, available: CGFloat) -> CGSize {
+        block.picture?.size(available: available) ?? CGSize(width: available, height: block.guessedHeight)
     }
 
     /// The height a missing picture's notice takes.
@@ -85,7 +105,10 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         return (container?.size.width ?? layoutFragmentFrame.width) - 2 * (container?.lineFragmentPadding ?? 0)
     }
 
-    private var pictureSize: CGSize? { drawing.picture.map { LiveDrawing.size(of: $0, available: lineWidth) } }
+    private var pictureSize: CGSize? {
+        if let block = drawing.block { return LiveDrawing.size(of: block, available: lineWidth) }
+        return drawing.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
+    }
 
     /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to a sliver
     /// (found in the lab): it is widened to the lines of text and, for a picture drawn after the revealed text, lengthened to take the paragraph's spacing too.
@@ -94,7 +117,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
         let width = max(lineWidth, base.width - 2 * padding)
         var height = max(base.height, layoutFragmentFrame.height)
-        if drawing.kind == .pictureAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
+        if drawing.kind == .pictureAfter || drawing.kind == .blockAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
         return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
     }
 
@@ -118,6 +141,25 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
             guard let size = pictureSize else { return }
             let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
             drawPicture(in: CGRect(x: left, y: point.y + textBottom + LiveDrawing.margin, width: size.width, height: size.height), context: context)
+        case .block:
+            guard let size = pictureSize else { return }
+            drawBlock(in: CGRect(x: left, y: point.y + LiveDrawing.margin, width: size.width, height: size.height), context: context)
+        case .blockAfter:
+            guard let size = pictureSize else { return }
+            let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
+            drawBlock(in: CGRect(x: left, y: point.y + textBottom + LiveDrawing.margin, width: size.width, height: size.height), context: context)
+        }
+    }
+
+    private func drawBlock(in rect: CGRect, context: CGContext) {
+        UIGraphicsPushContext(context)
+        defer { UIGraphicsPopContext() }
+        if let image = drawing.block?.picture?.image {
+            image.draw(in: rect)
+        } else if drawing.kind == .block {
+            // Not rendered yet (it is, as it comes near the screen): a faint stand-in of the height it is guessed to be.
+            drawing.noticeColor.withAlphaComponent(0.08).setFill()
+            UIBezierPath(roundedRect: rect, cornerRadius: 6).fill()
         }
     }
 

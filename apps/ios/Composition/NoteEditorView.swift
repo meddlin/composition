@@ -189,6 +189,31 @@ final class NoteTextView: UITextView {
     }
     private var lastWidth: CGFloat = 0
 
+    /// When the last touch on the text began: a tap on a block the Live tab draws as a picture (Step 5) puts the caret at the start of the block's source, which then shows
+    /// (D3), as a tap on a drawn picture puts it in the picture's Markdown. UIKit's tap lands at the end of the block's first line (its hidden characters; it does not ask
+    /// `closestPosition(to:)`, found in the Simulator), so the selection that follows a touch, when it is a caret in a block still drawn, is moved. The touch is noted in
+    /// `hitTest`, which UIKit calls as every touch begins: a gesture recogniser added for it (tried) stopped ⌘A from selecting the note in the UI tests.
+    private var lastTouch: TimeInterval?
+
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        let found = super.hitTest(point, with: event)
+        // TextKit 2 draws the text in views of its own inside the text view, which are what a touch on the text hits.
+        if isLive, event?.type == .touches, let found, found.isDescendant(of: self) { lastTouch = CACurrentMediaTime() }
+        return found
+    }
+
+    /// The start of the block drawn as a picture that a touch a moment ago put the caret in; nil otherwise. The touch is used once.
+    func blockStartForRecentTouch() -> Int? {
+        guard isLive, let touched = lastTouch, CACurrentMediaTime() - touched < 0.8, selectedRange.length == 0 else { return nil }
+        let caret = selectedRange.location
+        for at in [caret, caret - 1] where at >= 0 && at < textStorage.length {
+            guard let mark = textStorage.attribute(.liveBlock, at: at, effectiveRange: nil) as? LiveBlockMark, !mark.revealed else { continue }
+            lastTouch = nil
+            return caret == mark.source.location ? nil : mark.source.location
+        }
+        return nil
+    }
+
     /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
     func apply(_ edit: LineEdit) {
         selectedRange = NSRange(location: edit.start, length: edit.end - edit.start)
@@ -480,10 +505,18 @@ struct NoteEditorView: UIViewRepresentable {
                 selection.alpha = 0.02
                 view.addSubview(selection)
                 selectionLabel = selection
+                // `live-geometry`: where the first block drawn as a picture is in the window (`x,y,w,h`), for a test to tap on it.
+                let geometry = UILabel(frame: CGRect(x: 0, y: 6, width: 2, height: 2))
+                geometry.isAccessibilityElement = true
+                geometry.accessibilityIdentifier = "live-geometry"
+                geometry.alpha = 0.02
+                view.addSubview(geometry)
+                geometryLabel = geometry
                 updateSelectionLabel()
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
+                    self.updateGeometryLabel()
                 }
             }
             // `-liveBench <file>`: measures the editor on the note that is open and writes the result to that file (see `LiveBench`). A file and not an element, so that nothing
@@ -494,6 +527,14 @@ struct NoteEditorView: UIViewRepresentable {
                     guard let styler, let view else { return }
                     let result = await LiveBench.run(in: view, styler: styler, openedAt: opened)
                     try? result.write(toFile: file, atomically: true, encoding: .utf8)
+                }
+            }
+            // `-liveBlockSpike <folder>`: renders every block of the note as the Live tab renders a block's picture and writes them there (Step 5's spike, `LiveBlockSpike`).
+            if let folder = UserDefaults.standard.string(forKey: "liveBlockSpike") {
+                Task { @MainActor [weak view, weak styler] in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard let view, let styler else { return }
+                    LiveBlockSpike.run(in: view, look: look, imageFolder: styler.imageFolder(), to: URL(fileURLWithPath: folder))
                 }
             }
             // `-colourState 1`: an element that says how many full passes the colouring has started and whether it is settled, for the UI tests to see that it comes to rest on a long note.
@@ -620,6 +661,22 @@ struct NoteEditorView: UIViewRepresentable {
         #if DEBUG || EDITOR_TEST_HOOKS
         fileprivate var reportLabel: UILabel?
         fileprivate var selectionLabel: UILabel?
+        fileprivate var geometryLabel: UILabel?
+
+        /// The window frame of the first paragraph drawing a block's picture (Step 5), or `none`.
+        fileprivate func updateGeometryLabel() {
+            guard let view = textView, let label = geometryLabel, let layout = view.textLayoutManager, let content = layout.textContentManager else { return }
+            var found: Int?
+            view.textStorage.enumerateAttribute(.liveDraw, in: NSRange(location: 0, length: view.textStorage.length)) { value, range, stop in
+                if let drawing = value as? LiveDrawing, drawing.kind == .block { found = range.location; stop.pointee = true }
+            }
+            guard let offset = found, let location = content.location(content.documentRange.location, offsetBy: offset),
+                let fragment = layout.textLayoutFragment(for: location)
+            else { return label.accessibilityLabel = "none" }
+            let frame = fragment.layoutFragmentFrame.offsetBy(dx: view.textContainerInset.left, dy: view.textContainerInset.top)
+            let onScreen = view.convert(frame, to: nil)
+            label.accessibilityLabel = "\(Int(onScreen.minX)),\(Int(onScreen.minY)),\(Int(onScreen.width)),\(Int(onScreen.height))"
+        }
 
         /// `12+0 x=104.5 y=68 sx=315.5 sy=190 «text before|text after»`: where the selection is, where the caret (the selection's moving end) is drawn, in the text and on the
         /// screen (`sx`, `sy`), and what surrounds it, line breaks shown as ⏎. A key press that leaves x and y where they were moved the caret across something that cannot be seen.
@@ -642,7 +699,19 @@ struct NoteEditorView: UIViewRepresentable {
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
         #endif
 
+        func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            styler?.scrolled()
+            #if DEBUG || EDITOR_TEST_HOOKS
+            updateGeometryLabel()
+            #endif
+        }
+
         func textViewDidChangeSelection(_ textView: UITextView) {
+            // A tap on a block drawn as a picture: the caret to the start of its source (setting it comes back here, and goes on as usual).
+            if let editor = textView as? NoteTextView, let start = editor.blockStartForRecentTouch() {
+                textView.selectedRange = NSRange(location: start, length: 0)
+                return
+            }
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
             styler?.selectionChanged()
@@ -696,3 +765,4 @@ struct NoteEditorView: UIViewRepresentable {
         #endif
     }
 }
+
