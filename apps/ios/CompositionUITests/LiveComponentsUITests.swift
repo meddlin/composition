@@ -52,12 +52,8 @@ final class LiveComponentsUITests: XCTestCase {
 
     /// What the Live tab has made of the text, as `class → ranges`, from `live-report`.
     private func drawn() -> [String: String] {
-        var out: [String: String] = [:]
-        for part in (report.exists ? report.label : "").split(separator: ";") {
-            let pair = part.split(separator: ":", maxSplits: 1)
-            if pair.count == 2 { out[String(pair[0])] = String(pair[1]) }
-        }
-        return out
+        // The frontmatter's header block (Step 7) left out: see `LiveReportReading`.
+        LiveReportReading.parse(report.exists ? report.label : "")
     }
 
     /// The ranges of one class of the report, as `(start, end)`.

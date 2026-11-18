@@ -160,6 +160,16 @@ public struct LiveDecorations: Equatable, Sendable {
     public var links: [Link] = []
     /// The lines of lists and quotes (Step 4 of docs/ipad-live-default-plan.md). What they hide is here and not in `hidden`, because it is drawn over.
     public var lists: [ListLine] = []
+    /// The start of each line drawn with no height: a setext heading's underline while the selection is not in the heading (it is in `hidden` too).
+    public var collapsedLines: [Int] = []
+    /// Each footnote citation drawn as its number (Step 7): `[^label]` hidden, and the Preview's superscript number drawn in its place. One the selection
+    /// touches shows its source, dimmed, and is in `shown` instead.
+    public var footnoteRefs: [FootnoteRef] = []
+
+    public struct FootnoteRef: Hashable, Sendable {
+        public var range: NSRange
+        public var number: Int
+    }
 }
 
 public struct LiveModel: Sendable {
@@ -167,8 +177,11 @@ public struct LiveModel: Sendable {
         var line: Int
         var level: Int
         var node: NSRange
-        /// Each mark as it shows, and as it hides (the space after the opening `#`s goes with them, or the title would sit indented).
+        /// Each mark as it shows, and as it hides (the space after the opening `#`s goes with them, or the title would sit indented). A setext heading's one
+        /// mark is its underline, hidden as its whole line.
         var marks: [(shown: NSRange, hidden: NSRange)]
+        /// A setext heading's lines of text, each drawn as a heading (nil for an ATX heading, which is one line).
+        var setextLines: [NSRange]? = nil
     }
 
     struct RuleNode: Sendable {
@@ -254,6 +267,7 @@ public struct LiveModel: Sendable {
                 value.line += delta
                 value.node = move(value.node)
                 value.marks = value.marks.map { (move($0.shown), move($0.hidden)) }
+                value.setextLines = value.setextLines?.map(move)
                 return .heading(value)
             case .rule(var value):
                 value.line += delta
@@ -300,6 +314,9 @@ public struct LiveModel: Sendable {
     private var reach: [Int]
     private var frontmatterLines: [Int]
     private var scan: LiveScan.Result
+    /// The footnote citations that have a definition, numbered as the Preview numbers them (Step 7). They are numbered by the whole note, so, like `scan`, they are
+    /// moved with the edits between full reads and made right by the next one.
+    private var footnoteRefs: [LiveDecorations.FootnoteRef]
     private let extrasLimit: Int?
 
     /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read; nil (the default, as on the desktop) reads them in any note.
@@ -313,6 +330,15 @@ public struct LiveModel: Sendable {
         frontmatterLines = read.frontmatterLines
         let count = chars.count
         scan = (extrasLimit.map { count <= $0 } ?? true) ? LiveScan.read(text) : LiveScan.Result()
+        footnoteRefs = Self.footnoteRefs(of: text)
+    }
+
+    /// The citations of footnotes in `text` (a whole note), with their numbers: `NoteScanner`'s, which are the Preview's.
+    static func footnoteRefs(of text: String) -> [LiveDecorations.FootnoteRef] {
+        guard text.contains("[^") else { return [] }
+        let body = NoteFrontmatter.split(text).body
+        let offset = text.hasSuffix(body) ? text.utf16.count - body.utf16.count : 0
+        return NoteScanner.scan(body, at: offset).footnoteCitations.map { .init(range: $0.range, number: $0.number) }
     }
 
     /// The constructs of `text`, with positions in it, and the lines of its frontmatter. `frontmatter` says whether a `---` block at the very start is
@@ -372,6 +398,12 @@ public struct LiveModel: Sendable {
         chars.replaceSubrange(range.location..<NSMaxRange(range), with: (0..<newLength).map { text.character(at: range.location + $0) })
         length += delta
         scan = scan.shifted(replacing: range, by: delta)
+        // A citation the edit touches may be one no longer: it is left out until the full read. Those after it move.
+        footnoteRefs = footnoteRefs.compactMap { ref in
+            if NSMaxRange(ref.range) <= range.location { return ref }
+            if ref.range.location >= NSMaxRange(range) { return .init(range: NSRange(location: ref.range.location + delta, length: ref.range.length), number: ref.number) }
+            return nil
+        }
 
         // What starts in the old window is dropped, and what starts after it moves; what starts before it stays (and should end before it).
         let low = firstIndex(startingAtOrAfter: oldWindow.location)
@@ -433,9 +465,20 @@ public struct LiveModel: Sendable {
         forEachConstruct(startingAtOrBefore: NSMaxRange(window) - 1, reaching: window.location + 1) { construct in
             switch construct {
             case .heading(let heading):
+                let active = touches(heading.node)
+                if let textLines = heading.setextLines {
+                    // A setext heading: each line of its text is a heading's line, and away from the selection its underline's line is hidden and has no height.
+                    for line in textLines { out.headings.append(.init(line: line.location, level: heading.level, range: line)) }
+                    for mark in heading.marks {
+                        if active { out.shown.append(mark.shown) } else {
+                            out.hidden.append(mark.hidden)
+                            out.collapsedLines.append(mark.hidden.location)
+                        }
+                    }
+                    break
+                }
                 let lineRange = NSRange(location: heading.line, length: NSMaxRange(heading.node) - heading.line)
                 out.headings.append(.init(line: heading.line, level: heading.level, range: lineRange))
-                let active = touches(heading.node)
                 for mark in heading.marks {
                     if active { out.shown.append(mark.shown) } else { out.hidden.append(mark.hidden) }
                 }
@@ -480,6 +523,9 @@ public struct LiveModel: Sendable {
             out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width, kind: image.kind))
         }
         out.tints += scan.tints.filter { inWindow($0.range) }.map { .init(range: $0.range, color: $0.color) }
+        for ref in footnoteRefs where inWindow(ref.range) {
+            if touches(ref.range) { out.shown.append(ref.range) } else { out.footnoteRefs.append(ref) }
+        }
         for element in scan.elements {
             let whole = NSRange(location: element.open.location, length: NSMaxRange(element.close) - element.open.location)
             guard inWindow(whole) else { continue }
@@ -522,6 +568,7 @@ public struct LiveModel: Sendable {
             if whole.location <= NSMaxRange(selection), NSMaxRange(whole) >= selection.location { found.append(whole) }
         }
         for image in scan.images where image.range.location <= NSMaxRange(selection) && NSMaxRange(image.range) >= selection.location { found.append(image.range) }
+        for ref in footnoteRefs where ref.range.location <= NSMaxRange(selection) && NSMaxRange(ref.range) >= selection.location { found.append(ref.range) }
         return found
     }
 
@@ -534,8 +581,8 @@ public struct LiveModel: Sendable {
         return found.sorted { $0.location < $1.location }
     }
 
-    /// The places where this model and `older` (what is on the text) differ in what the Live look draws beyond the Markdown: highlights, `<Image />` tags and the
-    /// frontmatter. The Markdown's own constructs are what `HighlightModel.differences(from:)` compares.
+    /// The places where this model and `older` (what is on the text) differ in what the Live look draws beyond the Markdown: highlights, `<Image />` tags, footnote
+    /// numbers and the frontmatter. The Markdown's own constructs are what `HighlightModel.differences(from:)` compares.
     public func differences(from older: LiveModel) -> [NSRange] {
         var found = scan.differences(from: older.scan)
         // The lines of lists and quotes: a quick read of a window can end an item or a quote early (a line it takes in lazily, below the window), and the colours,
@@ -543,6 +590,8 @@ public struct LiveModel: Sendable {
         let lines = Set(listLineNodes), olderLines = Set(older.listLineNodes)
         found += lines.symmetricDifference(olderLines).map(\.node)
         if frontmatterRange != older.frontmatterRange { found += [frontmatterRange, older.frontmatterRange].compactMap { $0 } }
+        // Footnote numbers pair across the note: a citation typed early renumbers every one after it.
+        found += Set(footnoteRefs).symmetricDifference(Set(older.footnoteRefs)).map(\.range)
         return found
     }
 

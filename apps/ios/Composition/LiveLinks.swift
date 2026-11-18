@@ -81,6 +81,7 @@ final class LiveLinkFragment: NSTextLayoutFragment {
 
     override func draw(at point: CGPoint, in context: CGContext) {
         super.draw(at: point, in: context)
+        LiveDrawingFragment.drawFootnoteNumbers(of: self, at: point, in: context)  // a footnote's number in this paragraph (Step 7)
         UIGraphicsPushContext(context)
         defer { UIGraphicsPopContext() }
         for line in textLineFragments {

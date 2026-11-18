@@ -98,6 +98,10 @@ final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
             return LiveLinkFragment(textElement: textElement, range: textElement.elementRange)
         }
         if let list = LiveListFragment.make(for: textElement) { return list }
+        // A paragraph with a footnote citation drawn as its number (Step 7) draws the number itself.
+        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0, LiveDrawingFragment.footnoteNumbers(in: paragraph.attributedString).isEmpty == false {
+            return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: nil)
+        }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }
@@ -127,6 +131,32 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         return drawing?.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
     }
 
+    /// The footnote numbers to draw in a paragraph, and where their citations are in it.
+    static func footnoteNumbers(in paragraph: NSAttributedString) -> [(range: NSRange, number: LiveFootnoteNumber)] {
+        var found: [(NSRange, LiveFootnoteNumber)] = []
+        paragraph.enumerateAttribute(.liveFootnoteRef, in: NSRange(location: 0, length: paragraph.length)) { value, run, _ in
+            if let number = value as? LiveFootnoteNumber { found.append((run, number)) }
+        }
+        return found
+    }
+
+    /// Each footnote number where its hidden citation is: on the citation's line, at its first character, on the line's baseline (the Preview's superscript digits sit
+    /// raised by their own shape).
+    /// Called by every fragment the Live tab makes (this one, a list item's, a dead link's): a citation can be in any paragraph.
+    static func drawFootnoteNumbers(of fragment: NSTextLayoutFragment, at point: CGPoint, in context: CGContext) {
+        guard let paragraph = (fragment.textElement as? NSTextParagraph)?.attributedString else { return }
+        let numbers = Self.footnoteNumbers(in: paragraph)
+        guard !numbers.isEmpty else { return }
+        UIGraphicsPushContext(context)
+        defer { UIGraphicsPopContext() }
+        for (range, number) in numbers {
+            guard let line = fragment.textLineFragments.first(where: { NSLocationInRange(range.location, $0.characterRange) }) else { continue }
+            let x = line.locationForCharacter(at: range.location).x
+            let baseline = line.typographicBounds.minY + line.glyphOrigin.y
+            number.attributed.draw(at: CGPoint(x: point.x + line.typographicBounds.minX + x, y: point.y + baseline - number.font.ascender))
+        }
+    }
+
     /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to a sliver
     /// (found in the lab): it is widened to the lines of text and, for a picture drawn after the revealed text, lengthened to take the paragraph's spacing too.
     override var renderingSurfaceBounds: CGRect {
@@ -148,6 +178,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         // A code line's fill goes under its text, over the whole paragraph (its padding above or below included).
         code?.drawFill(in: CGRect(x: left, y: point.y, width: lineWidth, height: frame.height), context: context)
         super.draw(at: point, in: context)  // the text itself (hidden, except while the selection is in it)
+        Self.drawFootnoteNumbers(of: self, at: point, in: context)
         guard let drawing else { return }
         switch drawing.kind {
         case .rule:
