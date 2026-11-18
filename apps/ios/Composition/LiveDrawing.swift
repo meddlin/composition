@@ -64,6 +64,10 @@ final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
         {
             return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: drawing)
         }
+        // A dead `pdf:` link's "(PDF not on this device)" (LiveLinks.swift).
+        if let paragraph = textElement as? NSTextParagraph, LiveLinkFragment.wanted(for: paragraph.attributedString) {
+            return LiveLinkFragment(textElement: textElement, range: textElement.elementRange)
+        }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }

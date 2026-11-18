@@ -18,6 +18,9 @@ enum LiveReport {
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
             guard let font = attributes[.font] as? UIFont else { return }
             if let drawing = attributes[.liveDraw] as? LiveDrawing { note("draw-\(drawing.kind.rawValue)", run) }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): the words of one that can be followed, and where a dead `pdf:` link's "(PDF not on this device)" is drawn.
+            if attributes[.liveLink] != nil { note("link", run) }
+            if attributes[.liveLinkSuffix] != nil { note("suffix", run) }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }
