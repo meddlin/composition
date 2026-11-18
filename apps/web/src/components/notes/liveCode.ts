@@ -2,6 +2,7 @@ import { syntaxTree } from "@codemirror/language";
 import { StateEffect, type ChangeSet, type EditorState, type Extension, type Range, type Text } from "@codemirror/state";
 import { Decoration, EditorView, ViewPlugin, type DecorationSet, type ViewUpdate } from "@codemirror/view";
 import type { createLowlight } from "lowlight";
+import { codeLines, hasLineOptions, parseCodeFence } from "../../lib/composition/codeFence";
 import { parse } from "../../lib/composition/frontmatter";
 
 /**
@@ -11,6 +12,9 @@ import { parse } from "../../lib/composition/frontmatter";
  * are only hidden, by collapsing their lines, while the caret is outside the block, and an indented block's
  * four-space indent likewise. Inside the block both show, so what is being edited is the source (the iPad's rule
  * too, its V2).
+ *
+ * A fence's options (`showLineNumbers=107 {109}`, `docs/ui/code-blocks.md`) number its lines of code and highlight
+ * some, as more line decorations: the number is drawn by CSS from the line's `data-line`, so it is never text.
  *
  * Everything here is line and mark decorations, which a view plugin may give: hiding a whole fence line by replacing
  * it would replace a line break, which only a state field may do, so the line is drawn with no height instead.
@@ -85,10 +89,11 @@ export function loadHighlight(): Promise<Highlight> {
   return loading;
 }
 
-/** The language a fence's info string names, as remark reads it: its first word. Empty for an untagged fence. */
-export function fenceLanguage(info: string): string {
-  return info.trim().split(/\s/, 1)[0] ?? "";
-}
+/**
+ * The language a fence's info string names: its first word, as remark reads it, unless that word is one of the
+ * fence's options (`{3}`, `showLineNumbers`). Empty for an untagged fence.
+ */
+export { fenceLanguage } from "../../lib/composition/codeFence";
 
 const codeLine = Decoration.line({ class: "cm-live-codeblock" });
 const firstLine = Decoration.line({ class: "cm-live-codeblock cm-live-codeblock-first" });
@@ -103,6 +108,17 @@ const colourMark = (name: string) => {
   if (!mark) colourMarks.set(name, (mark = Decoration.mark({ class: name })));
   return mark;
 };
+
+/** The extra line decoration of a line of code in a fence with options: its number (null when not numbered) and highlight. */
+function lineOptions(number: number | null, digits: number, highlighted: boolean): Decoration {
+  const classes = [number !== null && "cm-live-codeblock-numbered", highlighted && "cm-live-codeblock-highlighted"].filter(Boolean);
+  const attributes: Record<string, string> = { class: classes.join(" ") };
+  if (number !== null) {
+    attributes["data-line"] = String(number);
+    attributes.style = `--code-digits: ${digits}`;
+  }
+  return Decoration.line({ attributes });
+}
 
 type Span = { from: number; to: number };
 
@@ -168,7 +184,19 @@ function decorateBlock(state: EditorState, block: SyntaxNode, ranges: readonly S
   }
 
   const info = block.getChild("CodeInfo");
-  const lang = info ? fenceLanguage(doc.sliceString(info.from, info.to)) : "";
+  const fence = info ? parseCodeFence(doc.sliceString(info.from, info.to)) : null;
+  if (fence && hasLineOptions(fence) && codeLast >= codeFirst) {
+    const drawn = codeLines(fence, codeLast - codeFirst + 1);
+    const digits = String(Math.max(...drawn.map((line) => line.number))).length;
+    for (let number = codeFirst; number <= codeLast; number++) {
+      const line = doc.line(number);
+      if (number !== shownFirst && number !== shownLast && !visible(line.from, line.to)) continue;
+      const { number: shown, highlighted } = drawn[number - codeFirst];
+      if (!fence.lineNumbers && !highlighted) continue;
+      out.push(lineOptions(fence.lineNumbers ? shown : null, digits, highlighted).range(line.from));
+    }
+  }
+  const lang = fence?.language ?? "";
   if (!lang || !highlight || codeLast < codeFirst) return lang !== "";
 
   // The code as Preview highlights it: each line's code, without the fences, the quote marks or the item's indent.
@@ -315,6 +343,25 @@ const codeTheme = EditorView.baseTheme({
   ".cm-line.cm-live-codeblock-fence": { color: "var(--muted-foreground)" },
   // A fence line while the caret is outside its block: collapsed to nothing, its text still in the document.
   ".cm-line.cm-live-codeblock-hidden": { height: "0", overflow: "hidden", padding: "0" },
+  // A numbered line of code (`showLineNumbers`): its number in a column of its own, right-aligned, so a long line
+  // wraps under its code and not under its number. Preview's look (`globals.css`, `.code-line`).
+  ".cm-line.cm-live-codeblock-numbered": {
+    position: "relative",
+    paddingLeft: "calc(1.1428571em + var(--code-digits, 1) * 1ch + 1.5em)",
+  },
+  ".cm-line.cm-live-codeblock-numbered::before": {
+    content: "attr(data-line)",
+    position: "absolute",
+    left: "1.1428571em",
+    width: "calc(var(--code-digits, 1) * 1ch)",
+    textAlign: "right",
+    color: "var(--muted-foreground)",
+  },
+  // A highlighted line (`{109}`): Preview's band and bar.
+  ".cm-line.cm-live-codeblock-highlighted": {
+    backgroundColor: "color-mix(in srgb, var(--highlight) 16%, var(--surface))",
+    boxShadow: "inset 3px 0 var(--highlight)",
+  },
   // The plain editor's code colour is for code it cannot colour; here the code is Preview's, plain or by language.
   ".cm-live-codeblock .md-code": { color: "inherit" },
 });

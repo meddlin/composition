@@ -197,6 +197,66 @@ describe("colours", () => {
     expect(fenceLanguage(" python title=\"x.py\"")).toBe("python");
     expect(fenceLanguage("")).toBe("");
   });
+
+  it("does not take a fence's option for its language, so `{2}` is not coloured as a language", () => {
+    expect(fenceLanguage("{2}")).toBe("");
+    expect(fenceLanguage("showLineNumbers=3 js")).toBe("");
+    const untagged = "```{1}\nconst a = 1;\n```\n\nEnd";
+    const { marked, wantsColour } = decorate(untagged, untagged.length);
+    expect(marked).toEqual([]);
+    expect(wantsColour).toBe(false);
+  });
+});
+
+describe("line numbers and highlighted lines", () => {
+  /** Each line of `text` with a number or a highlight: its text, its `data-line`, and whether it is highlighted. */
+  function options(text: string, caret: number) {
+    const state = stateOf(text, caret);
+    const { decorations } = codeDecorations(state, [{ from: 0, to: state.doc.length }], 0, highlightJs);
+    const found: { text: string; line: string | null; highlighted: boolean; digits: string | null }[] = [];
+    decorations.between(0, state.doc.length, (from, to, value) => {
+      const attributes = value.spec.attributes as Record<string, string> | undefined;
+      if (from !== to || !attributes) return;
+      found.push({
+        text: state.doc.lineAt(from).text,
+        line: attributes["data-line"] ?? null,
+        highlighted: attributes.class.split(" ").includes("cm-live-codeblock-highlighted"),
+        digits: attributes.style?.match(/--code-digits: (\d+)/)?.[1] ?? null,
+      });
+    });
+    return found;
+  }
+
+  const numbered = "```js showLineNumbers=107 {50,109,110-111,200}\na\nb\nc\nd\n```\n\nEnd";
+
+  it("numbers the lines of code from the start line and highlights by the numbers shown", () => {
+    expect(options(numbered, numbered.length)).toEqual([
+      { text: "a", line: "107", highlighted: false, digits: "3" },
+      { text: "b", line: "108", highlighted: false, digits: "3" },
+      { text: "c", line: "109", highlighted: true, digits: "3" },
+      { text: "d", line: "110", highlighted: true, digits: "3" },
+    ]);
+  });
+
+  it("numbers the code and not the fences while the caret is in the block", () => {
+    const found = options(numbered, numbered.indexOf("b"));
+    expect(found.map((line) => line.text)).toEqual(["a", "b", "c", "d"]);
+  });
+
+  it("highlights without numbers", () => {
+    const text = "```js {2}\na\nb\n```\n";
+    expect(options(text, text.length)).toEqual([{ text: "b", line: null, highlighted: true, digits: null }]);
+  });
+
+  it("gives a plain fence and an indented block nothing", () => {
+    expect(options(js, 0)).toEqual([]);
+    expect(options("Text\n\n    code {1}\n\nEnd", 0)).toEqual([]);
+  });
+
+  it("numbers a block with no language", () => {
+    const text = "``` showLineNumbers\na\n```\n";
+    expect(options(text, text.length).map((line) => line.line)).toEqual(["1"]);
+  });
 });
 
 describe("the same colours as Preview", () => {

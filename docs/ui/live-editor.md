@@ -149,6 +149,9 @@ Source: [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts). Plan: 
 - **Typing cost** (dev build, 2026-11-17): about 2 ms a key in plain text and 7.6 ms (median; 10.9 ms p90) inside a
   600-line JavaScript block, nearly all of it highlighting that block. A block of a few dozen lines costs well under
   a millisecond.
+- **Line numbers and highlighted lines** (```` ```ts showLineNumbers=107 {109} ````): each line of code gets its
+  number and highlight as line decorations, the number drawn by CSS from `data-line`. See
+  [code-blocks.md](code-blocks.md).
 - **Not like Preview:** long code lines wrap, where Preview scrolls the block sideways; a block in a quote or a list
   item puts the background behind the line's `>` or indent too.
 

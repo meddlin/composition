@@ -149,6 +149,8 @@ Debounce user input in search bar, by 350ms
 See [architecture/backup-restore.md](architecture/backup-restore.md) for backing up and restoring everything from Settings, and
 [manual-tests/backup-restore.md](manual-tests/backup-restore.md) for the guided manual test of it in each app.
 
+See [ui/code-blocks.md](ui/code-blocks.md) for numbering a code block's lines, starting the count at any line, and highlighting lines, written on the fence (```` ```ts showLineNumbers=107 {109,112-114} ````).
+
 See [ui/markdown-editor-highlighting.md](ui/markdown-editor-highlighting.md) for how the Markdown tab colours text as you write, and the rules that keep the colours aligned with the caret.
 
 Stored images can be browsed and reused from the Images page or with `Cmd/Ctrl+Shift+M` in the editor; see [architecture/images.md](architecture/images.md#browsing-and-reusing-images).
