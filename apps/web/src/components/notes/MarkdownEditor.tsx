@@ -525,6 +525,12 @@ export function MarkdownEditor({
     [notes, onOpenNote, pdfLinks],
   );
 
+  // What Preview's providers hand its drawing, for the blocks Live draws whole (tables).
+  const liveBlocks = useMemo(
+    () => ({ noteLinks, drawio: drawioEditing, sheet: readOnly ? null : sheetEditing }),
+    [noteLinks, drawioEditing, sheetEditing, readOnly],
+  );
+
   const highlight = value.length <= MAX_HIGHLIGHT_CHARS;
   const highlightLayer = useHighlightSync(textarea, highlight, value);
 
@@ -866,6 +872,7 @@ export function MarkdownEditor({
               findOptions={findOptions}
               findCurrent={findCurrent}
               onFindCount={setLiveMatchCount}
+              blocks={liveBlocks}
             />
             {showLive && writing.rulerEnabled && (
               // Clipped to the editor, so a ruler past its right edge doesn't widen the page.

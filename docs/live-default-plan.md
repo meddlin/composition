@@ -7,8 +7,8 @@ Markdown source. This plan covers drawing them and then making Live the view a n
 Markdown, Preview and Split stay available.
 
 Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** (see
-[Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (uncommitted); Gate 0 is the
-owner's.
+[Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (PR #321); Gate 0 is the
+owner's. **Step 5 built 2026-11-17** (the block layer and tables); Gate E is the owner's.
 
 ## Goal and rule
 
@@ -192,6 +192,43 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   editor's screen-reader text still reads the source.
 - **Gate E (the owner's):** tables read like Preview; arrowing into and out of a table, undo across one and find
   inside one all work.
+- **Built (2026-11-17).**
+  - `liveBlocks.ts`: `liveBlocksField`, incremental as designed. A change maps the blocks through it and reads again
+    the top-level nodes it touched in the tree before the change (mapped) and after it, so a code fence opened above
+    tables swallows them and closing it brings them back. Where the parser has not reached yet, the stretch is kept as
+    `dirty` and read when the tree gets there; the last top-level node of a partial tree is not trusted (it may be cut
+    short). The frontmatter's end is read from its lines (`frontmatterEndOf`); nothing before it is a block.
+  - `liveBlockWidget.tsx`: `BlockWidget`, a React root per block rendering `NoteMarkdown` inside `NoteLinksProvider`,
+    `DrawioEditContext` and `SheetEditContext`, fed by a `LiveBlockHost` the editor updates (it is built once). A
+    sheet's Edit offset is moved from the block to the note's body, ready for Step 6. `eq` compares the source;
+    `updateDOM` re-renders the same root for a new source; `destroy` unmounts it (in a microtask, since the editor can
+    be updating from inside a React effect).
+  - Reveal rule (D3) as designed, with `redrawBlocks` sent by a view plugin 300 ms after the last change. One addition:
+    a table that **stops being one** while it is typed (a header cell typed ahead of the delimiter row) keeps its
+    drawing until the pause or until the caret leaves, then goes if it is still not a table, so the drawing under it
+    does not blink out on every such key.
+  - Clicks: a drawn table puts the caret at its start; `BlockKind.ownsClicks` gives a block an "Edit source" button
+    (mouse and keyboard) instead. Both are tested; Step 6 adds its kinds to the `liveBlockKinds` facet.
+  - **Found in CodeMirror:** Up and Down jump over a block widget in one go, as if it were a line, so the caret never
+    entered a table from above or below. A small high-precedence keymap (`blockArrows`) turns a vertical move that
+    would cross a drawn block into one onto its first line (down) or last (up), at the caret's column; Shift extends.
+    The design is unchanged; this is what makes "arrowing into a table" work.
+  - Find: `revealBlocks` (sent with find's highlights) shows the source of the table holding the current match.
+  - Accessibility: a drawn table is a real `<table>` in the editor's content; while the caret is in a block, the
+    drawing under the source is `aria-hidden`, so a screen reader reads the source once.
+  - Not drawn: tables inside a list item or a quote (they are not top-level nodes); left as written.
+  - **Measured** (production build on this Mac, a 22 KB note with 50 tables of 8 rows, 100-note scratch database):
+    a keystroke costs 2.2-2.8 ms median in the editor (insert + measure) and 11.2-11.8 ms for the whole key (React
+    included, the app's known ~10.5 ms baseline), typing above, between or inside the tables. The same note with the
+    tables broken into plain text: 2.3-2.8 ms and 11.2-12.0 ms, so no difference within noise. The caret entering a
+    table costs 5 ms, leaving it 3 ms (editor update; the React drawing follows in the next frame); the drawing under
+    the source catches up 306 ms after the last key. The state field alone, over 2,000 keystrokes in node: 0 µs a key
+    typing in a paragraph and 60 µs typing in a cell at 50 tables; 77 and 193 µs at 500 tables. Only the blocks in
+    view are drawn (CodeMirror lays out what is near the viewport), so 50 tables mean 2 or 3 React roots on screen.
+  - Checks: `liveBlocks.test.ts` (state field: finding, incremental re-reads, mapping, partial parses, the reveal
+    rule, the debounce, orphans, find) and `liveBlocks.view.test.tsx` (the DOM: a real table, clicks, Edit source,
+    the pause in a real view, undo, one root kept while typing elsewhere, LiveEditor's providers and find). Checked in
+    the browser pane, dev and production builds.
 
 ### Step 6: MDX components (M)
 

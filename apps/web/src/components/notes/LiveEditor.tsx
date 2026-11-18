@@ -4,9 +4,11 @@ import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { Annotation, Compartment, EditorState, Prec, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, drawSelection, EditorView, keymap, placeholder, type DecorationSet } from "@codemirror/view";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
+import { LiveBlockHost, type LiveBlockContext } from "./liveBlockWidget";
+import { liveBlocks, revealBlocks } from "./liveBlocks";
 import { liveMarkdown } from "./liveMarkdown";
 import { liveReflow } from "./liveReflow";
 import { changedSpan } from "./reflowText";
@@ -112,6 +114,8 @@ type Props = {
    * shows again: its steps were made against a text that is no longer there.
    */
   active?: boolean;
+  /** What tables and other blocks drawn whole need from the editor around them (see `LiveBlockContext`). */
+  blocks?: LiveBlockContext;
 };
 
 const NO_OPTIONS: FindOptions = { matchCase: false, wholeWord: false };
@@ -135,6 +139,7 @@ export function LiveEditor({
   onFindCount,
   "aria-label": label = "Markdown editor",
   active = true,
+  blocks,
 }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
@@ -142,6 +147,8 @@ export function LiveEditor({
   const attributesFacet = useRef(new Compartment());
   const reflowFacet = useRef(new Compartment());
   const historyFacet = useRef(new Compartment());
+  const [blockHost] = useState(() => new LiveBlockHost());
+  useEffect(() => blockHost.set(blocks ?? {}), [blockHost, blocks]);
   // The editor is built once, so what it calls is read from here.
   const onChangeRef = useRef(onChange);
   const eventsRef = useRef(events);
@@ -165,6 +172,7 @@ export function LiveEditor({
           EditorView.lineWrapping,
           markdown({ base: markdownLanguage }),
           liveMarkdown,
+          liveBlocks(blockHost),
           findHighlights,
           editorTheme,
           placeholder("Start writing in Markdown…"),
@@ -212,7 +220,7 @@ export function LiveEditor({
       editor.destroy();
       view.current = null;
     };
-  }, []);
+  }, [blockHost]);
 
   const { enabled: reflowEnabled, column: reflowColumn, keepTables: reflowKeepsTables } = reflow;
   useEffect(() => {
@@ -273,6 +281,8 @@ export function LiveEditor({
     editor.dispatch({
       effects: [
         setFind.of({ matches, current: currentMatch }),
+        // A match in a table is shown in its source, so it can be seen and highlighted.
+        revealBlocks.of(currentMatch === -1 ? [] : [{ from: matches[currentMatch].start, to: matches[currentMatch].end }]),
         ...(scroll ? [EditorView.scrollIntoView(matches[currentMatch].start, { y: "center" })] : []),
       ],
     });

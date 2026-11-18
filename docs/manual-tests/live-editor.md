@@ -49,6 +49,22 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Put the caret in `![alt](src)` and press Cmd/Ctrl+Shift+X: it becomes `<Image … />` with the caret ready for another prop; one undo takes it back.
 - [ ] Cmd/Ctrl+Shift+D and the **Diagram** button open the diagram editor, and the saved diagram goes in at the caret, as a block of its own.
 
+## 4b. Tables (Gate E)
+
+Use a note with a few tables, one with aligned columns (`|:---|---:|`), a link, inline code and bold in its cells, and
+open it in **Split** beside **Live** in another panel to compare.
+
+- [ ] Away from the caret each table reads as in Preview: the same borders, header weight, alignment, link colour and code style, in a light and a dark scheme.
+- [ ] Click a cell: the caret goes to the start of the table's source, the source shows, and the drawing sits under it. Click below the table: it is drawn again.
+- [ ] From the line above a table, press Down: the caret lands on the table's first line, in its source. Keep pressing Down: it walks the rows, then leaves the table, which is drawn again. The same upwards from the line below, landing on its last row.
+- [ ] Shift+Down from the line above selects into the table, and its source shows.
+- [ ] Type in a cell: the drawing under the source stays as it was while you type and catches up about a third of a second after you stop. Add a column to the header row first: the drawing stays until you have added it to the delimiter row too, with no flash of plain text.
+- [ ] Cmd/Ctrl+Z after typing in a table, and after deleting a whole table, puts it back and it is drawn again.
+- [ ] Cmd/Ctrl+F a word that is in a table cell: the table shows its source, the match highlighted; **Next** to a match outside it draws the table again.
+- [ ] A note with 50 tables types smoothly above, between and inside them.
+- [ ] With VoiceOver, a drawn table is read as a table (rows, columns, cell text). Put the caret in it: the source lines are read, not the table twice.
+- [ ] A table inside a list item or a quote is left as written.
+
 ## 5. Ruler and reflow
 
 - [ ] Settings → Writing: turn on the ruler at 40. The line is drawn in the Live tab (it is approximate: see the note below). Turn on reflow at 40 and type a long sentence: it breaks at 40 characters with the caret staying at the end; a list item's continuation lines up under its text; a table row stays whole.

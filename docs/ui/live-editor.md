@@ -3,6 +3,8 @@
 Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveMarkdown.ts`](../../apps/web/src/components/notes/liveMarkdown.ts),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
+[`liveBlocks.ts`](../../apps/web/src/components/notes/liveBlocks.ts),
+[`liveBlockWidget.tsx`](../../apps/web/src/components/notes/liveBlockWidget.tsx),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
 [`editorSurface.ts`](../../apps/web/src/components/notes/editorSurface.ts),
@@ -32,12 +34,47 @@ it will read, with the syntax showing only where the caret is. The other three t
   Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
 - **Drawings** (`<Ink src="…" />`, from the iPad) are drawn the same way: in place of the tag, from the strokes the stored PNG carries, in the colour scheme in force
   (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is still left as written.
+- **Tables** (GFM) are drawn as Preview draws them: the same markup and `prose` styles, column alignment included.
+  See [Blocks](#blocks) below.
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
-- Everything else (links, lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
+- Everything else (links, lists, quotes, code blocks, MDX tags, and tables inside a list or a quote) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
 shows all their marks.
+
+## Blocks
+
+A block is a part of the note drawn whole, in place of its source: for now a table (Step 5 of
+[live-default-plan.md](../live-default-plan.md); MDX components, the frontmatter card, `<Toc>` and `<Footnotes>` come
+in Steps 6 and 7 through the same layer).
+
+- **Drawn by Preview's own code.** Each block is a React root that renders `NoteMarkdown` for the block's source, inside
+  the providers Preview has (note links, the diagram and sheet editors), so it looks and behaves as it does in Preview.
+- **The caret in a block shows its source**, with the drawing under it, as a picture's Markdown shows beside the
+  picture. "In" means anywhere from the start of the block's first line to the end of its last; the line before and
+  the line after are not the block. A selection that reaches into it counts too.
+- **The drawing under the source is redrawn once typing pauses** (300 ms), not on every key. Until then it shows the
+  block as it was, so a half-typed row never flashes. A table that stops being one while it is typed (a cell typed in
+  the header row before the delimiter row has it) keeps its drawing until the pause, then lets go of it if it is still
+  not a table. Leaving the block draws it as it is at once.
+- **Clicking a drawn table** puts the caret at the start of its source. Cmd/Ctrl+click on a link in it is the link's
+  (Preview's behaviour). A block whose drawing handles its own clicks (a sheet's grid, from Step 6) has a small
+  **Edit source** button instead, shown on hover and reachable from the keyboard.
+- **Up and down arrows step into a block**, onto its first line going down and its last going up, at the caret's
+  column; CodeMirror on its own would jump over the drawing in one go.
+- **Find** shows the source of the table holding the current match, so the match is seen and highlighted there.
+- **Undo** works across a block as across any text; the block is read again from what comes back.
+- **Screen readers** read a drawn table as a table, cells and all. While the caret is in a block, the drawing under
+  the source is hidden from them (`aria-hidden`), so the source is what they read.
+- **Not drawn:** a table inside a list item or a blockquote (it is shown as written), and anything in the frontmatter.
+
+How it works: a `StateField` (`liveBlocksField`), since CodeMirror takes block widgets only from a field. It keeps the
+blocks it found and, on a change, maps them through it and reads again only the top-level nodes of the syntax tree the
+change touched, before and after it (so a code fence opened above a table swallows it, and closing it brings it back).
+Where the parser has not reached yet (a long note just opened), the stretch is kept to read when it does. A widget's
+`eq` compares its source, so typing elsewhere redraws nothing. `liveBlockKinds` is the list of kinds; Step 6 adds MDX
+components to it.
 
 ## What it shares with the Markdown tab
 
@@ -71,8 +108,8 @@ same scenario on each:
   background (Settings → Styling) each line is a whole grid square tall (a level 1 or 2 heading, two), so the text
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
-- Not in the Live tab, by design: rendered links and lists, diagrams, and a preview of MDX components. Use
-  **Split** for those.
+- Not in the Live tab yet: rendered links and lists, diagrams, and a preview of MDX components (Steps 2 to 7 of
+  [live-default-plan.md](../live-default-plan.md)). Use **Split** for those.
 
 ## Keeping it level with the Markdown tab
 
