@@ -37,7 +37,11 @@ export const BLOCK_COMPONENTS: readonly string[] = COMPONENTS.map(([name]) => na
 /** A tag of one of `names` in some text: where it starts and ends, and what it is. */
 export type Tag = { name: string; at: number; end: number; close: boolean; selfClosing: boolean };
 
-const tagPattern = (names: readonly string[]) => new RegExp(`<(/?)(${names.join("|")})(?=[\\s/>]|$)`, "g");
+/**
+ * A tag of any name: `<Name` or `</Name`, the name followed by a space, `/`, `>` or the end. Which names count is
+ * checked after (a pattern built from the names would be a regex made at run time, which scanners flag).
+ */
+const tagPattern = () => /<(\/?)([A-Za-z][\w.-]*)(?=[\s/>]|$)/g;
 
 /**
  * Where the tag whose name ends at `from` ends (past its `>`), and whether it closes itself; "more" when `text` ends
@@ -74,12 +78,13 @@ function tagEnd(text: string, from: number): { end: number; selfClosing: boolean
  */
 export function tagsIn(text: string, names: readonly string[], inCode: (at: number) => boolean = () => false): { tags: Tag[]; more: boolean } {
   const tags: Tag[] = [];
-  const pattern = tagPattern(names);
+  const wanted = new Set(names);
+  const pattern = tagPattern();
   for (let match = pattern.exec(text); match; match = pattern.exec(text)) {
     const at = match.index;
-    if (inCode(at)) continue;
-    const close = match[1] === "/";
     const name = match[2];
+    if (!wanted.has(name) || inCode(at)) continue;
+    const close = match[1] === "/";
     const end = tagEnd(text, at + match[0].length);
     if (end === "more") return { tags, more: true };
     if (end === "invalid") continue;
@@ -121,14 +126,14 @@ export function elementEnd(state: EditorState, name: string, start: number): num
   }
 }
 
-const openingAt = (names: readonly string[]) => new RegExp(`^ {0,3}<(${names.join("|")})(?=[\\s/>]|$)`);
+/** An opening tag of any name at the start of a line, after up to three spaces (see `tagPattern`). */
+const OPENING = /^ {0,3}<([A-Za-z][\w.-]*)(?=[\s/>]|$)/;
 
 /** The end of the component of `name` that starts at a top-level node (see `BlockKind.reach`). */
 function reachOf(name: string) {
-  const opening = openingAt([name]);
   return (state: EditorState, node: { from: number; to: number }): number | null => {
-    const head = opening.exec(state.doc.sliceString(node.from, Math.min(node.to, node.from + name.length + 5)));
-    if (!head) return null;
+    const head = OPENING.exec(state.doc.sliceString(node.from, Math.min(node.to, node.from + name.length + 5)));
+    if (!head || head[1] !== name) return null;
     const start = node.from + head[0].length - name.length - 1;
     const end = elementEnd(state, name, start);
     // Not closed yet: the opening node alone, which can't be drawn yet.
