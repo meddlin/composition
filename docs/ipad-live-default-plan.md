@@ -182,6 +182,16 @@ feel, VoiceOver, speed on the device).
   `surface` fill behind the block (first and last line rounded). Fences as V2. Colours per I7.
 - **Simulator:** pixel check of the fill in five schemes; typing in a block keeps the 16 ms budget (`LiveBench`).
 - **Gate LD3 (iPad):** item 349.
+- **Status (2026-11-17): built, Simulator only.** `LiveModel` gives each block (`LiveDecorations.codeBlocks`): its range, the lines drawn on
+  the fill (first and last are the rounded ends) and which of them are fences, and the indents hidden (`codeIndentsHidden`). The app
+  (`LiveCode.swift`) puts each line in the Preview's code font (`.callout` monospaced, as Dynamic Type sizes it), 12 points in from the fill,
+  and `LiveDrawingFragment` paints the line's share of one `surface` fill behind it. Away from the caret a fence line collapses to nothing
+  (the desktop's Step 3 does the same), and a **top-level indented block's four-column indent is hidden**, as the desktop hides it; a block
+  with nothing between its fences keeps them, also as the desktop. A long line wraps (the Preview scrolls it sideways).
+  **Oracle:** the fixture writer emits the desktop's `codeDecorations` facts (`live-code-expected.json`) whenever `liveCode.ts` is in the
+  tree, and `LiveConformanceTests.codeBlocks` compares lines, ends, fences, collapsed fences and hidden indents for every selection: run
+  against the desktop's Step 3 branch, **all 375 texts agree, with nothing in `knownCode`**. On a tree without the desktop's Step 3 (this
+  branch's base) the file is not written and the comparison is skipped with a message. The V2 difference in the fixtures table is gone.
 
 ### Step 4: lists, task lists, quotes (M)
 

@@ -86,6 +86,7 @@ enum LiveOverlay {
             hide(part, in: storage)
         }
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
+        LiveCode.apply(decorations, to: range, in: storage, look: look)
     }
 
     /// A rule is a line and a picture is a picture, in place of the text that writes it: the text is hidden, and its paragraph is made tall enough, and marked for

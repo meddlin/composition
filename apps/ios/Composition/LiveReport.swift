@@ -3,7 +3,8 @@ import UIKit
 
 /// What the Live tab has made of the text, read back from the text storage: the runs that are hidden, italic, bold, struck, filled (a tint or the faint fill of
 /// code), smaller than the text (`small`, the frontmatter), drawn at another size or in the grey text (`dim64`), and the paragraphs a rule or a picture is drawn on (`draw-rule`,
-/// `draw-picture`, `draw-pictureAfter`). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
+/// `draw-picture`, `draw-pictureAfter`), the lines of a code block on its fill (`code`, with its ends `code-first` and `code-last`) and the lines
+/// collapsed to nothing (`collapsed`, a code block's fences away from the selection). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
 /// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`.
 enum LiveReport {
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
@@ -18,6 +19,13 @@ enum LiveReport {
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
             guard let font = attributes[.font] as? UIFont else { return }
             if let drawing = attributes[.liveDraw] as? LiveDrawing { note("draw-\(drawing.kind.rawValue)", run) }
+            if let code = attributes[.liveCode] as? LiveCodeLine {
+                // Step 3: the lines on a code block's fill, and which are its rounded ends.
+                note("code", run)
+                if code.first { note("code-first", run) }
+                if code.last { note("code-last", run) }
+            }
+            if let style = attributes[.paragraphStyle] as? NSParagraphStyle, style.maximumLineHeight > 0, style.maximumLineHeight < 1 { note("collapsed", run) }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }

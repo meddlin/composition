@@ -1102,6 +1102,84 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.frontmatterLines)).toBe(true);
   }, 600_000);
 
+  // docs/ipad-live-default-plan.md, Step 3: the code blocks of the same texts, for the same selections, as the desktop's real `codeDecorations`
+  // (liveCode.ts, Step 3 of docs/live-default-plan.md) draws them. That module comes with the desktop's Step 3; until it is in this tree, nothing
+  // is written and the Swift side (LiveConformanceTests) says so and skips the comparison.
+  it("writes the Live view's code blocks as the real liveCode draws them, when the desktop has it", async () => {
+    const source = path.resolve(__dirname, "../src/components/notes/liveCode.ts");
+    const file = path.join(outDir!, "live-code-expected.json");
+    fs.rmSync(file, { force: true });
+    if (!fs.existsSync(source)) return;
+    const { codeDecorations } = (await import(source)) as {
+      codeDecorations: (
+        state: EditorState,
+        ranges: readonly { from: number; to: number }[],
+        frontmatterEnd: number,
+        highlight: null,
+      ) => { decorations: import("@codemirror/view").DecorationSet };
+    };
+    const live = JSON.parse(fs.readFileSync(path.join(outDir!, "live-expected.json"), "utf8")) as {
+      texts: { text: string }[];
+      states: { t: number; from: number; to: number }[];
+    };
+
+    // The raw text's offset of each of CodeMirror's (as in the test above: CodeMirror reads `\r\n` as one), and back.
+    const rawOffsets = (raw: string): number[] => {
+      const map: number[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "\r" && raw[i + 1] === "\n") continue;
+        map.push(raw[i] === "\n" && raw[i - 1] === "\r" ? i - 1 : i);
+      }
+      map.push(raw.length);
+      return map;
+    };
+    const parsed = new Map<number, { state: EditorState; at: number[]; back: Map<number, number> }>();
+    const expected = live.states.map(({ t, from, to }) => {
+      let entry = parsed.get(t);
+      if (!entry) {
+        const raw = live.texts[t].text;
+        const text = raw.replace(/\r\n?/g, "\n");
+        let state = EditorState.create({ doc: text, extensions: [markdown({ base: markdownLanguage })] });
+        ensureSyntaxTree(state, state.doc.length, 60_000);
+        state = state.update({}).state;
+        const at = rawOffsets(raw);
+        entry = { state, at, back: new Map(at.map((raw, cm) => [raw, cm])) };
+        parsed.set(t, entry);
+      }
+      const { at, back } = entry;
+      const state = entry.state.update({ selection: EditorSelection.range(back.get(from) ?? from, back.get(to) ?? to) }).state;
+      const text = state.doc.toString();
+      const { decorations } = codeDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), null);
+      // Each line the block's look is on, with its classes (`first`, `last`, `fence`, `hidden`), and each run hidden (an indented block's indent).
+      const lines = new Map<number, Set<string>>();
+      const hidden: [number, number][] = [];
+      decorations.between(0, state.doc.length, (start, end, value) => {
+        const cls = (value.spec as { class?: string }).class;
+        if (cls === undefined) {
+          if (end > start) hidden.push([at[start], at[end]]);
+          return;
+        }
+        const names = cls
+          .split(/\s+/)
+          .filter((name) => name.startsWith("cm-live-codeblock"))
+          .map((name) => name.replace(/^cm-live-codeblock-?/, "") || "code");
+        if (names.length === 0) return;
+        const line = lines.get(at[start]) ?? new Set<string>();
+        for (const name of names) line.add(name);
+        lines.set(at[start], line);
+      });
+      return {
+        lines: [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([line, names]) => [line, [...names].filter((name) => name !== "code").sort().join(" ")]),
+        hidden: hidden.sort((a, b) => a[0] - b[0]),
+      };
+    });
+    fs.writeFileSync(file, JSON.stringify({ expected }));
+    // The check has teeth only if there are blocks, with their fences hidden and shown, and an indent hidden.
+    expect(expected.some((e) => e.lines.some(([, names]) => names === "hidden"))).toBe(true);
+    expect(expected.some((e) => e.lines.some(([, names]) => String(names).includes("fence")))).toBe(true);
+    expect(expected.some((e) => e.hidden.length > 0)).toBe(true);
+  }, 600_000);
+
   it("writes the colour schemes, <Mark> tints, fonts and chart colours the real globals.css, themes.ts, editorFonts.ts, previewFonts.ts and Chart.tsx hold", async () => {
     fs.mkdirSync(outDir!, { recursive: true });
     const src = path.resolve(__dirname, "../src");

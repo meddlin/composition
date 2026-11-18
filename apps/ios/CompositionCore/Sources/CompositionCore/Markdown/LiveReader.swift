@@ -2,7 +2,7 @@ import Foundation
 import Markdown
 
 // Reads a note with swift-markdown and finds what the Live view changes the look of: ATX headings, rules, bold, italic, strikethrough and code with
-// their marks, pictures written as `![alt](src "title")`, and fenced code blocks. The desktop gets these from lezer's syntax tree, so the marks are
+// their marks, pictures written as `![alt](src "title")`, and code blocks (fenced and indented). The desktop gets these from lezer's syntax tree, so the marks are
 // worked out as lezer works them out (a heading's closing `#`s, a rule's whole line, an image's raw address), from the text and not from what
 // cmark makes of it, because the two disagree on what is in a mark and on what an address is.
 
@@ -13,7 +13,7 @@ struct LiveReader: MarkupWalker {
     var rules: [LiveModel.RuleNode] = []
     var styles: [LiveModel.StyleNode] = []
     var pictures: [LiveModel.PictureNode] = []
-    var fenced: [LiveModel.FenceNode] = []
+    var codeBlocks: [LiveModel.FenceNode] = []
 
     private var chars: [UInt16] { map.chars }
 
@@ -206,30 +206,75 @@ struct LiveReader: MarkupWalker {
 
     // MARK: Code blocks
 
+    /// A fenced or an indented code block, as the desktop's `liveCode` reads lezer's `FencedCode` and `CodeBlock`: each of its lines, which of them are
+    /// fences (the opening one, and the closing one when the block is closed), whether any line is code, and, for an indented block at the top level, the
+    /// indent of each of its lines (four columns, which the Preview does not show).
     mutating func visitCodeBlock(_ block: CodeBlock) {
         guard let range = map.range(of: block) else { return }
-        // A fenced block: its first and last lines are the fences (a block that is not closed has no last one).
         var start = range.lowerBound
         while start < range.upperBound, chars[start] == 0x20 { start += 1 }
-        guard start < range.upperBound, chars[start] == 0x60 || chars[start] == 0x7E else { return }
+        var end = range.upperBound
+        while end > range.lowerBound, chars[end - 1] == 0x0A || chars[end - 1] == 0x0D { end -= 1 }
+        let first = lines.line(containing: range.lowerBound)
+        var last = lines.line(containing: max(end, range.lowerBound))
+        // cmark does not say which kind a block is. A fenced one spans more lines than its code has (its fences); an indented one, whose range starts
+        // after the indent of its first line, spans as many (`    ```` is indented code, not a fence).
+        let codeLines = block.code.utf16.reduce(0) { $1 == 0x0A ? $0 + 1 : $0 }
+        let fenced = last - first + 1 > codeLines && start < range.upperBound && (chars[start] == 0x60 || chars[start] == 0x7E)
+        var starts = Array(lines.starts[first...last])
+
+        guard fenced else {
+            // An indented block. Its range starts after the indent of its first line, as lezer's does, so a caret in that indent is outside the block.
+            let from = range.lowerBound
+            var indents: [NSRange] = []
+            if block.parent?.parent == nil {  // at the top level: in a list or a quote the indent is the item's
+                for line in starts {
+                    let indent = indentWidth(at: line)
+                    if indent > 0, line + indent < chars.count, !isLineBreak(chars[line + indent]) { indents.append(NSRange(location: line, length: indent)) }
+                }
+            }
+            codeBlocks.append(.init(node: NSRange(location: from, length: end - from), fences: [], lines: starts, fenceLines: [], hasCode: true, indents: indents))
+            return
+        }
+
         let fenceCharacter = chars[start]
         var opening = 0
         while start + opening < range.upperBound, chars[start + opening] == fenceCharacter { opening += 1 }
         let firstEnd = lineEnd(from: start)
-
-        var end = range.upperBound
-        while end > range.lowerBound, chars[end - 1] == 0x0A || chars[end - 1] == 0x0D { end -= 1 }
-        var fences = [NSRange(location: range.lowerBound, length: firstEnd - range.lowerBound)]
-        var lastStart = end
-        while lastStart > firstEnd, chars[lastStart - 1] != 0x0A, chars[lastStart - 1] != 0x0D { lastStart -= 1 }
-        if lastStart > firstEnd {
+        // A fence is hidden as its whole line: what is before it on the line (a list item's indent, a quote's `>`) goes with it, as on the desktop.
+        var fences = [NSRange(location: starts[0], length: firstEnd - starts[0])]
+        var fenceLines = [starts[0]]
+        let lastStart = starts[starts.count - 1]
+        if starts.count > 1 {
             var closing = 0
             var p = lastStart
-            while p < end, chars[p] == 0x20 { p += 1 }
+            while p < end, chars[p] == 0x20 || chars[p] == 0x3E { p += 1 }  // the indent, or a quote's `>` and its space
             while p + closing < end, chars[p + closing] == fenceCharacter { closing += 1 }
             let onlyFence = (p + closing..<end).allSatisfy { isSpace(chars[$0]) }
-            if closing >= opening, onlyFence { fences.append(NSRange(location: lastStart, length: end - lastStart)) }
+            if closing >= opening, onlyFence {
+                fences.append(NSRange(location: lastStart, length: lineEnd(from: lastStart) - lastStart))
+                fenceLines.append(lastStart)
+            }
         }
-        fenced.append(.init(node: NSRange(location: range.lowerBound, length: end - range.lowerBound), fences: fences))
+        if fenceLines.count == 1, (end..<chars.count).allSatisfy({ isLineBreak(chars[$0]) }), end < chars.count {
+            // Not closed, and nothing after it: it runs to the end of the note, the empty line after a last line break included, as lezer's does.
+            end = chars.count
+            last = lines.starts.count - 1
+            starts = Array(lines.starts[first...last])
+        }
+        let hasCode = starts.count > fenceLines.count
+        codeBlocks.append(.init(node: NSRange(location: range.lowerBound, length: end - range.lowerBound), fences: fences, lines: starts, fenceLines: fenceLines, hasCode: hasCode, indents: []))
     }
+
+    /// How many units of indent start the line at `line`, up to four columns (a tab goes to the next multiple of four).
+    private func indentWidth(at line: Int) -> Int {
+        var column = 0, i = line
+        while i < chars.count, column < 4 {
+            if chars[i] == 0x20 { column += 1 } else if chars[i] == 0x09 { column += 4 - column % 4 } else { break }
+            i += 1
+        }
+        return column >= 4 ? i - line : 0
+    }
+
+    private func isLineBreak(_ unit: UInt16) -> Bool { unit == 0x0A || unit == 0x0D }
 }

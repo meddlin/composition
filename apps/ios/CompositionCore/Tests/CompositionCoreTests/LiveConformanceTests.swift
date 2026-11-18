@@ -141,4 +141,85 @@ struct LiveConformanceTests {
         }
         #expect(report.isEmpty, "\(report.count) of \(fixture.texts.count) texts differ:\n\(report.joined(separator: "\n"))")
     }
+
+    /// Code blocks the Swift model and the desktop's `liveCode` read differently, each looked at, keyed as `known` is.
+    static let knownCode: [String: String] = [:]
+
+    /// docs/ipad-live-default-plan.md, Step 3: for the same texts and selections, the lines the desktop draws as a code block (which are its fill's
+    /// ends, which are fences), the fence lines it collapses and the indents it hides, from its real `codeDecorations` (liveCode.ts). That module
+    /// comes with the desktop's Step 3 (its PR #324); a tree without it writes no `live-code-expected.json`, and this is skipped.
+    @Test("every code block, with every selection tried, has its lines, fences and indent drawn and hidden as the desktop does")
+    func codeBlocks() throws {
+        let directory = try #require(conformanceDirectory)
+        let codeFile = directory.appendingPathComponent("live-code-expected.json")
+        guard FileManager.default.fileExists(atPath: codeFile.path) else {
+            print("live-code-expected.json is not there: the desktop's liveCode.ts (its Step 3) is not in this tree yet, so code blocks are not compared")
+            return
+        }
+        struct Code: Decodable {
+            struct Line: Decodable {
+                let start: Int, names: String
+                init(from decoder: Decoder) throws {
+                    var row = try decoder.unkeyedContainer()
+                    start = try row.decode(Int.self)
+                    names = try row.decode(String.self)
+                }
+            }
+            struct Expected: Decodable {
+                let lines: [Line]
+                let hidden: [[Int]]
+            }
+            let expected: [Expected]
+        }
+        // Only the texts and the selections of live-expected.json (the desktop's later steps change the rest of it).
+        struct Texts: Decodable {
+            let texts: [Fixture.Text]
+            let states: [Fixture.State]
+        }
+        let fixture = try JSONDecoder().decode(Texts.self, from: Data(contentsOf: directory.appendingPathComponent("live-expected.json")))
+        let code = try JSONDecoder().decode(Code.self, from: Data(contentsOf: codeFile))
+        #expect(code.expected.count == fixture.states.count)
+
+        func want(_ expected: Code.Expected) -> [String] {
+            (expected.lines.map { "line \($0.start): \($0.names)" } + expected.hidden.map { "indent hidden \($0[0])-\($0[1])" }).sorted()
+        }
+        func got(_ decorations: LiveDecorations) -> [String] {
+            var out: [String] = []
+            for block in decorations.codeBlocks {
+                for line in block.lines {
+                    var names: [String] = []
+                    if block.fences.contains(line) { names.append("fence") }
+                    if line == block.lines.first { names.append("first") }
+                    if line == block.lines.last { names.append("last") }
+                    out.append("line \(line): \(names.sorted().joined(separator: " "))")
+                }
+            }
+            out += decorations.fencesHidden.map { "line \($0.location): hidden" }
+            out += decorations.codeIndentsHidden.map { "indent hidden \($0.location)-\(NSMaxRange($0))" }
+            return out.sorted()
+        }
+
+        var models: [Int: LiveModel] = [:]
+        var different: [Int: (count: Int, first: String)] = [:]
+        var blocks = 0
+        for (index, state) in fixture.states.enumerated() {
+            let model = models[state.t] ?? LiveModel(text: fixture.texts[state.t].text)
+            models[state.t] = model
+            let wanted = want(code.expected[index])
+            let found = got(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)))
+            if !wanted.isEmpty { blocks += 1 }
+            guard wanted != found else { continue }
+            let missing = Set(wanted).subtracting(found).sorted(), extra = Set(found).subtracting(wanted).sorted()
+            let note = "selection \(state.from)-\(state.to): missing \(missing.prefix(4)), extra \(extra.prefix(4))"
+            different[state.t] = ((different[state.t]?.count ?? 0) + 1, different[state.t]?.first ?? note)
+        }
+        #expect(blocks > 100, "the desktop drew code blocks in only \(blocks) states")
+
+        var report: [String] = []
+        for (t, found) in different.sorted(by: { $0.key < $1.key }) where Self.knownCode[fixture.texts[t].group + "|" + fixture.texts[t].text] == nil {
+            let text = fixture.texts[t].text
+            report.append("[\(fixture.texts[t].group)] \(String(reflecting: text.count > 100 ? String(text.prefix(100)) + "…" : text))\n    \(found.count) selections differ; first: \(found.first)")
+        }
+        #expect(report.isEmpty, "\(report.count) of \(fixture.texts.count) texts differ:\n\(report.joined(separator: "\n"))")
+    }
 }

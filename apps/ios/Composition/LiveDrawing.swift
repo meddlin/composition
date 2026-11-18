@@ -59,21 +59,26 @@ final class LiveDrawing: NSObject {
 /// Gives the paragraphs marked `liveDraw` a layout fragment that also draws their rule or picture. Everything else gets the ordinary one.
 final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
     func textLayoutManager(_ textLayoutManager: NSTextLayoutManager, textLayoutFragmentFor location: any NSTextLocation, in textElement: NSTextElement) -> NSTextLayoutFragment {
-        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0,
+        if let paragraph = textElement as? NSTextParagraph, paragraph.attributedString.length > 0 {
             let drawing = paragraph.attributedString.attribute(.liveDraw, at: 0, effectiveRange: nil) as? LiveDrawing
-        {
-            return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: drawing)
+            let code = paragraph.attributedString.attribute(.liveCode, at: 0, effectiveRange: nil) as? LiveCodeLine
+            if drawing != nil || code != nil {
+                return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: drawing, code: code)
+            }
         }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }
 
-/// A paragraph's layout fragment that also draws a rule across the page or a picture, in the room the paragraph was made tall enough for.
+/// A paragraph's layout fragment that also draws a rule across the page or a picture, in the room the paragraph was made tall enough for, or, behind its text,
+/// its part of a code block's fill (`LiveCode`).
 final class LiveDrawingFragment: NSTextLayoutFragment {
-    let drawing: LiveDrawing
+    let drawing: LiveDrawing?
+    let code: LiveCodeLine?
 
-    init(textElement: NSTextElement, range: NSTextRange?, drawing: LiveDrawing) {
+    init(textElement: NSTextElement, range: NSTextRange?, drawing: LiveDrawing?, code: LiveCodeLine? = nil) {
         self.drawing = drawing
+        self.code = code
         super.init(textElement: textElement, range: range)
     }
 
@@ -85,7 +90,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         return (container?.size.width ?? layoutFragmentFrame.width) - 2 * (container?.lineFragmentPadding ?? 0)
     }
 
-    private var pictureSize: CGSize? { drawing.picture.map { LiveDrawing.size(of: $0, available: lineWidth) } }
+    private var pictureSize: CGSize? { drawing?.picture.map { LiveDrawing.size(of: $0, available: lineWidth) } }
 
     /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to a sliver
     /// (found in the lab): it is widened to the lines of text and, for a picture drawn after the revealed text, lengthened to take the paragraph's spacing too.
@@ -94,15 +99,18 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
         let width = max(lineWidth, base.width - 2 * padding)
         var height = max(base.height, layoutFragmentFrame.height)
-        if drawing.kind == .pictureAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
+        if drawing?.kind == .pictureAfter, let size = pictureSize { height += LiveDrawing.reserved(for: size.height) }
         return base.union(CGRect(x: base.minX, y: base.minY, width: width + 2 * padding, height: height))
     }
 
     override func draw(at point: CGPoint, in context: CGContext) {
-        super.draw(at: point, in: context)  // the text itself (hidden, except while the selection is in it)
         let frame = layoutFragmentFrame
         let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
         let left = point.x + padding
+        // A code line's fill goes under its text, over the whole paragraph (its padding above or below included).
+        code?.drawFill(in: CGRect(x: left, y: point.y, width: lineWidth, height: frame.height), context: context)
+        super.draw(at: point, in: context)  // the text itself (hidden, except while the selection is in it)
+        guard let drawing else { return }
         switch drawing.kind {
         case .rule:
             context.setStrokeColor(drawing.ruleColor.cgColor)
@@ -122,7 +130,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
     }
 
     private func drawPicture(in rect: CGRect, context: CGContext) {
-        guard let picture = drawing.picture else { return }
+        guard let drawing, let picture = drawing.picture else { return }
         UIGraphicsPushContext(context)
         defer { UIGraphicsPopContext() }
         guard picture.pixels != nil else {

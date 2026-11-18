@@ -73,7 +73,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -375,7 +375,8 @@ final class MarkdownStyler {
             emphasis = live ? [:] : [.foregroundColor: syntax.attr.uiColor]
             strikethrough = live ? [.strikethroughStyle: NSUnderlineStyle.single.rawValue] : [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: syntax.comment.uiColor]
             inlineCode = [.foregroundColor: syntax.string.uiColor, .backgroundColor: look.uiMutedFill, .font: code]
-            codeBlock = [.foregroundColor: syntax.string.uiColor, .font: code]
+            // In the Live tab a code block is in the Preview's code font (`MarkdownView`'s `.code`: `.callout`, monospaced), as Dynamic Type sizes it (Step 3).
+            codeBlock = [.foregroundColor: syntax.string.uiColor, .font: live ? UIFontMetrics(forTextStyle: .callout).scaledFont(for: .monospacedSystemFont(ofSize: 16, weight: .regular)) : code]
             linkText = [.foregroundColor: look.theme.link.uiColor]
             quote = [.foregroundColor: syntax.comment.uiColor]
             listMarker = [.foregroundColor: syntax.number.uiColor, .font: bold]
