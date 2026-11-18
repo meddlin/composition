@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { saveWritingSettings } from "@/lib/composition/client";
 import {
   MAX_WRITING_COLUMN,
   MIN_WRITING_COLUMN,
+  NOTE_VIEWS,
   validateWritingSettings,
+  type NoteView,
   type WritingSettings as Settings,
 } from "@/lib/composition/writing";
 
 /** The columns are typed as text, so a half-typed or empty field can be shown and fixed. */
 type Draft = {
+  openNotesIn: NoteView;
   rulerEnabled: boolean;
   rulerColumn: string;
   reflowEnabled: boolean;
@@ -25,6 +29,7 @@ type Draft = {
 
 // The heading rail is chosen under Styling, so this form neither shows nor sends it.
 const toDraft = (settings: Omit<Settings, "headingRailEnabled" | "headingRailSide">): Draft => ({
+  openNotesIn: settings.openNotesIn,
   rulerEnabled: settings.rulerEnabled,
   rulerColumn: String(settings.rulerColumn),
   reflowEnabled: settings.reflowEnabled,
@@ -33,11 +38,18 @@ const toDraft = (settings: Omit<Settings, "headingRailEnabled" | "headingRailSid
   wordCountEnabled: settings.wordCountEnabled,
 });
 
+const VIEW_LABELS: Record<NoteView, string> = {
+  live: "Live: the Markdown drawn as it reads, with its syntax shown where you are typing",
+  markdown: "Markdown",
+  preview: "Preview",
+  split: "Split: Markdown and Preview side by side",
+};
+
 const toNumber = (text: string) => (text.trim() === "" ? Number.NaN : Number(text));
 
 /**
- * The Markdown editor's writing aids: a ruler to guide the eye, and reflow, which breaks lines at a
- * column as they are typed. Changes reach the editor when you go back to your notes.
+ * Which tab notes open in, and the Markdown editor's writing aids: a ruler to guide the eye, and reflow, which breaks
+ * lines at a column as they are typed. Changes reach the editor when you go back to your notes.
  */
 export function WritingSettings({ initial }: { initial: Settings }) {
   const [draft, setDraft] = useState<Draft>(toDraft(initial));
@@ -65,8 +77,8 @@ export function WritingSettings({ initial }: { initial: Settings }) {
       setError(checked.error);
       return;
     }
-    const { rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled } = checked.settings;
-    const settings = { rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled };
+    const { openNotesIn, rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled } = checked.settings;
+    const settings = { openNotesIn, rulerEnabled, rulerColumn, reflowEnabled, reflowColumn, reflowKeepsTables, wordCountEnabled };
     startTransition(async () => {
       const result = await saveWritingSettings(settings);
       if (result.error) {
@@ -82,6 +94,29 @@ export function WritingSettings({ initial }: { initial: Settings }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-6 text-sm">
+      <FieldSet className="gap-2">
+        <FieldLegend variant="label">Open notes in</FieldLegend>
+        <FieldDescription className="text-xs">
+          The tab a note starts on when it opens in a new pane. A pane whose tab you change keeps it for the next note
+          you open there. With Split, a note opened beside another starts on Markdown, as there is no room for both.
+        </FieldDescription>
+        <RadioGroup
+          value={draft.openNotesIn}
+          onValueChange={(next) => edit({ openNotesIn: next as NoteView })}
+          aria-label="Open notes in"
+          className="gap-2"
+        >
+          {NOTE_VIEWS.map((view) => (
+            <Field key={view} orientation="horizontal" className="w-fit gap-3">
+              <RadioGroupItem value={view} id={`open-notes-in-${view}`} />
+              <FieldLabel htmlFor={`open-notes-in-${view}`} className="cursor-pointer font-normal">
+                {VIEW_LABELS[view]}
+              </FieldLabel>
+            </Field>
+          ))}
+        </RadioGroup>
+      </FieldSet>
+
       <FieldSet className="gap-2">
         <FieldLegend variant="label">Ruler</FieldLegend>
         <FieldDescription className="text-xs">

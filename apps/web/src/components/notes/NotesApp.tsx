@@ -97,9 +97,14 @@ export function NotesApp({ initialWriting = DEFAULT_WRITING_SETTINGS, store: kep
           notebooks: props.initialNotebooks,
           favorites: props.initialFavorites,
           home: props.initialHome,
+          writing: initialWriting,
         }),
   );
   const store = (kept ?? made)!;
+
+  // A workspace kept from before a visit to Settings takes on the view notes open in, as it may have changed there.
+  const { openNotesIn } = initialWriting;
+  useEffect(() => store.setOpenNotesIn(openNotesIn), [store, openNotesIn]);
 
   // A workspace made here goes with the screen, and takes any AI answer that is still streaming with it.
   useEffect(() => {

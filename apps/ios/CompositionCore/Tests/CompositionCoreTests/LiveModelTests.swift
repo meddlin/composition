@@ -6,7 +6,7 @@ import Testing
 // The Live model (docs/ipad-live-view-plan.md, step L2). What it shares with the desktop is checked against the desktop's real code by
 // LiveConformanceTests; these are the parts that are the iPad's own, and a few plain examples to read.
 
-private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = LiveModel.desktopExtrasLimit) -> LiveDecorations {
+private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = nil) -> LiveDecorations {
     LiveModel(text: text, extrasLimit: limit).decorations(selection: NSRange(location: caret, length: (end ?? caret) - caret))
 }
 
@@ -70,7 +70,50 @@ struct LiveModelTests {
         #expect(indented.fencesHidden.isEmpty && indented.fencesShown.isEmpty)
     }
 
-    @Test("highlight tags and <Image /> tags are read only up to the desktop's length, and the syntax in any note")
+    @Test("a fenced block is one fill over its code lines while the selection is elsewhere, and over its fences too while it is in it (Step 3)")
+    func fencedBlockLines() throws {
+        let text = "text\n\n```swift\nlet x = 1\nlet y = 2\n```\n\nafter"
+        // Lines start at 0, 5, 6 (the opening fence), 15, 25 and 35 (the closing fence); the block runs from 6 to 38.
+        let away = try #require(decorations(text, at: 0).codeBlocks.first)
+        #expect(away.range == NSRange(location: 6, length: 32))
+        #expect(away.lines == [15, 25] && away.fences.isEmpty && !away.active)
+        let inside = try #require(decorations(text, at: 20).codeBlocks.first)
+        #expect(inside.lines == [6, 15, 25, 35] && inside.fences == [6, 35] && inside.active)
+        #expect(decorations(text, at: 0).codeIndentsHidden.isEmpty)
+    }
+
+    @Test("an indented block at the top level hides its indent while the selection is outside it; one in a list keeps it")
+    func indentedBlockLines() throws {
+        let text = "para\n\n    one\n\tsix\n\nend"
+        // The block's lines start at 6 and 14; it starts after the first line's indent (10), as lezer's does.
+        let away = decorations(text, at: 0)
+        let block = try #require(away.codeBlocks.first)
+        #expect(block.range == NSRange(location: 6, length: 12) && block.lines == [6, 14] && block.fences.isEmpty)
+        #expect(ranges(away.codeIndentsHidden) == [[6, 10], [14, 15]])
+        #expect(decorations(text, at: 12).codeIndentsHidden.isEmpty)
+        let listed = decorations("- item\n\n      code\n", at: 0)
+        #expect(listed.codeBlocks.first?.lines == [8] && listed.codeIndentsHidden.isEmpty)
+    }
+
+    @Test("a fence not closed runs to the end of the note, a block with no code keeps its fences, and one in a list hides its fences' whole lines")
+    func unusualBlocks() throws {
+        let open = try #require(decorations("para\n\n```\ncode\n", at: 0).codeBlocks.first)
+        #expect(open.range == NSRange(location: 6, length: 9) && open.lines == [10, 15])  // the empty line after the last break too
+        #expect(ranges(decorations("para\n\n```\ncode\n", at: 0).fencesHidden) == [[6, 9]])
+        let empty = decorations("para\n\n```\n```\n", at: 0)
+        #expect(empty.fencesHidden.isEmpty && ranges(empty.fencesShown) == [[6, 9], [10, 13]])
+        #expect(empty.codeBlocks.first?.lines == [6, 10] && empty.codeBlocks.first?.fences == [6, 10])
+        let listed = decorations("- item\n\n  ```\n  code\n  ```\n\nend", at: 0)
+        #expect(ranges(listed.fencesHidden) == [[8, 13], [21, 26]])
+        #expect(listed.codeBlocks.first?.lines == [14])
+        let quoted = decorations("> ```\n> code\n> ```\n\nend", at: 22)
+        #expect(ranges(quoted.fencesHidden) == [[0, 5], [13, 18]] && quoted.codeBlocks.first?.lines == [6])
+        // Four spaces before backticks is indented code, not a fence.
+        let notFence = decorations("    ```\nafter", at: 12)
+        #expect(notFence.fencesHidden.isEmpty && notFence.codeBlocks.first?.lines == [0] && ranges(notFence.codeIndentsHidden) == [[0, 4]])
+    }
+
+    @Test("highlight tags and <Image /> tags are read in a note of any length unless a limit is given, and the syntax always")
     func length() {
         let text = "**bold** <Mark color=\"green\">tint</Mark> <Image src=\"a.png\" />"
         let all = decorations(text, at: 0)
@@ -114,6 +157,9 @@ private func facts(_ decorations: LiveDecorations, within window: NSRange? = nil
     out += decorations.pictures.filter { shown($0.range) }.map { "picture \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.src)" }
     out += decorations.fencesHidden.filter(shown).map { "fence hidden \($0.location)-\(NSMaxRange($0))" }
     out += decorations.fencesShown.filter(shown).map { "fence shown \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.codeBlocks.filter { shown($0.range) }.map { "code \($0.range.location)-\(NSMaxRange($0.range)) \($0.lines) \($0.fences) \($0.active)" }
+    out += decorations.codeIndentsHidden.filter(shown).map { "indent hidden \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.links.filter { shown($0.node) }.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.href)" }
     return out.sorted()
 }
 
@@ -123,6 +169,7 @@ struct LiveModelFollowingTests {
         # Notes on the Live view
 
         Some **bold** words, some *italic* ones and `code` too, with a [link](https://x.test).
+        A [note](note:12 "Title"), <https://y.test/a> and www.z.test/b, bare.
 
         - one **two**
         - three *four*
@@ -276,5 +323,99 @@ struct LiveModelDrawnTests {
         #expect(LiveModel(text: text).decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 26))
         #expect(LiveModel(text: "# No frontmatter").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == nil)
         #expect(LiveModel(text: "---\r\ntitle: A\r\n---\r\ntext").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 18))
+    }
+
+    // MARK: Links (Step 2 of docs/ipad-live-default-plan.md)
+
+    @Test("a link away from the selection hides `[` and `](url \"title\")` and is drawn as its words; touching it shows its four marks, dimmed")
+    func link() {
+        let text = "see [the note](note:12 \"Title\") here"
+        let away = decorations(text, at: 0)
+        #expect(away.links == [.init(range: NSRange(location: 5, length: 8), node: NSRange(location: 4, length: 27), href: "note:12", active: false)])
+        #expect(ranges(away.hidden) == [[4, 5], [13, 31]])
+        #expect(away.shown.isEmpty)
+        for caret in [4, 8, 13, 20, 31] {
+            let near = decorations(text, at: caret)
+            #expect(near.links.first?.active == true, "caret at \(caret)")
+            #expect(ranges(near.shown) == [[4, 5], [13, 14], [14, 15], [30, 31]], "caret at \(caret)")
+            #expect(near.hidden.isEmpty, "caret at \(caret)")
+        }
+        #expect(decorations(text, at: 32).links.first?.active == false)
+    }
+
+    @Test("an autolink is drawn as its address with `<` `>` hidden, and a bare address as itself; www. is given http:// and an email mailto:")
+    func autolinks() {
+        let text = "<https://x.test> or www.y.test, or a@b.test."
+        let away = decorations(text, at: text.utf16.count)
+        #expect(away.links.map { [$0.range.location, NSMaxRange($0.range)] } == [[1, 15], [20, 30], [35, 43]])
+        #expect(away.links.map(\.href) == ["https://x.test", "http://www.y.test", "mailto:a@b.test"])
+        #expect(ranges(away.hidden) == [[0, 1], [15, 16]])
+        #expect(ranges(decorations(text, at: 3).shown) == [[0, 1], [15, 16]])
+    }
+
+    @Test("a reference link follows its definition; a footnote, an empty link and a link with no text are left as written")
+    func references() {
+        let text = "[ref][one], [one], [^1], [](u), [x]()\n\n[one]: https://x.test\n[^1]: a note"
+        let away = decorations(text, at: text.utf16.count)
+        #expect(away.links.map { [$0.range.location, NSMaxRange($0.range)] } == [[1, 4], [13, 16]])
+        #expect(away.links.allSatisfy { $0.href == "https://x.test" })
+        #expect(ranges(away.hidden) == [[0, 1], [4, 10], [12, 13], [16, 17]])
+    }
+
+    @Test("a link's address that runs onto the next line is dimmed rather than hidden away from the selection (a line break cannot be hidden)")
+    func linkOverLines() {
+        let text = "[a](u\n\"title\") split"
+        let away = decorations(text, at: text.utf16.count)
+        #expect(ranges(away.hidden) == [[0, 1]])
+        #expect(ranges(away.shown) == [[2, 14]])
+    }
+
+    @Test("the links of a window are those that touch it, and they move with an edit before them")
+    func linksMove() {
+        let text = "first line\n\n[a](u) and [b](v)"
+        var live = LiveModel(text: text)
+        let window = live.decorations(in: NSRange(location: 12, length: 6), selection: NSRange(location: 0, length: 0))
+        #expect(window.links.map(\.href) == ["u"])
+        let now = "new first line\n\n[a](u) and [b](v)" as NSString
+        live.edited(replacing: NSRange(location: 0, length: 0), withLength: 4, rereading: NSRange(location: 0, length: 14), in: now)
+        #expect(live.decorations(selection: NSRange(location: 0, length: 0)).links.map { $0.range.location } == [17, 28])
+    }
+
+    // Step 1 of docs/ipad-live-default-plan.md: `<Ink />` and `<Drawio />` are pictures too. The `<Ink />` ranges are checked against the desktop by
+    // LiveConformanceTests; `<Drawio />` is the iPad's own (the desktop's Live tab leaves it as text), so these say what it does.
+
+    @Test("an <Ink /> and a <Drawio /> are pictures of their own kind, outside code, and only on a line of their own drawn in place")
+    func drawingKinds() {
+        let text = "<Ink src=\"app_data/a.png\" alt=\"Drawing\" />\n\n<Drawio src=\"app_data/d.png\" alt=\"Flow\" width=\"300\" />\n\n<Image src=\"p.png\" />\n\n```\n<Drawio src=\"code.png\" />\n```\n\nsee <Ink src=\"inline.png\" /> here\n\n<Drawiox src=\"no.png\" />"
+        let pictures = decorations(text, at: (text as NSString).length).pictures.sorted { $0.range.location < $1.range.location }
+        #expect(pictures.map(\.src) == ["app_data/a.png", "app_data/d.png", "p.png", "inline.png"])
+        #expect(pictures.map(\.kind) == [.ink, .drawio, .image, .ink])
+        #expect(pictures.map(\.ownLine) == [true, true, true, false])
+        #expect(pictures[1].width == "300" && pictures[1].alt == "Flow")
+        #expect(LiveModel(text: text).drawnPictureRanges.count == 3)
+    }
+
+    @Test("the caret on a drawing's tag shows the tag, with the drawing after it")
+    func drawingReveal() {
+        let text = "text\n\n<Drawio src=\"d.png\" />\n\nmore"
+        let tag = (text as NSString).range(of: "<Drawio src=\"d.png\" />")
+        #expect(decorations(text, at: 0).pictures.map(\.active) == [false])
+        #expect(decorations(text, at: tag.location + 3).pictures.map(\.active) == [true])
+        #expect(decorations(text, at: NSMaxRange(tag)).pictures.map(\.active) == [true])
+    }
+
+    @Test("a drawing keeps its kind when an edit before it moves it, and a full read finds a drawing typed")
+    func drawingAfterAnEdit() {
+        let text = "intro\n\n<Ink src=\"a.png\" />"
+        var live = LiveModel(text: text)
+        let edited = "intro, longer\n\n<Ink src=\"a.png\" />"
+        live.edited(replacing: NSRange(location: 5, length: 0), withLength: 8, rereading: NSRange(location: 0, length: 15), in: edited as NSString)
+        let moved = live.decorations(selection: NSRange(location: 0, length: 0)).pictures
+        #expect(moved.map(\.kind) == [.ink])
+        #expect(moved.map(\.range.location) == [15])
+        let typed = edited + "\n\n<Drawio src=\"d.png\" />"
+        let fresh = LiveModel(text: typed)
+        #expect(fresh.decorations(selection: NSRange(location: 0, length: 0)).pictures.map(\.kind) == [.ink, .drawio])
+        #expect(fresh.differences(from: live) == [(typed as NSString).range(of: "<Drawio src=\"d.png\" />")])
     }
 }

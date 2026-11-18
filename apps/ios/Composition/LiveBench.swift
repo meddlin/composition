@@ -65,10 +65,14 @@ enum LiveBench {
         // `-liveBenchAt 0.1`: how far into the note to type (a share of its length; the middle by default).
         let share = UserDefaults.standard.object(forKey: "liveBenchAt") == nil ? 0.5 : UserDefaults.standard.double(forKey: "liveBenchAt")
         result["typedAt"] = share
+        // `-liveBenchIn code`: type in a line of a fenced code block instead (`let x = …` in the speed test's note; docs/ipad-live-default-plan.md, Step 3).
+        let inCode = UserDefaults.standard.string(forKey: "liveBenchIn") == "code"
+        result["typedIn"] = inCode ? "code" : "paragraph"
         func paragraphWithMarks() -> NSRange {
             let current = view.nativeText as NSString
             let middle = Int(Double(current.length) * share)
-            let found = current.range(of: "**", options: [], range: NSRange(location: middle, length: current.length - middle))
+            let found = current.range(of: inCode ? "\nlet x = " : "**", options: [], range: NSRange(location: middle, length: current.length - middle))
+            if inCode, found.location != NSNotFound { return current.paragraphRange(for: NSRange(location: found.location + 1, length: 0)) }
             return found.location == NSNotFound ? current.paragraphRange(for: NSRange(location: middle, length: 0)) : current.paragraphRange(for: found)
         }
         let paragraph = paragraphWithMarks()

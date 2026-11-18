@@ -53,6 +53,10 @@ final class MarkdownStyler {
     var didApply: (() -> Void)?
     /// Where the notes' pictures are kept: asked when the Live tab draws one.
     var imageFolder: () -> URL? = { nil }
+    /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through (Step 2 of docs/ipad-live-default-plan.md).
+    var isLinkHere: (String) -> Bool = { _ in true }
+    /// Called after the Live look was put on a range: the ↗ beside a link follows what was drawn (`LiveLinks`).
+    var afterApply: (() -> Void)?
     /// Gives the paragraphs the Live tab draws a rule or a picture on their layout fragment.
     private let drawingDelegate = LiveDrawingDelegate()
     private nonisolated(unsafe) var pictureObserver: NSObjectProtocol?
@@ -73,7 +77,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -81,9 +85,12 @@ final class MarkdownStyler {
         palette = Palette(look: look, live: false)
         textView.textLayoutManager?.delegate = drawingDelegate
         // A picture the Live tab asked for has come in: the text is drawn again, with it.
-        pictureObserver = NotificationCenter.default.addObserver(forName: LiveImages.didLoad, object: nil, queue: .main) { [weak self] _ in
+        pictureObserver = NotificationCenter.default.addObserver(forName: LiveImages.didLoad, object: nil, queue: .main) { [weak self] note in
+            let resized = note.userInfo?["resized"] as? Bool == true
             MainActor.assumeIsolated {
                 guard let self, self.isLive, let layout = self.textView?.textLayoutManager else { return }
+                // A drawing's strokes came in: it may be drawn at another size, so the paragraphs the pictures are on are made again (Step 1 of the Live-default plan).
+                if resized { self.redrawPictures() }
                 layout.invalidateLayout(for: layout.documentRange)
                 self.textView?.setNeedsLayout()
             }
@@ -191,6 +198,14 @@ final class MarkdownStyler {
         for range in ranges { applyColours(to: range, using: model) }
     }
 
+    /// The link the selection is in, in the Live tab, when it can be followed (a `pdf:` link to a PDF not here cannot): what the ↗ beside it follows.
+    func activeLink() -> LiveDecorations.Link? {
+        guard isLive, let textView, let live, live.length == textView.textStorage.length else { return nil }
+        let selection = textView.selectedRange
+        let around = NSIntersectionRange(NSRange(location: max(0, selection.location - 1), length: selection.length + 2), NSRange(location: 0, length: live.length))
+        return live.decorations(in: around, selection: selection).links.first { $0.active && isLinkHere($0.href) }
+    }
+
     // MARK: Quick reads
 
     private func storageProcessedEditing() {
@@ -226,7 +241,7 @@ final class MarkdownStyler {
         // In the Live tab whole paragraphs: what is drawn in place of a paragraph's text is set on the paragraph, and made again as a whole.
         if isLive { range = storage.mutableString.paragraphRange(for: range) }
         storage.beginEditing()
-        for key in Self.managedKeys { storage.removeAttribute(key, range: range) }
+        for key in Self.managedKeys + LiveOverlay.linkKeys { storage.removeAttribute(key, range: range) }
         storage.addAttributes(palette.base, range: range)
         for span in model.spans(in: range) {
             let clipped = NSIntersectionRange(span.range, range)
@@ -234,10 +249,11 @@ final class MarkdownStyler {
         }
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
-            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth))
+            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere))
         }
         storage.endEditing()
         didApply?()
+        afterApply?()
     }
 
     // MARK: Corrections after a pause
@@ -375,7 +391,8 @@ final class MarkdownStyler {
             emphasis = live ? [:] : [.foregroundColor: syntax.attr.uiColor]
             strikethrough = live ? [.strikethroughStyle: NSUnderlineStyle.single.rawValue] : [.strikethroughStyle: NSUnderlineStyle.single.rawValue, .foregroundColor: syntax.comment.uiColor]
             inlineCode = [.foregroundColor: syntax.string.uiColor, .backgroundColor: look.uiMutedFill, .font: code]
-            codeBlock = [.foregroundColor: syntax.string.uiColor, .font: code]
+            // In the Live tab a code block is in the Preview's code font (`MarkdownView`'s `.code`: `.callout`, monospaced), as Dynamic Type sizes it (Step 3).
+            codeBlock = [.foregroundColor: syntax.string.uiColor, .font: live ? UIFontMetrics(forTextStyle: .callout).scaledFont(for: .monospacedSystemFont(ofSize: 16, weight: .regular)) : code]
             linkText = [.foregroundColor: look.theme.link.uiColor]
             quote = [.foregroundColor: syntax.comment.uiColor]
             listMarker = [.foregroundColor: syntax.number.uiColor, .font: bold]

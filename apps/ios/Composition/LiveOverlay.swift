@@ -19,6 +19,8 @@ enum LiveOverlay {
         /// Where the notes' pictures are kept, and how wide a line of the note's text is (a picture is as tall as that width makes it).
         var imageFolder: URL?
         var textWidth: CGFloat
+        /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
+        var isLinkHere: (String) -> Bool = { _ in true }
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -85,7 +87,9 @@ enum LiveOverlay {
             guard let part = inside(mark) else { continue }
             hide(part, in: storage)
         }
+        applyLinks(decorations, to: range, in: storage, look: look, isHere: context.isLinkHere)
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
+        LiveCode.apply(decorations, to: range, in: storage, look: look)
     }
 
     /// A rule is a line and a picture is a picture, in place of the text that writes it: the text is hidden, and its paragraph is made tall enough, and marked for
@@ -112,7 +116,18 @@ enum LiveOverlay {
             // A stored picture only: nothing is fetched from the network, as in the Preview, so another address stays its text.
             guard let name = NoteImage.name(fromRef: picture.src), let folder = context.imageFolder else { continue }
             let url = folder.appendingPathComponent(name)
-            let drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            var drawn = LiveDrawing.Picture(url: url, label: picture.alt.isEmpty ? name : picture.alt, pixels: LiveImages.shared.pixelSize(of: url), width: NoteImage.parseWidth(picture.width))
+            // Drawings as the Preview draws them (`PreviewImageView`): `<Ink />` from its strokes at its canvas's size, `<Drawio />` at half its pixels (stored at twice
+            // the size it is shown), each unless the tag gives a width.
+            drawn.kind = picture.kind
+            switch picture.kind {
+            case .ink:
+                drawn.theme = look.theme
+                drawn.natural = drawn.pixels == nil ? nil : LiveImages.shared.drawingSize(at: url)
+            case .drawio:
+                drawn.natural = drawn.pixels.map { CGSize(width: $0.width / 2, height: $0.height / 2) }
+            case .image: break
+            }
             let size = LiveDrawing.size(of: drawn, available: context.textWidth)
             let style = NSMutableParagraphStyle()
             if picture.active {

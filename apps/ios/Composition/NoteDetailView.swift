@@ -265,6 +265,9 @@ struct NoteDetailView: View {
         handle.noteID = noteID
         let shown = $mode
         handle.isShowing = { shown.wrappedValue != .preview }
+        // The Live tab's links (its ↗ and ⌘-tap) follow as the Preview's do, and a `pdf:` link to a PDF not here is drawn as the Preview draws it.
+        handle.followLink = { [weak model] href in model.map { LinkFollower(model: $0, noteId: noteID).follow(href) } ?? false }
+        handle.isLinkHere = { [weak model] href in model.map { LinkFollower.isHere(href, model: $0) } ?? true }
         let words = $storedWords, showing = $showingStored
         handle.openStoredImages = { [weak handle] in
             words.wrappedValue = handle?.selectedWords ?? ""
@@ -494,16 +497,8 @@ struct NoteReader: View {
             // The preview's type family, and its links in the scheme's link colour.
             .fontDesign(look.previewFont.design)
             .tint(look.link)
-            // A link to another note (`[title](note:12)`) opens that note.
-            .environment(\.openURL, OpenURLAction { url in
-                if url.scheme == "pdf", let ref = PdfRefs.parse(url.absoluteString) {
-                    model.followPdfLink(ref, from: session.noteId)
-                    return .handled
-                }
-                guard url.scheme == "note", let id = NoteLinks.id(fromRef: url.absoluteString) else { return .systemAction }
-                model.followNoteLink(id)
-                return .handled
-            })
+            // A link to another note (`[title](note:12)`) opens that note, and one to a PDF the PDF (`LinkFollower`, which the Live tab shares).
+            .environment(\.openURL, OpenURLAction { LinkFollower(model: model, noteId: session.noteId).open($0) })
             .environment(\.pdfLinks, PdfLinks { model.isPdfHere(uuid: $0) })
             .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             // The outline (Outline.swift) asked for a heading.

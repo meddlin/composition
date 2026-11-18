@@ -20,6 +20,10 @@ final class EditorHandle {
     /// Whether the text view is the tab showing. Under the Preview tab it stays alive, hidden (so its undo survives), and takes nothing a caller can put at the
     /// end of the note instead.
     var isShowing: () -> Bool = { true }
+    /// Follows a link of the Live tab (its ↗, and ⌘-tap): the screen's `LinkFollower`. False when there was nothing to follow.
+    var followLink: (String) -> Bool = { _ in false }
+    /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through, as the Preview draws it.
+    var isLinkHere: (String) -> Bool = { _ in true }
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -463,6 +467,8 @@ struct NoteEditorView: UIViewRepresentable {
         private var lastLength = 0
         private var breaking = false
         private(set) var styler: MarkdownStyler?
+        /// The ↗ beside a link in the Live tab, and ⌘-tap on one.
+        private var liveLinks: LiveLinks?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
 
@@ -477,6 +483,14 @@ struct NoteEditorView: UIViewRepresentable {
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
             styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): a dead `pdf:` link drawn as the Preview draws it, the ↗ beside the link the selection is in, and ⌘-tap.
+            styler.isLinkHere = { [weak self] in self?.handle?.isLinkHere($0) ?? true }
+            let links = LiveLinks(textView: view)
+            links.activeLink = { [weak styler] in styler?.activeLink() }
+            links.follow = { [weak self] in self?.handle?.followLink($0) ?? false }
+            links.tint = { [weak view] in ((view as? NoteTextView)?.look ?? .standard).uiLink }
+            styler.afterApply = { [weak links] in links?.update() }
+            liveLinks = links
             (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
             if live { styler.setLive(true) } else { styler.reload() }
             #if DEBUG || EDITOR_TEST_HOOKS
@@ -663,6 +677,7 @@ struct NoteEditorView: UIViewRepresentable {
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
             styler?.selectionChanged()
+            liveLinks?.update()
             #if DEBUG || EDITOR_TEST_HOOKS
             updateSelectionLabel()
             #endif

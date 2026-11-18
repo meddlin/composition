@@ -284,6 +284,7 @@ describe("saveWritingSettings", () => {
     wordCountEnabled: true,
     headingRailEnabled: false,
     headingRailSide: "right" as const,
+    openNotesIn: "live" as const,
   };
 
   it("stores the settings and leaves the rest alone", async () => {
@@ -309,6 +310,12 @@ describe("saveWritingSettings", () => {
     const { headingRailEnabled: _kept, ...own } = writing;
     expect(await saveWritingSettings({ ...own, rulerColumn: 90 })).toEqual({});
     expect(loadWebSettings().writing).toEqual({ ...writing, headingRailEnabled: true, rulerColumn: 90 });
+  });
+
+  it("rejects a view to open notes in that it doesn't offer", async () => {
+    const { saveWritingSettings } = await import("./service");
+
+    expect((await saveWritingSettings({ openNotesIn: "both" as never })).error).toMatch(/Unknown writing setting/);
   });
 
   it("rejects a heading rail side it doesn't offer", async () => {

@@ -1,9 +1,11 @@
 #if DEBUG || EDITOR_TEST_HOOKS
+import CompositionCore
 import UIKit
 
 /// What the Live tab has made of the text, read back from the text storage: the runs that are hidden, italic, bold, struck, filled (a tint or the faint fill of
 /// code), smaller than the text (`small`, the frontmatter), drawn at another size or in the grey text (`dim64`), and the paragraphs a rule or a picture is drawn on (`draw-rule`,
-/// `draw-picture`, `draw-pictureAfter`). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
+/// `draw-picture`, `draw-pictureAfter`), the lines of a code block on its fill (`code`, with its ends `code-first` and `code-last`) and the lines
+/// collapsed to nothing (`collapsed`, a code block's fences away from the selection). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
 /// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`.
 enum LiveReport {
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
@@ -17,7 +19,26 @@ enum LiveReport {
         }
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
             guard let font = attributes[.font] as? UIFont else { return }
-            if let drawing = attributes[.liveDraw] as? LiveDrawing { note("draw-\(drawing.kind.rawValue)", run) }
+            if let drawing = attributes[.liveDraw] as? LiveDrawing {
+                note("draw-\(drawing.kind.rawValue)", run)
+                // A drawing (Step 1 of docs/ipad-live-default-plan.md): `picture-ink` or `picture-drawio`, the width it is drawn at when its tag gives none
+                // (`natural440`), and `ink-strokes` for an `<Ink />` whose strokes were read, so that it is drawn from them.
+                if let picture = drawing.picture, picture.kind != .image {
+                    note("picture-\(picture.kind.rawValue)", run)
+                    if let natural = picture.natural { note("natural\(Int(natural.width.rounded()))", run) }
+                    if picture.kind == .ink, LiveImages.shared.strokes(at: picture.url)?.document != nil { note("ink-strokes", run) }
+                }
+            }
+            if let code = attributes[.liveCode] as? LiveCodeLine {
+                // Step 3: the lines on a code block's fill, and which are its rounded ends.
+                note("code", run)
+                if code.first { note("code-first", run) }
+                if code.last { note("code-last", run) }
+            }
+            if let style = attributes[.paragraphStyle] as? NSParagraphStyle, style.maximumLineHeight > 0, style.maximumLineHeight < 1 { note("collapsed", run) }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): the words of one that can be followed, and where a dead `pdf:` link's "(PDF not on this device)" is drawn.
+            if attributes[.liveLink] != nil { note("link", run) }
+            if attributes[.liveLinkSuffix] != nil { note("suffix", run) }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }

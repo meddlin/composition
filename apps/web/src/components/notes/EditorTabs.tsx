@@ -4,11 +4,12 @@ import type { KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
 import type { PaneView } from "./panes";
 
+// Live first, as notes open in it by default (docs/live-default-plan.md, D6).
 const TABS: { view: PaneView; label: string }[] = [
+  { view: "live", label: "Live" },
   { view: "markdown", label: "Markdown" },
   { view: "preview", label: "Preview" },
   { view: "split", label: "Split" },
-  { view: "live", label: "Live" },
 ];
 
 /** What each tab brings into view: split shows both the editor's and the preview's panels; live has a panel of its own. */

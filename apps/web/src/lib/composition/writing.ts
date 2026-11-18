@@ -17,6 +17,14 @@ export function isHeadingRailSide(value: unknown): value is HeadingRailSide {
   return HEADING_RAIL_SIDES.some((side) => side === value);
 }
 
+/** The views a note can be shown in, by its tabs: the editor, the preview, both side by side, or Live (the two in one). */
+export const NOTE_VIEWS = ["live", "markdown", "preview", "split"] as const;
+export type NoteView = (typeof NOTE_VIEWS)[number];
+
+export function isNoteView(value: unknown): value is NoteView {
+  return NOTE_VIEWS.some((view) => view === value);
+}
+
 export type WritingSettings = {
   /** Draw a vertical guide line at `rulerColumn`. */
   rulerEnabled: boolean;
@@ -38,6 +46,11 @@ export type WritingSettings = {
   headingRailEnabled: boolean;
   /** Which edge of the text the heading rail is on. */
   headingRailSide: HeadingRailSide;
+  /**
+   * The view a note opens in when it gets a new pane or panel. A pane whose tab was changed keeps it when another note
+   * opens in it. Live by default (docs/live-default-plan.md, D1); a view already saved is kept.
+   */
+  openNotesIn: NoteView;
 };
 
 export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
@@ -49,6 +62,7 @@ export const DEFAULT_WRITING_SETTINGS: WritingSettings = {
   wordCountEnabled: false,
   headingRailEnabled: true,
   headingRailSide: "left",
+  openNotesIn: "live",
 };
 
 /** Whether `value` is a whole number of columns the editor can use. */
@@ -82,6 +96,7 @@ export function parseWritingSettings(data: unknown): WritingSettings {
     wordCountEnabled: flag(value.wordCountEnabled, defaults.wordCountEnabled),
     headingRailEnabled: flag(value.headingRailEnabled, defaults.headingRailEnabled),
     headingRailSide: isHeadingRailSide(value.headingRailSide) ? value.headingRailSide : defaults.headingRailSide,
+    openNotesIn: isNoteView(value.openNotesIn) ? value.openNotesIn : defaults.openNotesIn,
   };
 }
 
@@ -97,6 +112,7 @@ export function validateWritingSettings(
     if (typeof value[key] !== "boolean") return { error: "Unknown writing setting." };
   }
   if (!isHeadingRailSide(value.headingRailSide)) return { error: "Unknown writing setting." };
+  if (!isNoteView(value.openNotesIn)) return { error: "Unknown writing setting." };
   for (const key of ["rulerColumn", "reflowColumn"] as const) {
     if (!isWritingColumn(value[key])) {
       return { error: `Use a whole number of characters from ${MIN_WRITING_COLUMN} to ${MAX_WRITING_COLUMN}.` };

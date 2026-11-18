@@ -28,20 +28,22 @@ from the keyboard, and the same menu also holds pinning.
 
 ## What a pane shows
 
-Each pane has its own tabs: **Markdown** (the editor), **Preview**, **Split** (both beside each
-other, with the divider between them shared by every pane) and **Live** (the two in one place: the Markdown drawn as it
-will read, with its syntax showing only under the caret; see [live-editor.md](live-editor.md)).
+Each pane has its own tabs: **Live** (the editor and the preview in one place: the Markdown drawn as it will read, with
+its syntax showing only under the caret; see [live-editor.md](live-editor.md)), **Markdown** (the editor), **Preview**
+and **Split** (both beside each other, with the divider between them shared by every pane). Ctrl/Cmd+\ steps through
+them in that order.
 
-- The first note opened starts on **Split**.
-- A pane added *beside* another starts on **Markdown**: notes open together are there to be written
-  in, and each has only part of the row. Switch that pane to **Split** from its own tabs.
+- The first note opened starts on the view chosen in **Settings › Writing › Open notes in** (Live unless changed).
+- A pane added *beside* another starts on that view too, except Split: then it starts on **Markdown**, as notes open
+  together are there to be written in, and each has only part of the row. Switch that pane to **Split** from its own tabs.
 - The other panes keep whatever they were showing, so opening a note beside a pane never changes it.
 - A pane narrower than 480px has no Split tab and shows the editor if it was on Split; widening it
   brings Split back.
 
 The arrangement, and each pane's tab, is not saved: a reload starts again with one pane. In the desktop app the open panes (and the AI helper's chats) are kept while you are in Settings or Images, and are
 there when you come back; the web app, which loads the page afresh, starts again with one pane.
-The terminal app shares the same pane logic, so a pane it opens with `o` also starts on the editor.
+The terminal app shares the same pane logic but has no Live tab: it opens notes in Split, so a pane it opens with `o`
+starts on the editor.
 
 ## The AI helper takes room from the note
 

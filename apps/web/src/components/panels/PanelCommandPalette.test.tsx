@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AssistantProvider } from "../notes/AssistantProvider";
 import type { Note } from "../notes/types";
@@ -9,6 +10,9 @@ import { MAIN_WINDOW, focusedPanelId } from "./panelsState";
 import { PanelCommandPalette } from "./PanelCommandPalette";
 import { resetPanelPrefs, useShowPluginRail } from "./panelPrefs";
 import { PanelGrid, type PanelHost } from "./PanelGrid";
+
+// The notes here are typed into on the Markdown tab, so they open in Split; Live, the default, has tests of its own.
+const writing: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 vi.mock("@/lib/composition/attachmentsClient", () => ({
   attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
@@ -56,7 +60,7 @@ const sidebar = (): PanelHost["sidebar"] => ({
 /** A window of panels with the commands mounted beside it, as the notes surface does. */
 function setup(prepare: (store: WorkspaceStore) => string = () => MAIN_WINDOW, showPanels?: () => void) {
   const deps = { saveNoteContent: vi.fn(async (id: number, content: string) => ({ ...note(id, `Note ${id}`), content })) } as unknown as WorkspaceDeps;
-  const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [] }, deps, undefined, { panels: {} });
+  const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [], writing }, deps, undefined, { panels: {} });
   const host: PanelHost = {
     ratio: 0.5,
     onRatioChange: vi.fn(),

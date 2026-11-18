@@ -186,6 +186,17 @@ feel, VoiceOver, speed on the device).
 - **Simulator:** a drawing made with *Drawing…* is drawn in Live in all five schemes (pixel check, as L4's tint test);
   the caret on it shows its tag with the drawing after it.
 - **Gate LD1 (iPad):** item 344.
+- **Status (2026-11-17): built; the Simulator checks pass; Gate LD1 is the owner's.** `LiveScan` reads the three
+  tags in one pass and `LiveDecorations.Picture` carries a `kind` (`image`, `ink`, `drawio`). `LiveImages` reads a
+  drawing's strokes off the main thread and renders them with `InkRenderer` in the scheme's `InkPalette`, cached by
+  file, scheme and scale; until they are in, the drawing is sized from its PNG's pixels and `pHYs` density (the same
+  size), so nothing jumps; a PNG with no strokes is drawn as its pixels. A `<Drawio>` is drawn at half its pixels
+  unless the tag gives a width. The fixture writer emits the desktop's `InkWidget`s as `inks`; `LiveConformanceTests`
+  compares them (24 new texts in `live-cases.json`, group `drawings`) and leaves `<Drawio>` out, since the desktop's
+  Live tab does not draw it (checked by `LiveModelTests` instead). UI tests: `LiveDrawingsUITests` (a finger's line
+  drawn in Live in all five schemes, its pixels the scheme's ink colour; the tag shown with the drawing after it
+  under the caret; a diagram at 440 points from its 880-pixel PNG). `live-report` gains `picture-ink`,
+  `picture-drawio`, `natural<width>` and `ink-strokes`.
 
 ### Step 2: links (S to M)
 
@@ -200,6 +211,23 @@ feel, VoiceOver, speed on the device).
   modifier opens it (XCUITest can hold ⌘ on a tap); a plain tap puts the caret in the link; editing a link's text
   and URL from the keyboard.
 - **Gate LD2 (iPad):** items 345 to 348 (↗ with a finger, ⌘-tap on the Magic Keyboard, a trackpad, VoiceOver on a link).
+- **Status (2026-11-17): built, Simulator only; LD2 is yours.** `LiveModel` reads `[text](url "title")`, `[text][label]` /
+  `[text][]` / `[text]` with a definition, `<url>` and bare addresses (found in the text as lezer's GFM `Autolink` finds
+  them: cmark here has no autolink extension). `LiveOverlay` draws the words in the link colour, underlined; a dead
+  `pdf:` link is struck through and muted, and `LiveLinkFragment` draws "(PDF not on this device)" in room made by
+  kerning the character after the words. `LiveLinks` keeps the ↗ (`live-follow-link`) after the link the selection is
+  in and takes ⌘-tap; both call `LinkFollower`, which the Preview's `openURL` now calls too. **Oracle:** the fixture
+  writer no longer leaves link marks out of `live-expected.json` and writes each link's range and address;
+  `LiveConformanceTests` compares them, and 404 of 405 texts agree. Left out: `[nested [brackets]](u)` (lezer takes the
+  inner `[brackets]` as a link even undefined, so the desktop draws none; cmark and the Preview make the outer one the
+  link), in `known`; and the desktop's link on a footnote definition's first word (`[^a]: A.` drawn as a link to
+  `http://A.`), not compared, since footnotes are Step 7's. A reference link whose definition is in another block is
+  found by the full read a pause after typing, not by the quick read of the edited block. **Simulator:**
+  `LiveLinksUITests` (hidden and dimmed marks, the ↗ and following it, ⌘-tap, a plain tap, editing a link, the dead
+  `pdf:` link). XCUITest's held ⌘ does not reach a touch's `modifierFlags` in the Simulator (they arrive as 0), so the
+  ⌘-tap tests launch with `-liveCommandHeld 1` (Debug and test builds), which stands in for it; the real ⌘ on a
+  keyboard is item 346. The ↗ sits on the line after the link's `)`, so it covers the start of a word that follows:
+  your look in LD2.
 
 ### Step 3: code blocks (S)
 
@@ -207,6 +235,23 @@ feel, VoiceOver, speed on the device).
   `surface` fill behind the block (first and last line rounded). Fences as V2. Colours per I7.
 - **Simulator:** pixel check of the fill in five schemes; typing in a block keeps the 16 ms budget (`LiveBench`).
 - **Gate LD3 (iPad):** item 349.
+- **Status (2026-11-17): built, Simulator only.** `LiveModel` gives each block (`LiveDecorations.codeBlocks`): its range, the lines drawn on
+  the fill (first and last are the rounded ends) and which of them are fences, and the indents hidden (`codeIndentsHidden`). The app
+  (`LiveCode.swift`) puts each line in the Preview's code font (`.callout` monospaced, as Dynamic Type sizes it), 12 points in from the fill,
+  and `LiveDrawingFragment` paints the line's share of one `surface` fill behind it. Away from the caret a fence line collapses to nothing
+  (the desktop's Step 3 does the same), and a **top-level indented block's four-column indent is hidden**, as the desktop hides it; a block
+  with nothing between its fences keeps them, also as the desktop. A long line wraps (the Preview scrolls it sideways).
+  **Oracle:** the fixture writer emits the desktop's `codeDecorations` facts (`live-code-expected.json`) whenever `liveCode.ts` is in the
+  tree, and `LiveConformanceTests.codeBlocks` compares lines, ends, fences, collapsed fences and hidden indents for every selection: run
+  against the desktop's Step 3 branch, **all 375 texts agree, with nothing in `knownCode`**; since the plan branch took main (with the
+  desktop's Step 3, through Step 2), it runs here too: all 429 texts and 64,839 selections agree. On a tree without `liveCode.ts` the file
+  is not written and the comparison is skipped with a message. The V2 difference in the fixtures table is gone.
+  **Simulator (iPad Pro 13-inch):** `LiveCodeUITests` (8) and `LiveUITests` (36) pass; the fill's pixels are checked in all five schemes.
+  **`LiveBench`** (Release, `EDITOR_TEST_HOOKS`, 200 keystrokes, two alternating rounds each; the Mac's load average was 190 to 810, so
+  the whole-keystroke times are mostly that): the Live pass per keystroke (the styler) is 0.5 to 1.2 ms before and after, typing in a
+  block or in a paragraph. In a 5,000-line note a keystroke in a block took a median of 5 to 10 ms before (p95 16 to 21, 7 and 13 of 200
+  over 16 ms) and 8 to 10 ms after (p95 11 to 33, 4 and 26 over, the 26 at a load of 786); in a 20,000-line note every keystroke is over 16 ms before and after alike (median 25
+  to 30 ms, nearly all of it TextKit's layout, which this step does not change). No regression to see; the iPad's own numbers are LD3's.
 
 ### Step 4: lists, task lists, quotes (M)
 
