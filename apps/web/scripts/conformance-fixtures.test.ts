@@ -5,7 +5,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageWidget } from "../src/components/notes/liveImages";
@@ -1039,22 +1039,6 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       ensureSyntaxTree(state, state.doc.length, 60_000);
       state = state.update({}).state;
       const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
-      // Links are drawn by the desktop since Step 2 of docs/live-default-plan.md (their `[`, `](url)` and `<` `>` hidden or
-      // shown dimmed); the iPad's Live view draws them under its own plan (D8), so a link's marks are left out of this model
-      // until it does. What is in a link's text (bold, a picture, a highlight) still counts.
-      const linkMarks: Pair[] = [];
-      syntaxTree(state).iterate({
-        enter(node) {
-          if (node.name === "Autolink") {
-            const url = node.node.getChild("URL");
-            if (url) linkMarks.push([node.from, url.from], [url.to, node.to]);
-          } else if (node.name === "Link") {
-            const [open, close] = node.node.getChildren("LinkMark");
-            if (open && close) linkMarks.push([node.from, open.to], [close.from, node.to]);
-          }
-        },
-      });
-      const inLinkMarks = (start: number, end: number) => linkMarks.some(([from, to]) => from <= start && end <= to);
       // Lists, task lists and quotes likewise (Step 4): the desktop draws a bullet, a number or a checkbox in place of an
       // item's marks and hides a quote's `> `; the iPad will under its own plan. Exactly what `listDecorations` replaces is
       // left out; what is in an item or a quote still counts.
@@ -1072,6 +1056,9 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         shown: [] as Pair[],
         pictures: [] as [number | null, number, string, string, string, string][],
         tints: [] as [number, number, string][],
+        // Step 2 of docs/ipad-live-default-plan.md: each link's drawn text (a `Link`'s words, an autolink's or a bare
+        // address's URL) and the address it follows. Whether it is dead is the app's (which notes and PDFs exist), not here.
+        links: [] as [number, number, string][],
       };
       set.between(0, state.doc.length, (start, end, value) => {
         const spec = value.spec as { class?: string; widget?: ImageWidget; attributes?: Record<string, string> };
@@ -1083,14 +1070,13 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         } else if (cls.startsWith("cm-live-heading")) out.headings.push([start, Number(/cm-live-h([1-6])/.exec(cls)![1])]);
         else if (cls === "cm-live-rule") out.rules.push(start);
         else if (cls === "cm-live-frontmatter") out.frontmatterLines.push(start);
-        else if (cls === "cm-live-syntax") {
-          if (!inLinkMarks(start, end)) out.shown.push([start, end]);
-        }
+        else if (cls === "cm-live-syntax") out.shown.push([start, end]);
+        else if (cls.startsWith("cm-live-link")) out.links.push([start, end, spec.attributes!["data-href"]]);
         else if (STYLES[cls]) out.styles.push([STYLES[cls], start, end]);
         else if (cls === "md-mark") out.tints.push([start, end, spec.attributes!["data-color"]]);
         else if (cls.startsWith("md-")) return; // the plain editor's colours (code, links, tags): the Markdown tab's, not part of this model
         else if (value.point && start !== end) {
-          if (!inLinkMarks(start, end) && !listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
+          if (!listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
         }
       });
       // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
@@ -1102,6 +1088,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       out.shown = out.shown.map(([a, b]) => [at[a], at[b]]);
       out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
       out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
+      out.links = out.links.map(([a, b, href]) => [at[a], at[b], href]);
       out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       for (const list of Object.values(out)) (list as unknown[]).sort(byValue);
       return out;
@@ -1129,6 +1116,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.pictures)).toBe(true);
     expect(seen((e) => e.tints)).toBe(true);
     expect(seen((e) => e.frontmatterLines)).toBe(true);
+    expect(seen((e) => e.links)).toBe(true);
   }, 600_000);
 
   it("writes the colour schemes, <Mark> tints, fonts and chart colours the real globals.css, themes.ts, editorFonts.ts, previewFonts.ts and Chart.tsx hold", async () => {
