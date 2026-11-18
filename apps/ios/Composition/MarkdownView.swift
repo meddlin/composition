@@ -12,6 +12,9 @@ struct PdfLinks {
 
 extension EnvironmentValues {
     @Entry var pdfLinks = PdfLinks()
+    /// Whether a table and a code block scroll sideways when they are wider than the text, as in the Preview. The Live tab's pictures of blocks (`LiveBlockRenderer`) turn it
+    /// off: `ImageRenderer` does not draw what is inside a `ScrollView`.
+    @Entry var previewScrolls = true
 }
 
 struct MarkdownView: View {
@@ -27,6 +30,7 @@ private struct MdBlockView: View {
     let block: MdBlock
     @Environment(\.look) private var look
     @Environment(\.pdfLinks) private var pdfLinks
+    @Environment(\.previewScrolls) private var scrolls
 
     var body: some View {
         switch block {
@@ -43,7 +47,7 @@ private struct MdBlockView: View {
                 Text(inlines.attributed(look, pdf: pdfLinks)).textSelection(.enabled)
             }
         case .code(_, let text):
-            ScrollView(.horizontal) {
+            sideways {
                 Text(text).font(.system(.callout, design: .monospaced)).textSelection(.enabled).padding(12)
             }
             .background(look.surface, in: RoundedRectangle(cornerRadius: 8))
@@ -64,7 +68,7 @@ private struct MdBlockView: View {
         case .rule:
             Rectangle().fill(look.border).frame(height: 1)
         case .table(let alignments, let header, let rows):
-            ScrollView(.horizontal) {
+            sideways {
                 Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
                     GridRow { ForEach(header.indices, id: \.self) { cell(header[$0], alignments, $0).bold() } }
                     Rectangle().fill(look.border).frame(height: 1)
@@ -76,6 +80,12 @@ private struct MdBlockView: View {
         case .html(let raw):
             Text(raw).font(.system(.callout, design: .monospaced)).foregroundStyle(look.mutedText)
         }
+    }
+
+    /// `content` in a sideways `ScrollView`, as the Preview has it, or as it is for a picture of it (`previewScrolls` off).
+    @ViewBuilder
+    private func sideways(@ViewBuilder _ content: () -> some View) -> some View {
+        if scrolls { ScrollView(.horizontal) { content() } } else { content() }
     }
 
     private func cell(_ inlines: [MdInline], _ alignments: [MdColumnAlignment], _ column: Int) -> some View {

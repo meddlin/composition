@@ -189,6 +189,20 @@ final class NoteTextView: UITextView {
     }
     private var lastWidth: CGFloat = 0
 
+    /// A tap on a block the Live tab draws as a picture (Step 5) puts the caret at the start of the block's source, which then shows (D3), as a tap on a drawn picture puts
+    /// it in the picture's Markdown. Anywhere else, and in the other tabs, the text view's own answer.
+    override func closestPosition(to point: CGPoint) -> UITextPosition? {
+        let found = super.closestPosition(to: point)
+        guard isLive, let found else { return found }
+        let offset = self.offset(from: beginningOfDocument, to: found)
+        for at in [offset, offset - 1] where at >= 0 && at < textStorage.length {
+            if let drawing = textStorage.attribute(.liveDraw, at: at, effectiveRange: nil) as? LiveDrawing, drawing.kind == .block, let block = drawing.block {
+                return position(from: beginningOfDocument, offset: block.source.location) ?? found
+            }
+        }
+        return found
+    }
+
     /// An edit the typing aids work out, put in as typing puts it, so that undo takes it back in one step.
     func apply(_ edit: LineEdit) {
         selectedRange = NSRange(location: edit.start, length: edit.end - edit.start)
@@ -496,6 +510,14 @@ struct NoteEditorView: UIViewRepresentable {
                     try? result.write(toFile: file, atomically: true, encoding: .utf8)
                 }
             }
+            // `-liveBlockSpike <folder>`: renders every block of the note as the Live tab renders a block's picture and writes them there (Step 5's spike, `LiveBlockSpike`).
+            if let folder = UserDefaults.standard.string(forKey: "liveBlockSpike") {
+                Task { @MainActor [weak view, weak styler] in
+                    try? await Task.sleep(for: .seconds(2))
+                    guard let view, let styler else { return }
+                    LiveBlockSpike.run(in: view, look: look, imageFolder: styler.imageFolder(), to: URL(fileURLWithPath: folder))
+                }
+            }
             // `-colourState 1`: an element that says how many full passes the colouring has started and whether it is settled, for the UI tests to see that it comes to rest on a long note.
             if UserDefaults.standard.bool(forKey: "colourState") {
                 let label = UILabel(frame: CGRect(x: 0, y: 2, width: 2, height: 2))
@@ -641,6 +663,8 @@ struct NoteEditorView: UIViewRepresentable {
         private var delegateMilliseconds: [Double] = []
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
         #endif
+
+        func scrollViewDidScroll(_ scrollView: UIScrollView) { styler?.scrolled() }
 
         func textViewDidChangeSelection(_ textView: UITextView) {
             caretMoved(textView.selectedRange.location)

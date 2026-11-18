@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Nothing is built.
+[Decisions](#decisions)). Step 5 (the block layer and tables) was built 2026-11-17; see its section.
 
 ## Goal and rule
 
@@ -217,6 +217,84 @@ feel, VoiceOver, speed on the device).
   drawn; the 16 ms budget on the showcase note.
 - **Gate LD5 (iPad):** items 354 to 358 (arrowing, a finger's selection through a table, the Pencil beside one,
   scrolling speed with ten tables, VoiceOver).
+
+**Status: built 2026-11-17** (branch `claude/ipad-live-step5-blocks-dd07b9`, stacked on this plan's branch). The spike
+said **yes**, so blocks are drawn as pictures and the fallback was not needed. Gate LD5 is the owner's.
+
+**The spike.** It was run on the Live tab itself, behind a launch switch, rather than in the Editor lab: the lab has
+its own drawing code, and the question was whether the real fragment layer copes. `-liveBlockReveal never` keeps a
+block hidden with the caret in it, which is the spike's "every character hidden" case; `LiveBlockSpikeUITests`
+(skipped unless `LIVE_BLOCK_SPIKE` is set) drives it and logs what happened. A five-line table, its first paragraph
+made as tall as the picture (`minimumLineHeight`), its other lines at `maximumLineHeight` 0.5, every character in the
+half-point clear font:
+
+| Case | What the Simulator showed |
+|---|---|
+| ↑ and ↓ across it, reveal off | One source line per press, both ways, from the line's end and from its start (eight presses from the line below the table to the one above). The caret on the four flat lines is drawn at one place (the bottom of the picture), so it does not seem to move; with D3 the source shows as soon as the caret is in, so this is never seen |
+| Shift-↓ through it | One line per press, with and without the reveal; with it, the source shows from the press that enters the table, and the selection runs on past it |
+| Find | Find (the toolbar's button) selects the word inside the hidden table, and the table reveals; closing Find leaves the selection there |
+| Marked text beside it | Composing on the blank line after the table leaves the table drawn and nothing is restyled until the composition ends. GFM then reads the composed line as a row of the table (a line right after a table is one), and the table grows and reveals, as the Preview reads it too |
+| A finger's drag | XCUITest's press-and-drag places the caret (the loupe) inside the table, which reveals; a selection handle dragged through it is item 355, the owner's |
+| Scribble, the Pencil | Not in the Simulator: item 356 |
+
+`ImageRenderer` on the showcase note's 22 top-level blocks (`-liveBlockSpike <folder>`, written by
+`LiveBlockSpike`): every one draws, the line and pie charts (Swift Charts, no animation in the picture), the info and
+warning panels, the cards, the notice and the table among them, in 1 to 120 ms each (the first of a kind is the slow
+one; a table is about 9 ms). Only the table and the code block needed a change: `MarkdownView` puts both in a sideways
+`ScrollView`, whose content `ImageRenderer` does not draw, so an environment value (`previewScrolls`, on by default)
+lets the picture leave the scroll view out. **A table wider than the text** (decision left to the spike): drawn at its
+own width, as the Preview does, when it fits; otherwise offered the text's width, so its cells wrap (SwiftUI's `Grid`
+shares the width between the columns); and only a table still wider than that (columns whose words cannot wrap) is
+**scaled down to fit**. Never clipped: nothing of a table is hidden from the eye that the source has.
+
+**What was built.**
+
+- **Core** (`NoteScanner`, `NotePreview`): `ScannedNote.blockRanges`, each top-level `NoteBlock`'s range in the
+  note (UTF-16, frontmatter and `\r\n` counted: `scan(_:at:)` takes where the body starts), a component from its
+  opening tag to the end of its closing one, a run of Markdown from its first written line to its last.
+  `NotePreview.located` is the same blocks with each run of Markdown split into its own blocks (each `.markdown([one])`,
+  located by swift-markdown's own ranges mapped back through the footnote cuts), which is what Live draws.
+  `BlockRangeTests`: over the 115 notes of `mdx-notes.json` and the preview showcase, as written, with a frontmatter
+  put in front and with every line ended by `\r\n`, the ranges are in order, never overlap, cover every written line
+  but the footnotes' own text, and hold their block (a component scanned alone is the same element, a run parses the
+  same, a table's text alone is the same table).
+- **`LiveBlocks`** (app): `LiveBlockKinds` is the seam (below); `LiveBlock.blocks(of:)` makes the drawn blocks from
+  the whole note's `NotePreview` in the styler's pause pass, off the main thread (and not at all when the note has no
+  `|`); `LiveBlocks` keeps them on the main thread, moves them with the edits between passes, and renders the pictures
+  one per turn of the run loop for the blocks within a screen of the viewport (and again as it scrolls), cached by
+  the block's source and the text's width, emptied when the look or the text size changes. `LiveBlockRenderer`
+  renders `PreviewBlockView` (made `internal` for it, with nothing copied) with the scheme's `Look`, its preview font,
+  the Dynamic Type size of the text view and `previewScrolls` off.
+- **Drawing** (`LiveOverlay.drawBlocks`, `LiveDrawing` kinds `block` and `blockAfter`): away from the selection,
+  every character of the block (its last line break too) hidden, the first paragraph as tall as the picture and drawn
+  with it, the other lines flat. With the selection in it (ends included, as a construct: D3) the source shows, drawn
+  as the rest of the Live look draws it, with the last good picture after its last line, `block-stale` until the
+  pause has rendered it anew. A block with no picture yet is a faint box of a guessed height (rows × 30 points);
+  revealed, it has nothing under it rather than a box that comes and goes while typing. `MarkdownStyler` widens
+  every range it draws to whole blocks, and treats a block as a construct when the selection moves.
+- **A tap** on a drawn block puts the caret at the start of its source (`NoteTextView.closestPosition(to:)`: the
+  position falls on the block's tall first paragraph, which carries the block's range).
+- **Accessibility**: the value stays the source; candidate B marks every hidden character "speak no punctuation", so
+  the table's words are read and its pipes and dashes are not; the picture adds no element. The audit runs on a note
+  with a table (`AccessibilityUITests.testTheLiveTabWithATable`).
+- **`live-report`** gains `block-<kind>` (the block's source), `block-revealed`, `block-pictured`, `block-stale`,
+  and `draw-block` / `draw-blockAfter` on the paragraph that draws it.
+
+**The seam for Steps 6 and 7.** `LiveBlockKinds.kind(of:)` in `LiveBlocks.swift` says which `PreviewBlock`s are
+drawn (a name for the report, or nil); `sizesToContent(_:)` says which are drawn at their own width (tables) rather
+than across the text (panels, charts); `mayHold(_:)` is the cheap test that skips the second read of a note that can
+hold none (today a `|`: Step 6 adds `<`). Nothing else changes per kind: hiding, revealing, the picture, its cache, a
+tap and the report are the same for all. `NotePreview.located` already gives every component, `<Toc />`, a placed
+`<Footnotes />` and each Markdown block with its range; the footnotes listed at the end of a note without the tag are
+written nowhere and have no range (Step 7 decides where they are drawn). The frontmatter is not a located block (Step
+7 adds the header).
+
+**Simulator** (`LiveBlockUITests`, all passing): a table is drawn as one picture with every character hidden and
+silenced; the caret into its last line reveals it with the picture after it, and out hides it; ↑ from the line below
+to the line above visits each of its five lines, eight presses each way; undo across it (typing before, in and after
+it, ⌘Z until the text is back) leaves the text as it was and the table drawn; typing in it redraws its picture after
+the pause; a tap on the picture puts the caret at its start. The 16 ms budget on the showcase note (`LiveBench`): see
+the numbers below. The existing `LiveUITests` pass.
 
 ### Step 6: components (M)
 
