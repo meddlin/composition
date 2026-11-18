@@ -374,7 +374,7 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
 drawn away from the caret with the value unchanged and every hidden character silenced; the caret walking up into `<Toc />`, a
 setext heading, a citation and the frontmatter, each revealed and drawn again; a tap on the Toc's picture putting the caret at its
 start), `LiveBlockUITests` (Step 5's 7) and `AccessibilityUITests` (14, the five Live audits among them) all pass;
-`LiveUITests` 31 of 32 in the run that counts. The one that fails, `testTapsAlongALineWithHiddenMarksLandNextToAVisibleCharacter`,
+`LiveUITests` 35 of 36 (34 in the full run, and its frontmatter test on a rerun once it waited out the tap). The one that fails, `testTapsAlongALineWithHiddenMarksLandNextToAVisibleCharacter`,
 fails the same way on `main` (Step 5) in the same Simulator: its first ⌘A after a tap is lost while the on-screen keyboard comes up.
 On an 11-inch Simulator in landscape with the sidebar and list showing, the mode picker's Markdown segment is clipped under the
 full-screen button and the six tests that tap it fail: use a 13-inch one. The 16 ms budget on the showcase note (which has footnotes,
