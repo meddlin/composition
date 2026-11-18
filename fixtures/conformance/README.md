@@ -41,6 +41,7 @@ The Swift suites are in `apps/ios/CompositionCore/Tests/CompositionCoreTests/`. 
 | `frontmatter-cases.json` | Frontmatter through the desktop's `frontmatter.ts`: parse, generate, header image, tag helpers. | `FrontmatterConformanceTests` |
 | `settings-cases.json` | Favorites, themes and the Follow the sun hours through `parseWebSettings` (it held saved cities until 2026-11-12). | `SettingsConformanceTests` |
 | `editing-cases.json` | The typing aids (completions, props, snippets, indentation, emphasis, note links) at every caret place. | `EditingConformanceTests` |
+| `list-continuation-cases.json` | Return and Backspace in lists and quotes: 124 texts, each tried at every caret place with the desktop's real `insertNewlineContinueMarkup` and `deleteMarkupBackward` (@codemirror/lang-markdown) on a real CodeMirror state; the generator writes the text afterwards and the caret, or that the command declined. | `ListContinuationConformanceTests` |
 | `images-cases.json` | Sniffing, naming and storing images, alt text, Markdown and tags, the stored-image picker. | `ImagesConformanceTests` |
 | `organization-cases.json` | The sidebar's pure rules: navigation history, where a drop lands, a group's listing. | `OrganizationConformanceTests` |
 | `live-cases.json` | The Live view: texts with the caret and selections tried on each, and what the desktop's `liveDecorations` hid, showed, styled, drew and tinted. | `LiveConformanceTests` |

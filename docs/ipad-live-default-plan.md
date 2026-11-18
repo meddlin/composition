@@ -232,9 +232,20 @@ feel, VoiceOver, speed on the device).
   in a list; Tab and Shift+Tab nesting and un-nesting two items. All 36 `LiveUITests` pass (some re-run alone: the Mac was very loaded, and on an
   11-inch iPad the crowded toolbar covers the view picker's *Markdown*, so the tab-switching and scheme tests were run on a 13-inch). Screenshots
   showed the bullets, numbers and boxes in the level left of the words.
-- **Not built:** Return does not continue a list or a quote in either tab. The plan said "as the Markdown tab does (`EditorAssist`)", but the iPad's
-  Markdown tab never has: Return is a plain line break in both, and that is what was checked. Continuing lists (the desktop's CodeMirror
-  `insertNewlineContinueMarkup`) is a separate item. VoiceOver says nothing of a box's state yet (item 353).
+- **Not built (as of the Step 4 PR):** Return did not continue a list or a quote in either tab. The plan said "as the Markdown tab does (`EditorAssist`)", but
+  the iPad's Markdown tab never had: Return was a plain line break in both, and that is what Step 4 checked. VoiceOver says nothing of a box's state yet
+  (item 353).
+- **Return and Backspace in lists, built after Step 4 (2026-11-18, its own PR on top of Step 4's):** `ListContinuation` (CompositionCore/Editing) ports
+  the desktop's CodeMirror `insertNewlineContinueMarkup` and `deleteMarkupBackward` (@codemirror/lang-markdown 6.5.2) to answer a `LineEdit`, which
+  `NoteTextView.apply` puts in as one edit through the text view; the editor's delegate asks it in both tabs (after the list at the caret has had Return,
+  not over a selection, not while an input method is composing, and for Backspace only when it takes the one character before the caret). The commands read
+  lezer's tree, and where lezer ends an item or a quote is not where cmark does, so `MarkdownBlocks` ports the part of @lezer/markdown 1.8.1's block parser
+  they look at (containers, their marks and where each block ends; HTML blocks and tags, where the desktop's Markdown is not active). **Oracle:**
+  fixtures/conformance/list-continuation-cases.json, 124 texts with Return and Backspace tried at every caret place by the real commands
+  (conformance-fixtures.test.ts writes list-continuation-expected.json); `ListContinuationConformanceTests` agrees at all 2,104 places (1,206 where Return changes the text, 285 where Backspace does), and
+  `ListContinuationTests` has hand cases. It is the desktop's behaviour, quirks included: Return on the empty second item of a tight two-item list adds a
+  blank line first (the list becomes loose), and Backspace after any item's `- ` (not only an empty one) turns it into spaces. Not ported: GFM tables
+  and link reference definitions (leaf blocks either way). **Simulator:** see the UI tests in the PR; items 359 to 362 are yours.
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 
