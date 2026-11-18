@@ -3,9 +3,14 @@ import { act, cleanup, createEvent, fireEvent, render, screen, within } from "@t
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deleteNote, moveNoteToGroup, saveNoteContent } from "@/lib/composition/client";
 import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { GROUP_DRAG_TYPE, NOTE_DRAG_TYPE, PANE_DRAG_TYPE } from "./dragTypes";
 import { NotesApp } from "./NotesApp";
 import type { Group, Note } from "./types";
+
+// These tests type into the Markdown tab's editor and read the preview beside it, so notes open in Split here; Live,
+// the default, has tests of its own.
+const OPEN_IN_SPLIT: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 // Every open note shows its Attachments below the editor; none of these tests are about them.
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -46,8 +51,8 @@ const makeNote = (id: number, title: string, groupId: number | null = null): Not
 const notes = [makeNote(1, "Alpha"), makeNote(2, "Beta"), makeNote(3, "Gamma")];
 const group: Group = { id: 9, name: "Work", parentId: null, notebookId: 1, createdAt: at, updatedAt: at };
 
-function renderApp(initialNotes: Note[] = notes, groups: Group[] = []) {
-  render(<NotesApp initialNotes={initialNotes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+function renderApp(initialNotes: Note[] = notes, groups: Group[] = [], writing: WritingSettings = OPEN_IN_SPLIT) {
+  render(<NotesApp initialWriting={writing} initialNotes={initialNotes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
 }
 
 /** A minimal DataTransfer stand-in: jsdom has none. */
@@ -621,14 +626,41 @@ describe("viewing a note as tabs", () => {
     observed.clear();
   });
 
-  it("offers the editor, the preview, both and the live editor, starting with both", () => {
-    renderApp();
+  it("opens a note in Live by default, the first of its tabs", () => {
+    renderApp(notes, [], DEFAULT_WRITING_SETTINGS);
 
     expect(within(pane("Alpha")).getAllByRole("tab").map((el) => el.textContent)).toEqual([
+      "Live",
       "Markdown",
       "Preview",
       "Split",
+    ]);
+    expect(selected("Alpha")).toEqual(["Live"]);
+    expect(panel("Alpha", "Live")).not.toBeNull();
+    expect(panel("Alpha", "Preview")).toBeNull();
+  });
+
+  it("opens a note beside another in Live too, as Live is one view and fits a share of the row", () => {
+    renderApp(notes, [], DEFAULT_WRITING_SETTINGS);
+
+    sizePane("Alpha");
+    const dt = dragFromSidebar("Beta", 2);
+    drag("dragOver", pane("Alpha"), dt, 900);
+    drag("drop", pane("Alpha"), dt, 900);
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+    expect(selected("Alpha")).toEqual(["Live"]);
+    expect(selected("Beta")).toEqual(["Live"]);
+  });
+
+  it("offers the editor, the preview, both and the live editor, starting with the view chosen in Settings", () => {
+    renderApp();
+
+    expect(within(pane("Alpha")).getAllByRole("tab").map((el) => el.textContent)).toEqual([
       "Live",
+      "Markdown",
+      "Preview",
+      "Split",
     ]);
     expect(selected("Alpha")).toEqual(["Split"]);
     expect(panel("Alpha", "Markdown")).not.toBeNull();
@@ -684,14 +716,20 @@ describe("viewing a note as tabs", () => {
     expect(pane("Alpha").querySelector(".cm-content")?.textContent).toContain("body of Alpha");
   });
 
-  it("takes the live editor away again on another tab, leaving the plain editor's text as it was", () => {
+  it("keeps the live editor, hidden, on another tab, leaving the plain editor's text as it was", () => {
     renderApp();
+    expect(pane("Alpha").querySelector(".cm-content")).toBeNull();
     fireEvent.click(tab("Alpha", "Live"));
 
     fireEvent.click(tab("Alpha", "Markdown"));
 
-    expect(pane("Alpha").querySelector(".cm-content")).toBeNull();
-    expect(editorIn("Alpha").value).toContain("body of Alpha");
+    const live = pane("Alpha").querySelector(".cm-content");
+    expect(live).not.toBeNull();
+    expect(live!.closest('[role="tabpanel"]')!.hasAttribute("hidden")).toBe(true);
+    // The hidden live editor is left out of what can be reached, so the only editor there is the plain one.
+    const editor = within(pane("Alpha")).getByRole<HTMLTextAreaElement>("textbox", { name: "Markdown editor" });
+    expect(editor.tagName).toBe("TEXTAREA");
+    expect(editor.value).toContain("body of Alpha");
   });
 
   it("chooses the view for each note's pane on its own", () => {
@@ -755,9 +793,9 @@ describe("viewing a note as tabs", () => {
       renderApp();
 
       fireEvent.keyDown(tab("Alpha", "Split"), { key: "Home" });
-      expect(selected("Alpha")).toEqual(["Markdown"]);
-      fireEvent.keyDown(tab("Alpha", "Markdown"), { key: "End" });
       expect(selected("Alpha")).toEqual(["Live"]);
+      fireEvent.keyDown(tab("Alpha", "Live"), { key: "End" });
+      expect(selected("Alpha")).toEqual(["Split"]);
     });
 
     it("cycles the view of the focused note with Ctrl+\\ or Cmd+\\", () => {

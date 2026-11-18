@@ -1,11 +1,15 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { panelIds } from "../panels/layoutTree";
 import type { Note, Notebook } from "../notes/types";
 import { createWorkspaceStore, type WorkspaceDeps } from "../notes/workspaceStore";
 import { PopoutApp } from "./PopoutApp";
 import type { SharedWorkspace } from "./popoutLink";
+
+// The notes here are typed into on the Markdown tab, so they open in Split; Live, the default, has tests of its own.
+const writing: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 vi.mock("@/lib/composition/attachmentsClient", () => ({
   attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
@@ -44,7 +48,7 @@ afterEach(() => {
 /** The main window's workspace with note 1 in it and a pop-out, w1, holding note 2 (a, b); `open` makes this page w1's. */
 function setup({ opener = true, path = "/popout/?w=w1" } = {}) {
   const saveNoteContent = vi.fn(async (id: number, content: string) => ({ ...note(id, `Note ${id}`), content }));
-  const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [], notebooks }, { saveNoteContent, deleteNote: vi.fn() } as unknown as WorkspaceDeps, undefined, { panels: {} });
+  const store = createWorkspaceStore({ notes: [note(1, "Alpha"), note(2, "Beta")], groups: [], notebooks, writing }, { saveNoteContent, deleteNote: vi.fn() } as unknown as WorkspaceDeps, undefined, { panels: {} });
   store.openNote(1);
   const [a] = panelIds(store.getSnapshot().panels.windows.main.layout);
   const b = store.splitPanel(a, "right")!;

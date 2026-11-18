@@ -49,6 +49,9 @@ export type AppProps = {
   columns?: Columns;
 };
 
+/** Notes open in Split here: the web app's default view, Live, is not drawn in a terminal. */
+const OPEN_IN: paneLib.PaneView = "split";
+
 const NEXT_VIEW: Record<paneLib.PaneView, paneLib.PaneView> = {
   split: "markdown",
   markdown: "preview",
@@ -245,8 +248,8 @@ export function App({ initial, api = defaultApi, theme: initialTheme = "dark", m
   const openNote = (noteId: number, beside = false) => {
     setPaneState((current) =>
       beside && current.focusedId !== null
-        ? paneLib.dropNote(current, noteId, current.focusedId, "right")
-        : paneLib.openNote(current, noteId),
+        ? paneLib.dropNote(current, noteId, current.focusedId, "right", OPEN_IN)
+        : paneLib.openNote(current, noteId, OPEN_IN),
     );
     setFocus("pane");
   };

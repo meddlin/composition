@@ -4,8 +4,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createGroup, createNote, deleteGroup, deleteNote, moveGroup, moveNoteToGroup, placeGroup, placeNote, renameGroup, saveFavorites, saveLayout, saveNoteContent } from "@/lib/composition/client";
 import type { Favorites } from "@/lib/composition/favorites";
 import { DEFAULT_LAYOUT, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
+
+// These tests type into the Markdown tab's editor and read the preview beside it, so notes open in Split here; Live,
+// the default, has tests of its own.
+const OPEN_IN_SPLIT: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 // The attachments panel reads through Server Actions; unmocked, they would open the real database.
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -56,7 +61,7 @@ const canonical = (content: string): Note => ({
 });
 
 function renderEditor() {
-  render(<NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+  render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
   return screen.getByLabelText<HTMLTextAreaElement>("Markdown editor");
 }
 
@@ -139,7 +144,7 @@ describe("NotesApp column resizing", () => {
 
   it("starts at the saved sidebar width", () => {
     render(
-      <NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={{ ...DEFAULT_LAYOUT, sidebarWidth: 300 }} />,
+      <NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[note]} initialGroups={[]} initialLayout={{ ...DEFAULT_LAYOUT, sidebarWidth: 300 }} />,
     );
 
     expect(sidebar().style.width).toBe("300px");
@@ -171,7 +176,7 @@ describe("NotesApp column resizing", () => {
   });
 
   it("keeps the sidebar handle when no note is open", () => {
-    render(<NotesApp initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
 
     drag(100, 140);
     expect(sidebar().style.width).toBe(`${DEFAULT_LAYOUT.sidebarWidth + 40}px`);
@@ -184,7 +189,7 @@ describe("NotesApp group note creation", () => {
   it("creates a note directly inside the group it was requested from", async () => {
     const group = { id: 7, name: "Work", parentId: null, notebookId: 1, createdAt: "", updatedAt: "" };
     vi.mocked(createNote).mockResolvedValue({ ...note, id: 2, groupId: 7 });
-    render(<NotesApp initialNotes={[]} initialGroups={[group]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[]} initialGroups={[group]} initialLayout={DEFAULT_LAYOUT} />);
 
     await act(async () => {
       fireEvent.click(screen.getByLabelText("New note in Work"));
@@ -196,7 +201,7 @@ describe("NotesApp group note creation", () => {
   it("creates an ungrouped note from the empty-state button without leaking the click event", async () => {
     vi.mocked(createNote).mockClear();
     vi.mocked(createNote).mockResolvedValue({ ...note, id: 2 });
-    render(<NotesApp initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
 
     // Scoped to the empty state: the sidebar has a "+ New note" button of its own.
     const emptyState = screen.getByText("No notes yet.").closest("[data-slot=empty]") as HTMLElement;
@@ -209,7 +214,7 @@ describe("NotesApp group note creation", () => {
   });
 
   it("keeps the New note / New group buttons below the note tree", () => {
-    render(<NotesApp initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[note]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
 
     const tree = screen.getByText("Ungrouped");
     const newNote = screen.getByText("+ New note");
@@ -235,7 +240,7 @@ describe("NotesApp group page", () => {
   ];
 
   function renderApp() {
-    render(<NotesApp initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
   }
 
   it("replaces the editor with a nested listing when a group name is clicked", () => {
@@ -367,7 +372,7 @@ describe("NotesApp group row menu", () => {
   const notes: Note[] = [{ ...note, id: 1, groupId: 1 }];
 
   function renderApp() {
-    render(<NotesApp initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
   }
 
   const trigger = (name: string) => screen.getByRole("button", { name: `Actions for ${name}` });
@@ -629,7 +634,7 @@ describe("NotesApp group drag-and-drop nesting", () => {
   ];
 
   function renderApp() {
-    render(<NotesApp initialNotes={[]} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[]} initialGroups={groups} initialLayout={DEFAULT_LAYOUT} />);
   }
 
   /** A minimal DataTransfer stand-in: jsdom has none. */
@@ -774,6 +779,7 @@ describe("NotesApp drag-and-drop reordering", () => {
   function renderApp(initialFavorites?: Favorites) {
     render(
       <NotesApp
+        initialWriting={OPEN_IN_SPLIT}
         initialNotes={notes}
         initialGroups={groups}
         initialLayout={DEFAULT_LAYOUT}
@@ -992,7 +998,7 @@ describe("NotesApp drag-and-drop reordering", () => {
   it("reorders a group within its own parent", async () => {
     vi.mocked(placeGroup).mockResolvedValue({ group: groups[3] });
     const withTwoChildren = [...groups, group(5, "Inner two", 3)];
-    render(<NotesApp initialNotes={[]} initialGroups={withTwoChildren} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[]} initialGroups={withTwoChildren} initialLayout={DEFAULT_LAYOUT} />);
 
     const dt = dragGroup("Inner two");
     await act(async () => drop(groupZone("Inner"), dt, 2));
@@ -1051,6 +1057,7 @@ describe("NotesApp favorites", () => {
   function renderApp(initialFavorites?: Favorites, initialNotes = notes) {
     render(
       <NotesApp
+        initialWriting={OPEN_IN_SPLIT}
         initialNotes={initialNotes}
         initialGroups={groups}
         initialLayout={DEFAULT_LAYOUT}
@@ -1157,6 +1164,7 @@ describe("NotesApp favorites", () => {
     ];
     render(
       <NotesApp
+        initialWriting={OPEN_IN_SPLIT}
         initialNotes={lawnNotes}
         initialGroups={lawn}
         initialLayout={DEFAULT_LAYOUT}
@@ -1241,7 +1249,7 @@ describe("NotesApp note deletion", () => {
   });
 
   function renderApp() {
-    render(<NotesApp initialNotes={[{ ...note, title: "Hello" }]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[{ ...note, title: "Hello" }]} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
     fireEvent.click(screen.getByRole("button", { name: "Delete Hello" }));
     return screen.getByRole("alertdialog");
   }

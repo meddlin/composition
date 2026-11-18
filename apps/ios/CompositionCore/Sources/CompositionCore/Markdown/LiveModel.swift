@@ -61,6 +61,18 @@ public struct LiveDecorations: Equatable, Sendable {
         public var color: String
     }
 
+    /// A link (Step 2 of docs/ipad-live-default-plan.md): `[text](url "title")`, `[text][label]`, `<url>` or a bare address.
+    public struct Link: Equatable, Sendable {
+        /// What is drawn as the link: a link's words, or an address (an autolink's, without its `<` `>`, or a bare one).
+        public var range: NSRange
+        /// The whole construct, marks and address included.
+        public var node: NSRange
+        /// The address to follow, as the desktop's `hrefOf` makes it (`www.…` given `http://`, an email `mailto:`).
+        public var href: String
+        /// The selection touches it: its marks show, dimmed, and it can be followed with the ↗ beside it.
+        public var active: Bool
+    }
+
     /// The start of each line of the frontmatter (it is drawn set apart, and never hidden).
     public var frontmatterLines: [Int] = []
     /// The whole frontmatter, from its first character to the end of its last line, when the note has one.
@@ -96,12 +108,10 @@ public struct LiveDecorations: Equatable, Sendable {
     public var codeBlocks: [CodeBlock] = []
     /// A top-level indented block's indent on each line (four columns), hidden while the selection is outside the block, as the desktop hides it.
     public var codeIndentsHidden: [NSRange] = []
+    public var links: [Link] = []
 }
 
 public struct LiveModel: Sendable {
-    /// The desktop reads highlights and `<Image />` tags only in a note this long or shorter (`MAX_HIGHLIGHT_CHARS`).
-    public static let desktopExtrasLimit = 100_000
-
     struct HeadingNode: Sendable {
         var line: Int
         var level: Int
@@ -142,6 +152,17 @@ public struct LiveModel: Sendable {
         var indents: [NSRange]
     }
 
+    struct LinkNode: Sendable {
+        var node: NSRange
+        /// What is drawn in the link colour.
+        var text: NSRange
+        var href: String
+        /// The marks that show, dimmed, while the selection touches the link (`[`, `]`, `(`, `)`; `<` `>`).
+        var marks: [NSRange]
+        /// What is hidden while it does not (`[`, and `](url "title")` or `][label]`; `<` `>`). A part that runs over a line break is dimmed instead.
+        var hide: [NSRange]
+    }
+
     /// Everything in the note that the selection can reveal, in one list ordered by where it starts.
     enum Construct: Sendable {
         case heading(HeadingNode)
@@ -149,6 +170,7 @@ public struct LiveModel: Sendable {
         case style(StyleNode)
         case picture(PictureNode)
         case fenced(FenceNode)
+        case link(LinkNode)
 
         var node: NSRange {
             switch self {
@@ -157,6 +179,7 @@ public struct LiveModel: Sendable {
             case .style(let value): value.node
             case .picture(let value): value.node
             case .fenced(let value): value.node
+            case .link(let value): value.node
             }
         }
 
@@ -187,6 +210,12 @@ public struct LiveModel: Sendable {
                 value.fenceLines = value.fenceLines.map { $0 + delta }
                 value.indents = value.indents.map(move)
                 return .fenced(value)
+            case .link(var value):
+                value.node = move(value.node)
+                value.text = move(value.text)
+                value.marks = value.marks.map(move)
+                value.hide = value.hide.map(move)
+                return .link(value)
             }
         }
     }
@@ -201,8 +230,8 @@ public struct LiveModel: Sendable {
     private var scan: LiveScan.Result
     private let extrasLimit: Int?
 
-    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read, as on the desktop; nil reads them in any note.
-    public init(text: String, extrasLimit: Int? = LiveModel.desktopExtrasLimit) {
+    /// Reads `text`. `extrasLimit` is the length beyond which highlights and `<Image />` tags are not read; nil (the default, as on the desktop) reads them in any note.
+    public init(text: String, extrasLimit: Int? = nil) {
         chars = Array(text.utf16)
         length = chars.count
         self.extrasLimit = extrasLimit
@@ -240,6 +269,7 @@ public struct LiveModel: Sendable {
         constructs += reader.styles.map { .style($0) }
         constructs += reader.pictures.map { .picture($0) }
         constructs += reader.codeBlocks.map { .fenced($0) }
+        constructs += reader.links.map { .link($0) }
         constructs.sort { $0.node.location < $1.node.location }
         return (constructs, frontmatterLines)
     }
@@ -358,6 +388,16 @@ public struct LiveModel: Sendable {
                 let from = block.lines.first ?? block.node.location
                 out.codeBlocks.append(.init(range: NSRange(location: from, length: NSMaxRange(block.node) - from), lines: drawn,
                     fences: hideFences ? [] : block.fenceLines, active: active))
+            case .link(let link):
+                let active = touches(link.node)
+                out.links.append(.init(range: link.text, node: link.node, href: link.href, active: active))
+                if active {
+                    out.shown += link.marks
+                } else {
+                    for part in link.hide where part.length > 0 {
+                        if containsLineBreak(part) { out.shown.append(part) } else { out.hidden.append(part) }
+                    }
+                }
             }
         }
 

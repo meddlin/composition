@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageWidget } from "../src/components/notes/liveImages";
 import { InkWidget } from "../src/components/notes/liveInk";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
+import { listDecorations } from "../src/components/notes/liveLists";
 
 /**
  * The desktop's side of the conformance checks the native cores run (fixtures/conformance/README.md; for the iPad,
@@ -973,16 +974,16 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     const mdx = JSON.parse(fs.readFileSync(path.join(conformance, "mdx-notes.json"), "utf8")) as { notes: { name: string; body: string }[] };
     const showcase = fs.readFileSync(path.join(conformance, "preview-showcase/note.md"), "utf8");
 
-    // Past this many characters the desktop draws only what the syntax tree gives (no tints, no `<Image />`, no highlight tags).
-    const LIMIT = 100_000;
+    // Long notes: the desktop's Live tab has no length limit (it used to stop reading tints and `<Image />` at 100,000 characters).
+    const LONG = 100_000;
     const filler = '# Heading\n\n**bold** <Mark color="green">tint</Mark> ![a](b.png) <Image src="c.png" /> *it* `code`\n\n';
     const sized = (length: number) => filler.repeat(Math.ceil(length / filler.length)).slice(0, length);
     const texts = [
       ...committed.cases,
       ...mdx.notes.map((note) => ({ group: `corpus:${note.name}`, text: note.body })),
       { group: "corpus:showcase", text: showcase },
-      { group: "limit:at", text: sized(LIMIT) },
-      { group: "limit:over", text: sized(LIMIT + 1) },
+      { group: "long:at", text: sized(LONG) },
+      { group: "long:over", text: sized(LONG + 1) },
     ];
 
     // A seeded generator, so that the same selections are tried every run (the Swift side reads them from the file).
@@ -1039,6 +1040,14 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       ensureSyntaxTree(state, state.doc.length, 60_000);
       state = state.update({}).state;
       const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
+      // Lists, task lists and quotes likewise (Step 4): the desktop draws a bullet, a number or a checkbox in place of an
+      // item's marks and hides a quote's `> `; the iPad will under its own plan. Exactly what `listDecorations` replaces is
+      // left out; what is in an item or a quote still counts.
+      const listMarks = new Set(
+        listDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text))
+          .filter(({ from, to, value }) => value.point && from !== to)
+          .map(({ from, to }) => `${from}:${to}`),
+      );
       const out = {
         frontmatterLines: [] as number[],
         headings: [] as Pair[],
@@ -1050,6 +1059,9 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         // An `<Ink … />`, drawn from its strokes (InkWidget): as a picture, in the same form (docs/ipad-live-default-plan.md, Step 1).
         inks: [] as [number | null, number, string, string, string, string][],
         tints: [] as [number, number, string][],
+        // Step 2 of docs/ipad-live-default-plan.md: each link's drawn text (a `Link`'s words, an autolink's or a bare
+        // address's URL) and the address it follows. Whether it is dead is the app's (which notes and PDFs exist), not here.
+        links: [] as [number, number, string][],
       };
       set.between(0, state.doc.length, (start, end, value) => {
         const spec = value.spec as { class?: string; widget?: ImageWidget | InkWidget; attributes?: Record<string, string> };
@@ -1065,10 +1077,13 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         else if (cls === "cm-live-rule") out.rules.push(start);
         else if (cls === "cm-live-frontmatter") out.frontmatterLines.push(start);
         else if (cls === "cm-live-syntax") out.shown.push([start, end]);
+        else if (cls.startsWith("cm-live-link")) out.links.push([start, end, spec.attributes!["data-href"]]);
         else if (STYLES[cls]) out.styles.push([STYLES[cls], start, end]);
         else if (cls === "md-mark") out.tints.push([start, end, spec.attributes!["data-color"]]);
         else if (cls.startsWith("md-")) return; // the plain editor's colours (code, links, tags): the Markdown tab's, not part of this model
-        else if (value.point && start !== end) out.hidden.push([start, end]);
+        else if (value.point && start !== end) {
+          if (!listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
+        }
       });
       // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
       const at = rawOffsets(raw);
@@ -1079,6 +1094,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       out.shown = out.shown.map(([a, b]) => [at[a], at[b]]);
       out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
       out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
+      out.links = out.links.map(([a, b, href]) => [at[a], at[b], href]);
       out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       out.inks = out.inks.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
       for (const list of Object.values(out)) (list as unknown[]).sort(byValue);
@@ -1096,7 +1112,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     });
     fs.writeFileSync(
       path.join(outDir!, "live-expected.json"),
-      JSON.stringify({ limit: LIMIT, texts: texts.map(({ group, text }) => ({ group, text })), states, expected }),
+      JSON.stringify({ texts: texts.map(({ group, text }) => ({ group, text })), states, expected }),
     );
     expect(expected.length).toBeGreaterThan(5000);
     // The check has teeth only if the desktop does something to the texts: bold is styled, headings drawn, a picture drawn, a tint put on.
@@ -1108,6 +1124,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.inks)).toBe(true);
     expect(seen((e) => e.tints)).toBe(true);
     expect(seen((e) => e.frontmatterLines)).toBe(true);
+    expect(seen((e) => e.links)).toBe(true);
   }, 600_000);
 
   // docs/ipad-live-default-plan.md, Step 3: the code blocks of the same texts, for the same selections, as the desktop's real `codeDecorations`

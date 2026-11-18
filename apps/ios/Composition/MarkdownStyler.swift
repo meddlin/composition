@@ -53,6 +53,10 @@ final class MarkdownStyler {
     var didApply: (() -> Void)?
     /// Where the notes' pictures are kept: asked when the Live tab draws one.
     var imageFolder: () -> URL? = { nil }
+    /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through (Step 2 of docs/ipad-live-default-plan.md).
+    var isLinkHere: (String) -> Bool = { _ in true }
+    /// Called after the Live look was put on a range: the ↗ beside a link follows what was drawn (`LiveLinks`).
+    var afterApply: (() -> Void)?
     /// Gives the paragraphs the Live tab draws a rule or a picture on their layout fragment.
     private let drawingDelegate = LiveDrawingDelegate()
     private nonisolated(unsafe) var pictureObserver: NSObjectProtocol?
@@ -194,6 +198,14 @@ final class MarkdownStyler {
         for range in ranges { applyColours(to: range, using: model) }
     }
 
+    /// The link the selection is in, in the Live tab, when it can be followed (a `pdf:` link to a PDF not here cannot): what the ↗ beside it follows.
+    func activeLink() -> LiveDecorations.Link? {
+        guard isLive, let textView, let live, live.length == textView.textStorage.length else { return nil }
+        let selection = textView.selectedRange
+        let around = NSIntersectionRange(NSRange(location: max(0, selection.location - 1), length: selection.length + 2), NSRange(location: 0, length: live.length))
+        return live.decorations(in: around, selection: selection).links.first { $0.active && isLinkHere($0.href) }
+    }
+
     // MARK: Quick reads
 
     private func storageProcessedEditing() {
@@ -229,7 +241,7 @@ final class MarkdownStyler {
         // In the Live tab whole paragraphs: what is drawn in place of a paragraph's text is set on the paragraph, and made again as a whole.
         if isLive { range = storage.mutableString.paragraphRange(for: range) }
         storage.beginEditing()
-        for key in Self.managedKeys { storage.removeAttribute(key, range: range) }
+        for key in Self.managedKeys + LiveOverlay.linkKeys { storage.removeAttribute(key, range: range) }
         storage.addAttributes(palette.base, range: range)
         for span in model.spans(in: range) {
             let clipped = NSIntersectionRange(span.range, range)
@@ -237,10 +249,11 @@ final class MarkdownStyler {
         }
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
-            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth))
+            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere))
         }
         storage.endEditing()
         didApply?()
+        afterApply?()
     }
 
     // MARK: Corrections after a pause

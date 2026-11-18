@@ -6,7 +6,7 @@ import Testing
 // The Live model (docs/ipad-live-view-plan.md, step L2). What it shares with the desktop is checked against the desktop's real code by
 // LiveConformanceTests; these are the parts that are the iPad's own, and a few plain examples to read.
 
-private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = LiveModel.desktopExtrasLimit) -> LiveDecorations {
+private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = nil) -> LiveDecorations {
     LiveModel(text: text, extrasLimit: limit).decorations(selection: NSRange(location: caret, length: (end ?? caret) - caret))
 }
 
@@ -113,7 +113,7 @@ struct LiveModelTests {
         #expect(notFence.fencesHidden.isEmpty && notFence.codeBlocks.first?.lines == [0] && ranges(notFence.codeIndentsHidden) == [[0, 4]])
     }
 
-    @Test("highlight tags and <Image /> tags are read only up to the desktop's length, and the syntax in any note")
+    @Test("highlight tags and <Image /> tags are read in a note of any length unless a limit is given, and the syntax always")
     func length() {
         let text = "**bold** <Mark color=\"green\">tint</Mark> <Image src=\"a.png\" />"
         let all = decorations(text, at: 0)
@@ -159,6 +159,7 @@ private func facts(_ decorations: LiveDecorations, within window: NSRange? = nil
     out += decorations.fencesShown.filter(shown).map { "fence shown \($0.location)-\(NSMaxRange($0))" }
     out += decorations.codeBlocks.filter { shown($0.range) }.map { "code \($0.range.location)-\(NSMaxRange($0.range)) \($0.lines) \($0.fences) \($0.active)" }
     out += decorations.codeIndentsHidden.filter(shown).map { "indent hidden \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.links.filter { shown($0.node) }.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.href)" }
     return out.sorted()
 }
 
@@ -168,6 +169,7 @@ struct LiveModelFollowingTests {
         # Notes on the Live view
 
         Some **bold** words, some *italic* ones and `code` too, with a [link](https://x.test).
+        A [note](note:12 "Title"), <https://y.test/a> and www.z.test/b, bare.
 
         - one **two**
         - three *four*
@@ -321,6 +323,62 @@ struct LiveModelDrawnTests {
         #expect(LiveModel(text: text).decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 26))
         #expect(LiveModel(text: "# No frontmatter").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == nil)
         #expect(LiveModel(text: "---\r\ntitle: A\r\n---\r\ntext").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 18))
+    }
+
+    // MARK: Links (Step 2 of docs/ipad-live-default-plan.md)
+
+    @Test("a link away from the selection hides `[` and `](url \"title\")` and is drawn as its words; touching it shows its four marks, dimmed")
+    func link() {
+        let text = "see [the note](note:12 \"Title\") here"
+        let away = decorations(text, at: 0)
+        #expect(away.links == [.init(range: NSRange(location: 5, length: 8), node: NSRange(location: 4, length: 27), href: "note:12", active: false)])
+        #expect(ranges(away.hidden) == [[4, 5], [13, 31]])
+        #expect(away.shown.isEmpty)
+        for caret in [4, 8, 13, 20, 31] {
+            let near = decorations(text, at: caret)
+            #expect(near.links.first?.active == true, "caret at \(caret)")
+            #expect(ranges(near.shown) == [[4, 5], [13, 14], [14, 15], [30, 31]], "caret at \(caret)")
+            #expect(near.hidden.isEmpty, "caret at \(caret)")
+        }
+        #expect(decorations(text, at: 32).links.first?.active == false)
+    }
+
+    @Test("an autolink is drawn as its address with `<` `>` hidden, and a bare address as itself; www. is given http:// and an email mailto:")
+    func autolinks() {
+        let text = "<https://x.test> or www.y.test, or a@b.test."
+        let away = decorations(text, at: text.utf16.count)
+        #expect(away.links.map { [$0.range.location, NSMaxRange($0.range)] } == [[1, 15], [20, 30], [35, 43]])
+        #expect(away.links.map(\.href) == ["https://x.test", "http://www.y.test", "mailto:a@b.test"])
+        #expect(ranges(away.hidden) == [[0, 1], [15, 16]])
+        #expect(ranges(decorations(text, at: 3).shown) == [[0, 1], [15, 16]])
+    }
+
+    @Test("a reference link follows its definition; a footnote, an empty link and a link with no text are left as written")
+    func references() {
+        let text = "[ref][one], [one], [^1], [](u), [x]()\n\n[one]: https://x.test\n[^1]: a note"
+        let away = decorations(text, at: text.utf16.count)
+        #expect(away.links.map { [$0.range.location, NSMaxRange($0.range)] } == [[1, 4], [13, 16]])
+        #expect(away.links.allSatisfy { $0.href == "https://x.test" })
+        #expect(ranges(away.hidden) == [[0, 1], [4, 10], [12, 13], [16, 17]])
+    }
+
+    @Test("a link's address that runs onto the next line is dimmed rather than hidden away from the selection (a line break cannot be hidden)")
+    func linkOverLines() {
+        let text = "[a](u\n\"title\") split"
+        let away = decorations(text, at: text.utf16.count)
+        #expect(ranges(away.hidden) == [[0, 1]])
+        #expect(ranges(away.shown) == [[2, 14]])
+    }
+
+    @Test("the links of a window are those that touch it, and they move with an edit before them")
+    func linksMove() {
+        let text = "first line\n\n[a](u) and [b](v)"
+        var live = LiveModel(text: text)
+        let window = live.decorations(in: NSRange(location: 12, length: 6), selection: NSRange(location: 0, length: 0))
+        #expect(window.links.map(\.href) == ["u"])
+        let now = "new first line\n\n[a](u) and [b](v)" as NSString
+        live.edited(replacing: NSRange(location: 0, length: 0), withLength: 4, rereading: NSRange(location: 0, length: 14), in: now)
+        #expect(live.decorations(selection: NSRange(location: 0, length: 0)).links.map { $0.range.location } == [17, 28])
     }
 
     // Step 1 of docs/ipad-live-default-plan.md: `<Ink />` and `<Drawio />` are pictures too. The `<Ink />` ranges are checked against the desktop by

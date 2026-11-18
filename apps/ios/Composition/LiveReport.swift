@@ -36,6 +36,9 @@ enum LiveReport {
                 if code.last { note("code-last", run) }
             }
             if let style = attributes[.paragraphStyle] as? NSParagraphStyle, style.maximumLineHeight > 0, style.maximumLineHeight < 1 { note("collapsed", run) }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): the words of one that can be followed, and where a dead `pdf:` link's "(PDF not on this device)" is drawn.
+            if attributes[.liveLink] != nil { note("link", run) }
+            if attributes[.liveLinkSuffix] != nil { note("suffix", run) }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }

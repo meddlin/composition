@@ -1,4 +1,5 @@
-import { BESIDE_VIEW, KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfGoTo, type PdfPanelState } from "./kinds";
+import { besideView, DEFAULT_OPEN_IN, type PaneView } from "../notes/panes";
+import { KINDS, noteIdOf, pdfDocumentIdOf, type AssistantPanelState, type NotePanelState, type PdfGoTo, type PdfPanelState } from "./kinds";
 import { launcherFor, type LauncherKind } from "./launchers";
 import {
   closePanel as closeLayout,
@@ -163,10 +164,14 @@ export function openKind(
   return { panels: splitPanel(panels, focusedId, "right", { id: panelId, kind, state: KINDS[kind].initialState() }), panelId };
 }
 
-/** Shows the note in a note panel (keeping its tab) or an empty one (which becomes a note panel), and focuses it. */
-function showNote(panels: PanelsState, panelId: PanelId, noteId: number): PanelsState {
+/**
+ * Shows the note in a note panel (keeping its tab) or an empty one (which becomes a note panel), and focuses it. A
+ * panel that has not shown a note yet starts on `openIn`, the view notes open in.
+ */
+function showNote(panels: PanelsState, panelId: PanelId, noteId: number, openIn: PaneView): PanelsState {
   const panel = panels.byId[panelId];
-  const state: NotePanelState = panel.kind === "note" ? { ...(panel.state as NotePanelState), noteId } : { noteId, view: "split" };
+  const shown = panel.kind === "note" ? (panel.state as NotePanelState) : null;
+  const state: NotePanelState = shown && shown.noteId !== null ? { ...shown, noteId } : { noteId, view: openIn };
   return focusPanel({ ...panels, byId: { ...panels.byId, [panelId]: { id: panelId, kind: "note", state } } }, panelId);
 }
 
@@ -175,7 +180,7 @@ function showNote(panels: PanelsState, panelId: PanelId, noteId: number): Panels
  * the focused panel if that is a note or empty one, or else in the note panel used last, or else in a new note
  * panel to the right of the focused one.
  */
-export function openNote(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId): PanelsState {
+export function openNote(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const window = panels.windows[windowId];
   if (!window) return panels;
 
@@ -187,9 +192,9 @@ export function openNote(panels: PanelsState, windowId: WindowId, noteId: number
     focused.kind === "empty" || focused.kind === "note"
       ? focused.id
       : window.focusOrder.find((id) => panels.byId[id].kind === "note");
-  if (target !== undefined) return showNote(panels, target, noteId);
+  if (target !== undefined) return showNote(panels, target, noteId, openIn);
 
-  const state: NotePanelState = { noteId, view: BESIDE_VIEW };
+  const state: NotePanelState = { noteId, view: besideView(openIn) };
   return splitPanel(panels, focused.id, "right", { id: newId(), kind: "note", state });
 }
 
@@ -198,8 +203,16 @@ export function openNote(panels: PanelsState, windowId: WindowId, noteId: number
  * PDF to the left of it, which is focused (reading comes first). A PDF the window already shows is only focused. With `goTo`
  * (a search result found in the PDF's text), the PDF panel is also asked to show that page.
  */
-export function openPdfPair(panels: PanelsState, windowId: WindowId, noteId: number, documentId: number, newId: () => PanelId, goTo?: PdfGoTo): PanelsState {
-  const withNote = openNote(panels, windowId, noteId, newId);
+export function openPdfPair(
+  panels: PanelsState,
+  windowId: WindowId,
+  noteId: number,
+  documentId: number,
+  newId: () => PanelId,
+  goTo?: PdfGoTo,
+  openIn: PaneView = DEFAULT_OPEN_IN,
+): PanelsState {
+  const withNote = openNote(panels, windowId, noteId, newId, openIn);
   const window = withNote.windows[windowId];
   if (!window) return panels;
 
@@ -247,8 +260,8 @@ export function clearPdfGoTo(panels: PanelsState, panelId: PanelId, seq?: number
 }
 
 /** A new note panel beside `panelId` showing the note, on the editor tab, focused. */
-function noteBeside(panels: PanelsState, panelId: PanelId, edge: Edge, noteId: number, newId: () => PanelId): PanelsState {
-  const state: NotePanelState = { noteId, view: BESIDE_VIEW };
+function noteBeside(panels: PanelsState, panelId: PanelId, edge: Edge, noteId: number, newId: () => PanelId, openIn: PaneView): PanelsState {
+  const state: NotePanelState = { noteId, view: besideView(openIn) };
   return splitPanel(panels, panelId, edge, { id: newId(), kind: "note", state });
 }
 
@@ -256,34 +269,34 @@ function noteBeside(panels: PanelsState, panelId: PanelId, edge: Edge, noteId: n
  * The sidebar's "Open to the side": a new note panel to the right of the focused one, even if the note is open in
  * another, since it was asked for. Like picking a note when nothing is open, it takes a lone empty panel.
  */
-export function openNoteBeside(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId): PanelsState {
+export function openNoteBeside(panels: PanelsState, windowId: WindowId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const window = panels.windows[windowId];
   if (!window) return panels;
 
   const focused = panels.byId[focusedPanelId(window)];
-  if (focused.kind === "empty" && window.focusOrder.length === 1) return showNote(panels, focused.id, noteId);
-  return noteBeside(panels, focused.id, "right", noteId, newId);
+  if (focused.kind === "empty" && window.focusOrder.length === 1) return showNote(panels, focused.id, noteId, openIn);
+  return noteBeside(panels, focused.id, "right", noteId, newId, openIn);
 }
 
 /**
  * A note dropped on a panel: on its middle it fills an empty panel or replaces a note panel's note (a panel of
  * another kind can't show it, so nothing happens), and on a side it makes a new note panel there.
  */
-export function dropNote(panels: PanelsState, noteId: number, panelId: PanelId, zone: DropZone, newId: () => PanelId): PanelsState {
+export function dropNote(panels: PanelsState, noteId: number, panelId: PanelId, zone: DropZone, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const panel = panels.byId[panelId];
   if (!panel) return panels;
-  if (zone !== "center") return noteBeside(panels, panelId, zone, noteId, newId);
-  return panel.kind === "empty" || panel.kind === "note" ? showNote(panels, panelId, noteId) : panels;
+  if (zone !== "center") return noteBeside(panels, panelId, zone, noteId, newId, openIn);
+  return panel.kind === "empty" || panel.kind === "note" ? showNote(panels, panelId, noteId, openIn) : panels;
 }
 
 /**
  * A note made from another one (an AI answer), opened to the right of the panel showing that other note, or, if
  * none does, the way "Open to the side" would.
  */
-export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, noteId: number, newId: () => PanelId): PanelsState {
+export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const source = Object.values(panels.byId).find((panel) => noteIdOf(panel) === fromNoteId);
-  if (source) return noteBeside(panels, source.id, "right", noteId, newId);
-  return openNoteBeside(panels, MAIN_WINDOW, noteId, newId);
+  if (source) return noteBeside(panels, source.id, "right", noteId, newId, openIn);
+  return openNoteBeside(panels, MAIN_WINDOW, noteId, newId, openIn);
 }
 
 /**
@@ -291,13 +304,13 @@ export function openNoteBesideNote(panels: PanelsState, fromNoteId: number, note
  * focused (a link never makes a second panel for it); otherwise the note opens to the right of the panel, or, when
  * not asked to open beside, replaces the note in it.
  */
-export function openLinkedNote(panels: PanelsState, fromPanelId: PanelId, noteId: number, beside: boolean, newId: () => PanelId): PanelsState {
+export function openLinkedNote(panels: PanelsState, fromPanelId: PanelId, noteId: number, beside: boolean, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const windowId = windowOf(panels, fromPanelId);
   if (windowId === undefined) return panels;
 
   const showing = panels.windows[windowId].focusOrder.find((id) => noteIdOf(panels.byId[id]) === noteId);
   if (showing !== undefined) return focusPanel(panels, showing);
-  return beside ? noteBeside(panels, fromPanelId, "right", noteId, newId) : showNote(panels, fromPanelId, noteId);
+  return beside ? noteBeside(panels, fromPanelId, "right", noteId, newId, openIn) : showNote(panels, fromPanelId, noteId, openIn);
 }
 
 /**
@@ -379,7 +392,7 @@ export function setPdfFollow(panels: PanelsState, panelId: PanelId, follow: bool
  * Shows a note in the PDF panel's paired note panel and pins the PDF to it (what picking a note in the reader's Notes tab
  * does). With no panel showing the paired note, the note opens to the right of the PDF.
  */
-export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: number, newId: () => PanelId): PanelsState {
+export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: number, newId: () => PanelId, openIn: PaneView = DEFAULT_OPEN_IN): PanelsState {
   const windowId = windowOf(panels, panelId);
   const panel = panels.byId[panelId];
   if (windowId === undefined || !panel || panel.kind !== "pdf") return panels;
@@ -391,8 +404,8 @@ export function openNoteForPdf(panels: PanelsState, panelId: PanelId, noteId: nu
     showing !== undefined
       ? focusPanel(panels, showing)
       : pairedPanel !== undefined
-        ? showNote(panels, pairedPanel, noteId)
-        : noteBeside(panels, panelId, "right", noteId, newId);
+        ? showNote(panels, pairedPanel, noteId, openIn)
+        : noteBeside(panels, panelId, "right", noteId, newId, openIn);
   // The PDF is pinned to the note it was asked to show, so that Quote goes there.
   return setPanelState(withNote, panelId, { ...(panel.state as PdfPanelState), noteId, follow: false } satisfies PdfPanelState);
 }

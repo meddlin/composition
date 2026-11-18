@@ -52,6 +52,17 @@ private struct Fixture: Decodable {
         }
     }
 
+    /// A link's drawn text and the address it follows (Step 2 of docs/ipad-live-default-plan.md).
+    struct Link: Decodable {
+        let from: Int, to: Int, href: String
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            from = try row.decode(Int.self)
+            to = try row.decode(Int.self)
+            href = try row.decode(String.self)
+        }
+    }
+
     struct Expected: Decodable {
         let frontmatterLines: [Int]
         let headings: [[Int]]
@@ -63,9 +74,9 @@ private struct Fixture: Decodable {
         /// Each `<Ink … />` the desktop draws from its strokes (InkWidget), in the form of a picture. Optional, so that a folder written before Step 1 still reads.
         let inks: [Picture]?
         let tints: [Tint]
+        let links: [Link]
     }
 
-    let limit: Int
     let texts: [Text]
     let states: [State]
     let expected: [Expected]
@@ -75,7 +86,23 @@ private struct Fixture: Decodable {
 private func unified(_ text: String) -> String { text.replacingOccurrences(of: "\r\n", with: "\n") }
 
 /// What the desktop said, one line for each fact, in a fixed order, so that two answers compare and a difference reads.
-private func lines(_ expected: Fixture.Expected) -> [String] {
+/// Whether `position` is where a footnote definition's first word starts (`[^a]: A.`). lezer reads such a line as a link definition whose address is that
+/// word, and the desktop's `drawLink` lets a footnote definition's address through as a bare one, so it draws `A.` as a link to `http://A.`: not a link
+/// anyone wrote. The iPad leaves footnotes alone until Step 7 of docs/ipad-live-default-plan.md draws them, so that one link is not compared (a link
+/// written in the definition's text is).
+private func isFootnoteDefinitionWord(_ position: Int, in text: String) -> Bool {
+    let units = Array(text.utf16)
+    var start = min(position, units.count)
+    while start > 0, units[start - 1] != 0x0A, units[start - 1] != 0x0D { start -= 1 }
+    guard start + 1 < units.count, units[start] == 0x5B, units[start + 1] == 0x5E, let close = units[start...].firstIndex(of: 0x5D),
+        close + 1 < units.count, units[close + 1] == 0x3A
+    else { return false }
+    var word = close + 2
+    while word < units.count, units[word] == 0x20 || units[word] == 0x09 { word += 1 }
+    return word == position
+}
+
+private func lines(_ expected: Fixture.Expected, text: String) -> [String] {
     var out: [String] = []
     out += expected.frontmatterLines.map { "frontmatter line at \($0)" }
     out += expected.headings.map { "heading at \($0[0]), level \($0[1])" }
@@ -90,6 +117,7 @@ private func lines(_ expected: Fixture.Expected) -> [String] {
     out += expected.pictures.map { line("picture", $0) }
     out += (expected.inks ?? []).map { line("ink", $0) }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
+    out += expected.links.filter { !isFootnoteDefinitionWord($0.from, in: text) }.map { "link \($0.from)-\($0.to) \(unified($0.href))" }
     return out.sorted()
 }
 
@@ -109,6 +137,7 @@ private func lines(_ decorations: LiveDecorations) -> [String] {
         return "\(name) \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
+    out += decorations.links.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \(unified($0.href))" }
     return out.sorted()
 }
 
@@ -120,20 +149,22 @@ struct LiveConformanceTests {
         // A bare address with a space in it is not a link, and lezer's autolink takes `https://x.test/*not` before it looks for emphasis, so the
         // `*` inside is not an opener. cmark reads emphasis first and finds `*not italic*`. Only an address written with a space in it does this.
         "inline|[a link](https://x.test/*not italic*) done": "autolinks are read before emphasis by lezer, after it by cmark",
+        // lezer makes a link of `[brackets]` whether or not it is defined, and a link may not hold another, so the outer `[…](u)` is not one; drawLink
+        // then draws nothing, `[brackets]` having no definition. CommonMark (cmark) makes the outer one a link, and so does the iPad's Preview.
+        "links|[nested [brackets]](u)": "lezer takes the inner `[brackets]` as a link even with no definition; cmark makes the outer one the link",
     ]
 
     @Test("every text, with every selection tried, is hidden, shown, styled, drawn and tinted as the desktop does")
     func agreement() throws {
         let directory = try #require(conformanceDirectory)
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: directory.appendingPathComponent("live-expected.json")))
-        #expect(fixture.limit == LiveModel.desktopExtrasLimit)
 
         var models: [Int: LiveModel] = [:]
         var different: [Int: (count: Int, first: String)] = [:]
         for (index, state) in fixture.states.enumerated() {
             let model = models[state.t] ?? LiveModel(text: fixture.texts[state.t].text)
             models[state.t] = model
-            let want = lines(fixture.expected[index])
+            let want = lines(fixture.expected[index], text: fixture.texts[state.t].text)
             let got = lines(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)))
             guard want != got else { continue }
             let missing = Set(want).subtracting(got).sorted(), extra = Set(got).subtracting(want).sorted()

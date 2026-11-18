@@ -176,6 +176,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
       if (key in value) settings[key] = flag("saveWritingSettings", value[key], key);
     }
     if ("headingRailSide" in value) settings.headingRailSide = text("saveWritingSettings", value.headingRailSide, "headingRailSide");
+    if ("openNotesIn" in value) settings.openNotesIn = text("saveWritingSettings", value.openNotesIn, "openNotesIn");
     if (Object.keys(settings).length === 0) fail("saveWritingSettings", "settings");
     return [settings];
   },
