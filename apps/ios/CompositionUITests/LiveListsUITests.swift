@@ -261,17 +261,17 @@ final class LiveListsUITests: XCTestCase {
         press(.upArrow, 1, modifiers: .shift)
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertTrue(eventually { text().hasSuffix("- a\n\t- b\n\t- c") }, "Tab indents both lines: \(text().suffix(20).debugDescription)")
-        press(.downArrow, 1, modifiers: .command)
-        app.typeText("\n\nend")
-        XCTAssertTrue(eventually { drawn()["indent64-64"] == at((4, 14)) }, "they are nested, two levels in: \(drawn())")
+        // Off the list with the caret, not with Return (which now continues the list): to the note's start.
+        press(.upArrow, 1, modifiers: .command)
+        // 0-3 "- a", 4-8 "\t- b", 9-13 "\t- c".
+        XCTAssertTrue(eventually { drawn()["indent64-64"] == at((4, 13)) }, "they are nested, two levels in: \(drawn())")
         XCTAssertEqual(drawn()["hidden"], at((0, 2), (4, 7), (9, 12)), "and the tab is hidden with the mark")
         screenshot("nested by Tab")
-        press(.upArrow, 2)
-        press(.rightArrow, modifiers: .command)  // the end of `- c`: a selection that ends at a line's start leaves that line out
+        press(.downArrow, 1, modifiers: .command)  // the end of `\t- c`
         press(.upArrow, 1, modifiers: .shift)
         app.typeKey(.tab, modifierFlags: .shift)
-        XCTAssertTrue(eventually { text().hasSuffix("- a\n- b\n- c\n\nend") }, "Shift+Tab takes it back: \(text().suffix(30).debugDescription)")
-        press(.downArrow, 2)
-        XCTAssertTrue(eventually { drawn()["indent32-32"] == at((0, 12)) }, "one level again: \(drawn())")
+        XCTAssertTrue(eventually { text().hasSuffix("\n\n- a\n- b\n- c") }, "Shift+Tab takes it back: \(text().suffix(30).debugDescription)")
+        press(.upArrow, 1, modifiers: .command)
+        XCTAssertTrue(eventually { drawn()["indent32-32"] == at((0, 11)) }, "one level again: \(drawn())")
     }
 }
