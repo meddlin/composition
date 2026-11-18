@@ -20,8 +20,47 @@ inserts text, which skips key events and so skips the menus' key handling.
 - [ ] Click on bold text: the marks appear and the text shifts a little to the right; the caret stays where you clicked.
 - [ ] Select from the middle of one bold word to the middle of another: both words show their marks. Copy and paste into the Markdown tab: the marks are in the text.
 - [ ] Frontmatter at the top is small and monospaced, and a note with `title: x` frontmatter does not turn the line above its closing `---` into a heading.
-- [ ] Code fences, links, lists, quotes and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
+- [ ] Code fences, links and `<Info>` tags are coloured as in the Markdown tab, in light and dark schemes and a scheme with a translucent window.
 - [ ] A long note (several thousand lines) types without lag, and scrolling is smooth.
+
+## 1a. Lists, task lists and quotes (Gate D)
+
+Put this in a note, and open the same note in **Split** beside it to compare with Preview:
+
+```markdown
+- First item, long enough to wrap onto a second row when the pane is narrow
+- Second item
+  - Nested
+    - Deeper
+* Star item
++ Plus item
+
+1. One
+3. Three as written
+7) Seven
+
+- [ ] To do
+- [x] Done
+
+> A quote long enough to wrap onto a second row
+> > Nested quote
+lazy line
+
+- Item with a quote
+  > quoted inside
+```
+
+- [ ] Away from the caret, every `-`, `*` and `+` is a bullet; Nested and Deeper step in a level each, as in Preview, and the first item's second row starts under its text, not under the bullet.
+- [ ] The numbers read `1.`, `3.`, `7)` (as written; Preview reads 1, 2, 3 and 1).
+- [ ] Click a line: its marks come back as written (`  - Nested`), dimmed colours as in the Markdown tab, and the bullet goes. Click away: the bullet is back.
+- [ ] Put the caret on the last line and click the **To do** box: it ticks, the caret is still on the last line, no menu opens, and the Markdown tab shows `- [x] To do`. Cmd/Ctrl+Z unticks it in one step; a second Cmd/Ctrl+Z undoes what you typed before, not the box.
+- [ ] Type a word and click a box straight away: one Cmd/Ctrl+Z unticks the box only.
+- [ ] Untick **Done** the same way. Right-click and middle-click a box: nothing changes.
+- [ ] The quote lines have a bar and an indent, the nested one two bars, the lazy line too, and the `>` shows only on the caret's line. The quote inside the list item has its bar at the item's text.
+- [ ] Enter at the end of **Second item**, **Nested**, **Three as written** and **Done**: each continues with `- `, `  - `, `4. ` and `- [ ] `. Enter on an empty item ends the list (an empty second item of a two-item list first adds a blank line; Enter again ends it). Enter at the end of a quote line continues the quote with `> `.
+- [ ] Tab and Shift+Tab, and Backspace right after a new `- `, behave as they did before this step.
+- [ ] With a screen reader, a list line reads with its `-`, a quote line with its `>`, and a task's box is announced as a checkbox, checked or not.
+- [ ] Light and dark schemes, and a translucent window: the bullets, numbers, boxes and bars are visible but quieter than the text.
 
 ## 2. Highlights
 

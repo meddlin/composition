@@ -181,6 +181,23 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Blockquotes: a bar down the quote's lines and an indent; the `> ` is hidden away from the caret line.
 - The Markdown keymap's Enter (which continues a list or quote) is already in place and is checked again here.
 - **Gate D (the owner's).**
+- **Built (2026-11-17).**
+  - `liveLists.ts`, imported by `liveMarkdown.ts` (which only adds its decorations and theme): one line decoration
+    per line of a list or quote, carrying its indent (2em a list level, `0.25rem + 1.25em` a quote level, as `prose`)
+    and its quote bars (a background per level), with `text-indent: -2em` on an item's first line so wrapped rows hang.
+    Away from the caret's line, the marks and indentation before the text become a bullet or the number as written, a
+    task's `[ ] ` a checkbox, and a quote's `> ` nothing visible.
+  - The checkbox toggles on `mousedown` (with `preventDefault`, so the caret and focus stay) through
+    `toggleTask`, which carries `isolateHistory.of("full")` so the toggle is its own undo step.
+  - Accessibility: the bullet, the checkbox and a hidden `>` keep their source as visually hidden text; the checkbox
+    is `role="checkbox"` with `aria-checked`.
+  - Ordered lists show their numbers as written, which differs from Preview (HTML renumbers from the first). Preview's
+    curly quotation marks around a quote are not drawn.
+  - Enter: CodeMirror's rule for an empty **second** item of a tight list (it makes the list loose rather than ending
+    it) is kept, tested and documented.
+  - Checks: `liveLists.test.tsx` (25 tests: the decorations over an `EditorState`, a click as one undo step, Enter),
+    the browser pane on a scratch database; manual items in
+    [manual-tests/live-editor.md](manual-tests/live-editor.md) §1a.
 
 ### Step 5: the block-widget layer, and tables (M to L)
 
