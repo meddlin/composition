@@ -15,6 +15,9 @@ brew install librsvg   # once: rsvg-convert draws the SVG
 apps/ios/icon/build.sh
 ```
 
+The desktop app uses the same art: `apps/desktop/scripts/render-app-icon.sh` puts it on a macOS rounded tile as
+`apps/desktop/build/app-icon-1024.png`. After changing `icon.svg`, run both scripts.
+
 `finish-icon.swift` writes the final PNGs and refuses a wrong size, or an Any or Tinted icon with even one translucent pixel.
 After changing the art, check with `sips -g pixelWidth -g pixelHeight -g hasAlpha -g profile` on each PNG, and build the app.
 
