@@ -10,6 +10,7 @@ import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageWidget } from "../src/components/notes/liveImages";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
+import { listDecorations } from "../src/components/notes/liveLists";
 
 /**
  * The desktop's side of the conformance checks the native cores run (fixtures/conformance/README.md; for the iPad,
@@ -1054,6 +1055,14 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         },
       });
       const inLinkMarks = (start: number, end: number) => linkMarks.some(([from, to]) => from <= start && end <= to);
+      // Lists, task lists and quotes likewise (Step 4): the desktop draws a bullet, a number or a checkbox in place of an
+      // item's marks and hides a quote's `> `; the iPad will under its own plan. Exactly what `listDecorations` replaces is
+      // left out; what is in an item or a quote still counts.
+      const listMarks = new Set(
+        listDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text))
+          .filter(({ from, to, value }) => value.point && from !== to)
+          .map(({ from, to }) => `${from}:${to}`),
+      );
       const out = {
         frontmatterLines: [] as number[],
         headings: [] as Pair[],
@@ -1081,7 +1090,7 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         else if (cls === "md-mark") out.tints.push([start, end, spec.attributes!["data-color"]]);
         else if (cls.startsWith("md-")) return; // the plain editor's colours (code, links, tags): the Markdown tab's, not part of this model
         else if (value.point && start !== end) {
-          if (!inLinkMarks(start, end)) out.hidden.push([start, end]);
+          if (!inLinkMarks(start, end) && !listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
         }
       });
       // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
