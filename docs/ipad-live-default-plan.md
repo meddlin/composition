@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Nothing is built.
+[Decisions](#decisions)). Step 4 is built (its status is under it).
 
 ## Goal and rule
 
@@ -197,6 +197,27 @@ feel, VoiceOver, speed on the device).
 - **Simulator:** UI tests for each, including Return, Tab/Shift-Tab over list lines (L5's test extended) and the
   toggle's undo.
 - **Gate LD4 (iPad):** items 350 to 353 (a finger on a checkbox, the Pencil and Scribble in a list).
+
+**Status (2026-11-17): built; Simulator checked; Gate LD4 is yours.** Branch `claude/ipad-live-step4-lists-26edbb`.
+
+- **Core:** `LiveModel` gives each line of a list or a quote (`LiveDecorations.lists`): its lists and quotes outermost first, whether an item starts
+  on it, and, away from the selection, the marks and indentation to hide, the marker (a bullet, or the number as written) and the task box.
+  `LiveReader` reads them from cmark's quotes and items and finds the marks in the text as lezer does (the desktop's `readLines` and `prefixEnd`,
+  liveLists.ts). What they hide is kept apart from `hidden`, so the fixture made by a desktop without its Step 4 still compares as before.
+  `differences(from:)` now also returns list lines, because a quick re-read of a window can end an item early (a lazy line below the window) and the
+  colours do not show it.
+- **Oracle:** the fixture writer can only emit the desktop's list facts on a tree that has `liveLists.ts` (PR #325's branch), so the writer change
+  (`lists`, `listDrawn`) belongs with the desktop's stack; `LiveConformanceTests` compares them when a fixture has them, and lists only then. Run
+  locally against PR #325's real `listDecorations`: **all 18,704 selections over 375 texts agree** (2,146 with list or quote lines, 334 with a drawn box,
+  253 with a drawn number). Hand cases in `LiveListTests` cover the same and the iPad's own parts (the box a tap finds, edits followed against a fresh read).
+- **App:** `LiveLists` puts on each line's indent (2 em a list level; the Preview's 3-point bar and 10 points a quote level; `headIndent` the same
+  as the first line's, so a wrapped line hangs under the text), the hidden marks and the quote's muted words; `LiveListFragment` draws the bars and,
+  in the level left of the text, the Preview's muted `•` or number, or its `square` / `checkmark.square.fill` (in place of the bullet, as the Preview
+  does; the desktop draws both). On the caret's line the marks show as written, starting a level further out. `LiveTaskTap` ticks or unticks a drawn box
+  through the text view (`replace(_:withText:)`), leaving the selection; the target is 44 points round the box, cut off where the item's text starts.
+- **Not built:** Return does not continue a list or a quote in either tab. The plan said "as the Markdown tab does (`EditorAssist`)", but the iPad's
+  Markdown tab never has: Return is a plain line break in both, and that is what was checked. Continuing lists (the desktop's CodeMirror
+  `insertNewlineContinueMarkup`) is a separate item. VoiceOver says nothing of a box's state yet (item 353).
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 

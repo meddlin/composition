@@ -18,6 +18,17 @@ enum LiveReport {
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
             guard let font = attributes[.font] as? UIFont else { return }
             if let drawing = attributes[.liveDraw] as? LiveDrawing { note("draw-\(drawing.kind.rawValue)", run) }
+            // Step 4: a line of a list or a quote, with what it draws (`list-bullet`, `list-number`, `list-box`, `list-ticked`), how many quote bars (`quote1`, `quote2`), and its indent in points.
+            if let line = attributes[.liveList] as? LiveListLine {
+                switch line.mark {
+                case .bullet: note("list-bullet", run)
+                case .number: note("list-number", run)
+                case .box(let checked, _): note(checked ? "list-ticked" : "list-box", run)
+                case nil: note("list-line", run)
+                }
+                if !line.bars.isEmpty { note("quote\(line.bars.count)", run) }
+                if let style = attributes[.paragraphStyle] as? NSParagraphStyle { note("indent\(Int(style.headIndent.rounded()))-\(Int(style.firstLineHeadIndent.rounded()))", run) }
+            }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }

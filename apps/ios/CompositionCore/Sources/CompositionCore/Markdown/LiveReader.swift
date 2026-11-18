@@ -14,6 +14,19 @@ struct LiveReader: MarkupWalker {
     var styles: [LiveModel.StyleNode] = []
     var pictures: [LiveModel.PictureNode] = []
     var fenced: [LiveModel.FenceNode] = []
+    /// The lines of lists and quotes, by where each starts, as the walk finds their containers (outermost first, since a container is visited before what it holds).
+    private var lists: [Int: ListFacts] = [:]
+
+    /// What a line of a list or a quote is made of (the desktop's `LineInfo`, liveLists.ts).
+    private struct ListFacts {
+        var start: Int
+        var end: Int
+        var containers: [LiveDecorations.ListLine.Container] = []
+        /// Where the marks at the line's start (`> `, `- `, `1. `) end; the line's start when it has none.
+        var marksEnd: Int
+        var marker: LiveDecorations.ListLine.Marker?
+        var task: LiveDecorations.ListLine.Task?
+    }
 
     private var chars: [UInt16] { map.chars }
 
@@ -231,5 +244,114 @@ struct LiveReader: MarkupWalker {
             if closing >= opening, onlyFence { fences.append(NSRange(location: lastStart, length: end - lastStart)) }
         }
         fenced.append(.init(node: NSRange(location: range.lowerBound, length: end - range.lowerBound), fences: fences))
+    }
+
+    // MARK: Lists and quotes
+
+    // The desktop reads these from lezer's `Blockquote`, `ListItem`, `ListMark`, `QuoteMark` and `TaskMarker` nodes. cmark gives the quotes and the items, and
+    // whether an item is a task; the marks are found in the text, where lezer finds them.
+
+    /// The facts of the line starting at `start`, made when first asked for.
+    private mutating func facts(atLine start: Int) -> ListFacts {
+        lists[start] ?? ListFacts(start: start, end: lineEnd(from: start), marksEnd: start)
+    }
+
+    /// The start of each line `range` covers. A container ends where its last line's text ends; a range that ends just after a line break does not take in
+    /// the line after it.
+    private func lineStarts(of range: Range<Int>) -> [Int] {
+        let first = lines.line(containing: range.lowerBound)
+        let last = lines.line(containing: max(range.lowerBound, range.upperBound - 1))
+        return (first...last).map { lines.starts[$0] }
+    }
+
+    /// Where a container's content ends: the end of its last child (lezer's node ends there; cmark's may take in blank lines after it), or its first line's end when
+    /// it has no children.
+    private func contentEnd(of markup: any Markup, from start: Int) -> Int {
+        var end = lineEnd(from: start)
+        for child in markup.children { if let range = map.range(of: child) { end = max(end, range.upperBound) } }
+        while end > start, chars[end - 1] == 0x0A || chars[end - 1] == 0x0D { end -= 1 }
+        return end
+    }
+
+    /// How many spaces follow `at`, as the gap between a list mark and its text: one to four, or none at the line's end (the desktop's `gapAfter`).
+    private func gapAfter(_ at: Int) -> Int {
+        let rest = lineEnd(from: at)
+        var count = 0
+        while at + count < rest, count < 5, chars[at + count] == 0x20 { count += 1 }
+        // Five or more spaces start an indented code block; the item's text is then one space in.
+        return count > 4 ? 1 : count
+    }
+
+    mutating func visitBlockQuote(_ quote: BlockQuote) {
+        if let range = map.range(of: quote) {
+            let end = contentEnd(of: quote, from: range.lowerBound)
+            for start in lineStarts(of: range.lowerBound..<max(end, range.lowerBound + 1)) {
+                var line = facts(atLine: start)
+                line.containers.append(.quote)
+                // The quote's `>` on this line, after the marks of what holds the quote (and the indentation that carries a list item on): a line taken in lazily has none.
+                var p = line.marksEnd
+                if case .list(starts: false, let column) = line.containers.dropLast().last { p = max(p, min(start + column, line.end)) }
+                while p < line.end, isSpace(chars[p]) { p += 1 }
+                if p < line.end, chars[p] == 0x3E {
+                    line.marksEnd = max(line.marksEnd, p + 1 + (p + 1 < chars.count && chars[p + 1] == 0x20 ? 1 : 0))
+                }
+                lists[start] = line
+            }
+        }
+        descendInto(quote)
+    }
+
+    mutating func visitListItem(_ item: ListItem) {
+        if let range = map.range(of: item), let mark = listMark(at: range.lowerBound) {
+            let first = lines.start(ofLineContaining: mark.lowerBound)
+            let gap = gapAfter(mark.upperBound)
+            let column = mark.upperBound + gap - first
+            let end = contentEnd(of: item, from: range.lowerBound)
+            for start in lineStarts(of: range.lowerBound..<max(end, range.lowerBound + 1)) {
+                var line = facts(atLine: start)
+                line.containers.append(.list(starts: start == first, column: column))
+                if start == first {
+                    line.marksEnd = max(line.marksEnd, mark.upperBound + gap)
+                    line.marker = .init(text: string(mark.lowerBound, mark.upperBound), ordered: item.parent is OrderedList)
+                    if item.checkbox != nil { line.task = task(from: mark.upperBound, lineEnd: line.end) }
+                }
+                lists[start] = line
+            }
+        }
+        descendInto(item)
+    }
+
+    /// The list mark at `start`: `-`, `*` or `+`, or one to nine digits and a `.` or `)`.
+    private func listMark(at start: Int) -> Range<Int>? {
+        guard start < chars.count else { return nil }
+        if [0x2D, 0x2A, 0x2B].contains(chars[start]) { return start..<start + 1 }
+        var p = start
+        while p < chars.count, p - start < 9, (0x30...0x39).contains(chars[p]) { p += 1 }
+        guard p > start, p < chars.count, chars[p] == 0x2E || chars[p] == 0x29 else { return nil }
+        return start..<p + 1
+    }
+
+    /// A task's `[ ]`, `[x]` or `[X]` after the item's mark, and the space after it.
+    private func task(from markEnd: Int, lineEnd end: Int) -> LiveDecorations.ListLine.Task? {
+        var p = markEnd
+        while p < end, isSpace(chars[p]) { p += 1 }
+        guard p + 3 <= end, chars[p] == 0x5B, chars[p + 2] == 0x5D, [0x20, 0x78, 0x58].contains(chars[p + 1]) else { return nil }
+        let gap = p + 3 < chars.count && chars[p + 3] == 0x20 ? 1 : 0
+        return .init(range: NSRange(location: p, length: 3 + gap), box: NSRange(location: p, length: 3), checked: chars[p + 1] != 0x20)
+    }
+
+    /// The lines of lists and quotes the walk found, in order, with what is hidden on each away from the selection worked out.
+    func listLines() -> [LiveModel.ListLineNode] {
+        lists.values.sorted { $0.start < $1.start }.compactMap { line in
+            guard let inner = line.containers.last else { return nil }
+            var end = line.marksEnd
+            // A line that carries on an item (its second paragraph, or a wrapped line typed with a break) is indented to the item's text in the source; that indentation
+            // goes too, and no further, so an indented code block keeps its own (the desktop's `prefixEnd`).
+            if case .list(starts: false, let column) = inner {
+                let limit = min(line.start + column, line.end)
+                while end < limit, isSpace(chars[end]) { end += 1 }
+            }
+            return .init(node: NSRange(location: line.start, length: line.end - line.start), containers: line.containers, prefixEnd: end, marker: line.marker, task: line.task)
+        }
     }
 }

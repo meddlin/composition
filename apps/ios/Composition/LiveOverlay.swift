@@ -50,6 +50,8 @@ enum LiveOverlay {
             // Set apart: smaller (the palette's font for it), and muted, and never hidden (the desktop's `.cm-live-frontmatter`).
             storage.addAttribute(.foregroundColor, value: look.uiMutedText, range: part)
         }
+        // Lists, task lists and quotes (Step 4 of docs/ipad-live-default-plan.md): their indents, muted quotes and hidden marks, and what their lines draw.
+        LiveLists.apply(decorations.lists, to: range, in: storage, look: look)
         for tint in decorations.tints {
             guard let part = inside(tint.range) else { continue }
             // Behind the words, but not over the faint fill of code, which has its own.

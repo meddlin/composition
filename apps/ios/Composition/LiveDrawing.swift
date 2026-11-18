@@ -64,6 +64,7 @@ final class LiveDrawingDelegate: NSObject, NSTextLayoutManagerDelegate {
         {
             return LiveDrawingFragment(textElement: textElement, range: textElement.elementRange, drawing: drawing)
         }
+        if let list = LiveListFragment.make(for: textElement) { return list }
         return NSTextLayoutFragment(textElement: textElement, range: textElement.elementRange)
     }
 }

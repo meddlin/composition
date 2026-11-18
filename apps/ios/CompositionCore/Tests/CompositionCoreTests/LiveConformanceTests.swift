@@ -52,6 +52,29 @@ private struct Fixture: Decodable {
         }
     }
 
+    /// A line of a list or a quote: where it starts, its lists (`L`) and quotes (`Q`) outermost first, and whether an item starts on it.
+    struct ListRow: Decodable {
+        let from: Int, kinds: String, starts: Bool
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            from = try row.decode(Int.self)
+            kinds = try row.decode(String.self)
+            starts = try row.decode(Bool.self)
+        }
+    }
+
+    /// What is drawn in place of a list's or a quote's marks: `marker` (the number as written, or `bullet`), `task` (`x` or a space) or `hidden`.
+    struct DrawnRow: Decodable {
+        let kind: String, from: Int, to: Int, extra: String
+        init(from decoder: Decoder) throws {
+            var row = try decoder.unkeyedContainer()
+            kind = try row.decode(String.self)
+            from = try row.decode(Int.self)
+            to = try row.decode(Int.self)
+            extra = try row.decode(String.self)
+        }
+    }
+
     struct Expected: Decodable {
         let frontmatterLines: [Int]
         let headings: [[Int]]
@@ -61,9 +84,15 @@ private struct Fixture: Decodable {
         let shown: [[Int]]
         let pictures: [Picture]
         let tints: [Tint]
+        /// Lists, task lists and quotes (docs/ipad-live-default-plan.md, Step 4): only in a fixture written by a desktop that draws them (its Step 4, PR #325, with the
+        /// writer's `lists` and `listDrawn`). Without them, lists are not compared.
+        let lists: [ListRow]?
+        let listDrawn: [DrawnRow]?
     }
 
-    let limit: Int
+    /// The length beyond which the desktop reads no highlights or `<Image />` tags; absent from a fixture written by a desktop with no such limit (its Step 1 of
+    /// docs/live-default-plan.md lifted it), and the model then reads them in any note, as the iPad's Live tab does (decision V5).
+    let limit: Int?
     let texts: [Text]
     let states: [State]
     let expected: [Expected]
@@ -86,10 +115,12 @@ private func lines(_ expected: Fixture.Expected) -> [String] {
         return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
+    out += (expected.lists ?? []).map { "list line at \($0.from): \($0.kinds)\($0.starts ? " starts" : "")" }
+    out += (expected.listDrawn ?? []).map { "list \($0.kind) \($0.from)-\($0.to)\($0.extra.isEmpty ? "" : " " + $0.extra)" }
     return out.sorted()
 }
 
-private func lines(_ decorations: LiveDecorations) -> [String] {
+private func lines(_ decorations: LiveDecorations, lists: Bool) -> [String] {
     var out: [String] = []
     out += decorations.frontmatterLines.map { "frontmatter line at \($0)" }
     out += decorations.headings.map { "heading at \($0.line), level \($0.level)" }
@@ -102,6 +133,17 @@ private func lines(_ decorations: LiveDecorations) -> [String] {
         return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
+    guard lists else { return out.sorted() }
+    for line in decorations.lists {
+        let kinds = line.containers.map { if case .quote = $0 { "Q" } else { "L" } }.joined()
+        let starts = line.containers.contains { if case .list(starts: true, _) = $0 { true } else { false } }
+        out.append("list line at \(line.range.location): \(kinds)\(starts ? " starts" : "")")
+        if let hidden = line.hidden {
+            let at = "\(hidden.location)-\(NSMaxRange(hidden))"
+            if let marker = line.marker { out.append("list marker \(at) \(marker.ordered ? marker.text : "bullet")") } else { out.append("list hidden \(at)") }
+        }
+        if let task = line.task { out.append("list task \(task.range.location)-\(NSMaxRange(task.range)) \(task.checked ? "x" : " ")") }
+    }
     return out.sorted()
 }
 
@@ -119,15 +161,15 @@ struct LiveConformanceTests {
     func agreement() throws {
         let directory = try #require(conformanceDirectory)
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: directory.appendingPathComponent("live-expected.json")))
-        #expect(fixture.limit == LiveModel.desktopExtrasLimit)
+        #expect(fixture.limit == nil || fixture.limit == LiveModel.desktopExtrasLimit)
 
         var models: [Int: LiveModel] = [:]
         var different: [Int: (count: Int, first: String)] = [:]
         for (index, state) in fixture.states.enumerated() {
-            let model = models[state.t] ?? LiveModel(text: fixture.texts[state.t].text)
+            let model = models[state.t] ?? LiveModel(text: fixture.texts[state.t].text, extrasLimit: fixture.limit)
             models[state.t] = model
             let want = lines(fixture.expected[index])
-            let got = lines(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)))
+            let got = lines(model.decorations(selection: NSRange(location: state.from, length: state.to - state.from)), lists: fixture.expected[index].lists != nil)
             guard want != got else { continue }
             let missing = Set(want).subtracting(got).sorted(), extra = Set(got).subtracting(want).sorted()
             let note = "selection \(state.from)-\(state.to): missing \(missing.prefix(4)), extra \(extra.prefix(4))"

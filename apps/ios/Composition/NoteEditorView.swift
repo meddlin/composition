@@ -448,6 +448,7 @@ struct NoteEditorView: UIViewRepresentable {
         private var lastLength = 0
         private var breaking = false
         private(set) var styler: MarkdownStyler?
+        private var taskTap: LiveTaskTap?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
 
@@ -464,6 +465,8 @@ struct NoteEditorView: UIViewRepresentable {
             styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
             (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
             if live { styler.setLive(true) } else { styler.reload() }
+            // A tap on a task box the Live tab draws ticks it (Step 4 of docs/ipad-live-default-plan.md).
+            taskTap = LiveTaskTap(textView: view, isLive: { [weak styler] in styler?.isLive ?? false }, drawnTask: { [weak styler] in styler?.drawnTask(at: $0) })
             #if DEBUG || EDITOR_TEST_HOOKS
             // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
             if UserDefaults.standard.bool(forKey: "liveReport") {
@@ -481,6 +484,15 @@ struct NoteEditorView: UIViewRepresentable {
                 view.addSubview(selection)
                 selectionLabel = selection
                 updateSelectionLabel()
+                // `live-boxes`: the screen centres of the task boxes the Live tab draws, `x,y;x,y` (Step 4).
+                let boxes = LiveProbe(frame: CGRect(x: 0, y: 6, width: 2, height: 2))
+                boxes.isAccessibilityElement = true
+                boxes.accessibilityIdentifier = "live-boxes"
+                boxes.alpha = 0.02
+                boxes.describe = { [weak self] in
+                    (self?.taskTap?.boxCenters() ?? []).map { String(format: "%.0f,%.0f", $0.x, $0.y) }.joined(separator: ";")
+                }
+                view.addSubview(boxes)
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
