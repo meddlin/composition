@@ -256,13 +256,14 @@ final class LiveListsUITests: XCTestCase {
 
     func testTabAndShiftTabOverListLinesNestAndUnnestThem() throws {
         try launch()
-        // 0-3 "- a", 4-7 "- b", 8-11 "- c".
-        write("- a\n- b\n- c")
+        // 0-3 "- a", 4-7 "- b", 8-11 "- c", 13-16 "end". The end is written first: Return after the nested `- c` would continue the list.
+        write("- a\n- b\n- c\n\nend")
+        press(.upArrow, 2)
+        press(.rightArrow, modifiers: .command)  // the end of `- c`
         press(.upArrow, 1, modifiers: .shift)
         app.typeKey(.tab, modifierFlags: [])
-        XCTAssertTrue(eventually { text().hasSuffix("- a\n\t- b\n\t- c") }, "Tab indents both lines: \(text().suffix(20).debugDescription)")
+        XCTAssertTrue(eventually { text().hasSuffix("- a\n\t- b\n\t- c\n\nend") }, "Tab indents both lines: \(text().suffix(20).debugDescription)")
         press(.downArrow, 1, modifiers: .command)
-        app.typeText("\n\nend")
         XCTAssertTrue(eventually { drawn()["indent64-64"] == at((4, 14)) }, "they are nested, two levels in: \(drawn())")
         XCTAssertEqual(drawn()["hidden"], at((0, 2), (4, 7), (9, 12)), "and the tab is hidden with the mark")
         screenshot("nested by Tab")
