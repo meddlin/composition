@@ -203,6 +203,12 @@ feel, VoiceOver, speed on the device).
   tree, and `LiveConformanceTests.codeBlocks` compares lines, ends, fences, collapsed fences and hidden indents for every selection: run
   against the desktop's Step 3 branch, **all 375 texts agree, with nothing in `knownCode`**. On a tree without the desktop's Step 3 (this
   branch's base) the file is not written and the comparison is skipped with a message. The V2 difference in the fixtures table is gone.
+  **Simulator (iPad Pro 13-inch):** `LiveCodeUITests` (8) and `LiveUITests` (36) pass; the fill's pixels are checked in all five schemes.
+  **`LiveBench`** (Release, `EDITOR_TEST_HOOKS`, 200 keystrokes, two alternating rounds each; the Mac's load average was 190 to 810, so
+  the whole-keystroke times are mostly that): the Live pass per keystroke (the styler) is 0.5 to 1.2 ms before and after, typing in a
+  block or in a paragraph. In a 5,000-line note a keystroke in a block took a median of 5 to 10 ms before (p95 16 to 21, 7 and 13 of 200
+  over 16 ms) and 8 to 10 ms after (p95 11 to 33, 4 and 26 over, the 26 at a load of 786); in a 20,000-line note every keystroke is over 16 ms before and after alike (median 25
+  to 30 ms, nearly all of it TextKit's layout, which this step does not change). No regression to see; the iPad's own numbers are LD3's.
 
 ### Step 4: lists, task lists, quotes (M)
 
