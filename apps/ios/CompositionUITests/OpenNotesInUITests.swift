@@ -167,11 +167,20 @@ final class OpenNotesInUITests: XCTestCase {
         XCTAssertTrue(eventually { self.tab() == "Preview" }, "and is kept: \(String(describing: tab()))")
     }
 
-    /// I5 after Step 8: with the setting on Preview, a note just made opens in Live (it opened in Markdown before), with the keyboard up.
+    /// I5 after Step 8: with the setting on Preview, a note made with the + button while another is read in the Preview opens in Live (it opened in Markdown
+    /// before), with the keyboard up: what is typed goes in without a tap. (The launch shortcut `-newNote` makes the note while the restore's alert is still up,
+    /// which takes the keyboard from it, so the test uses the button, as a writer does.)
     func testANewNoteOpensInLiveWhenTheSettingIsPreview() throws {
-        try launch(["-openNotesIn", "Preview", "-newNote", "1"])
+        try launch(["-openNotesIn", "Preview"])
+        XCTAssertTrue(eventually { self.tab() == "Preview" }, "the note the app opens on is in the Preview: \(String(describing: tab()))")
+        app.buttons["focus-toggle"].tap()  // the lists, whose notes column has the + button
+        let new = app.buttons["New Note"].firstMatch
+        XCTAssertTrue(new.waitForExistence(timeout: 10))
+        new.tap()
         XCTAssertTrue(eventually(30) { self.tab() == "Live" }, "the new note opens in Live: \(String(describing: tab()))")
-        XCTAssertTrue(eventually { self.app.keyboards.firstMatch.exists || self.editor.hasFocus }, "with the keyboard up")
+        RunLoop.current.run(until: Date().addingTimeInterval(1))
+        app.typeText("Wombat")
+        XCTAssertTrue(eventually { self.text().contains("Wombat") }, "what is typed goes into the new note: \(text().suffix(40))")
     }
 
     // MARK: Undo across the tabs (D7)

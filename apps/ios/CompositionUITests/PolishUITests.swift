@@ -199,7 +199,8 @@ final class PolishUITests: XCTestCase {
         app.typeText("zzz nothing")
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'No Results'")).firstMatch.waitForExistence(timeout: 5), "no image matches")
         XCTAssertFalse(card().exists)
-        app.typeKey("a", modifierFlags: .command)
+        // Delete what was typed (⌘A does not select a search field's text in every Simulator runtime: the words were added to it).
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "zzz nothing".count))
         app.typeText("sheet photo")
         XCTAssertTrue(card().waitForExistence(timeout: 5), "every word, anywhere in the name")
 
