@@ -607,6 +607,21 @@ Open it from the ellipsis menu at the top of the notebooks column: *PDF ink lab 
 214. **Turned and cropped pages.** *Book* ▸ *Make a 30-page book with turned and cropped pages*: the first nine pages are turned by quarter turns and cropped in different ways. Draw on each: the stroke appears under the tip, and stays on the same words after you scroll away and back. The report lists how each canvas sits on its page.
 215. **The cases.** Open *Cases to try*, mark each Fine or Problem as you go (they are in the report), and add anything else you saw in the notes box.
 
+## Code blocks in Live (Live default plan, Step 3; Gate LD3)
+
+Fenced and indented code blocks in the Live tab, drawn as the Preview draws them ([ipad-live-default-plan.md](../ipad-live-default-plan.md), Step 3).
+To try them, open a note in Live and type a block between two lines of ```` ``` ````, with a few lines in it, then a paragraph below it.
+
+349. **A code block in Live beside the Preview.** With the caret outside the block: its lines are in the code font on one rounded fill, a little
+     inset from it on every side, and the two fence lines are gone (no gap where they were). Put the Preview beside it (Split): the fill,
+     its colour, the font and its size, and the padding read as the same block; the one difference to expect is that Live wraps a long line
+     where the Preview scrolls it sideways. Tap in the block: both fences show, on the fill, and the text below moves down by their two lines;
+     tap below it and they go again. Type a few lines in the block, with Return: each new line is on the fill at once, and typing keeps up.
+     Then try an indented block (four spaces before each line): it is on a fill too, with the four spaces gone until you tap in it; and a
+     fenced block inside a list item. Do this in each of the five colour schemes (the fill can be seen against the page in all of them)
+     and once at the largest text size. **Tell me if Live and the Preview differ anywhere else, and whether the fences' coming and going is
+     comfortable with a finger and with a hardware keyboard's arrows.**
+
 ## What is not yet verified
 
 - **The PDF ink lab on a real iPad** (items 200 to 215): the Pencil, the latency, the memory and whether the finger and the Pencil can share the page. Only the Simulator, with a finger, has been used.

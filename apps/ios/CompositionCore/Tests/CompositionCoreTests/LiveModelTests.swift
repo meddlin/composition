@@ -70,6 +70,49 @@ struct LiveModelTests {
         #expect(indented.fencesHidden.isEmpty && indented.fencesShown.isEmpty)
     }
 
+    @Test("a fenced block is one fill over its code lines while the selection is elsewhere, and over its fences too while it is in it (Step 3)")
+    func fencedBlockLines() throws {
+        let text = "text\n\n```swift\nlet x = 1\nlet y = 2\n```\n\nafter"
+        // Lines start at 0, 5, 6 (the opening fence), 15, 25 and 35 (the closing fence); the block runs from 6 to 38.
+        let away = try #require(decorations(text, at: 0).codeBlocks.first)
+        #expect(away.range == NSRange(location: 6, length: 32))
+        #expect(away.lines == [15, 25] && away.fences.isEmpty && !away.active)
+        let inside = try #require(decorations(text, at: 20).codeBlocks.first)
+        #expect(inside.lines == [6, 15, 25, 35] && inside.fences == [6, 35] && inside.active)
+        #expect(decorations(text, at: 0).codeIndentsHidden.isEmpty)
+    }
+
+    @Test("an indented block at the top level hides its indent while the selection is outside it; one in a list keeps it")
+    func indentedBlockLines() throws {
+        let text = "para\n\n    one\n\tsix\n\nend"
+        // The block's lines start at 6 and 14; it starts after the first line's indent (10), as lezer's does.
+        let away = decorations(text, at: 0)
+        let block = try #require(away.codeBlocks.first)
+        #expect(block.range == NSRange(location: 6, length: 12) && block.lines == [6, 14] && block.fences.isEmpty)
+        #expect(ranges(away.codeIndentsHidden) == [[6, 10], [14, 15]])
+        #expect(decorations(text, at: 12).codeIndentsHidden.isEmpty)
+        let listed = decorations("- item\n\n      code\n", at: 0)
+        #expect(listed.codeBlocks.first?.lines == [8] && listed.codeIndentsHidden.isEmpty)
+    }
+
+    @Test("a fence not closed runs to the end of the note, a block with no code keeps its fences, and one in a list hides its fences' whole lines")
+    func unusualBlocks() throws {
+        let open = try #require(decorations("para\n\n```\ncode\n", at: 0).codeBlocks.first)
+        #expect(open.range == NSRange(location: 6, length: 9) && open.lines == [10, 15])  // the empty line after the last break too
+        #expect(ranges(decorations("para\n\n```\ncode\n", at: 0).fencesHidden) == [[6, 9]])
+        let empty = decorations("para\n\n```\n```\n", at: 0)
+        #expect(empty.fencesHidden.isEmpty && ranges(empty.fencesShown) == [[6, 9], [10, 13]])
+        #expect(empty.codeBlocks.first?.lines == [6, 10] && empty.codeBlocks.first?.fences == [6, 10])
+        let listed = decorations("- item\n\n  ```\n  code\n  ```\n\nend", at: 0)
+        #expect(ranges(listed.fencesHidden) == [[8, 13], [21, 26]])
+        #expect(listed.codeBlocks.first?.lines == [14])
+        let quoted = decorations("> ```\n> code\n> ```\n\nend", at: 22)
+        #expect(ranges(quoted.fencesHidden) == [[0, 5], [13, 18]] && quoted.codeBlocks.first?.lines == [6])
+        // Four spaces before backticks is indented code, not a fence.
+        let notFence = decorations("    ```\nafter", at: 12)
+        #expect(notFence.fencesHidden.isEmpty && notFence.codeBlocks.first?.lines == [0] && ranges(notFence.codeIndentsHidden) == [[0, 4]])
+    }
+
     @Test("highlight tags and <Image /> tags are read in a note of any length unless a limit is given, and the syntax always")
     func length() {
         let text = "**bold** <Mark color=\"green\">tint</Mark> <Image src=\"a.png\" />"
@@ -114,6 +157,8 @@ private func facts(_ decorations: LiveDecorations, within window: NSRange? = nil
     out += decorations.pictures.filter { shown($0.range) }.map { "picture \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.src)" }
     out += decorations.fencesHidden.filter(shown).map { "fence hidden \($0.location)-\(NSMaxRange($0))" }
     out += decorations.fencesShown.filter(shown).map { "fence shown \($0.location)-\(NSMaxRange($0))" }
+    out += decorations.codeBlocks.filter { shown($0.range) }.map { "code \($0.range.location)-\(NSMaxRange($0.range)) \($0.lines) \($0.fences) \($0.active)" }
+    out += decorations.codeIndentsHidden.filter(shown).map { "indent hidden \($0.location)-\(NSMaxRange($0))" }
     out += decorations.links.filter { shown($0.node) }.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.href)" }
     return out.sorted()
 }

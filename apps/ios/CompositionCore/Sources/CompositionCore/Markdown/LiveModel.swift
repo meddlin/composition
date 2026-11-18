@@ -9,9 +9,10 @@ import Markdown
 // does too. Offsets are UTF-16 units, as in the text view. The desktop works on text with one `\n` for each line break (CodeMirror reads `\r\n` as
 // one); this reads the text as it is, and its offsets are the text's.
 //
-// Two parts are the iPad's own and are not in the check, because the desktop has nothing to compare: a fenced code block's two fences are hidden
-// while the selection is elsewhere and both shown while it is anywhere in the block (decision V2), and colours (code, links, tags, list and quote
-// marks) are the Markdown tab's, so they are not here at all.
+// Code blocks (docs/ipad-live-default-plan.md, Step 3) are drawn as the desktop's `liveCode` draws them, and checked against it the same way
+// (`live-code-expected.json`): a fenced block's two fences are hidden while the selection is elsewhere and both shown while it is anywhere in the
+// block (the iPad's decision V2, which the desktop's Step 3 took too), a block with no code keeps its fences, and a top-level indented block's
+// indent is hidden like a fence. Colours (code, links, tags, list and quote marks) are the Markdown tab's, so they are not here at all.
 
 /// How the Live view draws a styled run of text.
 public enum LiveStyle: String, Equatable, Sendable {
@@ -86,9 +87,27 @@ public struct LiveDecorations: Equatable, Sendable {
     public var shown: [NSRange] = []
     public var pictures: [Picture] = []
     public var tints: [Tint] = []
-    /// The iPad's own (decision V2): a fenced block's fences, hidden while the selection is outside the block, and shown while it is in it.
+    /// A fenced block's fences (each its whole line), hidden while the selection is outside the block, and shown while it is in it (decision V2). A block
+    /// with nothing between its fences keeps them, as on the desktop: hidden, it would be nothing at all.
     public var fencesHidden: [NSRange] = []
     public var fencesShown: [NSRange] = []
+
+    /// A code block, drawn as the Preview draws one: its lines in the code font on one rounded fill (Step 3).
+    public struct CodeBlock: Equatable, Sendable {
+        /// The block, from the start of its first line to the end of its last.
+        public var range: NSRange
+        /// The start of each line drawn on the fill, in order: the fences' lines too while they show, but not while they are hidden. The first and the last
+        /// are the fill's rounded ends.
+        public var lines: [Int]
+        /// The lines among `lines` that are fences (they show only while the selection is in the block).
+        public var fences: [Int]
+        /// The selection is in the block.
+        public var active: Bool
+    }
+
+    public var codeBlocks: [CodeBlock] = []
+    /// A top-level indented block's indent on each line (four columns), hidden while the selection is outside the block, as the desktop hides it.
+    public var codeIndentsHidden: [NSRange] = []
     public var links: [Link] = []
 }
 
@@ -119,9 +138,18 @@ public struct LiveModel: Sendable {
         var title: String
     }
 
+    /// A code block, fenced or indented.
     struct FenceNode: Sendable {
         var node: NSRange
+        /// The fences' whole lines (none for an indented block).
         var fences: [NSRange]
+        /// The start of each of the block's lines, fences included.
+        var lines: [Int]
+        var fenceLines: [Int]
+        /// A line that is not a fence: what is left to show when the fences are hidden.
+        var hasCode: Bool
+        /// A top-level indented block's indent on each line.
+        var indents: [NSRange]
     }
 
     struct LinkNode: Sendable {
@@ -178,6 +206,9 @@ public struct LiveModel: Sendable {
             case .fenced(var value):
                 value.node = move(value.node)
                 value.fences = value.fences.map(move)
+                value.lines = value.lines.map { $0 + delta }
+                value.fenceLines = value.fenceLines.map { $0 + delta }
+                value.indents = value.indents.map(move)
                 return .fenced(value)
             case .link(var value):
                 value.node = move(value.node)
@@ -237,7 +268,7 @@ public struct LiveModel: Sendable {
         constructs += reader.rules.map { .rule($0) }
         constructs += reader.styles.map { .style($0) }
         constructs += reader.pictures.map { .picture($0) }
-        constructs += reader.fenced.map { .fenced($0) }
+        constructs += reader.codeBlocks.map { .fenced($0) }
         constructs += reader.links.map { .link($0) }
         constructs.sort { $0.node.location < $1.node.location }
         return (constructs, frontmatterLines)
@@ -349,7 +380,14 @@ public struct LiveModel: Sendable {
             case .picture(let picture):
                 out.pictures.append(.init(range: picture.node, ownLine: isOwnLine(picture.node), active: touches(picture.node), src: picture.src, alt: picture.alt, title: picture.title, width: ""))
             case .fenced(let block):
-                if touches(block.node) { out.fencesShown += block.fences } else { out.fencesHidden += block.fences }
+                let active = touches(block.node)
+                let hideFences = !active && block.hasCode
+                if hideFences { out.fencesHidden += block.fences } else { out.fencesShown += block.fences }
+                if !active { out.codeIndentsHidden += block.indents }
+                let drawn = hideFences ? block.lines.filter { !block.fenceLines.contains($0) } : block.lines
+                let from = block.lines.first ?? block.node.location
+                out.codeBlocks.append(.init(range: NSRange(location: from, length: NSMaxRange(block.node) - from), lines: drawn,
+                    fences: hideFences ? [] : block.fenceLines, active: active))
             case .link(let link):
                 let active = touches(link.node)
                 out.links.append(.init(range: link.text, node: link.node, href: link.href, active: active))
