@@ -9,6 +9,7 @@ import { fromNativeKey, type EditorKeyEvent } from "./editorSurface";
 import { findMatches, type FindOptions, type Match } from "./findMatches";
 import { LiveBlockHost, type LiveBlockContext } from "./liveBlockWidget";
 import { liveBlocks, revealBlocks } from "./liveBlocks";
+import { liveMdxBlocks } from "./liveMdx";
 import { noteLinksFacet } from "./liveLinks";
 import { liveMarkdown } from "./liveMarkdown";
 import { liveReflow } from "./liveReflow";
@@ -179,6 +180,7 @@ export function LiveEditor({
           markdown({ base: markdownLanguage }),
           liveMarkdown,
           liveBlocks(blockHost),
+          liveMdxBlocks,
           findHighlights,
           editorTheme,
           placeholder("Start writing in Markdown…"),

@@ -24,7 +24,7 @@ export const TABLE: BlockKind = { node: "Table" };
 
 /** The kinds of block drawn whole; tables by default, and more from extensions that add to it. */
 export const liveBlockKinds = Facet.define<BlockKind, readonly BlockKind[]>({
-  combine: (kinds) => (kinds.length > 0 ? kinds : [TABLE]),
+  combine: (kinds) => (kinds.length > 0 ? [...new Set(kinds)] : [TABLE]),
 });
 
 /** Redraws the drawing under each block being edited, from its source as it is now (what the pause timer sends). */
@@ -77,13 +77,18 @@ function isActive(state: EditorState, reveal: readonly Span[], block: Span): boo
   return touchesAny(state.selection.ranges, block.from, block.to) || touchesAny(reveal, block.from, block.to);
 }
 
-/** The top-level nodes of the tree (the children of its Document) that overlap or touch `from`..`to`, in order. */
-function topNodes(tree: Tree, from: number, to: number): SyntaxNode[] {
+/** The first top-level node of the tree (a child of its Document) that overlaps or touches `from` or comes after it. */
+function firstTopNode(tree: Tree, from: number): SyntaxNode | null {
   const top = tree.topNode;
   let node = top.childBefore(from) ?? top.firstChild;
   while (node && node.to < from) node = node.nextSibling;
+  return node;
+}
+
+/** The top-level nodes of the tree that overlap or touch `from`..`to`, in order. */
+function topNodes(tree: Tree, from: number, to: number): SyntaxNode[] {
   const nodes: SyntaxNode[] = [];
-  for (; node && node.from <= to; node = node.nextSibling) nodes.push(node);
+  for (let node = firstTopNode(tree, from); node && node.from <= to; node = node.nextSibling) nodes.push(node);
   return nodes;
 }
 
@@ -142,18 +147,24 @@ function mapSpan(span: Span, changes: ChangeDesc): Span {
   return { from: changes.mapPos(span.from, -1), to: changes.mapPos(span.to, 1) };
 }
 
-/** The block a top-level node writes, if it is one of `kinds`. */
+const startsAt = (kind: BlockKind, name: string) => (typeof kind.node === "string" ? kind.node === name : kind.node.includes(name));
+
+/** The block that starts at a top-level node, if it is one of `kinds` (the first that takes it). */
 function blockOf(state: EditorState, node: SyntaxNode, kinds: readonly BlockKind[], frontmatterEnd: number): Block | null {
   if (node.from < frontmatterEnd) return null;
-  const kind = kinds.find((candidate) => candidate.node === node.name);
-  if (!kind) return null;
   const doc = state.doc;
-  // A node ends at its last character; one that ends on a line break ends on the line before.
-  const last = node.to > node.from && doc.sliceString(node.to - 1, node.to) === "\n" ? node.to - 1 : node.to;
-  const from = doc.lineAt(node.from).from;
-  const to = doc.lineAt(last).to;
-  if (kind.accepts && !kind.accepts(doc.sliceString(from, to))) return null;
-  return { from, to, kind, active: false, drawn: null };
+  for (const kind of kinds) {
+    if (!startsAt(kind, node.name)) continue;
+    const end = kind.reach ? kind.reach(state, node) : node.to;
+    if (end === null) continue;
+    // A node ends at its last character; one that ends on a line break ends on the line before.
+    const last = end > node.from && doc.sliceString(end - 1, end) === "\n" ? end - 1 : end;
+    const from = doc.lineAt(node.from).from;
+    const to = doc.lineAt(last).to;
+    if (kind.accepts && !kind.accepts(doc.sliceString(from, to))) continue;
+    return { from, to, kind, active: false, drawn: null };
+  }
+  return null;
 }
 
 /**
@@ -169,25 +180,43 @@ function reread(state: EditorState, blocks: readonly Block[], dirty: readonly Sp
   let touched = false;
 
   for (const span of dirty) {
-    if (span.from >= trusted) {
+    // (A change at the very end of a note parsed to its end is read like any other.)
+    if (span.from >= trusted && trusted < state.doc.length) {
       left.push(span);
       continue;
     }
     const end = Math.min(span.to, trusted);
     if (span.to > trusted) left.push({ from: trusted, to: span.to });
-    const region = widen(tree, span.from, end);
+    let region = widen(tree, span.from, end);
+    // A block can run over several top-level nodes (an MDX component with Markdown in it), so it is read again whole:
+    // from the start of any block the change is in, and of any that a closing tag in it may end.
+    for (const block of next) {
+      if (block.from <= region.to && block.to >= region.from) region = { from: Math.min(region.from, block.from), to: Math.max(region.to, block.to) };
+    }
+    for (const startAbove of new Set(kinds.map((kind) => kind.startAbove))) {
+      const start = startAbove?.(state, region.from, region.to);
+      if (start != null && start < region.from) region = { from: start, to: region.to };
+    }
+    region = widen(tree, region.from, region.to);
 
-    const dropped = next.filter((block) => block.from <= region.to && block.to >= region.from);
-    const found: Block[] = [];
-    for (const node of topNodes(tree, region.from, region.to)) {
+    const read: Block[] = [];
+    let reach = region.to;
+    for (let node = firstTopNode(tree, region.from); node && node.from <= reach; node = node.nextSibling) {
       if (node.from >= trusted) break;
+      // Inside a block just found (the Markdown in a component).
+      if (read.length > 0 && node.from <= read[read.length - 1].to) continue;
       const block = blockOf(state, node, kinds, frontmatterEnd);
       if (!block) continue;
+      read.push(block);
+      reach = Math.max(reach, block.to);
+    }
+    const dropped = next.filter((block) => block.from <= reach && block.to >= region.from);
+    const found: Block[] = read.map((block) => {
       // A block read again (typed in, say) keeps the drawing it had. A new one the caret is in (being typed) has none
       // until typing pauses.
       const was = dropped.find((old) => old.kind === block.kind && old.from <= block.to && old.to >= block.from);
-      found.push(was ? { ...block, active: was.active, drawn: was.drawn } : { ...block, active: isActive(state, reveal, block) });
-    }
+      return was ? { ...block, active: was.active, drawn: was.drawn } : { ...block, active: isActive(state, reveal, block) };
+    });
     for (const old of dropped) {
       if (!old.active || old.drawn === null || found.some((block) => block.from <= old.to && block.to >= old.from)) continue;
       found.push({ ...old, orphan: true });
@@ -222,8 +251,13 @@ function decorate(state: EditorState, blocks: readonly Block[]): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   for (const block of blocks) {
     if (!block.active) {
-      const widget = new BlockWidget(state.doc.sliceString(block.from, block.to), block.kind, false, blockPlace);
-      decorations.push(Decoration.replace({ widget, block: true }).range(block.from, block.to));
+      const source = state.doc.sliceString(block.from, block.to);
+      // One that can't be drawn yet (not valid MDX) keeps its source, with the note saying so under it.
+      const ready = !block.kind.problem?.(source);
+      const widget = new BlockWidget(source, block.kind, !ready, blockPlace);
+      decorations.push(
+        ready ? Decoration.replace({ widget, block: true }).range(block.from, block.to) : Decoration.widget({ widget, block: true, side: 1 }).range(block.to),
+      );
     } else if (block.drawn !== null) {
       const widget = new BlockWidget(block.drawn, block.kind, true, blockPlace);
       decorations.push(Decoration.widget({ widget, block: true, side: 1 }).range(block.to));
@@ -409,7 +443,8 @@ const blockTheme = EditorView.baseTheme({
   // Under its own source while it is edited: set off a little from the text being typed.
   ".cm-live-block-beside": { opacity: "0.75" },
   ".cm-live-block-owns-clicks": { cursor: "auto" },
-  ".cm-live-block-body": { fontSize: "inherit", lineHeight: "1.7" },
+  // The editor's `pre-wrap` would draw the line breaks between a list's items in the drawing as blank lines.
+  ".cm-live-block-body": { fontSize: "inherit", lineHeight: "1.7", whiteSpace: "normal" },
   // In Live a table sits with the text, not two lines away from it as in Preview's flowing page.
   ".cm-live-block-body > :first-child": { marginTop: "0" },
   ".cm-live-block-body > :last-child": { marginBottom: "0" },

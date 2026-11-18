@@ -7,6 +7,7 @@ Source: [`LiveEditor.tsx`](../../apps/web/src/components/notes/LiveEditor.tsx),
 [`liveImages.ts`](../../apps/web/src/components/notes/liveImages.ts),
 [`liveBlocks.ts`](../../apps/web/src/components/notes/liveBlocks.ts),
 [`liveBlockWidget.tsx`](../../apps/web/src/components/notes/liveBlockWidget.tsx),
+[`liveMdx.ts`](../../apps/web/src/components/notes/liveMdx.ts),
 [`liveSurface.ts`](../../apps/web/src/components/notes/liveSurface.ts),
 [`liveReflow.ts`](../../apps/web/src/components/notes/liveReflow.ts),
 [`editorSurface.ts`](../../apps/web/src/components/notes/editorSurface.ts),
@@ -35,7 +36,7 @@ it will read, with the syntax showing only where the caret is. The other three t
   loaded shows "Image not found: alt" in place of the text (beside the text, while the caret is on it, it is left out).
   Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
 - **Drawings** (`<Ink src="…" />`, from the iPad) are drawn the same way: in place of the tag, from the strokes the stored PNG carries, in the colour scheme in force
-  (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is still left as written.
+  (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is a block: see [MDX components](#mdx-components).
 - **Links** (`[text](url "title")`) are drawn as their text, underlined in the link colour, with `[` and
   `](url "title")` hidden; hover one to see its address (and title) as a tooltip. While the caret or a selection is
   in a link its source shows, the brackets dimmed, so its text and its address are edited like any Markdown.
@@ -50,9 +51,11 @@ it will read, with the syntax showing only where the caret is. The other three t
   See [Code blocks](#code-blocks).
 - **Tables** (GFM) are drawn as Preview draws them: the same markup and `prose` styles, column alignment included.
   See [Blocks](#blocks) below.
+- **MDX components** (`<Info>`, `<Warning>`, `<Drawio>`, `<Chart>`, `<Repo>`, `<Sheet>`, `<YouTube>`) are drawn by
+  Preview's own code, Edit buttons included. See [MDX components](#mdx-components).
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
 - **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
-- Everything else (MDX tags, and tables inside a list or a quote) is shown as the Markdown you wrote, coloured
+- Everything else (`<Toc>`, `<Footnotes>`, a component inside a list or a quote, and tables inside a list or a quote) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 ### Lists, task lists and quotes
@@ -139,9 +142,9 @@ Source: [`liveCode.ts`](../../apps/web/src/components/notes/liveCode.ts). Plan: 
 
 ## Blocks
 
-A block is a part of the note drawn whole, in place of its source: for now a table (Step 5 of
-[live-default-plan.md](../live-default-plan.md); MDX components, the frontmatter card, `<Toc>` and `<Footnotes>` come
-in Steps 6 and 7 through the same layer).
+A block is a part of the note drawn whole, in place of its source: a table (Step 5 of
+[live-default-plan.md](../live-default-plan.md)) or an MDX component (Step 6, [below](#mdx-components)); the frontmatter
+card, `<Toc>` and `<Footnotes>` come in Step 7 through the same layer.
 
 - **Drawn by Preview's own code.** Each block is a React root that renders `NoteMarkdown` for the block's source, inside
   the providers Preview has (note links, the diagram and sheet editors), so it looks and behaves as it does in Preview.
@@ -153,8 +156,9 @@ in Steps 6 and 7 through the same layer).
   the header row before the delimiter row has it) keeps its drawing until the pause, then lets go of it if it is still
   not a table. Leaving the block draws it as it is at once.
 - **Clicking a drawn table** puts the caret at the start of its source. Cmd/Ctrl+click on a link in it is the link's
-  (Preview's behaviour). A block whose drawing handles its own clicks (a sheet's grid, from Step 6) has a small
-  **Edit source** button instead, shown on hover and reachable from the keyboard.
+  (Preview's behaviour), and a click on a button in a drawing (a diagram's **Edit diagram**) is the button's. A block
+  whose drawing handles its own clicks (a sheet's grid, a video player) has a small **Edit source** button instead,
+  shown on hover and reachable from the keyboard.
 - **Up and down arrows step into a block**, onto its first line going down and its last going up, at the caret's
   column; CodeMirror on its own would jump over the drawing in one go.
 - **Find** shows the source of the table holding the current match, so the match is seen and highlighted there.
@@ -167,8 +171,36 @@ How it works: a `StateField` (`liveBlocksField`), since CodeMirror takes block w
 blocks it found and, on a change, maps them through it and reads again only the top-level nodes of the syntax tree the
 change touched, before and after it (so a code fence opened above a table swallows it, and closing it brings it back).
 Where the parser has not reached yet (a long note just opened), the stretch is kept to read when it does. A widget's
-`eq` compares its source, so typing elsewhere redraws nothing. `liveBlockKinds` is the list of kinds; Step 6 adds MDX
-components to it.
+`eq` compares its source, so typing elsewhere redraws nothing. `liveBlockKinds` is the list of kinds. A kind can run
+over several top-level nodes (`reach`, with `startAbove` for a closing tag typed below its opening one), and can say its
+source can't be drawn yet (`problem`); a re-read takes in the whole of any block it touches.
+
+## MDX components
+
+Source: [`liveMdx.ts`](../../apps/web/src/components/notes/liveMdx.ts). Plan: Step 6 of
+[live-default-plan.md](../live-default-plan.md).
+
+- **Which.** `<Info>`, `<Warning>`, `<Drawio>`, `<Chart>`, `<Repo>`, `<Sheet>` and `<YouTube>` are blocks, drawn by
+  Preview's `NoteMarkdown` with Preview's providers, so each looks and acts as it does there. `<Mark>`, `<Image>` and
+  `<Ink>` keep their inline drawing (above). `<Toc>` and `<Footnotes>` need the whole note and come in Step 7.
+- **Where one starts and ends.** A component starts at a line that opens with its tag (an opening tag may run over
+  several lines) and ends at the line with its matching closing tag, the blank lines and Markdown inside it included,
+  as MDX reads it: a tag of the same name inside it nests, and a tag in code is not a tag. A self-closing tag
+  (`<YouTube … />`) is its own block. A component inside a list item or a quote is left as written.
+- **The caret in it** shows its source as Markdown, drawn as Live draws any Markdown (the list bullets, the CSV fence
+  as a code block), with the drawing under it, redrawn once typing pauses, as for a [table](#blocks).
+- **Not valid yet.** While a component is typed it is often not valid MDX (a quote not closed, an `{expression}`, an
+  unknown tag). Its source then shows, with a small grey line under it, "Not rendered yet:" and MDX's reason, in place
+  of the drawing: never Preview's banner. That holds away from the caret too, so a broken component is left showing
+  to be fixed. An opening tag with no closing tag yet is a block of its own line, with the same note; type the
+  closing tag below it and the whole stretch becomes the component. (The `<` menu inserts both tags at once.)
+- **Clicks.** A click on a callout, a chart, a repository card or a diagram's picture puts the caret at the start of
+  its source; Cmd/Ctrl+click on a link in one follows it. A diagram's **Edit diagram** and a sheet's **Edit sheet**,
+  **Re-import** and **Export…** work as in Preview. A sheet and a video take their own clicks, so they have the
+  **Edit source** button, at their top left (a sheet keeps its tools at the top right).
+- **Loading.** Code in a component is coloured by Preview's highlighter, fetched the first time a component with a
+  code fence is drawn (the same chunk Preview fetches). The Excel reader and writer load when they are used, as in
+  Preview.
 
 ## What it shares with the Markdown tab
 
@@ -203,7 +235,7 @@ same scenario on each:
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
 - **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
-- Not in the Live tab yet: diagrams and a preview of MDX components (Step 6 of the
+- Not in the Live tab yet: `<Toc>`, `<Footnotes>` and the frontmatter card (Step 7 of the
   [live-default plan](../live-default-plan.md)). Use **Split** for those.
 
 ## Long notes

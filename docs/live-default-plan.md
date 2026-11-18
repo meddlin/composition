@@ -11,7 +11,7 @@ Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** 
 owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
 built 2026-11-17** (PR #322); Gate B is the owner's. **Step 3 (code blocks) built 2026-11-17** (PR #324); Gate C is
 the owner's. **Step 4 (lists, task lists, quotes) built 2026-11-17** (PR #325); Gate D is the owner's. **Step 5 (the block layer and tables)
-built 2026-11-17** (PR #326); Gate E is the owner's.
+built 2026-11-17** (PR #326); Gate E is the owner's. **Step 6 (MDX components) built 2026-11-17**; Gate F is the owner's.
 
 ## Goal and rule
 
@@ -327,6 +327,33 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
 - Lazy imports (the sheet engine, highlight.js) load on the first such block, as in Preview.
 - **Gate F (the owner's):** the [mdx-components](ui/mdx-components.md) sample note looks like it does in Preview,
   with the Edit buttons working from Live.
+- **Built (2026-11-17).**
+  - In its own module, `liveMdx.ts`: one block kind per component, added to `liveBlockKinds` beside `TABLE`
+    (`liveMdxBlocks`, one line in `LiveEditor.tsx`). The syntax tree is left alone: a component starts at a top-level
+    HTML block or paragraph that opens with its tag, and runs to the top-level node holding its matching closing tag
+    (tags of the same name nested, tags in code skipped), so the blank lines and Markdown inside it are part of it,
+    and while the caret is in it its Markdown is drawn by Live as anywhere else.
+  - Three hooks on `BlockKind` let the block layer handle that without knowing about MDX: `reach` (where a block that
+    runs over several nodes ends), `startAbove` (a closing tag typed below an opening one, so the layer reads again
+    from the opening one) and `problem` (the source isn't valid MDX yet). `liveBlocks.ts` now tries every kind on a
+    node, widens a re-read to the blocks it touches, and draws a block with a `problem` as its source with a note
+    under it. One fix found on the way: a change at the very end of a fully parsed note was never read again.
+  - Not valid yet: the block's source is checked with Preview's own remark plugins (`mdxRemarkPlugins`, now exported
+    from `NoteMarkdown.tsx`), cached by source. A failing one shows its source and a small grey "Not rendered yet:
+    reason" line, never `MdxBoundary`'s banner. An opening tag with no closing tag yet is a block of that line alone,
+    so it gets the note too.
+  - Clicks: `<Sheet>` and `<YouTube>` own their clicks and get the Edit source button (top left, clear of the
+    sheet's own tools); a click on a button in any drawing (a diagram's Edit) is the button's. The sheet's Edit and
+    Re-import get the block's offset in the note's body (Step 5's mapping).
+  - Lazy loading: a block's drawing takes the highlighter through `useCodeHighlighting`, as Preview does, so a code
+    fence in a component is coloured and the chunk is fetched the first time one is drawn. The sheet engine is part
+    of Preview's bundle already (only the Excel reader and writer are lazy, and stay so).
+  - Found in the browser: the editor's `white-space: break-spaces` reached the drawings, so the line breaks between a
+    list's items drew as blank lines. The block body now sets `white-space: normal` (code keeps its own).
+  - Checks: `liveMdx.test.ts` (finding, nesting, code, multi-line tags, typing a closing tag below, the not-valid-yet
+    state, the pause, tags) and `liveMdx.view.test.tsx` (Preview's markup, the code coloured, click to edit, Edit
+    source, Edit diagram and Edit sheet with the right offset, the note instead of a banner). Checked in the browser
+    pane on a scratch database with the sample note. Manual items: [manual-tests/live-editor.md](manual-tests/live-editor.md) §4c.
 
 ### Step 7: the rest (S to M)
 

@@ -128,6 +128,23 @@ open it in **Split** beside **Live** in another panel to compare.
 - [ ] With VoiceOver, a drawn table is read as a table (rows, columns, cell text). Put the caret in it: the source lines are read, not the table twice.
 - [ ] A table inside a list item or a quote is left as written.
 
+## 4c. MDX components (Gate F)
+
+Make a note from the examples in [ui/mdx-components.md](../ui/mdx-components.md): an `<Info>` with bold, a link, a list
+and a code fence in it, a `<Warning>`, a `<Drawio>` you drew (so it has a picture), a `<YouTube>`, a `<Repo>`, a
+`<Chart>` and a `<Sheet>`. Open it in **Split** beside **Live** in another panel to compare.
+
+- [ ] Away from the caret each component reads as in Preview: the callouts' tint and icon, the list spacing, the code colours in the callout, the diagram, the player, the repository card, the chart and the sheet's grid, in a light and a dark scheme.
+- [ ] Click in a callout, the chart, the repository card or the diagram's picture: the caret goes to the start of its source, the whole component shows as Markdown (the lines inside it drawn as Live draws them) and its drawing sits under it. Click below it: it is drawn again.
+- [ ] Hover over the diagram and press **Edit diagram**: the draw.io editor opens on it, without the caret moving. Save a change: the note points at the new picture and Live draws it.
+- [ ] Hover over the sheet and press **Edit sheet**: the sheet editor opens on that sheet. Change a cell and save: the change is in that sheet's CSV (check the Markdown tab), and the rest of the note is unchanged. With two sheets in the note, each opens its own.
+- [ ] Hover over the video and the sheet: an **Edit source** button shows at the top left; it puts the caret in the source. Tab to it from the keyboard and press Enter or Space: the same. Clicks in the player and the grid are theirs (the video plays).
+- [ ] In a callout's source type ` {1`: about a third of a second after you stop, the drawing under it becomes a small grey "Not rendered yet: …" line, with no red banner. Delete it again: the callout is drawn again. Leave the caret outside while it is broken: the source stays showing with the note under it.
+- [ ] Type a new `<Info>` line by hand above a paragraph: the line shows "Not rendered yet". Type `</Info>` a few paragraphs further down: the whole stretch becomes one callout when the caret leaves it. Delete the closing tag: it lets go again.
+- [ ] Insert a component from the `<` menu: it is drawn as soon as the caret leaves it.
+- [ ] `<Mark>`, `<Image>` and `<Ink>` are drawn as before, inline; `<Toc />` and `<Footnotes />` are still shown as written (Step 7). A component in a code fence is left as written.
+- [ ] Open a note with a code fence only inside a callout, from a fresh reload: the colours appear in the callout once the highlighter has loaded.
+
 ## 5. Ruler and reflow
 
 - [ ] Settings → Writing: turn on the ruler at 40. The line is drawn in the Live tab (it is approximate: see the note below). Turn on reflow at 40 and type a long sentence: it breaks at 40 characters with the caret staying at the end; a list item's continuation lines up under its text; a table row stays whole.

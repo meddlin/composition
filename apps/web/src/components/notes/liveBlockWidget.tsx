@@ -1,4 +1,4 @@
-import { Facet } from "@codemirror/state";
+import { Facet, type EditorState } from "@codemirror/state";
 import { WidgetType, type EditorView } from "@codemirror/view";
 import { useLayoutEffect, useMemo, useSyncExternalStore } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -6,6 +6,7 @@ import { DrawioEditContext, type DrawioEditing } from "./DrawioEdit";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
 import { NoteMarkdown } from "./NoteMarkdown";
 import { SheetEditContext, type SheetEditing } from "./SheetEdit";
+import { useCodeHighlighting } from "./useCodeHighlighting";
 
 /**
  * What a block drawn in the Live tab needs from the editor around it: the same things Preview hands its
@@ -51,8 +52,10 @@ export type BlockPlace = { start: number; bodyStart: number };
 
 /** A kind of block the Live tab draws whole, by the syntax-tree node that writes it. */
 export type BlockKind = {
-  /** The node's name in the Markdown syntax tree (`Table`, `HTMLBlock`). */
-  node: string;
+  /** The node's name in the Markdown syntax tree (`Table`, `HTMLBlock`), or the names of the nodes it may start at. */
+  node: string | readonly string[];
+  /** What the drawing's `data-kind` says (the node's name, if not given). */
+  name?: string;
   /**
    * Whether the drawing handles its own clicks (a sheet's grid, a video player). Such a block gets a small "Edit
    * source" button that puts the caret in its source; any other is edited by clicking anywhere on it.
@@ -60,9 +63,26 @@ export type BlockKind = {
   ownsClicks?: boolean;
   /** Whether this node's text is one of these blocks (an HTML block that is a `<Sheet>`, say). All are, if not given. */
   accepts?: (source: string) => boolean;
+  /**
+   * For a block that may run over several top-level nodes (an MDX component with Markdown in it): where the block
+   * starting at `node` ends, or null if that node starts none. Without it, a block is its node.
+   */
+  reach?: (state: EditorState, node: { from: number; to: number }) => number | null;
+  /**
+   * For such a block: where one starts above `from` that `from`..`to` holds the end of (a closing tag typed below
+   * its opening one), or null. The block layer then reads the note again from there.
+   */
+  startAbove?: (state: EditorState, from: number, to: number) => number | null;
+  /**
+   * Why `source` can't be drawn yet (it is not valid MDX while it is typed), or null when it can. A block that can't
+   * shows its source, with a small "not rendered yet" note under it in place of the drawing.
+   */
+  problem?: (source: string) => string | null;
 };
 
-const NO_REHYPE: never[] = [];
+/** The name a kind's drawing is tagged with. */
+export const kindName = (kind: BlockKind): string => kind.name ?? (typeof kind.node === "string" ? kind.node : kind.node.join(" "));
+
 const NO_LINKS: NoteLinks = { exists: () => true, open: () => {} };
 
 /** The React roots of the blocks on screen, by the element they draw into. */
@@ -71,6 +91,8 @@ const roots = new WeakMap<HTMLElement, Root>();
 type ViewProps = {
   host: LiveBlockHost;
   source: string;
+  /** Why the source can't be drawn yet (see `BlockKind.problem`), or null. */
+  problem: string | null;
   /** Where the block is now, read when a component in it needs a position in the note (a sheet's Edit). */
   place: () => BlockPlace | null;
   /** Called once the drawing is in the page, so the editor measures it. */
@@ -78,7 +100,7 @@ type ViewProps = {
 };
 
 /** A block's source drawn as Preview draws it, inside Preview's providers. */
-function BlockView({ host, source, place, drawn }: ViewProps) {
+function BlockView({ host, source, problem, place, drawn }: ViewProps) {
   const { noteLinks, drawio = null, sheet = null } = useSyncExternalStore(host.subscribe, host.get, host.get);
   // A sheet's Edit says where its tag starts in what was drawn, which here is the block; the editor wants the note's body.
   const sheetEditing = useMemo<SheetEditing | null>(() => {
@@ -89,12 +111,21 @@ function BlockView({ host, source, place, drawn }: ViewProps) {
     };
     return { edit: (offset) => sheet.edit(inBody(offset)), reimport: (offset) => sheet.reimport(inBody(offset)) };
   }, [sheet, place]);
+  // Code in a block (a fence in an `<Info>`) is coloured as in Preview, by the same chunk, fetched the first time.
+  const rehypePlugins = useCodeHighlighting(problem === null ? source : "");
   useLayoutEffect(drawn);
+  if (problem !== null) {
+    return (
+      <p className="cm-live-block-pending not-prose" title={problem}>
+        Not rendered yet: {problem}
+      </p>
+    );
+  }
   return (
     <NoteLinksProvider value={noteLinks ?? NO_LINKS}>
       <DrawioEditContext.Provider value={drawio}>
         <SheetEditContext.Provider value={sheetEditing}>
-          <NoteMarkdown body={source} rehypePlugins={NO_REHYPE} />
+          <NoteMarkdown body={source} rehypePlugins={rehypePlugins} />
         </SheetEditContext.Provider>
       </DrawioEditContext.Provider>
     </NoteLinksProvider>
@@ -160,6 +191,8 @@ export class BlockWidget extends WidgetType {
         if (event.button !== 0 || this.beside) return;
         // A modified click on a link in the drawing is the link's (Preview's NoteAnchor follows it).
         if ((event.metaKey || event.ctrlKey) && (event.target as Element).closest?.("a")) return;
+        // A button in the drawing (a diagram's Edit) is the button's.
+        if ((event.target as Element).closest?.("button")) return;
         event.preventDefault();
         edit();
       });
@@ -176,7 +209,7 @@ export class BlockWidget extends WidgetType {
     const body = dom.firstElementChild as HTMLElement | null;
     const root = body && roots.get(body);
     // Another kind of block has its own buttons and handlers: build it afresh.
-    if (!root || dom.dataset.kind !== this.kind.node || dom.dataset.ownsClicks !== String(!!this.kind.ownsClicks)) return false;
+    if (!root || dom.dataset.kind !== kindName(this.kind) || dom.dataset.ownsClicks !== String(!!this.kind.ownsClicks)) return false;
     this.paint(dom);
     this.render(root, view, dom);
     return true;
@@ -185,7 +218,7 @@ export class BlockWidget extends WidgetType {
   /** The wrapper's classes and what assistive tech is told: the drawing under its own source is a repeat, so it is hidden from them. */
   private paint(dom: HTMLElement) {
     dom.className = `cm-live-block${this.beside ? " cm-live-block-beside" : ""}${this.kind.ownsClicks ? " cm-live-block-owns-clicks" : ""}`;
-    dom.dataset.kind = this.kind.node;
+    dom.dataset.kind = kindName(this.kind);
     dom.dataset.ownsClicks = String(!!this.kind.ownsClicks);
     if (this.beside) dom.setAttribute("aria-hidden", "true");
     else dom.removeAttribute("aria-hidden");
@@ -196,6 +229,7 @@ export class BlockWidget extends WidgetType {
       <BlockView
         host={view.state.facet(liveBlockHost)}
         source={this.source}
+        problem={this.kind.problem?.(this.source) ?? null}
         place={() => this.place(view, dom)}
         drawn={() => view.requestMeasure()}
       />,
