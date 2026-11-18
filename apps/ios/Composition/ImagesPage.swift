@@ -206,7 +206,7 @@ private struct ImageDetail: View {
         .confirmationDialog("Delete this image?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Image", role: .destructive) { delete() }
         } message: {
-            Text("“\(image.name)” (\(StoredImages.sizeLabel(bytes: image.size))) is deleted from this iPad, and backups made from now on will not hold it. No note refers to it, and nothing in the Trash Can does. It cannot be brought back.")
+            Text("“\(image.name)” (\(StoredImages.sizeLabel(bytes: image.size))) is deleted from this device, and backups made from now on will not hold it. No note refers to it, and nothing in the Trash Can does. It cannot be brought back.")
         }
         .accessibilityIdentifier("image-detail")
     }

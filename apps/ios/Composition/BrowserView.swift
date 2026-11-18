@@ -3,6 +3,11 @@ import SwiftUI
 
 /// The list of notes with a search field, and the note beside it.
 struct BrowserView: View {
+    /// How wide the window must be for all three columns: the notebooks and the notes list at their narrowest (250 and 300 points) and about 450 left
+    /// for the note. Every iPad in landscape, and the 13-inch iPad in portrait, has that; a smaller iPad in portrait and the open iPhone Duo (951)
+    /// do not, and there the system shows the notes list and the note, with the notebooks a swipe away, instead of laying the notebooks over the note.
+    static let threeColumnWidth: CGFloat = 1000
+
     @Bindable var model: AppModel
     var chooseBackup: () -> Void
     @State private var showingTrash = false
@@ -20,6 +25,13 @@ struct BrowserView: View {
     /// The Reading List link whose page was open (0 is none).
     @SceneStorage("readingSelection") private var storedReading = 0
     @State private var columns = NavigationSplitViewVisibility.automatic
+    /// Which column shows where the window is too narrow for columns (an iPhone, the closed iPhone Duo, Slide Over), and the three are one stack.
+    @State private var compactColumn = NavigationSplitViewColumn.content
+    /// How many of the third column's views are on screen: in the one stack, none until a note (or the home page) is gone on to. A count, because one
+    /// view can appear before the one it replaces has gone.
+    @State private var detailViews = 0
+    @Environment(\.horizontalSizeClass) private var sizeClass
+    private var collapsed: Bool { sizeClass == .compact }
     @State private var prompt: Prompt?
     @State private var promptText = ""
     @State private var moving: DraggedItem?
@@ -29,8 +41,11 @@ struct BrowserView: View {
     @Environment(\.dynamicTypeSize) private var textSize
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $columns) {
-            SidebarView(model: model, prompt: $prompt, moving: $moving)
+        NavigationSplitView(columnVisibility: $columns, preferredCompactColumn: $compactColumn) {
+            SidebarView(model: model, prompt: $prompt, moving: $moving, collapsed: collapsed) {
+                // In the one stack, choosing a notebook (even the one already chosen) goes on to its notes.
+                if collapsed { compactColumn = .content }
+            }
                 // Wider where the text is large, so that the names of notebooks are not broken to fit.
                 .navigationSplitViewColumnWidth(min: 250, ideal: textSize.isAccessibilitySize ? 420 : 320, max: 520)
                 .safeAreaInset(edge: .bottom) { appearanceButton }
@@ -41,6 +56,8 @@ struct BrowserView: View {
                             // The home page is in the notes' third column, which the Reading List's page takes while it is showing.
                             if model.sidebar == .readingList { model.visit(.all) }
                             model.open(nil)
+                            // In the one stack the home page is the last column, which no list row leads to: go to it.
+                            if collapsed { compactColumn = .detail }
                         } label: { Label("Home", systemImage: "house") }
                             .accessibilityIdentifier("home-button")
                     }
@@ -72,32 +89,38 @@ struct BrowserView: View {
                 if model.sidebar == .readingList {
                     ReadingListColumn(model: model)
                 } else {
-                    NotesColumnView(model: model, prompt: $prompt, moving: $moving, footer: AnyView(footer))
+                    NotesColumnView(model: model, prompt: $prompt, moving: $moving, footer: AnyView(footer), collapsed: collapsed, noteInSight: detailViews > 0, compactColumn: $compactColumn)
                 }
             }
             .navigationSplitViewColumnWidth(min: 300, ideal: textSize.isAccessibilitySize ? 440 : 360, max: 560)
         } detail: {
-            if model.sidebar == .readingList {
-                ReadingPageColumn(model: model)
-            } else if let id = model.selection {
-                NoteDetailView(model: model, noteID: id)
-            } else {
-                HomePageView(model: model) { item in
-                    model.visit(item)
-                    // In portrait the notes list is out of sight: bring it in beside the page, so that the card is seen to do something.
-                    if width < 900 { columns = .doubleColumn }
+            Group {
+                if model.sidebar == .readingList {
+                    ReadingPageColumn(model: model)
+                } else if let id = model.selection {
+                    NoteDetailView(model: model, noteID: id)
+                } else {
+                    HomePageView(model: model) { item in
+                        model.visit(item)
+                        // In portrait the notes list is out of sight: bring it in beside the page, so that the card is seen to do something.
+                        // In the one stack, go on to it.
+                        if collapsed { compactColumn = .content } else if width < Self.threeColumnWidth { columns = .doubleColumn }
+                    }
                 }
             }
+            .onAppear { detailViews += 1 }
+            .onDisappear { detailViews -= 1 }
         }
         .navigationSplitViewStyle(.balanced)
         // The note's toolbar can hide both lists, to give the writing all the room (see `NoteDetailView`).
         .environment(\.listsControl, ListsControl(hidden: columns == .detailOnly) { toggleLists() })
-        // Turning the iPad to landscape brings the sidebar back, which the system hid in portrait and does not bring back by itself; a column hidden by hand
-        // in landscape stays hidden, because only crossing this width changes anything.
+        // Turning the iPad to landscape (or widening its window) brings the sidebar back, which the system hid in portrait and does not bring back by itself;
+        // a column hidden by hand in landscape stays hidden, because only crossing this width changes anything.
         .background(GeometryReader { proxy in Color.clear.onAppear { width = proxy.size.width }.onChange(of: proxy.size.width) { _, new in width = new } })
         .onChange(of: width) { old, new in
             // A moment later, because the system settles its own choice first and would undo this.
-            if old < 900, new >= 900 { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { columns = .all } } else if old >= 900, new < 900 { columns = .automatic }
+            let wide = Self.threeColumnWidth
+            if old < wide, new >= wide { DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { columns = .all } } else if old >= wide, new < wide { columns = .automatic }
         }
         .onAppear {
             // Developer shortcut: `-openLab 1` opens the editor lab at launch.
@@ -111,8 +134,15 @@ struct BrowserView: View {
             restored = true
             restoreScene()
         }
-        .onChange(of: model.selection) { storedSelection = Int($1 ?? 0) }
-        .onChange(of: model.readingSelection) { storedReading = Int($1 ?? 0) }
+        .onChange(of: model.selection) { _, id in
+            storedSelection = Int(id ?? 0)
+            // A note chosen (here or in a wider window) is what the one stack shows when the window narrows, as when the iPhone Duo is closed.
+            if id != nil { compactColumn = .detail }
+        }
+        .onChange(of: model.readingSelection) { _, id in
+            storedReading = Int(id ?? 0)
+            if id != nil { compactColumn = .detail }
+        }
         .onChange(of: model.sidebar) { storedSidebar = ($1 ?? .all).stored }
         .onChange(of: model.expanded) { storedExpanded = $1.map(\.stored).sorted().joined(separator: ",") }
         .onChange(of: prompt) { promptText = $1?.startingText(in: model) ?? "" }
@@ -129,7 +159,7 @@ struct BrowserView: View {
             Button("Cancel", role: .cancel) {}
             Button(current.confirm) { submit(current) }
         }
-        .confirmationDialog("Replace everything on this iPad?", isPresented: $confirmingReplace, titleVisibility: .visible) {
+        .confirmationDialog("Replace everything on this device?", isPresented: $confirmingReplace, titleVisibility: .visible) {
             Button("Choose a backup…", role: .destructive, action: chooseBackup)
         } message: {
             Text("Notes, the Trash Can, images and files are replaced by the backup's. Nothing is merged, and the current ones are not kept.")

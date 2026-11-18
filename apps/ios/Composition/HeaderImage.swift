@@ -202,7 +202,7 @@ struct HeaderImageSheet: View {
             if let problem { Text(problem).font(.footnote).foregroundStyle(look.error).accessibilityIdentifier("header-image-problem") }
             if let header, HeaderImageSource.storedName(of: header.image) == nil {
                 // A web address typed into the frontmatter: kept as it is, and not drawn, because the iPad fetches nothing from the network.
-                Text("Currently \(header.image). It is a web address, which this iPad does not load, so it is not shown.").font(.footnote).foregroundStyle(look.mutedText)
+                Text("Currently \(header.image). It is a web address, which this app does not load, so it is not shown.").font(.footnote).foregroundStyle(look.mutedText)
             }
             if failed {
                 Text("Could not load the images.").foregroundStyle(look.error)

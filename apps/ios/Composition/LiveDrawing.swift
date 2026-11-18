@@ -198,7 +198,10 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
                 .draw(in: CGRect(x: rect.minX, y: rect.minY + 2, width: rect.width, height: rect.height))
             return
         }
-        let scale = textLayoutManager?.textContainer.map { _ in UIScreen.main.scale } ?? 2
+        // Pixels per point of what is being drawn into: the screen the text view is on now (the iPhone Duo's two screens, an external display), not
+        // the device's main screen.
+        let toDevice = context.userSpaceToDeviceSpaceTransform
+        let scale = max(hypot(toDevice.a, toDevice.b), 1)
         if picture.kind == .ink, let theme = picture.theme {
             // From its strokes, in the scheme's colours, as the Preview's `InkPictureView`; a PNG that carries none is drawn as its pixels, below.
             switch LiveImages.shared.strokes(at: picture.url) {
