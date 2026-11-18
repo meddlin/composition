@@ -292,14 +292,19 @@ tap and the report are the same for all. `NotePreview.located` already gives eve
 written nowhere and have no range (Step 7 decides where they are drawn). The frontmatter is not a located block (Step
 7 adds the header).
 
-**Simulator** (`LiveBlockUITests`, all passing): a table is drawn as one picture with every character hidden and
+**Simulator** (`LiveBlockUITests`, each passing; the Mac's load average was 150 to 950 from other sessions' Simulators,
+so most runs lost some tests to the harness: a launch that hung, typing that never arrived, UI queries timing out): a table is drawn as one picture with every character hidden and
 silenced; the caret into its last line reveals it with the picture after it, and out hides it; ↑ from the line below
 to the line above visits each of its five lines, eight presses each way; undo across it (typing before, in and after
 it, ⌘Z until the text is back) leaves the text as it was and the table drawn; typing in it redraws its picture after
 the pause; a tap on the picture puts the caret at its start. The 16 ms budget on the showcase note (`LiveBench`,
 Debug build, the Mac's load average about 80 to 300 while it ran): the styler's part of a keystroke median 0.7 ms,
 p95 1.1 ms; a whole keystroke (UIKit's insert, the styler, the layout) median 3.8 ms, p95 8.7 ms, 7 of 200 over
-16 ms (the worst 365 ms, the Mac's load); the pause's pass after typing settled in 304 ms.
+16 ms (the worst 365 ms, the Mac's load); the pause's pass after typing settled in 304 ms. The existing `LiveUITests`
+and the two Live audits on the final code: 40 of 45 in one run, and of the five it lost, three passed on a rerun;
+`testTapsAlongALineWithHiddenMarksLandNextToAVisibleCharacter` passed on the final code in another run, and
+`testHeadingsGrowWithTheTextSize` passed on this branch before the last change to taps (both failed at load 900 with
+the typed text never reaching the note). Worth one more run of the suite on a quiet Mac before Gate LD5.
 
 ### Step 6: components (M)
 
