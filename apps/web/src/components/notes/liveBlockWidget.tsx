@@ -1,6 +1,6 @@
 import { Facet, type EditorState } from "@codemirror/state";
 import { WidgetType, type EditorView } from "@codemirror/view";
-import { useLayoutEffect, useMemo, useSyncExternalStore } from "react";
+import { useLayoutEffect, useMemo, useSyncExternalStore, type ComponentType } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DrawioEditContext, type DrawioEditing } from "./DrawioEdit";
 import { NoteLinksProvider, type NoteLinks } from "./NoteLink";
@@ -78,6 +78,11 @@ export type BlockKind = {
    * shows its source, with a small "not rendered yet" note under it in place of the drawing.
    */
   problem?: (source: string) => string | null;
+  /**
+   * Draws the block in place of `NoteMarkdown` (inside the same providers), for a block that needs more of the note
+   * than its own source: `<Toc>` (the note's headings), `<Footnotes>` and the frontmatter card.
+   */
+  Drawing?: ComponentType<{ source: string; view: EditorView }>;
 };
 
 /** The name a kind's drawing is tagged with. */
@@ -93,6 +98,8 @@ type ViewProps = {
   source: string;
   /** Why the source can't be drawn yet (see `BlockKind.problem`), or null. */
   problem: string | null;
+  kind: BlockKind;
+  view: EditorView;
   /** Where the block is now, read when a component in it needs a position in the note (a sheet's Edit). */
   place: () => BlockPlace | null;
   /** Called once the drawing is in the page, so the editor measures it. */
@@ -100,7 +107,7 @@ type ViewProps = {
 };
 
 /** A block's source drawn as Preview draws it, inside Preview's providers. */
-function BlockView({ host, source, problem, place, drawn }: ViewProps) {
+function BlockView({ host, source, problem, kind, view, place, drawn }: ViewProps) {
   const { noteLinks, drawio = null, sheet = null } = useSyncExternalStore(host.subscribe, host.get, host.get);
   // A sheet's Edit says where its tag starts in what was drawn, which here is the block; the editor wants the note's body.
   const sheetEditing = useMemo<SheetEditing | null>(() => {
@@ -125,7 +132,7 @@ function BlockView({ host, source, problem, place, drawn }: ViewProps) {
     <NoteLinksProvider value={noteLinks ?? NO_LINKS}>
       <DrawioEditContext.Provider value={drawio}>
         <SheetEditContext.Provider value={sheetEditing}>
-          <NoteMarkdown body={source} rehypePlugins={rehypePlugins} />
+          {kind.Drawing ? <kind.Drawing source={source} view={view} /> : <NoteMarkdown body={source} rehypePlugins={rehypePlugins} />}
         </SheetEditContext.Provider>
       </DrawioEditContext.Provider>
     </NoteLinksProvider>
@@ -230,6 +237,8 @@ export class BlockWidget extends WidgetType {
         host={view.state.facet(liveBlockHost)}
         source={this.source}
         problem={this.kind.problem?.(this.source) ?? null}
+        kind={this.kind}
+        view={view}
         place={() => this.place(view, dom)}
         drawn={() => view.requestMeasure()}
       />,

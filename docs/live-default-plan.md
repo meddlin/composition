@@ -11,7 +11,9 @@ Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** 
 owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
 built 2026-11-17** (PR #322); Gate B is the owner's. **Step 3 (code blocks) built 2026-11-17** (PR #324); Gate C is
 the owner's. **Step 4 (lists, task lists, quotes) built 2026-11-17** (PR #325); Gate D is the owner's. **Step 5 (the block layer and tables)
-built 2026-11-17** (PR #326); Gate E is the owner's. **Step 6 (MDX components) built 2026-11-17**; Gate F is the owner's.
+built 2026-11-17** (PR #326); Gate E is the owner's. **Step 6 (MDX components) built 2026-11-17** (PR #327); Gate F
+is the owner's. **Step 7 (setext headings, footnotes, `<Toc>`, the frontmatter card) built 2026-11-17** (PR #328);
+Gate G is the owner's.
 
 ## Goal and rule
 
@@ -365,6 +367,33 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   scrolls Live to the heading.
 - The frontmatter: drawn as `FrontmatterCard` away from the caret, and only its YAML while the caret is in it (D5).
 - **Gate G (the owner's).**
+- **Built (2026-11-17)**, on Step 5's branch. Docs: [ui/live-editor.md](ui/live-editor.md#setext-headings-footnotes-toc-and-the-frontmatter),
+  [manual-tests/live-editor.md](manual-tests/live-editor.md) §4d.
+  - Setext headings: `liveSetext.ts`, a view plugin; the underline's line is collapsed with a line class, as the code
+    fences are, so no state field was needed. `extractHeadings` (`noteHeadings.ts`) now finds setext headings too, so
+    the heading rail, `#heading` links (`fragmentOffset`) and `<Toc>` count them, as Preview does.
+  - Footnotes: `liveFootnotes.tsx`. `footnoteMarksField` keeps every `[^label]` of the note and reads again only the
+    lines a change touches; `footnotesOf` numbers them by first citation (remark-gfm's order, checked against
+    Preview's output), leaving out code and the frontmatter. References and definitions are drawn by a view plugin and
+    followed with Cmd/Ctrl+click through Step 2's `data-href` and `fragmentOffset`.
+  - `<Footnotes />` hands Preview's `NoteMarkdown` the note's references, the tag and the cited definitions, so the list
+    is Preview's own (numbers, wording, `↩ ↩2`), the line of references hidden. `<Toc />` hands Preview's `Toc` the
+    headings from `extractHeadings`, with the slugs `fragmentOffset` finds them by. Both are block kinds with a
+    component of their own (`BlockKind.Drawing`, new) and re-read the note after each pause in typing (`useSettledNote`),
+    only while drawn. A click on an entry or a ↩ scrolls Live; the caret stays.
+  - Frontmatter (D5): a state field of its own (`liveFrontmatter.tsx`), since the frontmatter is not a syntax-tree node,
+    drawing Preview's `FrontmatterCard` through the block layer's widget. **Added:** the caret counts as in the
+    frontmatter only while the editor has focus, or every note would open on its YAML (the caret starts at 0); and Up
+    from the line under the card enters it, which CodeMirror would not do over a block widget at the top.
+  - **Found on the way:** Lezer reads a self-closing tag on its own line (`<Toc />`, and Step 6's `<YouTube … />`) as a
+    `Paragraph`, not an `HTMLBlock`, so these kinds match a paragraph whose text is the tag; and `blockOf` gave up when
+    the first kind with a matching node name did not accept the text, so two kinds on one node never both worked
+    (fixed). A drawn block also inherited CodeMirror's `white-space: pre-wrap`, which showed the newlines in Preview's
+    markup as line breaks (a footnote's number stood on a line of its own); blocks now use `normal`.
+  - Checks: `liveSetext.test.ts`, `liveFootnotes.test.tsx` (numbering against Preview's, incremental against a fresh
+    read, the drawing, `<Footnotes />` against Preview's list), `liveToc.test.tsx` (against Preview's `Toc` and
+    `fragmentOffset`), `liveRest.view.test.tsx` (the card, D5, Up, the table of contents and its re-read, the list and
+    ↩), `noteHeadings.test.ts`, `liveBlocks.test.ts` (two kinds on one node); checked in the browser pane.
 
 ### Step 8: make Live the default (S)
 

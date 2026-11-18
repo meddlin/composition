@@ -443,7 +443,7 @@ const blockTheme = EditorView.baseTheme({
   // Under its own source while it is edited: set off a little from the text being typed.
   ".cm-live-block-beside": { opacity: "0.75" },
   ".cm-live-block-owns-clicks": { cursor: "auto" },
-  // The editor's `pre-wrap` would draw the line breaks between a list's items in the drawing as blank lines.
+  // The editor's text keeps its white space (`pre-wrap`); a drawing's markup, like Preview's page, does not.
   ".cm-live-block-body": { fontSize: "inherit", lineHeight: "1.7", whiteSpace: "normal" },
   // In Live a table sits with the text, not two lines away from it as in Preview's flowing page.
   ".cm-live-block-body > :first-child": { marginTop: "0" },

@@ -89,6 +89,14 @@ describe("finding blocks", () => {
     const both = stateOf(doc, doc.length, [liveBlockKinds.of(TABLE), liveBlockKinds.of({ node: "HTMLBlock" })]);
     expect(field(both).blocks.map((block) => block.kind.node)).toEqual(["HTMLBlock", "Table"]);
   });
+
+  it("tries every kind on a node, so two kinds can share one (an HTML block that is a <div>, another a <section>)", () => {
+    const doc = "<div>\nhi\n</div>\n\n<section>\nthere\n</section>\n";
+    const div = { node: "HTMLBlock", accepts: (source: string) => source.startsWith("<div") };
+    const section = { node: "HTMLBlock", accepts: (source: string) => source.startsWith("<section") };
+    const state = stateOf(doc, doc.length, [liveBlockKinds.of(div), liveBlockKinds.of(section)]);
+    expect(field(state).blocks.map((block) => block.kind)).toEqual([div, section]);
+  });
 });
 
 describe("incremental reading", () => {
