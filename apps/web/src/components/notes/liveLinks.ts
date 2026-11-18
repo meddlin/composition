@@ -51,6 +51,8 @@ function definitionsOf(state: EditorState): Map<string, Definition> {
     const url = block.getChild("URL");
     if (!label || !url) continue;
     const key = normalLabel(state.sliceDoc(label.from, label.to));
+    // `[^1]: …` is a footnote's definition (GFM), which the parser reads as a link's.
+    if (key.startsWith("^")) continue;
     const title = block.getChild("LinkTitle");
     // The first definition of a label is the one that counts.
     if (!found.has(key)) found.set(key, { url: state.sliceDoc(url.from, url.to), title: title ? state.sliceDoc(title.from + 1, title.to - 1) : "" });
@@ -68,6 +70,12 @@ function hrefOf(url: string, bare: boolean): string {
 
 /** The constructs whose address is theirs to draw (or not), rather than a bare one in the text. */
 const OWNS_URL = new Set(["Link", "Image", "Autolink", "LinkReference"]);
+
+/** Whether a `[label]: …` the parser read is a footnote's definition (`[^1]: …`), whose text is a paragraph. */
+function isFootnoteDefinition(state: EditorState, node: SyntaxNode): boolean {
+  const label = node.name === "LinkReference" ? node.getChild("LinkLabel") : null;
+  return label !== null && state.sliceDoc(label.from, label.from + 2) === "[^";
+}
 
 /** How a link is drawn, by what it points at; `dead` says why it goes nowhere. */
 function linkMark(href: string, title: string, links: NoteLinks): Decoration {
@@ -104,7 +112,7 @@ function hide(state: EditorState, decorations: Range<Decoration>[], from: number
 export function drawLink(state: EditorState, node: SyntaxNode, context: LinkContext, decorations: Range<Decoration>[]): boolean {
   if (node.name === "URL") {
     // A bare address. One inside a link, an image or a definition is that construct's, drawn with it.
-    if (!node.parent || OWNS_URL.has(node.parent.name)) return false;
+    if (!node.parent || (OWNS_URL.has(node.parent.name) && !isFootnoteDefinition(state, node.parent))) return false;
     const url = state.sliceDoc(node.from, node.to);
     decorations.push(linkMark(hrefOf(url, true), "", context.links).range(node.from, node.to));
     return true;
@@ -137,7 +145,10 @@ export function drawLink(state: EditorState, node: SyntaxNode, context: LinkCont
     // `[text][label]` names its definition; `[text][]` and `[text]` are named by their text.
     const label = node.getChild("LinkLabel");
     const labelText = label ? state.sliceDoc(label.from, label.to) : "";
-    const definition = context.definitions().get(normalLabel(labelText.length > 2 ? labelText : state.sliceDoc(open.from, close.to)));
+    const key = normalLabel(labelText.length > 2 ? labelText : state.sliceDoc(open.from, close.to));
+    // `[^1]` is a footnote reference, as Preview draws it, not a link (Step 7 of the plan draws footnotes).
+    if (key.startsWith("^")) return false;
+    const definition = context.definitions().get(key);
     if (!definition) return false;
     href = hrefOf(definition.url, false);
     tip = definition.title;

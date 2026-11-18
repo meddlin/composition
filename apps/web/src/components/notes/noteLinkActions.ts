@@ -101,7 +101,24 @@ export function openInNewTab(href: string) {
 /** A footnote's definition (`fn-1`) or its first reference (`fnref-1`), as remark-gfm names their ids. */
 const FOOTNOTE_ID = /^(?:user-content-)?fn(ref)?-(.+)$/;
 
-const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Where `[^label]:` starts a line (after up to three spaces) in `text`, from `from` on, or -1. */
+function footnoteDefinition(text: string, label: string, from: number): number {
+  const mark = `[^${label}]:`;
+  for (let at = text.indexOf(mark, from); at !== -1; at = text.indexOf(mark, at + 1)) {
+    const lineStart = text.lastIndexOf("\n", at - 1) + 1;
+    if (at - lineStart <= 3 && text.slice(lineStart, at).trim() === "") return at;
+  }
+  return -1;
+}
+
+/** Where the first `[^label]` that is not a definition is in `text`, from `from` on, or -1. */
+function footnoteReference(text: string, label: string, from: number): number {
+  const mark = `[^${label}]`;
+  for (let at = text.indexOf(mark, from); at !== -1; at = text.indexOf(mark, at + 1)) {
+    if (text[at + mark.length] !== ":") return at;
+  }
+  return -1;
+}
 
 /**
  * Where in a note's Markdown `#id` points: the line of the heading the preview gives that id (the same slug as
@@ -124,9 +141,8 @@ export function fragmentOffset(text: string, id: string, bodyStart = 0): number 
   }
   const footnote = FOOTNOTE_ID.exec(wanted);
   if (footnote) {
-    const label = escapeRegExp(footnote[2]);
-    const found = new RegExp(footnote[1] ? `\\[\\^${label}\\](?!:)` : `^ {0,3}\\[\\^${label}\\]:`, "m").exec(text.slice(bodyStart));
-    if (found) return bodyStart + found.index;
+    const at = footnote[1] ? footnoteReference(text, footnote[2], bodyStart) : footnoteDefinition(text, footnote[2], bodyStart);
+    if (at !== -1) return at;
   }
   return null;
 }
