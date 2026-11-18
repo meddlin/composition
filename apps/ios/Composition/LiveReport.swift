@@ -4,9 +4,10 @@ import UIKit
 
 /// What the Live tab has made of the text, read back from the text storage: the runs that are hidden, italic, bold, struck, filled (a tint or the faint fill of
 /// code), smaller than the text (`small`, the frontmatter), drawn at another size or in the grey text (`dim64`), and the paragraphs a rule or a picture is drawn on (`draw-rule`,
-/// `draw-picture`, `draw-pictureAfter`, and for a block `draw-block`, `draw-blockAfter`, with `block-<kind>`, `block-revealed`, `block-pictured` and `block-stale` (drawn with its last good picture) over its source), the lines of a code block on its fill (`code`, with its ends `code-first` and `code-last`) and the lines
+/// `draw-picture`, `draw-pictureAfter`), the lines of a code block on its fill (`code`, with its ends `code-first` and `code-last`) and the lines
 /// collapsed to nothing (`collapsed`, a code block's fences away from the selection). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
-/// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`.
+/// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`. A block drawn as a picture (Step 5) adds `draw-block`,
+/// `draw-blockAfter`, `block-<kind>`, `block-revealed`, `block-pictured` and `block-stale` (drawn with its last good picture).
 enum LiveReport {
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
         var classes: [String: [NSRange]] = [:]

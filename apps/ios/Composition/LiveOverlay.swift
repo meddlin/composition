@@ -19,12 +19,12 @@ enum LiveOverlay {
         /// Where the notes' pictures are kept, and how wide a line of the note's text is (a picture is as tall as that width makes it).
         var imageFolder: URL?
         var textWidth: CGFloat
+        /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
+        var isLinkHere: (String) -> Bool = { _ in true }
         /// The blocks drawn as pictures that touch the range being drawn (`LiveBlocks`, Step 5), and where the selection is: a block shows its source while the selection
         /// is in it (D3).
         var blocks: [LiveBlocks.Entry] = []
         var selection = NSRange(location: 0, length: 0)
-        /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
-        var isLinkHere: (String) -> Bool = { _ in true }
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -134,7 +134,8 @@ enum LiveOverlay {
                 storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
                 continue
             }
-            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveCode, .liveList, .liveLink, .liveLinkSuffix] { storage.removeAttribute(key, range: lines) }
+            // What Steps 2 to 4 put on the lines goes too (a list or a link in a panel, a chart's CSV on a code fill: Step 6), so that the picture is all that is drawn.
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveCode, .liveList] + linkKeys { storage.removeAttribute(key, range: lines) }
             hide(lines, in: storage)
             let tall = NSMutableParagraphStyle()
             tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)

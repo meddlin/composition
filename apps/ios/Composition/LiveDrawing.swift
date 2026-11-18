@@ -123,9 +123,8 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
     }
 
     private var pictureSize: CGSize? {
-        guard let drawing else { return nil }
-        if let block = drawing.block { return LiveDrawing.size(of: block, available: lineWidth) }
-        return drawing.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
+        if let block = drawing?.block { return LiveDrawing.size(of: block, available: lineWidth) }
+        return drawing?.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
     }
 
     /// What TextKit will let the fragment draw on. By default it is the box round the (here tiny, hidden) text, so a rule or a picture would be clipped to a sliver

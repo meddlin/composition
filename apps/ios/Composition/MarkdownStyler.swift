@@ -286,7 +286,7 @@ final class MarkdownStyler {
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
             LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage,
-                              context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, blocks: touched, selection: selection, isLinkHere: isLinkHere))
+                              context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere, blocks: touched, selection: selection))
         }
         storage.endEditing()
         didApply?()

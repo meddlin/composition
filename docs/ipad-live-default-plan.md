@@ -10,7 +10,7 @@ It is the iPad's counterpart of the desktop's [live-default-plan.md](live-defaul
 separate iPad plan that copies the owner's decisions and adapts only what touch or UIKit needs). That page is on the desktop's own branch, so the link to
 it leads nowhere on `main` until that branch merges. Status: **drafted
 2026-11-17; the iPad questions I1 to I7 were decided by the owner the same day, all as recommended** (see
-[Decisions](#decisions)). Steps 1 to 4 are built (their status is under each); Step 5 (the block layer and tables) was built 2026-11-17; see its section.
+[Decisions](#decisions)). Steps 1 to 5 are built (each step's status is under it).
 
 ## Goal and rule
 
@@ -283,7 +283,7 @@ feel, VoiceOver, speed on the device).
   (conformance-fixtures.test.ts writes list-continuation-expected.json); `ListContinuationConformanceTests` agrees at all 2,104 places (1,206 where Return changes the text, 285 where Backspace does), and
   `ListContinuationTests` has hand cases. It is the desktop's behaviour, quirks included: Return on the empty second item of a tight two-item list adds a
   blank line first (the list becomes loose), and Backspace after any item's `- ` (not only an empty one) turns it into spaces. Not ported: GFM tables
-  and link reference definitions (leaf blocks either way). **Simulator:** see the UI tests in the PR; items 359 to 362 are yours.
+  and link reference definitions (leaf blocks either way). **Simulator:** see the UI tests in the PR; items 368 to 371 are yours (first numbered 359 to 362, which Step 6 had; renumbered 2026-11-18).
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 
@@ -402,12 +402,10 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
 - **Oracle:** `component-cases.json` already checks `NotePreview`'s component decisions against the desktop; Live
   draws those same blocks, so it inherits that check. A UI test opens the preview showcase in Live and checks, from
   the report, that every `PreviewBlock` kind the Preview shows has a drawn block in Live.
-- **Gate LD6 (iPad):** items 367 to 370 (the showcase note in Live beside the Preview, every scheme; a chart at the
-  largest text size; the actions; typing a component, and VoiceOver). Numbered 367 on because 359 to 362 went to
-  Return in a list (`ListContinuation`) and 363 to 366 are Step 7's.
+- **Gate LD6 (iPad):** items 359 to 362 (the showcase note in Live beside the Preview, every scheme; a chart at the
+  largest text size; the actions; typing a component, and VoiceOver).
 
-**Status: built 2026-11-18** (branch `claude/ipad-live-step6-components`, on Step 5's branch with this plan's branch,
-Steps 1 to 4, merged in for Step 2's ↗). Gate LD6 is the owner's.
+**Status: built 2026-11-18** (branch `claude/ipad-live-step6-components`, on this plan's branch with Steps 1 to 5). Gate LD6 is the owner's.
 
 - **Which blocks:** `LiveBlockKinds.kind(of:)` names `info`, `warning`, `chart`, `youtube`, `repo`, `mark` (a block
   `<Mark>`) and `notice`, beside Step 5's `table`; `mayHold` is now "a `|` or a `<`". `<Image>`, `<Ink>` and
