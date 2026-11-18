@@ -83,6 +83,8 @@ private struct Fixture: Decodable {
         let hidden: [[Int]]
         let shown: [[Int]]
         let pictures: [Picture]
+        /// Each `<Ink … />` the desktop draws from its strokes (InkWidget), in the form of a picture. Optional, so that a folder written before Step 1 still reads.
+        let inks: [Picture]?
         let tints: [Tint]
         /// Lists, task lists and quotes (docs/ipad-live-default-plan.md, Step 4): only in a fixture written by a desktop that draws them (its Step 4, PR #325, with the
         /// writer's `lists` and `listDrawn`). Without them, lists are not compared.
@@ -110,10 +112,12 @@ private func lines(_ expected: Fixture.Expected) -> [String] {
     out += expected.styles.map { "\($0.name) \($0.from)-\($0.to)" }
     out += expected.hidden.map { "hidden \($0[0])-\($0[1])" }
     out += expected.shown.map { "shown \($0[0])-\($0[1])" }
-    out += expected.pictures.map { picture in
+    func line(_ name: String, _ picture: Fixture.Picture) -> String {
         let where_ = picture.from.map { "in place of \($0)-\(picture.to)" } ?? "after the text, ending at \(picture.to)"
-        return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
+        return "\(name) \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
+    out += expected.pictures.map { line("picture", $0) }
+    out += (expected.inks ?? []).map { line("ink", $0) }
     out += expected.tints.map { "tint \($0.from)-\($0.to) \($0.color)" }
     out += (expected.lists ?? []).map { "list line at \($0.from): \($0.kinds)\($0.starts ? " starts" : "")" }
     out += (expected.listDrawn ?? []).map { "list \($0.kind) \($0.from)-\($0.to)\($0.extra.isEmpty ? "" : " " + $0.extra)" }
@@ -128,9 +132,12 @@ private func lines(_ decorations: LiveDecorations, lists: Bool) -> [String] {
     out += decorations.styles.map { "\($0.style.rawValue) \($0.range.location)-\(NSMaxRange($0.range))" }
     out += decorations.hidden.map { "hidden \($0.location)-\(NSMaxRange($0))" }
     out += decorations.shown.map { "shown \($0.location)-\(NSMaxRange($0))" }
-    out += decorations.pictures.map { picture in
+    // A `<Drawio … />` is the iPad's own (docs/ipad-live-default-plan.md, Step 1): the desktop's Live tab leaves it as its text, so it is not compared.
+    // It is read as `<Image />` and `<Ink />` are, which `LiveModelTests` checks.
+    out += decorations.pictures.filter { $0.kind != .drawio }.map { picture in
         let where_ = picture.active ? "after the text, ending at \(NSMaxRange(picture.range))" : "in place of \(picture.range.location)-\(NSMaxRange(picture.range))"
-        return "picture \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
+        let name = picture.kind == .ink ? "ink" : "picture"
+        return "\(name) \(where_): src=\(unified(picture.src)) alt=\(unified(picture.alt)) title=\(unified(picture.title)) width=\(picture.width)"
     }
     out += decorations.tints.map { "tint \($0.range.location)-\(NSMaxRange($0.range)) \($0.color)" }
     guard lists else { return out.sorted() }

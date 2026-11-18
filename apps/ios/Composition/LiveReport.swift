@@ -1,4 +1,5 @@
 #if DEBUG || EDITOR_TEST_HOOKS
+import CompositionCore
 import UIKit
 
 /// What the Live tab has made of the text, read back from the text storage: the runs that are hidden, italic, bold, struck, filled (a tint or the faint fill of
@@ -17,7 +18,16 @@ enum LiveReport {
         }
         storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
             guard let font = attributes[.font] as? UIFont else { return }
-            if let drawing = attributes[.liveDraw] as? LiveDrawing { note("draw-\(drawing.kind.rawValue)", run) }
+            if let drawing = attributes[.liveDraw] as? LiveDrawing {
+                note("draw-\(drawing.kind.rawValue)", run)
+                // A drawing (Step 1 of docs/ipad-live-default-plan.md): `picture-ink` or `picture-drawio`, the width it is drawn at when its tag gives none
+                // (`natural440`), and `ink-strokes` for an `<Ink />` whose strokes were read, so that it is drawn from them.
+                if let picture = drawing.picture, picture.kind != .image {
+                    note("picture-\(picture.kind.rawValue)", run)
+                    if let natural = picture.natural { note("natural\(Int(natural.width.rounded()))", run) }
+                    if picture.kind == .ink, LiveImages.shared.strokes(at: picture.url)?.document != nil { note("ink-strokes", run) }
+                }
+            }
             // Step 4: a line of a list or a quote, with what it draws (`list-bullet`, `list-number`, `list-box`, `list-ticked`), how many quote bars (`quote1`, `quote2`), and its indent in points.
             if let line = attributes[.liveList] as? LiveListLine {
                 switch line.mark {

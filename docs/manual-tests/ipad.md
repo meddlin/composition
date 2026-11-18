@@ -345,6 +345,19 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
 
 **Gate L passed (you, 2026-11-09):** you tried the Live tab on the iPad and it works well. Items 91 to 105 (the lab's cases and VoiceOver choices), 116 to 124 (the rest of L4: pictures, tints, the rule, the frontmatter) and 125 to 136 above were not recorded one by one, so none of them is ticked here.
 
+## Drawings and diagrams in the Live tab (Live-default plan, Step 1)
+
+`<Ink … />` (what *Image ▸ Drawing…* writes) and `<Drawio … />` are drawn as pictures in the Live tab, as the Preview draws them ([ipad-live-default-plan.md](../ipad-live-default-plan.md#step-1-ink-and-drawio-as-pictures-s)). This replaces the `<Drawio>` part of item 122: a diagram on a line of its own is no longer left as text. In the Simulator, UI tests (`LiveDrawingsUITests`) draw a line with a finger in each of the five schemes and check its pixels are the scheme's ink colour in Live, that the tag shows with the drawing after it while the caret is on its line, and that a diagram is drawn at 440 points from its 880-pixel PNG; what they cannot say is how a real drawing, made with the Pencil, looks and feels.
+
+344. **A drawing and a diagram in Live (Gate LD1).** In a note in the Live tab, make a drawing with the Pencil (*Image ▸ Drawing…*: a few words of handwriting and a shape, in black and in one colour), and tap *Done*. Then:
+    - It is drawn where its tag was, at the size the Preview draws it, and the tag is gone. Switch to Preview and back: the same size, the same place.
+    - Black ink is the scheme's text colour: white on Dark, Forest and Wine, dark on Light and Cream (change the scheme in the Appearance sheet with the note open). A coloured stroke keeps its colour as in the Preview.
+    - Tap the drawing: its `<Ink … />` tag shows, and the drawing is drawn below it; tap away and it is drawn in its place again. Tapping does not open the canvas in Live (it does in the Preview; editing from Live is decision I6's ↗, a later step).
+    - Add `width="50%"` to the tag: it is drawn half as wide as the text.
+    - A `<Drawio src="app_data/…" />` (a diagram from the desktop, or the Preview showcase's) is drawn at half the size of its picture, as in the Preview, and with a `width` at that width.
+    - A drawing whose file is gone (change a letter of its name) says `Image not found: …`, as a picture does.
+    - Tell me if a drawing ever flashes black on a dark scheme before it turns the right colour, or comes in late when you scroll to it.
+
 ## Lists, task lists and quotes in the Live tab (Live default plan, Step 4)
 
 [ipad-live-default-plan.md](../ipad-live-default-plan.md), Step 4. Away from the caret's line a bullet item's `- ` is hidden and a muted `•` drawn in its place; an ordered item's number is drawn as written, muted; a task's `[ ]` or `[x]` is drawn as the Preview's empty or ticked box; and a quote has a grey bar down its left side for each level, its `> ` hidden and its words muted. Each level is indented, and a long item wraps under its own words. On the caret's line the marks show as they are written. **A tap on a drawn box ticks or unticks it** (decision D4) and the caret stays where it was; ⌘Z takes a tick back on its own. In the Simulator, UI tests (`LiveListsUITests`) checked each of these from what the text view holds, tapped the boxes, undid the taps one at a time and then the typing, and checked Return, Backspace, Tab and Shift+Tab in a list; the Pencil, Scribble and a real finger are yours. Return in a list puts in a plain line break, as the Markdown tab does: neither tab starts the next item for you yet.

@@ -293,6 +293,44 @@ struct LiveModelDrawnTests {
         #expect(LiveModel(text: "# No frontmatter").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == nil)
         #expect(LiveModel(text: "---\r\ntitle: A\r\n---\r\ntext").decorations(selection: NSRange(location: 0, length: 0)).frontmatterRange == NSRange(location: 0, length: 18))
     }
+
+    // Step 1 of docs/ipad-live-default-plan.md: `<Ink />` and `<Drawio />` are pictures too. The `<Ink />` ranges are checked against the desktop by
+    // LiveConformanceTests; `<Drawio />` is the iPad's own (the desktop's Live tab leaves it as text), so these say what it does.
+
+    @Test("an <Ink /> and a <Drawio /> are pictures of their own kind, outside code, and only on a line of their own drawn in place")
+    func drawingKinds() {
+        let text = "<Ink src=\"app_data/a.png\" alt=\"Drawing\" />\n\n<Drawio src=\"app_data/d.png\" alt=\"Flow\" width=\"300\" />\n\n<Image src=\"p.png\" />\n\n```\n<Drawio src=\"code.png\" />\n```\n\nsee <Ink src=\"inline.png\" /> here\n\n<Drawiox src=\"no.png\" />"
+        let pictures = decorations(text, at: (text as NSString).length).pictures.sorted { $0.range.location < $1.range.location }
+        #expect(pictures.map(\.src) == ["app_data/a.png", "app_data/d.png", "p.png", "inline.png"])
+        #expect(pictures.map(\.kind) == [.ink, .drawio, .image, .ink])
+        #expect(pictures.map(\.ownLine) == [true, true, true, false])
+        #expect(pictures[1].width == "300" && pictures[1].alt == "Flow")
+        #expect(LiveModel(text: text).drawnPictureRanges.count == 3)
+    }
+
+    @Test("the caret on a drawing's tag shows the tag, with the drawing after it")
+    func drawingReveal() {
+        let text = "text\n\n<Drawio src=\"d.png\" />\n\nmore"
+        let tag = (text as NSString).range(of: "<Drawio src=\"d.png\" />")
+        #expect(decorations(text, at: 0).pictures.map(\.active) == [false])
+        #expect(decorations(text, at: tag.location + 3).pictures.map(\.active) == [true])
+        #expect(decorations(text, at: NSMaxRange(tag)).pictures.map(\.active) == [true])
+    }
+
+    @Test("a drawing keeps its kind when an edit before it moves it, and a full read finds a drawing typed")
+    func drawingAfterAnEdit() {
+        let text = "intro\n\n<Ink src=\"a.png\" />"
+        var live = LiveModel(text: text)
+        let edited = "intro, longer\n\n<Ink src=\"a.png\" />"
+        live.edited(replacing: NSRange(location: 5, length: 0), withLength: 8, rereading: NSRange(location: 0, length: 15), in: edited as NSString)
+        let moved = live.decorations(selection: NSRange(location: 0, length: 0)).pictures
+        #expect(moved.map(\.kind) == [.ink])
+        #expect(moved.map(\.range.location) == [15])
+        let typed = edited + "\n\n<Drawio src=\"d.png\" />"
+        let fresh = LiveModel(text: typed)
+        #expect(fresh.decorations(selection: NSRange(location: 0, length: 0)).pictures.map(\.kind) == [.ink, .drawio])
+        #expect(fresh.differences(from: live) == [(typed as NSString).range(of: "<Drawio src=\"d.png\" />")])
+    }
 }
 
 // Step 4 of docs/ipad-live-default-plan.md: lists, task lists and quotes. LiveConformanceTests compares them with the desktop's `listDecorations` (PR #325)
