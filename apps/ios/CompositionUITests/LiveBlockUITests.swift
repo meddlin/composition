@@ -18,7 +18,11 @@ final class LiveBlockUITests: XCTestCase {
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
-        done.tap()
+        // On a busy Mac the first tap on OK is sometimes lost, and the alert then takes the next tap meant for the editor.
+        for _ in 0..<5 where done.exists {
+            done.tap()
+            _ = eventually(3) { !done.exists }
+        }
         XCTAssertTrue(editor.waitForExistence(timeout: 30))
     }
 
@@ -172,19 +176,33 @@ final class LiveBlockUITests: XCTestCase {
         try launch()
         write(Self.note)
         XCTAssertTrue(eventually { tableIsDrawn() }, "\(drawn())")
+        // Pauses between the edits (as `LiveUITests`' undo test has them), so that the system does not join the typing of the note and the edits into one undo step.
+        func pause() { RunLoop.current.run(until: Date().addingTimeInterval(1.5)) }
+        pause()
+        // The first edit at the start of `after`, not where the note's typing ended: UIKit joins typing at the same place into one undo step, pauses or not.
+        press(.leftArrow, modifiers: .command)
+        pause()
         let original = text()
         app.typeText("X")
-        press(.upArrow, 3)  // into the table's last line
+        pause()
+        let afterX = text()
+        press(.upArrow, 2)  // into the table's last line
         app.typeText("Y")
         XCTAssertTrue(eventually { drawn()["block-revealed"] != nil }, "typing in the table, its source shows: \(drawn())")
-        press(.downArrow, 3)
+        pause()
+        let afterY = text()
+        press(.downArrow, 2)
         app.typeText("Z")
+        pause()
         XCTAssertTrue(eventually { text().filter { "XYZ".contains($0) }.count == 3 && !text().hasSuffix(Self.note) }, "three edits made: \(text().suffix(90))")
+        // ⌘Z until the text is what it was: the system may join edits into fewer steps, so each step must be a text the note was in.
+        let states = [original, afterX, afterY, text()]
         var steps = 0
-        while text() != original, steps < 8 {
+        while text() != original, steps < 6 {
             app.typeKey("z", modifierFlags: .command)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.6))
+            pause()
             steps += 1
+            XCTAssertTrue(states.contains(text()), "undo #\(steps) gives a text the note was in: \(text().suffix(90))")
         }
         XCTAssertEqual(text(), original, "undo brings the text back as it was, in \(steps) step(s)")
         XCTAssertTrue(eventually { drawn()["block-table"] == at(Self.tableStart, Self.tableEnd) }, "and the table is where it was: \(drawn())")
@@ -210,21 +228,32 @@ final class LiveBlockUITests: XCTestCase {
         try launch()
         write(Self.note)
         XCTAssertTrue(eventually { tableIsDrawn() }, "\(drawn())")
-        // Where the picture is on screen is not known to the test (it depends on how far typing scrolled the note): taps down the editor, a left-hand column, in steps
-        // smaller than the picture is tall, until one lands on it.
-        let frame = editor.frame
-        var down: CGFloat = 40
-        var landed = false
-        while !landed, down < frame.height - 10 {
-            editor.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.width * 0.3, dy: down)).tap()
-            landed = eventually(1.5) { self.selection().location == self.origin + Self.tableStart && self.selection().length == 0 }
-            if !landed, drawn()["block-revealed"] != nil {
-                // A tap on the source of the revealed table (not on its picture): out again, and on down the page.
-                press(.downArrow, 7)
-                _ = eventually(3) { self.tableIsDrawn() }
-            }
-            down += 30
+        // Where the picture is in the window comes from `live-geometry`. The on-screen keyboard (shown when the Simulator has no hardware keyboard) may cover it, and a tap
+        // there would land on the keyboard's suggestions: the note is scrolled until the picture is clear of the keyboard first.
+        let geometry = app.descendants(matching: .any)["live-geometry"]
+        func pictureFrame() -> CGRect? {
+            let parts = (geometry.exists ? geometry.label : "").split(separator: ",").compactMap { Double($0) }
+            return parts.count == 4 ? CGRect(x: parts[0], y: parts[1], width: parts[2], height: parts[3]) : nil
         }
+        func keyboardTop() -> CGFloat {
+            let keyboard = app.keyboards.firstMatch
+            return keyboard.exists && keyboard.frame.height > 50 ? keyboard.frame.minY : app.windows.firstMatch.frame.maxY
+        }
+        XCTAssertTrue(eventually { pictureFrame() != nil }, "the report says where the picture is: \(geometry.exists ? geometry.label : "none")")
+        let top = editor.frame.minY + 40
+        for _ in 0..<6 {
+            guard let frame = pictureFrame(), frame.minY + 30 > keyboardTop() - 20 || frame.minY + 30 < top else { break }
+            // Content moves with the finger: a picture below the clear area is brought up by dragging up, one above it down.
+            let from = editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            let by: CGFloat = frame.minY + 30 > keyboardTop() - 20 ? -150 : 150
+            from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: by)))
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+        }
+        let frame = try XCTUnwrap(pictureFrame())
+        let y = min(frame.minY + 30, keyboardTop() - 20)
+        XCTAssertGreaterThan(y, frame.minY, "the picture is clear of the keyboard: \(frame), keyboard at \(keyboardTop())")
+        app.windows.firstMatch.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: frame.minX + min(frame.width / 2, 80), dy: y)).tap()
+        let landed = eventually(4) { self.selection().location == self.origin + Self.tableStart && self.selection().length == 0 }
         XCTAssertTrue(landed, "a tap on the picture put the caret at the start of the table's source: \(selection()) \(drawn())")
         XCTAssertTrue(eventually { tableIsRevealed() }, "which then shows: \(drawn())")
     }

@@ -272,8 +272,11 @@ shares the width between the columns); and only a table still wider than that (c
   pause has rendered it anew. A block with no picture yet is a faint box of a guessed height (rows × 30 points);
   revealed, it has nothing under it rather than a box that comes and goes while typing. `MarkdownStyler` widens
   every range it draws to whole blocks, and treats a block as a construct when the selection moves.
-- **A tap** on a drawn block puts the caret at the start of its source (`NoteTextView.closestPosition(to:)`: the
-  position falls on the block's tall first paragraph, which carries the block's range).
+- **A tap** on a drawn block puts the caret at the start of its source. UIKit's tap does not ask
+  `closestPosition(to:)` (tried first: the caret landed at the end of the block's first line, its hidden characters),
+  so `NoteTextView` notes when a touch begins (`TouchRecorder`, a recogniser that fails at once and so takes nothing
+  from UIKit's own) and, when the selection that follows within 0.8 s is a caret in a block still drawn, moves it to
+  the block's start (`.liveBlock` carries the block's range).
 - **Accessibility**: the value stays the source; candidate B marks every hidden character "speak no punctuation", so
   the table's words are read and its pipes and dashes are not; the picture adds no element. The audit runs on a note
   with a table (`AccessibilityUITests.testTheLiveTabWithATable`).
@@ -293,8 +296,10 @@ written nowhere and have no range (Step 7 decides where they are drawn). The fro
 silenced; the caret into its last line reveals it with the picture after it, and out hides it; ↑ from the line below
 to the line above visits each of its five lines, eight presses each way; undo across it (typing before, in and after
 it, ⌘Z until the text is back) leaves the text as it was and the table drawn; typing in it redraws its picture after
-the pause; a tap on the picture puts the caret at its start. The 16 ms budget on the showcase note (`LiveBench`): see
-the numbers below. The existing `LiveUITests` pass.
+the pause; a tap on the picture puts the caret at its start. The 16 ms budget on the showcase note (`LiveBench`,
+Debug build, the Mac's load average about 80 to 300 while it ran): the styler's part of a keystroke median 0.7 ms,
+p95 1.1 ms; a whole keystroke (UIKit's insert, the styler, the layout) median 3.8 ms, p95 8.7 ms, 7 of 200 over
+16 ms (the worst 365 ms, the Mac's load); the pause's pass after typing settled in 304 ms.
 
 ### Step 6: components (M)
 

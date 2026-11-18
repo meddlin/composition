@@ -119,7 +119,7 @@ enum LiveOverlay {
             let guessed = CGFloat(entry.block.source.components(separatedBy: "\n").count) * 30 + 8
             let picture = LiveDrawing.BlockPicture(picture: entry.picture, guessedHeight: guessed, source: block)
             let size = LiveDrawing.size(of: picture, available: context.textWidth)
-            storage.addAttribute(.liveBlock, value: LiveBlockMark(kind: entry.block.kind, revealed: revealed, pictured: entry.picture != nil, stale: entry.stale), range: block)
+            storage.addAttribute(.liveBlock, value: LiveBlockMark(kind: entry.block.kind, revealed: revealed, pictured: entry.picture != nil, stale: entry.stale, source: block), range: block)
             if revealed {
                 // The source, and under it the picture it last made (none yet: nothing, rather than a stand-in that would come and go while it is typed).
                 guard entry.picture != nil else { continue }
@@ -260,4 +260,6 @@ struct LiveBlockMark {
     /// It has a picture, the one drawn (it may be the last good one, `stale`, while its own is rendered).
     var pictured: Bool
     var stale: Bool
+    /// Where the block's source is (a tap on its picture puts the caret at the start).
+    var source: NSRange
 }
