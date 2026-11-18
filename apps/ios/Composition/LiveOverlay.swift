@@ -21,6 +21,10 @@ enum LiveOverlay {
         var textWidth: CGFloat
         /// Whether a link's target is on this iPad (a `pdf:` link's PDF): one that is not is struck through, as the Preview draws it (`applyLinks`).
         var isLinkHere: (String) -> Bool = { _ in true }
+        /// The blocks drawn as pictures that touch the range being drawn (`LiveBlocks`, Step 5), and where the selection is: a block shows its source while the selection
+        /// is in it (D3).
+        var blocks: [LiveBlocks.Entry] = []
+        var selection = NSRange(location: 0, length: 0)
     }
 
     /// The font of a hidden mark: too small to see or to take room, and the characters stay in the text.
@@ -92,6 +96,56 @@ enum LiveOverlay {
         applyLinks(decorations, to: range, in: storage, look: look, isHere: context.isLinkHere)
         drawRulesAndPictures(decorations, in: range, of: storage, context: context)
         LiveCode.apply(decorations, to: range, in: storage, look: look)
+        drawBlocks(in: range, of: storage, context: context)
+    }
+
+    #if DEBUG || EDITOR_TEST_HOOKS
+    /// `-liveBlockReveal never`: a block stays hidden, drawn as its picture, with the selection in it (Step 5's spike: what the text view does across a block whose every
+    /// character is hidden).
+    static let revealsBlocks = UserDefaults.standard.string(forKey: "liveBlockReveal") != "never"
+    #else
+    static let revealsBlocks = true
+    #endif
+
+    /// Each block drawn as a picture (Step 5). Away from the selection every character of it is hidden, its first paragraph is made as tall as its picture and marked
+    /// for the fragment to draw the picture in (`.block`), and its other lines are made as short as they go; while the selection is in it (ends included, as a construct)
+    /// its source shows, as the rest of the Live look draws it, with the last good picture after its last line (`.blockAfter`). `range` is whole paragraphs and holds
+    /// every block it touches (`MarkdownStyler.applyColours` widens it so).
+    private static func drawBlocks(in range: NSRange, of storage: NSTextStorage, context: Context) {
+        let text = storage.mutableString
+        let look = context.look
+        for entry in context.blocks {
+            let block = NSIntersectionRange(entry.block.range, NSRange(location: 0, length: text.length))
+            guard block.length > 0, NSIntersectionRange(block, range).length > 0 else { continue }
+            let selection = context.selection
+            let revealed = revealsBlocks && selection.location <= NSMaxRange(block) && NSMaxRange(selection) >= block.location
+            let first = text.paragraphRange(for: NSRange(location: block.location, length: 0))
+            let lines = text.paragraphRange(for: block)
+            let last = text.paragraphRange(for: NSRange(location: NSMaxRange(block) - 1, length: 0))
+            let guessed = CGFloat(entry.block.source.components(separatedBy: "\n").count) * 30 + 8
+            let picture = LiveDrawing.BlockPicture(picture: entry.picture, guessedHeight: guessed, source: block)
+            let size = LiveDrawing.size(of: picture, available: context.textWidth)
+            storage.addAttribute(.liveBlock, value: LiveBlockMark(kind: entry.block.kind, revealed: revealed, pictured: entry.picture != nil, stale: entry.stale, source: block), range: block)
+            if revealed {
+                // The source, and under it the picture it last made (none yet: nothing, rather than a stand-in that would come and go while it is typed).
+                guard entry.picture != nil else { continue }
+                let style = NSMutableParagraphStyle()
+                style.paragraphSpacing = LiveDrawing.reserved(for: size.height)
+                storage.addAttributes([.paragraphStyle: style, .liveDraw: LiveDrawing(kind: .blockAfter, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: last)
+                continue
+            }
+            for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw] { storage.removeAttribute(key, range: lines) }
+            hide(lines, in: storage)
+            let tall = NSMutableParagraphStyle()
+            tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)
+            storage.addAttributes([.paragraphStyle: tall, .liveDraw: LiveDrawing(kind: .block, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: first)
+            let rest = NSRange(location: NSMaxRange(first), length: NSMaxRange(lines) - NSMaxRange(first))
+            if rest.length > 0 {
+                let flat = NSMutableParagraphStyle()
+                flat.maximumLineHeight = 0.5
+                storage.addAttribute(.paragraphStyle, value: flat, range: rest)
+            }
+        }
     }
 
     /// A rule is a line and a picture is a picture, in place of the text that writes it: the text is hidden, and its paragraph is made tall enough, and marked for
@@ -207,4 +261,22 @@ enum LiveOverlay {
         }
         return (font, true)
     }
+}
+
+extension NSAttributedString.Key {
+    /// On every character of a block the Live tab draws as a picture (`LiveBlocks`): what kind it is and whether it shows its source now. For the report (`LiveReport`) and
+    /// a tap on the picture.
+    static let liveBlock = NSAttributedString.Key("liveBlock")
+}
+
+/// What `.liveBlock` says of a block's characters.
+struct LiveBlockMark {
+    var kind: String
+    /// The selection is in it, so its source shows (D3).
+    var revealed: Bool
+    /// It has a picture, the one drawn (it may be the last good one, `stale`, while its own is rendered).
+    var pictured: Bool
+    var stale: Bool
+    /// Where the block's source is (a tap on its picture puts the caret at the start).
+    var source: NSRange
 }
