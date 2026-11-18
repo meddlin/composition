@@ -105,7 +105,7 @@ describe("web settings layout", () => {
   it("loads saved writing settings, repairing any part that is invalid", async () => {
     writeSettings({
       appDataDir: "/data",
-      writing: { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 3, reflowKeepsTables: "yes" },
+      writing: { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 3, reflowKeepsTables: "yes", openNotesIn: "Live" },
     });
     const { loadWebSettings } = await import("./webSettings");
 
@@ -118,6 +118,7 @@ describe("web settings layout", () => {
       wordCountEnabled: false,
       headingRailEnabled: true,
       headingRailSide: "left",
+      openNotesIn: "live",
     });
   });
 

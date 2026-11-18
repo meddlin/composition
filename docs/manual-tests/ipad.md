@@ -358,6 +358,15 @@ The same keys, VoiceOver choices and speed checks as items 91 to 105, in the Liv
     - A drawing whose file is gone (change a letter of its name) says `Image not found: …`, as a picture does.
     - Tell me if a drawing ever flashes black on a dark scheme before it turns the right colour, or comes in late when you scroll to it.
 
+## Links in the Live tab (Live default plan, Step 2; Gate LD2)
+
+Away from the caret a link is drawn as its words in the link colour, underlined, with `[` and `](address "title")` hidden; with the caret in it the marks show, dimmed, and a small **↗** sits just after it. A plain tap edits, as anywhere in the text; the ↗ follows, and so does ⌘-tap with a keyboard or trackpad (⌘⇧-tap too: there is no "beside" on the iPad). A `pdf:` link to a PDF that is not on this iPad is struck through, muted, with "(PDF not on this device)" after it, as in the Preview, and has no ↗. In the Simulator, UI tests (`LiveLinksUITests`) checked the hidden and shown marks, the ↗ opening another note, ⌘-tap with the modifier held, a plain tap putting the caret in the link, editing a link's words and address from the keyboard, and the dead `pdf:` link; what they cannot say is how it is to use. For each, use a note with a link to another note (⌘⇧K writes one), a link to a PDF that is here (*Cite this page* in a PDF writes one), a web address (`https://…`, bare or in `<…>`), and, if you have one, a link to a PDF that is not here.
+
+345. **The ↗ with a finger.** In the Live tab, tap into a link's words: the caret goes there, the brackets and the address show, dimmed, and the ↗ appears just after the link. Tap the ↗: a note link opens that note, a PDF link opens the PDF beside the note at its page, a web address opens Safari. Tell me whether the ↗ is easy to hit without moving the caret, whether it covers words you wanted to see (it sits on the line, after the link's `)`), and whether a link at the right edge of the page or wrapped onto two lines puts it somewhere odd.
+346. **⌘-tap on the Magic Keyboard.** With the Magic Keyboard (or any hardware keyboard), hold ⌘ and tap a link's words with a finger: it opens at once, and the caret does not move into the link first. Hold ⌘⇧ and tap: the same. A tap without ⌘ edits. Tell me if ⌘-tap ever moved the caret, selected a word, or did nothing. (The Simulator's UI test could not hold a real ⌘ on a tap, so it stood in for it: this item is the only check of the keyboard's own ⌘.)
+347. **A trackpad.** With the Magic Keyboard's trackpad (or a mouse), click into a link (it edits), then ⌘-click a link (it opens). Say whether the pointer changes over the ↗ and whether a ⌘-click on a link that wraps onto a second line works on both lines.
+348. **VoiceOver on a link.** With VoiceOver on, read a line with a link in the Live tab: the hidden `[` and `](…)` should not be spoken (candidate B silences them as it does `**`). Move the caret into the link, then find the ↗ (it is called "Follow link", and its value is the address) and double-tap it: the link opens. Tell me what VoiceOver says for the link's words and whether reaching the ↗ was easy.
+
 ## PDFs: import and the reader (M2, first step)
 
 The reader beside the note a PDF belongs to. **Tried in the Simulator only; this is its first time on the iPad.** You need a small PDF (a few pages, with a table of contents if you can), a book of a few hundred pages, and ideally a password-protected one. Marks, the Notes tab, quoting, search, export and the Pencil lab came after this and are in the next section (items 180 on; Gate P2). (These items are numbered from 140 to leave room for the Live view's.)
@@ -466,6 +475,26 @@ Built 2026-11-12 after your reader pass ("Search finds words in my notes, but no
 320. **The Trash Can.** Move a PDF's note to the Trash Can: a word only in its pages no longer finds it. Restore it: it does again. Delete it for good: gone, and nothing else is found in its place.
 321. **A restored backup.** Restore a desktop backup that has PDFs: after a little while their words are found, as in 311.
 322. **Speed.** With your real library, the line under the results (*3 results · 12 ms*) for a few searches that reach your books. *Tell me the numbers, the biggest book's pages, and Debug or Release.*
+
+## The Reading List (plugin, ahead of M3)
+
+Built 2026-11-13 at your request. **Checked in the iPad Simulator only (two UI tests against a local page); nothing here is ticked.** The
+desktop's Reading List on the iPad: links in the second column, the page in the third. [What it is and how it maps to the desktop](../ipad-build-plan.md#ahead-of-m3-the-reading-list).
+
+323. **Off until you turn it on.** Install this build and open the app: no *Reading List* in the sidebar. More ▸ *Plugins…*: *Reading List* is off, and To-do, RSS Reader and Contacts are listed as *Desktop app only*. Turn it on and tap Done: *Reading List* appears under Favorites with 0.
+324. **Add a link.** Tap *Reading List*. In Safari, copy a real article's link (Share ▸ Copy). Back in the app, tap the box and paste, then Return: the row appears with the site's name and a blue dot, and the page opens on the right. A moment later the row takes the page's title. **Tell me a site where the title is wrong or never comes.**
+325. **The Paste button.** Copy another link and tap the clipboard button at the top of the list: it is added without the box, and the system does not ask to paste.
+326. **Refused links.** Type `javascript:alert(1)`, then `mailto:you@example.com`, then `https://user:pass@example.com`: each is refused with a reason under the box, and the text stays to be fixed. Paste a link already in the list with `#something` on the end: *That link is already in your list: …*, and that link opens.
+327. **Reading.** On the page: scroll, follow a link inside it (it opens in place), use the page's back and forward arrows and a two-finger swipe from the edge. *Reload* reloads; while a page loads the button stops it, and a thin bar under the address shows the progress.
+328. **New windows go to Safari.** On a page, tap a link that opens a new tab (many sites' external links do): Safari opens with it, and the app's page stays where it was.
+329. **Read and unread.** Tap *Mark as Read* (the tick at the top right): the dot goes, the title greys, the row moves below the unread ones and the sidebar count drops. Swipe the row right for *Unread*: it comes back.
+330. **Delete asks first.** Swipe a row left and tap *Delete*: a question names the link and says it is not sent to the Trash Can. Tap outside it: nothing is deleted. Again, and *Delete*: it is gone. The same from the row's menu (press and hold).
+331. **Signed in to a paywall.** Open a site you subscribe to and sign in on the page. End the app and open it again: still signed in. More ▸ *Plugins…* ▸ *Clear Browsing Data…*: it asks first; after it, the site has signed you out and your links are all still there. **Tell me if a sign-in page refused to work inside the app.**
+332. **From Safari in Split View.** Put Safari beside the app and drag a link (or the address) from Safari onto the list, and onto the *Reading List* row in the sidebar: each is added.
+333. **Turn it off.** With a page open, More ▸ *Plugins…*, turn it off: the sidebar row goes and the notes are back. Turn it on again: the same links, the dots as they were.
+334. **Into the desktop and back.** Export a backup (More ▸ *Export a backup…*), restore it in the desktop app: the desktop's Reading List (turned on by the backup, since the switch travels with it) has the same links, titles and read marks. Add one on the desktop, back up, restore on the iPad: it is there.
+335. **The other columns.** In portrait, with the list hidden, picking a link from the list brings its page; the back and forward arrows at the top of the list move between the Reading List and your notebooks. In each colour scheme, the list, the box and the bar over the page are readable (the page itself keeps its own colours).
+336. **Speed and memory.** Open ten heavy pages one after another. **Tell me if the app was ever ended by the system or felt slow, and whether a page went blank** (the app reloads a page whose web process was ended).
 
 ## What it leaves out
 
@@ -587,6 +616,8 @@ Open it from the ellipsis menu at the top of the notebooks column: *PDF ink lab 
 - **The release polish screens on a real iPad** (items 184 to 199 and 216 to 226): the outline's popover and its scroll in a long note, the Images page with a large library, Photos and Files into the header image, and a hand on the home page; only the Simulator has been used.
 - Search speed on the iPad's own CPU and SQLite.
 - **Finding words in a PDF's own text on a real iPad** (items 311 to 322): how long the first reading of a real library takes, the index's size, search speed with books in it, and real books' text (ligatures, hyphenation, columns) as PDFKit reads it.
+- **Links in the Live tab on a real iPad** (items 345 to 348): the ↗ with a finger, ⌘-tap on the Magic Keyboard, a trackpad and VoiceOver; only the Simulator's UI tests have been used. **Gate LD2 is not passed.**
+- **The Reading List on a real iPad** (items 323 to 336): real sites, titles, paywall sign-ins, Safari in Split View, and memory with heavy pages; only the Simulator, against a test page, has been used.
 - Large backups on a device (the core streams, and was measured up to 1 GB on a Mac, but the app has not handled one).
 
 ## What to tell me

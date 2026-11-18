@@ -186,6 +186,23 @@ feel, VoiceOver, speed on the device).
   modifier opens it (XCUITest can hold ⌘ on a tap); a plain tap puts the caret in the link; editing a link's text
   and URL from the keyboard.
 - **Gate LD2 (iPad):** items 345 to 348 (↗ with a finger, ⌘-tap on the Magic Keyboard, a trackpad, VoiceOver on a link).
+- **Status (2026-11-17): built, Simulator only; LD2 is yours.** `LiveModel` reads `[text](url "title")`, `[text][label]` /
+  `[text][]` / `[text]` with a definition, `<url>` and bare addresses (found in the text as lezer's GFM `Autolink` finds
+  them: cmark here has no autolink extension). `LiveOverlay` draws the words in the link colour, underlined; a dead
+  `pdf:` link is struck through and muted, and `LiveLinkFragment` draws "(PDF not on this device)" in room made by
+  kerning the character after the words. `LiveLinks` keeps the ↗ (`live-follow-link`) after the link the selection is
+  in and takes ⌘-tap; both call `LinkFollower`, which the Preview's `openURL` now calls too. **Oracle:** the fixture
+  writer no longer leaves link marks out of `live-expected.json` and writes each link's range and address;
+  `LiveConformanceTests` compares them, and 404 of 405 texts agree. Left out: `[nested [brackets]](u)` (lezer takes the
+  inner `[brackets]` as a link even undefined, so the desktop draws none; cmark and the Preview make the outer one the
+  link), in `known`; and the desktop's link on a footnote definition's first word (`[^a]: A.` drawn as a link to
+  `http://A.`), not compared, since footnotes are Step 7's. A reference link whose definition is in another block is
+  found by the full read a pause after typing, not by the quick read of the edited block. **Simulator:**
+  `LiveLinksUITests` (hidden and dimmed marks, the ↗ and following it, ⌘-tap, a plain tap, editing a link, the dead
+  `pdf:` link). XCUITest's held ⌘ does not reach a touch's `modifierFlags` in the Simulator (they arrive as 0), so the
+  ⌘-tap tests launch with `-liveCommandHeld 1` (Debug and test builds), which stands in for it; the real ⌘ on a
+  keyboard is item 346. The ↗ sits on the line after the link's `)`, so it covers the start of a word that follows:
+  your look in LD2.
 
 ### Step 3: code blocks (S)
 

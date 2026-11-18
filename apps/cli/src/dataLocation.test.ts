@@ -36,6 +36,7 @@ function settingsFor(appDataDir: string, extra: Partial<WebSettings> = {}): WebS
       wordCountEnabled: false,
       headingRailEnabled: true,
       headingRailSide: "left",
+      openNotesIn: "split",
     },
     home: {
       layout: "rail",

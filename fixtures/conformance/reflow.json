@@ -5875,7 +5875,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5888,7 +5889,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5901,7 +5903,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5914,7 +5917,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5927,7 +5931,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5940,7 +5945,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5952,7 +5958,8 @@
         "reflowKeepsTables": false,
         "wordCountEnabled": true,
         "headingRailEnabled": false,
-        "headingRailSide": "right"
+        "headingRailSide": "right",
+        "openNotesIn": "preview"
       },
       "settings": {
         "rulerEnabled": true,
@@ -5962,7 +5969,8 @@
         "reflowKeepsTables": false,
         "wordCountEnabled": true,
         "headingRailEnabled": false,
-        "headingRailSide": "right"
+        "headingRailSide": "right",
+        "openNotesIn": "preview"
       }
     },
     {
@@ -5975,7 +5983,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -5988,7 +5997,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6001,7 +6011,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6014,7 +6025,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6027,7 +6039,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6040,7 +6053,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6053,7 +6067,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6066,7 +6081,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6079,7 +6095,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6092,7 +6109,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6105,7 +6123,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6118,7 +6137,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6131,7 +6151,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6144,7 +6165,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6157,7 +6179,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6170,7 +6193,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6183,7 +6207,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6196,7 +6221,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6209,7 +6235,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6222,7 +6249,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6235,7 +6263,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6248,7 +6277,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6261,7 +6291,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6274,7 +6305,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6287,7 +6319,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6300,7 +6333,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6313,7 +6347,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6326,7 +6361,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6339,7 +6375,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6352,7 +6389,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6365,7 +6403,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6378,7 +6417,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6391,7 +6431,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6404,7 +6445,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6417,7 +6459,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6430,7 +6473,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6443,7 +6487,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6456,7 +6501,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6469,7 +6515,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6482,7 +6529,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": true,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6495,7 +6543,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6508,7 +6557,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6521,7 +6571,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6534,7 +6585,8 @@
         "reflowKeepsTables": false,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6547,7 +6599,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6560,7 +6613,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": false,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6573,7 +6627,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6586,7 +6641,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6599,7 +6655,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6612,7 +6669,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6625,7 +6683,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6638,7 +6697,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6651,7 +6711,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6664,7 +6725,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6677,7 +6739,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6690,7 +6753,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6703,7 +6767,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6716,7 +6781,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6729,7 +6795,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6742,7 +6809,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6755,7 +6823,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6768,7 +6837,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6781,7 +6851,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6794,7 +6865,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6807,7 +6879,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6820,7 +6893,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6833,7 +6907,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6846,7 +6921,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6859,7 +6935,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6872,7 +6949,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6885,7 +6963,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6898,7 +6977,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6911,7 +6991,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6924,7 +7005,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6937,7 +7019,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6950,7 +7033,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6963,7 +7047,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6976,7 +7061,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "right"
+        "headingRailSide": "right",
+        "openNotesIn": "live"
       }
     },
     {
@@ -6989,7 +7075,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -7002,7 +7089,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -7015,7 +7103,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -7028,7 +7117,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -7041,7 +7131,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     },
     {
@@ -7054,7 +7145,148 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":"live"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":"markdown"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "markdown"
+      }
+    },
+    {
+      "input": {"openNotesIn":"preview"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "preview"
+      }
+    },
+    {
+      "input": {"openNotesIn":"split"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "split"
+      }
+    },
+    {
+      "input": {"openNotesIn":"Live"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":""},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":"both"},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":null},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":1},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {"openNotesIn":["live"]},
+      "settings": {
+        "rulerEnabled": false,
+        "rulerColumn": 80,
+        "reflowEnabled": false,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
       }
     }
   ],
@@ -7068,7 +7300,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7078,7 +7311,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {"input":null,"error":"Unknown writing setting."},
@@ -7095,6 +7329,7 @@
         "wordCountEnabled": false,
         "headingRailEnabled": true,
         "headingRailSide": "left",
+        "openNotesIn": "split",
         "extra": 1
       },
       "settings": {
@@ -7105,7 +7340,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7117,7 +7353,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7130,7 +7367,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7143,7 +7381,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7153,7 +7392,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7165,7 +7405,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7175,7 +7416,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7187,7 +7429,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7197,7 +7440,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7209,7 +7453,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7219,7 +7464,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7231,7 +7477,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7241,7 +7488,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7253,7 +7501,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7263,7 +7512,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7275,7 +7525,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7285,7 +7536,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7297,7 +7549,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7307,7 +7560,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7319,7 +7573,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7329,7 +7584,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7341,7 +7597,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7351,7 +7608,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7363,7 +7621,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7376,7 +7635,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7389,7 +7649,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7402,7 +7663,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7415,7 +7677,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7428,7 +7691,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7441,7 +7705,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7454,7 +7719,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7467,7 +7733,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7480,7 +7747,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7493,7 +7761,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7506,7 +7775,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7519,7 +7789,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7532,7 +7803,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7545,7 +7817,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7558,7 +7831,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7571,7 +7845,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7584,7 +7859,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7597,7 +7873,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7610,7 +7887,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7623,7 +7901,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7636,7 +7915,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7649,7 +7929,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7662,7 +7943,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Use a whole number of characters from 20 to 200."
     },
@@ -7675,7 +7957,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7685,7 +7968,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7697,7 +7981,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7707,7 +7992,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7719,7 +8005,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7729,7 +8016,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7741,7 +8029,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": true,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7751,7 +8040,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": true,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7763,7 +8053,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7773,7 +8064,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7785,7 +8077,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": false,
@@ -7795,7 +8088,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7807,7 +8101,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7817,7 +8112,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7829,7 +8125,8 @@
         "reflowKeepsTables": false,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7839,7 +8136,8 @@
         "reflowKeepsTables": false,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7851,7 +8149,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7861,7 +8160,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7873,7 +8173,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": false,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -7883,7 +8184,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": false,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -7895,7 +8197,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7908,7 +8211,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7921,7 +8225,8 @@
         "reflowKeepsTables": "true",
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7934,7 +8239,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": "true",
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7947,7 +8253,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": "true",
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7960,7 +8267,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7973,7 +8281,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7986,7 +8295,8 @@
         "reflowKeepsTables": 1,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -7999,7 +8309,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": 1,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8012,7 +8323,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": 1,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8025,7 +8337,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8038,7 +8351,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8051,7 +8365,8 @@
         "reflowKeepsTables": 0,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8064,7 +8379,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": 0,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8077,7 +8393,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": 0,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8090,7 +8407,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8103,7 +8421,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8116,7 +8435,8 @@
         "reflowKeepsTables": null,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8129,7 +8449,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": null,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8142,7 +8463,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": null,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8155,7 +8477,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8168,7 +8491,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8181,7 +8505,8 @@
         "reflowKeepsTables": [],
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8194,7 +8519,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": [],
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8207,7 +8533,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": [],
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8220,7 +8547,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8233,7 +8561,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8246,7 +8575,8 @@
         "reflowKeepsTables": {},
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8259,7 +8589,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": {},
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8272,7 +8603,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": {},
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8285,7 +8617,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -8295,7 +8628,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "left"
+        "headingRailSide": "left",
+        "openNotesIn": "split"
       }
     },
     {
@@ -8307,7 +8641,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "right"
+        "headingRailSide": "right",
+        "openNotesIn": "split"
       },
       "settings": {
         "rulerEnabled": true,
@@ -8317,7 +8652,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "right"
+        "headingRailSide": "right",
+        "openNotesIn": "split"
       }
     },
     {
@@ -8329,7 +8665,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "Left"
+        "headingRailSide": "Left",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8342,7 +8679,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": ""
+        "headingRailSide": "",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8355,7 +8693,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": "center"
+        "headingRailSide": "center",
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8368,7 +8707,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": null
+        "headingRailSide": null,
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8381,7 +8721,8 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": 1
+        "headingRailSide": 1,
+        "openNotesIn": "split"
       },
       "error": "Unknown writing setting."
     },
@@ -8394,7 +8735,188 @@
         "reflowKeepsTables": true,
         "wordCountEnabled": false,
         "headingRailEnabled": true,
-        "headingRailSide": ["left"]
+        "headingRailSide": ["left"],
+        "openNotesIn": "split"
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      },
+      "settings": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "live"
+      }
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "markdown"
+      },
+      "settings": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "markdown"
+      }
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "preview"
+      },
+      "settings": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "preview"
+      }
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "split"
+      },
+      "settings": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "split"
+      }
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "Live"
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": ""
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": "both"
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": null
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": 1
+      },
+      "error": "Unknown writing setting."
+    },
+    {
+      "input": {
+        "rulerEnabled": true,
+        "rulerColumn": 80,
+        "reflowEnabled": true,
+        "reflowColumn": 80,
+        "reflowKeepsTables": true,
+        "wordCountEnabled": false,
+        "headingRailEnabled": true,
+        "headingRailSide": "left",
+        "openNotesIn": ["live"]
       },
       "error": "Unknown writing setting."
     }

@@ -191,23 +191,26 @@ function typingCases(): Json[] {
 const COLUMNS: Json[] = [19, 20, 21, 80, 199, 200, 201, 0, -80, 80.5, "80", null, true, false, [80], { column: 80 }, 1e9, 1e-9];
 const FLAGS: Json[] = [true, false, "true", 1, 0, null, [], {}];
 const SIDES: Json[] = ["left", "right", "Left", "", "center", null, 1, ["left"]];
+const VIEWS: Json[] = ["live", "markdown", "preview", "split", "Live", "", "both", null, 1, ["live"]];
 
 function writingCases(): { parse: Json[]; validate: Json[] } {
   const inputs: Json[] = [
     {}, null, [], "text", 5, true,
-    { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 72, reflowKeepsTables: false, wordCountEnabled: true, headingRailEnabled: false, headingRailSide: "right" },
+    { rulerEnabled: true, rulerColumn: 100, reflowEnabled: true, reflowColumn: 72, reflowKeepsTables: false, wordCountEnabled: true, headingRailEnabled: false, headingRailSide: "right", openNotesIn: "preview" },
     ...COLUMNS.flatMap((c): Json[] => [{ rulerColumn: c }, { reflowColumn: c }]),
     ...FLAGS.flatMap((f): Json[] => [{ rulerEnabled: f }, { reflowEnabled: f }, { reflowKeepsTables: f }, { wordCountEnabled: f }, { headingRailEnabled: f }]),
     ...SIDES.map((side): Json => ({ headingRailSide: side })),
+    ...VIEWS.map((view): Json => ({ openNotesIn: view })),
   ];
   const full = (patch: Record<string, Json>): Json => ({
-    rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false, headingRailEnabled: true, headingRailSide: "left", ...patch,
+    rulerEnabled: true, rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false, headingRailEnabled: true, headingRailSide: "left", openNotesIn: "split", ...patch,
   });
   const toValidate: Json[] = [
     full({}), null, {}, [], "text", full({ extra: 1 }),
     ...COLUMNS.flatMap((c): Json[] => [full({ rulerColumn: c }), full({ reflowColumn: c })]),
     ...FLAGS.flatMap((f): Json[] => [full({ rulerEnabled: f }), full({ reflowEnabled: f }), full({ reflowKeepsTables: f }), full({ wordCountEnabled: f }), full({ headingRailEnabled: f })]),
     ...SIDES.map((side) => full({ headingRailSide: side })),
+    ...VIEWS.map((view) => full({ openNotesIn: view })),
   ];
   return {
     parse: inputs.map((input) => ({ input, settings: parseWritingSettings(input) as unknown as Json })),

@@ -636,6 +636,9 @@ blocks, read a Markdown table), the grid as typed text is [`mdx/sheetDraft.ts`](
 - **Invalid MDX never blanks the preview.** A note is invalid MDX while a tag is half-typed,
   so the preview shows what is wrong (with its position when MDX reports one) above a plain
   Markdown render of the note, and recovers as soon as the note is valid.
+- **The Live tab draws them too**, with this same renderer, each component as a block of its own; one that is not
+  valid MDX yet shows its source with a small "Not rendered yet" note instead of the banner. See
+  [live-editor.md](live-editor.md#mdx-components).
 
 In `next dev`, React also logs that failure and Next shows its "Issue" badge. Production
 builds don't.

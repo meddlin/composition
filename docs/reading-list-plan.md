@@ -132,6 +132,12 @@ The spike (Gate A) was run as `apps/desktop/scripts/smoke-reading-list.mjs` agai
 | Risk 6: is the plugin check stale after a save? | No: `loadWebSettings()` reads the settings file at each attach, so turning the plugin off refuses the next attach at once. |
 | Not in the plan, added | **Clear browsing data asks first** (it signs you out of every site), and the narrow/wide switch uses the panel's own width, not the window's. |
 
+## On the iPad
+
+Built 2026-11-13, ahead of the iPad's first release: the links in the second column and the page in the third, in a `WKWebView` with its own
+website data store, behind the same `plugins["reading-list"]` switch. The rules are a Swift port checked against this code by
+`fixtures/conformance/reading-list.json`. See [ipad-build-plan.md](ipad-build-plan.md#ahead-of-m3-the-reading-list).
+
 ## Non-goals and future work
 
 - Tags, folders, hand ordering, search across the list, due dates.
