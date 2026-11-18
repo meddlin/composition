@@ -61,12 +61,21 @@ final class LiveListsUITests: XCTestCase {
     private func text() -> String { (editor.value as? String) ?? "" }
     private var origin = 0
 
-    /// Types `content` at the end of the note as a paragraph of its own and leaves the caret at its end.
+    /// Types `content` at the end of the note as a paragraph of its own and leaves the caret at its end. Return continues a list or a quote, so after each
+    /// line break whatever Return wrote on the new line (`- `, `> `) is selected and typed over, and the text is as written.
     private func write(_ content: String) {
         editor.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.97)).tap()
         app.typeKey(.downArrow, modifierFlags: .command)
         let before = (text() as NSString).length
-        app.typeText("\n\n" + content)
+        app.typeText("\n\n")
+        for (index, line) in content.components(separatedBy: "\n").enumerated() {
+            if index > 0 {
+                app.typeText("\n")
+                app.typeKey(.leftArrow, modifierFlags: [.shift, .command])
+                app.typeText("x" + XCUIKeyboardKey.delete.rawValue)
+            }
+            if !line.isEmpty { app.typeText(line) }
+        }
         origin = before + 2
         XCTAssertTrue(eventually { text().hasSuffix("\n\n" + content) }, "the text is what was typed: \(text().suffix(80))")
     }
@@ -202,24 +211,47 @@ final class LiveListsUITests: XCTestCase {
 
     // MARK: Typing in a list
 
-    func testReturnInAnItemLeavesTheItemDrawnAndANewItemIsDrawnWhenTheCaretLeavesIt() throws {
+    func testReturnContinuesTheListAndOnAnEmptyItemEndsItAndBackspaceTakesAMarkerAway() throws {
         try launch()
         write("- one")
         XCTAssertTrue(eventually { drawn()["list-bullet"] == nil && drawn()["indent32-0"] == at((0, 5)) }, "the caret's line shows its mark: \(drawn())")
         app.typeText("\n")
-        XCTAssertTrue(eventually { text().hasSuffix("- one\n") }, "Return puts in a line break, as in the Markdown tab: \(text().suffix(20).debugDescription)")
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n- ") }, "Return writes the next item's mark, as the desktop does: \(text().suffix(20).debugDescription)")
         XCTAssertTrue(eventually { drawn()["hidden"] == at((0, 2)) && drawn()["list-bullet"] == at((0, 6)) }, "the item the caret left is drawn: \(drawn())")
-        app.typeText("- two\n\nend")
+        app.typeText("two\n")
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n- two\n- ") }, "\(text().suffix(20).debugDescription)")
+        app.typeText("\n")
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n- two\n") }, "Return on the empty third item takes its mark off, and the list ends: \(text().suffix(20).debugDescription)")
+        app.typeText("\nend")
         XCTAssertTrue(eventually { text().hasSuffix("- one\n- two\n\nend") })
         XCTAssertTrue(eventually { drawn()["hidden"] == at((0, 2), (6, 8)) && drawn()["list-bullet"] == at((0, 12)) }, "both items are drawn: \(drawn())")
-        // Backspace at the start of the second item's text, with its mark showing, takes the space of the mark, as in the Markdown tab.
+        // Backspace just after the second item's `- `, with its mark showing, turns the mark into spaces, as the desktop does: `two` goes on the first item.
         press(.upArrow, 2)
         press(.leftArrow, modifiers: .command)
         press(.rightArrow, 2)
         XCTAssertTrue(eventually { caret() == 8 }, "the caret after `- `: \(selection.label)")
         app.typeText(XCUIKeyboardKey.delete.rawValue)
-        XCTAssertTrue(eventually { text().hasSuffix("- one\n-two\n\nend") }, "\(text().suffix(20).debugDescription)")
-        XCTAssertTrue(eventually { drawn()["list-bullet"] == at((0, 6)) }, "`-two` is no item, so only the first is drawn: \(drawn())")
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n  two\n\nend") }, "\(text().suffix(20).debugDescription)")
+        XCTAssertTrue(eventually { caret() == 8 }, "the caret stays after the spaces: \(selection.label)")
+        app.typeText(XCUIKeyboardKey.delete.rawValue)
+        XCTAssertTrue(eventually { text().hasSuffix("- one\ntwo\n\nend") }, "a second Backspace takes the spaces: \(text().suffix(20).debugDescription)")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n  two\n\nend") }, "⌘Z puts the spaces back: \(text().suffix(20).debugDescription)")
+        app.typeKey("z", modifierFlags: .command)
+        XCTAssertTrue(eventually { text().hasSuffix("- one\n- two\n\nend") }, "and then the mark, in a step of its own: \(text().suffix(20).debugDescription)")
+    }
+
+    func testReturnInAQuoteWritesItsMarkAndOnASecondEmptyLineEndsIt() throws {
+        try launch()
+        write("> one")
+        app.typeText("\n")
+        XCTAssertTrue(eventually { text().hasSuffix("> one\n> ") }, "Return writes `> `: \(text().suffix(20).debugDescription)")
+        app.typeText("\n")
+        XCTAssertTrue(eventually { text().hasSuffix("> one\n>\n> ") }, "on an empty quote line it writes another: \(text().suffix(20).debugDescription)")
+        app.typeText("\n")
+        XCTAssertTrue(eventually { text().hasSuffix("> one\n\n") }, "and on the second the quote ends: \(text().suffix(20).debugDescription)")
+        app.typeText("end")
+        XCTAssertTrue(eventually { drawn()["quote1"] == at((0, 6)) }, "the quote is the one line: \(drawn())")
     }
 
     func testTabAndShiftTabOverListLinesNestAndUnnestThem() throws {
