@@ -197,7 +197,7 @@ against a fake `CompositionApi`; `next font` behavior offline is verified.
 
 ### Phase 6: Hardening and polish (S-M)
 
-**Status: partly done. Sandbox, context isolation, a CSP on `app://`, navigation and window-open guards, and a hardened Meilisearch (master key in the environment, production mode, no analytics) are in. **Not done:** fuses, automatic Meilisearch restart (it degrades to a clear message instead), the app icon, and a final app name and bundle identifier.**
+**Status: partly done. Sandbox, context isolation, a CSP on `app://`, navigation and window-open guards, and a hardened Meilisearch (master key in the environment, production mode, no analytics) are in. **Not done:** fuses, automatic Meilisearch restart (it degrades to a clear message instead), and a final app name and bundle identifier. The app icon is the Benchnote icon (2026-11-16), shared with the iPad app.**
 
 Sandbox and context isolation confirmed on; CSP set on `app://` responses; `will-navigate` and
 window-open restricted; fuses set at package time; crash/restart handling for Meilisearch;
