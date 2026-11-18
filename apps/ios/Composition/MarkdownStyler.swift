@@ -59,6 +59,10 @@ final class MarkdownStyler {
     var afterApply: (() -> Void)?
     /// Gives the paragraphs the Live tab draws a rule or a picture on their layout fragment.
     private let drawingDelegate = LiveDrawingDelegate()
+    /// The blocks the Live tab draws as pictures (Step 5): found by the pause pass, moved by the edits between passes, their pictures rendered near the screen.
+    let blocks = LiveBlocks()
+    /// A picture of a block is being rendered, or is due on the next turn of the run loop.
+    private var renderDue = false
     private nonisolated(unsafe) var pictureObserver: NSObjectProtocol?
     private var widthPass: DispatchWorkItem?
     private var pendingEdits = EditAccumulator()
@@ -77,7 +81,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveCode, .liveList, .liveBlock]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView
@@ -120,7 +124,14 @@ final class MarkdownStyler {
     private func redrawPictures() {
         guard isLive, let model, let live, let storage = textView?.textStorage, live.length == storage.length else { return }
         for range in live.drawnPictureRanges { applyColours(to: range, using: model) }
+        // A block's picture is rendered for the width of the text: each is drawn with the one it has, scaled, until its own is rendered again.
+        blocks.markStale()
+        for entry in blocks.entries { applyColours(to: entry.block.range, using: model) }
+        scheduleRender()
     }
+
+    /// The text view scrolled: the blocks coming into view get their pictures.
+    func scrolled() { if isLive, !blocks.entries.isEmpty { scheduleRender() } }
 
     /// How wide a line of the note's text is.
     private var textWidth: CGFloat {
@@ -143,6 +154,8 @@ final class MarkdownStyler {
     /// The text size changed: the fonts in the colours are stale.
     func restyleAll() {
         palette = Palette(look: look, live: isLive)
+        // The blocks' pictures were drawn in the old look or at the old size.
+        blocks.forgetPictures()
         reload()
     }
 
@@ -152,6 +165,7 @@ final class MarkdownStyler {
         isLive = on
         (textView as? NoteTextView)?.isLive = on
         live = nil
+        blocks.clear()
         drawnSelection = nil
         restyleAll()
     }
@@ -188,7 +202,8 @@ final class MarkdownStyler {
         guard textView.markedTextRange == nil, let model, let live, model.length == storage.length, live.length == storage.length else { return }
         defer { drawnSelection = now }
         guard let before = drawnSelection, before != now else { return }
-        let left = Set(live.constructRanges(touching: before)), entered = Set(live.constructRanges(touching: now))
+        // A block drawn as a picture is a construct too: its source shows while the selection is in it (D3).
+        let left = Set(live.constructRanges(touching: before) + blocks.ranges(touching: before)), entered = Set(live.constructRanges(touching: now) + blocks.ranges(touching: now))
         let changed = left.symmetricDifference(entered).sorted { $0.location < $1.location }
         // Nested constructs overlap: draw their union once.
         var ranges: [NSRange] = []
@@ -196,6 +211,12 @@ final class MarkdownStyler {
             if let last = ranges.last, range.location <= NSMaxRange(last) { ranges[ranges.count - 1] = NSUnionRange(last, range) } else { ranges.append(range) }
         }
         for range in ranges { applyColours(to: range, using: model) }
+    }
+
+    /// The task box drawn at `position` for the selection in force, when there is one (what a tap on a box ticks; `LiveTaskTap`).
+    func drawnTask(at position: Int) -> LiveDecorations.ListLine.Task? {
+        guard isLive, let live, let textView, live.length == textView.textStorage.length, textView.markedTextRange == nil else { return nil }
+        return live.task(at: position, selection: textView.selectedRange)
     }
 
     /// The link the selection is in, in the Live tab, when it can be followed (a `pdf:` link to a PDF not here cannot): what the ↗ beside it follows.
@@ -230,6 +251,7 @@ final class MarkdownStyler {
         measurements.quickEdits += 1
         let window = model!.edited(replacing: merged.range, withLength: merged.newLength, in: storage.mutableString)
         live?.edited(replacing: merged.range, withLength: merged.newLength, rereading: window, in: storage.mutableString)
+        if isLive { blocks.edited(replacing: merged.range, withLength: merged.newLength) }
         applyColours(to: window, using: model!)
     }
 
@@ -238,8 +260,14 @@ final class MarkdownStyler {
         guard let storage = textView?.textStorage else { return }
         var range = NSIntersectionRange(range, NSRange(location: 0, length: storage.length))
         guard range.length > 0 else { return }
-        // In the Live tab whole paragraphs: what is drawn in place of a paragraph's text is set on the paragraph, and made again as a whole.
-        if isLive { range = storage.mutableString.paragraphRange(for: range) }
+        // In the Live tab whole paragraphs, and whole blocks: what is drawn in place of a paragraph's text is set on the paragraph, and a block drawn as a picture is hidden
+        // or shown as a whole.
+        var touched: [LiveBlocks.Entry] = []
+        if isLive {
+            touched = blocks.entries(touching: range)
+            for entry in touched { range = NSUnionRange(range, NSIntersectionRange(entry.block.range, NSRange(location: 0, length: storage.length))) }
+            range = storage.mutableString.paragraphRange(for: range)
+        }
         storage.beginEditing()
         for key in Self.managedKeys + LiveOverlay.linkKeys { storage.removeAttribute(key, range: range) }
         storage.addAttributes(palette.base, range: range)
@@ -249,7 +277,8 @@ final class MarkdownStyler {
         }
         if isLive, let live, live.length == storage.length {
             let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
-            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage, context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere))
+            LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage,
+                              context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere, blocks: touched, selection: selection))
         }
         storage.endEditing()
         didApply?()
@@ -284,6 +313,8 @@ final class MarkdownStyler {
             // No length limit (decision V5, docs/ipad-live-view-plan.md): the desktop reads highlights and `<Image />` tags only up to 100,000 characters; the numbers of step L7 say
             // that here neither they nor the rest of the look need it.
             let freshLive = wantsLive ? LiveModel(text: snapshot, extrasLimit: nil) : nil
+            // The blocks drawn as pictures (Step 5), from the note read as the Preview reads it.
+            let freshBlocks = wantsLive ? LiveBlock.blocks(of: snapshot) : []
             let dirty = known.map { fresh.differences(from: $0) } ?? [NSRange(location: 0, length: fresh.length)]
             let spent = ContinuousClock.now - started
             DispatchQueue.main.async {
@@ -294,6 +325,8 @@ final class MarkdownStyler {
                     var dirty = dirty
                     // Highlights, `<Image />` tags and the frontmatter pair across blocks: what the quick reads had moved and what the full read says differ there.
                     if let freshLive, let current = self.live { dirty = Self.joined(dirty + freshLive.differences(from: current)) }
+                    // The blocks found replace the ones the quick reads moved; those that changed are drawn again.
+                    if freshLive != nil { dirty = Self.joined(dirty + self.blocks.replace(with: freshBlocks, width: self.textWidth)) }
                     if known != nil, !dirty.isEmpty { self.measurements.corrections += 1 }
                     self.beginPuttingOn(fresh, live: freshLive, dirty: dirty)
                 }
@@ -345,11 +378,41 @@ final class MarkdownStyler {
     /// The pass that was running is over, however it ended; the one that was asked for meanwhile, if there is one and nothing is waiting to start already, starts now.
     private func endPass() {
         passRunning = false
+        if isLive, !blocks.entries.isEmpty { scheduleRender() }
         if let passStarted { measurements.lastPassMilliseconds = Self.milliseconds(clock.now - passStarted) }
         passStarted = nil
         guard passDue else { return }
         passDue = false
         if idlePass == nil { scheduleFullPass(after: 0) }
+    }
+
+    // MARK: Pictures of blocks
+
+    /// Renders the next missing picture of a block near the screen on the next turn of the run loop, and then the next, one a turn, so that a frame waits for one at most.
+    private func scheduleRender() {
+        guard !renderDue else { return }
+        renderDue = true
+        DispatchQueue.main.async { [weak self] in MainActor.assumeIsolated { self?.renderStep() } }
+    }
+
+    private func renderStep() {
+        renderDue = false
+        guard isLive, let textView, let model, textView.markedTextRange == nil, model.length == textView.textStorage.length else { return }
+        guard let range = blocks.renderOne(near: nearScreen, width: textWidth, look: look, traits: textView.traitCollection, imageFolder: imageFolder()) else { return }
+        applyColours(to: range, using: model)
+        scheduleRender()
+    }
+
+    /// The characters on screen, and a screen's worth either side (in characters, roughly): the blocks whose pictures are rendered.
+    private var nearScreen: NSRange {
+        guard let textView else { return NSRange(location: 0, length: 0) }
+        let all = NSRange(location: 0, length: textView.textStorage.length)
+        guard let layout = textView.textLayoutManager, let content = layout.textContentManager, let viewport = layout.textViewportLayoutController.viewportRange else { return all }
+        let start = content.offset(from: content.documentRange.location, to: viewport.location)
+        let end = content.offset(from: content.documentRange.location, to: viewport.endLocation)
+        let reach = max(3_000, end - start)
+        let low = max(0, start - reach), high = min(all.length, end + reach)
+        return NSRange(location: low, length: max(0, high - low))
     }
 
     /// In order, with ranges that overlap or touch made into one.

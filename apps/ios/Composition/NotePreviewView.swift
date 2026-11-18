@@ -56,7 +56,8 @@ struct PreviewBlocksView: View {
     }
 }
 
-private struct PreviewBlockView: View {
+/// One block of the preview. Also what the Live tab renders a block's picture from (`LiveBlockRenderer`), so the two never draw a block differently.
+struct PreviewBlockView: View {
     let block: PreviewBlock
     @Environment(\.look) private var look
 

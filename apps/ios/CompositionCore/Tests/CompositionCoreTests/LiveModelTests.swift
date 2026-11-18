@@ -160,7 +160,23 @@ private func facts(_ decorations: LiveDecorations, within window: NSRange? = nil
     out += decorations.codeBlocks.filter { shown($0.range) }.map { "code \($0.range.location)-\(NSMaxRange($0.range)) \($0.lines) \($0.fences) \($0.active)" }
     out += decorations.codeIndentsHidden.filter(shown).map { "indent hidden \($0.location)-\(NSMaxRange($0))" }
     out += decorations.links.filter { shown($0.node) }.map { "link \($0.range.location)-\(NSMaxRange($0.range)) \($0.active) \($0.href)" }
+    out += decorations.lists.filter { shown($0.range) }.map(listFact)
     return out.sorted()
+}
+
+/// A line of a list or a quote, written out: where it is, what it is in, whether the selection is on it, and what is hidden and drawn.
+private func listFact(_ line: LiveDecorations.ListLine) -> String {
+    let containers = line.containers.map { container -> String in
+        switch container {
+        case .quote: "Q"
+        case .list(let starts, let column): "L\(starts ? "+" : "")\(column)"
+        }
+    }.joined(separator: " ")
+    var out = "line \(line.range.location)-\(NSMaxRange(line.range)) [\(containers)]\(line.active ? " active" : "")"
+    if let hidden = line.hidden { out += " hide \(hidden.location)-\(NSMaxRange(hidden))" }
+    if let marker = line.marker { out += " marker \(marker.ordered ? marker.text : "bullet")" }
+    if let task = line.task { out += " task \(task.range.location)-\(NSMaxRange(task.range)) \(task.checked ? "x" : "o")" }
+    return out
 }
 
 @Suite("The Live model follows edits and the selection")
@@ -419,3 +435,136 @@ struct LiveModelDrawnTests {
         #expect(fresh.differences(from: live) == [(typed as NSString).range(of: "<Drawio src=\"d.png\" />")])
     }
 }
+
+// Step 4 of docs/ipad-live-default-plan.md: lists, task lists and quotes. LiveConformanceTests compares them with the desktop's `listDecorations` (PR #325)
+// when the fixture carries its facts; these are examples to read, and what is the iPad's own (the tap on a box).
+@Suite("The Live model's lists, task lists and quotes")
+struct LiveListTests {
+    private func lists(_ text: String, at caret: Int, to end: Int? = nil) -> [String] {
+        decorations(text, at: caret, to: end).lists.map(listFact)
+    }
+
+    @Test("a bullet's `- ` is hidden away from its line and a bullet drawn in its place; on its line it shows as written")
+    func bullets() {
+        let text = "- one\n- two\n\nafter"
+        #expect(lists(text, at: 15) == ["line 0-5 [L+2] hide 0-2 marker bullet", "line 6-11 [L+2] hide 6-8 marker bullet"])
+        #expect(lists(text, at: 3) == ["line 0-5 [L+2] active", "line 6-11 [L+2] hide 6-8 marker bullet"])
+        #expect(lists(text, at: 5) == ["line 0-5 [L+2] active", "line 6-11 [L+2] hide 6-8 marker bullet"], "the end of the line is on it")
+        #expect(lists(text, at: 6)[1] == "line 6-11 [L+2] active", "and so is the start of the next")
+        #expect(decorations(text, at: 15).hidden.isEmpty, "what the lists hide is theirs, not in `hidden`")
+    }
+
+    @Test("an ordered item keeps its number as written, and the gap after a mark is one to four spaces")
+    func numbers() {
+        #expect(lists("3. three\n4) four", at: 0, to: 0).last == "line 9-16 [L+3] hide 9-12 marker 4)")
+        #expect(lists("10.   wide", at: 10) == ["line 0-10 [L+6] active"])
+        #expect(lists("10.   wide\n", at: 11) == ["line 0-10 [L+6] hide 0-6 marker 10."])
+        // Five spaces or more start an indented code block in the item: its text is one space in.
+        #expect(lists("-      code\n", at: 12) == ["line 0-11 [L+2] hide 0-2 marker bullet"])
+    }
+
+    @Test("a nested item is in both lists, and a line that carries an item on hides its indentation up to the item's text")
+    func nesting() {
+        let text = "- a\n  - b\n\n    more of b\n\nend"
+        #expect(lists(text, at: 30) == [
+            "line 0-3 [L+2] hide 0-2 marker bullet",
+            "line 4-9 [L2 L+4] hide 4-8 marker bullet",
+            "line 10-10 [L2 L4]",  // the blank line inside the item, which goes on after it
+            "line 11-24 [L2 L4] hide 11-15",
+        ])
+    }
+
+    @Test("a task's box is hidden and drawn away from its line; it shows as written on it")
+    func tasks() {
+        let text = "- [ ] open\n- [x] done\n\nend"
+        #expect(lists(text, at: 24) == [
+            "line 0-10 [L+2] hide 0-2 marker bullet task 2-6 o",
+            "line 11-21 [L+2] hide 11-13 marker bullet task 13-17 x",
+        ])
+        #expect(lists(text, at: 4)[0] == "line 0-10 [L+2] active")
+        #expect(lists("* [X] Upper", at: 11) == ["line 0-11 [L+2] active"])
+        #expect(lists("* [X] Upper\n", at: 12) == ["line 0-11 [L+2] hide 0-2 marker bullet task 2-6 x"])
+        // Not a task: no space after the box, or something other than a space or an x in it.
+        #expect(lists("- [ ]\n- [y] no\n- [x]no\n", at: 21).allSatisfy { !$0.contains("task") })
+    }
+
+    @Test("a tap finds the drawn box at a place in it, and ticking writes an x where the space was, and back")
+    func toggling() throws {
+        let text = "- [ ] open\n- [x] done\n\nend"
+        let model = LiveModel(text: text)
+        let away = NSRange(location: 24, length: 0)
+        let open = try #require(model.task(at: 3, selection: away))
+        #expect(open.box == NSRange(location: 2, length: 3) && !open.checked)
+        #expect(open.toggle.range == NSRange(location: 3, length: 1) && open.toggle.text == "x")
+        let done = try #require(model.task(at: 13, selection: away))
+        #expect(done.checked && done.toggle.text == " ")
+        #expect(model.task(at: 3, selection: NSRange(location: 8, length: 0)) == nil, "no box is drawn on the caret's line, so there is nothing to tap")
+        #expect(model.task(at: 8, selection: away) == nil, "the words after the box are not the box")
+    }
+
+    @Test("a quote's `> ` is hidden away from its line, one bar for each level, and a lazy line is in the quote with nothing to hide")
+    func quotes() {
+        let text = "> one\n> > two\nlazy\n\nend"
+        #expect(lists(text, at: 22) == ["line 0-5 [Q] hide 0-2", "line 6-13 [Q Q] hide 6-10", "line 14-18 [Q Q]"])
+        #expect(lists("> - item\n>   more\n\nx", at: 21) == ["line 0-8 [Q L+4] hide 0-4 marker bullet", "line 9-17 [Q L4] hide 9-13"])
+        // A quote in an item: the line's innermost container is the quote, so its marks are hidden and no bullet is drawn (as on the desktop).
+        #expect(lists("- > quoted\n\nx", at: 13) == ["line 0-10 [L+2 Q] hide 0-4"])
+    }
+
+    @Test("nothing in the frontmatter is a list")
+    func frontmatter() {
+        #expect(lists("---\ntags:\n- a\n---\n- b\n", at: 0) == ["line 18-21 [L+2] hide 18-20 marker bullet"])
+    }
+
+    @Test("after edits, the lines of lists and quotes are what a fresh read says")
+    func edits() {
+        var seed: UInt64 = 0x9E3779B97F4A7C15
+        func next(_ below: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return Int((seed >> 33) % UInt64(below))
+        }
+        let pieces = ["- ", "1. ", "[ ] ", "[x] ", "> ", "  ", "\n", "\n\n", "word", "x"]
+        var text = "- [ ] one\n- two\n  - three\n\n> quoted\n> > deeper\n\n1. first\n2. second\n"
+        var highlights = HighlightModel(text: text)
+        var live = LiveModel(text: text)
+        var compared = 0, corrected = 0
+        for step in 0..<300 {
+            let ns = text as NSString
+            let location = next(ns.length + 1)
+            let deleting = next(4) == 0 && ns.length > 0
+            let range = deleting ? NSRange(location: min(location, ns.length - 1), length: min(1 + next(3), ns.length - min(location, ns.length - 1))) : NSRange(location: location, length: 0)
+            let insertion = deleting ? "" : pieces[next(pieces.count)]
+            text = ns.replacingCharacters(in: range, with: insertion)
+            let now = text as NSString
+            let window = highlights.edited(replacing: range, withLength: (insertion as NSString).length, in: now)
+            live.edited(replacing: range, withLength: (insertion as NSString).length, rereading: window, in: now)
+            guard HighlightModel(text: text).differences(from: highlights).isEmpty else {
+                highlights = HighlightModel(text: text)
+                live = LiveModel(text: text)
+                continue
+            }
+            let fresh = LiveModel(text: text)
+            let selection = NSRange(location: next(now.length + 1), length: 0)
+            let want = fresh.decorations(selection: selection).lists, got = live.decorations(selection: selection).lists
+            if want != got {
+                // The quick read of a window ended an item or a quote early: the full read a pause later says where, and those lines are drawn again.
+                let differing = Set(want.map(\.range)).symmetricDifference(got.map(\.range)).union(zip(want, got).filter { $0 != $1 }.flatMap { [$0.range, $1.range] })
+                let said = fresh.differences(from: live)
+                #expect(differing.allSatisfy { line in said.contains { NSIntersectionRange($0, line).length > 0 || $0 == line } }, "after edit \(step): \(differing) not in \(said)")
+                corrected += 1
+                live = fresh
+                continue
+            }
+            compared += 1
+        }
+        #expect(compared > 100 && corrected < compared / 4, "\(compared) agreed at once, \(corrected) after the pause's correction")
+    }
+
+    @Test("the line a selection is on is one of the constructs it touches, so moving onto or off a list line draws it again")
+    func touching() {
+        let model = LiveModel(text: "- one\n- two\n\nend")
+        #expect(model.constructRanges(touching: NSRange(location: 8, length: 0)).contains(NSRange(location: 6, length: 5)))
+        #expect(!model.constructRanges(touching: NSRange(location: 15, length: 0)).contains(NSRange(location: 6, length: 5)))
+    }
+}
+

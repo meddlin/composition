@@ -79,23 +79,42 @@ public indirect enum PreviewBlock: Equatable, Sendable {
     case notice(String)
 }
 
+/// A block of a note's preview and where its source is in the note's text, in UTF-16 units (what a text view counts in): what the Live tab draws in place of
+/// that text (docs/ipad-live-default-plan.md, Step 5). A component is one, from its opening tag to the end of its closing one; a run of Markdown between
+/// components is one per Markdown block in it (a paragraph, a list, a table), each `.markdown` with that one block, so that the Live tab can draw a table as
+/// the Preview does and leave the paragraphs round it to its own look.
+public struct LocatedBlock: Equatable, Sendable {
+    public var range: NSRange
+    public var block: PreviewBlock
+
+    public init(range: NSRange, block: PreviewBlock) {
+        self.range = range
+        self.block = block
+    }
+}
+
 public struct NotePreview: Sendable {
     public var blocks: [PreviewBlock]
     /// Why the note's components are not drawn (it is not valid MDX): shown above the note drawn as plain Markdown.
     public var error: String?
     public var headings: [NoteHeading]
+    /// The top-level blocks with where they are written, in order, never overlapping: the same blocks as `blocks`, with each run of Markdown split into its
+    /// own blocks. The footnotes listed at the end of a note with no `<Footnotes />` are written nowhere, and so are not among them.
+    public var located: [LocatedBlock] = []
 
-    /// The preview of a note's stored text, frontmatter and all.
+    /// The preview of a note's stored text, frontmatter and all. The located blocks' ranges are in `content`.
     public static func make(content: String) -> NotePreview {
-        make(scanned: NoteScanner.scan(NoteFrontmatter.split(content).body))
+        let body = NoteFrontmatter.split(content).body
+        let offset = content.hasSuffix(body) ? content.utf16.count - body.utf16.count : 0
+        return make(scanned: NoteScanner.scan(body, at: offset))
     }
 
     public static func make(scanned: ScannedNote) -> NotePreview {
         var builder = Builder(scanned: scanned)
-        var blocks = builder.build(scanned.blocks)
+        var (blocks, located) = builder.buildTop()
         // A note with footnotes and no `<Footnotes />` lists them at the end, as the desktop does.
         if !builder.placedFootnotes, !scanned.footnotes.isEmpty { blocks.append(.footnotes(builder.footnoteEntries())) }
-        return NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings)
+        return NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings, located: located)
     }
 
     // MARK: Components
@@ -110,6 +129,34 @@ public struct NotePreview: Sendable {
             self.scanned = scanned
             footnoteNumbers = Dictionary(uniqueKeysWithValues: scanned.footnotes.enumerated().map { ($1, $0 + 1) })
             converter = MarkdownConverter(footnoteNumbers: footnoteNumbers)
+        }
+
+        /// The note's own blocks, as `build` makes them, and the same blocks located in the note: each run of Markdown is parsed once, and its blocks are converted
+        /// one by one (what `MarkdownConverter.blocks` does) so that each keeps where swift-markdown found it.
+        mutating func buildTop() -> (blocks: [PreviewBlock], located: [LocatedBlock]) {
+            var blocks: [PreviewBlock] = []
+            var located: [LocatedBlock] = []
+            for (index, block) in scanned.blocks.enumerated() {
+                switch block {
+                case .markdown(let source):
+                    let document = Document(parsing: source)
+                    let map = SourceMap(text: source)
+                    var all: [MdBlock] = []
+                    for child in document.children {
+                        guard let converted = converter.block(child) else { continue }
+                        all.append(converted)
+                        if let written = map.range(of: child), let range = scanned.noteRange(ofRun: index, text: source, written) {
+                            located.append(LocatedBlock(range: range, block: .markdown([converted])))
+                        }
+                    }
+                    blocks.append(.markdown(all))
+                case .element(let name, let props, let children):
+                    let made = element(name, props, children)
+                    blocks += made
+                    if made.count == 1, index < scanned.blockRanges.count { located.append(LocatedBlock(range: scanned.blockRanges[index], block: made[0])) }
+                }
+            }
+            return (blocks, located)
         }
 
         mutating func build(_ blocks: [NoteBlock]) -> [PreviewBlock] {
@@ -246,7 +293,7 @@ struct MarkdownConverter {
         container.children.compactMap { block($0) }
     }
 
-    private mutating func block(_ markup: any Markup) -> MdBlock? {
+    mutating func block(_ markup: any Markup) -> MdBlock? {
         switch markup {
         case let heading as Heading:
             let ordinal = headings

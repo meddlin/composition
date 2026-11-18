@@ -6,7 +6,8 @@ import UIKit
 /// code), smaller than the text (`small`, the frontmatter), drawn at another size or in the grey text (`dim64`), and the paragraphs a rule or a picture is drawn on (`draw-rule`,
 /// `draw-picture`, `draw-pictureAfter`), the lines of a code block on its fill (`code`, with its ends `code-first` and `code-last`) and the lines
 /// collapsed to nothing (`collapsed`, a code block's fences away from the selection). The UI tests read it from an element of the editor (`live-report`, with `-liveReport 1`), so that they check what the
-/// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`.
+/// screen is drawing and not only what the model says. For example `hidden:0-2,11-13;italic:20-26;size32:0-9`. A block drawn as a picture (Step 5) adds `draw-block`,
+/// `draw-blockAfter`, `block-<kind>`, `block-revealed`, `block-pictured` and `block-stale` (drawn with its last good picture).
 enum LiveReport {
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
         var classes: [String: [NSRange]] = [:]
@@ -39,6 +40,24 @@ enum LiveReport {
             // Links (Step 2 of docs/ipad-live-default-plan.md): the words of one that can be followed, and where a dead `pdf:` link's "(PDF not on this device)" is drawn.
             if attributes[.liveLink] != nil { note("link", run) }
             if attributes[.liveLinkSuffix] != nil { note("suffix", run) }
+            // Step 4: a line of a list or a quote, with what it draws (`list-bullet`, `list-number`, `list-box`, `list-ticked`), how many quote bars (`quote1`, `quote2`), and its indent in points.
+            if let line = attributes[.liveList] as? LiveListLine {
+                switch line.mark {
+                case .bullet: note("list-bullet", run)
+                case .number: note("list-number", run)
+                case .box(let checked, _): note(checked ? "list-ticked" : "list-box", run)
+                case nil: note("list-line", run)
+                }
+                if !line.bars.isEmpty { note("quote\(line.bars.count)", run) }
+                if let style = attributes[.paragraphStyle] as? NSParagraphStyle { note("indent\(Int(style.headIndent.rounded()))-\(Int(style.firstLineHeadIndent.rounded()))", run) }
+            }
+            // A block drawn as a picture (Step 5): `block-table` over all its source, `block-revealed` while its source shows, `block-pictured` once it has a picture.
+            if let block = attributes[.liveBlock] as? LiveBlockMark {
+                note("block-\(block.kind)", run)
+                if block.revealed { note("block-revealed", run) }
+                if block.pictured { note("block-pictured", run) }
+                if block.stale { note("block-stale", run) }
+            }
             if LiveOverlay.isHidden(font) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }
