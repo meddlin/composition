@@ -45,15 +45,31 @@ struct SidebarView: View {
     @Environment(\.look) private var look
     @Binding var prompt: Prompt?
     @Binding var moving: DraggedItem?
+    /// Whether the window is narrow enough that the columns are one stack (an iPhone, the closed iPhone Duo, Slide Over).
+    var collapsed = false
+    /// A row was chosen (BrowserView goes on to the notes in the one stack).
+    var picked: () -> Void = {}
+    /// The stack came back here from the notes. The list then shows nothing chosen, so that the notebook that was chosen can be chosen again, which
+    /// the stack only follows when the choice changes. (`model.sidebar` keeps it, for the notes list and for a wider window.)
+    @State private var backInStack = false
 
     var body: some View {
-        List(selection: Binding(get: { model.sidebar }, set: { model.visit($0) })) {
+        List(selection: Binding(get: { backInStack ? nil : model.sidebar }, set: { item in
+            if let item {
+                backInStack = false
+                model.visit(item)
+                picked()
+            } else if collapsed {
+                backInStack = true
+            }
+        })) {
             ForEach(model.sidebarRows) { row in
                 SidebarRowView(model: model, row: row)
                     .tag(row.item)
                     .modifier(RowAffordances(model: model, row: row, prompt: $prompt, moving: $moving))
             }
         }
+        .onChange(of: collapsed) { if !$1 { backInStack = false } }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(look.panel)

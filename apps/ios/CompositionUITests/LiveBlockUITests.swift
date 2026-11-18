@@ -40,13 +40,8 @@ final class LiveBlockUITests: XCTestCase {
     }
 
     private func drawn() -> [String: String] {
-        let label = report.exists ? report.label : ""
-        var out: [String: String] = [:]
-        for part in label.split(separator: ";") {
-            let pair = part.split(separator: ":", maxSplits: 1)
-            if pair.count == 2 { out[String(pair[0])] = String(pair[1]) }
-        }
-        return out
+        // The frontmatter's header block (Step 7) left out: see `LiveReportReading`.
+        LiveReportReading.parse(report.exists ? report.label : "")
     }
 
     private func text() -> String { (editor.value as? String) ?? "" }

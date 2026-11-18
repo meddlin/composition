@@ -4,12 +4,20 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// One note, with the four tabs of the design: **Markdown** (the editor), **Live** (the editor with the syntax hidden away from the caret: the note drawn
-/// as it will read), **Preview** (Markdown and the components, drawn from what is typed, not only from what is saved) and **Split** (Markdown and Preview, side
+/// One note, with the four tabs of the design: **Live** (the editor with the syntax hidden away from the caret: the note drawn as it will read; the
+/// default since Step 8 of docs/ipad-live-default-plan.md), **Markdown** (the editor), **Preview** (Markdown and the components, drawn from what is typed, not only from what is saved) and **Split** (Markdown and Preview, side
 /// by side, or one above the other in a narrow window, with a divider that can be dragged).
 /// The note's `NoteSession` is open for as long as the note is on screen, so that every tab shows the same text and saving is one thing.
 struct NoteDetailView: View {
-    enum Mode: String, CaseIterable { case markdown = "Markdown", live = "Live", preview = "Preview", split = "Split" }
+    enum Mode: String, CaseIterable {
+        // Live first, everywhere the tabs are listed (the toolbar's picker, the compact View menu, "Open notes in"): D6.
+        case live = "Live", markdown = "Markdown", preview = "Preview", split = "Split"
+        /// Where the "Open notes in" setting is kept (Appearance ▸ Writing): on this iPad only, not in `settings.json`, so a restored desktop backup leaves it alone
+        /// (docs/ipad-live-default-plan.md, I3). Live since Step 8 (D1); Preview before (I4). Only the picker writes the key, so `@AppStorage` never stores
+        /// this default: a value never chosen follows it, and a value chosen in the picker (Preview included) stays.
+        static let openNotesInKey = "openNotesIn"
+        static let openNotesInDefault = Mode.live
+    }
 
     let model: AppModel
     let noteID: Int64
@@ -17,7 +25,11 @@ struct NoteDetailView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.listsControl) private var lists
     // What the system brings back after the app was ended: the tab, and where the caret was.
-    @SceneStorage("noteMode") private var mode = Mode.preview
+    @SceneStorage("noteMode") private var mode = Mode.openNotesInDefault
+    /// The note `mode` was chosen for. Every other note opens in the "Open notes in" setting's view (I3): the tab chosen lasts until another note opens, and only the
+    /// note that was open when the app was ended comes back in the tab it was in.
+    @SceneStorage("modeNote") private var modeNote = 0
+    @AppStorage(Mode.openNotesInKey) private var openNotesIn = Mode.openNotesInDefault
     @SceneStorage("caretOffset") private var caret = 0
     @SceneStorage("caretNote") private var caretNote = 0
     @State private var session: NoteSession?
@@ -119,11 +131,11 @@ struct NoteDetailView: View {
         .sheet(isPresented: $showingHeaderImage) {
             if let session { HeaderImageSheet(model: model, session: session) }
         }
-        // The Images page's *Insert in Open Note*: a stored picture goes in at the caret, from the Preview tab too (which has no text to put it in, so it opens the Markdown tab first).
+        // The Images page's *Insert in Open Note*: a stored picture goes in at the caret, from the Preview tab too (which has no text to put it in, so it opens the Live tab first).
         .onChange(of: model.imageToInsert) { _, name in
             guard let name else { return }
             model.imageToInsert = nil
-            if mode == .preview { mode = .markdown }
+            if mode == .preview { mode = .live }
             Task {
                 try? await Task.sleep(for: .milliseconds(500))
                 handle.insertStoredImage(named: name, description: "")
@@ -195,25 +207,19 @@ struct NoteDetailView: View {
             .keyboardShortcut("x", modifiers: [.command, .shift])
     }
 
-    /// The note itself, in the tab chosen.
-    @ViewBuilder private func noteContent(_ session: NoteSession) -> some View {
-        switch mode {
-        // One branch for both writing tabs, so that going from one to the other does not rebuild the text view: the caret, the keyboard and the
-        // scroll stay where they are.
-        case .markdown, .live: editor(session, live: mode == .live)
-        case .preview: NoteReader(model: model, session: session, jump: outlineJump)
-        case .split:
-            SplitLayout {
-                editor(session)
-            } trailing: {
-                NoteReader(model: model, session: session, jump: outlineJump)
-            }
+    /// The note itself, in the tab chosen. One layout for all four tabs, so that going from one to another never rebuilds the text view: the caret, the scroll
+    /// and the undo history stay (D7 of docs/ipad-live-default-plan.md). Under the Preview the text view is kept, hidden; in Split it is the Markdown tab.
+    private func noteContent(_ session: NoteSession) -> some View {
+        SplitLayout(showing: mode == .split ? .both : mode == .preview ? .trailing : .leading) {
+            editor(session, live: mode == .live, hidden: mode == .preview)
+        } trailing: {
+            NoteReader(model: model, session: session, jump: outlineJump)
         }
     }
 
-    private func editor(_ session: NoteSession, live: Bool = false) -> some View {
+    private func editor(_ session: NoteSession, live: Bool = false, hidden: Bool = false) -> some View {
         // A note that was just made opens with the caret at the end, after its frontmatter; one that was open before the app was ended, where it was.
-        NoteEditorView(session: session, handle: handle, initialCaret: focusOnOpen ? .max : (caretNote == Int(noteID) ? caret : 0), focusOnOpen: focusOnOpen, live: live) { offset in
+        NoteEditorView(session: session, handle: handle, initialCaret: focusOnOpen ? .max : (caretNote == Int(noteID) ? caret : 0), focusOnOpen: focusOnOpen, live: live, hidden: hidden) { offset in
             caret = offset
             caretNote = Int(noteID)
         }
@@ -238,13 +244,16 @@ struct NoteDetailView: View {
     /// Opens the note's session (and closes the previous note's, saving what is unsaved).
     private func open() async {
         close()
+        // Every note opens in the "Open notes in" setting's view (I3), but the one that was open when the app was ended, which comes back as it was.
+        if modeNote != Int(noteID) { mode = openNotesIn }
         #if DEBUG || EDITOR_TEST_HOOKS
         // Developer shortcut: `-openMode Markdown` (or Live, Preview, Split) at launch.
         if let name = UserDefaults.standard.string(forKey: "openMode"), let forced = Mode(rawValue: name) { mode = forced }
         #endif
-        // A note that was just made opens in the editor, with the keyboard up.
+        // A note that was just made opens in a writing tab, with the keyboard up: the setting's, or Live when the setting is Preview (I5, Live since Step 8).
         focusOnOpen = model.takeFreshNote(noteID)
-        if focusOnOpen { mode = .markdown }
+        if focusOnOpen { mode = openNotesIn == .preview ? .live : openNotesIn }
+        modeNote = Int(noteID)
         pdf = nil
         await refreshPdf()
         // Another note was chosen while this one was being read: that one opens, not this.
@@ -256,6 +265,11 @@ struct NoteDetailView: View {
         handle.problem = { [weak model] message in model?.errorMessage = message }
         handle.noteCandidates = { [weak model] in model?.linkCandidates ?? [] }
         handle.noteID = noteID
+        let shown = $mode
+        handle.isShowing = { shown.wrappedValue != .preview }
+        // The Live tab's links (its ↗ and ⌘-tap) follow as the Preview's do, and a `pdf:` link to a PDF not here is drawn as the Preview draws it.
+        handle.followLink = { [weak model] href in model.map { LinkFollower(model: $0, noteId: noteID).follow(href) } ?? false }
+        handle.isLinkHere = { [weak model] href in model.map { LinkFollower.isHere(href, model: $0) } ?? true }
         let words = $storedWords, showing = $showingStored
         handle.openStoredImages = { [weak handle] in
             words.wrappedValue = handle?.selectedWords ?? ""
@@ -327,19 +341,25 @@ struct SplitLabels {
     static let pdfAndNote = SplitLabels(between: "the PDF and the note", first: "PDF", key: "Pdf")
 }
 
+/// Which of a split's two views show: both (with the divider), the first alone, or the second alone with the first kept under it, hidden (the note's Preview tab:
+/// the text view stays alive, so its undo history survives).
+enum SplitShowing { case both, leading, trailing }
+
 /// The editor and the preview together: side by side when there is room, one above the other when there is not. The same views either way,
-/// so turning the iPad does not rebuild the text view. The divider between them can be dragged (or moved with VoiceOver's adjust gesture) to give
+/// so turning the iPad does not rebuild the text view; and the same when only one of them shows (`showing`), so changing tabs does not either. The divider between them can be dragged (or moved with VoiceOver's adjust gesture) to give
 /// either one more room, and a double tap puts it back in the middle; where it was left is kept, one place for side by side and one for stacked.
 struct SplitLayout<Leading: View, Trailing: View>: View {
     let leading: Leading
     let trailing: Trailing
     private let labels: SplitLabels
+    private let showing: SplitShowing
     @AppStorage private var sideBySide: Double
     @AppStorage private var stacked: Double
     @Environment(\.look) private var look
 
-    init(labels: SplitLabels = .editorPreview, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
+    init(labels: SplitLabels = .editorPreview, showing: SplitShowing = .both, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
         self.labels = labels
+        self.showing = showing
         self.leading = leading()
         self.trailing = trailing()
         _sideBySide = AppStorage(wrappedValue: 0.5, "splitFractionSideBySide\(labels.key)")
@@ -357,12 +377,19 @@ struct SplitLayout<Leading: View, Trailing: View>: View {
             let total = max(wide ? geometry.size.width : geometry.size.height, 1)
             // Neither half is ever made smaller than this: a text view narrower than about 300 points, or a preview shorter than about 160, is of no use.
             let smallest = min(wide ? 300 : 160, total / 3)
-            let layout = wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            // One view alone fills the space, the second over the first (`AnyLayout` keeps each view's identity when the layout changes).
+            let both = showing == .both
+            let layout = !both ? AnyLayout(ZStackLayout(alignment: .topLeading)) : wide ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
             let fraction = clamp(wide ? sideBySide : stacked, smallest / total, 1 - smallest / total)
+            let hidden = showing == .trailing
             layout {
-                leading.frame(width: wide ? total * fraction : nil, height: wide ? nil : total * fraction)
-                handle(wide: wide, fraction: fraction, total: total, smallest: smallest)
-                trailing
+                leading
+                    .frame(width: both && wide ? total * fraction : nil, height: both && !wide ? total * fraction : nil)
+                    .opacity(hidden ? 0 : 1)
+                    .allowsHitTesting(!hidden)
+                    .accessibilityHidden(hidden)
+                if both { handle(wide: wide, fraction: fraction, total: total, smallest: smallest) }
+                if showing != .leading { trailing }
             }
             .coordinateSpace(name: "split")
         }
@@ -442,26 +469,11 @@ struct NoteReader: View {
         }
     }
 
-    @ViewBuilder private var header: some View {
-        if !live.updated.isEmpty { Label(live.updated, systemImage: "clock").fixedSize(horizontal: false, vertical: true) }
-        if !live.tags.isEmpty { Text(live.tags) }
-    }
-
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
-                    // The picture above the title, from the frontmatter's `headerImage`.
-                    if let headerImage = live.headerImage { HeaderImageBanner(header: headerImage) }
-                    Text(live.title.isEmpty ? "Untitled" : live.title).font(.largeTitle.bold())
-                    // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
-                    ViewThatFits(in: .horizontal) {
-                        HStack(spacing: 12) { header }
-                        VStack(alignment: .leading, spacing: 4) { header }
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(look.mutedText)
-                    Divider()
+                    NoteReaderHeader(title: live.title, updated: live.updated, tags: live.tags, headerImage: live.headerImage)
                     if let preview = live.preview { NotePreviewView(preview: preview) } else { ProgressView() }
                 }
                 .padding()
@@ -472,16 +484,8 @@ struct NoteReader: View {
             // The preview's type family, and its links in the scheme's link colour.
             .fontDesign(look.previewFont.design)
             .tint(look.link)
-            // A link to another note (`[title](note:12)`) opens that note.
-            .environment(\.openURL, OpenURLAction { url in
-                if url.scheme == "pdf", let ref = PdfRefs.parse(url.absoluteString) {
-                    model.followPdfLink(ref, from: session.noteId)
-                    return .handled
-                }
-                guard url.scheme == "note", let id = NoteLinks.id(fromRef: url.absoluteString) else { return .systemAction }
-                model.followNoteLink(id)
-                return .handled
-            })
+            // A link to another note (`[title](note:12)`) opens that note, and one to a PDF the PDF (`LinkFollower`, which the Live tab shares).
+            .environment(\.openURL, OpenURLAction { LinkFollower(model: model, noteId: session.noteId).open($0) })
             .environment(\.pdfLinks, PdfLinks { model.isPdfHere(uuid: $0) })
             .environment(\.scrollToHeading, { ordinal in withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(ordinal), anchor: .top) } })
             // The outline (Outline.swift) asked for a heading.
@@ -489,11 +493,55 @@ struct NoteReader: View {
                 guard let jump else { return }
                 withAnimation(reduceMotion ? nil : .default) { proxy.scrollTo(PreviewScroll.headingID(jump.ordinal), anchor: .top) }
             }
+            #if DEBUG || EDITOR_TEST_HOOKS
+            // `-externalEditButton 1`: a button that adds a paragraph to the note from outside the text view, as a quote from a PDF does while the
+            // Preview shows (`PdfInsertion.append`), for the UI test that such an edit leaves the text view nothing to undo.
+            .overlay(alignment: .bottomLeading) {
+                if UserDefaults.standard.bool(forKey: "externalEditButton") {
+                    // Bottom left: the bottom right corner is the window's resizing grip.
+                    Button("Add from outside") { session.edit(session.text + "\n\nAdded from outside.\n") }
+                        .accessibilityIdentifier("test-external-edit")
+                        .padding(40)
+                }
+            }
+            #endif
             .environment(\.imageFolder, model.location.imagesURL)
             .environment(\.editInk, { name in editingInk = InkEditing.load(named: name, from: model.location.imagesURL) })
             .fullScreenCover(item: $editingInk) { editing in
                 InkCanvasScreen(editing: editing, look: look) { saved in saveEdited(editing, saved: saved) } cancelled: { editingInk = nil }
             }
+        }
+    }
+}
+
+/// What the preview shows above a note's body, from its frontmatter: the header image, the title, the date and the tags, and a divider. The Live tab draws the same view
+/// in place of the frontmatter (docs/ipad-live-default-plan.md, Step 7, D5), with the header image already read (`loadedImage`), since its picture is taken before any task runs.
+struct NoteReaderHeader: View {
+    let title: String
+    let updated: String
+    let tags: String
+    let headerImage: HeaderImage?
+    var loadedImage: (image: UIImage, pixels: CGSize)? = nil
+    @Environment(\.look) private var look
+
+    @ViewBuilder private var dateAndTags: some View {
+        if !updated.isEmpty { Label(updated, systemImage: "clock").fixedSize(horizontal: false, vertical: true) }
+        if !tags.isEmpty { Text(tags) }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // The picture above the title, from the frontmatter's `headerImage`.
+            if let headerImage { HeaderImageBanner(header: headerImage, loaded: loadedImage) }
+            Text(title.isEmpty ? "Untitled" : title).font(.largeTitle.bold())
+            // The date and the tags on one line when they fit, one under the other when they do not (and never a date cut in two).
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { dateAndTags }
+                VStack(alignment: .leading, spacing: 4) { dateAndTags }
+            }
+            .font(.subheadline)
+            .foregroundStyle(look.mutedText)
+            Divider()
         }
     }
 }

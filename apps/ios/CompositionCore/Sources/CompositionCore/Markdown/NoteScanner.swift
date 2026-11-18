@@ -46,6 +46,17 @@ public indirect enum NoteBlock: Equatable, Sendable {
     case element(name: String, props: [String: MdxPropValue], children: [NoteBlock])
 }
 
+/// Where a footnote's citation or definition is in a note's text (UTF-16 units), and its number (`FootnoteEntry.number`).
+public struct FootnotePlace: Equatable, Sendable {
+    public var range: NSRange
+    public var number: Int
+
+    public init(range: NSRange, number: Int) {
+        self.range = range
+        self.number = number
+    }
+}
+
 public struct ScannedNote: Sendable {
     /// Whether the note mentions a component, and so was read as MDX.
     public var isMdx: Bool
@@ -69,18 +80,59 @@ public struct ScannedNote: Sendable {
     /// a component. With `index`, what turns a place in a run's text back into a place in the note.
     var runPieces: [[Range<Int>]]
     var index: SourceIndex
+    /// Each citation of a footnote that has a definition, `[^label]` in the note's text or in a footnote's (not in code), with its number:
+    /// where the Live tab draws the number (docs/ipad-live-default-plan.md, Step 7). In the note's text, in UTF-16 units.
+    public var footnoteCitations: [FootnotePlace] = []
+    /// Each definition of a footnote that is cited, `[^label]: text` with the lines that carry it on, where it is written (from the start of its first line to
+    /// the end of its last, the line break after it left out), in the order written, in runs: definitions with nothing but blank lines between them are one run.
+    public var footnoteDefinitions: [[FootnotePlace]] = []
 
     public var isValid: Bool { error == nil }
 
-    /// Where `range` (UTF-16 units of the text of `blocks[block]`, a run of Markdown) is in the note. Nil for a component.
+    /// Puts the scanner's footnote places into the note's text, numbered as the preview numbers them.
+    mutating func placeFootnotes(_ places: NoteScanner.FootnoteScalars) {
+        let numbers = Dictionary(uniqueKeysWithValues: footnotes.enumerated().map { ($1, $0 + 1) })
+        footnoteCitations = places.citations.compactMap { place in numbers[place.label].map { FootnotePlace(range: index.range(place.range), number: $0) } }
+        footnoteDefinitions = places.definitions.map { run in
+            run.compactMap { place in numbers[place.label].map { FootnotePlace(range: index.range(place.range), number: $0) } }
+        }
+    }
+
+    /// Where `range` (UTF-16 units of the text of `blocks[block]`, a run of Markdown) is in the note. Nil for a component. To locate many places in one run, make
+    /// its `RunLocator` once (`locator(ofRun:text:)`): this makes one for each call.
     func noteRange(ofRun block: Int, text: String, _ range: Range<Int>) -> NSRange? {
+        locator(ofRun: block, text: text)?.noteRange(range)
+    }
+
+    /// What turns places in the text of `blocks[block]` (a run of Markdown) into places in the note, made once for the run: its scalars' UTF-16 offsets are read
+    /// once, not once for each of its blocks (a run of thousands of blocks was quadratic, found in Step 6 on a long note).
+    func locator(ofRun block: Int, text: String) -> RunLocator? {
         guard block < runPieces.count, !runPieces[block].isEmpty else { return nil }
-        let pieces = runPieces[block]
-        // UTF-16 offsets of the run's text to its scalars.
-        var utf16: [Int] = [0]
-        utf16.reserveCapacity(text.unicodeScalars.count + 1)
-        for scalar in text.unicodeScalars { utf16.append(utf16[utf16.count - 1] + (scalar.value > 0xFFFF ? 2 : 1)) }
-        func scalar(at offset: Int) -> Int {
+        return RunLocator(pieces: runPieces[block], text: text, index: index)
+    }
+
+    struct RunLocator {
+        let pieces: [Range<Int>]
+        let index: SourceIndex
+        /// UTF-16 offsets of the run's text to its scalars.
+        private let utf16: [Int]
+        /// How many scalars of the run come before each piece.
+        private let before: [Int]
+
+        init(pieces: [Range<Int>], text: String, index: SourceIndex) {
+            self.pieces = pieces
+            self.index = index
+            var utf16: [Int] = [0]
+            utf16.reserveCapacity(text.utf16.count + 1)
+            for scalar in text.unicodeScalars { utf16.append(utf16[utf16.count - 1] + (scalar.value > 0xFFFF ? 2 : 1)) }
+            self.utf16 = utf16
+            var before: [Int] = []
+            var count = 0
+            for piece in pieces { before.append(count); count += piece.count }
+            self.before = before
+        }
+
+        private func scalar(at offset: Int) -> Int {
             var low = 0, high = utf16.count - 1
             while low < high {
                 let middle = (low + high + 1) / 2
@@ -88,19 +140,27 @@ public struct ScannedNote: Sendable {
             }
             return low
         }
+
         /// A scalar of the run's text as a scalar of the scanned text; an end that falls where one piece stops and the next starts belongs to the first.
-        func source(_ k: Int, end: Bool) -> Int {
-            var before = 0
-            for piece in pieces {
-                let count = piece.count
-                if k < before + count || (end && k == before + count) { return piece.lowerBound + (k - before) }
-                before += count
+        private func source(_ k: Int, end: Bool) -> Int {
+            // The first piece that holds k (or ends at it, for an end): the last piece starting at or before k, stepped back for an end on a boundary.
+            var low = 0, high = pieces.count - 1
+            while low < high {
+                let middle = (low + high + 1) / 2
+                if before[middle] <= k { low = middle } else { high = middle - 1 }
             }
+            // An end on a boundary belongs to the piece before it (the first piece it is the end of, as the scan of every piece in order had it).
+            while end, low > 0, k <= before[low] { low -= 1 }
+            let piece = pieces[low]
+            if k - before[low] <= piece.count { return piece.lowerBound + (k - before[low]) }
             return pieces[pieces.count - 1].upperBound
         }
-        let start = index.utf16(source(scalar(at: range.lowerBound), end: false))
-        let stop = index.utf16(source(scalar(at: range.upperBound), end: true))
-        return NSRange(location: start, length: max(0, stop - start))
+
+        func noteRange(_ range: Range<Int>) -> NSRange {
+            let start = index.utf16(source(scalar(at: range.lowerBound), end: false))
+            let stop = index.utf16(source(scalar(at: range.upperBound), end: true))
+            return NSRange(location: start, length: max(0, stop - start))
+        }
     }
 }
 
@@ -156,16 +216,20 @@ public enum NoteScanner {
         let footnotes = scanner.footnotes()
         if scanner.readTags, scanner.failure == nil {
             let cut = scanner.blocks(footnotes)
-            return ScannedNote(isMdx: true, error: nil, elements: scanner.elements, headings: headings(of: markdownRuns(cut.blocks)), footnotes: footnotes.order,
-                               footnoteBodies: footnotes.bodies, blocks: cut.blocks, blockRanges: cut.ranges.map(index.range), runPieces: cut.pieces, index: index)
+            var note = ScannedNote(isMdx: true, error: nil, elements: scanner.elements, headings: headings(of: markdownRuns(cut.blocks)), footnotes: footnotes.order,
+                                   footnoteBodies: footnotes.bodies, blocks: cut.blocks, blockRanges: cut.ranges.map(index.range), runPieces: cut.pieces, index: index)
+            note.placeFootnotes(footnotes.places)
+            return note
         }
         // Not MDX (it mentions no component), or not valid MDX: the whole note as plain Markdown, where footnotes still work.
         var plain = Scanner(scalars, readTags: false)
         plain.run()
         let plainFootnotes = plain.footnotes()
         let whole = plain.blocks(plainFootnotes)
-        return ScannedNote(isMdx: scanner.readTags, error: scanner.failure, elements: [], headings: headings(of: markdownRuns(whole.blocks)), footnotes: plainFootnotes.order,
-                           footnoteBodies: plainFootnotes.bodies, blocks: whole.blocks, blockRanges: whole.ranges.map(index.range), runPieces: whole.pieces, index: index)
+        var note = ScannedNote(isMdx: scanner.readTags, error: scanner.failure, elements: [], headings: headings(of: markdownRuns(whole.blocks)), footnotes: plainFootnotes.order,
+                               footnoteBodies: plainFootnotes.bodies, blocks: whole.blocks, blockRanges: whole.ranges.map(index.range), runPieces: whole.pieces, index: index)
+        note.placeFootnotes(plainFootnotes.places)
+        return note
     }
 
     /// The desktop's `usesMdxComponent`: `<` and a component's name, then a space, `/` or `>`. Code does not matter to it.
@@ -256,6 +320,14 @@ public enum NoteScanner {
         var order: [String] = []
         var bodies: [String: String] = [:]
         var edits: [(range: Range<Int>, replacement: String)] = []
+        /// Where the citations in the note's own text are and where each label's first definition is (scalars of the text), for `FootnotePlace`.
+        var places = FootnoteScalars()
+    }
+
+    struct FootnoteScalars {
+        var citations: [(label: String, range: Range<Int>)] = []
+        /// In runs: those with only blank lines between them.
+        var definitions: [[(label: String, range: Range<Int>)]] = []
     }
 
     private struct Scanner {
@@ -659,12 +731,20 @@ public enum NoteScanner {
             var removals: [Range<Int>] = []
             var sink = Sink.text
             var span: (start: Int, end: Int)?
+            /// The label of the definition `span` is, when it is the first one of that label.
+            var spanLabel: String?
+            var definitionSpans: [(label: String, range: Range<Int>)] = []
             var previousBlank = true
             var lineStart = 0
 
             func closeSpan() {
-                if let open = span { removals.append(open.start..<min(open.end, s.count)) }
+                if let open = span {
+                    removals.append(open.start..<min(open.end, s.count))
+                    // The definition as written: to the end of its last line, the line break after it left out.
+                    if let label = spanLabel { definitionSpans.append((label, open.start..<max(open.start, min(open.end - 1, s.count)))) }
+                }
                 span = nil
+                spanLabel = nil
             }
             func note(_ found: [(label: String, range: Range<Int>)], in sink: Sink) {
                 for mark in found { seen.append((mark.label, mark.range, sink)) }
@@ -689,6 +769,7 @@ public enum NoteScanner {
                     sink = defined.insert(definition.label).inserted ? .definition(definition.label) : .ignored
                     if case .definition(let label) = sink { lines[label, default: []].append(definition.contentStart..<end) }
                     span = (lineStart, end + 1)
+                    if case .definition(let label) = sink { spanLabel = label }
                     note(marks(in: definition.contentStart..<end), in: sink)
                     previousBlank = false
                     continue
@@ -726,6 +807,16 @@ public enum NoteScanner {
                 info.bodies[label] = (lines[label] ?? []).map { trimmed(String(String.UnicodeScalarView(s[$0]))) }.joined(separator: "\n")
             }
             info.edits = removals.map { ($0, "") }
+            // Those in a footnote's own text too: the list draws them as numbers, and so does the Live tab while a definition shows its source.
+            info.places.citations = seen.compactMap { mark in info.order.contains(mark.label) ? (mark.label, mark.range) : nil }
+            for definition in definitionSpans where info.order.contains(definition.label) {
+                if let previous = info.places.definitions.last?.last, previous.range.upperBound <= definition.range.lowerBound,
+                    s[previous.range.upperBound..<definition.range.lowerBound].allSatisfy(Self.isWhitespace) {
+                    info.places.definitions[info.places.definitions.count - 1].append(definition)
+                } else {
+                    info.places.definitions.append([definition])
+                }
+            }
             return info
         }
 
@@ -770,7 +861,7 @@ public enum NoteScanner {
     }
 
     /// `12` as `¹²`: a citation, which the Markdown would otherwise read as a link if it were `[12]`.
-    static func superscript(_ number: Int) -> String {
+    public static func superscript(_ number: Int) -> String {
         let digits = Array("⁰¹²³⁴⁵⁶⁷⁸⁹")
         return String(String(number).compactMap { $0.wholeNumberValue.map { digits[$0] } })
     }

@@ -94,7 +94,8 @@ final class TypingAidsUITests: XCTestCase {
     func testTabIndentsTheLinesOfASelectionAndShiftTabTakesItBack() throws {
         try launch(mode: "Markdown")
         let editor = editorAtTheEnd()
-        app.typeText("\n\n- one\n- two")
+        app.typeText("\n\n- one\ntwo")  // Return writes the second item's `- `
+        XCTAssertTrue(eventually { text(editor).hasSuffix("\n\n- one\n- two") }, "Return continued the list: \(text(editor).suffix(30))")
         app.typeKey(.upArrow, modifierFlags: .shift)  // the selection now runs from the first item into the second
         app.typeKey(.tab, modifierFlags: [])
         XCTAssertTrue(eventually { text(editor).hasSuffix("\n\n\t- one\n\t- two") }, "Tab indents both lines: \(text(editor).suffix(30))")

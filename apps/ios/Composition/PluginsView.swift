@@ -31,7 +31,7 @@ struct PluginsView: View {
                     LabeledContent("RSS Reader", value: "Desktop app only")
                     LabeledContent("Contacts", value: "Desktop app only")
                 } header: {
-                    Text("Not on the iPad yet")
+                    Text("Not in this app yet")
                 } footer: {
                     Text("What they keep is in your backups either way, and a backup made here gives it back to the desktop app as it was.")
                 }

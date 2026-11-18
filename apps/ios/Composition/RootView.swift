@@ -9,6 +9,9 @@ struct RootView: View {
 
     var body: some View {
         content
+            // The whole window, whatever is showing: while the notes open, `content` is only a spinner, and the background and the busy overlay
+            // below would otherwise be the spinner's size (the overlay's message cut to "…").
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(look.background.ignoresSafeArea())
             // Any file: a backup is a `.tar.gz`, which the system may not name as a type this app could list.
             .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.data]) { result in
@@ -49,7 +52,7 @@ struct RootView: View {
             ContentUnavailableView {
                 Label("No notes yet", systemImage: "tray")
             } description: {
-                Text("In the desktop app, open Settings and choose Backup. Get the file to this iPad (AirDrop, iCloud Drive or a cable), then choose it here.")
+                Text("In the desktop app, open Settings and choose Backup. Get the file to this device (AirDrop, iCloud Drive or a cable), then choose it here.")
             } actions: {
                 Button("Choose a backup…") { choosingBackup = true }.buttonStyle(.borderedProminent)
             }

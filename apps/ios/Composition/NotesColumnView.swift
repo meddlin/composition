@@ -10,14 +10,23 @@ struct NotesColumnView: View {
     @Binding var prompt: Prompt?
     @Binding var moving: DraggedItem?
     var footer: AnyView
+    /// Whether the columns are one stack (an iPhone, the closed iPhone Duo, Slide Over), where the system's own back button is beside this list's.
+    var collapsed = false
+    /// Whether the third column (the note) is on screen; in the one stack it is not while this list is.
+    var noteInSight = true
+    /// Which column the one stack shows (BrowserView's).
+    var compactColumn: Binding<NavigationSplitViewColumn> = .constant(.content)
     @State private var choosingPdf = false
 
     private var item: SidebarItem { model.sidebar ?? .all }
     private var searching: Bool { !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
-        List(selection: Binding(get: { model.selection }, set: { id in
+        // In the one stack this list shows nothing chosen while it is the column in sight, so that any row, the open note's too (one brought back
+        // when the app opened, or left open in a wider window), goes on to its note: the stack only follows a change.
+        List(selection: Binding(get: { collapsed && !noteInSight ? nil : model.selection }, set: { id in
             model.open(id)
+            if id != nil, collapsed { compactColumn.wrappedValue = .detail }
             // A result found in its PDF's text opens the PDF at the page the words are on, with the find bar showing them.
             if let id, searching { model.openPdfHit(id) }
         })) {
@@ -64,13 +73,19 @@ struct NotesColumnView: View {
         .onChange(of: model.query) { model.queryChanged() }
         .safeAreaInset(edge: .bottom) { footer }
         .toolbar {
-            ToolbarItemGroup(placement: .topBarLeading) {
-                Button("Back", systemImage: "chevron.backward") { model.goBack() }
-                    .keyboardShortcut("[", modifiers: .command)
-                    .disabled(!model.canGoBack)
-                Button("Forward", systemImage: "chevron.forward") { model.goForward() }
-                    .keyboardShortcut("]", modifiers: .command)
-                    .disabled(!model.canGoForward)
+            if collapsed {
+                // In the one stack the system's back button (to the notebooks) is already a "<": the history's two go in a menu of their own, so
+                // that there are not two of the same arrow, one above the other.
+                ToolbarItem(placement: .topBarLeading) {
+                    Menu {
+                        historyButtons
+                    } label: {
+                        Label("History", systemImage: "clock.arrow.circlepath")
+                    }
+                    .disabled(!model.canGoBack && !model.canGoForward)
+                }
+            } else {
+                ToolbarItemGroup(placement: .topBarLeading) { historyButtons }
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 if item != .favorites {
@@ -81,6 +96,15 @@ struct NotesColumnView: View {
                 Button("New Note", systemImage: "square.and.pencil") { Task { await model.createNote() } }
             }
         }
+    }
+
+    @ViewBuilder private var historyButtons: some View {
+        Button("Back", systemImage: "chevron.backward") { model.goBack() }
+            .keyboardShortcut("[", modifiers: .command)
+            .disabled(!model.canGoBack)
+        Button("Forward", systemImage: "chevron.forward") { model.goForward() }
+            .keyboardShortcut("]", modifiers: .command)
+            .disabled(!model.canGoForward)
     }
 
     // MARK: Putting things in order

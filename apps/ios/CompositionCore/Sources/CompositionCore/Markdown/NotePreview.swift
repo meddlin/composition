@@ -101,6 +101,10 @@ public struct NotePreview: Sendable {
     /// The top-level blocks with where they are written, in order, never overlapping: the same blocks as `blocks`, with each run of Markdown split into its
     /// own blocks. The footnotes listed at the end of a note with no `<Footnotes />` are written nowhere, and so are not among them.
     public var located: [LocatedBlock] = []
+    /// The footnotes' definitions as they are written, each run of them (definitions with only blank lines between) a `.footnotes` block of their entries, in the
+    /// order written, numbered as the list numbers them: what the Live tab draws in place of them (docs/ipad-live-default-plan.md, Step 7). At the end of a
+    /// note, where definitions are usually written, a run reads as the list the Preview adds there. Only definitions that are cited.
+    public var footnoteDefinitions: [LocatedBlock] = []
 
     /// The preview of a note's stored text, frontmatter and all. The located blocks' ranges are in `content`.
     public static func make(content: String) -> NotePreview {
@@ -114,7 +118,16 @@ public struct NotePreview: Sendable {
         var (blocks, located) = builder.buildTop()
         // A note with footnotes and no `<Footnotes />` lists them at the end, as the desktop does.
         if !builder.placedFootnotes, !scanned.footnotes.isEmpty { blocks.append(.footnotes(builder.footnoteEntries())) }
-        return NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings, located: located)
+        var preview = NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings, located: located)
+        if !scanned.footnoteDefinitions.isEmpty {
+            let entries = builder.footnoteEntries()
+            preview.footnoteDefinitions = scanned.footnoteDefinitions.compactMap { run in
+                guard let first = run.first, let last = run.last else { return nil }
+                let range = NSRange(location: first.range.location, length: NSMaxRange(last.range) - first.range.location)
+                return LocatedBlock(range: range, block: .footnotes(run.map { entries[$0.number - 1] }))
+            }
+        }
+        return preview
     }
 
     // MARK: Components
@@ -141,11 +154,12 @@ public struct NotePreview: Sendable {
                 case .markdown(let source):
                     let document = Document(parsing: source)
                     let map = SourceMap(text: source)
+                    let locator = scanned.locator(ofRun: index, text: source)
                     var all: [MdBlock] = []
                     for child in document.children {
                         guard let converted = converter.block(child) else { continue }
                         all.append(converted)
-                        if let written = map.range(of: child), let range = scanned.noteRange(ofRun: index, text: source, written) {
+                        if let written = map.range(of: child), let range = locator?.noteRange(written) {
                             located.append(LocatedBlock(range: range, block: .markdown([converted])))
                         }
                     }

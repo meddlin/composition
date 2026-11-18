@@ -215,6 +215,27 @@ final class PolishUITests: XCTestCase {
         XCTAssertTrue(eventually(20) { editorText.components(separatedBy: "](app_data/\(pastedPicture)").count - 1 == 2 }, "the picture is in the note again: \(editorText)")
     }
 
+    /// *Insert in Open Note* on a note shown in the Preview, which has no text to put the picture in: the note switches to Live (Step 8 of
+    /// docs/ipad-live-default-plan.md; it was Markdown before), and the picture goes in there.
+    func testInsertInOpenNoteSwitchesAPreviewToLive() throws {
+        try launch(["-openNote", "25", "-openMode", "Split", "-pasteImage", try environment("COMPOSITION_UI_IMAGE")])
+        XCTAssertTrue(eventually { editorText.contains("](app_data/\(pastedPicture)") }, "the picture is in the note")
+        let preview = app.buttons["Preview"].firstMatch
+        for _ in 0..<3 where !preview.isSelected {
+            preview.tap()
+            _ = eventually(8) { preview.isSelected }
+        }
+        XCTAssertTrue(preview.isSelected, "the note is shown in the Preview")
+        openImagesPage()
+        XCTAssertTrue(card().waitForExistence(timeout: 10), "the picture is listed")
+        card().tap()
+        XCTAssertTrue(element("image-detail").waitForExistence(timeout: 10), "the picture's page opens")
+        element("image-insert").tap()
+        XCTAssertTrue(element("images-page").waitForNonExistence(timeout: 10), "the page closes")
+        XCTAssertTrue(eventually { self.app.buttons["Live"].firstMatch.isSelected }, "the note switches to Live, not Markdown")
+        XCTAssertTrue(eventually(20) { editorText.components(separatedBy: "](app_data/\(pastedPicture)").count - 1 == 2 }, "the picture is in the note again: \(editorText)")
+    }
+
     func testImagesPageDeletesAPictureNothingUsesAfterAsking() throws {
         try launch(["-openNote", "25", "-openMode", "Split", "-pasteImage", try environment("COMPOSITION_UI_IMAGE")])
         let editor = app.textViews["note-editor"]

@@ -17,6 +17,13 @@ final class EditorHandle {
     var noteID: Int64?
     /// Opens the list of images already stored (⌘⇧M, and the Image menu's *Stored Image…*): the screen owns the sheet.
     var openStoredImages: () -> Void = {}
+    /// Whether the text view is the tab showing. Under the Preview tab it stays alive, hidden (so its undo survives), and takes nothing a caller can put at the
+    /// end of the note instead.
+    var isShowing: () -> Bool = { true }
+    /// Follows a link of the Live tab (its ↗, and ⌘-tap): the screen's `LinkFollower`. False when there was nothing to follow.
+    var followLink: (String) -> Bool = { _ in false }
+    /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through, as the Preview draws it.
+    var isLinkHere: (String) -> Bool = { _ in true }
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -60,14 +67,14 @@ final class EditorHandle {
     /// showing (the Preview tab), so that the caller can put it at the end of the note instead.
     func insertBlock(_ markdown: String) -> Bool {
         // A text view that is not on screen (the note is behind the PDF, or in the Preview tab) takes nothing: the caller puts the Markdown at the end of the note.
-        guard let view = textView, view.window != nil else { return false }
+        guard let view = textView, view.window != nil, isShowing() else { return false }
         write(paragraphs: [markdown])
         return true
     }
 
     /// A short piece of Markdown (a link to a page of a PDF) in the words around the caret; False when the editor is not showing.
     func insertInline(_ markdown: String) -> Bool {
-        guard let view = textView, view.window != nil else { return false }
+        guard let view = textView, view.window != nil, isShowing() else { return false }
         view.becomeFirstResponder()
         let whole = view.nativeText as NSString
         let frontmatterEnd = whole.length - (NoteFrontmatter.parse(whole as String).body as NSString).length
@@ -388,12 +395,14 @@ struct NoteEditorView: UIViewRepresentable {
     let focusOnOpen: Bool
     /// The Live tab: the same text view, drawn as the note will read, with the marks hidden away from the selection (`MarkdownStyler.setLive`).
     var live = false
+    /// Under the Preview tab: the text view stays alive (its undo history with it) but is hidden, so that it is neither drawn, touched nor read by VoiceOver.
+    var hidden = false
     let caretMoved: (Int) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(session: session, caretMoved: caretMoved) }
 
     func makeUIView(context: Context) -> UITextView {
-        let view = NoteTextView(usingTextLayoutManager: true)  // TextKit 2. Never touch `layoutManager`: that falls back to TextKit 1.
+        let view = NoteTextView(usingTextLayoutManager: true)
         view.isFindInteractionEnabled = true
         view.adjustsFontForContentSizeCategory = true
         view.autocapitalizationType = .none
@@ -447,6 +456,16 @@ struct NoteEditorView: UIViewRepresentable {
         context.coordinator.caretMoved = caretMoved
         // The Live tab came to the front, or left it: the same text view, drawn the other way (the caret, the keyboard and the text stay).
         context.coordinator.styler?.setLive(live)
+        // Hidden under the Preview (out of the touches' and VoiceOver's reach; `accessibilityHidden` and `isAccessibilityElement` do not reach a representable's view),
+        // on the next turn of the run loop and never inside SwiftUI's update: giving the keyboard up there (which hiding the view does too) makes the keyboard's
+        // tracking ask SwiftUI to render inside that same update, a cycle that held the main thread (found by sampling the app while a UI test stalled).
+        if view.isHidden != hidden {
+            DispatchQueue.main.async { [weak view] in
+                guard let view, view.isHidden != hidden else { return }
+                if hidden { _ = view.resignFirstResponder() }
+                view.isHidden = hidden
+            }
+        }
         // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
         let look = context.environment.look
         if let editor = view as? NoteTextView { editor.writing = context.environment.writing }
@@ -473,6 +492,9 @@ struct NoteEditorView: UIViewRepresentable {
         private var lastLength = 0
         private var breaking = false
         private(set) var styler: MarkdownStyler?
+        private var taskTap: LiveTaskTap?
+        /// The ↗ beside a link in the Live tab, and ⌘-tap on one.
+        private var liveLinks: LiveLinks?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
 
@@ -487,8 +509,18 @@ struct NoteEditorView: UIViewRepresentable {
             let styler = MarkdownStyler(textView: view, look: look)
             self.styler = styler
             styler.imageFolder = { [weak self] in self?.handle?.location?.imagesURL }
+            // Links (Step 2 of docs/ipad-live-default-plan.md): a dead `pdf:` link drawn as the Preview draws it, the ↗ beside the link the selection is in, and ⌘-tap.
+            styler.isLinkHere = { [weak self] in self?.handle?.isLinkHere($0) ?? true }
+            let links = LiveLinks(textView: view)
+            links.activeLink = { [weak styler] in styler?.activeLink() }
+            links.follow = { [weak self] in self?.handle?.followLink($0) ?? false }
+            links.tint = { [weak view] in ((view as? NoteTextView)?.look ?? .standard).uiLink }
+            styler.afterApply = { [weak links] in links?.update() }
+            liveLinks = links
             (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
             if live { styler.setLive(true) } else { styler.reload() }
+            // A tap on a task box the Live tab draws ticks it (Step 4 of docs/ipad-live-default-plan.md).
+            taskTap = LiveTaskTap(textView: view, isLive: { [weak styler] in styler?.isLive ?? false }, drawnTask: { [weak styler] in styler?.drawnTask(at: $0) })
             #if DEBUG || EDITOR_TEST_HOOKS
             // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
             if UserDefaults.standard.bool(forKey: "liveReport") {
@@ -513,6 +545,15 @@ struct NoteEditorView: UIViewRepresentable {
                 view.addSubview(geometry)
                 geometryLabel = geometry
                 updateSelectionLabel()
+                // `live-boxes`: the screen centres of the task boxes the Live tab draws, `x,y;x,y` (Step 4).
+                let boxes = LiveProbe(frame: CGRect(x: 0, y: 6, width: 2, height: 2))
+                boxes.isAccessibilityElement = true
+                boxes.accessibilityIdentifier = "live-boxes"
+                boxes.alpha = 0.02
+                boxes.describe = { [weak self] in
+                    (self?.taskTap?.boxCenters() ?? []).map { String(format: "%.0f,%.0f", $0.x, $0.y) }.joined(separator: ";")
+                }
+                view.addSubview(boxes)
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
@@ -562,12 +603,14 @@ struct NoteEditorView: UIViewRepresentable {
             }
         }
 
-        /// Another window changed the note: show its text, keeping the caret near where it was.
+        /// Another window, or something outside this text view (a drawing edited from the Preview, a quote put at the end of the note while the Preview shows), changed
+        /// the note: show its text, keeping the caret near where it was. The text view's undo steps were made against the old text, so they are dropped (D7).
         @MainActor
         private func show(_ text: String) {
             guard let view = textView, view.nativeText != text else { return }
             let selection = view.selectedRange
             view.text = text
+            view.undoManager?.removeAllActions()
             lastLength = view.textStorage.length
             view.selectedRange = NSRange(location: min(selection.location, (text as NSString).length), length: 0)
             styler?.reload()
@@ -601,8 +644,31 @@ struct NoteEditorView: UIViewRepresentable {
         }
 
         /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
+        /// Otherwise Return continues a Markdown list or quote, and Backspace just after an item's marker takes the marker away, as the desktop's
+        /// Markdown keys do (`ListContinuation`, Step 4 of docs/ipad-live-default-plan.md): in both tabs, since the text is the same Markdown in each.
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            !(text == "\n" && assist?.accept() == true)
+            if text == "\n" && assist?.accept() == true { return false }
+            guard let view = textView as? NoteTextView, let edit = listEdit(view, range: range, replacement: text) else { return true }
+            view.apply(edit)
+            return false
+        }
+
+        /// What Return or Backspace does to a list or a quote at the caret, or nil when the key should do what it always does: not over a selection, not
+        /// while an input method is composing (its text is not settled), and for Backspace only when it takes the one character before the caret (not a
+        /// word, a line or a selection).
+        private func listEdit(_ view: NoteTextView, range: NSRange, replacement: String) -> LineEdit? {
+            let selection = view.selectedRange
+            guard selection.length == 0, view.markedTextRange == nil, !view.isPasting else { return nil }
+            if let undo = view.undoManager, undo.isUndoing || undo.isRedoing { return nil }
+            if replacement == "\n", range.length == 0, range.location == selection.location {
+                return ListContinuation.newline(view.nativeText, at: selection.location)
+            }
+            if replacement.isEmpty, range.length > 0, NSMaxRange(range) == selection.location {
+                let text = view.nativeText
+                guard range == (text as NSString).rangeOfComposedCharacterSequence(at: range.location) else { return nil }
+                return ListContinuation.deleteBackward(text, at: selection.location)
+            }
+            return nil
         }
 
         /// A line the keystroke pushed past the column is broken at the last space before it (`LiveReflow`, the desktop's `reflowAtCaret` behind it), and the caret
@@ -668,7 +734,9 @@ struct NoteEditorView: UIViewRepresentable {
             guard let view = textView, let label = geometryLabel, let layout = view.textLayoutManager, let content = layout.textContentManager else { return }
             var found: Int?
             view.textStorage.enumerateAttribute(.liveDraw, in: NSRange(location: 0, length: view.textStorage.length)) { value, range, stop in
-                if let drawing = value as? LiveDrawing, drawing.kind == .block { found = range.location; stop.pointee = true }
+                // The frontmatter's header (Step 7) is left out: the first block drawn in the note's body.
+                let block = view.textStorage.attribute(.liveBlock, at: range.location, effectiveRange: nil) as? LiveBlockMark
+                if let drawing = value as? LiveDrawing, drawing.kind == .block, block?.kind != LiveBlockKinds.frontmatter { found = range.location; stop.pointee = true }
             }
             guard let offset = found, let location = content.location(content.documentRange.location, offsetBy: offset),
                 let fragment = layout.textLayoutFragment(for: location)
@@ -715,15 +783,22 @@ struct NoteEditorView: UIViewRepresentable {
             caretMoved(textView.selectedRange.location)
             assist?.selectionChanged()
             styler?.selectionChanged()
+            liveLinks?.update()
             #if DEBUG || EDITOR_TEST_HOOKS
             updateSelectionLabel()
             #endif
+        }
+
+        /// The frontmatter's header gives way to its YAML when the note is written in (Step 7, D5).
+        func textViewDidBeginEditing(_ textView: UITextView) {
+            styler?.focusChanged()
         }
 
         /// Leaving the field is a good moment to write: it is cheap, and the keyboard going away often means the app is too.
         func textViewDidEndEditing(_ textView: UITextView) {
             session.autosaver.flush()
             assist?.focusLost()
+            styler?.focusChanged()
         }
 
         #if DEBUG || EDITOR_TEST_HOOKS

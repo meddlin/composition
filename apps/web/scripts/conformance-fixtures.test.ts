@@ -4,13 +4,16 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { ensureSyntaxTree, syntaxTree } from "@codemirror/language";
+import { deleteMarkupBackward, insertNewlineContinueMarkup, markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ImageWidget } from "../src/components/notes/liveImages";
+import { InkWidget } from "../src/components/notes/liveInk";
 import { bodyStart, liveDecorations, scanOf } from "../src/components/notes/liveMarkdown";
 import { listDecorations } from "../src/components/notes/liveLists";
+import { footnoteDecorations, footnoteMarksField, footnotesOf } from "../src/components/notes/liveFootnotes";
+import { setextDecorations } from "../src/components/notes/liveSetext";
 
 /**
  * The desktop's side of the conformance checks the native cores run (fixtures/conformance/README.md; for the iPad,
@@ -59,6 +62,9 @@ import { listDecorations } from "../src/components/notes/liveLists";
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
  *                                  imagesToMdx (imageToMdx.ts), and for the picker of stored images listImages (images.ts, over real
  *                                  folders), imageUsage (imageRefs.ts) and matchImages, usageLabel and formatSize (imagePicker.ts)
+ *   list-continuation-cases.json, list-continuation-expected.json
+ *                                  docs/ipad-live-default-plan.md, Step 4: Return and Backspace at every caret place of each text, through the
+ *                                  real insertNewlineContinueMarkup and deleteMarkupBackward (@codemirror/lang-markdown) on a real CodeMirror state
  *   live-expected.json             docs/ipad-live-view-plan.md, step L2: the texts of fixtures/conformance/live-cases.json, the notes of
  *                                  mdx-notes.json and the preview showcase, each with the caret and selections tried on it, and what the
  *                                  real liveDecorations (liveMarkdown.ts, on a real CodeMirror state with the Markdown language) hid,
@@ -966,6 +972,34 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(expected.emphasis.filter((e) => e !== null).length).toBeGreaterThan(300);
   }, 120_000);
 
+  it("writes the list-continuation cases and what the real insertNewlineContinueMarkup and deleteMarkupBackward make of each", () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/list-continuation-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { texts: string[] };
+    // Return and Backspace with the caret at every place of each text, on a real state with the desktop's Markdown language (LiveEditor.tsx):
+    // the text afterwards and the caret, or null where the command declined (and the key does what it always does).
+    type Result = [string, number] | null;
+    const run = (text: string, caret: number, command: typeof insertNewlineContinueMarkup): Result => {
+      let state = EditorState.create({ doc: text, selection: EditorSelection.cursor(caret), extensions: [markdown({ base: markdownLanguage })] });
+      ensureSyntaxTree(state, state.doc.length, 60_000);
+      state = state.update({}).state;
+      let result: Result = null;
+      command({ state, dispatch: (tr) => (result = [tr.state.doc.toString(), tr.state.selection.main.head]) });
+      return result;
+    };
+    // Each place as [caret, Return, Backspace]; not between the two halves of a surrogate pair, where a text view never puts the caret.
+    const inPair = (text: string, caret: number) => /[\uDC00-\uDFFF]/.test(text.charAt(caret)) && /[\uD800-\uDBFF]/.test(text.charAt(caret - 1));
+    const expected = cases.texts.map((text) =>
+      Array.from({ length: text.length + 1 }, (_, caret) => caret)
+        .filter((caret) => !inPair(text, caret))
+        .map((caret) => [caret, run(text, caret, insertNewlineContinueMarkup), run(text, caret, deleteMarkupBackward)] as const),
+    );
+    fs.copyFileSync(file, path.join(outDir!, "list-continuation-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "list-continuation-expected.json"), JSON.stringify(expected));
+    expect(expected.flat().filter(([, enter]) => enter !== null).length).toBeGreaterThan(300);
+    expect(expected.flat().filter(([, , back]) => back !== null).length).toBeGreaterThan(30);
+  });
+
   it("writes the Live view cases and what the real liveDecorations make of each", () => {
     fs.mkdirSync(outDir!, { recursive: true });
     const conformance = path.resolve(__dirname, "../../../fixtures/conformance");
@@ -1034,35 +1068,35 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
 
     function decorate(raw: string, from: number, to: number) {
       const text = raw.replace(/\r\n?/g, "\n");
-      let state = EditorState.create({ doc: text, selection: EditorSelection.range(from, to), extensions: [markdown({ base: markdownLanguage })] });
+      let state = EditorState.create({
+        doc: text,
+        selection: EditorSelection.range(from, to),
+        extensions: [markdown({ base: markdownLanguage }), footnoteMarksField],
+      });
       // The state holds only the first screenful of a long text's tree; `ensureSyntaxTree` parses the rest, and an update moves it into the state.
       ensureSyntaxTree(state, state.doc.length, 60_000);
       state = state.update({}).state;
       const set = liveDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), scanOf(text));
-      // Links are drawn by the desktop since Step 2 of docs/live-default-plan.md (their `[`, `](url)` and `<` `>` hidden or
-      // shown dimmed); the iPad's Live view draws them under its own plan (D8), so a link's marks are left out of this model
-      // until it does. What is in a link's text (bold, a picture, a highlight) still counts.
-      const linkMarks: Pair[] = [];
-      syntaxTree(state).iterate({
-        enter(node) {
-          if (node.name === "Autolink") {
-            const url = node.node.getChild("URL");
-            if (url) linkMarks.push([node.from, url.from], [url.to, node.to]);
-          } else if (node.name === "Link") {
-            const [open, close] = node.node.getChildren("LinkMark");
-            if (open && close) linkMarks.push([node.from, open.to], [close.from, node.to]);
-          }
-        },
-      });
-      const inLinkMarks = (start: number, end: number) => linkMarks.some(([from, to]) => from <= start && end <= to);
-      // Lists, task lists and quotes likewise (Step 4): the desktop draws a bullet, a number or a checkbox in place of an
-      // item's marks and hides a quote's `> `; the iPad will under its own plan. Exactly what `listDecorations` replaces is
-      // left out; what is in an item or a quote still counts.
-      const listMarks = new Set(
-        listDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text))
-          .filter(({ from, to, value }) => value.point && from !== to)
-          .map(({ from, to }) => `${from}:${to}`),
-      );
+      // Lists, task lists and quotes (Step 4): the desktop draws a bullet, a number or a checkbox in place of an item's
+      // marks and hides a quote's `> `. What `listDecorations` replaces is left out of `hidden` and given on its own, as
+      // the iPad's model keeps it (docs/ipad-live-default-plan.md, Step 4): each line's lists and quotes, outermost first
+      // (`L` a list level, `Q` a quote), whether an item starts on it, and what is drawn in place of the marks away from
+      // the caret. What is in an item or a quote still counts as usual.
+      const listSet = listDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text));
+      const listMarks = new Set(listSet.filter(({ from, to, value }) => value.point && from !== to).map(({ from, to }) => `${from}:${to}`));
+      const lists: [number, string, boolean][] = [];
+      const listDrawn: [string, number, number, string][] = [];
+      for (const { from, to, value } of listSet) {
+        const spec = value.spec as { class?: string; attributes?: Record<string, string>; widget?: Record<string, unknown> };
+        if (from === to && (spec.class ?? "").includes("cm-live-block")) {
+          const style = spec.attributes?.style ?? "";
+          const padding = /padding-left: calc\(([^;]*)\)/.exec(style)?.[1] ?? "";
+          const kinds = [...padding.matchAll(/\(0\.25rem \+ 1\.25em\)|2em/g)].map((m) => (m[0] === "2em" ? "L" : "Q")).join("");
+          lists.push([from, kinds, style.includes("text-indent")]);
+        } else if (spec.widget && "checked" in spec.widget) listDrawn.push(["task", from, to, spec.widget.checked ? "x" : " "]);
+        else if (spec.widget && "ordered" in spec.widget) listDrawn.push(["marker", from, to, spec.widget.ordered ? String(spec.widget.text) : "bullet"]);
+        else listDrawn.push(["hidden", from, to, ""]);
+      }
       const out = {
         frontmatterLines: [] as number[],
         headings: [] as Pair[],
@@ -1071,28 +1105,58 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
         hidden: [] as Pair[],
         shown: [] as Pair[],
         pictures: [] as [number | null, number, string, string, string, string][],
+        // An `<Ink … />`, drawn from its strokes (InkWidget): as a picture, in the same form (docs/ipad-live-default-plan.md, Step 1).
+        inks: [] as [number | null, number, string, string, string, string][],
         tints: [] as [number, number, string][],
+        // Step 2 of docs/ipad-live-default-plan.md: each link's drawn text (a `Link`'s words, an autolink's or a bare
+        // address's URL) and the address it follows. Whether it is dead is the app's (which notes and PDFs exist), not here.
+        links: [] as [number, number, string][],
+        lists,
+        listDrawn,
+        // Step 7 (iPad plan docs/ipad-live-default-plan.md): footnote citations drawn as their number, `[from, to, number]`.
+        footnoteRefs: [] as [number, number, number][],
       };
       set.between(0, state.doc.length, (start, end, value) => {
-        const spec = value.spec as { class?: string; widget?: ImageWidget; attributes?: Record<string, string> };
+        const spec = value.spec as { class?: string; widget?: ImageWidget | InkWidget; attributes?: Record<string, string> };
         const cls = spec.class ?? "";
         if (spec.widget instanceof ImageWidget) {
           const { src, alt, title, width } = spec.widget.spec;
           // A picture drawn beside its text is a widget at the end of it; one drawn in place of it replaces the text.
           out.pictures.push([start === end ? null : start, end, src, alt, title, width]);
+        } else if (spec.widget instanceof InkWidget) {
+          const { src, alt, title, width } = spec.widget.spec;
+          out.inks.push([start === end ? null : start, end, src, alt, title, width]);
         } else if (cls.startsWith("cm-live-heading")) out.headings.push([start, Number(/cm-live-h([1-6])/.exec(cls)![1])]);
         else if (cls === "cm-live-rule") out.rules.push(start);
         else if (cls === "cm-live-frontmatter") out.frontmatterLines.push(start);
-        else if (cls === "cm-live-syntax") {
-          if (!inLinkMarks(start, end)) out.shown.push([start, end]);
-        }
+        else if (cls === "cm-live-syntax") out.shown.push([start, end]);
+        else if (cls.startsWith("cm-live-link")) out.links.push([start, end, spec.attributes!["data-href"]]);
         else if (STYLES[cls]) out.styles.push([STYLES[cls], start, end]);
         else if (cls === "md-mark") out.tints.push([start, end, spec.attributes!["data-color"]]);
         else if (cls.startsWith("md-")) return; // the plain editor's colours (code, links, tags): the Markdown tab's, not part of this model
         else if (value.point && start !== end) {
-          if (!inLinkMarks(start, end) && !listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
+          if (!listMarks.has(`${start}:${end}`)) out.hidden.push([start, end]);
         }
       });
+      // Step 7 (liveSetext, liveFootnotes): setext headings and footnote citations, which the iPad draws in its model too. A setext
+      // heading's lines are headings, its underline shown dimmed by the caret or, away from it, its whole line hidden. A
+      // citation away from the caret is drawn as its number (`footnoteRefs`), and by it is shown dimmed. A definition the iPad
+      // draws as a block of the Preview's list instead (its `[^label]:` as a number is the desktop's own), so it is left out.
+      const whole = [{ from: 0, to: state.doc.length }];
+      for (const range of setextDecorations(state, whole, bodyStart(text))) {
+        const cls = (range.value.spec as { class?: string }).class ?? "";
+        const heading = /cm-live-h([12])/.exec(cls);
+        if (heading) out.headings.push([range.from, Number(heading[1])]);
+        else if (cls === "cm-live-setext-hidden") out.hidden.push([range.from, state.doc.lineAt(range.from).to]);
+        else if (cls === "cm-live-syntax") out.shown.push([range.from, range.to]);
+      }
+      const references = new Map(footnotesOf(state).references.map((reference) => [`${reference.from}:${reference.to}`, reference.number]));
+      for (const range of footnoteDecorations(state, whole)) {
+        const number = references.get(`${range.from}:${range.to}`);
+        if (number === undefined) continue;
+        if (range.value.spec.widget) out.footnoteRefs.push([range.from, range.to, number]);
+        else out.shown.push([range.from, range.to]);
+      }
       // Back to the raw text's offsets (the pair lists hold two offsets, the triples one or two after a name).
       const at = rawOffsets(raw);
       out.frontmatterLines = out.frontmatterLines.map((n) => at[n]);
@@ -1102,7 +1166,12 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
       out.shown = out.shown.map(([a, b]) => [at[a], at[b]]);
       out.styles = out.styles.map(([kind, a, b]) => [kind, at[a], at[b]]);
       out.tints = out.tints.map(([a, b, color]) => [at[a], at[b], color]);
+      out.links = out.links.map(([a, b, href]) => [at[a], at[b], href]);
+      out.footnoteRefs = out.footnoteRefs.map(([a, b, number]) => [at[a], at[b], number]);
       out.pictures = out.pictures.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
+      out.inks = out.inks.map(([a, b, ...rest]) => [a === null ? null : at[a], at[b], ...rest]);
+      out.lists = out.lists.map(([a, kinds, starts]) => [at[a], kinds, starts]);
+      out.listDrawn = out.listDrawn.map(([kind, a, b, extra]) => [kind, at[a], at[b], extra]);
       for (const list of Object.values(out)) (list as unknown[]).sort(byValue);
       return out;
     }
@@ -1127,8 +1196,89 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(seen((e) => e.headings)).toBe(true);
     expect(seen((e) => e.rules)).toBe(true);
     expect(seen((e) => e.pictures)).toBe(true);
+    expect(seen((e) => e.inks)).toBe(true);
     expect(seen((e) => e.tints)).toBe(true);
+    expect(seen((e) => e.footnoteRefs)).toBe(true);
     expect(seen((e) => e.frontmatterLines)).toBe(true);
+    expect(seen((e) => e.links)).toBe(true);
+  }, 600_000);
+
+  // docs/ipad-live-default-plan.md, Step 3: the code blocks of the same texts, for the same selections, as the desktop's real `codeDecorations`
+  // (liveCode.ts, Step 3 of docs/live-default-plan.md) draws them. That module comes with the desktop's Step 3; until it is in this tree, nothing
+  // is written and the Swift side (LiveConformanceTests) says so and skips the comparison.
+  it("writes the Live view's code blocks as the real liveCode draws them, when the desktop has it", async () => {
+    const source = path.resolve(__dirname, "../src/components/notes/liveCode.ts");
+    const file = path.join(outDir!, "live-code-expected.json");
+    fs.rmSync(file, { force: true });
+    if (!fs.existsSync(source)) return;
+    const { codeDecorations } = (await import(source)) as {
+      codeDecorations: (
+        state: EditorState,
+        ranges: readonly { from: number; to: number }[],
+        frontmatterEnd: number,
+        highlight: null,
+      ) => { decorations: import("@codemirror/view").DecorationSet };
+    };
+    const live = JSON.parse(fs.readFileSync(path.join(outDir!, "live-expected.json"), "utf8")) as {
+      texts: { text: string }[];
+      states: { t: number; from: number; to: number }[];
+    };
+
+    // The raw text's offset of each of CodeMirror's (as in the test above: CodeMirror reads `\r\n` as one), and back.
+    const rawOffsets = (raw: string): number[] => {
+      const map: number[] = [];
+      for (let i = 0; i < raw.length; i++) {
+        if (raw[i] === "\r" && raw[i + 1] === "\n") continue;
+        map.push(raw[i] === "\n" && raw[i - 1] === "\r" ? i - 1 : i);
+      }
+      map.push(raw.length);
+      return map;
+    };
+    const parsed = new Map<number, { state: EditorState; at: number[]; back: Map<number, number> }>();
+    const expected = live.states.map(({ t, from, to }) => {
+      let entry = parsed.get(t);
+      if (!entry) {
+        const raw = live.texts[t].text;
+        const text = raw.replace(/\r\n?/g, "\n");
+        let state = EditorState.create({ doc: text, extensions: [markdown({ base: markdownLanguage })] });
+        ensureSyntaxTree(state, state.doc.length, 60_000);
+        state = state.update({}).state;
+        const at = rawOffsets(raw);
+        entry = { state, at, back: new Map(at.map((raw, cm) => [raw, cm])) };
+        parsed.set(t, entry);
+      }
+      const { at, back } = entry;
+      const state = entry.state.update({ selection: EditorSelection.range(back.get(from) ?? from, back.get(to) ?? to) }).state;
+      const text = state.doc.toString();
+      const { decorations } = codeDecorations(state, [{ from: 0, to: state.doc.length }], bodyStart(text), null);
+      // Each line the block's look is on, with its classes (`first`, `last`, `fence`, `hidden`), and each run hidden (an indented block's indent).
+      const lines = new Map<number, Set<string>>();
+      const hidden: [number, number][] = [];
+      decorations.between(0, state.doc.length, (start, end, value) => {
+        const cls = (value.spec as { class?: string }).class;
+        if (cls === undefined) {
+          if (end > start) hidden.push([at[start], at[end]]);
+          return;
+        }
+        const names = cls
+          .split(/\s+/)
+          .filter((name) => name.startsWith("cm-live-codeblock"))
+          .map((name) => name.replace(/^cm-live-codeblock-?/, "") || "code");
+        if (names.length === 0) return;
+        const line = lines.get(at[start]) ?? new Set<string>();
+        for (const name of names) line.add(name);
+        lines.set(at[start], line);
+      });
+      return {
+        lines: [...lines.entries()].sort((a, b) => a[0] - b[0]).map(([line, names]) => [line, [...names].filter((name) => name !== "code").sort().join(" ")]),
+        hidden: hidden.sort((a, b) => a[0] - b[0]),
+      };
+    });
+    fs.writeFileSync(file, JSON.stringify({ expected }));
+    // The check has teeth only if there are blocks, with their fences hidden and shown, and an indent hidden.
+    expect(expected.some((e) => e.lines.some(([, names]) => names === "hidden"))).toBe(true);
+    expect(expected.some((e) => e.lines.some(([, names]) => String(names).includes("fence")))).toBe(true);
+    expect(expected.some((e) => e.hidden.length > 0)).toBe(true);
   }, 600_000);
 
   it("writes the colour schemes, <Mark> tints, fonts and chart colours the real globals.css, themes.ts, editorFonts.ts, previewFonts.ts and Chart.tsx hold", async () => {

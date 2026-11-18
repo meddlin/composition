@@ -11,12 +11,14 @@ struct AppearanceView: View {
     @State private var hoursDraft = SunHours.default
     @State private var hoursSaved = false
     @State private var hoursRefusal: String?
+    /// The view every note opens in (docs/ipad-live-default-plan.md, D9 and I3): kept on this iPad, unlike the rest of this sheet.
+    @AppStorage(NoteDetailView.Mode.openNotesInKey) private var openNotesIn = NoteDetailView.Mode.openNotesInDefault
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    row("System", detail: "Light by day and dark at night, as the iPad is set", choice: .system, id: "system") { SystemSwatch() }
+                    row("System", detail: "Light by day and dark at night, as this device is set", choice: .system, id: "system") { SystemSwatch() }
                     ForEach(Theme.all, id: \.name) { theme in
                         row(theme.label, detail: nil, choice: .theme(theme.name), id: theme.name) { SchemeSwatch(theme: theme) }
                     }
@@ -42,7 +44,7 @@ struct AppearanceView: View {
                 } header: {
                     Text("Fonts").foregroundStyle(look.mutedText)
                 } footer: {
-                    Text("The iPad's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not on the iPad yet.").foregroundStyle(look.mutedText)
+                    Text("The system's own faces. The desktop's open-source families (Geist, Lora, Literata …) are not in this app yet.").foregroundStyle(look.mutedText)
                 }
                 .listRowBackground(look.surface)
 
@@ -65,6 +67,10 @@ struct AppearanceView: View {
     /// The ruler and reflow, which help with the shape of the text in the Markdown and Live tabs (the desktop's Settings ▸ Writing). Both are off until switched on.
     @ViewBuilder private var writing: some View {
         Section {
+            Picker("Open notes in", selection: $openNotesIn) {
+                ForEach(NoteDetailView.Mode.allCases, id: \.self) { Text($0.rawValue) }
+            }
+            .accessibilityIdentifier("open-notes-in")
             Toggle("Ruler", isOn: writingBinding(\.rulerEnabled)).accessibilityIdentifier("ruler-toggle")
             if model.writing.rulerEnabled {
                 Stepper(value: writingBinding(\.rulerColumn), in: WritingSettings.minColumn...WritingSettings.maxColumn) {
@@ -83,7 +89,7 @@ struct AppearanceView: View {
         } header: {
             Text("Writing").foregroundStyle(look.mutedText)
         } footer: {
-            Text("The ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
+            Text("Every note opens in the view chosen here; a tab you switch to lasts until you open another note. A new note opens ready to type: in Markdown when this is Preview. This choice is kept on this iPad only.\n\nThe ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
@@ -145,7 +151,7 @@ struct AppearanceView: View {
         } header: {
             Text("When it changes").foregroundStyle(look.mutedText)
         } footer: {
-            Text("Times on this iPad's own clock, so they follow it if it changes zone. They go once round the clock in order, starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before. The defaults are 05:45, 07:15, 17:45 and 19:15. Nothing is looked up: there is no city, no location and no network request.")
+            Text("Times on this device's own clock, so they follow it if it changes zone. They go once round the clock in order, starting anywhere (to be light over the night, start in the evening), each at least a minute after the one before. The defaults are 05:45, 07:15, 17:45 and 19:15. Nothing is looked up: there is no city, no location and no network request.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
