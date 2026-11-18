@@ -215,6 +215,12 @@ feel, VoiceOver, speed on the device).
   in the level left of the text, the Preview's muted `•` or number, or its `square` / `checkmark.square.fill` (in place of the bullet, as the Preview
   does; the desktop draws both). On the caret's line the marks show as written, starting a level further out. `LiveTaskTap` ticks or unticks a drawn box
   through the text view (`replace(_:withText:)`), leaving the selection; the target is 44 points round the box, cut off where the item's text starts.
+- **Simulator (2026-11-18):** `LiveListsUITests` (7, from `live-report`, with the boxes tapped where the Debug-only `live-boxes` element says they are):
+  bullets, numbers and a nested item drawn and their marks shown on the caret's line; a quote's bars, hidden `> ` and muted words; two box taps
+  each undone on its own by ⌘Z, the selection left where it was; a tap on an item's words edits and draws no box on that line; Return and Backspace
+  in a list; Tab and Shift+Tab nesting and un-nesting two items. All 36 `LiveUITests` pass (some re-run alone: the Mac was very loaded, and on an
+  11-inch iPad the crowded toolbar covers the view picker's *Markdown*, so the tab-switching and scheme tests were run on a 13-inch). Screenshots
+  showed the bullets, numbers and boxes in the level left of the words.
 - **Not built:** Return does not continue a list or a quote in either tab. The plan said "as the Markdown tab does (`EditorAssist`)", but the iPad's
   Markdown tab never has: Return is a plain line break in both, and that is what was checked. Continuing lists (the desktop's CodeMirror
   `insertNewlineContinueMarkup`) is a separate item. VoiceOver says nothing of a box's state yet (item 353).
