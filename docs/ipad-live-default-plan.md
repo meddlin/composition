@@ -433,7 +433,26 @@ the typed text never reaching the note). Worth one more run of the suite on a qu
 - **Preview probe:** with `-liveReport 1` the Preview has an element `preview-blocks` naming the kinds of block it
   draws (from its own `PreviewBlock`s), for the showcase test.
 
-SIMULATOR_RESULTS
+**Simulator** (`LiveComponentsUITests`, own Simulator, `-parallel-testing-enabled NO`, the Mac's load average 15 to
+300): all seven pass. The showcase opened in the Preview says it draws `toc, markdown, info, warning, image, chart,
+repo, youtube, notice, table, footnotes` (`preview-blocks`); in Live every one has its drawn block from its first line
+(`block-<kind>` with `draw-block`), the pictures through the picture layer, and `toc` and `footnotes` are reported as
+Step 7's. A note with each component (both panels, a block `<Mark>`, a bar chart, a video, a repository, a notice) has
+each drawn as one picture with every character hidden. An `<Info>` panel's fill (the brand at 12% over the page) and
+its bar of the brand are on screen in Dark and in Light, and not in the Markdown tab. The ↗ is beside a video's tag
+with its youtube.com address while the caret is in it, goes when the caret leaves, and beside a repository's tag (the
+caret put there by a tap on its picture) opens Safari. Typing ` an <Mark>open` leaves the panel drawn with its picture
+for three seconds of passes, with no notice in Live, and closing the tag leaves it drawn. The 16 ms budget on the
+showcase, now with its panels, charts and cards drawn (`LiveBench`, Debug): styler p95 1.6 ms, whole keystroke p95
+7.9 ms, 1 of 200 over 16 ms. The existing Live tests (`LiveBlockUITests`, `LiveUITests`, `LiveLinksUITests`,
+`LiveCodeUITests`, `LiveListsUITests`, `LiveDrawingsUITests`, `AccessibilityUITests`) with the new ones, 92 in one
+run: 90 passed. `AccessibilityUITests.testTheListOfStoredImages` lost the restore's alert and passed alone;
+`LiveDrawingsUITests.testADiagramIsDrawnAtHalfItsPixels` fails alone too, and fails the same way on the plan branch
+without Step 6 (the first diagram is drawn revealed, as if the caret opened on its line): not this step's.
+
+Found on the way, not changed here: arrowing up or down into a component's tag can stop in its name (`<Yo|uTube`),
+where the `<` list (`EditorAssist`) opens and takes ↑ and ↓ until Escape. It is the typing aid's, in both tabs, and is
+more likely in Live now that whole components reveal under the caret.
 
 ### Step 7: the rest (M)
 
