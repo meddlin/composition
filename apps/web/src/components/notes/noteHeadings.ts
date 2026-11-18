@@ -7,11 +7,21 @@ const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 // A setext heading's underline: `===` makes the paragraph above it a level 1 heading, `---` a level 2.
 const UNDERLINE = /^ {0,3}(=+|-+)[ \t]*$/;
 // Lines that start something other than a paragraph, which an underline after them does not make a heading: a list
-// item, a quote, an HTML or MDX block, a definition (`[x]: url`, `[^1]: note`), or a thematic break.
-const NOT_PARAGRAPH = /^ {0,3}(?:[-*+](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|<|\[[^\]]+\]:|([-*_])(?:[ \t]*\1){2,}[ \t]*$)/;
+// item, a quote, an HTML or MDX block, a definition (`[x]: url`, `[^1]: note`), or a thematic break (`isRule`).
+const NOT_PARAGRAPH = /^ {0,3}(?:[-*+](?:[ \t]|$)|\d{1,9}[.)](?:[ \t]|$)|>|<|\[[^\]]+\]:)/;
 const INDENTED = /^(?: {4}|\t)/;
-// What can cut a paragraph short (an HTML block or a link's definition can't).
-const INTERRUPTS = /^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\[\^[^\]\s]+\]:|([*_])(?:[ \t]*\1){2,}[ \t]*$)/;
+// What can cut a paragraph short (an HTML block or a link's definition can't), besides a thematic break.
+const INTERRUPTS = /^ {0,3}(?:[-*+][ \t]|\d{1,9}[.)][ \t]|>|\[\^[^\]\s]+\]:)/;
+
+/**
+ * Whether `line` is a thematic break: up to three spaces, then three or more of one of `-`, `*` or `_`, with spaces
+ * or tabs between them allowed. Checked without a backreference, which regex scanners take for a ReDoS risk.
+ */
+function isRule(line: string): boolean {
+  if (!/^ {0,3}[-*_]/.test(line)) return false;
+  const marks = line.replace(/[ \t]/g, "");
+  return marks.length >= 3 && marks === marks[0].repeat(marks.length);
+}
 
 /** Cuts an ATX heading's optional closing hashes (`## Title ##`) and the Markdown that only styles the label. */
 function labelOf(raw: string): string {
@@ -78,15 +88,15 @@ export function extractHeadings(text: string, bodyStart = 0): NoteHeading[] {
 
     if (paragraph) {
       // A list, quote or the like can interrupt a paragraph; anything else carries it on.
-      if (INTERRUPTS.test(line)) {
+      if (INTERRUPTS.test(line) || isRule(line)) {
         paragraph = null;
         other = true;
       } else paragraph.lines.push(line.trim());
     } else if (!other) {
       // Indented code can't start a paragraph; nothing in a list item or a quote is one at the top level.
-      if (NOT_PARAGRAPH.test(line) || INDENTED.test(line)) other = true;
+      if (NOT_PARAGRAPH.test(line) || isRule(line) || INDENTED.test(line)) other = true;
       else paragraph = { offset: lineStart, lines: [line.trim()] };
-    } else if (/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/.test(line)) {
+    } else if (isRule(line)) {
       // A rule ends a list or a quote.
       other = false;
     }
