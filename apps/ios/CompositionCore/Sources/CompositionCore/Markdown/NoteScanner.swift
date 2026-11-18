@@ -61,8 +61,82 @@ public struct ScannedNote: Sendable {
     /// are (`[^label]`): they become numbers when the Markdown is parsed, since replacing them in the text would change which
     /// `**` and `_` mark emphasis.
     public var blocks: [NoteBlock]
+    /// Where each of `blocks` is written, in the note's text, in UTF-16 units (what a text view counts in), in the same order: a component from its opening
+    /// tag to the end of its closing one, a run of Markdown from the start of its first line that is not blank to the end of its last. The ranges are in order
+    /// and never overlap (docs/ipad-live-default-plan.md, Step 5: what the Live tab draws a block in place of).
+    public var blockRanges: [NSRange]
+    /// For each run of Markdown, the pieces of the note it was copied from (the footnotes' own text is cut out of it), as scalars of the scanned text; empty for
+    /// a component. With `index`, what turns a place in a run's text back into a place in the note.
+    var runPieces: [[Range<Int>]]
+    var index: SourceIndex
 
     public var isValid: Bool { error == nil }
+
+    /// Where `range` (UTF-16 units of the text of `blocks[block]`, a run of Markdown) is in the note. Nil for a component.
+    func noteRange(ofRun block: Int, text: String, _ range: Range<Int>) -> NSRange? {
+        guard block < runPieces.count, !runPieces[block].isEmpty else { return nil }
+        let pieces = runPieces[block]
+        // UTF-16 offsets of the run's text to its scalars.
+        var utf16: [Int] = [0]
+        utf16.reserveCapacity(text.unicodeScalars.count + 1)
+        for scalar in text.unicodeScalars { utf16.append(utf16[utf16.count - 1] + (scalar.value > 0xFFFF ? 2 : 1)) }
+        func scalar(at offset: Int) -> Int {
+            var low = 0, high = utf16.count - 1
+            while low < high {
+                let middle = (low + high + 1) / 2
+                if utf16[middle] <= offset { low = middle } else { high = middle - 1 }
+            }
+            return low
+        }
+        /// A scalar of the run's text as a scalar of the scanned text; an end that falls where one piece stops and the next starts belongs to the first.
+        func source(_ k: Int, end: Bool) -> Int {
+            var before = 0
+            for piece in pieces {
+                let count = piece.count
+                if k < before + count || (end && k == before + count) { return piece.lowerBound + (k - before) }
+                before += count
+            }
+            return pieces[pieces.count - 1].upperBound
+        }
+        let start = index.utf16(source(scalar(at: range.lowerBound), end: false))
+        let stop = index.utf16(source(scalar(at: range.upperBound), end: true))
+        return NSRange(location: start, length: max(0, stop - start))
+    }
+}
+
+/// Where the scalars the scanner reads are in the note's text: UTF-16 units, past the frontmatter, and counting the `\r` of each `\r\n` that the scanner
+/// does not see.
+struct SourceIndex: Sendable {
+    private var units: [Int]
+
+    init(body: String, offset: Int) {
+        let scalars = Array(body.unicodeScalars)
+        units = []
+        units.reserveCapacity(scalars.count + 1)
+        var position = offset
+        var i = 0
+        while i < scalars.count {
+            if scalars[i] == "\r", i + 1 < scalars.count, scalars[i + 1] == "\n" {
+                // The scanner reads `\r\n` as `\n`: its `\n` stands for both, so that what ends before it ends before the `\r`.
+                units.append(position)
+                position += 2
+                i += 2
+                continue
+            }
+            units.append(position)
+            position += scalars[i].value > 0xFFFF ? 2 : 1
+            i += 1
+        }
+        units.append(position)
+    }
+
+    /// The UTF-16 offset in the note of scalar `k` of the scanned text (its end, for the count of scalars).
+    func utf16(_ k: Int) -> Int { units[min(max(k, 0), units.count - 1)] }
+
+    func range(_ scalars: Range<Int>) -> NSRange {
+        let start = utf16(scalars.lowerBound)
+        return NSRange(location: start, length: utf16(scalars.upperBound) - start)
+    }
 }
 
 public enum NoteScanner {
@@ -71,25 +145,27 @@ public enum NoteScanner {
     /// here and an error there until the web side is wired.
     public static let components = ["Info", "Warning", "Image", "Drawio", "Ink", "Toc", "Mark", "Footnotes", "YouTube", "Repo", "Chart"]
 
-    /// Reads a note's body (its text without the frontmatter).
-    public static func scan(_ body: String) -> ScannedNote {
+    /// Reads a note's body (its text without the frontmatter). `offset` is where the body starts in the note, in UTF-16 units: the block ranges are counted
+    /// from the note's start.
+    public static func scan(_ body: String, at offset: Int = 0) -> ScannedNote {
         let text = body.replacingOccurrences(of: "\r\n", with: "\n")
         let scalars = Array(text.unicodeScalars)
+        let index = SourceIndex(body: body, offset: offset)
         var scanner = Scanner(scalars, readTags: mentionsComponent(scalars))
         scanner.run()
         let footnotes = scanner.footnotes()
         if scanner.readTags, scanner.failure == nil {
-            let blocks = scanner.blocks(footnotes)
-            return ScannedNote(isMdx: true, error: nil, elements: scanner.elements, headings: headings(of: markdownRuns(blocks)), footnotes: footnotes.order,
-                               footnoteBodies: footnotes.bodies, blocks: blocks)
+            let cut = scanner.blocks(footnotes)
+            return ScannedNote(isMdx: true, error: nil, elements: scanner.elements, headings: headings(of: markdownRuns(cut.blocks)), footnotes: footnotes.order,
+                               footnoteBodies: footnotes.bodies, blocks: cut.blocks, blockRanges: cut.ranges.map(index.range), runPieces: cut.pieces, index: index)
         }
         // Not MDX (it mentions no component), or not valid MDX: the whole note as plain Markdown, where footnotes still work.
         var plain = Scanner(scalars, readTags: false)
         plain.run()
         let plainFootnotes = plain.footnotes()
         let whole = plain.blocks(plainFootnotes)
-        return ScannedNote(isMdx: scanner.readTags, error: scanner.failure, elements: [], headings: headings(of: markdownRuns(whole)), footnotes: plainFootnotes.order,
-                           footnoteBodies: plainFootnotes.bodies, blocks: whole)
+        return ScannedNote(isMdx: scanner.readTags, error: scanner.failure, elements: [], headings: headings(of: markdownRuns(whole.blocks)), footnotes: plainFootnotes.order,
+                           footnoteBodies: plainFootnotes.bodies, blocks: whole.blocks, blockRanges: whole.ranges.map(index.range), runPieces: whole.pieces, index: index)
     }
 
     /// The desktop's `usesMdxComponent`: `<` and a component's name, then a space, `/` or `>`. Code does not matter to it.
@@ -502,50 +578,73 @@ public enum NoteScanner {
 
         // MARK: Blocks
 
-        /// The note cut at its block tags: what is between them is Markdown, and what a pair of tags holds is the element's children.
-        func blocks(_ footnotes: FootnoteInfo) -> [NoteBlock] {
+        /// The note cut at its block tags: what is between them is Markdown, and what a pair of tags holds is the element's children. With the top-level
+        /// blocks' places (in scalars of the text) and, for each run of Markdown, the pieces of the text its own text was copied from.
+        func blocks(_ footnotes: FootnoteInfo) -> (blocks: [NoteBlock], ranges: [Range<Int>], pieces: [[Range<Int>]]) {
             var root: [NoteBlock] = []
-            var open: [(name: String, props: [String: MdxPropValue], children: [NoteBlock])] = []
+            var ranges: [Range<Int>] = []
+            var pieces: [[Range<Int>]] = []
+            var open: [(name: String, props: [String: MdxPropValue], children: [NoteBlock], start: Int)] = []
             var at = 0
 
-            func add(_ block: NoteBlock) {
-                if open.isEmpty { root.append(block) } else { open[open.count - 1].children.append(block) }
+            func add(_ block: NoteBlock, at range: Range<Int>, copied: [Range<Int>] = []) {
+                if open.isEmpty {
+                    root.append(block)
+                    ranges.append(range)
+                    pieces.append(copied)
+                } else {
+                    open[open.count - 1].children.append(block)
+                }
             }
             func flush(to end: Int) {
                 guard at < end else { return }
-                let text = applying(footnotes.edits, to: at..<end)
-                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { add(.markdown(text)) }
+                let (text, copied) = applying(footnotes.edits, to: at..<end)
+                if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { add(.markdown(text), at: written(at..<end), copied: copied) }
             }
             for flow in flowTags {
                 let tag = flow.tag
                 flush(to: tag.start)
                 at = tag.end
                 if tag.closing {
-                    if let top = open.popLast() { add(.element(name: top.name, props: top.props, children: top.children)) }
+                    if let top = open.popLast() { add(.element(name: top.name, props: top.props, children: top.children), at: top.start..<tag.end) }
                 } else if tag.selfClosing {
-                    add(.element(name: tag.name, props: tag.props, children: []))
+                    add(.element(name: tag.name, props: tag.props, children: []), at: tag.start..<tag.end)
                 } else {
-                    open.append((tag.name, tag.props, []))
+                    open.append((tag.name, tag.props, [], tag.start))
                 }
             }
             flush(to: s.count)
-            return root
+            return (root, ranges, pieces)
+        }
+
+        /// `range` less its blank lines at either end: from the start of its first line with something on it to the last thing on its last.
+        private func written(_ range: Range<Int>) -> Range<Int> {
+            var first = range.lowerBound
+            while first < range.upperBound, Self.isWhitespace(s[first]) { first += 1 }
+            var last = range.upperBound
+            while last > first, Self.isWhitespace(s[last - 1]) { last -= 1 }
+            var start = first
+            while start > range.lowerBound, s[start - 1] != "\n" { start -= 1 }
+            return start..<max(start, last)
         }
 
         // MARK: Footnotes
 
-        /// `s[range]` with the edits that lie inside it made.
-        func applying(_ edits: [(range: Range<Int>, replacement: String)], to range: Range<Int>) -> String {
+        /// `s[range]` with the edits that lie inside it made, and the pieces of `s` that were copied into it, in order.
+        func applying(_ edits: [(range: Range<Int>, replacement: String)], to range: Range<Int>) -> (text: String, pieces: [Range<Int>]) {
             var out = String.UnicodeScalarView()
+            var pieces: [Range<Int>] = []
             var at = range.lowerBound
             for edit in edits.sorted(by: { $0.range.lowerBound < $1.range.lowerBound })
             where edit.range.lowerBound >= at && edit.range.upperBound <= range.upperBound {
                 out.append(contentsOf: s[at..<edit.range.lowerBound])
-                out.append(contentsOf: edit.replacement.unicodeScalars)
+                if at < edit.range.lowerBound { pieces.append(at..<edit.range.lowerBound) }
+                out.append(contentsOf: edit.replacement.unicodeScalars)  // only ever "" (a footnote's text cut out): nothing in the note to point at
                 at = edit.range.upperBound
             }
             out.append(contentsOf: s[at..<range.upperBound])
-            return String(out)
+            if at < range.upperBound { pieces.append(at..<range.upperBound) }
+            return (String(out), pieces)
         }
 
         /// The footnotes. GFM's footnotes are not in swift-markdown, so `[^label]` and `[^label]: text` are read here, outside

@@ -74,6 +74,20 @@ final class AccessibilityUITests: XCTestCase {
         try launch(mode: "Live", scheme: "forest", note: nil, extra: ["-importText", file.path])
         try audit("live, a note with headings and marks, forest")
     }
+    /// A note with a table, which the Live tab draws as a picture of the Preview's table (docs/ipad-live-default-plan.md, Step 5): every character of the table is hidden and
+    /// the picture adds no element of its own, so the text view's value is still the source (VoiceOver is told not to speak its pipes and dashes: `LiveUITests`, and the
+    /// manual test's item 358).
+    func testTheLiveTabWithATable() throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("live-audit-table.md")
+        try "# A table\n\nBefore it.\n\n| Name | Count | Notes |\n|:--|--:|---|\n| apples | 3 | **red** ones |\n| pears | 12 | `green` |\n\nAfter it.\n".write(to: file, atomically: true, encoding: .utf8)
+        try launch(mode: "Live", scheme: "forest", note: nil, extra: ["-importText", file.path, "-liveReport", "1"])
+        let report = app.descendants(matching: .any)["live-report"]
+        let drawn = { report.exists && report.label.contains("block-pictured:") }
+        let end = Date().addingTimeInterval(20)
+        while !drawn(), Date() < end { RunLoop.current.run(until: Date().addingTimeInterval(0.25)) }
+        XCTAssertTrue(drawn(), "the table is drawn as a picture: \(report.exists ? report.label : "no report")")
+        try audit("live, a note with a table, forest")
+    }
     func testTheLiveTabInCream() throws { try launch(mode: "Live", scheme: "cream"); try audit("live, cream") }
     func testTheLiveTabAtTheLargestTextSize() throws { try launch(mode: "Live", scheme: "cream", size: "UICTContentSizeCategoryAccessibilityXXXL"); try audit("live, cream, largest text") }
 
