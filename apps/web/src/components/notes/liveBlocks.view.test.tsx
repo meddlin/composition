@@ -10,6 +10,11 @@ import { LiveEditor } from "./LiveEditor";
 import { LiveBlockHost } from "./liveBlockWidget";
 import { liveBlockKinds, liveBlocks, liveBlocksField, REDRAW_DELAY, TABLE } from "./liveBlocks";
 
+// jsdom lays nothing out and has no Range rects. A drawn block asks the editor to measure once it has rendered, and
+// that measure (run on an animation frame, sometimes after a test is done) reads text through them.
+Range.prototype.getClientRects ??= () => [] as unknown as DOMRectList;
+Range.prototype.getBoundingClientRect ??= () => new DOMRect();
+
 const TABLE_1 = "| Name | Count |\n|---|---|\n| apples | 3 |";
 const DOC = `Before\n\n${TABLE_1}\n\nAfter`;
 const FROM = DOC.indexOf("| Name");
