@@ -160,6 +160,9 @@ final class LiveComponentsUITests: XCTestCase {
         let note = "Components\n\n" + Self.parts.joined(separator: "\n\n") + "\n\nend"
         try launch(text: note)
         XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        // The caret on `end`, away from every component (where a note opens it is not this test's: it may be in the first block, which then shows its source).
+        focusEditor()
+        app.typeKey(.downArrow, modifierFlags: .command)
         for (part, kind) in zip(Self.parts, Self.kindsOfParts) {
             let at = try XCTUnwrap(range(of: part), "\(kind) is in the note")
             XCTAssertTrue(eventually(30) { (self.drawn()["block-\(kind)"] ?? "").contains(at) && (self.drawn()["block-pictured"] ?? "").contains(at) },
@@ -219,7 +222,9 @@ final class LiveComponentsUITests: XCTestCase {
 
     private func checkThePanelsTint(in scheme: Scheme) throws {
         let panel = "<Info>\n\nA panel drawn in the Live tab, as the Preview draws it, in the scheme's own tint.\n\n</Info>"
-        try launch(text: "Panel\n\n" + panel + "\n\nend", scheme: scheme.name)
+        // A paragraph before the panel: a note may open with the caret in its first block after the title, and the panel must not be showing its source. The editor
+        // is not given the keys, so that no keyboard bar is on screen for the pixels to find.
+        try launch(text: "Panel\n\nA paragraph first.\n\n" + panel + "\n\nend", scheme: scheme.name)
         XCTAssertTrue(editor.waitForExistence(timeout: 30))
         let at = try XCTUnwrap(range(of: panel))
         XCTAssertTrue(eventually(30) { (self.drawn()["block-pictured"] ?? "").contains(at) && self.drawn()["block-revealed"] == nil }, "\(scheme.name): the panel is drawn: \(drawn())")
