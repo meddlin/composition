@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, placeTodo, sortByPriority, sortDoneLast, subtreeIds, todoSections, withDone, withPriority, withStatus } from "./todos";
+import { archiveGroups, buildTodoTree, cleanTodoTitle, countDescendants, nestTodo, placeTodo, sortByPriority, sortDoneLast, subtreeIds, todoSections, withDone, withPriority, withStatus } from "./todos";
 import type { ArchivedTodo, Todo, TodoPriority } from "./todosApi";
 
 const todo = (id: number, parentId: number | null, title = `t${id}`): Todo => ({
@@ -236,6 +236,32 @@ describe("placeTodo", () => {
 
     expect(ids(placeTodo(todos, 2, 2))).toEqual([1, 2, 3]);
     expect(ids(placeTodo(todos, 9, 1))).toEqual([1, 2, 3]);
+  });
+});
+
+describe("nestTodo", () => {
+  const shape = (todos: Todo[]) => todos.map((t) => [t.id, t.parentId]);
+
+  it("makes an item, with what is under it, the last sub-item of another, or puts it before one of them", () => {
+    const todos = [todo(1, null), todo(2, 1), todo(3, null), todo(4, 3), todo(5, null)];
+
+    expect(shape(nestTodo(todos, 3, 1, null))).toEqual([[1, null], [2, 1], [3, 1], [4, 3], [5, null]]);
+    expect(shape(nestTodo(todos, 5, 1, 2))).toEqual([[1, null], [5, 1], [3, null], [4, 3], [2, 1]]);
+  });
+
+  it("brings a sub-item back to the top level, before the item given", () => {
+    const todos = [todo(1, null), todo(2, 1), todo(3, null)];
+
+    expect(shape(nestTodo(todos, 2, null, 3))).toEqual([[1, null], [2, null], [3, null]]);
+    expect(nestTodo(todos, 2, null, 3).filter((t) => t.parentId === null).map((t) => t.id)).toEqual([1, 2, 3]);
+  });
+
+  it("leaves the list as it is for an item put under itself or under one of its own sub-items, or one that is not there", () => {
+    const todos = [todo(1, null), todo(2, 1), todo(3, 2)];
+
+    expect(nestTodo(todos, 1, 1, null)).toEqual(todos);
+    expect(nestTodo(todos, 1, 3, null)).toEqual(todos);
+    expect(nestTodo(todos, 9, 1, null)).toEqual(todos);
   });
 });
 

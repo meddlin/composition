@@ -138,6 +138,20 @@ export function placeTodo(todos: readonly Todo[], id: number, beforeId: number |
   return applyOrder([...todos], placeBefore(siblings, id, beforeId));
 }
 
+/**
+ * The items with `id` (and everything under it) moved under `parentId`, or to the top level when that is null, placed
+ * immediately before `beforeId` among its new siblings, or last when `beforeId` is null or not one of them. Unchanged
+ * when the item is missing or the parent is the item itself or under it. The repo persists the same rule (todosRepo.ts).
+ */
+export function nestTodo(todos: readonly Todo[], id: number, parentId: number | null, beforeId: number | null): Todo[] {
+  if (!todos.some((t) => t.id === id) || (parentId !== null && subtreeIds(todos, id).has(parentId))) return [...todos];
+  return placeTodo(
+    todos.map((t) => (t.id === id ? { ...t, parentId } : t)),
+    id,
+    beforeId,
+  );
+}
+
 /** Every group of siblings, as ids in display order with the open items first and the done ones after, each keeping its own order. */
 export function doneLastGroups(todos: readonly Todo[]): number[][] {
   const groups = new Map<number | null, Todo[]>();

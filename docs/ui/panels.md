@@ -21,7 +21,7 @@ A panel shows one thing, its *kind*:
 | Kind | Shows |
 |---|---|
 | **Empty** | A place to arrange the window before filling it, offering to become one of the other kinds. |
-| **Note** | A note, with its Markdown / Preview / Split / Live tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. |
+| **Note** | A note, with its Live / Markdown / Preview / Split tabs and its find bar. A note panel with no note yet says so, and takes the next note picked in the sidebar or dropped on it. A new note panel starts on the view chosen in **Settings › Writing › Open notes in**, which is **Live** unless changed ([live-editor.md](live-editor.md)); where it is Split, a panel opened beside another starts on Markdown instead. A panel whose tab you changed keeps it when another note opens in it, and a saved layout comes back on the tabs it had. |
 | **Notes browser** | A second tree of a notebook's groups and notes, with its own chosen notebook (a menu at the top). Picking a note opens it in the note panel used last, or in a new one beside the browser. |
 | **AI helper** | The [AI helper](ai-helper.md)'s chat about one note. See below. |
 | **To-do** | A to-do list that archives what is done each week, with an archive and reports. See below. |
@@ -146,8 +146,8 @@ layout (a panel saved before the board, the reports and the archive existed open
   (sub-items nest without limit, and the box stays open for more; Escape closes it). A new item starts in **This week**; the **Backlog** has its own box, with its own **Add**.
 - **Renaming.** The pencil on an item, or double-click its title. Enter saves, Escape gives up.
 - **Done.** The checkbox ticks an item off and its text is struck through and dimmed. Ticking an item does not tick its sub-items.
-- **Removing.** The bin on an item is **Remove**: it goes to the archive at once, with its sub-items, and a bar says so with an **Undo** for a few
-  seconds. Nothing is asked first. An item that comes back from the archive is a to-do again, whatever it was.
+- **Removing.** The bin on an item is **Remove**: a confirmation asks first (Cancel has the focus, so a stray Enter backs out), saying how many
+  sub-items go with it. On **Remove** it goes to the archive with its sub-items, and a bar says so with an **Undo** for a few seconds. An item that comes back from the archive is a to-do again, whatever it was.
 - **Delete permanently.** The **⋯** menu beside Remove on a row or a board card, and the bin on an Archive entry, erase an item, everything under
   it and its history for good. A confirmation says how many items go, that it cannot be undone, that backup files made earlier may still contain it,
   and lists the reports that mention it as links that open the report beside, so you can edit them first. Reports are never changed by a delete.
@@ -174,6 +174,13 @@ dragged on its own (dragging it picks up the item it is under), and a row being 
 (`TODO_DRAG_TYPE`, [`dragTypes.ts`](../../apps/web/src/components/notes/dragTypes.ts)), not as text, so a note or a panel dropped on the same screen is not mistaken for it, and a
 note's editor has no text to take from it. It is mouse-only: the keyboard way to place a Rolled over entry is its **Add to this week** button, and a Backlog item or a to-do is moved
 on the board. The board is unchanged: its cards move by their arrows or by dragging between columns.
+
+**Dragging onto an item.** A top-level item in **This week** or the **Backlog** (done or not) can be dropped *on* another row in either section to become its last
+sub-item, with everything under it coming along ([`nestTodo`](../../apps/web/src/lib/composition/todos.ts)). On a row it could also be reordered among, the top and
+bottom quarters still put it before or after (a line), and the middle half puts it under (a ring and a tint); on any other row, sub-items included, the whole row puts
+it under. The item keeps its status, a folded item it lands in is opened, and a bar says **Moved “A” under “B”** with an **Undo** that puts it back at the top level
+where it was. It cannot go under itself or under one of its own sub-items, a sub-item cannot be dragged onto another item, and Rolled over neither gives nor takes one.
+Like the other drags it is mouse-only, and there is no drag back out to the top level yet beyond the Undo.
 
 ### The board
 

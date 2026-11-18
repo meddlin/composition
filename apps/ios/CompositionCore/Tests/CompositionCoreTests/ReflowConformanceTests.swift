@@ -39,6 +39,7 @@ private func settings(_ value: JSONValue?) -> WritingSettings? {
     if case .bool(let b)? = o["wordCountEnabled"] { out.wordCountEnabled = b }
     if case .bool(let b)? = o["headingRailEnabled"] { out.headingRailEnabled = b }
     out.headingRailSide = o["headingRailSide"]?.stringValue.flatMap(HeadingRailSide.init(rawValue:)) ?? .left
+    out.openNotesIn = o["openNotesIn"]?.stringValue.flatMap(NoteView.init(rawValue:)) ?? .live
     return out
 }
 

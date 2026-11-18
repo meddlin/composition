@@ -138,6 +138,13 @@ export interface TodosApi {
    * Rejects a missing item.
    */
   moveTodo(id: number, beforeId: number | null): Promise<void>;
+  /**
+   * Makes the item a sub-item of `parentId` (or a top-level item when that is null), with everything under it coming
+   * along, immediately before `beforeId` among its new siblings, or last among them when `beforeId` is null or not one of
+   * them. Its status and everything else are kept; like `moveTodo` it is not logged. Rejects a missing item or parent, and
+   * a parent that is the item itself or under it.
+   */
+  nestTodo(id: number, parentId: number | null, beforeId: number | null): Promise<void>;
   /** "Move completed to the bottom": among the siblings at every level, the done items go below the open ones, each keeping its order. */
   sortDoneTodosLast(): Promise<void>;
   /** "Sort by priority": among the siblings at every level, P1 comes first and items with no priority last, each keeping its order among equals. */
@@ -208,6 +215,7 @@ export const TODO_METHODS = [
   "setTodoStatus",
   "setTodoPriority",
   "moveTodo",
+  "nestTodo",
   "sortDoneTodosLast",
   "sortTodosByPriority",
   "deleteTodo",

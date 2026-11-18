@@ -259,7 +259,8 @@ that is the same signature problem, and it goes away only with signing and notar
 - [ ] The Meilisearch Rust-crate license list is generated and shipped
       (see [Licensing Meilisearch](desktop-app-plan.md#licensing-meilisearch)).
 - [ ] The repo has a `LICENSE` file. It has none today, so the app's own license is undefined.
-- [ ] The app icon is in place (not done yet; see Phase 6 of the plan).
+- [x] The app icon is in place: the Benchnote icon, `build/app-icon-1024.png`, rendered from
+      `apps/ios/icon/icon.svg` by `apps/desktop/scripts/render-app-icon.sh`.
 - [ ] Both architectures are built if you want to support Intel Macs (`mac-x64`).
 - [ ] `latest-mac.yml` and the blockmaps are attached to the release, and `latest-mac.yml` lists every architecture (`pnpm release` checks this).
 

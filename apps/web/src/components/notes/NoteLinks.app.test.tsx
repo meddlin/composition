@@ -2,8 +2,13 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { NotesApp } from "./NotesApp";
 import type { Note } from "./types";
+
+// These tests type into the Markdown tab's editor and read the preview beside it, so notes open in Split here; Live,
+// the default, has tests of its own.
+const OPEN_IN_SPLIT: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 // Every open note shows its Attachments below the editor; none of these tests are about them.
 vi.mock("@/lib/composition/attachmentsClient", () => ({
@@ -60,7 +65,7 @@ describe("following a note link in the preview", () => {
   afterEach(cleanup);
 
   function renderApp() {
-    render(<NotesApp initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
   }
 
   it("shows the linked note in the pane the link was in", () => {
@@ -81,6 +86,14 @@ describe("following a note link in the preview", () => {
     expect(screen.getByRole("region", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
   });
 
+  it("opens it beside with Cmd/Ctrl+Shift held too, which is beside in Live", () => {
+    renderApp();
+
+    fireEvent.click(link("Alpha", "Beta"), { metaKey: true, shiftKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+  });
+
   it("focuses a linked note that is already open instead of opening it twice", () => {
     renderApp();
     fireEvent.click(link("Alpha", "Beta"), { metaKey: true });
@@ -97,5 +110,45 @@ describe("following a note link in the preview", () => {
     renderApp();
 
     expect(within(screen.getByRole("region", { name: "Alpha" })).queryByRole("link", { name: "Gone" })).toBeNull();
+  });
+});
+
+describe("following a note link in Live", () => {
+  afterEach(cleanup);
+
+  /** Alpha, shown in its Live tab, and its drawn link to `href`. */
+  function liveLink(href: string) {
+    render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={notes} initialGroups={[]} initialLayout={DEFAULT_LAYOUT} />);
+    const pane = screen.getByRole("region", { name: "Alpha" });
+    fireEvent.click(within(pane).getByRole("tab", { name: "Live" }));
+    const drawn = pane.querySelector<HTMLElement>(`.cm-live-link[data-href="${href}"]`);
+    expect(drawn).not.toBeNull();
+    return drawn!;
+  }
+
+  // A plain click is CodeMirror's own (it places the caret), which jsdom can't lay out: checked in the browser
+  // (docs/manual-tests/live-editor.md).
+
+  it("shows the linked note in the same pane with Ctrl held (Cmd on a Mac)", () => {
+    fireEvent.mouseDown(liveLink("note:2"), { button: 0, ctrlKey: true });
+
+    expect(paneTitles()).toEqual(["Beta"]);
+  });
+
+  it("opens it beside with Ctrl+Shift held", () => {
+    fireEvent.mouseDown(liveLink("note:2"), { button: 0, ctrlKey: true, shiftKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha", "Beta"]);
+    expect(screen.getByRole("region", { name: "Beta" }).getAttribute("aria-current")).toBe("true");
+  });
+
+  it("strikes through a link to a note that no longer exists, and following it does nothing", () => {
+    const dead = liveLink("note:99");
+    expect(dead.classList.contains("cm-live-link-dead")).toBe(true);
+    expect(dead.getAttribute("title")).toBe("This note no longer exists");
+
+    fireEvent.mouseDown(dead, { button: 0, ctrlKey: true });
+
+    expect(paneTitles()).toEqual(["Alpha"]);
   });
 });

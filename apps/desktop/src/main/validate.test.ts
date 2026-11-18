@@ -37,6 +37,7 @@ describe("VALIDATORS", () => {
     };
     expect(VALIDATORS.saveHomeSettings([{ ...home, extra: 1 }])).toEqual([home]);
     const writing = {
+      openNotesIn: "live",
       rulerEnabled: true,
       rulerColumn: 72,
       reflowEnabled: false,
@@ -187,6 +188,7 @@ describe("VALIDATORS", () => {
     ["saveWritingSettings", [{}]],
     ["saveWritingSettings", [{ headingRailEnabled: "yes" }]],
     ["saveWritingSettings", [{ headingRailSide: 3 }]],
+    ["saveWritingSettings", [{ openNotesIn: 3 }]],
     ["saveWritingSettings", [{ rulerEnabled: "yes", rulerColumn: 80, reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["saveWritingSettings", [{ rulerEnabled: true, rulerColumn: "80", reflowEnabled: true, reflowColumn: 80, reflowKeepsTables: true, wordCountEnabled: false }]],
     ["savePluginSettings", [null]],
@@ -604,6 +606,14 @@ describe("TODO_VALIDATORS", () => {
     expect(TODO_VALIDATORS.moveTodo([4, null])).toEqual([4, null]);
     for (const args of [[], [null, 2], ["4", 2], [4], [4, "2"], [4, 1.5], [4, undefined], [4, {}]]) {
       expect(() => TODO_VALIDATORS.moveTodo(args)).toThrow(InvalidArgumentsError);
+    }
+  });
+
+  it("passes on an id, a parent (or null) and what to go before (or null) for nestTodo, and refuses anything else", () => {
+    expect(TODO_VALIDATORS.nestTodo([4, 2, null, "extra"])).toEqual([4, 2, null]);
+    expect(TODO_VALIDATORS.nestTodo([4, null, 3])).toEqual([4, null, 3]);
+    for (const args of [[], [null, 2, null], ["4", 2, null], [4], [4, 2], [4, "2", null], [4, 2, 1.5], [4, {}, null]]) {
+      expect(() => TODO_VALIDATORS.nestTodo(args)).toThrow(InvalidArgumentsError);
     }
   });
 

@@ -6,7 +6,7 @@ import Testing
 // The Live model (docs/ipad-live-view-plan.md, step L2). What it shares with the desktop is checked against the desktop's real code by
 // LiveConformanceTests; these are the parts that are the iPad's own, and a few plain examples to read.
 
-private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = LiveModel.desktopExtrasLimit) -> LiveDecorations {
+private func decorations(_ text: String, at caret: Int, to end: Int? = nil, limit: Int? = nil) -> LiveDecorations {
     LiveModel(text: text, extrasLimit: limit).decorations(selection: NSRange(location: caret, length: (end ?? caret) - caret))
 }
 
@@ -70,7 +70,7 @@ struct LiveModelTests {
         #expect(indented.fencesHidden.isEmpty && indented.fencesShown.isEmpty)
     }
 
-    @Test("highlight tags and <Image /> tags are read only up to the desktop's length, and the syntax in any note")
+    @Test("highlight tags and <Image /> tags are read in a note of any length unless a limit is given, and the syntax always")
     func length() {
         let text = "**bold** <Mark color=\"green\">tint</Mark> <Image src=\"a.png\" />"
         let all = decorations(text, at: 0)

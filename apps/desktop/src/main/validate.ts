@@ -176,6 +176,7 @@ export const VALIDATORS: Record<ApiMethod, Validator> = {
       if (key in value) settings[key] = flag("saveWritingSettings", value[key], key);
     }
     if ("headingRailSide" in value) settings.headingRailSide = text("saveWritingSettings", value.headingRailSide, "headingRailSide");
+    if ("openNotesIn" in value) settings.openNotesIn = text("saveWritingSettings", value.openNotesIn, "openNotesIn");
     if (Object.keys(settings).length === 0) fail("saveWritingSettings", "settings");
     return [settings];
   },
@@ -386,6 +387,11 @@ export const TODO_VALIDATORS: Record<TodoMethod, Validator> = {
     priority === null || isTodoPriority(priority) ? priority : fail("setTodoPriority", "priority"),
   ],
   moveTodo: ([todoId, beforeId]) => [id("moveTodo", todoId, "id"), nullableId("moveTodo", beforeId, "beforeId")],
+  nestTodo: ([todoId, parentId, beforeId]) => [
+    id("nestTodo", todoId, "id"),
+    nullableId("nestTodo", parentId, "parentId"),
+    nullableId("nestTodo", beforeId, "beforeId"),
+  ],
   sortDoneTodosLast: none,
   sortTodosByPriority: none,
   deleteTodo: ([todoId]) => [id("deleteTodo", todoId, "id")],

@@ -5,8 +5,13 @@ import { streamChat } from "@/lib/composition/assistantClient";
 import { createNote, listAssistantModels, saveNoteContent } from "@/lib/composition/client";
 import * as frontmatter from "@/lib/composition/frontmatter";
 import { DEFAULT_LAYOUT } from "@/lib/composition/layout";
+import { DEFAULT_WRITING_SETTINGS, type WritingSettings } from "@/lib/composition/writing";
 import { NotesApp } from "./NotesApp";
 import type { Group, Note } from "./types";
+
+// These tests type into the Markdown tab's editor and read the preview beside it, so notes open in Split here; Live,
+// the default, has tests of its own.
+const OPEN_IN_SPLIT: WritingSettings = { ...DEFAULT_WRITING_SETTINGS, openNotesIn: "split" };
 
 vi.mock("@/lib/composition/attachmentsClient", () => ({
   attachmentCapabilities: { canReveal: false, saveCopyTitle: "Download", saveCopyLabel: (n: string) => `Download ${n}` },
@@ -55,7 +60,7 @@ afterEach(() => {
 const pane = (title: string) => screen.getByRole("region", { name: title });
 
 async function askAndMakeNote() {
-  render(<NotesApp initialNotes={[source]} initialGroups={[group]} initialLayout={DEFAULT_LAYOUT} />);
+  render(<NotesApp initialWriting={OPEN_IN_SPLIT} initialNotes={[source]} initialGroups={[group]} initialLayout={DEFAULT_LAYOUT} />);
   fireEvent.click(within(pane("Trip")).getByRole("button", { name: "AI helper" }));
   await screen.findByRole("option", { name: /qwen3/ });
   const box = screen.getByLabelText("Ask about this note");

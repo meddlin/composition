@@ -51,7 +51,7 @@ transcription. Full reasoning in [Recommendation](#recommendation).
 - **College notes are hard input**: fast cursive, abbreviations and course jargon, equations and diagrams mixed with text, crossings-out,
   ruled lines and margin notes, faint pencil, and the two-ring holes and shadows of loose-leaf paper.
 - **Recognised text is a guess, and a wrong guess can be confident.** The Gate C bug is the lesson (PR #301): a confidence of 1.00 was
-  wrong, so confidence alone cannot decide what goes into a person's notes, search, or what VoiceOver says. PR #301 (open, tried on the
+  wrong, so confidence alone cannot decide what goes into a person's notes, search, or what VoiceOver says. PR #301 (merged, tried on the
   iPad) guards a drawing's `alt` with a confidence floor of 0.5 and a short never-guessed list in `InkTranscript`; scans need the same
   guard **and** a way for a person to review the text, because a page has hundreds of words where a drawing has a few.
 - **The engines differ by device.** PR #301 found that "the iPad's Vision reads differently from the Mac's", so a result on the Mac is
@@ -391,7 +391,7 @@ much to spend on review and on better engines.
 [13], which is the right input for a drawing's `alt` and better suited than rendering the strokes to a picture for Vision, as
 `InkTranscript` does. It gives a single best reading and an "indexable" form that concatenates every candidate (search only, never for
 `alt` or VoiceOver), and **no confidence** [13], so PR #301's floor would need another rule. It needs iPadOS 27. A follow-up for the ink
-work, not part of this feature.
+work, not part of this feature (followed up in PR #304, open).
 
 ## Sources
 

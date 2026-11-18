@@ -235,6 +235,28 @@ describe("the to-do store's order", () => {
     expect(api.moveTodo).toHaveBeenCalledWith(3, 1);
   });
 
+  it("shows an item put under another at once, and asks the backend to keep it", async () => {
+    const api = fakeBackend([make(1, null, "a"), make(2, null, "b"), make(3, null, "c")]);
+    const store = createTodosStore(api);
+    await store.load();
+
+    const nesting = store.nest(3, 1, null);
+    expect(store.getSnapshot().todos.find((t) => t.id === 3)).toMatchObject({ parentId: 1 });
+    await nesting;
+
+    expect(api.nestTodo).toHaveBeenCalledWith(3, 1, null);
+  });
+
+  it("puts back where an item really is when the backend refuses to put it under another", async () => {
+    const api = fakeBackend([make(1, null, "a"), make(2, null, "b")]);
+    api.nestTodo.mockRejectedValueOnce(new Error("no disk"));
+    const store = createTodosStore(api);
+    await store.load();
+
+    expect(await store.nest(2, 1, null)).toEqual({ error: "no disk" });
+    expect(store.getSnapshot().todos.find((t) => t.id === 2)).toMatchObject({ parentId: null });
+  });
+
   it("shows the done items below the open ones at once", async () => {
     const api = fakeBackend([make(1, null, "a", true), make(2, null, "b"), make(3, null, "c", true), make(4, null, "d")]);
     const store = createTodosStore(api);

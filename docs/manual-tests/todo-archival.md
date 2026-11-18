@@ -96,7 +96,7 @@ From test 2 (the *behind* scenario), in the **List** view:
 - **Move to backlog** on *Write the Q4 plan*: it goes to the Backlog.
 - **Drop** on *Pack boxes*: it goes to the Archive, marked **Dropped**.
 - With Rolled over empty, the section is gone. The same three actions are on the **strip above the board's columns** in the **Board** view; the board's columns do not show rolled-over items.
-- The bin is **Remove**: on *Plan trip* (now under This week) it disappears at once, with a bar, **Removed “Plan trip” and 1 sub-item. Undo**, for a few seconds. **Undo** brings both back, as to-dos (an item restored from the archive is a to-do again, whatever it was). Remove does not ask first; it goes to the Archive, marked **Removed**.
+- The bin is **Remove**: on *Plan trip* (now under This week) it first asks **Remove this to-do?**, saying *Plan trip* and its 1 sub-item go to the archive. **Cancel** (or Escape, or Enter straight away) leaves it be. **Remove** takes it off, with a bar, **Removed “Plan trip” and 1 sub-item. Undo**, for a few seconds. **Undo** brings both back, as to-dos (an item restored from the archive is a to-do again, whatever it was). A removed item goes to the Archive, marked **Removed**.
 - **Drag** works too, in the List view: drag *Someday: learn Spanish* (Backlog) onto **This week**, and a Rolled over entry onto it. While you hold one, This week
   shows a dashed outline, firmer when you are over it. A dropped Backlog item becomes a to-do; a dropped entry does what **Add to this week** does (its
   sub-items come with it). Let go over Rolled over or Backlog instead: nothing changes. Dragging a sub-item (*Book flights*) picks up the whole entry.

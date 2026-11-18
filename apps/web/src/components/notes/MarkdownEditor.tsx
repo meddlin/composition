@@ -143,6 +143,11 @@ export function MarkdownEditor({
   const showEditor = view === "markdown" || view === "split";
   const showPreview = view === "preview" || view === "split";
   const showLive = view === "live";
+  // Live is mounted the first time it shows for a note, then kept, hidden, while another tab shows, so that its undo
+  // history survives a look at Preview. It is a second copy of the editor, so a note never shown in Live has none.
+  const [liveKeptFor, setLiveKeptFor] = useState<number | null>(showLive ? noteId : null);
+  if (showLive && liveKeptFor !== noteId) setLiveKeptFor(noteId);
+  const liveMounted = liveKeptFor === noteId;
   // The raw text (frontmatter included) stays in the editor; the preview shows
   // the frontmatter as a metadata card rather than as Markdown content.
   const [fm, body] = useMemo(() => parse(value), [value]);
@@ -520,6 +525,12 @@ export function MarkdownEditor({
     [notes, onOpenNote, pdfLinks],
   );
 
+  // What Preview's providers hand its drawing, for the blocks Live draws whole (tables).
+  const liveBlocks = useMemo(
+    () => ({ noteLinks, drawio: drawioEditing, sheet: readOnly ? null : sheetEditing }),
+    [noteLinks, drawioEditing, sheetEditing, readOnly],
+  );
+
   const highlight = value.length <= MAX_HIGHLIGHT_CHARS;
   const highlightLayer = useHighlightSync(textarea, highlight, value);
 
@@ -841,11 +852,13 @@ export function MarkdownEditor({
           </p>
         )}
         {showLive && pasteBanner}
-        {/* Not mounted while hidden: it is a second copy of the editor, and the plain editor keeps the undo history. */}
-        {showLive && (
+        {liveMounted && (
           // The box the menus are placed in, as the plain editor's wrapper is for its own.
           <div ref={liveBox} className="relative flex min-h-0 flex-1 flex-col">
             <LiveEditor
+              // A note of its own gets an editor of its own, so undo never reaches back into the note shown before.
+              key={noteId}
+              active={showLive}
               value={value}
               onChange={onChange}
               readOnly={readOnly}
@@ -859,8 +872,10 @@ export function MarkdownEditor({
               findOptions={findOptions}
               findCurrent={findCurrent}
               onFindCount={setLiveMatchCount}
+              blocks={liveBlocks}
+              links={noteLinks}
             />
-            {writing.rulerEnabled && (
+            {showLive && writing.rulerEnabled && (
               // Clipped to the editor, so a ruler past its right edge doesn't widen the page.
               <div aria-hidden data-testid="editor-ruler" className="pointer-events-none absolute inset-0 overflow-hidden">
                 {/* After the editor's left padding, in the editor's own font: a column here is that many widths of a "0", which in a proportional font is only a guide. */}
@@ -870,8 +885,8 @@ export function MarkdownEditor({
                 />
               </div>
             )}
-            <HeadingRail {...liveRail} side={railSide} />
-            {menus}
+            {showLive && <HeadingRail {...liveRail} side={railSide} />}
+            {showLive && menus}
           </div>
         )}
       </section>
