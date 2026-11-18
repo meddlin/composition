@@ -7,8 +7,9 @@ Markdown source. This plan covers drawing them and then making Live the view a n
 Markdown, Preview and Split stay available.
 
 Status: **drafted 2026-11-16; every decision taken by the owner on 2026-11-17** (see
-[Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (uncommitted); Gate 0 is the
-owner's. **Step 1 built 2026-11-17** (PR on top of Step 0's); Gate A passed on the editor's own work (below).
+[Decided by the owner](#decided-by-the-owner-2026-11-17)). **Step 0 built 2026-11-17** (PR #321); Gate 0 is the
+owner's. **Step 1 built 2026-11-17** (PR #323); Gate A passed on the editor's own work (below). **Step 2 (links)
+built 2026-11-17** (PR #322); Gate B is the owner's.
 
 ## Goal and rule
 
@@ -28,7 +29,7 @@ What Preview draws and Live does not, as of `ad9701a`:
 
 | Construct | Live today | Preview | Step |
 |---|---|---|---|
-| Links `[text](url)`, `note:`, `pdf:`, `#heading` | Coloured; the brackets and URL show; clicking does nothing | Text only; clicking follows the link | 2 |
+| Links `[text](url)`, `note:`, `pdf:`, `#heading` | Coloured; the brackets and URL show; clicking does nothing (drawn and followed since Step 2) | Text only; clicking follows the link | 2 |
 | Fenced and indented code blocks | One flat "code" colour; fences show | Language highlighting (`rehype-highlight` over `lowlight`) on a block background | 3 |
 | Lists | The marker is coloured | Bullets, numbers, a hanging indent | 4 |
 | Task lists `- [ ]` | Text | Checkboxes | 4 |
@@ -195,6 +196,20 @@ not need the limit, and the iPad measured its version and dropped it (V5, 2026-1
   Cmd/Ctrl+Shift+click for beside**, so the Live habit works there too.
 - **Gate B (the owner's):** links read and follow as in Preview; editing a link's text and its URL still works
   from the keyboard and the mouse.
+- **Built (2026-11-17)**, on its own branch from Step 0's (PR #321).
+  - `liveLinks.ts` draws `Link`, `Autolink` and bare `URL` nodes (`drawLink`, called from `liveDecorations`), reference
+    links included when the note defines the label. The tooltip is the address, the title above it, and how to follow.
+    A hidden stretch that would run over a line break (a link's text or title wrapped onto two lines) is dimmed instead,
+    as a plugin may not hide a line break. Which notes and PDFs exist reaches the editor as a facet (`noteLinksFacet`,
+    from `LiveEditor`'s `links`), and a change to it redraws.
+  - Following: `followLink` and its helpers moved out of `NoteAnchor` into `noteLinkActions.ts`; `NoteAnchor` and Live
+    both call them. Live passes its own `scrollTo` (`fragmentOffset`: the heading the preview gives that slug, or a
+    footnote) and opens web addresses (`http:`, `https:`, `mailto:` only) in a new tab. Cmd/Ctrl is the platform's: Cmd
+    on a Mac, where Ctrl+click is the context menu; Ctrl elsewhere. Preview still takes either.
+  - Checks: `liveLinks.test.ts` (decorations), `noteLinkActions.test.ts`, Live and Preview following in
+    `NoteLinks.app.test.tsx`; [ui/live-editor.md](ui/live-editor.md#following-a-link) and §1a of the manual test.
+  - Not done: a link's definition line (`[label]: url`) still shows as written (Preview hides it), and a plain click
+    on a link in Live is checked by hand only (jsdom can't place a caret from a click).
 
 ### Step 3: code blocks (M)
 

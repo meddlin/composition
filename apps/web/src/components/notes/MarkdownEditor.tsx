@@ -866,6 +866,7 @@ export function MarkdownEditor({
               findOptions={findOptions}
               findCurrent={findCurrent}
               onFindCount={setLiveMatchCount}
+              links={noteLinks}
             />
             {showLive && writing.rulerEnabled && (
               // Clipped to the editor, so a ruler past its right edge doesn't widen the page.

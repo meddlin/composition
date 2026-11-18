@@ -1,25 +1,12 @@
-import { createContext, useContext, type ComponentPropsWithoutRef, type MouseEvent } from "react";
+import { createContext, useContext, type ComponentPropsWithoutRef } from "react";
 import { defaultUrlTransform, type ExtraProps, type Options } from "react-markdown";
 import { noteIdFromRef } from "@/lib/composition/noteRefs";
-import { parsePdfRef, type PdfRef } from "@/lib/composition/pdfRefs";
+import { parsePdfRef } from "@/lib/composition/pdfRefs";
+import { deadLink, followLink, linkTarget, NO_NOTE_LINKS, type NoteLinks } from "./noteLinkActions";
 
-/** What a note's `pdf:` links need: only the desktop app has PDFs, so elsewhere every such link is shown as dead. */
-export type PdfLinks = {
-  /** Whether the PDF is on this device and its note is not in the Trash Can. */
-  exists: (uuid: string) => boolean;
-  /** Shows the page, and the mark, the link names, opening the PDF beside the note if it is not showing. */
-  open: (ref: PdfRef) => void;
-};
+export type { NoteLinks, PdfLinks } from "./noteLinkActions";
 
-export type NoteLinks = {
-  /** Whether the note still exists; a link to one that was deleted for good is shown as dead. */
-  exists: (noteId: number) => boolean;
-  /** Opens the note; `beside` asks for it next to the one being read rather than in its place. */
-  open: (noteId: number, beside: boolean) => void;
-  pdf?: PdfLinks;
-};
-
-const NoteLinksContext = createContext<NoteLinks>({ exists: () => true, open: () => {} });
+const NoteLinksContext = createContext<NoteLinks>(NO_NOTE_LINKS);
 
 /** What the preview's note links need from the app around it, handed down without threading it through Markdown. */
 export const NoteLinksProvider = NoteLinksContext.Provider;
@@ -37,73 +24,63 @@ function withoutNode({ node, ...attributes }: ComponentPropsWithoutRef<"a"> & Ex
   return attributes;
 }
 
-function scrollToFragment(event: MouseEvent, id: string) {
+function scrollToId(id: string) {
   // The id lives in the page, not the address bar: a hash change would leave the note in the desktop app.
-  event.preventDefault();
   document.getElementById(id)?.scrollIntoView({ block: "start" });
 }
 
 /**
  * The preview's rendering of Markdown links, `[text](target)`. Wired in through
- * react-markdown's `components` map (see `markdownComponents`).
+ * react-markdown's `components` map (see `markdownComponents`). What a link does
+ * is `followLink`'s, which the Live editor shares.
  *
  * A `note:<id>` target opens that note in the app, or beside this one with
- * Cmd/Ctrl held; one whose note is gone is shown as dead text. A `pdf:<uuid>`
- * target shows the page or mark it names in the PDF's panel; one whose PDF is
- * not on this device is dead text too, and the words in the note still read. Any other link
- * is left as written, except that one to a place in the note itself (`#id`, which
- * is what footnotes use) scrolls there rather than changing the address.
+ * Cmd/Ctrl held (with or without Shift, which is beside in Live); one whose note
+ * is gone is shown as dead text. A `pdf:<uuid>` target shows the page or mark it
+ * names in the PDF's panel; one whose PDF is not on this device is dead text too,
+ * and the words in the note still read. Any other link is left as written, except
+ * that one to a place in the note itself (`#id`, which is what footnotes use)
+ * scrolls there rather than changing the address.
  */
 export function NoteAnchor({ href, title, children, ...props }: ComponentPropsWithoutRef<"a"> & ExtraProps) {
   const links = useContext(NoteLinksContext);
-  const noteId = href ? noteIdFromRef(href) : null;
-  const pdf = href ? parsePdfRef(href) : null;
+  const target = linkTarget(href ?? "");
+  const dead = deadLink(target, links);
 
-  if (pdf) {
-    if (!links.pdf?.exists(pdf.uuid)) {
-      return (
-        <span title="PDF not on this device" className="text-muted-foreground line-through">
-          {children}
-        </span>
-      );
-    }
+  if (dead) {
     return (
-      // A fragment target rather than `pdf:…`, so opening it in a new tab or window lands on this page.
+      <span title={dead} className="text-muted-foreground line-through">
+        {children}
+      </span>
+    );
+  }
+  if (target.kind === "other" || target.kind === "fragment") {
+    return (
+      // What react-markdown adds to a link besides these (a footnote's id, say) is kept; its `node` is not an attribute.
       <a
-        href={`#pdf-${pdf.uuid}`}
+        href={href}
         title={title}
-        onClick={(event) => {
-          event.preventDefault();
-          links.pdf?.open(pdf);
-        }}
+        {...withoutNode(props)}
+        onClick={
+          target.kind === "fragment"
+            ? (event) => {
+                if (followLink(target, links, { beside: false, scrollTo: scrollToId })) event.preventDefault();
+              }
+            : undefined
+        }
       >
         {children}
       </a>
     );
   }
-  if (noteId === null) {
-    return (
-      // What react-markdown adds to a link besides these (a footnote's id, say) is kept; its `node` is not an attribute.
-      <a href={href} title={title} {...withoutNode(props)} onClick={href?.startsWith("#") ? (event) => scrollToFragment(event, href.slice(1)) : undefined}>
-        {children}
-      </a>
-    );
-  }
-  if (!links.exists(noteId)) {
-    return (
-      <span title="This note no longer exists" className="text-muted-foreground line-through">
-        {children}
-      </span>
-    );
-  }
   return (
-    // A fragment target rather than `note:…`, so opening it in a new tab or window lands on this page.
+    // A fragment target rather than `note:…` or `pdf:…`, so opening it in a new tab or window lands on this page.
     <a
-      href={`#note-${noteId}`}
+      href={target.kind === "note" ? `#note-${target.noteId}` : `#pdf-${target.ref.uuid}`}
       title={title}
       onClick={(event) => {
         event.preventDefault();
-        links.open(noteId, event.metaKey || event.ctrlKey);
+        followLink(target, links, { beside: event.metaKey || event.ctrlKey, scrollTo: scrollToId });
       }}
     >
       {children}

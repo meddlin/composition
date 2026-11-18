@@ -32,13 +32,39 @@ it will read, with the syntax showing only where the caret is. The other three t
   Click a picture to edit its Markdown. `![alt][ref]` references, and images in code or frontmatter, are left as written.
 - **Drawings** (`<Ink src="…" />`, from the iPad) are drawn the same way: in place of the tag, from the strokes the stored PNG carries, in the colour scheme in force
   (see [`<Ink>`](mdx-components.md#ink)). A PNG with no readable strokes is drawn as the picture. `<Drawio>` is still left as written.
+- **Links** (`[text](url "title")`) are drawn as their text, underlined in the link colour, with `[` and
+  `](url "title")` hidden; hover one to see its address (and title) as a tooltip. While the caret or a selection is
+  in a link its source shows, the brackets dimmed, so its text and its address are edited like any Markdown.
+  Reference links (`[text][label]`, `[label]`) are drawn the same way when the note defines the label. Autolinks
+  (`<https://…>`, the brackets hidden) and bare addresses (`https://…`, `www.…`) are drawn as links too. A
+  `note:` link to a note that no longer exists, and a `pdf:` link to a PDF that is not on this device (every PDF
+  link, in the web app), are struck through and muted, as in Preview, and go nowhere. See
+  [Following a link](#following-a-link).
 - **Frontmatter** is set apart in a small monospaced face and is not read as Markdown (its closing `---` is not a heading).
 - **Notes of any length** are drawn this way, with no limit on their size (see [Long notes](#long-notes)).
-- Everything else (links, lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
+- Everything else (lists, quotes, code blocks, other MDX tags) is shown as the Markdown you wrote, coloured
   as the Markdown tab colours it ([markdown-editor-highlighting.md](markdown-editor-highlighting.md)).
 
 "Touches" means the selection reaches the construct, ends included, so a selection that spans several constructs
 shows all their marks.
+
+## Following a link
+
+The Live tab is for writing, so a click in a link is a click in text (decision D2 of the
+[plan](../live-default-plan.md#decided-by-the-owner-2026-11-17)):
+
+| Do | What happens |
+|---|---|
+| Click | The caret goes into the link, which shows its source, to edit |
+| Cmd+click (Mac), Ctrl+click (elsewhere) | Follows it: opens the note in this pane, shows the PDF's page, scrolls to the `#heading`, or opens a web address in a new tab (the desktop app hands it to your browser) |
+| Cmd/Ctrl+Shift+click | Opens a linked note beside this one |
+
+While Cmd/Ctrl is held the pointer turns to a hand over a link. A `#heading` link scrolls Live to the heading the
+preview would give that id (`#next-steps` for `## Next Steps`, `#next-steps-1` for a second one); `#fn-1` and
+`#fnref-1` go to a footnote's definition and its reference. Only `http:`, `https:` and `mailto:` addresses are
+opened. Following is the same code as Preview's (`followLink` in `noteLinkActions.ts`), so a dead link is dead in
+both. Preview keeps a plain click to follow and Cmd/Ctrl+click to open a note beside, and takes Cmd/Ctrl+Shift+click
+for beside as well, so the Live habit works there too. On a Mac, Ctrl+click in Live is left as the context menu.
 
 ## What it shares with the Markdown tab
 
@@ -72,7 +98,8 @@ same scenario on each:
   background (Settings → Styling) each line is a whole grid square tall (a level 1 or 2 heading, two), so the text
   sits on the rules as it does in the Markdown tab.
 - **The note is drawn in the preview's font**, not the editor's.
-- Not in the Live tab, by design: rendered links and lists, diagrams, and a preview of MDX components. Use
+- **A click in a link edits it**; Cmd/Ctrl+click follows it. In Preview a plain click follows.
+- Not in the Live tab, by design: rendered lists, diagrams, and a preview of MDX components. Use
   **Split** for those.
 
 ## Long notes
