@@ -4,17 +4,19 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// One note, with the four tabs of the design: **Markdown** (the editor), **Live** (the editor with the syntax hidden away from the caret: the note drawn
-/// as it will read), **Preview** (Markdown and the components, drawn from what is typed, not only from what is saved) and **Split** (Markdown and Preview, side
+/// One note, with the four tabs of the design: **Live** (the editor with the syntax hidden away from the caret: the note drawn as it will read; the
+/// default since Step 8 of docs/ipad-live-default-plan.md), **Markdown** (the editor), **Preview** (Markdown and the components, drawn from what is typed, not only from what is saved) and **Split** (Markdown and Preview, side
 /// by side, or one above the other in a narrow window, with a divider that can be dragged).
 /// The note's `NoteSession` is open for as long as the note is on screen, so that every tab shows the same text and saving is one thing.
 struct NoteDetailView: View {
     enum Mode: String, CaseIterable {
-        case markdown = "Markdown", live = "Live", preview = "Preview", split = "Split"
+        // Live first, everywhere the tabs are listed (the toolbar's picker, the compact View menu, "Open notes in"): D6.
+        case live = "Live", markdown = "Markdown", preview = "Preview", split = "Split"
         /// Where the "Open notes in" setting is kept (Appearance ▸ Writing): on this iPad only, not in `settings.json`, so a restored desktop backup leaves it alone
-        /// (docs/ipad-live-default-plan.md, I3). Preview until Live becomes the default (I4).
+        /// (docs/ipad-live-default-plan.md, I3). Live since Step 8 (D1); Preview before (I4). Only the picker writes the key, so `@AppStorage` never stores
+        /// this default: a value never chosen follows it, and a value chosen in the picker (Preview included) stays.
         static let openNotesInKey = "openNotesIn"
-        static let openNotesInDefault = Mode.preview
+        static let openNotesInDefault = Mode.live
     }
 
     let model: AppModel
@@ -129,11 +131,11 @@ struct NoteDetailView: View {
         .sheet(isPresented: $showingHeaderImage) {
             if let session { HeaderImageSheet(model: model, session: session) }
         }
-        // The Images page's *Insert in Open Note*: a stored picture goes in at the caret, from the Preview tab too (which has no text to put it in, so it opens the Markdown tab first).
+        // The Images page's *Insert in Open Note*: a stored picture goes in at the caret, from the Preview tab too (which has no text to put it in, so it opens the Live tab first).
         .onChange(of: model.imageToInsert) { _, name in
             guard let name else { return }
             model.imageToInsert = nil
-            if mode == .preview { mode = .markdown }
+            if mode == .preview { mode = .live }
             Task {
                 try? await Task.sleep(for: .milliseconds(500))
                 handle.insertStoredImage(named: name, description: "")
@@ -248,9 +250,9 @@ struct NoteDetailView: View {
         // Developer shortcut: `-openMode Markdown` (or Live, Preview, Split) at launch.
         if let name = UserDefaults.standard.string(forKey: "openMode"), let forced = Mode(rawValue: name) { mode = forced }
         #endif
-        // A note that was just made opens in a writing tab, with the keyboard up: the setting's, or Markdown when the setting is Preview (I5).
+        // A note that was just made opens in a writing tab, with the keyboard up: the setting's, or Live when the setting is Preview (I5, Live since Step 8).
         focusOnOpen = model.takeFreshNote(noteID)
-        if focusOnOpen { mode = openNotesIn == .preview ? .markdown : openNotesIn }
+        if focusOnOpen { mode = openNotesIn == .preview ? .live : openNotesIn }
         modeNote = Int(noteID)
         pdf = nil
         await refreshPdf()

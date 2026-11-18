@@ -77,13 +77,14 @@ final class LiveUITests: XCTestCase {
 
     // MARK: The tab
 
-    func testLiveIsTheSecondWordOfTheViewPicker() throws {
+    /// Live first since Step 8 of docs/ipad-live-default-plan.md (D6; V4 had it second).
+    func testLiveIsTheFirstWordOfTheViewPicker() throws {
         try launch()
-        let words = ["Markdown", "Live", "Preview", "Split"].map { app.buttons[$0] }
+        let words = ["Live", "Markdown", "Preview", "Split"].map { app.buttons[$0] }
         for word in words { XCTAssertTrue(word.waitForExistence(timeout: 10), "\(word)") }
         let positions = words.map { $0.frame.minX }
-        XCTAssertEqual(positions, positions.sorted(), "Markdown, Live, Preview, Split, in that order")
-        XCTAssertTrue(words[1].isSelected, "and Live is the one chosen")
+        XCTAssertEqual(positions, positions.sorted(), "Live, Markdown, Preview, Split, in that order")
+        XCTAssertTrue(words[0].isSelected, "and Live is the one chosen")
     }
 
     // MARK: What is drawn
