@@ -63,8 +63,11 @@ final class PdfReader {
     var inkPages: Set<Int> = []
     /// The Pencil draws on the pages (otherwise ink only shows).
     var inking = false
-    /// A finger draws too, for an iPad with no Pencil (and the Simulator); the PDF then scrolls with two fingers.
-    var fingerDraws = UserDefaults.standard.bool(forKey: "pdfInkFinger")
+    /// A finger draws too, for an iPhone, an iPad with no Pencil (and the Simulator); the PDF then scrolls with two fingers. Until the person sets it,
+    /// it follows the system's "Only Draw with Apple Pencil" (which iOS turns on once a Pencil is used): on a phone, a finger draws.
+    var fingerDraws = UserDefaults.standard.object(forKey: "pdfInkFinger") != nil
+        ? UserDefaults.standard.bool(forKey: "pdfInkFinger")
+        : !UIPencilInteraction.prefersPencilOnlyDrawing
     /// A line of confirmation (a quote put in the note) that goes by itself.
     var notice: String?
     /// The notes that belong with this PDF, for the Notes tab and the Highlights tab's "quoted" marks.
@@ -374,6 +377,8 @@ struct PdfReaderPane: View {
             ViewThatFits(in: .horizontal) {
                 strip(compact: false)
                 strip(compact: true)
+                // A phone: the page as "12/340".
+                strip(compact: true, shortPage: true)
             }
             Rectangle().fill(look.border).frame(height: 1)
             pages
@@ -400,12 +405,15 @@ struct PdfReaderPane: View {
         .sheet(isPresented: $exporting) { PdfExportSheet(reader: reader) }
     }
 
-    private func strip(compact: Bool) -> some View {
+    private func strip(compact: Bool, shortPage: Bool = false) -> some View {
         HStack(spacing: 4) {
             Button("Contents, bookmarks, highlights and notes", systemImage: "list.bullet.indent") { showingContents = true }
                 .labelStyle(.iconOnly)
                 .accessibilityIdentifier("pdf-contents")
-                .popover(isPresented: $showingContents) { PdfSidebar(reader: reader) { showingContents = false }.frame(minWidth: 360, minHeight: 440) }
+                .popover(isPresented: $showingContents) {
+                    // 360 wide where it is a popover; a sheet on a phone, which may be narrower than that.
+                    PdfSidebar(reader: reader) { showingContents = false }.frame(minWidth: 280, idealWidth: 360, minHeight: 440)
+                }
             Button("Find in the PDF", systemImage: "magnifyingglass") { reader.find() }
                 .labelStyle(.iconOnly)
                 .accessibilityIdentifier("pdf-find")
@@ -455,7 +463,7 @@ struct PdfReaderPane: View {
                 jumpText = ""
                 jumping = true
             } label: {
-                Text(reader.pageCount > 0 && reader.restored ? "Page \(reader.pageIndex + 1) of \(reader.pageCount)" : "")
+                Text(reader.pageCount > 0 && reader.restored ? (shortPage ? "\(reader.pageIndex + 1)/\(reader.pageCount)" : "Page \(reader.pageIndex + 1) of \(reader.pageCount)") : "")
                     .monospacedDigit()
                     .foregroundStyle(look.mutedText)
                     .lineLimit(1)
@@ -479,7 +487,7 @@ struct PdfReaderPane: View {
         if reader.source.url == nil {
             ContentUnavailableView("This PDF's file is missing", systemImage: "doc.questionmark", description: Text("The note is here, but its file is not. Restore a backup that has it, or move the note to the Trash Can."))
         } else if reader.failedToOpen {
-            ContentUnavailableView("This PDF can't be opened", systemImage: "exclamationmark.triangle", description: Text("The file is damaged, or is not a PDF this iPad can read."))
+            ContentUnavailableView("This PDF can't be opened", systemImage: "exclamationmark.triangle", description: Text("The file is damaged, or is not a PDF this app can read."))
         } else if reader.locked {
             PdfPasswordPrompt(reader: reader)
         } else if reader.pdf == nil {
