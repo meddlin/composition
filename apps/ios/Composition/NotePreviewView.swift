@@ -43,6 +43,50 @@ struct NotePreviewView: View {
             }
             PreviewBlocksView(blocks: preview.blocks)
         }
+        .overlay(alignment: .topLeading) { PreviewBlocksProbe(blocks: preview.blocks) }
+    }
+}
+
+/// `-liveReport 1` (Debug and test builds): an element that names the kinds of top-level block the Preview draws, in order and once each (`preview-blocks`, for
+/// example `toc,markdown,info,warning,image,chart,repo,youtube,notice,table,footnotes`), so that a UI test can check that the Live tab draws each of them
+/// (docs/ipad-live-default-plan.md, Step 6). Named from the Preview's own blocks, not from the Live tab's list of what it draws.
+private struct PreviewBlocksProbe: View {
+    let blocks: [PreviewBlock]
+
+    var body: some View {
+        #if DEBUG || EDITOR_TEST_HOOKS
+        if UserDefaults.standard.bool(forKey: "liveReport") {
+            Text(".")
+                .font(.system(size: 2))
+                .opacity(0.05)
+                .accessibilityElement()
+                .accessibilityIdentifier("preview-blocks")
+                .accessibilityLabel(Self.kinds(of: blocks).joined(separator: ","))
+        }
+        #endif
+    }
+
+    static func kinds(of blocks: [PreviewBlock]) -> [String] {
+        var out: [String] = []
+        func add(_ kind: String) { if !out.contains(kind) { out.append(kind) } }
+        for block in blocks {
+            switch block {
+            case .markdown(let parts):
+                for part in parts {
+                    if case .table = part { add("table") } else { add("markdown") }
+                }
+            case .panel(let tone, _): add(tone == .info ? "info" : "warning")
+            case .toc: add("toc")
+            case .footnotes: add("footnotes")
+            case .image: add("image")
+            case .chart: add("chart")
+            case .repo: add("repo")
+            case .youtube: add("youtube")
+            case .highlight: add("mark")
+            case .notice: add("notice")
+            }
+        }
+        return out
     }
 }
 

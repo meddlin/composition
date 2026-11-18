@@ -38,6 +38,12 @@ struct HeaderImageBanner: View {
     /// The file was tried and could not be read.
     @State private var gaveUp = false
 
+    /// `loaded`: the picture already read (the Live tab's picture of the header, Step 7, which is drawn before a task could read it).
+    init(header: HeaderImage, loaded: (image: UIImage, pixels: CGSize)? = nil) {
+        self.header = header
+        _loaded = State(initialValue: loaded)
+    }
+
     private static var exposedToTests: Bool {
         #if DEBUG || EDITOR_TEST_HOOKS
         UserDefaults.standard.bool(forKey: "exposeDecorative")

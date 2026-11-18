@@ -11,6 +11,8 @@ struct AppearanceView: View {
     @State private var hoursDraft = SunHours.default
     @State private var hoursSaved = false
     @State private var hoursRefusal: String?
+    /// The view every note opens in (docs/ipad-live-default-plan.md, D9 and I3): kept on this iPad, unlike the rest of this sheet.
+    @AppStorage(NoteDetailView.Mode.openNotesInKey) private var openNotesIn = NoteDetailView.Mode.openNotesInDefault
 
     var body: some View {
         NavigationStack {
@@ -65,6 +67,10 @@ struct AppearanceView: View {
     /// The ruler and reflow, which help with the shape of the text in the Markdown and Live tabs (the desktop's Settings ▸ Writing). Both are off until switched on.
     @ViewBuilder private var writing: some View {
         Section {
+            Picker("Open notes in", selection: $openNotesIn) {
+                ForEach(NoteDetailView.Mode.allCases, id: \.self) { Text($0.rawValue) }
+            }
+            .accessibilityIdentifier("open-notes-in")
             Toggle("Ruler", isOn: writingBinding(\.rulerEnabled)).accessibilityIdentifier("ruler-toggle")
             if model.writing.rulerEnabled {
                 Stepper(value: writingBinding(\.rulerColumn), in: WritingSettings.minColumn...WritingSettings.maxColumn) {
@@ -83,7 +89,7 @@ struct AppearanceView: View {
         } header: {
             Text("Writing").foregroundStyle(look.mutedText)
         } footer: {
-            Text("The ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
+            Text("Every note opens in the view chosen here; a tab you switch to lasts until you open another note. A new note opens ready to type: in Markdown when this is Preview. This choice is kept on this iPad only.\n\nThe ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)
