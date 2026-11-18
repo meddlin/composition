@@ -1030,6 +1030,102 @@
    "text": "<Image alt=\"first\" alt=\"second\" src=\"a.png\" />"
   },
   {
+   "group": "drawings",
+   "text": "<Ink src=\"app_data/note-drawing-0123456789ab.png\" alt=\"Drawing\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\" alt=\"A sketch\" width=\"50%\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src='drawing.png' alt='single' title='T' />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src={\"drawing.png\"} alt={\"braced\"} />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink alt=\"no src\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"\" alt=\"empty\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\">"
+  },
+  {
+   "group": "drawings",
+   "text": "<Inkwell src=\"drawing.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"drawing.png\"\n  alt=\"two lines\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "before <Ink src=\"a.png\" /> and <Image src=\"b.png\" /> after"
+  },
+  {
+   "group": "drawings",
+   "text": "text\n\n<Ink src=\"app_data/a.png\" alt=\"Drawing\" />\n\ntext"
+  },
+  {
+   "group": "drawings",
+   "text": "`<Ink src=\"code.png\" />`"
+  },
+  {
+   "group": "drawings",
+   "text": "```\n<Ink src=\"fence.png\" />\n```"
+  },
+  {
+   "group": "drawings",
+   "text": "---\nimage: <Ink src=\"front.png\" />\n---\n\n<Ink src=\"body.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "> <Ink src=\"q.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "- <Ink src=\"l.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"a.png\" /><Ink src=\"b.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Ink src=\"a.png\" alt=\"x\" /> <Mark>tint</Mark> **bold**"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio src=\"app_data/diagram-0123456789ab.png\" alt=\"Request flow\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio src=\"diagram.png\" alt=\"Flow\" width=\"300\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawio alt=\"no src\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "<Drawiox src=\"d.png\" />"
+  },
+  {
+   "group": "drawings",
+   "text": "```\n<Drawio src=\"fence.png\" />\n```"
+  },
+  {
+   "group": "drawings",
+   "text": "text\n\n<Drawio src=\"d.png\" />\n\n<Ink src=\"i.png\" />\n\n<Image src=\"p.png\" />"
+  },
+  {
    "group": "links",
    "text": "[a link](https://x.test)"
   },

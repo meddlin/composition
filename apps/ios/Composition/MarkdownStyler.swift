@@ -85,9 +85,12 @@ final class MarkdownStyler {
         palette = Palette(look: look, live: false)
         textView.textLayoutManager?.delegate = drawingDelegate
         // A picture the Live tab asked for has come in: the text is drawn again, with it.
-        pictureObserver = NotificationCenter.default.addObserver(forName: LiveImages.didLoad, object: nil, queue: .main) { [weak self] _ in
+        pictureObserver = NotificationCenter.default.addObserver(forName: LiveImages.didLoad, object: nil, queue: .main) { [weak self] note in
+            let resized = note.userInfo?["resized"] as? Bool == true
             MainActor.assumeIsolated {
                 guard let self, self.isLive, let layout = self.textView?.textLayoutManager else { return }
+                // A drawing's strokes came in: it may be drawn at another size, so the paragraphs the pictures are on are made again (Step 1 of the Live-default plan).
+                if resized { self.redrawPictures() }
                 layout.invalidateLayout(for: layout.documentRange)
                 self.textView?.setNeedsLayout()
             }

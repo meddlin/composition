@@ -1,4 +1,5 @@
 import CompositionCore
+import CompositionInk
 import UIKit
 
 extension NSAttributedString.Key {
@@ -14,11 +15,16 @@ final class LiveDrawing: NSObject {
     enum Kind: String { case rule, picture, pictureAfter }
 
     /// A picture: where its file is and how big it is (nil when there is no such file), the words to show in its place then, and how wide the tag asked for it to be.
+    /// `kind` and `theme` are for drawings (docs/ipad-live-default-plan.md, Step 1): an `<Ink />` is drawn from its strokes in the theme's colours, `<Drawio />` at
+    /// half its pixels; `natural` is the size either is drawn at when its tag gives no width (nil: the pixels, one to a point).
     struct Picture {
         var url: URL
         var label: String
         var pixels: CGSize?
         var width: ImageWidth?
+        var kind: LivePictureKind = .image
+        var theme: Theme?
+        var natural: CGSize?
     }
 
     let kind: Kind
@@ -42,14 +48,15 @@ final class LiveDrawing: NSObject {
     /// tag says: a share of the text, or points).
     static func size(of picture: Picture, available: CGFloat) -> CGSize {
         guard let pixels = picture.pixels else { return CGSize(width: available, height: noticeHeight) }
+        let natural = picture.natural ?? pixels
         let target: CGFloat
         switch picture.width {
         case .some(let width) where width.unit == .percent: target = available * width.value / 100
         case .some(let width): target = min(width.value, available)
-        case .none: target = min(pixels.width, available)
+        case .none: target = min(natural.width, available)
         }
         let width = max(1, target)
-        return CGSize(width: width, height: width * pixels.height / pixels.width)
+        return CGSize(width: width, height: width * natural.height / max(natural.width, 1))
     }
 
     /// The height the paragraph is made, for a picture of `size`.
@@ -137,12 +144,30 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
             return
         }
         let scale = textLayoutManager?.textContainer.map { _ in UIScreen.main.scale } ?? 2
+        if picture.kind == .ink, let theme = picture.theme {
+            // From its strokes, in the scheme's colours, as the Preview's `InkPictureView`; a PNG that carries none is drawn as its pixels, below.
+            switch LiveImages.shared.strokes(at: picture.url) {
+            case .some(let read) where read.document != nil:
+                if let image = LiveImages.shared.drawingPicture(of: read.document!, at: picture.url, theme: theme, scale: scale) {
+                    image.draw(in: rect)
+                } else {
+                    drawStandIn(rect)
+                }
+                return
+            case .some: break
+            case .none: return drawStandIn(rect)
+            }
+        }
         if let image = LiveImages.shared.thumbnail(at: picture.url, maxPixel: Int(max(rect.width, rect.height) * scale)) {
             image.draw(in: rect)
         } else {
-            // Not in yet: a faint stand-in of the right size, and the text is drawn again when it is.
-            drawing.noticeColor.withAlphaComponent(0.12).setFill()
-            UIBezierPath(roundedRect: rect, cornerRadius: 6).fill()
+            drawStandIn(rect)
         }
+    }
+
+    /// Not in yet: a faint stand-in of the right size, and the text is drawn again when it is.
+    private func drawStandIn(_ rect: CGRect) {
+        drawing.noticeColor.withAlphaComponent(0.12).setFill()
+        UIBezierPath(roundedRect: rect, cornerRadius: 6).fill()
     }
 }

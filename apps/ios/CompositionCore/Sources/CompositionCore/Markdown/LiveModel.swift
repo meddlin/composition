@@ -18,6 +18,12 @@ public enum LiveStyle: String, Equatable, Sendable {
     case strong, emphasis, strike, code
 }
 
+/// Which tag writes a picture, which says how it is drawn: `![…](…)` and `<Image />` as the picture, `<Ink />` from the drawing's strokes in the scheme's colours
+/// (its PNG when it carries none), and `<Drawio />` at half its pixel size unless the tag gives a width, as the Preview draws each (docs/ipad-live-default-plan.md, Step 1).
+public enum LivePictureKind: String, Equatable, Sendable {
+    case image, ink, drawio
+}
+
 /// What the Live view does to a note for one selection. Ranges are in the note's text; each list is in the order the note holds them.
 public struct LiveDecorations: Equatable, Sendable {
     public struct Heading: Equatable, Sendable {
@@ -34,7 +40,7 @@ public struct LiveDecorations: Equatable, Sendable {
     }
 
     public struct Picture: Equatable, Sendable {
-        /// The text that writes the picture: `![alt](src "title")` or `<Image … />`.
+        /// The text that writes the picture: `![alt](src "title")`, `<Image … />`, `<Ink … />` or `<Drawio … />`.
         public var range: NSRange
         /// Nothing but space is on its line with it: such a picture is drawn in place of its text. One in the middle of a sentence (the desktop draws it inline) is
         /// left as its text, because drawing it in the line would need something in the text that is not its characters.
@@ -45,6 +51,7 @@ public struct LiveDecorations: Equatable, Sendable {
         public var alt: String
         public var title: String
         public var width: String
+        public var kind: LivePictureKind = .image
     }
 
     public struct Tint: Equatable, Sendable {
@@ -357,7 +364,7 @@ public struct LiveModel: Sendable {
         }
 
         for image in scan.images where inWindow(image.range) {
-            out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width))
+            out.pictures.append(.init(range: image.range, ownLine: isOwnLine(image.range), active: touches(image.range), src: image.src, alt: image.alt, title: image.title, width: image.width, kind: image.kind))
         }
         out.tints += scan.tints.filter { inWindow($0.range) }.map { .init(range: $0.range, color: $0.color) }
         for element in scan.elements {
