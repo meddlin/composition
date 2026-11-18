@@ -4,7 +4,7 @@ import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
+import { deleteMarkupBackward, insertNewlineContinueMarkup, markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { ensureSyntaxTree } from "@codemirror/language";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -60,6 +60,9 @@ import { listDecorations } from "../src/components/notes/liveLists";
  *                                  (images.ts), imageAlt, imageMarkdown, imageTag and findImageRefs (imageRefs.ts), and
  *                                  imagesToMdx (imageToMdx.ts), and for the picker of stored images listImages (images.ts, over real
  *                                  folders), imageUsage (imageRefs.ts) and matchImages, usageLabel and formatSize (imagePicker.ts)
+ *   list-continuation-cases.json, list-continuation-expected.json
+ *                                  docs/ipad-live-default-plan.md, Step 4: Return and Backspace at every caret place of each text, through the
+ *                                  real insertNewlineContinueMarkup and deleteMarkupBackward (@codemirror/lang-markdown) on a real CodeMirror state
  *   live-expected.json             docs/ipad-live-view-plan.md, step L2: the texts of fixtures/conformance/live-cases.json, the notes of
  *                                  mdx-notes.json and the preview showcase, each with the caret and selections tried on it, and what the
  *                                  real liveDecorations (liveMarkdown.ts, on a real CodeMirror state with the Markdown language) hid,
@@ -966,6 +969,34 @@ describe.skipIf(!outDir)("conformance fixtures", () => {
     expect(expected.indents.filter((e) => e !== null).length).toBeGreaterThan(300);
     expect(expected.emphasis.filter((e) => e !== null).length).toBeGreaterThan(300);
   }, 120_000);
+
+  it("writes the list-continuation cases and what the real insertNewlineContinueMarkup and deleteMarkupBackward make of each", () => {
+    fs.mkdirSync(outDir!, { recursive: true });
+    const file = path.resolve(__dirname, "../../../fixtures/conformance/list-continuation-cases.json");
+    const cases = JSON.parse(fs.readFileSync(file, "utf8")) as { texts: string[] };
+    // Return and Backspace with the caret at every place of each text, on a real state with the desktop's Markdown language (LiveEditor.tsx):
+    // the text afterwards and the caret, or null where the command declined (and the key does what it always does).
+    type Result = [string, number] | null;
+    const run = (text: string, caret: number, command: typeof insertNewlineContinueMarkup): Result => {
+      let state = EditorState.create({ doc: text, selection: EditorSelection.cursor(caret), extensions: [markdown({ base: markdownLanguage })] });
+      ensureSyntaxTree(state, state.doc.length, 60_000);
+      state = state.update({}).state;
+      let result: Result = null;
+      command({ state, dispatch: (tr) => (result = [tr.state.doc.toString(), tr.state.selection.main.head]) });
+      return result;
+    };
+    // Each place as [caret, Return, Backspace]; not between the two halves of a surrogate pair, where a text view never puts the caret.
+    const inPair = (text: string, caret: number) => /[\uDC00-\uDFFF]/.test(text.charAt(caret)) && /[\uD800-\uDBFF]/.test(text.charAt(caret - 1));
+    const expected = cases.texts.map((text) =>
+      Array.from({ length: text.length + 1 }, (_, caret) => caret)
+        .filter((caret) => !inPair(text, caret))
+        .map((caret) => [caret, run(text, caret, insertNewlineContinueMarkup), run(text, caret, deleteMarkupBackward)] as const),
+    );
+    fs.copyFileSync(file, path.join(outDir!, "list-continuation-cases.json"));
+    fs.writeFileSync(path.join(outDir!, "list-continuation-expected.json"), JSON.stringify(expected));
+    expect(expected.flat().filter(([, enter]) => enter !== null).length).toBeGreaterThan(300);
+    expect(expected.flat().filter(([, , back]) => back !== null).length).toBeGreaterThan(30);
+  });
 
   it("writes the Live view cases and what the real liveDecorations make of each", () => {
     fs.mkdirSync(outDir!, { recursive: true });

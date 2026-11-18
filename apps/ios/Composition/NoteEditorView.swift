@@ -586,8 +586,31 @@ struct NoteEditorView: UIViewRepresentable {
         }
 
         /// On the software keyboard Return is typed text; with a list open it takes the highlighted choice instead (a hardware Return the list takes first).
+        /// Otherwise Return continues a Markdown list or quote, and Backspace just after an item's marker takes the marker away, as the desktop's
+        /// Markdown keys do (`ListContinuation`, Step 4 of docs/ipad-live-default-plan.md): in both tabs, since the text is the same Markdown in each.
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            !(text == "\n" && assist?.accept() == true)
+            if text == "\n" && assist?.accept() == true { return false }
+            guard let view = textView as? NoteTextView, let edit = listEdit(view, range: range, replacement: text) else { return true }
+            view.apply(edit)
+            return false
+        }
+
+        /// What Return or Backspace does to a list or a quote at the caret, or nil when the key should do what it always does: not over a selection, not
+        /// while an input method is composing (its text is not settled), and for Backspace only when it takes the one character before the caret (not a
+        /// word, a line or a selection).
+        private func listEdit(_ view: NoteTextView, range: NSRange, replacement: String) -> LineEdit? {
+            let selection = view.selectedRange
+            guard selection.length == 0, view.markedTextRange == nil, !view.isPasting else { return nil }
+            if let undo = view.undoManager, undo.isUndoing || undo.isRedoing { return nil }
+            if replacement == "\n", range.length == 0, range.location == selection.location {
+                return ListContinuation.newline(view.nativeText, at: selection.location)
+            }
+            if replacement.isEmpty, range.length > 0, NSMaxRange(range) == selection.location {
+                let text = view.nativeText
+                guard range == (text as NSString).rangeOfComposedCharacterSequence(at: range.location) else { return nil }
+                return ListContinuation.deleteBackward(text, at: selection.location)
+            }
+            return nil
         }
 
         /// A line the keystroke pushed past the column is broken at the last space before it (`LiveReflow`, the desktop's `reflowAtCaret` behind it), and the caret
