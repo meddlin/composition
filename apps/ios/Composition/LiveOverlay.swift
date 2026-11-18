@@ -34,6 +34,11 @@ enum LiveOverlay {
     /// Whether `font` is a hidden mark's: no text of the note is as small as this.
     static func isHidden(_ font: UIFont) -> Bool { font.pointSize < 1 }
 
+    /// Whether a run is hidden: in the hidden font, or concealed (the frontmatter drawn as the header, Step 7).
+    static func isHidden(_ attributes: [NSAttributedString.Key: Any]) -> Bool {
+        attributes[.liveConcealed] != nil || (attributes[.font] as? UIFont).map(isHidden) == true
+    }
+
     /// How many times the size of the text a heading is drawn (`.cm-live-h1` and the others of the desktop's Live tab).
     static func headingScale(_ level: Int) -> CGFloat {
         switch level {
@@ -163,7 +168,14 @@ enum LiveOverlay {
                 continue
             }
             for key in [NSAttributedString.Key.backgroundColor, .strikethroughStyle, .underlineStyle, .liveHeading, .liveDraw, .liveFootnoteRef, .kern] { storage.removeAttribute(key, range: lines) }
-            hide(lines, in: storage)
+            if entry.block.kind == LiveBlockKinds.frontmatter {
+                // The frontmatter keeps its own font, in no colour (`.liveConcealed`), rather than the hidden marks' half-point one: it is the top of the note, and Xcode's
+                // accessibility audit reads the text there and says a half-point font does not grow with Dynamic Type. Its lines are as flat as any block's.
+                storage.addAttributes([.foregroundColor: UIColor.clear, .liveConcealed: true], range: lines)
+                storage.removeAttribute(.obliqueness, range: lines)
+            } else {
+                hide(lines, in: storage)
+            }
             let tall = NSMutableParagraphStyle()
             tall.minimumLineHeight = LiveDrawing.reserved(for: size.height)
             storage.addAttributes([.paragraphStyle: tall, .liveDraw: LiveDrawing(kind: .block, ruleColor: look.uiRule, noticeColor: look.uiMutedText, block: picture)], range: first)
@@ -287,6 +299,10 @@ extension NSAttributedString.Key {
 }
 
 extension NSAttributedString.Key {
+    /// On characters hidden by colour in their own font rather than by the hidden marks' font (the frontmatter drawn as the header, Step 7): hidden all the same, to the
+    /// report and to VoiceOver (`LiveOverlay.isHidden(_:)`).
+    static let liveConcealed = NSAttributedString.Key("liveConcealed")
+
     /// On the characters of a footnote citation drawn as its number (Step 7): a `LiveFootnoteNumber`, which `LiveDrawingFragment` draws where the citation is.
     static let liveFootnoteRef = NSAttributedString.Key("liveFootnoteRef")
 }

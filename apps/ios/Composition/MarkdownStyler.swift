@@ -77,7 +77,7 @@ final class MarkdownStyler {
 
     private static let stepLength = 3_000
     private static let pause: TimeInterval = 0.3
-    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveBlock, .liveFootnoteRef, .kern]
+    private static let managedKeys: [NSAttributedString.Key] = [.font, .foregroundColor, .backgroundColor, .strikethroughStyle, .underlineStyle, .obliqueness, .paragraphStyle, .liveDraw, .liveHeading, .liveBlock, .liveFootnoteRef, .kern, .liveConcealed]
 
     init(textView: UITextView, look: Look = .standard) {
         self.textView = textView

@@ -33,7 +33,7 @@ enum LiveReport {
             // Step 7: a footnote citation drawn as its number (`footnote1` over its hidden source), and a line drawn with no height (a setext heading's underline).
             if let number = attributes[.liveFootnoteRef] as? LiveFootnoteNumber { note("footnote\(number.text.unicodeScalars.map { String(Self.digit($0)) }.joined())", run) }
             if let style = attributes[.paragraphStyle] as? NSParagraphStyle, style.maximumLineHeight > 0, style.maximumLineHeight < 1 { note("flat", run) }
-            if LiveOverlay.isHidden(font) { return note("hidden", run) }
+            if LiveOverlay.isHidden(attributes) { return note("hidden", run) }
             let traits = font.fontDescriptor.symbolicTraits
             if traits.contains(.traitItalic) || ((attributes[.obliqueness] as? NSNumber)?.doubleValue ?? 0) > 0 { note("italic", run) }
             if traits.contains(.traitBold) { note("bold", run) }
