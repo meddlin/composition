@@ -41,7 +41,7 @@ final class LiveScribbleUITests: XCTestCase {
 
     private func drawn() -> [String: String] { LiveReportReading.parse(report.exists ? report.label : "") }
 
-    /// A drawn item from `live-drawn`: its kind (`picture-drawio`, `pictureAfter-ink`, `block`, …), the picture's window frame, and the band its room takes.
+    /// A drawn item from `live-drawn`: its kind (`picture-drawio`, `pictureAfter-ink`, `block-table`, …), the picture's window frame, and the band its room takes.
     private struct Item {
         let kind: String
         let picture: CGRect
@@ -67,20 +67,33 @@ final class LiveScribbleUITests: XCTestCase {
         app.windows.firstMatch.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: point.x, dy: point.y)).tap()
     }
 
-    /// Touches the text at `point` (window coordinates) and returns what the Scribble delegate answered there: true when Scribble could have begun.
-    private func scribbleAllowed(at point: CGPoint, _ what: String) throws -> Bool {
+    /// Touches the text at `point` (window coordinates) and checks what the Scribble delegate answered there: `allowed` when Scribble could have begun.
+    private func checkScribble(at place: @autoclosure () throws -> CGPoint, allowed: Bool, _ what: String) throws {
+        // The on-screen keyboard (the Simulator has no hardware one here) covers the lower part of the screen once the text has the caret: the note is scrolled
+        // until the place is clear of it, and the place read again, since scrolling moves it.
+        var point = try place()
+        for _ in 0..<6 {
+            let keyboard = app.keyboards.firstMatch
+            let bottom = keyboard.exists && keyboard.frame.height > 50 ? keyboard.frame.minY - 30 : app.windows.firstMatch.frame.maxY - 30
+            let top = editor.frame.minY + 30
+            guard point.y > bottom || point.y < top else { break }
+            let from = editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+            from.press(forDuration: 0.05, thenDragTo: from.withOffset(CGVector(dx: 0, dy: point.y > bottom ? -120 : 120)))
+            RunLoop.current.run(until: Date().addingTimeInterval(1))
+            point = try place()
+        }
         let before = probe.label
         tapWindow(point)
         XCTAssertTrue(eventually(5) { probe.label != before }, "\(what): the touch at \(point) reached the text view (\(probe.label))")
         let parts = probe.label.split(separator: " ")
-        let answer = try XCTUnwrap(parts.last.map(String.init), "\(what): \(probe.label)")
         let at = parts.count == 3 ? parts[1].split(separator: ",").compactMap { Double($0) } : []
         XCTAssertEqual(at.count, 2, "\(what): \(probe.label)")
         if at.count == 2 {
             XCTAssertEqual(at[0], Double(point.x), accuracy: 3, "\(what): the probe heard this touch: \(probe.label)")
             XCTAssertEqual(at[1], Double(point.y), accuracy: 3, "\(what): the probe heard this touch: \(probe.label)")
         }
-        return answer == "yes"
+        XCTAssertEqual(parts.last.map(String.init), allowed ? "yes" : "no",
+                       "\(what): Scribble \(allowed ? "may" : "may not") begin at \(point): \(probe.label); drawn: \(drawnProbe.label); selection: \(app.descendants(matching: .any)["live-selection"].label)")
     }
 
     private func keepScreenshot(_ name: String) {
@@ -101,38 +114,56 @@ final class LiveScribbleUITests: XCTestCase {
             .write(to: file, atomically: true, encoding: .utf8)
         try launch(note: nil, ["-importText", file.path])
         XCTAssertTrue(eventually { text().contains("<Drawio") }, "the imported note is open: \(text().prefix(80))")
-        XCTAssertTrue(eventually(30) { item("picture-drawio") != nil && item("block") != nil && drawn()["block-pictured"] != nil },
+        XCTAssertTrue(eventually(30) { item("picture-drawio") != nil && item("block-table") != nil && drawn()["block-pictured"] != nil },
                       "the diagram and the table are drawn: \(drawnProbe.label) \(drawn())")
         keepScreenshot("diagram and table drawn")
-        var diagram = try XCTUnwrap(item("picture-drawio"))
-        let table = try XCTUnwrap(item("block"))
-        XCTAssertLessThan(diagram.picture.width, 300, "the diagram is drawn at its tag's width, narrower than the line: \(diagram)")
+        // Where each is is read again before every touch: a touch near a picture can put the caret in its source, which then shows and moves what is below.
+        func diagram() throws -> Item { try XCTUnwrap(items().first { $0.kind.hasSuffix("-drawio") }, "the diagram: \(drawnProbe.label)") }
+        func table() throws -> Item { try XCTUnwrap(items().first { $0.kind.hasSuffix("-table") }, "the table: \(drawnProbe.label)") }
+        XCTAssertLessThan(try diagram().picture.width, 300, "the diagram is drawn at its tag's width, narrower than the line: \(drawnProbe.label)")
 
         // The lines above and below each: text, where Scribble writes as always.
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: diagram.picture.midX, y: diagram.top - 8), "the line above the diagram"))
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: diagram.picture.midX, y: diagram.bottom + 8), "the line below the diagram"))
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: table.picture.midX, y: table.top - 8), "the line above the table"))
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: table.picture.midX, y: table.bottom + 8), "the line below the table"))
-        // The table's picture.
-        XCTAssertFalse(try scribbleAllowed(at: CGPoint(x: table.picture.minX + min(table.picture.width / 2, 80), y: table.picture.midY), "the table"))
-        // Beside the narrow diagram, on its band: this touch puts the caret in its tag, which then shows, with the diagram after it.
-        diagram = try XCTUnwrap(item("picture-drawio"))
-        XCTAssertFalse(try scribbleAllowed(at: CGPoint(x: diagram.picture.maxX + 60, y: diagram.picture.midY), "beside the diagram"))
-        XCTAssertTrue(eventually { item("pictureAfter-drawio") != nil }, "the diagram's tag shows, with the diagram after it: \(drawnProbe.label)")
-        let after = try XCTUnwrap(item("pictureAfter-drawio"))
+        try checkScribble(at: CGPoint(x: try diagram().picture.midX, y: try diagram().bottom + 8), allowed: true, "the line below the diagram")
+        try checkScribble(at: CGPoint(x: try table().picture.midX, y: try table().bottom + 8), allowed: true, "the line below the table")
+        try checkScribble(at: CGPoint(x: try table().picture.midX, y: try table().top - 8), allowed: true, "the line above the table")
+        try checkScribble(at: CGPoint(x: try diagram().picture.midX, y: try diagram().top - 8), allowed: true, "the line above the diagram")
+        // The table's picture, with the caret away from it, so that it is drawn in place of its source.
+        try checkScribble(at: CGPoint(x: try diagram().picture.midX, y: try diagram().bottom + 8), allowed: true, "the line below the diagram, again")
+        XCTAssertTrue(eventually { items().contains { $0.kind == "block-table" } }, "the table is drawn in place of its source: \(drawnProbe.label)")
+        try checkScribble(at: CGPoint(x: try table().picture.minX + min(try table().picture.width / 2, 80), y: try table().picture.midY), allowed: false, "the table")
+        // Beside the narrow diagram, on its band (the caret moved off it first): this touch puts the caret in its tag, which then shows, with the diagram after it.
+        try checkScribble(at: CGPoint(x: try table().picture.midX, y: try table().bottom + 8), allowed: true, "the line below the table, again")
+        XCTAssertTrue(eventually { items().contains { $0.kind == "picture-drawio" } }, "the diagram is drawn in place of its tag: \(drawnProbe.label)")
+        try checkScribble(at: CGPoint(x: try diagram().picture.maxX + 60, y: try diagram().picture.midY), allowed: false, "beside the diagram")
+        XCTAssertTrue(eventually { items().contains { $0.kind == "pictureAfter-drawio" } }, "the diagram's tag shows, with the diagram after it: \(drawnProbe.label)")
+        func after() throws -> Item { try XCTUnwrap(item("pictureAfter-drawio"), "the diagram after its tag: \(drawnProbe.label)") }
         keepScreenshot("the diagram's tag revealed")
         // The diagram drawn after its tag is still not written on; the tag's own line is text.
-        XCTAssertFalse(try scribbleAllowed(at: CGPoint(x: after.picture.midX, y: after.picture.midY), "the diagram after its tag"))
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: after.picture.minX + 40, y: after.top - 8), "the diagram's revealed tag"))
+        try checkScribble(at: CGPoint(x: try after().picture.midX, y: try after().picture.midY), allowed: false, "the diagram after its tag")
+        try checkScribble(at: CGPoint(x: try after().picture.minX + 40, y: try after().top - 8), allowed: true, "the diagram's revealed tag")
 
-        // The Markdown tab draws nothing: Scribble writes everywhere, where the diagram was too.
+        // The Markdown tab draws nothing: Scribble writes everywhere, the tags' lines too.
         for _ in 0..<3 where report.label != "markdown" {
             app.buttons["Markdown"].tap()
             _ = eventually(10) { report.label == "markdown" }
         }
         XCTAssertEqual(report.label, "markdown", "the Markdown tab is showing")
         XCTAssertTrue(eventually { items().isEmpty }, "nothing drawn in the Markdown tab: \(drawnProbe.label)")
-        XCTAssertTrue(try scribbleAllowed(at: CGPoint(x: diagram.picture.midX, y: diagram.picture.midY), "the Markdown tab"))
+        let tagLine = try XCTUnwrap(app.descendants(matching: .any)["live-selection"].label.split(separator: " ").first { $0.hasPrefix("sy=") }.flatMap { Double($0.dropFirst(3)) }, "where the caret is")
+        try checkScribble(at: CGPoint(x: editor.frame.midX, y: tagLine + 10), allowed: true, "the Markdown tab, on the diagram's tag")
+        leaveTheCaretAtTheTop()
+    }
+
+    /// The app restores the caret of the note that was open (per scene), and a later test's imported note can take this one's id: the caret goes to the top of the note,
+    /// where a note that was never open has it, so that it does not reopen in a tag and show it (found running `LiveDrawingsUITests` after this class).
+    private func leaveTheCaretAtTheTop() {
+        let selection = app.descendants(matching: .any)["live-selection"]
+        for _ in 0..<3 where !selection.label.hasPrefix("0+0 ") {
+            if !editorHasFocus { editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.1)).tap() }
+            app.typeKey(.upArrow, modifierFlags: .command)
+            _ = eventually(3) { selection.label.hasPrefix("0+0 ") }
+        }
+        XCTAssertTrue(selection.label.hasPrefix("0+0 "), "the caret is at the top: \(selection.label)")
     }
 
     // MARK: The Pencil on a drawing
@@ -198,5 +229,6 @@ final class LiveScribbleUITests: XCTestCase {
         XCTAssertTrue(eventually(30) { inkSources.count == 1 && inkSources.first != first }, "the tag names the edited drawing: \(inkSources), was \(first)")
         XCTAssertTrue(text().hasSuffix("Below the drawing."), "the rest of the note is as it was: \(text().suffix(120))")
         XCTAssertTrue(eventually(30) { item("picture-ink") != nil }, "the edited drawing is drawn: \(drawnProbe.label)")
+        leaveTheCaretAtTheTop()
     }
 }

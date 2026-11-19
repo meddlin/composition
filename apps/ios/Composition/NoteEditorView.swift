@@ -582,7 +582,9 @@ struct NoteEditorView: UIViewRepresentable {
                     guard let editor = view as? NoteTextView else { return "" }
                     return LiveDrawn.all(in: editor).map { item in
                         let picture = editor.convert(item.picture, to: nil), room = editor.convert(item.room, to: nil)
-                        let kind = item.drawing.picture.map { "\(item.drawing.kind.rawValue)-\($0.kind)" } ?? item.drawing.kind.rawValue
+                        // `picture-ink`, `pictureAfter-drawio`, `block-table`, `blockAfter-frontmatter`, …
+                        let block = item.drawing.block.flatMap { editor.textStorage.length > $0.source.location ? editor.textStorage.attribute(.liveBlock, at: $0.source.location, effectiveRange: nil) as? LiveBlockMark : nil }
+                        let kind = item.drawing.kind.rawValue + (item.drawing.picture.map { "-\($0.kind)" } ?? block.map { "-\($0.kind)" } ?? "")
                         return String(format: "%@ %.0f,%.0f,%.0f,%.0f %.0f-%.0f", kind, picture.minX, picture.minY, picture.width, picture.height, room.minY, room.maxY)
                     }.joined(separator: ";")
                 }
