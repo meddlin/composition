@@ -160,4 +160,24 @@ final class TypingAidsUITests: XCTestCase {
         link.tap()
         XCTAssertTrue(eventually { text(app.textViews["note-editor"]).hasPrefix("---\ntitle: \(title)\n") }, "the linked note is open: \(text(app.textViews["note-editor"]).prefix(60))")
     }
+
+    /// ⌘F opens the find bar over the note: before the text has been tapped into (the focus elsewhere), and with the caret in it.
+    func testCommandFOpensFindWhetherOrNotTheTextHasTheFocus() throws {
+        try launch(mode: "Live")
+        let editor = app.textViews["note-editor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 30))
+        // The system's find bar (not the notes list's "Search notes" field).
+        let field = app.searchFields["find.searchField"]
+        XCTAssertFalse(field.exists, "no find bar yet")
+        app.typeKey("f", modifierFlags: .command)
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "⌘F opens the find bar without the text focused: \(app.debugDescription)")
+        app.typeText("pipeline")
+        XCTAssertTrue(eventually { (field.value as? String) == "pipeline" }, "what is typed goes to the find bar: \(String(describing: field.value))")
+        // Closed, then opened again from inside the text.
+        app.buttons["find.doneButton"].tap()
+        XCTAssertTrue(eventually { !field.exists }, "the find bar closes")
+        _ = editorAtTheEnd()
+        app.typeKey("f", modifierFlags: .command)
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "⌘F opens the find bar with the caret in the text")
+    }
 }
