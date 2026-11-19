@@ -106,6 +106,7 @@ struct NoteDetailView: View {
                     if mode != .preview {
                         Menu {
                             Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                                .keyboardShortcut("f", modifiers: .command)
                             Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                             Menu("Image", systemImage: "photo.badge.plus") { imageItems }
                         } label: {
@@ -113,7 +114,10 @@ struct NoteDetailView: View {
                         }
                     }
                 } else if mode != .preview {
+                    // ⌘F as well, from wherever the focus is (the lists, or a note not yet tapped into), not only from inside the text.
                     Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .accessibilityIdentifier("find-button")
                     Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                     Menu { imageItems } label: { Label("Image", systemImage: "photo.badge.plus") }
                 }

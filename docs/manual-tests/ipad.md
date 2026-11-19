@@ -132,7 +132,7 @@ The note screen has **Markdown** (the editor), **Preview** and **Split**. **Use 
 28. **Colours while typing fast,** on a hardware keyboard and on the on-screen one, in a long note of yours. Nothing should lag, and no text should flicker to a wrong colour for more than a moment. Type three backticks on a line of their
     own in the middle of a note: the text below should turn into code within about half a second, without a freeze.
 29. **Preview and Split.** Type in *Split*: the preview follows about a quarter of a second after you stop. Turn the iPad: the halves should stack when the note's pane is narrower than 800 points and sit side by side when it is wider, without losing the keyboard or your place.
-30. **Find** (the magnifying glass, or ⌘F with a hardware keyboard). It marks every match in the colours' place, and the next and previous buttons move between them.
+30. **Find** (the magnifying glass, or ⌘F with a hardware keyboard: also before you have tapped into the text, or with the focus in the lists). It marks every match in the colours' place, and the next and previous buttons move between them.
 31. **Search for what you typed.** Type an unusual word into a note, wait a second, then search for it in the list: the note is found, with no relaunch. Then trash the note from its own screen (the trash button, top right) and
     restore it from the Trash Can: it is back, and still found.
 32. **Undo and redo** (⌘Z, ⇧⌘Z, or the shake and the three-finger swipe) after typing and after a paste. The colours should be right afterwards.
