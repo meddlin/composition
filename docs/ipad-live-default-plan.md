@@ -197,6 +197,11 @@ feel, VoiceOver, speed on the device).
   drawn in Live in all five schemes, its pixels the scheme's ink colour; the tag shown with the drawing after it
   under the caret; a diagram at 440 points from its 880-pixel PNG). `live-report` gains `picture-ink`,
   `picture-drawio`, `natural<width>` and `ink-strokes`.
+- **Gate LD1 failed (2026-11-18), fixed (2026-11-19).** The Pencil over a drawing started Scribble, which wrote into
+  its hidden tag, and the drawing vanished (item 344). `LiveScribble` adds a `UIScribbleInteraction` whose delegate
+  refuses to begin over the band any drawn picture or block takes (`LiveDrawingFragment.drawnRoom`), across the
+  whole line, and `LivePencilOpen` makes a Pencil touch on a drawn `<Ink>` open its canvas (the owner's choice; it
+  amends I6 for the Pencil only). UI tests: `LiveScribbleUITests`. Retest: items 344 and 372.
 
 ### Step 2: links (S to M)
 
@@ -611,7 +616,7 @@ The iPad's own questions:
 | I3 | Where the setting lives and what it changes | Appearance sheet › Writing › "Open notes in", **kept on this iPad** (not in `settings.json`, so a restored desktop backup does not bring the desktop's choice); **every note opens in it**, and changing the tab lasts until another note opens | **As recommended**: kept on this iPad, and every note opens in it |
 | I4 | The default until Step 8 (desktop: Split) | **Preview**, as today (Split is cramped on a portrait iPad) | **Preview** |
 | I5 | A new note (today: Markdown, keyboard up) | Opens in the setting's view when it is a writing view (Live, Markdown, Split); when it is Preview, in **Markdown until Step 8 and Live after** | **As recommended** |
-| I6 | How blocks are drawn, and what a touch on one does | **Pictures of the Preview's own views** in the existing fragment layer; a tap edits; a component's action (a card's address, editing a drawing) is the same **↗** as a link's, while the caret is in it; a `<Toc />` entry is reached through the Outline button | **As recommended** |
+| I6 | How blocks are drawn, and what a touch on one does | **Pictures of the Preview's own views** in the existing fragment layer; a tap edits; a component's action (a card's address, editing a drawing) is the same **↗** as a link's, while the caret is in it; a `<Toc />` entry is reached through the Outline button | **As recommended**; amended 2026-11-19 (Gate LD1): a **Pencil** touch on a drawn `<Ink>` opens its canvas, a finger still edits |
 | I7 | Code-block colours (the iPad's Preview has none by language) | **Match the Preview**: one fill, the code font, no language colours; language colours for both tabs is a separate later item | **Match the Preview** |
 
 ## Out of scope

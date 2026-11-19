@@ -24,6 +24,8 @@ final class EditorHandle {
     var followLink: (String) -> Bool = { _ in false }
     /// Whether a link's target is on this iPad: a `pdf:` link to a PDF that is not is drawn struck through, as the Preview draws it.
     var isLinkHere: (String) -> Bool = { _ in true }
+    /// Opens the canvas on a stored drawing (a Pencil touch on an `<Ink />` the Live tab draws, `LivePencilOpen`): the screen owns the canvas.
+    var editInk: (String) -> Void = { _ in }
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -201,11 +203,18 @@ final class NoteTextView: UITextView {
     /// `closestPosition(to:)`, found in the Simulator), so the selection that follows a touch, when it is a caret in a block still drawn, is moved. The touch is noted in
     /// `hitTest`, which UIKit calls as every touch begins: a gesture recogniser added for it (tried) stopped ⌘A from selecting the note in the UI tests.
     private var lastTouch: TimeInterval?
+    #if DEBUG || EDITOR_TEST_HOOKS
+    /// Hears where each touch on the text view begins (the `live-scribble` probe, with `-liveReport 1`).
+    var touched: ((CGPoint) -> Void)?
+    #endif
 
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let found = super.hitTest(point, with: event)
         // TextKit 2 draws the text in views of its own inside the text view, which are what a touch on the text hits.
         if isLive, event?.type == .touches, let found, found.isDescendant(of: self) { lastTouch = CACurrentMediaTime() }
+        #if DEBUG || EDITOR_TEST_HOOKS
+        if event?.type == .touches { touched?(point) }
+        #endif
         return found
     }
 
@@ -495,6 +504,9 @@ struct NoteEditorView: UIViewRepresentable {
         private var taskTap: LiveTaskTap?
         /// The ↗ beside a link in the Live tab, and ⌘-tap on one.
         private var liveLinks: LiveLinks?
+        /// Where Scribble may begin in the Live tab (not over what it draws), and the Pencil on a drawing (its canvas).
+        private var scribble: LiveScribble?
+        private var pencilOpen: LivePencilOpen?
         private weak var textView: UITextView?
         private var observation: NoteSession.Observation?
 
@@ -521,6 +533,13 @@ struct NoteEditorView: UIViewRepresentable {
             if live { styler.setLive(true) } else { styler.reload() }
             // A tap on a task box the Live tab draws ticks it (Step 4 of docs/ipad-live-default-plan.md).
             taskTap = LiveTaskTap(textView: view, isLive: { [weak styler] in styler?.isLive ?? false }, drawnTask: { [weak styler] in styler?.drawnTask(at: $0) })
+            // Scribble never begins over a picture or a block the Live tab draws (Gate LD1, item 344), and the Pencil on a drawing opens its canvas.
+            if let editor = view as? NoteTextView {
+                scribble = LiveScribble(textView: editor)
+                let pencil = LivePencilOpen(textView: editor)
+                pencil.open = { [weak self] name in self?.handle?.editInk(name) }
+                pencilOpen = pencil
+            }
             #if DEBUG || EDITOR_TEST_HOOKS
             // `-liveReport 1`: an element of the editor that says what the Live tab has made of the text (see `LiveReport`), for the UI tests to read.
             if UserDefaults.standard.bool(forKey: "liveReport") {
@@ -554,6 +573,34 @@ struct NoteEditorView: UIViewRepresentable {
                     (self?.taskTap?.boxCenters() ?? []).map { String(format: "%.0f,%.0f", $0.x, $0.y) }.joined(separator: ";")
                 }
                 view.addSubview(boxes)
+                // `live-drawn`: the pictures and blocks the Live tab draws, `kind x,y,w,h top-bottom;…`, each picture's window frame and the band its room takes (`LiveDrawn`).
+                let drawnItems = LiveProbe(frame: CGRect(x: 0, y: 8, width: 2, height: 2))
+                drawnItems.isAccessibilityElement = true
+                drawnItems.accessibilityIdentifier = "live-drawn"
+                drawnItems.alpha = 0.02
+                drawnItems.describe = { [weak view] in
+                    guard let editor = view as? NoteTextView else { return "" }
+                    return LiveDrawn.all(in: editor).map { item in
+                        let picture = editor.convert(item.picture, to: nil), room = editor.convert(item.room, to: nil)
+                        let kind = item.drawing.picture.map { "\(item.drawing.kind.rawValue)-\($0.kind)" } ?? item.drawing.kind.rawValue
+                        return String(format: "%@ %.0f,%.0f,%.0f,%.0f %.0f-%.0f", kind, picture.minX, picture.minY, picture.width, picture.height, room.minY, room.maxY)
+                    }.joined(separator: ";")
+                }
+                view.addSubview(drawnItems)
+                // `live-scribble`: whether Scribble could have begun where the last touch began, as the real delegate answers (`n=3 x,y yes`): the UI tests cannot write with a Pencil.
+                let scribbleProbe = UILabel(frame: CGRect(x: 0, y: 10, width: 2, height: 2))
+                scribbleProbe.isAccessibilityElement = true
+                scribbleProbe.accessibilityIdentifier = "live-scribble"
+                scribbleProbe.alpha = 0.02
+                scribbleProbe.accessibilityLabel = "n=0"
+                view.addSubview(scribbleProbe)
+                var touches = 0
+                (view as? NoteTextView)?.touched = { [weak self, weak view, weak scribbleProbe] point in
+                    guard let self, let view, let scribble = self.scribble else { return }
+                    touches += 1
+                    let onScreen = view.convert(point, to: nil)
+                    scribbleProbe?.accessibilityLabel = String(format: "n=%d %.0f,%.0f %@", touches, onScreen.x, onScreen.y, scribble.allows(at: point) ? "yes" : "no")
+                }
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
                     self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"

@@ -47,7 +47,7 @@ struct NoteDetailView: View {
     @State private var showingStored = false
     @State private var storedWords = ""
     @State private var pickedStored: StoredImageInfo?
-    /// The drawing canvas, open on a blank page (Image menu, *Drawing…*).
+    /// The drawing canvas, open on a blank page (Image menu, *Drawing…*), or on a stored drawing the Pencil touched in the Live tab (`LivePencilOpen`).
     @State private var drawing: InkEditing?
     /// The sheet that picks the picture above the note's title (HeaderImage.swift).
     @State private var showingHeaderImage = false
@@ -165,7 +165,11 @@ struct NoteDetailView: View {
         .fullScreenCover(item: $drawing) { editing in
             InkCanvasScreen(editing: editing, look: look) { saved in
                 drawing = nil
-                handle.insertInk(png: saved.png, alt: saved.transcript)
+                if editing.stored != nil {
+                    if let session { InkEditing.storeEdited(editing, saved: saved, model: model, session: session) }
+                } else {
+                    handle.insertInk(png: saved.png, alt: saved.transcript)
+                }
             } cancelled: {
                 drawing = nil
             }
@@ -270,6 +274,12 @@ struct NoteDetailView: View {
         // The Live tab's links (its ↗ and ⌘-tap) follow as the Preview's do, and a `pdf:` link to a PDF not here is drawn as the Preview draws it.
         handle.followLink = { [weak model] href in model.map { LinkFollower(model: $0, noteId: noteID).follow(href) } ?? false }
         handle.isLinkHere = { [weak model] href in model.map { LinkFollower.isHere(href, model: $0) } ?? true }
+        // The Pencil on a drawing in the Live tab opens its canvas, as a tap on it in the Preview does.
+        let canvas = $drawing
+        handle.editInk = { [weak model] name in
+            guard let model, canvas.wrappedValue == nil, let editing = InkEditing.load(named: name, from: model.location.imagesURL) else { return }
+            canvas.wrappedValue = editing
+        }
         let words = $storedWords, showing = $showingStored
         handle.openStoredImages = { [weak handle] in
             words.wrappedValue = handle?.selectedWords ?? ""
@@ -451,22 +461,9 @@ struct NoteReader: View {
         _live = State(initialValue: LivePreview(session: session))
     }
 
-    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old. The `alt`
-    /// follows the words read from the drawing unless a person has changed it.
     private func saveEdited(_ editing: InkEditing, saved: InkSaved) {
         editingInk = nil
-        guard let old = editing.stored else { return }
-        let location = model.location
-        let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
-        Task {
-            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
-            switch outcome {
-            case .stored(let name):
-                let renamed = InkTag.replacing(old, with: name, in: session.text)
-                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
-            case .failed(let message): model.errorMessage = message
-            }
-        }
+        InkEditing.storeEdited(editing, saved: saved, model: model, session: session)
     }
 
     var body: some View {
@@ -577,6 +574,26 @@ final class LivePreview {
             updated = made.1?.updatedAt ?? ""
             tags = made.1.map { NoteFrontmatter.tagsToString($0.tags).tagLine } ?? ""
             headerImage = made.1?.headerImage
+        }
+    }
+}
+
+extension InkEditing {
+    /// An edited drawing (opened from the Preview, or by the Pencil in the Live tab) is stored under its own new name (the name carries a hash of the bytes), and the
+    /// note's text names that one in place of the old. The `alt` follows the words read from the drawing unless a person has changed it.
+    @MainActor
+    static func storeEdited(_ editing: InkEditing, saved: InkSaved, model: AppModel, session: NoteSession) {
+        guard let old = editing.stored else { return }
+        let location = model.location
+        let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
+            switch outcome {
+            case .stored(let name):
+                let renamed = InkTag.replacing(old, with: name, in: session.text)
+                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
+            case .failed(let message): model.errorMessage = message
+            }
         }
     }
 }
