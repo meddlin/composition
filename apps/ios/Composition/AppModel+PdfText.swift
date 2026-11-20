@@ -16,9 +16,16 @@ extension AppModel {
             let documents = try database.listDocuments()
             let sources = documents.map(PdfTextSource.init)
             let stored = Dictionary(documents.map { ($0.id, $0.storedName) }, uniquingKeysWith: { first, _ in first })
+            let scans = try database.scanDocumentIds()
             var read = 0
             for source in try index.reconcilePdfText(with: sources) {
                 if Task.isCancelled { break }
+                // A scan's pages have no text of their own: its text is what was read from them (AppModel+Scans.swift).
+                if scans.contains(source.documentId) {
+                    try Self.storeScanText(source, database: database, into: index)
+                    read += 1
+                    continue
+                }
                 guard let name = stored[source.documentId] else { continue }
                 try Self.readPdfText(source, url: location.documentsURL.appendingPathComponent(name), password: nil, into: index)
                 read += 1
@@ -38,6 +45,22 @@ extension AppModel {
         }
     }
 
+    /// A scan's text in Search, made again from the lines read from it so far (after each page is read, and after a line is checked or corrected).
+    func indexScanText(documentId: Int64) {
+        guard let database = store?.database, let index = searchIndexForPdfText else { return }
+        queuePdfText { () -> Int in
+            guard let document = try database.document(id: documentId) else { return 0 }
+            try Self.storeScanText(PdfTextSource(document), database: database, into: index)
+            return 1
+        }
+    }
+
+    /// A scan's pages' text as Search keeps it: each page's lines that Search may use (`ScanText.pageText`: never a held line). Off the main thread.
+    nonisolated private static func storeScanText(_ source: PdfTextSource, database: CompositionDatabase, into index: SearchIndex) throws {
+        let pages = try database.scanPageTexts(documentId: source.documentId).map { PdfTextPage(page: $0.page, text: $0.text) }
+        try index.storePdfText(documentId: source.documentId, noteId: source.noteId, sha256: source.sha256, pages: pages)
+    }
+
     /// Where a PDF's text is in Search, for the reader's Contents (nil while it has not been read).
     func pdfTextState(documentId: Int64) async -> PdfTextState? {
         guard let index = searchIndexForPdfText else { return nil }
@@ -51,10 +74,12 @@ extension AppModel {
         pdfGoTo = PdfGoTo(documentId: entry.documentId, page: page, mark: nil, find: PdfSearchText.findText(forQuery: query), sequence: pdfGoToCount)
     }
 
-    /// What a search result found in a PDF says under its title: "In the PDF, p. 212" (the printed page label when the PDF has one).
+    /// What a search result found in a PDF says under its title: "In the PDF, p. 212" (the printed page label when the PDF has one), or "In the
+    /// scan, p. 3" for words read from a scanned page.
     func pdfHitLine(_ noteId: Int64) -> String? {
         guard let hit = pdfHits[noteId], let page = hit.pdfPage else { return nil }
-        return "In the PDF, p. \(hit.pdfPageLabel ?? String(page + 1))"
+        let isScan = pdfsByUuid.values.contains { $0.noteId == noteId && scanDocuments.contains($0.documentId) }
+        return "In the \(isScan ? "scan" : "PDF"), p. \(hit.pdfPageLabel ?? String(page + 1))"
     }
 
     // MARK: The queue

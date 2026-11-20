@@ -1,0 +1,1411 @@
+{
+  "scripts": [
+    {
+      "name": "a scan is read page by page and picks up where it stopped",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "Physics 101.pdf", "storedName": "0123456789ab-Physics 101.pdf", "sha256": "aa", "size": 1000, "pageCount": 3},
+        {"op": "addDocument", "noteId": 2, "fileName": "Book.pdf", "storedName": "0123456789ac-Book.pdf", "sha256": "bb", "size": 2000, "pageCount": 9},
+        {"op": "isScan", "documentId": 1},
+        {"op": "scanSummary", "documentId": 1},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 3},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 3},
+        {"op": "isScan", "documentId": 1},
+        {"op": "isScan", "documentId": 2},
+        {"op": "pendingScanPages"},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "apple-vision/text/3/accurate/lc/iOS 27.0", "lines": [{"rect": [72,700,300,720], "text": "Lecture 4: entropy", "confidence": 1},{"rect": [72,670,400,690], "text": "  the second   law ", "confidence": 0.81234},{"rect": [72,640,200,660], "text": "", "confidence": 0.9}]},
+        {"op": "pendingScanPages"},
+        {"op": "pendingScanPages", "documentId": 1},
+        {"op": "storeRecognition", "documentId": 1, "page": 2, "engine": "apple-vision/text/3/accurate/lc/iOS 27.0", "lines": []},
+        {"op": "pendingScanPages"},
+        {"op": "listScanPages", "documentId": 1},
+        {"op": "scanSummary", "documentId": 1},
+        {"op": "scanPageTexts", "documentId": 1},
+        {"op": "listScanLines", "documentId": 1, "page": 2}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "Physics 101.pdf",
+              "storedName": "0123456789ab-Physics 101.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 3,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "noteId": 2,
+              "fileName": "Book.pdf",
+              "storedName": "0123456789ac-Book.pdf",
+              "sha256": "bb",
+              "size": 2000,
+              "pageCount": 9,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": false
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": 3
+          },
+          {
+            "ok": 0
+          },
+          {
+            "ok": true
+          },
+          {
+            "ok": false
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 0
+              },
+              {
+                "documentId": 1,
+                "page": 1
+              },
+              {
+                "documentId": 1,
+                "page": 2
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  72,
+                  700,
+                  300,
+                  720
+                ],
+                "text": "Lecture 4: entropy",
+                "confidence": 1,
+                "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 1,
+                "rect": [
+                  72,
+                  670,
+                  400,
+                  690
+                ],
+                "text": "the second law",
+                "confidence": 0.812,
+                "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 1
+              },
+              {
+                "documentId": 1,
+                "page": 2
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 1
+              },
+              {
+                "documentId": 1,
+                "page": 2
+              }
+            ]
+          },
+          {
+            "ok": []
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 1
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+                "recognizedAt": "<time>",
+                "createdAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 1,
+                "engine": null,
+                "recognizedAt": null,
+                "createdAt": "<time>"
+              },
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 2,
+                "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+                "recognizedAt": "<time>",
+                "createdAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": {
+              "pages": 3,
+              "recognized": 2,
+              "lines": 2,
+              "unchecked": 2,
+              "held": 0,
+              "checked": 0,
+              "corrected": 0
+            }
+          },
+          {
+            "ok": [
+              {
+                "page": 0,
+                "text": "Lecture 4: entropy\nthe second law"
+              }
+            ]
+          },
+          {
+            "ok": []
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "Physics 101.pdf",
+            "stored_name": "0123456789ab-Physics 101.pdf",
+            "sha256": "aa",
+            "size": 1000,
+            "page_count": 3,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "note_id": 2,
+            "file_name": "Book.pdf",
+            "stored_name": "0123456789ac-Book.pdf",
+            "sha256": "bb",
+            "size": 2000,
+            "page_count": 9,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "pages": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+            "recognized_at": "<time>",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 1,
+            "engine": null,
+            "recognized_at": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 3,
+            "document_id": 1,
+            "page": 2,
+            "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+            "recognized_at": "<time>",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "lines": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "line": 0,
+            "rect": "[72,700,300,720]",
+            "text": "Lecture 4: entropy",
+            "confidence": 1,
+            "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 0,
+            "line": 1,
+            "rect": "[72,670,400,690]",
+            "text": "the second law",
+            "confidence": 0.812,
+            "engine": "apple-vision/text/3/accurate/lc/iOS 27.0",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "unsure and never-guessed lines are held out of search",
+      "steps": [
+        {"op": "setNotes", "live": [1], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "Notes.pdf", "storedName": "0123456789ab-Notes.pdf", "sha256": "aa", "size": 1000, "pageCount": 1},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 1},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "test", "lines": [{"rect": [10,10,100,20], "text": "Meeting notes", "confidence": 1},{"rect": [10,30,100,40], "text": "Drien fucking", "confidence": 1},{"rect": [10,50,100,60], "text": "Sugarfrom", "confidence": 0.3},{"rect": [10,70,100,80], "text": "call Sam", "confidence": 0.4996}]},
+        {"op": "scanSummary", "documentId": 1},
+        {"op": "scanPageTexts", "documentId": 1}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "Notes.pdf",
+              "storedName": "0123456789ab-Notes.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 1,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": 1
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  10,
+                  10,
+                  100,
+                  20
+                ],
+                "text": "Meeting notes",
+                "confidence": 1,
+                "engine": "test",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 1,
+                "rect": [
+                  10,
+                  30,
+                  100,
+                  40
+                ],
+                "text": "Drien fucking",
+                "confidence": 1,
+                "engine": "test",
+                "status": "held",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 2,
+                "rect": [
+                  10,
+                  50,
+                  100,
+                  60
+                ],
+                "text": "Sugarfrom",
+                "confidence": 0.3,
+                "engine": "test",
+                "status": "held",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 4,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 3,
+                "rect": [
+                  10,
+                  70,
+                  100,
+                  80
+                ],
+                "text": "call Sam",
+                "confidence": 0.5,
+                "engine": "test",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": {
+              "pages": 1,
+              "recognized": 1,
+              "lines": 4,
+              "unchecked": 2,
+              "held": 2,
+              "checked": 0,
+              "corrected": 0
+            }
+          },
+          {
+            "ok": [
+              {
+                "page": 0,
+                "text": "Meeting notes\ncall Sam"
+              }
+            ]
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "Notes.pdf",
+            "stored_name": "0123456789ab-Notes.pdf",
+            "sha256": "aa",
+            "size": 1000,
+            "page_count": 1,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "pages": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "engine": "test",
+            "recognized_at": "<time>",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "lines": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "line": 0,
+            "rect": "[10,10,100,20]",
+            "text": "Meeting notes",
+            "confidence": 1,
+            "engine": "test",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 0,
+            "line": 1,
+            "rect": "[10,30,100,40]",
+            "text": "Drien fucking",
+            "confidence": 1,
+            "engine": "test",
+            "status": "held",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 3,
+            "document_id": 1,
+            "page": 0,
+            "line": 2,
+            "rect": "[10,50,100,60]",
+            "text": "Sugarfrom",
+            "confidence": 0.3,
+            "engine": "test",
+            "status": "held",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 4,
+            "document_id": 1,
+            "page": 0,
+            "line": 3,
+            "rect": "[10,70,100,80]",
+            "text": "call Sam",
+            "confidence": 0.5,
+            "engine": "test",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a person checks and corrects lines, and reading the page again keeps them",
+      "steps": [
+        {"op": "setNotes", "live": [1], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "Notes.pdf", "storedName": "0123456789ab-Notes.pdf", "sha256": "aa", "size": 1000, "pageCount": 1},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 1},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "engine-1", "lines": [{"rect": [10,100,200,120], "text": "Thermo", "confidence": 0.9},{"rect": [10,70,200,90], "text": "entrapy rises", "confidence": 0.8},{"rect": [10,40,200,60], "text": "Sugarfrom", "confidence": 0.3},{"rect": [10,10,200,30], "text": "last line", "confidence": 0.7}]},
+        {"op": "checkScanLine", "id": 1},
+        {"op": "correctScanLine", "id": 2, "text": "  entropy\nrises "},
+        {"op": "correctScanLine", "id": 3, "text": "Sugarfrom"},
+        {"op": "correctScanLine", "id": 99, "text": "nothing here"},
+        {"op": "checkScanLine", "id": 99},
+        {"op": "scanPageTexts", "documentId": 1},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "engine-2", "lines": [{"rect": [12,101,198,119], "text": "Thermos", "confidence": 0.95},{"rect": [10,70,200,90], "text": "entropy rises", "confidence": 0.95},{"rect": [10,40,200,60], "text": "Sugar from", "confidence": 0.95},{"rect": [10,10,200,30], "text": "final line", "confidence": 0.95},{"rect": [210,10,300,30], "text": "margin note", "confidence": 0.6}]},
+        {"op": "listScanLines", "documentId": 1, "page": 0},
+        {"op": "scanPageTexts", "documentId": 1},
+        {"op": "scanSummary", "documentId": 1}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "Notes.pdf",
+              "storedName": "0123456789ab-Notes.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 1,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": 1
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  10,
+                  100,
+                  200,
+                  120
+                ],
+                "text": "Thermo",
+                "confidence": 0.9,
+                "engine": "engine-1",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 1,
+                "rect": [
+                  10,
+                  70,
+                  200,
+                  90
+                ],
+                "text": "entrapy rises",
+                "confidence": 0.8,
+                "engine": "engine-1",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 2,
+                "rect": [
+                  10,
+                  40,
+                  200,
+                  60
+                ],
+                "text": "Sugarfrom",
+                "confidence": 0.3,
+                "engine": "engine-1",
+                "status": "held",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 4,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 3,
+                "rect": [
+                  10,
+                  10,
+                  200,
+                  30
+                ],
+                "text": "last line",
+                "confidence": 0.7,
+                "engine": "engine-1",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 0,
+              "line": 0,
+              "rect": [
+                10,
+                100,
+                200,
+                120
+              ],
+              "text": "Thermo",
+              "confidence": 0.9,
+              "engine": "engine-1",
+              "status": "checked",
+              "corrected": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 0,
+              "line": 1,
+              "rect": [
+                10,
+                70,
+                200,
+                90
+              ],
+              "text": "entrapy rises",
+              "confidence": 0.8,
+              "engine": "engine-1",
+              "status": "corrected",
+              "corrected": "entropy rises",
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 3,
+              "uuid": "<uuid>",
+              "documentId": 1,
+              "page": 0,
+              "line": 2,
+              "rect": [
+                10,
+                40,
+                200,
+                60
+              ],
+              "text": "Sugarfrom",
+              "confidence": 0.3,
+              "engine": "engine-1",
+              "status": "checked",
+              "corrected": null,
+              "createdAt": "<time>",
+              "updatedAt": "<time>"
+            }
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": [
+              {
+                "page": 0,
+                "text": "Thermo\nentropy rises\nSugarfrom\nlast line"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  10,
+                  100,
+                  200,
+                  120
+                ],
+                "text": "Thermo",
+                "confidence": 0.9,
+                "engine": "engine-1",
+                "status": "checked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 1,
+                "rect": [
+                  10,
+                  70,
+                  200,
+                  90
+                ],
+                "text": "entrapy rises",
+                "confidence": 0.8,
+                "engine": "engine-1",
+                "status": "corrected",
+                "corrected": "entropy rises",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 2,
+                "rect": [
+                  10,
+                  40,
+                  200,
+                  60
+                ],
+                "text": "Sugarfrom",
+                "confidence": 0.3,
+                "engine": "engine-1",
+                "status": "checked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 5,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 3,
+                "rect": [
+                  10,
+                  10,
+                  200,
+                  30
+                ],
+                "text": "final line",
+                "confidence": 0.95,
+                "engine": "engine-2",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 6,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 4,
+                "rect": [
+                  210,
+                  10,
+                  300,
+                  30
+                ],
+                "text": "margin note",
+                "confidence": 0.6,
+                "engine": "engine-2",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  10,
+                  100,
+                  200,
+                  120
+                ],
+                "text": "Thermo",
+                "confidence": 0.9,
+                "engine": "engine-1",
+                "status": "checked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 1,
+                "rect": [
+                  10,
+                  70,
+                  200,
+                  90
+                ],
+                "text": "entrapy rises",
+                "confidence": 0.8,
+                "engine": "engine-1",
+                "status": "corrected",
+                "corrected": "entropy rises",
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 3,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 2,
+                "rect": [
+                  10,
+                  40,
+                  200,
+                  60
+                ],
+                "text": "Sugarfrom",
+                "confidence": 0.3,
+                "engine": "engine-1",
+                "status": "checked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 5,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 3,
+                "rect": [
+                  10,
+                  10,
+                  200,
+                  30
+                ],
+                "text": "final line",
+                "confidence": 0.95,
+                "engine": "engine-2",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              },
+              {
+                "id": 6,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 4,
+                "rect": [
+                  210,
+                  10,
+                  300,
+                  30
+                ],
+                "text": "margin note",
+                "confidence": 0.6,
+                "engine": "engine-2",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "page": 0,
+                "text": "Thermo\nentropy rises\nSugarfrom\nfinal line\nmargin note"
+              }
+            ]
+          },
+          {
+            "ok": {
+              "pages": 1,
+              "recognized": 1,
+              "lines": 5,
+              "unchecked": 2,
+              "held": 0,
+              "checked": 2,
+              "corrected": 1
+            }
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "Notes.pdf",
+            "stored_name": "0123456789ab-Notes.pdf",
+            "sha256": "aa",
+            "size": 1000,
+            "page_count": 1,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "pages": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "engine": "engine-2",
+            "recognized_at": "<time>",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "lines": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "line": 0,
+            "rect": "[10,100,200,120]",
+            "text": "Thermo",
+            "confidence": 0.9,
+            "engine": "engine-1",
+            "status": "checked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 0,
+            "line": 1,
+            "rect": "[10,70,200,90]",
+            "text": "entrapy rises",
+            "confidence": 0.8,
+            "engine": "engine-1",
+            "status": "corrected",
+            "corrected": "entropy rises",
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 3,
+            "document_id": 1,
+            "page": 0,
+            "line": 2,
+            "rect": "[10,40,200,60]",
+            "text": "Sugarfrom",
+            "confidence": 0.3,
+            "engine": "engine-1",
+            "status": "checked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 5,
+            "document_id": 1,
+            "page": 0,
+            "line": 3,
+            "rect": "[10,10,200,30]",
+            "text": "final line",
+            "confidence": 0.95,
+            "engine": "engine-2",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 6,
+            "document_id": 1,
+            "page": 0,
+            "line": 4,
+            "rect": "[210,10,300,30]",
+            "text": "margin note",
+            "confidence": 0.6,
+            "engine": "engine-2",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "what is refused, and nothing is written when it is",
+      "steps": [
+        {"op": "setNotes", "live": [1], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "Notes.pdf", "storedName": "0123456789ab-Notes.pdf", "sha256": "aa", "size": 1000, "pageCount": 2},
+        {"op": "addScanPages", "documentId": 7, "pageCount": 2},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 0},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 1.5},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 2},
+        {"op": "storeRecognition", "documentId": 1, "page": 5, "engine": "test", "lines": []},
+        {"op": "storeRecognition", "documentId": 7, "page": 0, "engine": "test", "lines": []},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "", "lines": []},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "   ", "lines": []},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": {"$repeat": ["e",201]}, "lines": []},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "test", "lines": [{"rect": [0,0,10,10], "text": "good", "confidence": 1},{"rect": [0,0,10], "text": "bad box", "confidence": 1}]},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "test", "lines": [{"rect": [0,0,10,10], "text": "good", "confidence": "sure"}]},
+        {"op": "pendingScanPages"},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": {"$repeat": ["e",200]}, "lines": [{"rect": [0,0,10,10], "text": "good", "confidence": 1}]},
+        {"op": "pendingScanPages"}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "Notes.pdf",
+              "storedName": "0123456789ab-Notes.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 2,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": 2
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "error": true
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 0
+              },
+              {
+                "documentId": 1,
+                "page": 1
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  0,
+                  0,
+                  10,
+                  10
+                ],
+                "text": "good",
+                "confidence": 1,
+                "engine": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "documentId": 1,
+                "page": 1
+              }
+            ]
+          }
+        ],
+        "documents": [
+          {
+            "id": 1,
+            "note_id": 1,
+            "file_name": "Notes.pdf",
+            "stored_name": "0123456789ab-Notes.pdf",
+            "sha256": "aa",
+            "size": 1000,
+            "page_count": 2,
+            "view_state": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "pages": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "engine": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "recognized_at": "<time>",
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          },
+          {
+            "id": 2,
+            "document_id": 1,
+            "page": 1,
+            "engine": null,
+            "recognized_at": null,
+            "created_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ],
+        "lines": [
+          {
+            "id": 1,
+            "document_id": 1,
+            "page": 0,
+            "line": 0,
+            "rect": "[0,0,10,10]",
+            "text": "good",
+            "confidence": 1,
+            "engine": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "status": "unchecked",
+            "corrected": null,
+            "created_at": "<time>",
+            "updated_at": "<time>",
+            "uuid": "<uuid>"
+          }
+        ]
+      }
+    },
+    {
+      "name": "a scan's pages and lines go with its PDF",
+      "steps": [
+        {"op": "setNotes", "live": [1,2], "trashed": []},
+        {"op": "addDocument", "noteId": 1, "fileName": "One.pdf", "storedName": "0123456789ab-One.pdf", "sha256": "aa", "size": 1000, "pageCount": 1},
+        {"op": "addDocument", "noteId": 2, "fileName": "Two.pdf", "storedName": "0123456789ac-Two.pdf", "sha256": "bb", "size": 1000, "pageCount": 1},
+        {"op": "addScanPages", "documentId": 1, "pageCount": 1},
+        {"op": "addScanPages", "documentId": 2, "pageCount": 1},
+        {"op": "storeRecognition", "documentId": 1, "page": 0, "engine": "test", "lines": [{"rect": [0,0,10,10], "text": "one", "confidence": 1}]},
+        {"op": "storeRecognition", "documentId": 2, "page": 0, "engine": "test", "lines": [{"rect": [0,0,10,10], "text": "two", "confidence": 1}]},
+        {"op": "deleteDocument", "id": 1},
+        {"op": "isScan", "documentId": 1},
+        {"op": "scanSummary", "documentId": 1},
+        {"op": "setNotes", "live": [], "trashed": [2]},
+        {"op": "deleteOrphanedDocuments"},
+        {"op": "isScan", "documentId": 2},
+        {"op": "setNotes", "live": [], "trashed": []},
+        {"op": "deleteOrphanedDocuments"},
+        {"op": "isScan", "documentId": 2}
+      ],
+      "expect": {
+        "steps": [
+          {
+            "ok": null
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "One.pdf",
+              "storedName": "0123456789ab-One.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 1,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": {
+              "id": 2,
+              "uuid": "<uuid>",
+              "noteId": 2,
+              "fileName": "Two.pdf",
+              "storedName": "0123456789ac-Two.pdf",
+              "sha256": "bb",
+              "size": 1000,
+              "pageCount": 1,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": 1
+          },
+          {
+            "ok": 1
+          },
+          {
+            "ok": [
+              {
+                "id": 1,
+                "uuid": "<uuid>",
+                "documentId": 1,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  0,
+                  0,
+                  10,
+                  10
+                ],
+                "text": "one",
+                "confidence": 1,
+                "engine": "test",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": [
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "documentId": 2,
+                "page": 0,
+                "line": 0,
+                "rect": [
+                  0,
+                  0,
+                  10,
+                  10
+                ],
+                "text": "two",
+                "confidence": 1,
+                "engine": "test",
+                "status": "unchecked",
+                "corrected": null,
+                "createdAt": "<time>",
+                "updatedAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": {
+              "id": 1,
+              "uuid": "<uuid>",
+              "noteId": 1,
+              "fileName": "One.pdf",
+              "storedName": "0123456789ab-One.pdf",
+              "sha256": "aa",
+              "size": 1000,
+              "pageCount": 1,
+              "viewState": {},
+              "createdAt": "<time>"
+            }
+          },
+          {
+            "ok": false
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": []
+          },
+          {
+            "ok": true
+          },
+          {
+            "ok": null
+          },
+          {
+            "ok": [
+              {
+                "id": 2,
+                "uuid": "<uuid>",
+                "noteId": 2,
+                "fileName": "Two.pdf",
+                "storedName": "0123456789ac-Two.pdf",
+                "sha256": "bb",
+                "size": 1000,
+                "pageCount": 1,
+                "viewState": {},
+                "createdAt": "<time>"
+              }
+            ]
+          },
+          {
+            "ok": false
+          }
+        ],
+        "documents": [],
+        "pages": [],
+        "lines": []
+      }
+    }
+  ]
+}

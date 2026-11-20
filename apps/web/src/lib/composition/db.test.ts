@@ -72,6 +72,8 @@ const UUID_TABLES = [
   "pdf_annotations",
   "pdf_bookmarks",
 ] as const;
+// scan_pages and scan_lines carry uuids too, but were made after uuids were: a database from before them has neither table.
+// scanConformance.test.ts checks every row they hold has one.
 /** 128 random bits, as lowercase hex: what `lower(hex(randomblob(16)))` makes. */
 const UUID_PATTERN = /^[0-9a-f]{32}$/;
 
@@ -143,6 +145,8 @@ describe("opening the database", () => {
       "pdf_annotations",
       "pdf_bookmarks",
       "reading_list",
+      "scan_lines",
+      "scan_pages",
       "todo_closed",
       "todo_events",
       "todo_places",

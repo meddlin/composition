@@ -237,6 +237,11 @@ final class PdfReader {
     /// the main thread.
     func find(_ text: String, onPage index: Int?) {
         guard let view, let pdf, !text.isEmpty else { return }
+        // A scan's pages are pictures, with no text for PDFKit to find: the lines read from the page are marked instead.
+        if isScan, let index {
+            Task { await findInScan(text, onPage: index) }
+            return
+        }
         if let index, let page = pdf.page(at: index), let string = page.string {
             var found: [PDFSelection] = []
             var range = NSRange(location: 0, length: (string as NSString).length)
@@ -260,8 +265,50 @@ final class PdfReader {
 
     /// Where the PDF's text is in Search: `noText` makes the Contents say that Search cannot find words in it.
     private(set) var textState: PdfTextState?
+    /// For a scan: how far reading its pages has got, and what is kept out of Search (nil for a PDF that is not a scan).
+    private(set) var scan: ScanSummary?
 
-    func loadTextState() async { textState = await app.pdfTextState(documentId: documentId) }
+    var isScan: Bool { app.scanDocuments.contains(documentId) }
+
+    func loadTextState() async {
+        textState = await app.pdfTextState(documentId: documentId)
+        scan = await app.scanSummary(documentId: documentId)
+    }
+
+    /// Marks, for a few seconds, the lines read from a scanned page that hold `text` (case and accents ignored), and goes to the first. Only lines
+    /// Search may use are looked through: a held line is never shown as a match.
+    func findInScan(_ text: String, onPage index: Int) async {
+        let lines = await app.scanLines(documentId: documentId, page: index)
+        let fold = { (value: String) in value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        let wanted = fold(text)
+        let matching = lines.filter { line in line.searchText.map { fold($0).contains(wanted) } ?? false }
+        guard let pdf, let page = pdf.page(at: index) else { return }
+        flashTask?.cancel()
+        clearFlash()
+        go(toPage: index)
+        guard !matching.isEmpty else {
+            say("Page \(index + 1): “\(text)” is in the words read from it, but not as one run of text.")
+            return
+        }
+        let frames = matching.map { line in
+            let frame = PDFAnnotation(bounds: MarkAnnotations.cgRect(line.rect).insetBy(dx: -3, dy: -3), forType: .square, withProperties: nil)
+            frame.color = UIColor.systemYellow
+            frame.interiorColor = UIColor.systemYellow.withAlphaComponent(0.3)
+            let border = PDFBorder()
+            border.lineWidth = 2
+            frame.border = border
+            page.addAnnotation(frame)
+            return frame
+        }
+        flashing = frames
+        flashPage = page
+        say(matching.count == 1 ? "Found on 1 line of page \(index + 1)." : "Found on \(matching.count) lines of page \(index + 1).")
+        flashTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            self?.clearFlash()
+        }
+    }
 
     // MARK: Bookmarks
 
@@ -613,6 +660,7 @@ struct PdfSidebar: View {
         .background(look.background)
         .foregroundStyle(look.foreground)
         .task { await reader.loadTextState() }
+        .onChange(of: reader.app.scanReading) { Task { await reader.loadTextState() } }
         .alert("Name the bookmark", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
             TextField("Page \((renaming?.page ?? 0) + 1)", text: $label)
             Button("Cancel", role: .cancel) {}
@@ -621,7 +669,12 @@ struct PdfSidebar: View {
     }
 
     @ViewBuilder private var contents: some View {
-        if reader.textState == .noText {
+        if let scan = reader.scan {
+            ScanStatusLine(scan: scan, reading: reader.app.scanReading?.documentId == reader.documentId ? reader.app.scanReading : nil)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 14)
+                .padding(.bottom, 6)
+        } else if reader.textState == .noText {
             // OCR is not built (docs/pdf-markup-plan.md, P7 and P8): a scan's words are not in Search, its marks and bookmarks are.
             Label("No searchable text (scanned). Search finds this PDF's highlights, comments, typed notes and bookmarks, not its words.", systemImage: "exclamationmark.magnifyingglass")
                 .font(.footnote)
@@ -692,5 +745,39 @@ struct PdfSidebar: View {
             .listStyle(.plain)
             .accessibilityIdentifier("pdf-bookmarks")
         }
+    }
+}
+
+/// What the Contents of a scan say about its words: how many pages are read (or the one being read), how many lines, and how many are kept out
+/// of Search because the reader was unsure of them or they hold a word never written on a guess.
+struct ScanStatusLine: View {
+    let scan: ScanSummary
+    let reading: ScanReading?
+    @Environment(\.look) private var look
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(progress)
+                if scan.held > 0 {
+                    Text(scan.held == 1
+                        ? "1 line is kept out of Search: the reader was unsure of it."
+                        : "\(scan.held) lines are kept out of Search: the reader was unsure of them.")
+                }
+            }
+        } icon: {
+            if reading != nil { ProgressView().controlSize(.small) } else { Image(systemName: "text.viewfinder") }
+        }
+        .font(.footnote)
+        .foregroundStyle(look.mutedText)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("scan-status")
+    }
+
+    private var progress: String {
+        let lines = scan.lines == 1 ? "1 line" : "\(scan.lines) lines"
+        if let reading { return "Reading the handwriting: \(reading.done) of \(reading.total) pages read, \(lines) so far. Words are found as their page is read." }
+        if scan.recognized < scan.pages { return "Scanned handwriting: \(scan.recognized) of \(scan.pages) pages read, \(lines). The rest are read in the background." }
+        return "Scanned handwriting: all \(scan.pages == 1 ? "1 page" : "\(scan.pages) pages") read, \(lines). Search finds the words read with confidence."
     }
 }

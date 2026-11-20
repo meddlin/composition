@@ -49,6 +49,8 @@ final class AppModel {
     private(set) var pdfSizes: [Int64: Int64] = [:]
     /// The PDFs by the uuid a `pdf:` link names them by: the PDF's id and the note that owns it. A link is followed only while that note is not in the Trash Can.
     private(set) var pdfsByUuid: [String: PdfEntry] = [:]
+    /// The PDFs that are scans (AppModel+Scans.swift), by the PDF's id.
+    private(set) var scanDocuments: Set<Int64> = []
     /// A PDF shown beside a note that does not own it: a note that cites the PDF, opened from the PDF's Notes tab or after following a link in it (the
     /// note's id, then the PDF's). It lasts while the app is open, as the desktop's panel pairing does until the layout is saved.
     var pdfBeside: [Int64: Int64] = [:]
@@ -84,6 +86,12 @@ final class AppModel {
     private(set) var pdfHits: [Int64: SearchHit] = [:]
     /// Reading PDFs' text into the index, one after another (AppModel+PdfText.swift).
     @ObservationIgnored var pdfTextTask: Task<Void, Never>?
+    /// Reading scanned pages with Vision, a page at a time, in the background (AppModel+Scans.swift).
+    @ObservationIgnored var scanTask: Task<Void, Never>?
+    /// The scan being read now and how far it has got, for the reader; nil while nothing is being read.
+    var scanReading: ScanReading?
+    /// The scan import sheet is showing.
+    var importingScans = false
 
     /// The notes open for editing, shared by every window; the one place text typed in the app is saved from (Step 4, spike S6).
     private var sessions: NoteSessions?
@@ -108,6 +116,7 @@ final class AppModel {
         let trashedNotes: [TrashedNote]
         let trashedGroups: [TrashedGroup]
         let documents: [StoredDocument]
+        let scans: Set<Int64>
         let sqliteVersion: String
     }
 
@@ -215,10 +224,23 @@ final class AppModel {
             if let path = UserDefaults.standard.string(forKey: "importPdf") {
                 await importPdfs([.local(URL(fileURLWithPath: path))], into: sidebar)
             }
+            // `-importScan /path/folder` makes a scan of every picture in that folder, in name order, as Import Scans does with them.
+            if let path = UserDefaults.standard.string(forKey: "importScan") {
+                await importScanFolder(URL(fileURLWithPath: path, isDirectory: true))
+            }
             #endif
             await reload()
+            #if DEBUG || EDITOR_TEST_HOOKS
+            // `-searchQuery words` types that into Search at launch, for screenshots and scripts.
+            if let words = UserDefaults.standard.string(forKey: "searchQuery") {
+                query = words
+                queryChanged()
+            }
+            #endif
             // PDFs whose text is not in Search yet (imported before it was, or restored from a backup) are read in the background.
             indexPdfText()
+            // Scanned pages not read yet (the app was closed while it read them) are read in the background.
+            readScans()
         } catch {
             errorMessage = "Couldn't open your notes: \(error.localizedDescription)"
             phase = FileManager.default.fileExists(atPath: location.databaseURL.path) ? .ready : .empty
@@ -292,7 +314,7 @@ final class AppModel {
                 return Snapshot(
                     all: try database.listNotes(), ordered: try database.notesInDisplayOrder(), notebooks: try database.listNotebooks(), groups: try database.listGroups(),
                     favorites: settings?.favorites() ?? [], trashedNotes: trash.notes, trashedGroups: trash.groups,
-                    documents: try database.listDocuments(), sqliteVersion: try database.sqliteVersion())
+                    documents: try database.listDocuments(), scans: try database.scanDocumentIds(), sqliteVersion: try database.sqliteVersion())
             }
             orderedNotes = snapshot.ordered
             linkCandidates = snapshot.all.map { NoteLinks.Candidate(id: $0.id, title: $0.title) }
@@ -306,6 +328,7 @@ final class AppModel {
             trashedGroups = snapshot.trashedGroups
             pdfSizes = Dictionary(snapshot.documents.map { ($0.noteId, $0.size) }, uniquingKeysWith: { first, _ in first })
             pdfsByUuid = Dictionary(snapshot.documents.map { ($0.uuid, PdfEntry(documentId: $0.id, noteId: $0.noteId)) }, uniquingKeysWith: { first, _ in first })
+            scanDocuments = snapshot.scans
             noteCount = snapshot.all.count
             sqliteVersion = snapshot.sqliteVersion
             if trimmedQuery.isEmpty {
@@ -542,6 +565,8 @@ final class AppModel {
         let closingDatabase = database, closingIndex = searchIndex
         pdfTextTask?.cancel()
         pdfTextTask = nil
+        scanTask?.cancel()
+        scanTask = nil
         database = nil
         searchIndex = nil
         sessions = nil

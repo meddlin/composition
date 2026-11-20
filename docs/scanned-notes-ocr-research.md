@@ -2,9 +2,15 @@
 
 Can the owner's scanned, handwritten loose-leaf college notes be imported into Benchnote, read with notes written beside them, and
 made searchable by OCR, on the iPad and on the desktop? How well would it work, and what would it cost to build? Researched
-2026-11-12 against first-party documentation, papers and model cards, and this repo. **Nothing here is built, and the spike on the
-owner's own pages has not been run** (it waits for pages: [The spike](#the-spike-on-your-own-pages)). The feature is planned for
-**after M3**.
+2026-11-12 against first-party documentation, papers and model cards, and this repo. **The spike on the owner's own pages has not been
+run** (it waits for pages: [The spike](#the-spike-on-your-own-pages)).
+
+**Built since, 2026-11-19, at the owner's word ("let's build this"): the iPad's slices 1 and 2** (scans in as a note that owns them as an
+image-only PDF; Vision reads the pages in the background; the lines it is sure of are searchable), with the shared tables and rules in
+TypeScript as the oracle. How it works: [architecture/scans.md](architecture/scans.md). The build took the picks below where the owner had
+not decided: decision 2, shape A (an image-only PDF); decision 3, no OCR on the desktop yet (it keeps and deletes the rows, and does not
+search them); decision 4, unchecked lines above the floor are searched, with no typo tolerance, as a PDF's text; decision 5, no cloud OCR.
+Slices 3 (review and correct) and 4 (select, highlight and quote a line), and the desktop's D1 to D4, are not built.
 
 Facts carry a bracketed source number (see [Sources](#sources)); repo facts cite a file. **Measured** means run on this Mac (Apple M4
 Pro, 24 GB, macOS 27.0.1, Swift 6.4.2) on 2026-11-12. **Inference** is my reasoning from those facts, not something a source states;
