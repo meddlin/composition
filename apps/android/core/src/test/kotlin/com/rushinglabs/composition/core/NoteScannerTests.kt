@@ -6,6 +6,11 @@ import com.rushinglabs.composition.core.markdown.NoteBlock
 import com.rushinglabs.composition.core.markdown.NoteHeading
 import com.rushinglabs.composition.core.markdown.NoteScanner
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.preview.MarkdownConverter
+import com.rushinglabs.composition.core.preview.MdBlock
+import com.rushinglabs.composition.core.preview.NotePreview
+import com.rushinglabs.composition.core.preview.PanelTone
+import com.rushinglabs.composition.core.preview.PreviewBlock
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -19,8 +24,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
 
-// The restricted MDX layer's blocks, ported from NoteScannerTests.swift, and where each block is written, ported from the scanner half
-// of BlockRangeTests.swift (the preview's located blocks wait for the preview model, which spike A2 decides).
+// The restricted MDX layer's blocks, ported from NoteScannerTests.swift, and where each block is written, ported from BlockRangeTests.swift
+// (the scanner's block ranges, and the preview's located blocks).
 
 @DisplayName("The restricted MDX layer: blocks")
 class NoteScannerTests {
@@ -227,5 +232,128 @@ class BlockRangeTests {
         problems.take(20).forEach(::println)
         assertTrue(problems.isEmpty(), "${problems.size} problems")
         assertNotNull(corpusDirectory)
+    }
+
+    // Located blocks (what the Live tab draws) ----------------------------------------------------------------------------------------
+
+    private fun isTable(block: PreviewBlock) = block is PreviewBlock.Markdown && block.blocks.size == 1 && block.blocks[0] is MdBlock.Table
+
+    private fun isParagraph(block: PreviewBlock) = block is PreviewBlock.Markdown && block.blocks.size == 1 && block.blocks[0] is MdBlock.Paragraph
+
+    private fun written(text: String, range: TextRange) = text.substring(range.location, range.end)
+
+    @Test
+    @DisplayName("the located blocks are the preview's own blocks, a run of Markdown split into its blocks, each written where it says")
+    fun located() {
+        val corpus = corpus()
+        val crlf = corpus.last().second.replace("\n", "\r\n")
+        val problems = ArrayList<String>()
+        for ((name, text) in corpus + ("crlf showcase" to crlf)) {
+            val preview = NotePreview.make(text)
+            // The same blocks: the markdown runs' blocks in order, and the components as they are.
+            val flattened = ArrayList<PreviewBlock>()
+            for (block in preview.blocks) {
+                when (block) {
+                    is PreviewBlock.Markdown -> flattened += block.blocks.map { PreviewBlock.Markdown(listOf(it)) }
+                    is PreviewBlock.Footnotes -> {}
+                    else -> flattened.add(block)
+                }
+            }
+            val ours = preview.located.map { it.block }.filter { it !is PreviewBlock.Footnotes }
+            val theirs = flattened.filter { it !is PreviewBlock.Markdown || it.blocks.isNotEmpty() }
+            // A `<Footnotes />` that is written is located; one only listed at the end is not.
+            if (!(ours == theirs || preview.located.map { it.block } == flattened)) problems.add("$name: located blocks are the preview's")
+            var end = 0
+            for (located in preview.located) {
+                if (!(located.range.location >= end && located.range.end <= text.length)) problems.add("$name: ${located.range} in order, inside the note")
+                end = located.range.end
+                val words = written(text, located.range).replace("\r\n", "\n")
+                if (isTable(located.block)) {
+                    if (!(words.startsWith("|") && words.endsWith("|"))) problems.add("$name: a table from its first pipe to its last: ${reflecting(words)}")
+                    if (words.split("\n").filter { it.isNotEmpty() }.size < 2) problems.add("$name: a table has two lines at least")
+                    // The table's text alone is the same table.
+                    val own = (located.block as PreviewBlock.Markdown).blocks
+                    if (MarkdownConverter().blocks(NoteScanner.markdownParser.parse(words)) != own) problems.add("$name: the table's text parses to the same table")
+                }
+            }
+        }
+        problems.take(20).forEach(::println)
+        assertTrue(problems.isEmpty(), "${problems.size} problems")
+    }
+
+    @Test
+    @DisplayName("a table between paragraphs, after a frontmatter, with a footnote's text before it, is located on its lines")
+    fun tableAfterFootnote() {
+        val note = "---\ntitle: T\n---\nIntro[^a] é😀\n\n[^a]: the note's footnote.\n\n| x | y |\n|---|---|\n| 1 | 2 |\n\nafter\n"
+        val preview = NotePreview.make(note)
+        val table = preview.located.firstOrNull { isTable(it.block) } ?: fail("no table located")
+        assertEquals("| x | y |\n|---|---|\n| 1 | 2 |", written(note, table.range))
+        val paragraphs = preview.located.filter { isParagraph(it.block) }.map { written(note, it.range) }
+        assertEquals(listOf("Intro[^a] é😀", "after"), paragraphs)
+    }
+
+    @Test
+    @DisplayName("a component is located from its opening tag to the end of its closing one, and what is inside is not located again")
+    fun components() {
+        val note = "a\n\n<Info>\n\n| x |\n|---|\n| 1 |\n\n</Info>\n\n<Image src=\"app_data/a.png\" />\n"
+        val preview = NotePreview.make(note)
+        assertEquals(listOf("a", "<Info>\n\n| x |\n|---|\n| 1 |\n\n</Info>", "<Image src=\"app_data/a.png\" />"), preview.located.map { written(note, it.range) })
+        assertTrue((preview.located[1].block as? PreviewBlock.Panel)?.tone == PanelTone.INFO, "the panel is the second block")
+    }
+
+    @Test
+    @DisplayName("each component the Live tab draws (Step 6) is located whole, one block each: panels, a block Mark, charts, cards and a notice")
+    fun everyComponentDrawnInLive() {
+        val parts = listOf(
+            "<Info>\n\nSome **words**.\n\n</Info>",
+            "<Warning>\n\n- one\n- two\n\n</Warning>",
+            "<Mark color=\"green\">\n\nA tinted block.\n\n</Mark>",
+            "<Chart type=\"bar\" x=\"k\" y=\"v\">\n\n```csv\nk,v\na,1\nb,2\n```\n\n</Chart>",
+            "<YouTube url=\"https://youtu.be/dQw4w9WgXcQ\" title=\"A video\" />",
+            "<Repo url=\"https://github.com/meddlin/composition\" />",
+            "<Repo url=\"not a repository\" />",
+        )
+        val note = "a\n\n" + parts.joinToString("\n\n") + "\n\nb\n"
+        val preview = NotePreview.make(note)
+        assertNull(preview.error)
+        assertEquals(listOf("a") + parts + listOf("b"), preview.located.map { written(note, it.range) })
+        val kinds = preview.located.drop(1).dropLast(1).map {
+            when (val block = it.block) {
+                is PreviewBlock.Panel -> if (block.tone == PanelTone.INFO) "info" else "warning"
+                is PreviewBlock.Highlight -> "mark"
+                is PreviewBlock.Chart -> "chart"
+                is PreviewBlock.YouTube -> "youtube"
+                is PreviewBlock.Repo -> "repo"
+                is PreviewBlock.Notice -> "notice"
+                else -> "other"
+            }
+        }
+        assertEquals(listOf("info", "warning", "mark", "chart", "youtube", "repo", "notice"), kinds)
+    }
+
+    @Test
+    @DisplayName("a note that stops being valid MDX loses its located components (why the Live tab keeps its last good pictures then, Step 6)")
+    fun invalidNoteLosesComponents() {
+        val valid = "<Info>\n\nx\n\n</Info>\n\nan open"
+        assertNull(NotePreview.make(valid).error)
+        val broken = NotePreview.make(valid.replace("an open", "an <Mark>open"))
+        assertNotNull(broken.error)
+        assertTrue(broken.located.none { it.block is PreviewBlock.Panel }, "the panel is plain Markdown while the note is not valid")
+    }
+
+    @Test
+    @DisplayName("a long note's blocks are located in time that grows with its length, not its square (Step 6: a run of 8,000 blocks took 96 s)")
+    fun longNoteIsLocatedQuickly() {
+        val lines = ArrayList<String>()
+        for (section in 0 until 4000) lines += listOf("## Section $section", "", "Some <Mark color=\"yellow\">highlighted</Mark> and **bold** words, é😀, in a paragraph.", "")
+        val note = lines.joinToString("\n")
+        val started = System.nanoTime()
+        val preview = NotePreview.make(note)
+        val spent = (System.nanoTime() - started) / 1e9
+        assertEquals(8000, preview.located.size)
+        assertTrue(written(note, preview.located[7999].range).endsWith("in a paragraph."))
+        assertEquals("## Section 3999", written(note, preview.located[7998].range))
+        // The iPad, in a debug build on a loaded Mac: about 0.5 s; quadratic, it was 96 s.
+        assertTrue(spent < 15, "$spent s")
     }
 }
