@@ -172,12 +172,17 @@ conformance corpus is the test of the port. It is ported in the order the iPad's
 
 Each step is done when its suites pass. It is predictable work. The standing cost is that every later rule change lands in Kotlin too (C2).
 
+**Where the port stands (2026-11-20).** Steps 1 to 7 are in [#349](https://github.com/meddlin/composition/pull/349). Steps 8 to 13, and two pieces the list above left to spike A2 (the
+editor's colours and the preview model), were ported side by side, each in its own PR stacked on #349: [#350](https://github.com/meddlin/composition/pull/350) to [#355](https://github.com/meddlin/composition/pull/355). Merged
+together, the whole core passes its 448 tests. [Core slices after A1](#core-slices-after-a1) has each slice's results.
+
 ### Keeping the implementations honest
 
 The corpus in `fixtures/conformance/` is the guard, as on the iPad. **JUnit suites, one per Swift suite and named after it**, read the folder from
 `COMPOSITION_CONFORMANCE_DIR`. A suite with no generated files is reported as **skipped, never passed**, as the Swift side does. They run
-on the Mac's JVM and on the emulator. A CI job on a Linux runner runs them on the same path filters as `ios-core.yml`. Every action in that job is
-pinned to a commit SHA ([AGENTS.md](../AGENTS.md)). The desktop then restores the backups the Kotlin core wrote, as `conformance.sh` does for Swift.
+on the Mac's JVM and on the emulator. A CI job on a Linux runner (`.github/workflows/android-core.yml`) runs the JVM half on the same path filters as
+`ios-core.yml`. Every action in that job is pinned to a commit SHA ([AGENTS.md](../AGENTS.md)). The desktop then restores the backups the Kotlin
+core wrote, as `conformance.sh` does for Swift. The emulator half (`scripts/test-on-device.sh`) is run on a Mac.
 
 ### Markdown and MDX
 
@@ -564,7 +569,7 @@ Recommendations are proposals until the status says *Decided*.
 |---|---|---|---|
 | R1 | Swift on Android is not solid enough for the core | | **Retired** (2026-11-20): the core is Kotlin (D1) |
 | R2 | The Live tab cannot hide marks cleanly under Android keyboards (composing regions, Gboard's caret logic, handwriting gestures) | Medium, medium | A2 with Gboard, Samsung's keyboard, a hardware keyboard and a stylus; C19 |
-| R3 | Typing lags in a long note with colour spans | Medium, high | A2 on a 5,000-line note; incremental colouring from the start |
+| R3 | Typing lags in a long note with colour spans | Medium, high | A2 on a 5,000-line note; incremental colouring from the start. **Measured for the core ([#354](https://github.com/meddlin/composition/pull/354)):** on a 5,002-line note the whole note is coloured in 86 ms on the emulator, and the blocks around a keystroke in 0.15 ms median, 1.26 ms worst. Putting the spans on a text view is A2's to measure. |
 | R4 | No PDF library gives geometry in PDF user space, text that matches the desktop, and annotated export together | Medium, high | A3 across three candidates; a seam so two libraries can share the job |
 | R5 | `androidx.pdf` is still beta and its API changes | Medium, low | Pin it; keep it behind our own seam |
 | R6 | The stroke JSON's points (per-point nib size, angles) do not map cleanly onto Jetpack Ink | Medium, medium | A4; keep unknown fields; bump `version` only if a reader would misdraw |
@@ -669,13 +674,19 @@ Android emulator.
 | **MDX** | 2026-11-20 | The restricted MDX scanner (components, props, block or inline, what MDX refuses, footnotes, block ranges in the note's text) and the component helpers (`<Chart>` CSV, `<Repo>` and `<YouTube>` addresses, `<Image>` width and `app_data` refs): 1,231 lines of Swift became 1,316 of Kotlin. Headings are read with commonmark-java 0.32.0 and its GFM extensions. | The desktop's real preview pipeline (`mdx-expected.json`) and component functions (`component-expected.json`) | 115 of 115 notes agree (valid or not, components and props, headings, footnote order). 166 of 166 component inputs. Block ranges cover every corpus note, and the same notes behind a frontmatter and with `\r\n` line ends. |
 | **Images** | 2026-11-20 | Sniffing, naming and storing images in `app_data/`; alt text, Markdown, `<Image>` tags and the references a note makes; Markdown images to `<Image />` tags; the stored-image list, who uses each image, the picker's matching and labels; the header image's source; and the iPad's clean-up of images nothing points at. 522 lines of Swift became 555 of Kotlin, with JavaScript's `\s`, `.` and fence check in a shared `JavaScriptPatterns.kt`. | The desktop's `images.ts`, `imageRefs.ts`, `imageToMdx.ts` and `imagePicker.ts` (`images-expected.json`) | 75 of 75 byte strings sniffed. 160 of 160 file names. 24 of 24 real stores (the same bytes on disk, the file reused the second time). 119 of 119 alt texts, Markdown, tags and references. 1,504 of 1,504 cursors and selections. 7 of 7 folders listed. 5 of 5 note sets joined. 60 of 60 picker queries. 47 of 47 labels. |
 | **Typing aids** | 2026-11-20 | The completion lists (components after `<`, the props and values inside a tag, the frontmatter's missing properties, snippets after `/`), note links after `[[`, indenting and outdenting, bold and italic, the `<Mark>` highlight, and Return and Backspace in lists and quotes, with the part of lezer's Markdown block parser they read. 1,828 lines of Swift became 1,866 of Kotlin. | The desktop's `completions.ts`, `props.ts`, `frontmatterProps.ts`, `snippets.ts`, `indentLines.ts`, `emphasis.ts`, `noteLinks.ts` and `noteRefs.ts` (`editing-expected.json`), and CodeMirror's real `insertNewlineContinueMarkup` and `deleteMarkupBackward` (`list-continuation-expected.json`) | 3,508 of 3,508 trigger and prop answers at carets. 678 of 678 frontmatter carets. 2,562 of 2,562 completion lists. 130 of 130 snippet carets. 948 of 948 indents. 1,004 of 1,004 emphasis toggles. 217 of 217 note-link cases. 35 of 35 catalogue checks. Return 2,104 of 2,104 and Backspace 2,104 of 2,104 caret places. |
+| **Organization, autosave and the Reading List** (steps 8 and 11) | [#355](https://github.com/meddlin/composition/pull/355) | The home page's listing, group listings, drop edges and back and forward; drafts, sessions and the autosaver (on coroutines, free of Android classes); the Reading List's store, links and web addresses, with a port of `tr46` (UTS #46) for non-ASCII hosts. | `navHistory.ts`, `dropEdge.ts`, `groupListing.ts` (`organization-expected.json`); the desktop's Reading List and `new URL` (`reading-list.json`) | History 2,013 of 2,013 steps, drags 552 of 552, listings 183 of 183, paths 182 of 182. Reading List: links 168 of 168, labels 21 of 21, titles 20 of 20, sorted lists 15 of 15, settings files 15 of 15, store steps 29 of 29. |
+| **The Live model** (step 9) | [#353](https://github.com/meddlin/composition/pull/353) | `LiveScan`, `LiveReader`, `LiveModel` and `LiveReveal`: from a note's text and a selection, the marks hidden or shown, the styled runs, the heading, rule and code lines, the tints and the pictures. 1,661 lines of Swift became 1,883 of Kotlin. | The desktop's real `liveDecorations` and `codeDecorations` (`live-expected.json`, `live-code-expected.json`) | 22,207 of 22,324 selections over 444 texts; the other 117 are the iPad's known differences between lezer and CommonMark. Code blocks 22,324 of 22,324. A keystroke on a 5,000-line note: 1.0 ms median on the emulator. |
+| **Appearance, Follow the sun, reflow and the settings check** (step 10) | [#350](https://github.com/meddlin/composition/pull/350) | The five schemes and the sun palettes, `ThemeColor`, the appearance keys; `SunHours`, the schedule and the pairs; `ReflowText`, `LiveReflow` and the writing settings; and the settings suites A1 left out. | `globals.css`, `themes.ts`, `Chart.tsx`, the sun and reflow code (`appearance-expected.json`, `sun.json`, `reflow.json`, `settings-expected.json`) | Palettes 105 of 105 tokens; sun levels 7,376 of 7,376, sun palettes and blends 225 of 225, the wall clock 204 of 204 instants in 14 zones; reflow 605 of 605 lines and 262 of 262 live changes; writing settings 201 of 201; settings 63 of 63. |
+| **Editor colours and the preview model** | [#354](https://github.com/meddlin/composition/pull/354) | `MarkdownHighlighter`, `HighlightModel` (re-colours only the blocks around an edit), `NotePreview`, `SourceMap` and `NoteOutline`. | No desktop fixture covers these; a one-off dump of the iPad core's output on 348 notes and 107 edge cases | Preview blocks, located blocks, footnotes, outline and errors 348 of 348; highlight spans 343 of 348 (the 5 are iPad bugs, below). The quick re-read agrees with a full one on 97.7% of corpus edits, as on the iPad. R3, below. |
+| **PDF tables, refs, markup and text search** (step 12) | [#352](https://github.com/meddlin/composition/pull/352) | Document names, the documents store and library, `pdf:` links and citations, marks with their editor and geometry, the ink store, and search in a PDF's own text. | `document-names.json`, `pdf-refs.json`, `pdf/` (schema, validation, scripts), `pdf-text.json`, `pdf-text-search.json` (a real Meilisearch) | Names 48 of 48, shown names 35 of 35, schema 13 objects and 29 columns, validation 48 of 48, scripts 54 of 54 steps, links and citations 411 of 411, page text 55 of 55, PDF text search 48 of 48. |
+| **The ink format** (step 13) | [#351](https://github.com/meddlin/composition/pull/351) | The drawing model, its JSON, the `<Ink>` tag, the PNG that carries the drawing (`java.util.zip`), crop, the transcript seam, and the renderer's geometry (each stroke's polygons, colour and alpha). | `fixtures/conformance/ink/`, and the iPad renderer's own PNGs | Validation 41 of 41, containers 4 of 4, renderer 13 of 13 and dark style 14 of 14. Filled by a test rasterizer, the Kotlin geometry inks the same 16,798 and 48,381 pixels as the iPad's renderer. The iPad's real backup restores with its drawing. |
 
 **Search: what it showed.**
 1. **Folding words without Foundation.** The iPad folds a word with Foundation's case- and accent-insensitive folding. Kotlin
    decomposes it, drops the accent marks and lowercases it. That is closer to what FTS5's `unicode61` tokenizer does
    (Foundation turns `ß` into `ss`; FTS5 and this keep `ß`). The corpus is English and does not tell the two apart.
 2. **The iPad's `SearchTypoCoverageTests` does not run on Android.** It reads the Mac's word list and is Mac-only on the iPad too.
-3. **Not yet here (the PDF slice):** finding a note by its PDF's own words and by its marks.
+3. **Finding a note by its PDF's own words and by its marks** came with the PDF slice ([#352](https://github.com/meddlin/composition/pull/352)).
 
 **MDX: what it showed.**
 1. **The notes with `\r\n` line ends that broke Swift on Android pass in Kotlin.** That case failed 120 times under Swift's Foundation on Android in the
@@ -685,8 +696,8 @@ Android emulator.
 3. **Addresses are read without Foundation.** The iPad reads `<Repo>` and `<YouTube>` addresses with `URLComponents`; Android's `Uri` does not exist on a
    desktop JVM, so a small reader does what `URLComponents` does for an address a note can have. The 85 address cases agree.
 4. **Kotlin's `Int` is 32 bits and Swift's 64**, so a YouTube start time is a `Long` here.
-5. **Not in this slice:** the preview model (`NotePreview.swift`, what the preview draws from), the editor's syntax colouring and the Live model. They follow
-   from spike A2 (how Android draws the preview and edits), and the typing aids and Live rules come next in the port order.
+5. **Not in this slice:** the preview model, the editor's syntax colouring and the Live model. They were ported later ([#354](https://github.com/meddlin/composition/pull/354), [#353](https://github.com/meddlin/composition/pull/353)); how
+   Android draws them is still spike A2's question.
 
 **Images: what it showed.**
 1. **The desktop's patterns are spelled as JavaScript reads them.** The Markdown-image pattern uses `\s` and `.`, and a JVM's `\s` is ASCII
@@ -710,8 +721,43 @@ Android emulator.
    components where the desktop does not.
 3. **The `<Mark>` highlight has no desktop oracle.** Like the iPad's, it is a smaller rule than the desktop's (plain words on one line), so
    the tests say what it does.
-4. **Not in this slice:** reflow and the writing settings (`ReflowText`, `LiveReflow`, `Writing`), which come with Follow the sun in
-   step 10, and the editor that calls these rules (spike A2).
+4. **Not in this slice:** reflow and the writing settings, which came with Follow the sun ([#350](https://github.com/meddlin/composition/pull/350)), and the editor that calls these
+   rules (spike A2).
+
+**The parallel slices: what they showed.** Six sessions ported steps 8 to 13 and the editor's colours and preview at the same time,
+each from #349 in its own worktree. All fifteen pairs of branches merge without a conflict, and merged together the core passes 448 tests in
+70 suites (3 skipped on request: the 100,000-word search scale, a dense ink page, and one Live test that waits for the preview model).
+1. **On Android, making a `Matcher` copies the text.** Kotlin's `findAll` makes one per match, so a pattern run over a long note copied the
+   note once per match: the Live model's first version spent most of a long note's read on it ([#353](https://github.com/meddlin/composition/pull/353)). The core now runs such patterns
+   through one matcher (`forEachMatch` in `JavaScriptPatterns.kt`), the fence check and the image code included.
+2. **Swift's number and text rules need spelling out.** Swift's `rounded()` is half away from zero, where `floor(x + 0.5)` rounds
+   0.49999999999999994 up and Kotlin's `round` is half to even. JavaScript's `toFixed` needs the double's exact decimal value, which a JVM's
+   `%.25f` does not give (`BigDecimal` does). Swift's `min` and `max` pass a NaN over, Kotlin's return it. Kotlin's `toIntOrNull` takes other
+   scripts' digits, and kotlinx's `booleanOrNull` reads the text `"true"` as a boolean. A Swift `Character` is a grapheme cluster, so `\r\n` is
+   one character on the iPad.
+3. **commonmark-java's source spans are already UTF-16 offsets,** so the iPad's line-and-column `SourceMap` became three rules that move a
+   block's start to where cmark puts it ([#353](https://github.com/meddlin/composition/pull/353), [#354](https://github.com/meddlin/composition/pull/354)).
+4. **The iPad has bugs the Kotlin port does not copy** ([#354](https://github.com/meddlin/composition/pull/354)): after a lone `\r` line end its editor loses every colour; after a link
+   reference definition the inline places in that paragraph are a line out; swift-markdown turns straight quotes, `--` and `...` into curly
+   quotes, dashes and an ellipsis, which the desktop's preview does not; and it does not link bare addresses, which the desktop does.
+5. **Non-ASCII web addresses need their own UTS #46.** A JVM's `java.net.IDN` is IDNA 2003 (it makes `faß.de` `fass.de`), and Android's
+   ICU IDNA is not on a JVM, so the Reading List carries a port of `tr46`, the URL Standard's reference, with a 9,280-line table made by
+   `scripts/generate-uts46-data.mjs` ([#355](https://github.com/meddlin/composition/pull/355)). It agrees with `tr46` on 7 million domains, and with Node's own parser on the corpus.
+6. **The ink renderer's geometry is exact enough to compare pixels** with the iPad's PNGs, and the PNG's density chunk is written as ImageIO
+   writes it, so Android's drawings say their density as the iPad's do ([#351](https://github.com/meddlin/composition/pull/351)).
+7. **Two shared files were agreed between sessions** and are byte for byte the same on both branches: `appearance/ThemeColor.kt` ([#350](https://github.com/meddlin/composition/pull/350),
+   [#351](https://github.com/meddlin/composition/pull/351)) and `json/JsonValue.kt` ([#351](https://github.com/meddlin/composition/pull/351), [#352](https://github.com/meddlin/composition/pull/352)).
+
+**What the core leaves to the app, or to later.**
+- **Platform work:** reading a PDF's text (`PdfRenderer`'s text API from API 35, or PdfBox-Android) and exporting an annotated PDF; drawing ink
+  pixels (an Android `Canvas` filling the renderer's shapes); turning Jetpack Ink strokes into the ink model; a text recognizer behind
+  `InkTextRecognizing` (ML Kit or another); the screens.
+- **Once both halves have merged:** the Live model's checks of the Preview's footnote list and its colour spans need `NotePreview` and
+  `HighlightModel` ([#353](https://github.com/meddlin/composition/pull/353) with [#354](https://github.com/meddlin/composition/pull/354)); the ink palette from a scheme needs `Theme` ([#351](https://github.com/meddlin/composition/pull/351) with [#350](https://github.com/meddlin/composition/pull/350)).
+- **The appearance keys keep the iPad's names** (`iosEditorFont`, `iosPreviewFont`), so a backup moved between the two keeps the choice. A
+  neutral name would mean changing both apps.
+- **Comparing with the iPad in CI:** the editor colours were checked against a one-off dump of the iPad core's output. A Swift test that
+  writes it as a fixture would let CI do this every time.
 
 ## Setting up this Mac
 
@@ -777,6 +823,7 @@ Then M2 (ink, PDFs) and M3 (the Reading List, polish, the audit, Play).
 - **2026-11-20:** Page written, from the question "what is required to start getting this ready for Android?". Nothing run or built.
 - **2026-11-20:** **D1 decided by you: a Kotlin core** ("Use the most appropriate, native language for Android. Don't complicate things by trying to add a translation layer to get Swift running on Android."). O3 and O4 rejected, C2 accepted, C21 resolved, R1 retired, R15 added. A1 redefined as the Kotlin core's first slice.
   The first A1 (the iPad's Swift core built for Android) had been started when you decided. It was stopped, and its code and tools were removed. It had built the core for Android with a handful of stand-ins, and 427 of 445 of the core's tests passed on the emulator. One finding applies to Kotlin too, and is kept under [What the app is today](#what-the-app-is-today): the core relies on how Apple builds SQLite. Restoring a backup opens a URI filename, and all 13 restores failed against a SQLite built without URI support.
+- **2026-11-20:** **The rest of the core is ported, in six PRs stacked on #349:** organization, autosave and the Reading List ([#355](https://github.com/meddlin/composition/pull/355)), the Live model ([#353](https://github.com/meddlin/composition/pull/353)), appearance, Follow the sun and reflow ([#350](https://github.com/meddlin/composition/pull/350)), the editor's colours and the preview model ([#354](https://github.com/meddlin/composition/pull/354)), the PDF tables, refs, markup and text search ([#352](https://github.com/meddlin/composition/pull/352)), and the ink format ([#351](https://github.com/meddlin/composition/pull/351)). Each passes on the JVM and the emulator; merged together, 448 tests pass. CI for the Kotlin core (`android-core.yml`) added in #349. What the slices showed, and what is left to the app, is under [Core slices after A1](#core-slices-after-a1).
 - **2026-11-20:** **The typing aids slice is done:** the completion lists, note links, indenting, emphasis, the highlight, and Return and Backspace in lists and quotes, with the part of lezer's block parser they read. Every case of `editing-cases.json` and `list-continuation-cases.json` matches the desktop (2,104 of 2,104 caret places for each key among them), on the JVM and the emulator. The MDX helpers' case-insensitive patterns were found to accept letters the desktop refuses, on Android even with Java's own `(?i)`; they now match as JavaScript's `i` does on both ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **The images slice is done:** storing and naming, the note's references, Markdown images to `<Image />` tags, the stored-image list and picker, the header image and clean-up. Every case of `images-cases.json` matches the desktop (1,504 of 1,504 conversions among them), on the JVM and the emulator ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **The MDX slice is done:** the scanner and the component helpers, 115 of 115 notes and 166 of 166 component inputs as the desktop has them, on the JVM and the emulator ([Core slices after A1](#core-slices-after-a1)).

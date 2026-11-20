@@ -19,8 +19,22 @@ private val fence = Regex("""(?<![^\n\r\u2028\u2029]) {0,3}(?:`{3,}|~{3,})""")
  * Whether the line starting at `lineStart` (a UTF-16 offset) sits inside a fenced code block: the desktop's `insideFence` (fences.ts),
  * which counts the fence lines before it. The typing aids ask it too.
  */
-internal fun insideFence(text: String, lineStart: Int): Boolean =
-    fence.findAll(text.substring(0, lineStart.coerceIn(0, text.length))).count() % 2 == 1
+internal fun insideFence(text: String, lineStart: Int): Boolean {
+    var fences = 0
+    fence.forEachMatch(text, end = lineStart) { fences++ }
+    return fences % 2 == 1
+}
+
+/**
+ * Each match of the pattern in `text` (or in `[0, end)` of it), found with one `Matcher`. Kotlin's `findAll` makes a new `Matcher` for
+ * every match, and on Android making one copies the whole text (ICU's matcher keeps its own copy), so a pattern run over a long note
+ * with many matches would copy the note that many times; on a JVM it costs nothing either way.
+ */
+internal inline fun Regex.forEachMatch(text: CharSequence, end: Int = text.length, action: (java.util.regex.Matcher) -> Unit) {
+    val matcher = toPattern().matcher(text)
+    matcher.region(0, end.coerceIn(0, text.length))
+    while (matcher.find()) action(matcher)
+}
 
 /** `text` with A to Z lowered and nothing else changed, so every offset stays where it was. */
 internal fun asciiLower(text: String): String {

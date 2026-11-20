@@ -1,8 +1,8 @@
 # Android app
 
 The Android app for phones and tablets: Kotlin throughout, Jetpack Compose for the screens. The design is
-[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices** (spike A1, then search, MDX, images and the typing aids);
-there is no app yet.
+[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices**: spike A1, then search, MDX, images and the typing aids here,
+and the rest of the port in PRs #350 to #355, stacked on this one. There is no app yet.
 
 | Module | What |
 |---|---|
@@ -51,10 +51,19 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
 - **No case-insensitive flags: use `AsciiCaseless`.** JavaScript's `i` folds only A to Z. Kotlin's `IGNORE_CASE` folds all of Unicode
   (`ſ` matches `s`), and so does Android's `(?i)`, although a JVM's doesn't. Write the pattern in lower case and wrap it in `AsciiCaseless`
   (`markdown/JavaScriptPatterns.kt`), which runs it on the text with only A to Z lowered.
-- **Write `\u2028`, not the character.** Invisible characters (line separators, no-break spaces) are written as escapes in the sources.
-  `scripts/escape-invisible-characters.py` rewrites any that get in (some editing tools turn an escape into the character), and CI fails
-  on them.
+- **Write `\u2028`, not the character.** Invisible characters (line separators, no-break spaces, zero-width joiners, soft hyphens, combining
+  marks) are written as escapes in the sources. `scripts/escape-invisible-characters.py` rewrites any that get in, and CI fails on them.
+  Some editing tools turn an escape into the character, in a file or a shell heredoc alike, and a lone surrogate's escape into U+FFFD.
 - **Say how a conformance suite did in one line ending "agree with the desktop"** (`Lists, Return: 2104 of 2104 caret places agree with
   the desktop`). The device script shows those lines from the emulator's log.
+- **A test must return `Unit`.** JUnit 5 does not run a test method that returns a value (an expression body that ends in a call
+  returning something): it logs a warning and the test silently never runs. Android's JUnit 4 calls it an error. Write
+  `fun name(): Unit = withScratch { ... }` or a block body.
+- **No regex with `*/` in a KDoc comment.** `/\s*[\r\n]+\s*/` ends the comment early; write such patterns in `//` comments.
+- **Run a pattern over a long text with one matcher.** Kotlin's `findAll` makes a `Matcher` per match, and on Android each one copies the
+  whole text. Use `forEachMatch` (`markdown/JavaScriptPatterns.kt`).
+- **Swift's rules, spelled out.** `rounded()` is half away from zero (not `floor(x + 0.5)`, not Kotlin's `round`); `min` and `max` pass a NaN
+  over; `Int(_:)` takes ASCII digits only (Kotlin's `toIntOrNull` takes other scripts' too); a `Character` is a grapheme cluster. For
+  JavaScript's `toFixed`, use `BigDecimal(double)`, not `String.format`. kotlinx's `booleanOrNull` reads the text `"true"` as `true`.
 - **SQL text that ends up in `sqlite_master` is copied character for character.** `SqlScript` splits a block the way GRDB's `execute`
   runs it, so a trigger's body stays whole.
