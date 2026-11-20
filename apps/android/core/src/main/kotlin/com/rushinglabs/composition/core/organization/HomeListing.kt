@@ -68,7 +68,7 @@ object HomeListing {
         text = spaces.replace(text, " ")
         text = JavaScriptText.trim(text)
         if (text.length <= max) return text
-        return JavaScriptText.trim(text.substring(0, max)) + "…"
+        return JavaScriptText.trim(text.substring(0, max)) + "\u2026"
     }
 
     // Relative time ------------------------------------------------------------------------------------------------------------

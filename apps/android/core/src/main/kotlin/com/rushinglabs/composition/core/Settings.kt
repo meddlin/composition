@@ -155,10 +155,10 @@ class SettingsStore(location: DataLocation) {
         return (runCatching { Json.parseToJsonElement(file.readText()) }.getOrNull() as? JsonObject) ?: emptyMap()
     }
 
-    private fun <T> locked(body: (Map<String, JsonElement>) -> T): T = lock.withLock { body(readObject()) }
+    internal fun <T> locked(body: (Map<String, JsonElement>) -> T): T = lock.withLock { body(readObject()) }
 
     /** Changes the keys `body` touches and writes the object back, every other key as it was. Written to a temporary name and renamed. */
-    private fun edit(body: (MutableMap<String, JsonElement>) -> Unit) = lock.withLock {
+    internal fun edit(body: (MutableMap<String, JsonElement>) -> Unit) = lock.withLock {
         val obj = LinkedHashMap(readObject())
         body(obj)
         // The city an older version kept for Follow the sun is not read any more, and goes with the next write.

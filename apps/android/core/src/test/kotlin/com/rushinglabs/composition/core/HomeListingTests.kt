@@ -47,7 +47,7 @@ class HomeListingTests {
     @DisplayName("the excerpt drops frontmatter and markup, and truncates")
     fun excerpt() {
         assertEquals("Heading Some bold and a link.", HomeListing.excerpt("---\ntitle: T\n---\n# Heading\n\nSome **bold** and a [link](http://x.y)."))
-        assertEquals("aaaaaaaaaa…", HomeListing.excerpt("a".repeat(200), max = 10))
+        assertEquals("aaaaaaaaaa\u2026", HomeListing.excerpt("a".repeat(200), max = 10))
         assertEquals("item one quoted text code", HomeListing.excerpt("```swift\nlet x = 1\n```\n\n![pic](app_data/a.png)\n- item one\n> quoted _text_ `code`"))
         assertEquals("", HomeListing.excerpt(""))
     }
@@ -58,7 +58,7 @@ class HomeListingTests {
         assertEquals("a b", HomeListing.excerpt("a\u2028\u00A0\uFEFFb"), "JavaScript's white space, which a JVM's \\s leaves out")
         assertEquals("a\u0085b", HomeListing.excerpt("a\u0085b"), "U+0085 is not white space to JavaScript")
         assertEquals("one two", HomeListing.excerpt("# one\u2028- two"), "a line starts after U+2028")
-        assertEquals("١. not a list", HomeListing.excerpt("١. not a list"), "only 0 to 9 number a list item")
+        assertEquals("\u0661. not a list", HomeListing.excerpt("\u0661. not a list"), "only 0 to 9 number a list item")
     }
 
     @Test
