@@ -87,6 +87,7 @@ Legend for the tracker:
   and to be discussed later). It is not "later": nothing for it is planned, designed or spiked until you raise it.
 - The terminal app, the panel grid and pop-out windows ([C5](#compromise-register), [C7](#compromise-register)).
 - iPhone, macOS (Catalyst) and Android. The core package is kept free of UIKit so it *could* be reused; that is not a goal.
+  (Android now has its own design, [android-app-design.md](android-app-design.md): a Kotlin app with a Kotlin port of this core, checked by the same corpus; 2026-11-20.)
 - Apple Pencil Pro features (squeeze, barrel roll). The test iPad does not support that Pencil.
 
 **Already decided by you**
