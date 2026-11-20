@@ -87,9 +87,9 @@ class SearchQueryTests {
     @Test
     @DisplayName("JavaScript's whitespace, not Kotlin's, separates words")
     fun whitespace() {
-        assertEquals("a b", parse("a b").text, "a no-break space is a space to JavaScript")
+        assertEquals("a b", parse("a\u00A0b").text, "a no-break space is a space to JavaScript")
         assertEquals("a\u0085b", parse("a\u0085b").text, "NEL is not")
-        assertEquals("a b", parse("a﻿b").text)
+        assertEquals("a b", parse("a\uFEFFb").text)
     }
 }
 

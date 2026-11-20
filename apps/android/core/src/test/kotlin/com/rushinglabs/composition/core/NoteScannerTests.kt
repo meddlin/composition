@@ -145,7 +145,7 @@ class BlockRangeTests {
         var i = from
         while (i < text.length) {
             val c = text[i]
-            if (c == '\n' || c == '\r' || c == '\u0085' || c == ' ' || c == ' ') {
+            if (c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029') {
                 result.add(start to i)
                 i += if (c == '\r' && i + 1 < text.length && text[i + 1] == '\n') 2 else 1
                 start = i

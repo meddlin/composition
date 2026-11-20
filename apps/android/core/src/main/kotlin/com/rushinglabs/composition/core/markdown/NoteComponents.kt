@@ -93,7 +93,8 @@ private class ParsedUrl(
     }
 }
 
-private val hasScheme = Regex("^[a-z][a-z0-9+.-]*:", RegexOption.IGNORE_CASE)
+// Both cases written out: a case-insensitive flag would also fold letters JavaScript's `i` leaves alone (see AsciiCaseless).
+private val hasScheme = Regex("^[A-Za-z][A-Za-z0-9+.-]*:")
 
 /** `new URL(text)` for an address with or without `https://`. */
 private fun addressUrl(text: String) = ParsedUrl.parse(if (hasScheme.containsMatchIn(text)) text else "https://$text")
@@ -346,8 +347,9 @@ data class ImageWidth(val value: Double, val unit: Unit) {
 }
 
 object NoteImage {
-    private val width = Regex("^$JS_SPACE*([0-9]+(?:\\.[0-9]+)?)$JS_SPACE*(px|%)?$JS_SPACE*\\z", RegexOption.IGNORE_CASE)
-    private val imageName = Regex("^[A-Za-z0-9][A-Za-z0-9._-]*\\.(png|jpe?g|gif|webp)\\z", RegexOption.IGNORE_CASE)
+    // Case-insensitive as JavaScript's `i` is: A to Z only (AsciiCaseless).
+    private val width = AsciiCaseless("^$JS_SPACE*([0-9]+(?:\\.[0-9]+)?)$JS_SPACE*(px|%)?$JS_SPACE*\\z")
+    private val imageName = AsciiCaseless("^[a-z0-9][a-z0-9._-]*\\.(png|jpe?g|gif|webp)\\z")
     const val DIRECTORY_NAME = "app_data"
 
     /**

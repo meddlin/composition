@@ -898,7 +898,7 @@ object NoteScanner {
         return number.toString().filter { it in '0'..'9' }.map { digits[it - '0'] }.joinToString("")
     }
 
-    private val namedEntities = mapOf("amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to " ")
+    private val namedEntities = mapOf("amp" to "&", "lt" to "<", "gt" to ">", "quot" to "\"", "apos" to "'", "nbsp" to "\u00A0")
 
     /** The character references a prop's value may use. */
     internal fun decodeEntities(text: String): String {

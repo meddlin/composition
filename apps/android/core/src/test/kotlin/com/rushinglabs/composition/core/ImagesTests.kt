@@ -236,6 +236,8 @@ class ImagesTests {
         assertNull(HeaderImageSource.resolve("http\u017F://a.png"), "a long s is not an s")
         assertNull(HeaderImageSource.resolve("data:image/png;base64,AAAA"))
         assertNull(HeaderImageSource.resolve("app_data/../x.png"))
+        assertNull(HeaderImageSource.resolve("app_data/\u017F.png"), "a long s is not a letter a to z, as in JavaScript's case-insensitive match")
+        assertNull(HeaderImageSource.resolve("app_data/\u212A.png"), "nor is a Kelvin sign")
         assertEquals("a.png", HeaderImageSource.storedName("app_data/a.png"))
         assertNull(HeaderImageSource.storedName("https://example.com/a.png"))
         assertNull(HeaderImageSource.storedName(null))

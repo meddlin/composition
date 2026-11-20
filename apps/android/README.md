@@ -1,12 +1,12 @@
 # Android app
 
 The Android app for phones and tablets: Kotlin throughout, Jetpack Compose for the screens. The design is
-[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices** (spike A1, then search, MDX and images);
+[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices** (spike A1, then search, MDX, images and the typing aids);
 there is no app yet.
 
 | Module | What |
 |---|---|
-| `core` | The Kotlin core: a port of the iPad's `CompositionCore` (`apps/ios/CompositionCore`), checked against the desktop's own code by the shared corpus in `fixtures/conformance/`. No Android framework dependency, so its tests run on the Mac's JVM. So far: the schema pass, notes, groups, notebooks, the Trash Can, frontmatter (with a port of the iPad's `js-yaml` port), settings, backup and restore, search (the query parser, Meilisearch's typo rules, and the FTS5 index the store keeps in step), the MDX scanner with the component helpers, and images (storing, naming, the note's references, Markdown images to `<Image />`, the stored-image list and picker, the header image's source and clean-up). |
+| `core` | The Kotlin core: a port of the iPad's `CompositionCore` (`apps/ios/CompositionCore`), checked against the desktop's own code by the shared corpus in `fixtures/conformance/`. No Android framework dependency, so its tests run on the Mac's JVM. So far: the schema pass, notes, groups, notebooks, the Trash Can, frontmatter (with a port of the iPad's `js-yaml` port), settings, backup and restore, search (the query parser, Meilisearch's typo rules, and the FTS5 index the store keeps in step), the MDX scanner with the component helpers, and images (storing, naming, the note's references, Markdown images to `<Image />`, the stored-image list and picker, the header image's source and clean-up), and the typing aids (completion lists, note links, indenting, emphasis, the highlight, and Return and Backspace in lists and quotes). |
 | `core-device-tests` | No code of its own: runs `core`'s test sources on an emulator or a device, through Android's test runner. |
 
 ## Running the checks
@@ -44,5 +44,9 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
   character class or the reader out, as `ParsedUrl` does. `markdown/JavaScriptPatterns.kt` holds JavaScript's `\s` (`JS_SPACE`, and
   `JS_SPACE_CHARS` for inside a class), its `.` (`JS_ANY`) and the desktop's `insideFence`: use them when porting a desktop pattern.
 - **A JVM regex's `$` also matches before a final line break.** Write `\z` where JavaScript wrote `$` without the `m` flag.
+- **No case-insensitive flags: use `AsciiCaseless`.** JavaScript's `i` folds only A to Z. Kotlin's `IGNORE_CASE` folds all of Unicode
+  (`ſ` matches `s`), and so does Android's `(?i)`, although a JVM's doesn't. Write the pattern in lower case and wrap it in `AsciiCaseless`
+  (`markdown/JavaScriptPatterns.kt`), which runs it on the text with only A to Z lowered.
+- **Write `\u2028`, not the character.** Invisible characters (line separators, no-break spaces) are written as escapes in the sources.
 - **SQL text that ends up in `sqlite_master` is copied character for character.** `SqlScript` splits a block the way GRDB's `execute`
   runs it, so a trigger's body stays whole.
