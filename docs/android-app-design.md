@@ -747,7 +747,7 @@ each from #349 in its own worktree. All fifteen pairs of branches merge without 
    writes it, so Android's drawings say their density as the iPad's do ([#351](https://github.com/meddlin/composition/pull/351)).
 7. **Two shared files were agreed between sessions** and are byte for byte the same on both branches: `appearance/ThemeColor.kt` ([#350](https://github.com/meddlin/composition/pull/350),
    [#351](https://github.com/meddlin/composition/pull/351)) and `json/JsonValue.kt` ([#351](https://github.com/meddlin/composition/pull/351), [#352](https://github.com/meddlin/composition/pull/352)).
-8. **What needed two slices was finished once all six had merged.** `LiveReveal` takes the editor's colour spans, as the
+8. **What needed two slices was finished once all six had merged** ([#359](https://github.com/meddlin/composition/pull/359)). `LiveReveal` takes the editor's colour spans, as the
    iPad's does; the Live model's edit tests drive the real `HighlightModel` instead of a stand-in; and `LiveRestTests` checks the
    Preview's footnote lists, so `definitionRuns` runs. `InkPalette(theme)` makes the ink palette from a scheme, and the ink slice's own
    copy of the mark hues gave way to `Theme.MARK_HUES`. Copies of one rule that came in from different slices are now one:
