@@ -26,7 +26,11 @@ apps/android/scripts/test-on-device.sh
 ```
 
 The same suites on Android: on the device `adb` sees, or on the `Pixel_10` emulator (another with `AVD=`), booted headless and shut
-down again afterwards. Then the desktop restores the backups the core wrote on the device.
+down again afterwards. Then the desktop restores the backups the core wrote on the device. Only one run at a time uses the emulator:
+the script takes a lock (`~/.android/composition-device-tests.lock`), and a second run waits for it.
+
+CI (`.github/workflows/android-core.yml`) runs `conformance.sh` on Linux with `COMPOSITION_JVM_ONLY=true`, which leaves the device
+module out of the Gradle build, and checks that no invisible characters are in the sources.
 
 Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the conformance suites as skipped, never as passed.
 
@@ -48,5 +52,9 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
   (`ſ` matches `s`), and so does Android's `(?i)`, although a JVM's doesn't. Write the pattern in lower case and wrap it in `AsciiCaseless`
   (`markdown/JavaScriptPatterns.kt`), which runs it on the text with only A to Z lowered.
 - **Write `\u2028`, not the character.** Invisible characters (line separators, no-break spaces) are written as escapes in the sources.
+  `scripts/escape-invisible-characters.py` rewrites any that get in (some editing tools turn an escape into the character), and CI fails
+  on them.
+- **Say how a conformance suite did in one line ending "agree with the desktop"** (`Lists, Return: 2104 of 2104 caret places agree with
+  the desktop`). The device script shows those lines from the emulator's log.
 - **SQL text that ends up in `sqlite_master` is copied character for character.** `SqlScript` splits a block the way GRDB's `execute`
   runs it, so a trigger's body stays whole.

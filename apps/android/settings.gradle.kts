@@ -18,5 +18,8 @@ dependencyResolutionManagement {
 rootProject.name = "composition-android"
 
 include(":core")
-// Runs :core's own test sources on an emulator or device, through Android's test runner (spike A1).
-include(":core-device-tests")
+// Runs :core's own test sources on an emulator or device, through Android's test runner (spike A1). CI's JVM run sets
+// COMPOSITION_JVM_ONLY=true and leaves it out, so it needs no Android SDK.
+if (providers.environmentVariable("COMPOSITION_JVM_ONLY").orNull != "true") {
+    include(":core-device-tests")
+}
