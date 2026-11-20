@@ -21,7 +21,8 @@ import java.util.concurrent.atomic.AtomicReference
 //   3. Within each group, notes matching in the title come before notes matching in the text, and the rest are most recently
 //      updated first.
 //
-// Not yet here (the PDF slice): the words of a PDF's own pages and of its marks.
+// A note that owns a PDF is also found by the words of its marks (they follow its text in its entry: `NoteStore.indexed`) and by the
+// words of the PDF's own pages, which are kept apart (PdfTextIndex.kt).
 
 /** A note as the index needs it: the columns of `notes`. */
 data class IndexedNote(
@@ -45,7 +46,7 @@ enum class SearchTolerance {
     internal val fallback get() = if (this == FORGIVING) Typo.Rules.FORGIVING_FALLBACK else null
 }
 
-class SearchIndex private constructor(private val file: SqliteFile, private val tolerance: SearchTolerance) : AutoCloseable {
+class SearchIndex private constructor(internal val file: SqliteFile, private val tolerance: SearchTolerance) : AutoCloseable {
     companion object {
         /** The most results a search returns, as on the desktop. */
         const val RESULT_LIMIT = 50
@@ -70,6 +71,7 @@ class SearchIndex private constructor(private val file: SqliteFile, private val 
                     CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                     """.trimIndent(),
                 )
+                createPdfTextTables(db)
             }
             return SearchIndex(file, tolerance)
         }
@@ -157,13 +159,16 @@ class SearchIndex private constructor(private val file: SqliteFile, private val 
      * The ids of the notes matching `query`, best first, at most `RESULT_LIMIT`. The query may mix free text with `field: value`
      * filters (`SearchQueryParser`). A query with neither matches nothing.
      */
-    fun search(query: String): List<Long> {
+    fun search(query: String): List<Long> = searchHits(query).map { it.noteId }
+
+    /** `search`, with where each note was found: a note found only by words in its PDF's own text says on which page they first are. */
+    fun searchHits(query: String): List<SearchHit> {
         val parsed = SearchQueryParser.parse(query)
         if (parsed.text.isEmpty() && parsed.filters.isEmpty()) return emptyList()
         return file.read { search(parsed, it) }
     }
 
-    private fun search(parsed: ParsedSearchQuery, db: Db): List<Long> {
+    private fun search(parsed: ParsedSearchQuery, db: Db): List<SearchHit> {
         val conditions = ArrayList<String>()
         val arguments = ArrayList<Any?>()
         for (filter in parsed.filters) {
@@ -188,6 +193,7 @@ class SearchIndex private constructor(private val file: SqliteFile, private val 
         // Nothing to look for in the text (it was only punctuation, say): list what the filters allow, newest first.
         if (query.isEmpty) {
             return db.longs("SELECT id FROM docs WHERE 1 = 1$filterSql ORDER BY updated_ts DESC, updated_at DESC, id DESC LIMIT $RESULT_LIMIT", *arguments.toTypedArray())
+                .map { SearchHit(it) }
         }
 
         val vocabulary = currentVocabulary(db)
@@ -237,11 +243,16 @@ class SearchIndex private constructor(private val file: SqliteFile, private val 
         }
 
         val found = answer(tolerance.rules)
+        val hits = ArrayList(found.map { SearchHit(it) })
+        // Then the notes whose PDFs have every word on one page, which their own text did not find (PdfTextIndex.kt).
+        if (hits.size < RESULT_LIMIT && "content" in allowed) {
+            hits += pdfTextHits(query, found.toSet(), RESULT_LIMIT - hits.size, filterSql, arguments, db)
+        }
         // Nothing at all: read the short words as if one letter of each might be wrong, which is too noisy to do when there is
         // something to show.
         val fallback = tolerance.fallback
-        if (found.isEmpty() && fallback != null) return answer(fallback)
-        return found
+        if (hits.isEmpty() && fallback != null) return answer(fallback).map { SearchHit(it) }
+        return hits
     }
 
     private fun currentVocabulary(db: Db): Vocabulary =
