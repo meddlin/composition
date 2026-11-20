@@ -1,5 +1,7 @@
 package com.rushinglabs.composition.core
 
+import com.rushinglabs.composition.core.search.IndexedNote
+import com.rushinglabs.composition.core.search.SearchIndex
 import java.time.Instant
 
 // Notes, groups and notebooks: ports of `notesRepo.ts`, `groupsRepo.ts`, `notebooksRepo.ts`, `ordering.ts` and `groupMove.ts`
@@ -263,20 +265,56 @@ internal fun fetchNotebook(db: Db, id: Long): Notebook? = db.row("SELECT $NOTEBO
 
 internal fun defaultNotebookId(db: Db): Long = db.long("SELECT MIN(id) FROM notebooks") ?: throw CoreException.NoNotebooks()
 
+/** Where the core reports what it carries on past (an index that failed to update). The app points it at Android's log. */
+object CoreLog {
+    @Volatile var sink: (String) -> Unit = { System.err.println(it) }
+}
+
 /**
  * What the app calls to change notes, groups and notebooks: the data operations of the desktop's `service.ts`, one for one, on
- * top of the repository functions above (NoteStore.swift). The search index joins in a later slice.
+ * top of the repository functions above (NoteStore.swift). Writing a note also keeps the search index in step.
+ *
+ * Indexing is derived state, as on the desktop: a failure to index never fails or rolls back a write, so it is logged and
+ * swallowed, and a stale index is repaired by `rebuildIfStale` on the next launch. The index is only marked as matching the notes
+ * when it matched them before the write; one that was already stale stays marked stale.
  */
-class NoteStore(val database: CompositionDatabase) {
-    fun createNote(title: String, groupId: Long? = null, notebookId: Long? = null, now: Instant = Instant.now()) =
-        database.createNote(title, groupId = groupId, notebookId = notebookId, now = now)
+class NoteStore(val database: CompositionDatabase, private val search: SearchIndex? = null) {
+    fun createNote(title: String, groupId: Long? = null, notebookId: Long? = null, now: Instant = Instant.now()): NoteDetail =
+        write({ database.createNote(title, groupId = groupId, notebookId = notebookId, now = now) }) { index, note -> index.upsert(listOf(indexed(note))) }
 
-    fun saveNoteContent(id: Long, content: String, now: Instant = Instant.now()) = database.saveNoteContent(id, content, now)
+    /** Saves what the editor holds (see `saveNoteContent`) and re-indexes the note. */
+    fun saveNoteContent(id: Long, content: String, now: Instant = Instant.now()): NoteDetail =
+        write({ database.saveNoteContent(id, content, now) }) { index, note -> index.upsert(listOf(indexed(note))) }
 
-    /** Moves the note to the Trash Can rather than erasing it. */
-    fun deleteNote(id: Long, now: Instant = Instant.now()) = database.trashNote(id, now)
+    /** Moves the note to the Trash Can rather than erasing it. It leaves the search index straight away, and comes back if restored. */
+    fun deleteNote(id: Long, now: Instant = Instant.now()) =
+        write({ database.trashNote(id, now) }) { index, _ -> index.remove(listOf(id)) }
 
-    fun restoreNote(id: Long): RestoreResult? = database.restoreNote(id)
+    fun restoreNote(id: Long): RestoreResult? = write({ database.restoreNote(id) }) { index, restored ->
+        if (restored == null) return@write
+        val note = database.note(id)
+        // A note that came back under a new id (its own was taken) has nothing to add by the old one: start the index over.
+        if (note != null) index.upsert(listOf(indexed(note))) else index.rebuild(database)
+    }
+
+    private fun indexed(note: NoteDetail) =
+        IndexedNote(note.id, note.title, note.description, note.content, note.tags, note.createdAt, note.updatedAt)
+
+    /** Runs `change`, then `reindex`, and marks the index current if it was before. The write's errors are thrown; the index's are logged. */
+    private fun <T> write(change: () -> T, reindex: (SearchIndex, T) -> Unit): T {
+        val index = search
+        val wasCurrent = index != null && runCatching { index.isCurrent(database) }.getOrDefault(false)
+        val result = change()
+        if (index != null) {
+            try {
+                reindex(index, result)
+                if (wasCurrent) index.markCurrent(database)
+            } catch (error: Exception) {
+                CoreLog.sink("[search] indexing failed: $error")
+            }
+        }
+        return result
+    }
 
     fun moveNote(id: Long, groupId: Long?) = database.setNoteGroup(id, groupId)
 

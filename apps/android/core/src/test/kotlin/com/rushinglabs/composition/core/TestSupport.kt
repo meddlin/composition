@@ -23,10 +23,21 @@ val corpusDirectory: File? =
     (System.getenv("COMPOSITION_CORPUS_DIR") ?: System.getProperty("composition.corpus") ?: instrumentationArgument("corpusDir"))
         ?.let(::File)?.takeIf { it.isDirectory }
 
-/** Skips the calling test (reported as skipped, never as passed) unless the desktop's fixtures are there. */
+/**
+ * Skips the calling test unless `condition` holds: reported as skipped, never as passed, under JUnit 5 on the JVM and JUnit 4 on
+ * Android alike (each runner knows only its own way of saying so).
+ */
+fun skipUnless(condition: Boolean, reason: String) {
+    if (condition) return
+    val junit4 = runCatching { Class.forName("org.junit.AssumptionViolatedException") }.getOrNull()
+    if (junit4 != null) throw junit4.getConstructor(String::class.java).newInstance(reason) as Throwable
+    assumeTrue(false, reason)
+}
+
+/** Skips the calling test unless the desktop's fixtures are there. */
 fun requireConformance(): File {
     val directory = conformanceDirectory
-    assumeTrue(directory != null, "COMPOSITION_CONFORMANCE_DIR is not set")
+    skipUnless(directory != null, "COMPOSITION_CONFORMANCE_DIR is not set")
     return directory!!
 }
 

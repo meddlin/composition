@@ -41,6 +41,7 @@ kotlin {
 dependencies {
     androidTestImplementation(project(":core"))
     androidTestImplementation(libs.kotlinx.serialization.json)
+    androidTestImplementation(libs.commonmark)
     androidTestImplementation(kotlin("test-junit"))
     // The suites' display names and the skip in `requireConformance` come from JUnit 5's API.
     androidTestImplementation(libs.junit.jupiter.api)

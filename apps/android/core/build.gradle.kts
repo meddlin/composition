@@ -12,6 +12,12 @@ dependencies {
     api(libs.androidx.sqlite)
     implementation(libs.androidx.sqlite.bundled)
     implementation(libs.kotlinx.serialization.json)
+    // CommonMark and GFM (tables, strikethrough, autolinks, task lists), as swift-markdown reads them on the iPad.
+    implementation(libs.commonmark)
+    implementation(libs.commonmark.strikethrough)
+    implementation(libs.commonmark.tables)
+    implementation(libs.commonmark.autolink)
+    implementation(libs.commonmark.tasklist)
     api(libs.kotlinx.coroutines.core)
 
     testImplementation(kotlin("test"))

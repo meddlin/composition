@@ -80,6 +80,37 @@ class CompositionDatabase private constructor(internal val file: SqliteFile) : A
     /** One note with its text, or null if there is none with this id. */
     fun note(id: Long): NoteDetail? = file.read { db -> fetchNote(db, id) }
 
+    /** The notes with these ids, in the order given; an id that is not a note is skipped (a search result may have just been trashed). */
+    fun notes(ids: List<Long>): List<NoteSummary> = file.read { db ->
+        val found = HashMap<Long, NoteSummary>()
+        // SQLite's limit on variables is far above any page of results, but a long list is read in pieces anyway.
+        for (chunk in ids.chunked(500)) {
+            val marks = chunk.joinToString(", ") { "?" }
+            db.rows("SELECT id, uuid, title, tags, notebook_id, group_id, created_at, updated_at FROM notes WHERE id IN ($marks)", *chunk.toTypedArray())
+                .forEach { found[it.long("id")] = NoteSummary(it) }
+        }
+        ids.mapNotNull { found[it] }
+    }
+
+    /**
+     * What the notes look like now, in one short string: how many, the latest change, and the sum of their ids. The search index
+     * stores it when it is built, and a different one later means the notes changed behind its back (a restore, say).
+     */
+    fun notesFingerprint(): String = file.read { db ->
+        val row = db.row("SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), '') AS latest, COALESCE(SUM(id), 0) AS total FROM notes")!!
+        "${row["n"]}|${row["latest"]}|${row["total"]}"
+    }
+
+    /** Every note as the search index takes it. (A PDF's marks will follow its owner's text once the PDF slice is ported.) */
+    internal fun indexedNotes(): List<com.rushinglabs.composition.core.search.IndexedNote> = file.read { db ->
+        db.rows("SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map {
+            com.rushinglabs.composition.core.search.IndexedNote(
+                it.long("id"), it.string("title"), it.string("description"), it.string("content"), it.string("tags"),
+                it.string("created_at"), it.string("updated_at"),
+            )
+        }
+    }
+
     /** The version of the SQLite this database runs on (the bundled one). */
     fun sqliteVersion(): String = file.read { it.string("SELECT sqlite_version()") ?: "unknown" }
 

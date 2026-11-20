@@ -655,8 +655,36 @@ The emulator ran on a Mac that other sessions were also using, so its timings ar
    same core.
 
 **Not in A1 (the next slices, in the port order):**
-- search with the typo layer, the MDX scanner, the typing aids, the Live rules, images, the PDF tables, the Reading List, the ink format;
+- search, the MDX scanner, the typing aids, the Live rules, images, the PDF tables, the Reading List, the ink format;
 - a CI job.
+
+### Core slices after A1
+
+Each slice follows the port order under [The core](#the-core-d1). It is done when its suites pass on the Mac's JVM and on the
+Android emulator.
+
+| Slice | Done | Ported | Checked against | Results (the same on the JVM and the emulator) |
+|---|---|---|---|---|
+| **Search** | 2026-11-20 | The `field: value` query parser, Meilisearch's typo rules, and the FTS5 index in its own `search.db` (747 lines of Swift became 711 of Kotlin). The store keeps the index in step as notes are made, saved, trashed and restored. | The desktop's `parseSearchQuery`, and a real Meilisearch's committed answers (`search-expected.json`, the iPad's spike S2 corpus) | Parser: 272 of 272 queries. **A:** the same set as Meilisearch for 159 of 159 exact queries, top-10 overlap 0.93. **B:** none of the 95 typo queries misses anything Meilisearch finds. All 267 uncapped queries give the same set. **C:** slowest query on 1,000 notes 1.3 ms (JVM), 2.3 ms (emulator); with 20,000 distinct words 4.5 ms and 29 ms; with 100,000, 15.9 ms on the JVM. |
+| **MDX** | 2026-11-20 | The restricted MDX scanner (components, props, block or inline, what MDX refuses, footnotes, block ranges in the note's text) and the component helpers (`<Chart>` CSV, `<Repo>` and `<YouTube>` addresses, `<Image>` width and `app_data` refs): 1,231 lines of Swift became 1,316 of Kotlin. Headings are read with commonmark-java 0.32.0 and its GFM extensions. | The desktop's real preview pipeline (`mdx-expected.json`) and component functions (`component-expected.json`) | 115 of 115 notes agree (valid or not, components and props, headings, footnote order). 166 of 166 component inputs. Block ranges cover every corpus note, and the same notes behind a frontmatter and with `\r\n` line ends. |
+
+**Search: what it showed.**
+1. **Folding words without Foundation.** The iPad folds a word with Foundation's case- and accent-insensitive folding. Kotlin
+   decomposes it, drops the accent marks and lowercases it. That is closer to what FTS5's `unicode61` tokenizer does
+   (Foundation turns `ß` into `ss`; FTS5 and this keep `ß`). The corpus is English and does not tell the two apart.
+2. **The iPad's `SearchTypoCoverageTests` does not run on Android.** It reads the Mac's word list and is Mac-only on the iPad too.
+3. **Not yet here (the PDF slice):** finding a note by its PDF's own words and by its marks.
+
+**MDX: what it showed.**
+1. **The notes with `\r\n` line ends that broke Swift on Android pass in Kotlin.** That case failed 120 times under Swift's Foundation on Android in the
+   stopped Swift run; the Kotlin scanner reads the same notes as the Mac does.
+2. **commonmark-java stands in for swift-markdown where the scanner needs a Markdown parser**, which is only to list the headings for `<Toc />`. It agreed
+   with the desktop on every note. Pinned to 0.32.0, not 0.33.0, which was released the morning this slice was ported.
+3. **Addresses are read without Foundation.** The iPad reads `<Repo>` and `<YouTube>` addresses with `URLComponents`; Android's `Uri` does not exist on a
+   desktop JVM, so a small reader does what `URLComponents` does for an address a note can have. The 85 address cases agree.
+4. **Kotlin's `Int` is 32 bits and Swift's 64**, so a YouTube start time is a `Long` here.
+5. **Not in this slice:** the preview model (`NotePreview.swift`, what the preview draws from), the editor's syntax colouring and the Live model. They follow
+   from spike A2 (how Android draws the preview and edits), and the typing aids and Live rules come next in the port order.
 
 ## Setting up this Mac
 
@@ -722,6 +750,8 @@ Then M2 (ink, PDFs) and M3 (the Reading List, polish, the audit, Play).
 - **2026-11-20:** Page written, from the question "what is required to start getting this ready for Android?". Nothing run or built.
 - **2026-11-20:** **D1 decided by you: a Kotlin core** ("Use the most appropriate, native language for Android. Don't complicate things by trying to add a translation layer to get Swift running on Android."). O3 and O4 rejected, C2 accepted, C21 resolved, R1 retired, R15 added. A1 redefined as the Kotlin core's first slice.
   The first A1 (the iPad's Swift core built for Android) had been started when you decided. It was stopped, and its code and tools were removed. It had built the core for Android with a handful of stand-ins, and 427 of 445 of the core's tests passed on the emulator. One finding applies to Kotlin too, and is kept under [What the app is today](#what-the-app-is-today): the core relies on how Apple builds SQLite. Restoring a backup opens a URI filename, and all 13 restores failed against a SQLite built without URI support.
+- **2026-11-20:** **The MDX slice is done:** the scanner and the component helpers, 115 of 115 notes and 166 of 166 component inputs as the desktop has them, on the JVM and the emulator ([Core slices after A1](#core-slices-after-a1)).
+- **2026-11-20:** **The search slice is done:** the parser, the typo rules and the FTS5 index, and the store keeping them in step. It matches the desktop's parser on 272 of 272 queries and a real Meilisearch on criteria A and B, on the JVM and the emulator, and it is well under the 200 ms target ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **Spike A1 done:** the first slice of the Kotlin core passes every case of the corpus it covers, on the Mac's JVM and on the Android emulator, both ways with the desktop ([A1 status](#a1-status)). R13 retired; R15 measured. Gate A now waits only on this page being agreed (D2, D11).
 
 ## Sources
