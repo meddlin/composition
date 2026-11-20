@@ -1,4 +1,5 @@
 import Foundation
+import Markdown
 import Testing
 
 @testable import CompositionCore
@@ -247,5 +248,137 @@ struct HighlighterContinuationLineTests {
         let text = "> a\n*b*\n\n1. a\n  `c`\n\nx\n    **d**\n"
         #expect(HighlightModel(text: text).spans(in: NSRange(location: 0, length: (text as NSString).length)) == MarkdownHighlighter.spans(in: text))
         #expect(found(text).contains("emphasis: \"*b*\"") && found(text).contains("inlineCode: \"`c`\"") && found(text).contains("strong: \"**d**\""))
+    }
+}
+
+/// cmark does not count the new line after a backslash hard break (`a\` at a line's end), nor one inside a link's address, title or reference label
+/// (`[x](` then `u)` on the next line): what follows in the paragraph is reported a line early, its columns counted on from the earlier line's text.
+/// The desktop (lezer, remark) has it where it is written.
+@Suite("The highlighter after a line cmark does not count")
+struct HighlighterUncountedLineTests {
+    private func found(_ text: String) -> [String] {
+        let ns = text as NSString
+        return MarkdownHighlighter.spans(in: text).map { "\($0.kind): \(String(reflecting: ns.substring(with: $0.range)))" }
+    }
+
+    @Test("after a backslash hard break, the rest of the paragraph is coloured where it is written")
+    func backslash() {
+        for text in [
+            "a\\\nb\n*c*\n",
+            "a\\\n   b *c*\n",
+            "a\\\nb\\\nc\n*c*\n",
+            "a\\\nb\n`x` and *c*\n",
+            "a\\\r\nb\r\n*c*\r\n",
+            "> a\\\n> b\n> *c*\n",
+            "> a\\\nb\n*c*\n",
+            "- a\\\n  b\n  *c*\n",
+            "é\\\nb\n*c*\n",
+            "a\\\nb\n*c*\n===\n",
+            "[d]: https://x.test\na\\\nb\n*c*\n",
+            "a \\\\\\\nb\n*c*\n",
+        ] {
+            #expect(found(text).contains("emphasis: \"*c*\""), "\(String(reflecting: text)): \(found(text))")
+        }
+        let across = found("*a\\\n  b* *c*\n")
+        #expect(across.contains("emphasis: \"*a\\\\\\n  b*\"") && across.contains("emphasis: \"*c*\""), "\(across)")
+    }
+
+    @Test("a backslash that is not a hard break leaves the lines as they are")
+    func notABreak() {
+        for text in ["a\\\\\nb\n*c*\n", "`a\\\nb` x\n*c*\n", "a\\  \nb\n*c*\n", "a\\\n"] {
+            let spans = found(text)
+            #expect(!text.contains("*c*") || spans.contains("emphasis: \"*c*\""), "\(String(reflecting: text)): \(spans)")
+        }
+    }
+
+    @Test("after a link whose address, title or label runs onto the next line, the rest is coloured where it is written")
+    func link() {
+        let address = found("a [x](\n   https://x.test) *d*\n")
+        #expect(address.contains("mark: \"](\\n   https://x.test)\"") && address.contains("emphasis: \"*d*\""), "\(address)")
+        let title = found("> [x](https://x.test\n> \"t\") *d*\n> *e*\n")
+        #expect(title.contains("mark: \"](https://x.test\\n> \\\"t\\\")\""), "\(title)")
+        #expect(title.contains("emphasis: \"*d*\"") && title.contains("emphasis: \"*e*\""), "\(title)")
+        let label = found("[x][a\n  b] *d*\n\n[a b]: https://x.test\n")
+        #expect(label.contains("mark: \"][a\\n  b]\"") && label.contains("emphasis: \"*d*\""), "\(label)")
+        let text = found("[x\ny](\n  u) *d*\n")
+        #expect(text.contains("linkText: \"x\\ny\"") && text.contains("emphasis: \"*d*\""), "\(text)")
+        let image = found("[![a](\n  i.png)](\n  u) *d*\n")
+        #expect(image.contains("emphasis: \"*d*\""), "\(image)")
+    }
+
+    @Test("in generated paragraphs, every inline is placed on its own marks: lines over containers, breaks, links, code and HTML")
+    func generated() {
+        // What a line can hold, and what can run from a line's end onto the next: one cmark counts and one it does not, of each kind.
+        let items = ["a", "*em*", "**st**", "`co`", "[l](u)", "![i](p)", "<b>", "é", "_u_", "~~s~~"]
+        let over: [(String, String)] = [
+            ("x\\", "y"), ("x  ", "y"), ("x", "y"), ("[l](", "u)"), ("[l](u", "\"t\")"), ("[l](u \"t", "t\")"), ("[l][r", "s]"), ("![i](", "p)"),
+            ("[![i](", "p)](u)"), ("[l", "m](u)"), ("`co", "de`"), ("<span", "x>"), ("*em", "ph*"),
+        ]
+        // The first line's container, and what each later line may start with: its marks, fewer (a lazy line), or more space.
+        let containers: [(String, [String])] = [
+            ("", ["", "  ", "\t"]), ("   ", ["", " ", "      "]), ("> ", ["> ", "", ">", ">  "]), ("- ", ["  ", "", " ", "    "]),
+            ("1. ", ["   ", "", "  "]), ("> - ", [">   ", "", "> "]), ("- > ", ["  > ", "", "  "]),
+        ]
+        var seed: UInt64 = 7
+        func random(_ count: Int) -> Int {
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            return Int((seed >> 33) % UInt64(count))
+        }
+        var wrong: [String] = []
+        for _ in 0..<3_000 {
+            let (first, later) = containers[random(containers.count)]
+            let count = 2 + random(4)
+            var text = first.isEmpty && random(5) == 0 ? "[d]: https://x.test\n" : "", carry = ""
+            for index in 0..<count {
+                var line = carry
+                for _ in 0..<random(3) { line += (line.isEmpty ? "" : " ") + items[random(items.count)] }
+                if index < count - 1 {
+                    let (end, start) = over[random(over.count)]
+                    line += (line.isEmpty ? "" : " ") + end
+                    carry = start + " "
+                }
+                text += (index == 0 ? first : later[random(later.count)]) + (line.isEmpty ? "z" : line) + (random(5) == 0 ? "\r\n" : "\n")
+            }
+            text += "\n[r s]: https://x.test\n"
+            if let problem = misplaced(in: text) { wrong.append("\(String(reflecting: text)): \(problem)") }
+        }
+        #expect(wrong.isEmpty, "\(wrong.count) misplaced, first: \(wrong.prefix(5).joined(separator: "\n"))")
+    }
+
+    /// The first inline of `text` whose place does not start and end with its own marks (or, for text, hold its words), if any.
+    private func misplaced(in text: String) -> String? {
+        let map = SourceMap(text: text), ns = text as NSString
+        var queue: [any Markup] = [Document(note: text)]
+        while let markup = queue.popLast() {
+            queue += markup.children
+            guard !(markup is BlockMarkup || markup is SoftBreak || markup is LineBreak) else { continue }
+            guard let range = map.range(of: markup) else { return "\(type(of: markup)) has no place" }
+            let written = ns.substring(with: NSRange(location: range.lowerBound, length: range.count))
+            let ends: (starts: [String], ends: [String])? = switch markup {
+            case is Strong: (["**"], ["**"])
+            case is Emphasis: (["*", "_"], ["*", "_"])
+            case is Strikethrough: (["~"], ["~"])
+            case is InlineCode: (["`"], ["`"])
+            case is InlineHTML: (["<"], [">"])
+            case is Image: (["!["], [")", "]"])
+            case is Link: (["["], [")", "]"])
+            default: nil
+            }
+            if let ends, !ends.starts.contains(where: written.hasPrefix) || !ends.ends.contains(where: written.hasSuffix) {
+                return "\(type(of: markup)) is at \(String(reflecting: written))"
+            }
+            if let text = markup as? Text, !written.contains("\\"), !written.contains("&"),
+                written.trimmingCharacters(in: .whitespaces) != text.string.trimmingCharacters(in: .whitespaces) {
+                return "text \(String(reflecting: text.string)) is at \(String(reflecting: written))"
+            }
+        }
+        return nil
+    }
+
+    @Test("the incremental model colours such lines as a full read does")
+    func model() {
+        let text = "a\\\nb\n*c*\n\n- [x](\n  u) **d**\n"
+        #expect(HighlightModel(text: text).spans(in: NSRange(location: 0, length: (text as NSString).length)) == MarkdownHighlighter.spans(in: text))
+        #expect(found(text).contains("emphasis: \"*c*\"") && found(text).contains("strong: \"**d**\""))
     }
 }

@@ -4,7 +4,7 @@ import Markdown
 /// Where things are in a note's text. swift-markdown reports a line and a UTF-8 column; everything built on it (the highlighter, the Live model) wants
 /// UTF-16 units, which is what a text view counts in.
 ///
-/// Three of cmark's ways of counting are put right here, so that places agree with the desktop's (lezer, remark):
+/// Four of cmark's ways of counting are put right here, so that places agree with the desktop's (lezer, remark):
 /// - a line ends at `\n`, `\r\n` or a lone `\r`, as cmark counts lines (counting `\n` alone put everything after a lone `\r` on the wrong line);
 /// - on a paragraph's (or a setext heading's) second and later lines, cmark places what is there at where it is in the text it read from that line, plus
 ///   the block's own start column, as if every line started where the first does. A line indented more or less than the first, or a lazy line (one
@@ -12,7 +12,10 @@ import Markdown
 ///   cmark starts reading it, by matching the quotes and list items the block is in as cmark does (`BlockPlaces`);
 /// - after a paragraph's (or a setext heading's) leading link reference definitions, which include a footnote's written `[^1]: text`, cmark leaves the
 ///   definitions out of the block's text but still counts the lines of what is left from the block's first line, and starts the block there. Here such a
-///   block starts on its own first line and what is inside it is on the lines it is written on.
+///   block starts on its own first line and what is inside it is on the lines it is written on;
+/// - cmark does not count the new line after a backslash hard break (`a\` at a line's end), nor one inside a link's address, title or reference label (`[x](`
+///   with `u)` on the next line), so it reports what follows in the block a line early, its columns counted on from the earlier line's text. Here the
+///   block's inlines are walked in order to find which of its new lines cmark left uncounted (`UncountedLines`), and each place is read back through them.
 struct SourceMap {
     /// The text as UTF-16 units.
     let chars: [UInt16]
@@ -25,8 +28,13 @@ struct SourceMap {
     private let mayHaveDefinitions: Bool
     /// By line (from 0): whether cmark can have placed something on it away from where it is written. Only a line that can go on with a paragraph can be
     /// out (one after a line that is not blank), and only when it starts with space, a tab or `>`, or the lines before it, back to a blank one, include
-    /// one that starts with those or with a list's mark (a paragraph whose first line has something before its text). Everything else keeps the quick way.
+    /// one that starts with those or with a list's mark (a paragraph whose first line has something before its text). After a line that `holds` (below),
+    /// so are it and the rest of its lines up to a blank one, when there are any: cmark reports what is on them a line early. Everything else keeps the
+    /// quick way.
     private var mayBeOut: [Bool] = []
+    /// By line (from 0): whether it ends with `\` (a backslash hard break, when it is one) or has a `](` or `][` in it (a link whose address, title or
+    /// label may run onto the next line), after which cmark may leave a new line uncounted.
+    private var holds: [Bool] = []
     /// What each paragraph and heading has been found to need, by where cmark says it starts. A class, so that a `let` map can remember.
     private let blocks = BlockPlacesCache()
 
@@ -35,13 +43,25 @@ struct SourceMap {
         utf8Count = utf8.count
         chars = Array(text.utf16)
         var definitions = false
+        var holds = [false]
         for (index, byte) in utf8.enumerated() {
-            if byte == 0x0A || (byte == 0x0D && (index + 1 == utf8.count || utf8[index + 1] != 0x0A)) { lineStarts.append(index + 1) }
-            if byte == 0x3A, index > 0, utf8[index - 1] == 0x5D { definitions = true }
+            let previous = index > 0 ? utf8[index - 1] : 0
+            if byte == 0x0A || (byte == 0x0D && (index + 1 == utf8.count || utf8[index + 1] != 0x0A)) {
+                // `\` before the line's end: before its `\r`, for a `\r\n`.
+                if previous == 0x5C || (previous == 0x0D && index > 1 && utf8[index - 2] == 0x5C) { holds[holds.count - 1] = true }
+                lineStarts.append(index + 1)
+                holds.append(false)
+            }
+            if previous == 0x5D {
+                if byte == 0x3A { definitions = true } else if byte == 0x28 || byte == 0x5B { holds[holds.count - 1] = true }
+            }
         }
         mayHaveDefinitions = definitions
+        self.holds = holds
         var out = [Bool](repeating: false, count: lineStarts.count)
         var previousBlank = true, runMarked = false
+        // A line of this run that holds, not yet followed by one that goes on with it; and whether one was.
+        var holding: Int?, runHeld = false
         for (index, start) in lineStarts.enumerated() {
             var at = start
             while at < utf8.count, utf8[at] == 0x20 || utf8[at] == 0x09 { at += 1 }
@@ -49,6 +69,17 @@ struct SourceMap {
             let first = start < utf8.count ? utf8[start] : 0
             let indented = first == 0x20 || first == 0x09 || first == 0x3E
             out[index] = !previousBlank && (indented || runMarked)
+            if blank {
+                holding = nil
+                runHeld = false
+            } else {
+                if let from = holding {
+                    for line in from..<index { out[line] = true }
+                    holding = nil
+                    runHeld = true
+                }
+                if runHeld { out[index] = true } else if holds[index], holding == nil { holding = index }
+            }
             let marked = indented || first == 0x2D || first == 0x2B || first == 0x2A || (0x30...0x39).contains(first)
             runMarked = !blank && (runMarked || marked)
             previousBlank = blank
@@ -116,8 +147,46 @@ struct SourceMap {
         let first = range.lowerBound.line, last = range.upperBound.line
         guard definitions > 0 || last > first else { return nil }
         let textStarts = (first < last ? Array((first + 1)...last) : []).map { textStart(line: $0, in: containers) }
-        return BlockPlaces(firstLine: first, column: range.lowerBound.column, definitionLines: definitions, textStarts: textStarts)
+        var places = BlockPlaces(firstLine: first, column: range.lowerBound.column, definitionLines: definitions, textStarts: textStarts)
+        places.uncounted = uncountedLines(block, places, lastLine: last - (block is Heading ? 1 : 0))
+        return places
     }
+
+    // MARK: Lines cmark does not count
+
+    /// The lines of `block` whose new line cmark left uncounted, and where it then reads from, or nil when it counted them all (as it does unless a line
+    /// `holds`). `lastLine` is the block's last line of text (a setext heading's underline is not one).
+    private func uncountedLines(_ block: any Markup, _ places: BlockPlaces, lastLine: Int) -> UncountedLines? {
+        let top = places.firstLine + places.definitionLines  // the line cmark's text starts on
+        guard lastLine > top, let lastHolding = (top..<lastLine).last(where: { $0 >= 1 && $0 <= holds.count && holds[$0 - 1] }) else { return nil }
+        // The text cmark reads: each line from where it reads it to its end, and a `\n` after each.
+        var starts: [Int] = [], backslash: [Bool] = []
+        var at = 0
+        for line in top...lastLine {
+            let lineStart = lineStarts[line - 1]
+            let from = lineStart + places.textStart(line: line)
+            let end = max(from, textEnd(line: line))
+            starts.append(at)
+            backslash.append(end > from && chars[utf16(end - 1)] == 0x5C)
+            at += end - from + 1
+        }
+        var walk = UncountedWalk(firstLine: places.firstLine, column: places.column, starts: starts, endsWithBackslash: backslash)
+        for child in block.children {
+            // Past the last line that holds, with no link open, every new line left is counted.
+            if walk.next > lastHolding - top { break }
+            walk.visit(child)
+        }
+        return walk.found()
+    }
+
+    /// Where `line`'s text ends (before its `\n`, `\r\n` or `\r`), in UTF-8 bytes.
+    private func textEnd(line: Int) -> Int {
+        guard line < lineStarts.count else { return utf8Count }
+        let next = lineStarts[line], unit = utf16(next)
+        return next - (unit >= 2 && chars[unit - 1] == 0x0A && chars[unit - 2] == 0x0D ? 2 : 1)
+    }
+
+    private func utf16(_ byte: Int) -> Int { utf16At.map { Int($0[byte]) } ?? byte }
 
     /// A quote or list item a paragraph is in, as cmark matches it at the start of each of the paragraph's lines.
     private enum Container {
@@ -279,6 +348,8 @@ struct BlockPlaces: Sendable {
     var definitionLines: Int
     /// For each line after the first, where cmark reads its text from, in bytes from the line's start.
     var textStarts: [Int]
+    /// Which new lines cmark left uncounted in the block, when it left any.
+    var uncounted: UncountedLines?
 
     /// Where an inline's range is written. cmark ends code and HTML that run onto a later line by where their end is in that line's text alone, without
     /// the block's column (and, for HTML, before its closing `>`), so their ends are moved by that much more.
@@ -291,10 +362,21 @@ struct BlockPlaces: Sendable {
     }
 
     private func moved(_ location: SourceLocation, by extra: Int) -> SourceLocation {
-        let line = location.line + definitionLines
+        // Which of the block's lines of text (from the first after any definitions) cmark counts this as on, and where in the text it read from it.
+        var line = location.line - firstLine, at = location.column + extra - column
+        if let uncounted, let place = uncounted.place(line: line, at: at) { (line, at) = place }
+        let later = definitionLines + line - 1
+        guard line >= 0, later < textStarts.count else {
+            return SourceLocation(line: location.line + definitionLines, column: location.column, source: location.source)
+        }
+        let start = later < 0 ? column - 1 : textStarts[later]
+        return SourceLocation(line: firstLine + definitionLines + line, column: start + at + 1, source: location.source)
+    }
+
+    /// Where cmark reads `line` (a line of the block, from its first) from, in bytes from the line's start.
+    func textStart(line: Int) -> Int {
         let later = line - firstLine - 1
-        guard later >= 0, later < textStarts.count else { return SourceLocation(line: line, column: location.column, source: location.source) }
-        return SourceLocation(line: line, column: location.column + textStarts[later] + 1 - column + extra, source: location.source)
+        return later < 0 ? column - 1 : textStarts[later]
     }
 
     /// Where the block itself starts: where cmark says, or, after definitions, where its text starts on its own first line (never after its end, which
@@ -303,6 +385,97 @@ struct BlockPlaces: Sendable {
         let later = definitionLines - 1
         guard definitionLines > 0, later < textStarts.count else { return start }
         return min(SourceLocation(line: firstLine + definitionLines, column: textStarts[later] + 1, source: nil), end)
+    }
+}
+
+/// The new lines cmark did not count in a paragraph or setext heading, and how its places there are read back.
+///
+/// cmark reads a block's text as its lines one after another, each from where it starts reading it and ended by a `\n`. It reports a place by how many of
+/// those new lines it has counted, and by how far it is from the start of the line it counted last (plus the block's column). A new line it reads over
+/// without counting (after a backslash hard break, or inside a link's address, title or label) leaves both behind: what follows is on the line before,
+/// counted on from that line's start.
+struct UncountedLines: Sendable {
+    /// Where each line of the block's text starts in the text cmark reads, in bytes.
+    var starts: [Int]
+    /// By how many new lines cmark has counted: the line it is then reading.
+    var countedTo: [Int]
+    /// By line: whether cmark read over the new line after it without counting it.
+    var held: [Bool]
+
+    /// The line of the block's text (from its first) and the place in that line's text of what cmark reports `at` bytes into the line it counted `line`
+    /// lines down, or nil when cmark counted no such line.
+    func place(line: Int, at: Int) -> (line: Int, at: Int)? {
+        guard line >= 0, line < countedTo.count else { return nil }
+        var read = countedTo[line]
+        let position = starts[read] + at
+        while held[read], read + 1 < starts.count, starts[read + 1] <= position { read += 1 }
+        return (read, position - starts[read])
+    }
+}
+
+/// A walk through a block's inlines in cmark's order, telling for each new line in its text whether cmark counted it: a soft break, a hard break of two
+/// spaces, and code or HTML that run over lines count theirs; a backslash hard break and what a link or image reads after its text (an address and
+/// title, or a label) do not. Where the walk and cmark's lines part (something else read over a new line), it takes cmark's count as right.
+private struct UncountedWalk {
+    let firstLine: Int
+    let column: Int
+    let starts: [Int]
+    let endsWithBackslash: [Bool]
+    /// The line whose new line is the next to be read.
+    var next = 0
+    var countedTo = [0]
+    var held: [Bool]
+
+    init(firstLine: Int, column: Int, starts: [Int], endsWithBackslash: [Bool]) {
+        self.firstLine = firstLine
+        self.column = column
+        self.starts = starts
+        self.endsWithBackslash = endsWithBackslash
+        held = [Bool](repeating: false, count: starts.count)
+    }
+
+    mutating func visit(_ markup: any Markup) {
+        if let range = markup.range { catchUp(to: range.lowerBound.line) }
+        switch markup {
+        case is SoftBreak:
+            count()
+        case is LineBreak:
+            if next < endsWithBackslash.count, endsWithBackslash[next] { hold() } else { count() }
+        case is InlineCode, is InlineHTML:
+            guard let range = markup.range else { return }
+            for _ in 0..<max(0, range.upperBound.line - range.lowerBound.line) { count() }
+        default:
+            for child in markup.children { visit(child) }
+            // Every new line the link's text holds is read by now: any before its end are in its address, title or label.
+            guard markup is Link || markup is Image || markup is InlineAttributes, let end = markup.range?.upperBound,
+                countedTo.indices.contains(end.line - firstLine)
+            else { return }
+            let position = starts[countedTo[end.line - firstLine]] + end.column - column
+            while next + 1 < starts.count, starts[next + 1] <= position { hold() }
+        }
+    }
+
+    /// What was found, or nil when cmark counted every new line.
+    mutating func found() -> UncountedLines? {
+        guard held.contains(true) else { return nil }
+        while next + 1 < starts.count { count() }
+        return UncountedLines(starts: starts, countedTo: countedTo, held: held)
+    }
+
+    private mutating func catchUp(to line: Int) {
+        while countedTo.count <= line - firstLine, next + 1 < starts.count { count() }
+    }
+
+    private mutating func count() {
+        guard next + 1 < starts.count else { return }
+        next += 1
+        countedTo.append(next)
+    }
+
+    private mutating func hold() {
+        guard next + 1 < starts.count else { return }
+        held[next] = true
+        next += 1
     }
 }
 
