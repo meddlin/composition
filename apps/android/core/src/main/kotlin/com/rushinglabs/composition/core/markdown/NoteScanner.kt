@@ -12,6 +12,7 @@ import org.commonmark.node.Heading
 import org.commonmark.node.Node
 import org.commonmark.node.SoftLineBreak
 import org.commonmark.node.Text
+import org.commonmark.parser.IncludeSourceSpans
 import org.commonmark.parser.Parser
 
 // The restricted MDX layer, ported from the iPad's NoteScanner.swift. A Markdown parser reads the CommonMark and GFM part of a note,
@@ -205,8 +206,14 @@ object NoteScanner {
         TablesExtension.create(), StrikethroughExtension.create(), AutolinkExtension.create(), TaskListItemsExtension.create(),
     )
 
-    /** CommonMark with GFM's tables, strikethrough, autolinks and task lists: what swift-markdown reads on the iPad. No footnotes: they are read here. */
+    /**
+     * CommonMark with GFM's tables, strikethrough, autolinks and task lists, as the desktop's remark-gfm reads them. No footnotes: they are
+     * read here. swift-markdown, as the iPad calls it, has no autolink literals (a bare URL is not a link there) and uses smart punctuation.
+     */
     val markdownParser: Parser = Parser.builder().extensions(extensions).build()
+
+    /** The same, with where each block and inline is written (`SourceMap`): for the editor's colours and the preview's located blocks. */
+    val spannedParser: Parser = Parser.builder().extensions(extensions).includeSourceSpans(IncludeSourceSpans.BLOCKS_AND_INLINES).build()
 
     /** Reads a note's body (its text without the frontmatter). `offset` is where the body starts in the note, in UTF-16 units. */
     fun scan(body: String, offset: Int = 0): ScannedNote {
