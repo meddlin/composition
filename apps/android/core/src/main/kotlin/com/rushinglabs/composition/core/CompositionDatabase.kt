@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core
 
+import com.rushinglabs.composition.core.pdf.marksSearchText
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
@@ -101,13 +102,18 @@ class CompositionDatabase private constructor(internal val file: SqliteFile) : A
         "${row["n"]}|${row["latest"]}|${row["total"]}"
     }
 
-    /** Every note as the search index takes it. (A PDF's marks will follow its owner's text once the PDF slice is ported.) */
-    internal fun indexedNotes(): List<com.rushinglabs.composition.core.search.IndexedNote> = file.read { db ->
-        db.rows("SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map {
-            com.rushinglabs.composition.core.search.IndexedNote(
-                it.long("id"), it.string("title"), it.string("description"), it.string("content"), it.string("tags"),
-                it.string("created_at"), it.string("updated_at"),
-            )
+    /** Every note as the search index takes it. A note that owns a PDF is also found by the words of that PDF's marks, which follow its text. */
+    internal fun indexedNotes(): List<com.rushinglabs.composition.core.search.IndexedNote> {
+        val marks = marksSearchText()
+        return file.read { db ->
+            db.rows("SELECT id, title, description, content, tags, created_at, updated_at FROM notes ORDER BY id").map {
+                val id = it.long("id")
+                val content = it.string("content")
+                com.rushinglabs.composition.core.search.IndexedNote(
+                    id, it.string("title"), it.string("description"), marks[id]?.let { words -> "$content\n\n$words" } ?: content,
+                    it.string("tags"), it.string("created_at"), it.string("updated_at"),
+                )
+            }
         }
     }
 

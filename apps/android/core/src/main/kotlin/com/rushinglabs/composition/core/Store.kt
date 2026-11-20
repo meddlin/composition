@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core
 
+import com.rushinglabs.composition.core.pdf.marksSearchText
 import com.rushinglabs.composition.core.search.IndexedNote
 import com.rushinglabs.composition.core.search.SearchIndex
 import java.time.Instant
@@ -278,7 +279,7 @@ object CoreLog {
  * swallowed, and a stale index is repaired by `rebuildIfStale` on the next launch. The index is only marked as matching the notes
  * when it matched them before the write; one that was already stale stays marked stale.
  */
-class NoteStore(val database: CompositionDatabase, private val search: SearchIndex? = null) {
+class NoteStore(val database: CompositionDatabase, internal val search: SearchIndex? = null) {
     fun createNote(title: String, groupId: Long? = null, notebookId: Long? = null, now: Instant = Instant.now()): NoteDetail =
         write({ database.createNote(title, groupId = groupId, notebookId = notebookId, now = now) }) { index, note -> index.upsert(listOf(indexed(note))) }
 
@@ -297,8 +298,17 @@ class NoteStore(val database: CompositionDatabase, private val search: SearchInd
         if (note != null) index.upsert(listOf(indexed(note))) else index.rebuild(database)
     }
 
-    private fun indexed(note: NoteDetail) =
-        IndexedNote(note.id, note.title, note.description, note.content, note.tags, note.createdAt, note.updatedAt)
+    /**
+     * The note as the index holds it: its own text, and for a note that owns a PDF the words of that PDF's marks after it, never shown
+     * (`noteToDocument` in the desktop's `searchIndex.ts`).
+     */
+    internal fun indexed(note: NoteDetail): IndexedNote {
+        val marks = database.marksSearchText(note.id)[note.id] ?: ""
+        return IndexedNote(
+            note.id, note.title, note.description, if (marks.isEmpty()) note.content else "${note.content}\n\n$marks", note.tags,
+            note.createdAt, note.updatedAt,
+        )
+    }
 
     /** Runs `change`, then `reindex`, and marks the index current if it was before. The write's errors are thrown; the index's are logged. */
     private fun <T> write(change: () -> T, reindex: (SearchIndex, T) -> Unit): T {
