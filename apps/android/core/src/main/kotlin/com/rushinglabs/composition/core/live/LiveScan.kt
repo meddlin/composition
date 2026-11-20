@@ -4,6 +4,7 @@ import com.rushinglabs.composition.core.editing.MarkHighlight
 import com.rushinglabs.composition.core.markdown.JS_ANY
 import com.rushinglabs.composition.core.markdown.JS_SPACE_CHARS
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.markdown.joined
 import java.util.regex.Pattern
 
 // What the Live view needs to know of a note's text beyond its Markdown tree, ported from LiveScan.swift: the desktop's `scanOf`
@@ -319,20 +320,4 @@ internal fun <T> symmetricDifference(a: List<T>, b: List<T>): List<T> {
     val left = a.toSet()
     val right = b.toSet()
     return (left - right).toList() + (right - left).toList()
-}
-
-/** Sorted, with ranges that overlap or touch made into one. */
-internal fun joined(ranges: List<TextRange>): List<TextRange> {
-    val result = ArrayList<TextRange>()
-    for (range in ranges.sortedBy { it.location }) {
-        val last = result.lastOrNull()
-        if (last != null && range.location <= last.end) result[result.lastIndex] = union(last, range) else result.add(range)
-    }
-    return result
-}
-
-/** The smallest range holding both: `NSUnionRange`. */
-internal fun union(a: TextRange, b: TextRange): TextRange {
-    val start = minOf(a.location, b.location)
-    return TextRange(start, maxOf(a.end, b.end) - start)
 }

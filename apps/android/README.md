@@ -47,6 +47,9 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
 - **Don't lean on the platform for text rules.** A JVM's regex `\s` is ASCII, Android's is ICU's, and Swift's `URLComponents` has no twin. Write the
   character class or the reader out, as `ParsedUrl` does. `markdown/JavaScriptPatterns.kt` holds JavaScript's `\s` (`JS_SPACE`, and
   `JS_SPACE_CHARS` for inside a class), its `.` (`JS_ANY`) and the desktop's `insideFence`: use them when porting a desktop pattern.
+  JavaScript's other rules are in `yaml/JavaScriptText.kt` (its white space as a test on one character, `trim`, how it writes a number,
+  `Math.round`, `toFixed`), and Swift's in `SwiftRules.kt` (`SwiftText`'s two white space sets, `trim`, `Int(_:)` and `Double(_:)`;
+  `swiftRounded`, `swiftMin`, `swiftMax`). Use these rather than writing another copy: the parallel slices had each brought their own.
 - **A JVM regex's `$` also matches before a final line break.** Write `\z` where JavaScript wrote `$` without the `m` flag.
 - **No case-insensitive flags: use `AsciiCaseless`.** JavaScript's `i` folds only A to Z. Kotlin's `IGNORE_CASE` folds all of Unicode
   (`ſ` matches `s`), and so does Android's `(?i)`, although a JVM's doesn't. Write the pattern in lower case and wrap it in `AsciiCaseless`
@@ -63,7 +66,8 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
 - **Run a pattern over a long text with one matcher.** Kotlin's `findAll` makes a `Matcher` per match, and on Android each one copies the
   whole text. Use `forEachMatch` (`markdown/JavaScriptPatterns.kt`).
 - **Swift's rules, spelled out.** `rounded()` is half away from zero (not `floor(x + 0.5)`, not Kotlin's `round`); `min` and `max` pass a NaN
-  over; `Int(_:)` takes ASCII digits only (Kotlin's `toIntOrNull` takes other scripts' too); a `Character` is a grapheme cluster. For
-  JavaScript's `toFixed`, use `BigDecimal(double)`, not `String.format`. kotlinx's `booleanOrNull` reads the text `"true"` as `true`.
+  over (`swiftRounded`, `swiftMin` and `swiftMax` in `SwiftRules.kt`); `Int(_:)` takes ASCII digits only (Kotlin's `toIntOrNull` takes
+  other scripts' too); a `Character` is a grapheme cluster. For JavaScript's `toFixed`, use `JavaScriptText.toFixed` (it works from
+  `BigDecimal(double)`), not `String.format`. kotlinx's `booleanOrNull` reads the text `"true"` as `true`.
 - **SQL text that ends up in `sqlite_master` is copied character for character.** `SqlScript` splits a block the way GRDB's `execute`
   runs it, so a trigger's body stays whole.

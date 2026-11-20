@@ -3,16 +3,18 @@ package com.rushinglabs.composition.core
 import com.rushinglabs.composition.core.live.LiveDecorations
 import com.rushinglabs.composition.core.live.LiveModel
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.preview.NotePreview
+import com.rushinglabs.composition.core.preview.PreviewBlock
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 // "The rest" of the Live view, ported from LiveRestTests.swift: setext headings and footnote citations drawn as their numbers. What the desktop
 // also draws (setext headings, the citations) is checked against it in LiveConformanceTests; these are examples to read, and the iPad's own
-// parts (the numbering being the Preview's). The iPad's suite also checks the Preview's list of footnote definitions (`NotePreview`), which is
-// the preview model's slice of the port: those checks wait for it, and `definitionRuns` is reported as skipped until then.
+// parts (the definitions, the numbering being the Preview's).
 
 private fun decorations(text: String, caret: Int, end: Int? = null): LiveDecorations = LiveModel(text).decorations(TextRange(caret, (end ?: caret) - caret))
 
@@ -107,7 +109,10 @@ class LiveRestTests {
     fun numbering() {
         val text = "A[^two] B[^one] C[^two].\n\n[^one]: 1\n[^two]: 2"
         assertEquals(listOf(1, 2, 1), decorations(text, 0).footnoteRefs.map { it.number })
-        // The iPad also checks the Preview's list here (`NotePreview`, the preview model's slice): entries numbered 1 and 2.
+        val preview = NotePreview.make(text)
+        val list = assertIs<PreviewBlock.Footnotes>(preview.blocks.lastOrNull(), "no list")
+        assertEquals(listOf(1, 2), list.entries.map { it.number })
+
         val before = LiveModel("x[^b]\n\n[^a]: A\n[^b]: B")
         val after = LiveModel("[^a]x[^b]\n\n[^a]: A\n[^b]: B")
         assertTrue(after.differences(before).isNotEmpty())
@@ -130,14 +135,22 @@ class LiveRestTests {
     @Test
     @DisplayName("definitions are located in runs, each run the Preview's list of their entries, in the order written")
     fun definitionRuns() {
-        skipUnless(false, "the Preview's list of footnote definitions is NotePreview's, the preview model's slice of the port")
+        val text = "A[^a] B[^b] C[^c].\n\n[^b]: Bee.\n\n[^a]: Ay\n    more.\n\nBetween.\n\n[^c]: Cee.\n[^z]: Nobody cites this."
+        val preview = NotePreview.make(text)
+        assertEquals(
+            listOf("[^b]: Bee.\n\n[^a]: Ay\n    more.", "[^c]: Cee."),
+            preview.footnoteDefinitions.map { text.substring(it.range.location, it.range.end) },
+        )
+        val first = assertIs<PreviewBlock.Footnotes>(preview.footnoteDefinitions[0].block, "not a list")
+        assertEquals(listOf(2, 1), first.entries.map { it.number })
     }
 
     @Test
     @DisplayName("definitions' places are in the note's text, frontmatter and `\\r\\n` counted")
     fun definitionPlacesCRLF() {
         val text = "---\r\ntitle: T\r\n---\r\nA[^n]\r\n\r\n[^n]: N\r\n"
-        // The iPad also checks where the Preview's definitions are (`NotePreview`, the preview model's slice): `[^n]: N`.
+        val preview = NotePreview.make(text)
+        assertEquals(listOf("[^n]: N"), preview.footnoteDefinitions.map { text.substring(it.range.location, it.range.end) })
         assertEquals(listOf(21), LiveModel(text).decorations(TextRange(0, 0)).footnoteRefs.map { it.range.location })
     }
 }

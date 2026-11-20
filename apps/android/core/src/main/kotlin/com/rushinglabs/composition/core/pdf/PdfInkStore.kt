@@ -7,7 +7,7 @@ import java.time.Instant
 
 // Ink on a PDF (docs/pdf-markup-plan.md, "Ink on the page"), ported from PdfInkStore.swift: the pen's strokes for a page, kept beside the
 // file as one `pdf_annotations` row of kind `ink` per page, whose `body` is that page's stroke JSON (docs/architecture/ink.md, the D9
-// format). This file only keeps the text: reading and writing the strokes is the ink format's, which is another slice of the port.
+// format). This file only keeps the text: reading and writing the strokes is the ink format's (`ink/InkJson.kt`).
 //
 // The strokes are in the canvas a reader lays over a page: points, y down, from the top-left corner of the page's unturned crop box
 // (`PdfInkGeometry`). A page's ink is one record because one drawing covers one page; it is replaced whole each time the page's drawing

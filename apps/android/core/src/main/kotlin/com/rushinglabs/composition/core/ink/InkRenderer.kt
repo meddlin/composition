@@ -1,6 +1,10 @@
 package com.rushinglabs.composition.core.ink
 
+import com.rushinglabs.composition.core.appearance.Theme
 import com.rushinglabs.composition.core.appearance.ThemeColor
+import com.rushinglabs.composition.core.swiftMax
+import com.rushinglabs.composition.core.swiftMin
+import com.rushinglabs.composition.core.swiftRounded
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -24,16 +28,18 @@ import kotlin.math.sin
 /**
  * What the names in a drawing look like on one scheme. `ink` and `accent` follow the scheme; a `<Mark>` colour name is that hue. A fixed
  * colour is as stored on a light scheme and, on a dark one, as PencilKit shows it in a dark interface style (`ThemeColor.darkStyle`),
- * so the preview matches the canvas. (Swift's `init(theme:)` waits for the appearance slice: `ink` is the scheme's foreground,
- * `accent` its brand colour, `darkStyle` whether it is dark.)
+ * so the preview matches the canvas.
  */
 data class InkPalette(
     val ink: ThemeColor,
     val accent: ThemeColor,
-    val marks: Map<String, ThemeColor> = MARK_HUES,
+    val marks: Map<String, ThemeColor> = Theme.MARK_HUES,
     /** Whether a fixed colour is drawn as PencilKit draws it in a dark style. */
     val darkStyle: Boolean = false,
 ) {
+    /** The scheme's text colour for `ink` (so black ink is white on a dark scheme) and its brand colour for `accent`. */
+    constructor(theme: Theme) : this(theme.foreground, theme.brand, darkStyle = theme.isDark)
+
     /** A name this palette does not know is drawn as ink. */
     fun color(color: InkColor): ThemeColor = when (color) {
         is InkColor.Fixed -> if (darkStyle) color.color.darkStyle else color.color
@@ -42,17 +48,6 @@ data class InkPalette(
             "ink" -> ink
             else -> marks[color.name] ?: ink
         }
-    }
-
-    companion object {
-        /** The `<Mark>` hues, the same in every scheme (Swift's `Theme.markHues`, which the appearance slice ports with the rest of `Theme`). */
-        val MARK_HUES: Map<String, ThemeColor> = mapOf(
-            "yellow" to ThemeColor(0xF5, 0xC5, 0x18),
-            "green" to ThemeColor(0x3F, 0xB8, 0x76),
-            "blue" to ThemeColor(0x3B, 0x9E, 0xFF),
-            "pink" to ThemeColor(0xFF, 0x6F, 0xAE),
-            "orange" to ThemeColor(0xFF, 0x8A, 0x2B),
-        )
     }
 }
 
@@ -91,7 +86,7 @@ val ThemeColor.darkStyle: ThemeColor
             hue < 300 -> Triple(second, 0.0, chroma)
             else -> Triple(chroma, 0.0, second)
         }
-        fun channel(value: Double): Int = roundHalfAway((value + offset) * 255).toInt().coerceIn(0, 255)
+        fun channel(value: Double): Int = swiftRounded((value + offset) * 255).toInt().coerceIn(0, 255)
         return ThemeColor(channel(r1), channel(g1), channel(b1))
     }
 
@@ -110,8 +105,8 @@ object InkRenderer {
     fun imageSize(drawing: InkDocument, scale: Double = 2.0): InkImageSize {
         val fit = pixelsPerPoint(drawing, scale)
         return InkImageSize(
-            swiftMax(1.0, roundHalfAway(drawing.width * fit)).toInt(),
-            swiftMax(1.0, roundHalfAway(drawing.height * fit)).toInt(),
+            swiftMax(1.0, swiftRounded(drawing.width * fit)).toInt(),
+            swiftMax(1.0, swiftRounded(drawing.height * fit)).toInt(),
         )
     }
 

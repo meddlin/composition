@@ -2,6 +2,7 @@ package com.rushinglabs.composition.core.appearance
 
 import com.rushinglabs.composition.core.sun.Sun
 import com.rushinglabs.composition.core.sun.SunPairName
+import com.rushinglabs.composition.core.swiftRounded
 import kotlin.math.max
 
 /**
@@ -96,7 +97,7 @@ data class Theme(
      */
     fun dimmedShare(over: ThemeColor, increasedContrast: Boolean): Double {
         val least = mutedShare(increasedContrast)
-        for (percent in ThemeColor.roundHalfAwayFromZero(least * 100)..100) {
+        for (percent in swiftRounded(least * 100).toInt()..100) {
             val share = percent.toDouble() / 100
             if (ThemeColor.contrast(foreground.over(over, share), over) >= READABLE) return share
         }

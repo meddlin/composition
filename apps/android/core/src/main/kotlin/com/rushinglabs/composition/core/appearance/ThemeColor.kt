@@ -1,7 +1,7 @@
 package com.rushinglabs.composition.core.appearance
 
+import com.rushinglabs.composition.core.swiftRounded
 import java.util.Locale
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -28,7 +28,7 @@ data class ThemeColor(val red: Int, val green: Int, val blue: Int) {
 
     /** This colour at `alpha` (0 to 1) over `bottom`, each channel rounded half up, as the desktop's `blend` does it for a `<Mark>` tint. */
     fun over(bottom: ThemeColor, alpha: Double): ThemeColor {
-        fun channel(top: Int, under: Int): Int = roundHalfAwayFromZero(top.toDouble() * alpha + under.toDouble() * (1 - alpha))
+        fun channel(top: Int, under: Int): Int = swiftRounded(top.toDouble() * alpha + under.toDouble() * (1 - alpha)).toInt()
         return ThemeColor(channel(red, bottom.red), channel(green, bottom.green), channel(blue, bottom.blue))
     }
 
@@ -52,16 +52,6 @@ data class ThemeColor(val red: Int, val green: Int, val blue: Int) {
             val high = max(a.luminance, b.luminance)
             val low = min(a.luminance, b.luminance)
             return (high + 0.05) / (low + 0.05)
-        }
-
-        /**
-         * Swift's `rounded(.toNearestOrAwayFromZero)` (and JavaScript's `Math.round` for what is never negative). `x - floor(x)` is
-         * exact, unlike `floor(x + 0.5)`, which rounds 0.49999999999999994 up.
-         */
-        internal fun roundHalfAwayFromZero(value: Double): Int {
-            if (value < 0) return -roundHalfAwayFromZero(-value)
-            val whole = floor(value)
-            return (if (value - whole >= 0.5) whole + 1 else whole).toInt()
         }
     }
 }

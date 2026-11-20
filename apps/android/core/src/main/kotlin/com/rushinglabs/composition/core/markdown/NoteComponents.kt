@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.markdown
 
+import com.rushinglabs.composition.core.SwiftText
 import java.net.URLDecoder
 
 // What the components read from their props: ports of the desktop's chartData.ts, repoRef.ts, youtubeRef.ts, imageWidth.ts and the
@@ -10,7 +11,7 @@ import java.net.URLDecoder
 // URLComponents; Android has its own `Uri`, which a desktop JVM does not, so `ParsedUrl` below reads them itself, the way URLComponents
 // does for an address a note can have (RFC 3986, a default port dropped, `.` and `..` segments resolved).
 
-private fun trimmed(text: String) = NoteScanner.trim(text)
+private fun trimmed(text: String) = SwiftText.trim(text)
 
 /** The parts of a URL that a note's address can have, read the way URLComponents reads them. */
 private class ParsedUrl(
@@ -255,7 +256,7 @@ object NoteRepo {
     /** What a note's `<Repo url="…" />` points at; null when it is not an address with an owner and a repository name. */
     fun parse(url: String?): RepoRef? {
         val text = url?.let(::trimmed)?.takeIf { it.isNotEmpty() } ?: return null
-        if (text.codePoints().anyMatch(NoteScanner::isWhitespace)) return null
+        if (text.codePoints().anyMatch(SwiftText::isWhitespace)) return null
 
         var host: String
         val path: String

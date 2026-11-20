@@ -1,5 +1,8 @@
 package com.rushinglabs.composition.core.ink
 
+import com.rushinglabs.composition.core.swiftMax
+import com.rushinglabs.composition.core.swiftMin
+
 // How big a new drawing's page is (docs/architecture/ink.md, "The page's size"), ported from InkCrop.swift. The canvas the pen draws on
 // is as big as the screen, but what is stored is **cut to what was drawn**, with a margin all round: a small sketch is a small picture,
 // which the note shows at its own size, and a page of handwriting is as big as the writing. When the drawing is opened again the canvas

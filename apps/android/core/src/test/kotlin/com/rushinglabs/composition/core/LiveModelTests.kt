@@ -5,6 +5,7 @@ import com.rushinglabs.composition.core.live.LiveModel
 import com.rushinglabs.composition.core.live.LivePictureKind
 import com.rushinglabs.composition.core.live.LiveStyle
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.preview.HighlightModel
 import org.junit.jupiter.api.DisplayName
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -14,8 +15,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // The Live model, ported from LiveModelTests.swift. What it shares with the desktop is checked against the desktop's real code by
-// LiveConformanceTests; these are the parts that are the iPad's own, and a few plain examples to read. The edit tests drive `EditorBlocks`
-// (LiveTestSupport.kt) where the iPad's drive its `HighlightModel`.
+// LiveConformanceTests; these are the parts that are the iPad's own, and a few plain examples to read. As on the iPad, the edit tests drive the
+// editor's colours (`HighlightModel`): the window they re-read after an edit is what the Live model reads again.
 
 private fun decorations(text: String, caret: Int, end: Int? = null, limit: Int? = null): LiveDecorations =
     LiveModel(text, extrasLimit = limit).decorations(TextRange(caret, (end ?: caret) - caret))
@@ -237,7 +238,7 @@ class LiveModelFollowingTests {
         val random = SeededEdits(0x2545F4914F6CDD1DuL)
         val pieces = listOf("a", " ", "b", "**", "*", "~~", "# ", "- ", "\n", "\n\n", "x y", "_", "`", "> ")
         var text = sample
-        var blocks = EditorBlocks(text)
+        var highlights = HighlightModel(text)
         var live = LiveModel(text)
         var compared = 0
         val failures = ArrayList<String>()
@@ -252,12 +253,12 @@ class LiveModelFollowingTests {
             }
             val insertion = if (deleting) "" else pieces[random.next(pieces.size)]
             text = replacing(text, range, insertion)
-            val window = blocks.edited(range, insertion.length, text)
+            val window = highlights.edited(range, insertion.length, text)
             live.edited(range, insertion.length, window, text)
             // The quick read of a piece can differ from the whole's (a fence typed on a line swallows what is below it): the colours put that right
             // a pause later, and so do these. Only where the colours agree with a fresh read is the model held to it.
-            if (EditorBlocks(text).differences(blocks).isNotEmpty()) {
-                blocks = EditorBlocks(text)
+            if (HighlightModel(text).differences(highlights).isNotEmpty()) {
+                highlights = HighlightModel(text)
                 live = LiveModel(text)
                 continue
             }
@@ -314,13 +315,13 @@ class LiveModelFollowingTests {
 @DisplayName("The Live model keeps highlights, pictures and the frontmatter right")
 class LiveModelDrawnTests {
     private class Editor(var text: String) {
-        val blocks = EditorBlocks(text)
+        val highlights = HighlightModel(text)
         val live = LiveModel(text)
 
         /** Types `insertion` over `range`, the way the editor tells the models: the colours re-read their blocks and the Live model follows. */
         fun type(insertion: String, range: TextRange) {
             text = replacing(text, range, insertion)
-            val window = blocks.edited(range, insertion.length, text)
+            val window = highlights.edited(range, insertion.length, text)
             live.edited(range, insertion.length, window, text)
         }
     }
@@ -566,7 +567,7 @@ class LiveListTests {
         val random = SeededEdits(0x9E3779B97F4A7C15uL)
         val pieces = listOf("- ", "1. ", "[ ] ", "[x] ", "> ", "  ", "\n", "\n\n", "word", "x")
         var text = "- [ ] one\n- two\n  - three\n\n> quoted\n> > deeper\n\n1. first\n2. second\n"
-        var blocks = EditorBlocks(text)
+        var highlights = HighlightModel(text)
         var live = LiveModel(text)
         var compared = 0
         var corrected = 0
@@ -581,10 +582,10 @@ class LiveListTests {
             }
             val insertion = if (deleting) "" else pieces[random.next(pieces.size)]
             text = replacing(text, range, insertion)
-            val window = blocks.edited(range, insertion.length, text)
+            val window = highlights.edited(range, insertion.length, text)
             live.edited(range, insertion.length, window, text)
-            if (EditorBlocks(text).differences(blocks).isNotEmpty()) {
-                blocks = EditorBlocks(text)
+            if (HighlightModel(text).differences(highlights).isNotEmpty()) {
+                highlights = HighlightModel(text)
                 live = LiveModel(text)
                 continue
             }

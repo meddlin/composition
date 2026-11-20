@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.search
 
+import com.rushinglabs.composition.core.SwiftText
 import com.rushinglabs.composition.core.yaml.JavaScriptText
 import java.text.BreakIterator
 import java.text.Normalizer
@@ -45,7 +46,7 @@ object PdfSearchText {
         val text = SearchQueryParser.parse(query).text
         val parts = text.split("\"")
         // The odd pieces were between quotes.
-        val phrase = parts.withIndex().firstOrNull { it.index % 2 == 1 && trimmedOfSpaces(it.value).isNotEmpty() }?.value
+        val phrase = parts.withIndex().firstOrNull { it.index % 2 == 1 && SwiftText.trimSpaces(it.value).isNotEmpty() }?.value
         if (phrase != null) return splitOnWhiteSpace(phrase).joinToString(" ")
         // Words are runs of characters (as a person sees them) that are letters or numbers; the longest wins, the first of a tie.
         var best = ""
@@ -126,21 +127,11 @@ object PdfSearchText {
         }
     }
 
-    /** Unicode's White_Space (Swift's `Character.isWhitespace`), written out: no platform has the same list. */
-    private fun isWhiteSpace(c: Char): Boolean = c in '\u0009'..'\u000D' || c == ' ' || c == '\u0085' || c == '\u00A0' || c == '\u1680' ||
-        c in '\u2000'..'\u200A' || c == '\u2028' || c == '\u2029' || c == '\u202F' || c == '\u205F' || c == '\u3000'
-
-    /** Foundation's `CharacterSet.whitespaces`: the spaces (Zs) and the tab, not the line breaks. */
-    private fun isSpace(c: Char): Boolean = c == '\t' || c == ' ' || c == '\u00A0' || c == '\u1680' || c in '\u2000'..'\u200A' ||
-        c == '\u202F' || c == '\u205F' || c == '\u3000'
-
-    private fun trimmedOfSpaces(text: String): String = text.trim(::isSpace)
-
     private fun splitOnWhiteSpace(text: String): List<String> {
         val words = ArrayList<String>()
         val current = StringBuilder()
         for (c in text) {
-            if (isWhiteSpace(c)) {
+            if (SwiftText.isWhitespace(c.code)) {
                 if (current.isNotEmpty()) words.add(current.toString())
                 current.clear()
             } else current.append(c)

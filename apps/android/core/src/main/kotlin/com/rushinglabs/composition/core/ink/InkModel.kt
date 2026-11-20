@@ -3,9 +3,6 @@ package com.rushinglabs.composition.core.ink
 import com.rushinglabs.composition.core.appearance.ThemeColor
 import com.rushinglabs.composition.core.json.JsonMember
 import com.rushinglabs.composition.core.json.JsonValue
-import kotlin.math.abs
-import kotlin.math.floor
-import kotlin.math.withSign
 
 // What a drawing is: the ink stroke format (docs/architecture/ink.md, design decision D9), ported from InkModel.swift. A drawing is a
 // canvas size and a list of strokes; a stroke is an ink (its type and colour) and the points the pen sampled. The model keeps what it
@@ -156,16 +153,3 @@ object InkLimits {
     /** The JSON text, before it is parsed. */
     const val MAX_JSON_BYTES = 256 * 1024 * 1024
 }
-
-/** Swift's `rounded()`: to the nearest whole number, a half away from zero. Kotlin's `round` takes a half to the even one. */
-internal fun roundHalfAway(value: Double): Double {
-    val magnitude = abs(value)
-    val whole = floor(magnitude)
-    return (if (magnitude - whole >= 0.5) whole + 1 else whole).withSign(value)
-}
-
-/** Swift's `min`: `y < x ? y : x`, so a NaN second argument is passed over (Kotlin's `min` returns NaN). */
-internal fun swiftMin(x: Double, y: Double): Double = if (y < x) y else x
-
-/** Swift's `max`: `y >= x ? y : x`. */
-internal fun swiftMax(x: Double, y: Double): Double = if (y >= x) y else x

@@ -747,13 +747,19 @@ each from #349 in its own worktree. All fifteen pairs of branches merge without 
    writes it, so Android's drawings say their density as the iPad's do ([#351](https://github.com/meddlin/composition/pull/351)).
 7. **Two shared files were agreed between sessions** and are byte for byte the same on both branches: `appearance/ThemeColor.kt` ([#350](https://github.com/meddlin/composition/pull/350),
    [#351](https://github.com/meddlin/composition/pull/351)) and `json/JsonValue.kt` ([#351](https://github.com/meddlin/composition/pull/351), [#352](https://github.com/meddlin/composition/pull/352)).
+8. **What needed two slices was finished once all six had merged.** `LiveReveal` takes the editor's colour spans, as the
+   iPad's does; the Live model's edit tests drive the real `HighlightModel` instead of a stand-in; and `LiveRestTests` checks the
+   Preview's footnote lists, so `definitionRuns` runs. `InkPalette(theme)` makes the ink palette from a scheme, and the ink slice's own
+   copy of the mark hues gave way to `Theme.MARK_HUES`. Copies of one rule that came in from different slices are now one:
+   `union` and `joined` of text ranges (`markdown/TextRange.kt`); Swift's `rounded()`, `min`, `max` and white space, and its reading of
+   numbers (`SwiftRules.kt`, from the ink, appearance, preview, PDF search and MDX code); and JavaScript's `Math.round` and `toFixed`
+   (`JavaScriptText`, now in `yaml/JavaScriptText.kt`, from the PDF, images and Follow the sun code). The core passes 454 tests, and only
+   the two opt-in suites are skipped (`INK_DENSITY`, `SEARCH_SCALE_FULL`).
 
 **What the core leaves to the app, or to later.**
 - **Platform work:** reading a PDF's text (`PdfRenderer`'s text API from API 35, or PdfBox-Android) and exporting an annotated PDF; drawing ink
   pixels (an Android `Canvas` filling the renderer's shapes); turning Jetpack Ink strokes into the ink model; a text recognizer behind
   `InkTextRecognizing` (ML Kit or another); the screens.
-- **Once both halves have merged:** the Live model's checks of the Preview's footnote list and its colour spans need `NotePreview` and
-  `HighlightModel` ([#353](https://github.com/meddlin/composition/pull/353) with [#354](https://github.com/meddlin/composition/pull/354)); the ink palette from a scheme needs `Theme` ([#351](https://github.com/meddlin/composition/pull/351) with [#350](https://github.com/meddlin/composition/pull/350)).
 - **The appearance keys keep the iPad's names** (`iosEditorFont`, `iosPreviewFont`), so a backup moved between the two keeps the choice. A
   neutral name would mean changing both apps.
 - **Comparing with the iPad in CI:** the editor colours were checked against a one-off dump of the iPad core's output. A Swift test that

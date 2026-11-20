@@ -3,6 +3,7 @@ package com.rushinglabs.composition.core.ink
 import com.rushinglabs.composition.core.json.JsonMember
 import com.rushinglabs.composition.core.json.JsonParseError
 import com.rushinglabs.composition.core.json.JsonValue
+import com.rushinglabs.composition.core.swiftRounded
 import java.nio.ByteBuffer
 import java.nio.charset.CharacterCodingException
 import java.nio.charset.CodingErrorAction
@@ -175,8 +176,8 @@ val InkDocument.json: JsonValue
 
 /** `value` as a number with the decimals of `step`: the whole number divided by 10, 100 or 1000 is the number the text names, so it prints short. */
 fun InkDocument.Companion.stored(value: Double, step: Double): Double {
-    val scale = roundHalfAway(1 / step)
-    return roundHalfAway(value * scale) / scale
+    val scale = swiftRounded(1 / step)
+    return swiftRounded(value * scale) / scale
 }
 
 private fun InkStroke.json(extraNames: List<String>): JsonValue {

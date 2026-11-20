@@ -74,10 +74,7 @@ class AppearanceTests {
         assertEquals(ThemeColor(128, 1, 0), ThemeColor(255, 1, 0).over(ThemeColor(0, 0, 0), 0.5))
         assertEquals(ThemeColor(10, 20, 30), ThemeColor(10, 20, 30).over(ThemeColor(200, 100, 0), 1.0))
         assertEquals(ThemeColor(200, 100, 0), ThemeColor(10, 20, 30).over(ThemeColor(200, 100, 0), 0.0))
-        // Just under a half is not a half: `floor(x + 0.5)` would round this up.
-        assertEquals(0, ThemeColor.roundHalfAwayFromZero(0.49999999999999994))
-        assertEquals(1, ThemeColor.roundHalfAwayFromZero(0.5))
-        assertEquals(-1, ThemeColor.roundHalfAwayFromZero(-0.5))
+        // The rounding is Swift's `rounded()` (`swiftRounded`); SharedRulesTests holds its edges, such as just under a half.
     }
 
     // Schemes
