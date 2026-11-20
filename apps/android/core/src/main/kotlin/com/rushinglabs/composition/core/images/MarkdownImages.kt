@@ -3,6 +3,7 @@ package com.rushinglabs.composition.core.images
 import com.rushinglabs.composition.core.markdown.JS_ANY
 import com.rushinglabs.composition.core.markdown.JS_SPACE
 import com.rushinglabs.composition.core.markdown.JS_SPACE_CHARS
+import com.rushinglabs.composition.core.markdown.forEachMatch
 import com.rushinglabs.composition.core.markdown.insideFence
 
 /**
@@ -48,15 +49,15 @@ object MarkdownImages {
      */
     fun toMdx(text: String, selectionStart: Int, selectionEnd: Int): ImageConversion? {
         val found = ArrayList<Found>()
-        for (match in image.findAll(text)) {
-            val start = match.range.first
-            val end = match.range.last + 1
+        image.forEachMatch(text) { match ->
+            val start = match.start()
+            val end = match.end()
             val touched = if (selectionStart == selectionEnd) start <= selectionStart && selectionStart <= end
             else start < selectionEnd && selectionStart < end
-            if (!touched || insideCode(text, start)) continue
-            val alt = match.groups[1]?.value ?: ""
-            val src = match.groups[2]?.value ?: ""
-            val title = match.groups[3]?.value
+            if (!touched || insideCode(text, start)) return@forEachMatch
+            val alt = match.group(1) ?: ""
+            val src = match.group(2) ?: ""
+            val title: String? = match.group(3)
             val tag = StringBuilder("<Image src=\"${attribute(src)}\" alt=\"${attribute(alt)}\"")
             if (title != null) tag.append(" title=\"${attribute(title)}\"")
             found.add(Found(start, end, tag.append(CLOSING_TAG).toString()))

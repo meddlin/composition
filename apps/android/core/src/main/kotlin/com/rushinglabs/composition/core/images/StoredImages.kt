@@ -3,6 +3,7 @@ package com.rushinglabs.composition.core.images
 import com.rushinglabs.composition.core.BackupNames
 import com.rushinglabs.composition.core.DataLocation
 import com.rushinglabs.composition.core.markdown.NoteImage
+import com.rushinglabs.composition.core.markdown.forEachMatch
 import com.rushinglabs.composition.core.yaml.JavaScriptText
 import java.io.File
 import java.io.IOException
@@ -65,7 +66,7 @@ object StoredImages {
     private fun slug(text: String, maxLength: Int): String {
         // NFKD, then the combining marks go, then lower case: so "Café" is "cafe" and a full-width "ＡＢＣ" is "abc".
         val plain = StringBuilder()
-        for (c in Normalizer.normalize(text, Normalizer.Form.NFKD)) if (c !in '̀'..'ͯ') plain.append(c)
+        for (c in Normalizer.normalize(text, Normalizer.Form.NFKD)) if (c !in '\u0300'..'\u036F') plain.append(c)
         val out = StringBuilder()
         var pendingDash = false
         for (c in plain.toString().lowercase()) {
@@ -173,9 +174,9 @@ object StoredImages {
     /** Every stored image a note's text refers to, by file name. Finds `![](app_data/x.png)` and `<Image src="app_data/x.png" />` alike. */
     fun findRefs(content: String): Set<String> {
         val names = LinkedHashSet<String>()
-        for (match in imageRef.findAll(content)) {
+        imageRef.forEachMatch(content) { match ->
             // A path at the end of a sentence picks up its full stop.
-            NoteImage.nameFromRef(match.value.trimEnd('.'))?.let(names::add)
+            NoteImage.nameFromRef(match.group().trimEnd('.'))?.let(names::add)
         }
         return names
     }
