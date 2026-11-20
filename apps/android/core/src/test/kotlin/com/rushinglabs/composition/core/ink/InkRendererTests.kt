@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.ink
 
+import com.rushinglabs.composition.core.appearance.Theme
 import com.rushinglabs.composition.core.appearance.ThemeColor
 import org.junit.jupiter.api.DisplayName
 import kotlin.math.abs
@@ -10,7 +11,6 @@ import kotlin.test.assertTrue
 
 // The renderer's geometry, ported from InkRendererTests.swift: the same pixels looked at, drawn from `InkRenderer.plan` by `InkRaster`
 // instead of CoreGraphics. What these check is the port's geometry and colours; how Canvas antialiases is the app's to check on a device.
-// (`paletteFromAScheme` waits for the appearance slice's `Theme`.)
 
 @DisplayName("Ink: the renderer's shapes")
 class InkRendererTests {
@@ -142,6 +142,17 @@ class InkRendererTests {
     fun anEmptyDrawingIsTransparent() {
         assertEquals(0, render(InkDocument(30.0, 30.0), black).inkedPixelCount)
         assertTrue(InkRenderer.plan(InkDocument(30.0, 30.0, listOf(InkStroke(points = emptyList()))), black).shapes.isEmpty())
+    }
+
+    @Test
+    @DisplayName("a scheme's palette: ink is its text colour, the accent its brand colour, a name its hue")
+    fun paletteFromAScheme() {
+        for (theme in Theme.ALL) {
+            val palette = InkPalette(theme)
+            assertEquals(theme.foreground, palette.color(InkColor.INK), theme.name)
+            assertEquals(theme.brand, palette.color(InkColor.ACCENT), theme.name)
+            assertEquals(Theme.MARK_HUES["yellow"], palette.color(InkColor.Semantic("yellow")), theme.name)
+        }
     }
 
     @Test

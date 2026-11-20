@@ -4,7 +4,6 @@ import com.rushinglabs.composition.core.json.JsonMember
 import com.rushinglabs.composition.core.json.JsonValue
 import com.rushinglabs.composition.core.yaml.JavaScriptText
 import kotlin.math.abs
-import kotlin.math.floor
 
 // What a mark on a PDF is, and what makes one valid, ported from PdfMarkup.swift: the twin of `pdfMarkup.ts` (docs/pdf-markup-plan.md).
 // The rules are the desktop's, and the conformance corpus in `fixtures/conformance/pdf` pins them: the TypeScript writes what each input
@@ -185,14 +184,8 @@ object PdfMarkup {
     /** Far past any real page (a PDF's own limit is 14,400 units), near enough to catch garbage. */
     internal const val COORDINATE_LIMIT = 1e7
 
-    /** `Math.round`: a half goes toward +infinity (-0.5 is -0), which `Math.rint` and `roundToLong` do not do. */
-    internal fun javaScriptRound(value: Double): Double {
-        val down = floor(value)
-        return if (value - down >= 0.5) down + 1 else down
-    }
-
     /** `Math.round(value * 1000) / 1000` */
-    internal fun round3(value: Double): Double = javaScriptRound(value * 1000) / 1000
+    internal fun round3(value: Double): Double = JavaScriptText.round(value * 1000) / 1000
 
     /** Checks a mark and returns it as it is stored. Throws `InvalidMarkException`. */
     fun validate(input: PdfMarkInput): ValidPdfMark {

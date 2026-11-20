@@ -9,7 +9,6 @@ import java.io.File
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.attribute.BasicFileAttributes
-import kotlin.math.floor
 
 // The images already stored: inserting one again (the tracker's "Insert a stored image"), and the Images page that cleans them up.
 // The twins of the desktop's `listImages` (images.ts), of the join with the notes that point at each image (`imageUsage` in
@@ -160,11 +159,9 @@ object ImageLibrary {
     /** A file size the way a person reads it: `812 KB`, `2.4 MB`. */
     fun sizeLabel(bytes: Long): String {
         if (bytes < 1024) return "$bytes B"
-        // `Math.round`: halves go up.
-        if (bytes < 1024 * 1024) return "${floor(bytes / 1024.0 + 0.5).toLong()} KB"
+        if (bytes < 1024 * 1024) return "${JavaScriptText.round(bytes / 1024.0).toLong()} KB"
         // `toFixed(1)`: the nearest tenth, the larger one when two are as near (an exact quarter of a megabyte, say).
-        val tenths = floor(bytes / (1024.0 * 1024) * 10 + 0.5).toLong()
-        return "${tenths / 10}.${tenths % 10} MB"
+        return "${JavaScriptText.toFixed(bytes / (1024.0 * 1024), 1)} MB"
     }
 
     // Cleaning up (the Images page)

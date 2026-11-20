@@ -1,6 +1,8 @@
 package com.rushinglabs.composition.core.preview
 
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.markdown.joined
+import com.rushinglabs.composition.core.markdown.union
 
 // Colouring only what was typed, ported from the iPad's HighlightModel.swift (its build plan, Step 5; its risk R13, Android's R3). Reading
 // the whole note and re-colouring all of it after every keystroke took 87 ms for a 5,000-line note on the iPad (S3). This keeps the colours
@@ -239,16 +241,6 @@ class HighlightModel private constructor(blocks: List<Block>, length: Int) {
     }
 
     companion object {
-        /** Sorted, with ranges that overlap or touch made into one. */
-        internal fun joined(ranges: List<TextRange>): List<TextRange> {
-            val result = ArrayList<TextRange>()
-            for (range in ranges.sortedBy { it.location }) {
-                val last = result.lastOrNull()
-                if (last != null && range.location <= last.end) result[result.size - 1] = union(last, range) else result.add(range)
-            }
-            return result
-        }
-
         private fun isLineEnd(c: Char) = c == '\n' || c == '\r' || c == '\u0085' || c == '\u2028' || c == '\u2029'
 
         /**

@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.ink
 
+import com.rushinglabs.composition.core.appearance.Theme
 import com.rushinglabs.composition.core.appearance.ThemeColor
 import com.rushinglabs.composition.core.json.JsonValue
 import com.rushinglabs.composition.core.skipUnless
@@ -124,7 +125,7 @@ class InkConformanceTests {
             if (style.constantWidth != (member.value.objectValue?.get("oneWidth") == JsonValue.Bool(true))) different.add("${member.key}: one width")
         }
         val marks = assertNotNull(corpus["marks"]?.objectValue)
-        assertEquals(InkPalette.MARK_HUES.keys, marks.members.map { it.key }.toSet())
+        assertEquals(Theme.MARK_HUES.keys, marks.members.map { it.key }.toSet())
         val palette = InkPalette(ThemeColor(1, 2, 3), ThemeColor(4, 5, 6))
         for (member in marks.members) {
             if (palette.color(InkColor.Semantic(member.key)).hex != member.value.stringValue) different.add("mark ${member.key}")
@@ -153,7 +154,7 @@ class InkConformanceTests {
             assertEquals(stored, light.color(InkColor.Fixed(stored)), "a light scheme draws it as stored")
             // Names do not change with the scheme's style: `ink` and `accent` come from the scheme, a mark hue is its hue.
             assertEquals(dark.ink, dark.color(InkColor.INK))
-            assertEquals(InkPalette.MARK_HUES["blue"], dark.color(InkColor.Semantic("blue")))
+            assertEquals(Theme.MARK_HUES["blue"], dark.color(InkColor.Semantic("blue")))
         }
         println("Ink, renderer.json dark style: ${pairs.size - different.size} of ${pairs.size} colours agree with the desktop")
         assertEquals(emptyList(), different)

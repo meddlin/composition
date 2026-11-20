@@ -3,6 +3,7 @@ package com.rushinglabs.composition.core
 import com.rushinglabs.composition.core.live.LiveModel
 import com.rushinglabs.composition.core.live.LiveScan
 import com.rushinglabs.composition.core.markdown.TextRange
+import com.rushinglabs.composition.core.preview.HighlightModel
 import org.junit.jupiter.api.DisplayName
 import java.util.Locale
 import kotlin.test.Test
@@ -64,12 +65,12 @@ class LiveTimingTests {
         // A keystroke: a letter typed in the middle of a paragraph, the editor's colours re-reading its blocks and the Live model following.
         val paragraph = text.indexOf("Some **bold**", middle)
         var typed = text
-        val blocks = EditorBlocks(typed)
+        val colours = HighlightModel(typed)
         val live = LiveModel(typed)
         val keystrokes = (0 until 50).map {
             val at = paragraph + 5 + it
             typed = typed.substring(0, at) + "x" + typed.substring(at)
-            val reread = blocks.edited(TextRange(at, 0), 1, typed)
+            val reread = colours.edited(TextRange(at, 0), 1, typed)
             val start = System.nanoTime()
             live.edited(TextRange(at, 0), 1, reread, typed)
             live.decorations(window, TextRange(at + 1, 0))

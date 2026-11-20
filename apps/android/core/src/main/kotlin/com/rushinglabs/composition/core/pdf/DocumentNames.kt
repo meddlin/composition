@@ -82,7 +82,7 @@ object DocumentNames {
             value /= 1000
             unit += 1
         }
-        val shown = if (value >= 100) PdfMarkup.javaScriptRound(value) else PdfMarkup.javaScriptRound(value * 10) / 10
+        val shown = if (value >= 100) JavaScriptText.round(value) else JavaScriptText.round(value * 10) / 10
         return "${JavaScriptText.numberString(shown)} ${units[unit]}"
     }
 

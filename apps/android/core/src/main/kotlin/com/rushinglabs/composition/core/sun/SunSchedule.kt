@@ -1,7 +1,6 @@
 package com.rushinglabs.composition.core.sun
 
-import java.math.BigDecimal
-import java.math.RoundingMode
+import com.rushinglabs.composition.core.yaml.JavaScriptText
 import java.time.Instant
 import java.time.ZoneId
 
@@ -68,15 +67,11 @@ object Sun {
     fun tone(level: Double, flipLevel: Double = INK_FLIP_LEVEL): Tone = if (level >= flipLevel) Tone.LIGHT else Tone.DARK
 
     /** The `--auto-light` the desktop writes on its page: the level as a percentage with one decimal, `(level * 100).toFixed(1)`. */
-    fun autoLight(level: Double): String = "${toFixed1(level * 100)}%"
+    fun autoLight(level: Double): String = "${percent(level)}%"
 
     /** `autoLight` as the share (0 to 1) the surfaces blend by: the page blends by the rounded percentage it writes, not by the level. */
-    fun autoLightShare(level: Double): Double = toFixed1(level * 100).toDouble() / 100
+    fun autoLightShare(level: Double): Double = percent(level).toDouble() / 100
 
-    /**
-     * `Number.prototype.toFixed(1)` for a number from 0 to 100: the nearest tenth of the exact value, a tie going up. The double's
-     * exact decimal value comes from `BigDecimal`; `String.format` would round a tie to even, and a JVM's `%.25f` pads with zeros
-     * after the shortest digits instead of writing the exact ones, as the iPad's `String(format:)` does.
-     */
-    internal fun toFixed1(value: Double): String = BigDecimal(maxOf(0.0, value)).setScale(1, RoundingMode.HALF_UP).toPlainString()
+    /** `(level * 100).toFixed(1)` for a level from 0 to 1, a level below 0 taken as 0. */
+    private fun percent(level: Double): String = JavaScriptText.toFixed(maxOf(0.0, level * 100), 1)
 }

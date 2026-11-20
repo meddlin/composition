@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.markdown
 
+import com.rushinglabs.composition.core.SwiftText
 import org.commonmark.Extension
 import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.ext.gfm.strikethrough.StrikethroughExtension
@@ -25,11 +26,6 @@ import org.commonmark.parser.Parser
 // Like the desktop, a note that does not mention a component is not scanned at all: it is plain Markdown, where a stray `<` or `{` is fine.
 //
 // A note that is not valid MDX is not an error to show as a blank page: the caller draws it as plain Markdown, with the reason.
-
-/** A range of a note's text in UTF-16 units (what a text view counts in): the counterpart of the iPad's `NSRange`. */
-data class TextRange(val location: Int, val length: Int) {
-    val end get() = location + length
-}
 
 /** A half-open run `[start, end)` of the code points the scanner reads. */
 internal data class Span(val start: Int, val end: Int) {
@@ -252,7 +248,7 @@ object NoteScanner {
                 val end = i + 1 + letters.size
                 if (end >= s.size || !letters.indices.all { s[i + 1 + it] == letters[it] }) continue
                 val next = s[end]
-                if (next == '/'.code || next == '>'.code || isWhitespace(next)) return true
+                if (next == '/'.code || next == '>'.code || SwiftText.isWhitespace(next)) return true
             }
         }
         return false
@@ -271,7 +267,7 @@ object NoteScanner {
         for (run in runs) {
             markdownParser.parse(run).accept(object : AbstractVisitor() {
                 override fun visit(heading: Heading) {
-                    headings.add(NoteHeading(heading.level, trim(plainText(heading))))
+                    headings.add(NoteHeading(heading.level, SwiftText.trim(plainText(heading))))
                 }
             })
         }
@@ -295,26 +291,13 @@ object NoteScanner {
 
     /** A lone tag written as text, `<Mark color="green">`, `</Mark>` or `<Image src="a.png" />`, read the way a note's tags are. */
     internal fun lone(html: String): LoneTag? {
-        val points = trim(html).codePoints().toArray()
+        val points = SwiftText.trim(html).codePoints().toArray()
         val tag = (Scanner(points, readTags = true).parseTag(0) as? TagResult.Found)?.tag ?: return null
         if (tag.end != points.size) return null
         return LoneTag(tag.name, tag.closing, tag.selfClosing, tag.props)
     }
 
     internal data class LoneTag(val name: String, val closing: Boolean, val selfClosing: Boolean, val props: Map<String, MdxPropValue>)
-
-    /** Unicode's White_Space: what Swift's `properties.isWhitespace` and `.whitespacesAndNewlines` both mean here. */
-    internal fun isWhitespace(c: Int) = c in 0x09..0x0D || c == 0x20 || c == 0x85 || c == 0xA0 || c == 0x1680 || c in 0x2000..0x200A ||
-        c == 0x2028 || c == 0x2029 || c == 0x202F || c == 0x205F || c == 0x3000
-
-    /** `trimmingCharacters(in: .whitespacesAndNewlines)`. */
-    internal fun trim(text: String): String {
-        var start = 0
-        var end = text.length
-        while (start < end && isWhitespace(text[start].code)) start++
-        while (end > start && isWhitespace(text[end - 1].code)) end--
-        return text.substring(start, end)
-    }
 
     private fun isNameStart(c: Int) = c == '_'.code || c == '$'.code || Character.isAlphabetic(c)
 
@@ -591,13 +574,13 @@ object NoteScanner {
         fun parseTag(i: Int): TagResult {
             var p = i + 1
             if (p >= s.size) return TagResult.Error("Unexpected end of file before name.")
-            if (isWhitespace(s[p])) return TagResult.NotATag  // `a < b` is text
+            if (SwiftText.isWhitespace(s[p])) return TagResult.NotATag  // `a < b` is text
             var closing = false
             when (s[p]) {
                 '/'.code -> {
                     closing = true
                     p++
-                    while (p < s.size && isWhitespace(s[p])) p++
+                    while (p < s.size && SwiftText.isWhitespace(s[p])) p++
                     if (isChar(p, '>')) return TagResult.Error("Fragments (<>…</>) are not supported.")
                 }
                 '>'.code -> return TagResult.Error("Fragments (<>…</>) are not supported.")
@@ -609,18 +592,18 @@ object NoteScanner {
             val name = string(s, nameStart, p)
             if (name !in components) return TagResult.Error("Unknown component <$name>. Available: ${components.joinToString(", ") { "<$it>" }}.")
             if (closing) {
-                while (p < s.size && isWhitespace(s[p])) p++
+                while (p < s.size && SwiftText.isWhitespace(s[p])) p++
                 if (!isChar(p, '>')) return TagResult.Error("Unexpected character in closing tag, expected `>`.")
                 return TagResult.Found(Tag(closing = true, selfClosing = false, name = name, props = emptyMap(), start = i, end = p + 1))
             }
 
             val props = LinkedHashMap<String, MdxPropValue>()
             while (true) {
-                while (p < s.size && isWhitespace(s[p])) p++
+                while (p < s.size && SwiftText.isWhitespace(s[p])) p++
                 if (p >= s.size) return TagResult.Error("Unexpected end of file before attribute name.")
                 if (s[p] == '/'.code) {
                     p++
-                    while (p < s.size && isWhitespace(s[p])) p++
+                    while (p < s.size && SwiftText.isWhitespace(s[p])) p++
                     if (!isChar(p, '>')) return TagResult.Error("Unexpected character after self-closing slash, expected `>`.")
                     return TagResult.Found(Tag(closing = false, selfClosing = true, name = name, props = props, start = i, end = p + 1))
                 }
@@ -631,13 +614,13 @@ object NoteScanner {
                 while (p < s.size && (isNamePart(s[p]) || s[p] == ':'.code)) p++
                 val attribute = string(s, attributeStart, p)
                 var q = p
-                while (q < s.size && isWhitespace(s[q])) q++
+                while (q < s.size && SwiftText.isWhitespace(s[q])) q++
                 if (!isChar(q, '=')) {
                     props[attribute] = MdxPropValue.Flag
                     continue
                 }
                 q++
-                while (q < s.size && isWhitespace(s[q])) q++
+                while (q < s.size && SwiftText.isWhitespace(s[q])) q++
                 if (q >= s.size) return TagResult.Error("Unexpected end of file before attribute value.")
                 if (s[q] == '{'.code) return TagResult.Error("{expressions} are not supported.")
                 if (s[q] != '"'.code && s[q] != '\''.code) return TagResult.Error("Unexpected character before attribute value, expected a quote.")
@@ -697,7 +680,7 @@ object NoteScanner {
             fun flush(end: Int) {
                 if (at >= end) return
                 val (text, copied) = applying(footnotes.edits, Span(at, end))
-                if (trim(text).isNotEmpty()) add(NoteBlock.Markdown(text), written(Span(at, end)), copied)
+                if (SwiftText.trim(text).isNotEmpty()) add(NoteBlock.Markdown(text), written(Span(at, end)), copied)
             }
             for (tag in flowTags) {
                 flush(tag.start)
@@ -718,9 +701,9 @@ object NoteScanner {
         /** `range` less its blank lines at either end: from the start of its first line with something on it to the last thing on its last. */
         private fun written(range: Span): Span {
             var first = range.start
-            while (first < range.end && isWhitespace(s[first])) first++
+            while (first < range.end && SwiftText.isWhitespace(s[first])) first++
             var last = range.end
-            while (last > first && isWhitespace(s[last - 1])) last--
+            while (last > first && SwiftText.isWhitespace(s[last - 1])) last--
             var start = first
             while (start > range.start && s[start - 1] != '\n'.code) start--
             return Span(start, maxOf(start, last))
@@ -849,7 +832,7 @@ object NoteScanner {
             }
 
             for (label in info.order) {
-                info.bodies[label] = (lines[label] ?: emptyList()).joinToString("\n") { trim(string(s, it.start, it.end)) }
+                info.bodies[label] = (lines[label] ?: emptyList()).joinToString("\n") { SwiftText.trim(string(s, it.start, it.end)) }
             }
             info.edits = removals
             // Those in a footnote's own text too: the list draws them as numbers, and so does the Live tab.
@@ -858,7 +841,7 @@ object NoteScanner {
                 if (definition.first !in info.order) continue
                 val previous = info.places.definitions.lastOrNull()?.lastOrNull()
                 if (previous != null && previous.second.end <= definition.second.start &&
-                    (previous.second.end until definition.second.start).all { isWhitespace(s[it]) }
+                    (previous.second.end until definition.second.start).all { SwiftText.isWhitespace(s[it]) }
                 ) {
                     info.places.definitions.last().add(definition)
                 } else {
@@ -873,7 +856,7 @@ object NoteScanner {
         private fun definitionStart(i: Int, end: Int): Pair<String, Int>? {
             if (!(i + 3 < end && s[i] == '['.code && s[i + 1] == '^'.code)) return null
             var j = i + 2
-            while (j < end && s[j] != ']'.code && !isWhitespace(s[j])) j++
+            while (j < end && s[j] != ']'.code && !SwiftText.isWhitespace(s[j])) j++
             val label = string(s, i + 2, j)
             if (label.isEmpty() || !(j < end && s[j] == ']'.code && j + 1 < end && s[j + 1] == ':'.code)) return null
             return label to j + 2
@@ -886,7 +869,7 @@ object NoteScanner {
             while (i + 2 < until) {
                 if (s[i] == '['.code && s[i + 1] == '^'.code && !isCode(i) && (i == 0 || s[i - 1] != '\\'.code)) {
                     var j = i + 2
-                    while (j < until && s[j] != ']'.code && !isWhitespace(s[j])) j++
+                    while (j < until && s[j] != ']'.code && !SwiftText.isWhitespace(s[j])) j++
                     if (j > i + 2 && j < until && s[j] == ']'.code) {
                         found.add(string(s, i + 2, j) to Span(i, j + 1))
                         i = j + 1

@@ -6,6 +6,7 @@ import com.rushinglabs.composition.core.markdown.SourceMap
 import com.rushinglabs.composition.core.markdown.TextRange
 import com.rushinglabs.composition.core.markdown.UnitRange
 import com.rushinglabs.composition.core.markdown.children
+import com.rushinglabs.composition.core.markdown.union
 import org.commonmark.ext.gfm.strikethrough.Strikethrough
 import org.commonmark.ext.task.list.items.TaskListItemMarker
 import org.commonmark.node.BlockQuote
@@ -60,12 +61,6 @@ data class HighlightedBlock(
     /** Outermost first, as `MarkdownHighlighter.spans` has them; positions are in the whole text. */
     val spans: List<HighlightSpan>,
 )
-
-/** `NSUnionRange`: from the earlier start to the later end. */
-internal fun union(a: TextRange, b: TextRange): TextRange {
-    val start = minOf(a.location, b.location)
-    return TextRange(start, maxOf(a.end, b.end) - start)
-}
 
 object MarkdownHighlighter {
     /** The spans of `text`, outermost first. */

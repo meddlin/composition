@@ -1,6 +1,7 @@
 package com.rushinglabs.composition.core.search
 
 import com.rushinglabs.composition.core.Timestamp
+import com.rushinglabs.composition.core.yaml.JavaScriptText
 
 // The search bar's `field: value` syntax, parsed the way `searchQuery.ts` does it, character for character (ported from
 // SearchQuery.swift). Pure, so it is safe to run on every keystroke. The rules are in docs/architecture/search.md; the conformance
@@ -57,8 +58,7 @@ object SearchQueryParser {
     private val keys: List<IntArray> = fields.keys.map { it.codePoints().toArray() }
 
     /** JavaScript's `\s` (and `trim`). */
-    fun isSpace(c: Int): Boolean = c in 0x09..0x0D || c == 0x20 || c == 0xA0 || c == 0x1680 || c in 0x2000..0x200A ||
-        c == 0x2028 || c == 0x2029 || c == 0x202F || c == 0x205F || c == 0x3000 || c == 0xFEFF
+    private fun isSpace(c: Int): Boolean = JavaScriptText.isWhitespace(c)
 
     private fun text(s: IntArray, from: Int, until: Int): String {
         val builder = StringBuilder()

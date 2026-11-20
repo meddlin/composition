@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.ink
 
+import com.rushinglabs.composition.core.swiftRounded
 import java.io.ByteArrayOutputStream
 import java.util.zip.CRC32
 import java.util.zip.DataFormatException
@@ -83,7 +84,7 @@ object InkPng {
      */
     fun settingDensity(png: ByteArray, dotsPerInch: Double): ByteArray {
         val chunks = walk(png)
-        val perMetre = roundHalfAway(dotsPerInch / 0.0254).toLong().coerceIn(1L, 0x7FFF_FFFFL)
+        val perMetre = swiftRounded(dotsPerInch / 0.0254).toLong().coerceIn(1L, 0x7FFF_FFFFL)
         val body = ByteArrayOutputStream(9).apply {
             writeBigEndian(perMetre)
             writeBigEndian(perMetre)
@@ -162,7 +163,7 @@ object InkPng {
         val x = readBigEndian(png, phys.start + 8)
         val y = readBigEndian(png, phys.start + 12)
         if (png[phys.start + 16] != 1.toByte() || x != y || x <= 0) return fallback
-        val density = roundHalfAway(x.toDouble() * 0.0254 / 72 * 100) / 100
+        val density = swiftRounded(x.toDouble() * 0.0254 / 72 * 100) / 100
         return if (density > 0) density else fallback
     }
 

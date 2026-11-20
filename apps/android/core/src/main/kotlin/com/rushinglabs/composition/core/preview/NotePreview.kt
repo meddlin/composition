@@ -1,6 +1,7 @@
 package com.rushinglabs.composition.core.preview
 
 import com.rushinglabs.composition.core.NoteFrontmatter
+import com.rushinglabs.composition.core.SwiftText
 import com.rushinglabs.composition.core.markdown.ChartParse
 import com.rushinglabs.composition.core.markdown.ChartSpec
 import com.rushinglabs.composition.core.markdown.ImageWidth
@@ -231,17 +232,17 @@ data class NotePreview(
                     listOf(PreviewBlock.Footnotes(footnoteEntries()))
                 }
                 "YouTube" -> {
-                    val url = text(props, "url")?.let(NoteScanner::trim)
+                    val url = text(props, "url")?.let(SwiftText::trim)
                     val ref = NoteYouTube.parse(url, text(props, "start"))
                         ?: return listOf(PreviewBlock.Notice(if (url.isNullOrEmpty()) "YouTube video: add a url" else "Not a YouTube video: $url"))
-                    val title = text(props, "title")?.let(NoteScanner::trim)
+                    val title = text(props, "title")?.let(SwiftText::trim)
                     listOf(PreviewBlock.YouTube(ref, title?.takeIf { it.isNotEmpty() } ?: "YouTube video"))
                 }
                 "Repo" -> {
-                    val url = text(props, "url")?.let(NoteScanner::trim)
+                    val url = text(props, "url")?.let(SwiftText::trim)
                     val ref = NoteRepo.parse(url)
                         ?: return listOf(PreviewBlock.Notice(if (url.isNullOrEmpty()) "Repository: add a url" else "Not a repository address: $url"))
-                    val description = text(props, "description")?.let(NoteScanner::trim)
+                    val description = text(props, "description")?.let(SwiftText::trim)
                     listOf(PreviewBlock.Repo(ref, description?.takeIf { it.isNotEmpty() }))
                 }
                 "Chart" -> when (val parsed = NoteChart.parse(text(props, "type"), text(props, "x"), text(props, "y"), csv(children))) {

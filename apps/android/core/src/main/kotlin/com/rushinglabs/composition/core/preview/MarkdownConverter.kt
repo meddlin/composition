@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core.preview
 
+import com.rushinglabs.composition.core.SwiftText
 import com.rushinglabs.composition.core.markdown.MdxPropValue
 import com.rushinglabs.composition.core.markdown.NoteImage
 import com.rushinglabs.composition.core.markdown.NoteScanner
@@ -60,7 +61,7 @@ internal class MarkdownConverter(
             val close = after.indexOf(']')
             val label = if (close >= 0) after.substring(0, close) else null
             val number = label?.let { footnoteNumbers[it] }
-            if (label != null && label.isNotEmpty() && label.codePoints().noneMatch(NoteScanner::isWhitespace) && number != null) {
+            if (label != null && label.isNotEmpty() && label.codePoints().noneMatch(SwiftText::isWhitespace) && number != null) {
                 out.append(NoteScanner.superscript(number))
                 rest = after.substring(close + 1)
             } else {
@@ -87,7 +88,7 @@ internal class MarkdownConverter(
         is OrderedList -> MdBlock.ListBlock(true, node.markerStartNumber ?: 1, items(node))
         is ThematicBreak -> MdBlock.Rule
         is TableBlock -> table(node)
-        is HtmlBlock -> MdBlock.Html(NoteScanner.trim(node.literal))
+        is HtmlBlock -> MdBlock.Html(SwiftText.trim(node.literal))
         else -> NoteScanner.plainText(node).takeIf { it.isNotEmpty() }?.let { MdBlock.Paragraph(listOf(MdInline.Text(it))) }
     }
 
