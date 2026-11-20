@@ -117,6 +117,34 @@ public static class Schema
         CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page);
         """;
 
+    /// <summary>db.ts SCANS_SCHEMA: the pages of a scanned PDF and the lines read from them (docs/architecture/scans.md).</summary>
+    private const string Scans = """
+        CREATE TABLE IF NOT EXISTS scan_pages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page INTEGER NOT NULL,
+            engine TEXT,
+            recognized_at TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_pages_page ON scan_pages (document_id, page);
+        CREATE TABLE IF NOT EXISTS scan_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            document_id INTEGER NOT NULL,
+            page INTEGER NOT NULL,
+            line INTEGER NOT NULL,
+            rect TEXT NOT NULL,
+            text TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            engine TEXT NOT NULL,
+            status TEXT NOT NULL,
+            corrected TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_scan_lines_page ON scan_lines (document_id, page, line);
+        """;
+
     private const string Todos = """
         CREATE TABLE IF NOT EXISTS todos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,7 +269,7 @@ public static class Schema
     public static readonly string[] UuidTables =
     [
         "notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments",
-        "documents", "pdf_annotations", "pdf_bookmarks",
+        "documents", "pdf_annotations", "pdf_bookmarks", "scan_pages", "scan_lines",
     ];
 
     /// <summary>Built-in SQL only: an older build opening this file has no user-defined functions.</summary>
@@ -288,6 +316,7 @@ public static class Schema
         ExecDdl(db, Trash);
         ExecDdl(db, Attachments);
         ExecDdl(db, Documents);
+        ExecDdl(db, Scans);
         ExecDdl(db, Todos);
         ExecDdl(db, ReadingList);
         ExecDdl(db, Feeds);
