@@ -1,5 +1,6 @@
 package com.rushinglabs.composition.core
 
+import com.rushinglabs.composition.core.sun.SunHours
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
