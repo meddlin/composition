@@ -131,6 +131,34 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         return drawing?.picture.map { LiveDrawing.size(of: $0, available: lineWidth) }
     }
 
+    /// Where the picture (or a block's picture) is drawn, in the text container's coordinates, as `draw(at:in:)` places it; nil for a rule, or a paragraph with
+    /// nothing drawn.
+    var drawnRect: CGRect? {
+        guard let drawing, drawing.kind != .rule, let size = pictureSize else { return nil }
+        let padding = textLayoutManager?.textContainer?.lineFragmentPadding ?? 0
+        return CGRect(x: padding, y: pictureTop(of: drawing) + LiveDrawing.margin, width: size.width, height: size.height)
+    }
+
+    /// The room the picture takes, across the whole line, in the text container's coordinates: where Scribble may not begin (`LiveScribble`). A picture drawn in
+    /// place of its source takes its whole paragraph, the source being hidden in it (writing beside a narrow drawing would land in its tag, which item 344 found);
+    /// one drawn after its revealed source takes only the room below that source's lines, which stay text.
+    var drawnRoom: CGRect? {
+        guard let drawing, drawing.kind != .rule, let size = pictureSize else { return nil }
+        let width = textLayoutManager?.textContainer?.size.width ?? layoutFragmentFrame.maxX
+        let frame = layoutFragmentFrame
+        switch drawing.kind {
+        case .picture, .block: return CGRect(x: 0, y: frame.minY, width: width, height: max(frame.height, LiveDrawing.reserved(for: size.height)))
+        default: return CGRect(x: 0, y: pictureTop(of: drawing), width: width, height: LiveDrawing.reserved(for: size.height))
+        }
+    }
+
+    /// The top of the room the picture is drawn in (its margin above it): the paragraph's top, or, after a revealed source, the bottom of its lines.
+    private func pictureTop(of drawing: LiveDrawing) -> CGFloat {
+        let frame = layoutFragmentFrame
+        guard drawing.kind == .pictureAfter || drawing.kind == .blockAfter else { return frame.minY }
+        return frame.minY + (textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height)
+    }
+
     /// The footnote numbers to draw in a paragraph, and where their citations are in it.
     static func footnoteNumbers(in paragraph: NSAttributedString) -> [(range: NSRange, number: LiveFootnoteNumber)] {
         var found: [(NSRange, LiveFootnoteNumber)] = []
@@ -187,21 +215,12 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
             context.move(to: CGPoint(x: left, y: point.y + frame.height / 2))
             context.addLine(to: CGPoint(x: left + lineWidth, y: point.y + frame.height / 2))
             context.strokePath()
-        case .picture:
-            guard let size = pictureSize else { return }
-            drawPicture(in: CGRect(x: left, y: point.y + LiveDrawing.margin, width: size.width, height: size.height), context: context)
-        case .pictureAfter:
-            // After the text's own lines: the fragment's frame is taller than they are, because it includes the paragraph's spacing, which is where this goes.
-            guard let size = pictureSize else { return }
-            let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
-            drawPicture(in: CGRect(x: left, y: point.y + textBottom + LiveDrawing.margin, width: size.width, height: size.height), context: context)
-        case .block:
-            guard let size = pictureSize else { return }
-            drawBlock(in: CGRect(x: left, y: point.y + LiveDrawing.margin, width: size.width, height: size.height), context: context)
-        case .blockAfter:
-            guard let size = pictureSize else { return }
-            let textBottom = textLineFragments.map { $0.typographicBounds.maxY }.max() ?? frame.height
-            drawBlock(in: CGRect(x: left, y: point.y + textBottom + LiveDrawing.margin, width: size.width, height: size.height), context: context)
+        case .picture, .pictureAfter, .block, .blockAfter:
+            // `drawnRect` is in the container's coordinates; `point` is the frame's origin. After a revealed source the picture goes after the text's own lines: the
+            // fragment's frame is taller than they are, because it includes the paragraph's spacing, which is where it goes.
+            guard let drawn = drawnRect else { return }
+            let rect = drawn.offsetBy(dx: left - drawn.minX, dy: point.y - frame.minY)
+            if drawing.kind == .picture || drawing.kind == .pictureAfter { drawPicture(in: rect, context: context) } else { drawBlock(in: rect, context: context) }
         }
     }
 
