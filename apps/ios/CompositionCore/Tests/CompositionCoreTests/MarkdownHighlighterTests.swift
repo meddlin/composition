@@ -99,3 +99,71 @@ struct HighlighterCRLFTests {
         #expect(texts(windows).map { $0.replacingOccurrences(of: "\r\n", with: "\n") } == texts(unix))
     }
 }
+
+@Suite("The highlighter and a note with a lone \\r for a line break")
+struct HighlighterLoneCRTests {
+    static let note = "# Title\n\nSome **bold** text\nand `code`.\n\n> a *quote*\n> two\n\n- one\n- [x] two\n\n```swift\nlet x = 1\n```\n\nend [link](https://x.test)\n"
+
+    @Test("a lone \\r ends a line as \\n does (cmark reads it so), so every span is where it is with \\n")
+    func sameSpans() {
+        let unix = Self.note
+        #expect(MarkdownHighlighter.spans(in: unix.replacingOccurrences(of: "\n", with: "\r")) == MarkdownHighlighter.spans(in: unix))
+        // One lone \r in a paragraph near the top of a note that otherwise has \n: the colours below it are not lost.
+        let one = unix.replacingOccurrences(of: "text\nand", with: "text\rand")
+        #expect(one != unix && !one.contains("\r\n"))
+        #expect(MarkdownHighlighter.spans(in: one) == MarkdownHighlighter.spans(in: unix))
+    }
+
+    @Test("the incremental model colours such a note as a full read of the same note with \\n does")
+    func model() {
+        let unix = Self.note, mac = unix.replacingOccurrences(of: "\n", with: "\r")
+        #expect(HighlightModel(text: mac).spans(in: NSRange(location: 0, length: (mac as NSString).length)) == MarkdownHighlighter.spans(in: unix))
+    }
+}
+
+/// cmark leaves a paragraph's leading link reference definitions out of its text, but counts the lines of what is left from the paragraph's first line,
+/// the definition's, and starts the paragraph there. The desktop (lezer, remark) has the definition and the paragraph as two blocks, each where it is written.
+@Suite("The highlighter after a link reference definition")
+struct HighlighterDefinitionTests {
+    private func found(_ text: String) -> [String] {
+        let ns = text as NSString
+        return MarkdownHighlighter.spans(in: text).map { "\($0.kind): \(String(reflecting: ns.substring(with: $0.range)))" }
+    }
+
+    @Test("a paragraph's spans are where they are written, after one definition or several, a footnote's, one over lines, or one in a container")
+    func spansAfterDefinitions() {
+        for text in [
+            "[a]: https://x.test\nSome *em* and **b**\nmore `c`\n",
+            "[a]: https://x.test\n[b]: https://y.test 'title'\nSome *em* and **b**\nmore `c`\n",
+            "[^1]: A footnote.\nSome *em* and **b**\nmore `c`\n",
+            "[a]:\n  https://x.test\n  'a title\n  over lines'\nSome *em* and **b**\nmore `c`\n",
+            "[a]: https://x.test\n  Some *em* and **b**\nmore `c`\n",
+            "> [a]: https://x.test\n> Some *em* and **b**\n> more `c`\n",
+            "- [a]: https://x.test\n  Some *em* and **b**\n  more `c`\n",
+            "> [a]: https://x.test\nSome *em* and **b** `c`\n",
+        ] {
+            let spans = found(text)
+            #expect(spans.contains("emphasis: \"*em*\"") && spans.contains("strong: \"**b**\"") && spans.contains("inlineCode: \"`c`\""), "\(String(reflecting: text)): \(spans)")
+        }
+    }
+
+    @Test("a setext heading after a definition is coloured where it is written")
+    func setext() {
+        let spans = found("[a]: https://x.test\nTitle *em*\n===\n")
+        #expect(spans.contains("heading(level: 1): \"Title *em*\\n===\"") && spans.contains("emphasis: \"*em*\""), "\(spans)")
+    }
+
+    @Test("the paragraph after a definition is a block from its own first line")
+    func blockRange() {
+        let text = "[a]: https://x.test\nSome *em* text\n"
+        #expect(MarkdownHighlighter.blocks(in: text).map { (text as NSString).substring(with: $0.range) } == ["Some *em* text"])
+    }
+
+    @Test("a paragraph that only starts with a link is left as it is")
+    func notADefinition() {
+        // cmark ends a link whose title goes onto the next line on its first line, so the lines alone cannot tell this from a definition.
+        let text = "[a](https://x.test\n'title')\n"
+        #expect(found(text).contains("linkText: \"a\""))
+        #expect(MarkdownHighlighter.blocks(in: text).first?.range.location == 0)
+    }
+}

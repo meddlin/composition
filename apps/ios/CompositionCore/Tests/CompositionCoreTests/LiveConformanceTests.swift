@@ -193,9 +193,6 @@ struct LiveConformanceTests {
         // A bare address with a space in it is not a link, and lezer's autolink takes `https://x.test/*not` before it looks for emphasis, so the
         // `*` inside is not an opener. cmark reads emphasis first and finds `*not italic*`. Only an address written with a space in it does this.
         "inline|[a link](https://x.test/*not italic*) done": "autolinks are read before emphasis by lezer, after it by cmark",
-        // Step 7: the desktop's setext headings take the frontmatter's end from `bodyStart`, which does not count a frontmatter whose YAML does not parse, while its
-        // frontmatter look does; so it draws `title: [unclosed` over `---` as a heading inside what it shows as frontmatter. The iPad keeps it frontmatter for both.
-        "frontmatter|---\ntitle: [unclosed\n---\n# Body **bold**": "the desktop reads a heading inside a frontmatter whose YAML does not parse",
         // Step 7 meets Step 4: on a setext heading's underline inside a quote (`> ===`), the desktop's lists draw no quote bar over its `> ` (lezer's underline line
         // carries no QuoteMark the lists read), while the iPad draws the bar on every quoted line, this one too.
         "rest|> Quoted\n> ===\n\nx": "the desktop draws no quote bar on a quoted setext underline's line",

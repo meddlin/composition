@@ -360,7 +360,7 @@ public struct LiveModel: Sendable {
         }
 
         var reader = LiveReader(map: SourceMap(text: text), lines: lines)
-        reader.visit(Document(parsing: source))
+        reader.visit(Document(note: source))
         var constructs: [Construct] = []
         constructs += reader.headings.map { .heading($0) }
         constructs += reader.rules.map { .rule($0) }

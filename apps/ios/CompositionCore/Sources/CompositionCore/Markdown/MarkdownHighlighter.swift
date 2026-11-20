@@ -76,7 +76,7 @@ public enum MarkdownHighlighter {
                 let blank = String(head.unicodeScalars.map { $0 == "\n" || $0 == "\r" ? Character($0) : " " })
                 source = blank + String(text.dropFirst(head.count))
             }
-            for child in Document(parsing: source).children {
+            for child in Document(note: source).children {
                 spans.removeAll(keepingCapacity: true)
                 visit(child)
                 guard !spans.isEmpty else { continue }
@@ -103,6 +103,9 @@ public enum MarkdownHighlighter {
         }
 
         // MARK: Positions
+
+        /// `\n`, or the `\r` of a `\r\n` or of a lone `\r`: cmark ends a line at each, and so does the desktop's editor.
+        private static func isLineEnd(_ unit: UInt16) -> Bool { unit == 0x0A || unit == 0x0D }
 
         private func range(of markup: any Markup) -> Range<Int>? { map.range(of: markup) }
 
@@ -154,12 +157,12 @@ public enum MarkdownHighlighter {
             while start < whole.upperBound, chars[start] == 0x20 { start += 1 }
             guard start < whole.upperBound, chars[start] == 0x60 || chars[start] == 0x7E else { return }
             var firstEnd = whole.lowerBound
-            while firstEnd < whole.upperBound, chars[firstEnd] != 0x0A { firstEnd += 1 }
+            while firstEnd < whole.upperBound, !Self.isLineEnd(chars[firstEnd]) { firstEnd += 1 }
             add(whole.lowerBound..<firstEnd, .mark)
             var lastStart = whole.upperBound
-            while lastStart > firstEnd, chars[lastStart - 1] == 0x0A { lastStart -= 1 }  // a trailing break is not part of the line
+            while lastStart > firstEnd, Self.isLineEnd(chars[lastStart - 1]) { lastStart -= 1 }  // a trailing break is not part of the line
             let lineEnd = lastStart
-            while lastStart > firstEnd, chars[lastStart - 1] != 0x0A { lastStart -= 1 }
+            while lastStart > firstEnd, !Self.isLineEnd(chars[lastStart - 1]) { lastStart -= 1 }
             if lastStart > firstEnd { add(lastStart..<lineEnd, .mark) }
         }
 
@@ -189,7 +192,8 @@ public enum MarkdownHighlighter {
                 var p = line
                 while p < whole.upperBound, chars[p] == 0x20 { p += 1 }
                 while p < whole.upperBound, chars[p] == 0x3E { add(p..<(p + 1), .mark); p += 1; if p < whole.upperBound, chars[p] == 0x20 { p += 1 } }
-                while line < whole.upperBound, chars[line] != 0x0A { line += 1 }
+                while line < whole.upperBound, !Self.isLineEnd(chars[line]) { line += 1 }
+                if line + 1 < whole.upperBound, chars[line] == 0x0D, chars[line + 1] == 0x0A { line += 1 }
                 line += 1
             }
         }
