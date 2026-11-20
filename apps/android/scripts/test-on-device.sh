@@ -61,7 +61,7 @@ set +e
 "$adb" shell am instrument -w -e conformanceDir "$remote/conformance" -e corpusDir "$remote/corpus" \
     "$package/androidx.test.runner.AndroidJUnitRunner" | tee "$android/build/device-tests.txt"
 set -e
-"$adb" logcat -d -s System.out:I | sed -n 's/.*System.out: //p' | grep -E 'SQLite|ENABLE_FTS5|Timings|Search|of [0-9]+ (steps|blocks|edits|queries|notes|inputs)|restored' || true
+"$adb" logcat -d -s System.out:I | sed -n 's/.*System.out: //p' | grep -E 'SQLite|ENABLE_FTS5|Timings|Search|Images|of [0-9]+ (steps|blocks|edits|queries|notes|inputs)|restored' || true
 grep -q '^OK (' "$android/build/device-tests.txt" || { echo "== the suites failed on the device" >&2; exit 1; }
 
 echo "== the desktop restores what the Kotlin core wrote on the device"

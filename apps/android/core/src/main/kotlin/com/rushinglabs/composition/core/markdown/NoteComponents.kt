@@ -10,9 +10,6 @@ import java.net.URLDecoder
 // URLComponents; Android has its own `Uri`, which a desktop JVM does not, so `ParsedUrl` below reads them itself, the way URLComponents
 // does for an address a note can have (RFC 3986, a default port dropped, `.` and `..` segments resolved).
 
-/** JavaScript's `\s`, which the desktop's patterns mean (a JVM's `\s` is ASCII only, and Android's is ICU's). */
-private const val JS_SPACE = "[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
-
 private fun trimmed(text: String) = NoteScanner.trim(text)
 
 /** The parts of a URL that a note's address can have, read the way URLComponents reads them. */

@@ -667,6 +667,7 @@ Android emulator.
 |---|---|---|---|---|
 | **Search** | 2026-11-20 | The `field: value` query parser, Meilisearch's typo rules, and the FTS5 index in its own `search.db` (747 lines of Swift became 711 of Kotlin). The store keeps the index in step as notes are made, saved, trashed and restored. | The desktop's `parseSearchQuery`, and a real Meilisearch's committed answers (`search-expected.json`, the iPad's spike S2 corpus) | Parser: 272 of 272 queries. **A:** the same set as Meilisearch for 159 of 159 exact queries, top-10 overlap 0.93. **B:** none of the 95 typo queries misses anything Meilisearch finds. All 267 uncapped queries give the same set. **C:** slowest query on 1,000 notes 1.3 ms (JVM), 2.3 ms (emulator); with 20,000 distinct words 4.5 ms and 29 ms; with 100,000, 15.9 ms on the JVM. |
 | **MDX** | 2026-11-20 | The restricted MDX scanner (components, props, block or inline, what MDX refuses, footnotes, block ranges in the note's text) and the component helpers (`<Chart>` CSV, `<Repo>` and `<YouTube>` addresses, `<Image>` width and `app_data` refs): 1,231 lines of Swift became 1,316 of Kotlin. Headings are read with commonmark-java 0.32.0 and its GFM extensions. | The desktop's real preview pipeline (`mdx-expected.json`) and component functions (`component-expected.json`) | 115 of 115 notes agree (valid or not, components and props, headings, footnote order). 166 of 166 component inputs. Block ranges cover every corpus note, and the same notes behind a frontmatter and with `\r\n` line ends. |
+| **Images** | 2026-11-20 | Sniffing, naming and storing images in `app_data/`; alt text, Markdown, `<Image>` tags and the references a note makes; Markdown images to `<Image />` tags; the stored-image list, who uses each image, the picker's matching and labels; the header image's source; and the iPad's clean-up of images nothing points at. 522 lines of Swift became 555 of Kotlin, with JavaScript's `\s`, `.` and fence check in a shared `JavaScriptPatterns.kt`. | The desktop's `images.ts`, `imageRefs.ts`, `imageToMdx.ts` and `imagePicker.ts` (`images-expected.json`) | 75 of 75 byte strings sniffed. 160 of 160 file names. 24 of 24 real stores (the same bytes on disk, the file reused the second time). 119 of 119 alt texts, Markdown, tags and references. 1,504 of 1,504 cursors and selections. 7 of 7 folders listed. 5 of 5 note sets joined. 60 of 60 picker queries. 47 of 47 labels. |
 
 **Search: what it showed.**
 1. **Folding words without Foundation.** The iPad folds a word with Foundation's case- and accent-insensitive folding. Kotlin
@@ -685,6 +686,18 @@ Android emulator.
 4. **Kotlin's `Int` is 32 bits and Swift's 64**, so a YouTube start time is a `Long` here.
 5. **Not in this slice:** the preview model (`NotePreview.swift`, what the preview draws from), the editor's syntax colouring and the Live model. They follow
    from spike A2 (how Android draws the preview and edits), and the typing aids and Live rules come next in the port order.
+
+**Images: what it showed.**
+1. **The desktop's patterns are spelled as JavaScript reads them.** The Markdown-image pattern uses `\s` and `.`, and a JVM's `\s` is ASCII
+   while Android's is ICU's. `JavaScriptPatterns.kt` holds JavaScript's `\s`, its `.` and the desktop's fence check, which the typing aids
+   need next. A no-break space ends an image's address here, as it does on the desktop.
+2. **File sizes are `Long`.** One picker label case is 3.3 GB, past what Kotlin's `Int` holds.
+3. **The listing reads through a link, as the desktop's `stat` does.** The iPad's listing does not. Nothing in the app makes links in
+   `app_data/`, so the two only differ in theory.
+4. **The header image's source and the clean-up have no desktop fixtures.** The clean-up is the iPad's own (the desktop never deletes an
+   image), and the header image rules are three lines; unit tests cover both.
+5. **Not in this slice:** turning a photo into JPEG (on Android, `ImageDecoder` and `Bitmap.compress`), paste and drop, and the picker's
+   screen. They are app work, after spike A2.
 
 ## Setting up this Mac
 
@@ -750,6 +763,7 @@ Then M2 (ink, PDFs) and M3 (the Reading List, polish, the audit, Play).
 - **2026-11-20:** Page written, from the question "what is required to start getting this ready for Android?". Nothing run or built.
 - **2026-11-20:** **D1 decided by you: a Kotlin core** ("Use the most appropriate, native language for Android. Don't complicate things by trying to add a translation layer to get Swift running on Android."). O3 and O4 rejected, C2 accepted, C21 resolved, R1 retired, R15 added. A1 redefined as the Kotlin core's first slice.
   The first A1 (the iPad's Swift core built for Android) had been started when you decided. It was stopped, and its code and tools were removed. It had built the core for Android with a handful of stand-ins, and 427 of 445 of the core's tests passed on the emulator. One finding applies to Kotlin too, and is kept under [What the app is today](#what-the-app-is-today): the core relies on how Apple builds SQLite. Restoring a backup opens a URI filename, and all 13 restores failed against a SQLite built without URI support.
+- **2026-11-20:** **The images slice is done:** storing and naming, the note's references, Markdown images to `<Image />` tags, the stored-image list and picker, the header image and clean-up. Every case of `images-cases.json` matches the desktop (1,504 of 1,504 conversions among them), on the JVM and the emulator ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **The MDX slice is done:** the scanner and the component helpers, 115 of 115 notes and 166 of 166 component inputs as the desktop has them, on the JVM and the emulator ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **The search slice is done:** the parser, the typo rules and the FTS5 index, and the store keeping them in step. It matches the desktop's parser on 272 of 272 queries and a real Meilisearch on criteria A and B, on the JVM and the emulator, and it is well under the 200 ms target ([Core slices after A1](#core-slices-after-a1)).
 - **2026-11-20:** **Spike A1 done:** the first slice of the Kotlin core passes every case of the corpus it covers, on the Mac's JVM and on the Android emulator, both ways with the desktop ([A1 status](#a1-status)). R13 retired; R15 measured. Gate A now waits only on this page being agreed (D2, D11).

@@ -1,12 +1,12 @@
 # Android app
 
 The Android app for phones and tablets: Kotlin throughout, Jetpack Compose for the screens. The design is
-[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices** (spike A1, then search and MDX);
+[docs/android-app-design.md](../../docs/android-app-design.md). **So far only the Kotlin core exists, in slices** (spike A1, then search, MDX and images);
 there is no app yet.
 
 | Module | What |
 |---|---|
-| `core` | The Kotlin core: a port of the iPad's `CompositionCore` (`apps/ios/CompositionCore`), checked against the desktop's own code by the shared corpus in `fixtures/conformance/`. No Android framework dependency, so its tests run on the Mac's JVM. So far: the schema pass, notes, groups, notebooks, the Trash Can, frontmatter (with a port of the iPad's `js-yaml` port), settings, backup and restore, search (the query parser, Meilisearch's typo rules, and the FTS5 index the store keeps in step), and the MDX scanner with the component helpers. |
+| `core` | The Kotlin core: a port of the iPad's `CompositionCore` (`apps/ios/CompositionCore`), checked against the desktop's own code by the shared corpus in `fixtures/conformance/`. No Android framework dependency, so its tests run on the Mac's JVM. So far: the schema pass, notes, groups, notebooks, the Trash Can, frontmatter (with a port of the iPad's `js-yaml` port), settings, backup and restore, search (the query parser, Meilisearch's typo rules, and the FTS5 index the store keeps in step), the MDX scanner with the component helpers, and images (storing, naming, the note's references, Markdown images to `<Image />`, the stored-image list and picker, the header image's source and clean-up). |
 | `core-device-tests` | No code of its own: runs `core`'s test sources on an emulator or a device, through Android's test runner. |
 
 ## Running the checks
@@ -41,6 +41,8 @@ Without `COMPOSITION_CONFORMANCE_DIR`, `./gradlew :core:test` reports the confor
   Swift's `String(format:)` doesn't follow the locale.
 - **Kotlin's `Int` is 32 bits; Swift's is 64.** Where a Swift `Int` holds a number from a note or a file, use `Long`.
 - **Don't lean on the platform for text rules.** A JVM's regex `\s` is ASCII, Android's is ICU's, and Swift's `URLComponents` has no twin. Write the
-  character class or the reader out, as `JS_SPACE` and `ParsedUrl` do.
+  character class or the reader out, as `ParsedUrl` does. `markdown/JavaScriptPatterns.kt` holds JavaScript's `\s` (`JS_SPACE`, and
+  `JS_SPACE_CHARS` for inside a class), its `.` (`JS_ANY`) and the desktop's `insideFence`: use them when porting a desktop pattern.
+- **A JVM regex's `$` also matches before a final line break.** Write `\z` where JavaScript wrote `$` without the `m` flag.
 - **SQL text that ends up in `sqlite_master` is copied character for character.** `SqlScript` splits a block the way GRDB's `execute`
   runs it, so a trigger's body stays whole.
