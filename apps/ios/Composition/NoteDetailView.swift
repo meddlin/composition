@@ -55,6 +55,8 @@ struct NoteDetailView: View {
     @State private var showingOutline = false
     @State private var outline: [OutlineHeading]?
     @State private var outlineJump = OutlineJump()
+    /// Keeps the Split tab's two halves at the same place in the note.
+    @State private var scrollSync = SplitScrollSync()
 
     var body: some View {
         Group {
@@ -221,8 +223,19 @@ struct NoteDetailView: View {
         SplitLayout(showing: mode == .split ? .both : mode == .preview ? .trailing : .leading) {
             editor(session, live: mode == .live, hidden: mode == .preview)
         } trailing: {
-            NoteReader(model: model, session: session, jump: outlineJump)
+            NoteReader(model: model, session: session, jump: outlineJump, sync: scrollSync)
         }
+        .onChange(of: mode, initial: true) { scrollSync.isOn = mode == .split }
+        #if DEBUG || EDITOR_TEST_HOOKS
+        .overlay(alignment: .bottomTrailing) {
+            if scrollSync.reporting {
+                Text(".").font(.system(size: 2)).opacity(0.05)
+                    .accessibilityElement()
+                    .accessibilityIdentifier("split-sync")
+                    .accessibilityLabel(scrollSync.report)
+            }
+        }
+        #endif
     }
 
     private func editor(_ session: NoteSession, live: Bool = false, hidden: Bool = false) -> some View {
@@ -273,6 +286,7 @@ struct NoteDetailView: View {
         handle.problem = { [weak model] message in model?.errorMessage = message }
         handle.noteCandidates = { [weak model] in model?.linkCandidates ?? [] }
         handle.noteID = noteID
+        handle.scrollSync = scrollSync
         let shown = $mode
         handle.isShowing = { shown.wrappedValue != .preview }
         // The Live tab's links (its ↗ and ⌘-tap) follow as the Preview's do, and a `pdf:` link to a PDF not here is drawn as the Preview draws it.
@@ -457,11 +471,14 @@ struct NoteReader: View {
     @State private var editingInk: InkEditing?
     /// Where the outline asks the preview to scroll to.
     var jump: OutlineJump?
+    /// What keeps the Split tab's halves at the same place in the note (nil where the preview is shown on its own, beside a PDF's notes for one).
+    var sync: SplitScrollSync?
 
-    init(model: AppModel, session: NoteSession, jump: OutlineJump? = nil) {
+    init(model: AppModel, session: NoteSession, jump: OutlineJump? = nil, sync: SplitScrollSync? = nil) {
         self.model = model
         self.session = session
         self.jump = jump
+        self.sync = sync
         _live = State(initialValue: LivePreview(session: session))
     }
 
@@ -481,7 +498,12 @@ struct NoteReader: View {
                 // In a wide window (landscape, with the list hidden) the text keeps to a readable width and sits in the middle.
                 .frame(maxWidth: NoteTextView.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                // Where each block is drawn, and the scroll view under it all, for the Split tab's halves to be kept together.
+                .coordinateSpace(name: PreviewAnchors.space)
+                .background { if let sync { ScrollViewProbe { sync.attach(preview: $0) } } }
             }
+            .onPreferenceChange(PreviewAnchorsKey.self) { frames in MainActor.assumeIsolated { sync?.framesChanged(frames) } }
+            .onChange(of: live.revision, initial: true) { sync?.previewChanged(located: live.preview?.located.map(\.range) ?? [], textLength: live.textLength) }
             // The preview's type family, and its links in the scheme's link colour.
             .fontDesign(look.previewFont.design)
             .tint(look.link)
@@ -556,6 +578,9 @@ final class LivePreview {
     private(set) var updated = ""
     private(set) var tags = ""
     private(set) var headerImage: HeaderImage?
+    /// The length of the text `preview` was made from (UTF-16 units), and a count of the times it has been made.
+    private(set) var textLength = 0
+    private(set) var revision = 0
     private var observation: NoteSession.Observation?
     private var task: Task<Void, Never>?
 
@@ -574,6 +599,8 @@ final class LivePreview {
             let made = await Task.detached(priority: .userInitiated) { (NotePreview.make(content: text), NoteFrontmatter.parse(text).frontmatter) }.value
             guard !Task.isCancelled, let self else { return }
             preview = made.0
+            textLength = (text as NSString).length
+            revision += 1
             title = made.1?.title ?? ""
             updated = made.1?.updatedAt ?? ""
             tags = made.1.map { NoteFrontmatter.tagsToString($0.tags).tagLine } ?? ""

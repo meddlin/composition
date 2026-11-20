@@ -49,6 +49,7 @@ import { useEditorFeatures } from "./useEditorFeatures";
 import { useImageUpload } from "./useImageUpload";
 import { IMAGE_PICKER_SHORTCUT } from "./useImagePicker";
 import { usePreviewFind } from "./usePreviewFind";
+import { useSplitScrollSync } from "./useSplitScrollSync";
 import { NOTE_LINK_SHORTCUT } from "./useNoteLinkPicker";
 
 /** A search within this note: what to look for, which match is being looked at, and where to report how many there are. */
@@ -540,6 +541,8 @@ export function MarkdownEditor({
   const editorRail = useTextareaRail(textarea, value, railOn && showEditor);
   const liveRail = useLiveRail(liveView, value, railOn && showLive);
   const previewRail = usePreviewRail(previewBox, railOn && showPreview);
+  // Split's two halves stay at the same place in the note: scrolling either scrolls the other.
+  useSplitScrollSync(view === "split", textarea, previewBox, value, body);
   const findQuery = find?.query ?? "";
   const findCurrent = find?.current ?? 0;
   const matchCase = find?.options.matchCase ?? false;

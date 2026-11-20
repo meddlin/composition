@@ -33,6 +33,12 @@ its syntax showing only under the caret; see [live-editor.md](live-editor.md)), 
 and **Split** (both beside each other, with the divider between them shared by every pane). Ctrl/Cmd+\ steps through
 them in that order.
 
+In Split the two halves stay at the same place in the note: scrolling either one scrolls the other to the matching spot.
+They are matched by where each half's top is in the note's text, not by how far down each is scrolled, because pictures,
+tables and components are much taller in the preview than in the editor. The side being scrolled by hand (wheel,
+trackpad, scrollbar, keys) leads; otherwise the editor does, so the preview keeps up with typing and with find. At the
+very top or bottom of one, the other goes to its top or bottom too. (`useSplitScrollSync`; the iPad does the same.)
+
 - The first note opened starts on the view chosen in **Settings › Writing › Open notes in** (Live unless changed).
 - A pane added *beside* another starts on that view too, except Split: then it starts on **Markdown**, as notes open
   together are there to be written in, and each has only part of the row. Switch that pane to **Split** from its own tabs.
