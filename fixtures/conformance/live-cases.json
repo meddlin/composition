@@ -855,6 +855,14 @@
   },
   {
    "group": "blocks",
+   "text": "Hard\\\nbreak\n*then* `code` after"
+  },
+  {
+   "group": "blocks",
+   "text": "> Quoted\\\n> break\n> **bold** too"
+  },
+  {
+   "group": "blocks",
    "text": "A paragraph with a footnote[^1] and **bold**.\n\n[^1]: The note with *italic*."
   },
   {
@@ -1244,6 +1252,14 @@
   {
    "group": "links",
    "text": "[a](u(1)) parens"
+  },
+  {
+   "group": "links",
+   "text": "See [a link](\n  https://x.test) and *more*"
+  },
+  {
+   "group": "links",
+   "text": "[a](https://x.test\n\"title\") then\n**bold**"
   },
   {
    "group": "rest",

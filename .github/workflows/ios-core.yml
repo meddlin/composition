@@ -19,6 +19,11 @@ on:
       - "apps/web/src/components/notes/liveImages.ts"
       - "apps/web/src/components/notes/markTints.ts"
       - "apps/web/src/components/notes/markdownTokens.ts"
+      # The rest of the Live view the fixtures are drawn by (lists, code blocks, links, setext headings, footnotes, ink), which the Swift Live model ports.
+      - "apps/web/src/components/notes/live*.ts"
+      - "apps/web/src/components/notes/live*.tsx"
+      # The preview's text (bare addresses, punctuation), which the Swift preview replays (fixtures/conformance/preview-text.json).
+      - "apps/web/src/components/notes/previewTextConformance.test.ts"
       # Reflow, which the Swift core ports and replays (fixtures/conformance/reflow.json).
       - "apps/web/src/components/notes/reflowText.ts"
       - "apps/web/src/components/notes/liveReflow.ts"
