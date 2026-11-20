@@ -19,6 +19,8 @@ on:
       - "apps/web/src/components/notes/liveImages.ts"
       - "apps/web/src/components/notes/markTints.ts"
       - "apps/web/src/components/notes/markdownTokens.ts"
+      # The rest of the Live view the fixtures are drawn by (lists, code blocks, links, setext headings, footnotes, ink), which the Kotlin Live model ports.
+      - "apps/web/src/components/notes/live*.ts"
       - "apps/web/src/components/notes/reflowText.ts"
       - "apps/web/src/components/notes/liveReflow.ts"
       - "apps/web/src/components/notes/reflowConformance.test.ts"
