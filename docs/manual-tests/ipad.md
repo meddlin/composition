@@ -688,7 +688,24 @@ To try them, open a note in Live and type a block between two lines of ```` ``` 
      and once at the largest text size. **Tell me if Live and the Preview differ anywhere else, and whether the fences' coming and going is
      comfortable with a finger and with a hardware keyboard's arrows.**
 
+## Split keeps both halves at the same place
+
+Scrolling either half of the *Split* tab scrolls the other to the same place in the note, matched by where each half's top is in the
+text (not by how far down each is scrolled, since pictures, tables and components are much taller in the Preview than in the editor).
+Use a long note with pictures, a table, a code block and a component or two.
+
+373. **Scrolling together in Split.** Open the note in *Split*. Scroll the editor slowly with a finger: the Preview keeps the same part of
+     the note at its top, passing through a tall picture while the editor passes its one line of tag. Fling the editor, and the Preview
+     glides with it. Now scroll the Preview: the editor follows. Put a finger on one half while the other is still gliding: the one under
+     your finger leads, and nothing jumps back. Scroll to the very end of either: both are at their ends; to the very top: both at the top.
+     Type at the bottom of the screen so the editor scrolls to keep the caret in sight: the Preview follows a quarter of a second later.
+     Jump with the Outline to a heading near the end: both halves go to it. Do it once side by side (the list hidden, landscape) and once
+     one above the other (the list open), and with a trackpad's two-finger scroll if you have one. **Tell me if the halves ever drift apart,
+     fight each other, or lag behind enough to bother you.**
+
 ## What is not yet verified
+
+- **Split's halves scrolling together on a real iPad** (item 373): a finger, a fling, a trackpad and the Outline; only the Simulator's UI test (a drag on each half) has been used.
 
 - **Live as the default, for a week on a real iPad** (item 367): only the Simulator's UI tests have opened notes in Live by default. **Gate LD8 is not passed.**
 - **Return and Backspace in lists on a real iPad** (items 368 to 371): the software keyboard, undo, Scribble, dictation and input methods; the UI tests type on a hardware keyboard only.

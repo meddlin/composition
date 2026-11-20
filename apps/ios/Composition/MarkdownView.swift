@@ -19,9 +19,11 @@ extension EnvironmentValues {
 
 struct MarkdownView: View {
     let blocks: [MdBlock]
+    /// Where each block is among the note's located blocks, for the Split tab (`PreviewBlocksView.located`); empty for blocks nested in others.
+    var anchors: [Int?] = []
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ForEach(blocks.indices, id: \.self) { MdBlockView(block: blocks[$0]) }
+            ForEach(blocks.indices, id: \.self) { MdBlockView(block: blocks[$0]).previewAnchor($0 < anchors.count ? anchors[$0] : nil) }
         }
     }
 }

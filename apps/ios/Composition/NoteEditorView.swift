@@ -26,6 +26,8 @@ final class EditorHandle {
     var isLinkHere: (String) -> Bool = { _ in true }
     /// Opens the canvas on a stored drawing (a Pencil touch on an `<Ink />` the Live tab draws, `LivePencilOpen`): the screen owns the canvas.
     var editInk: (String) -> Void = { _ in }
+    /// What keeps the Split tab's halves at the same place in the note: told each time the text view scrolls.
+    weak var scrollSync: SplitScrollSync?
 
     func presentFind() { textView?.findInteraction?.presentFindNavigator(showingReplace: false) }
 
@@ -818,6 +820,7 @@ struct NoteEditorView: UIViewRepresentable {
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             styler?.scrolled()
+            if let editor = scrollView as? NoteTextView { handle?.scrollSync?.editorScrolled(editor) }
             #if DEBUG || EDITOR_TEST_HOOKS
             updateGeometryLabel()
             #endif
