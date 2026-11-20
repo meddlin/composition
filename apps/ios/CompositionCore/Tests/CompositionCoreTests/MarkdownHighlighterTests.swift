@@ -167,3 +167,85 @@ struct HighlighterDefinitionTests {
         #expect(MarkdownHighlighter.blocks(in: text).first?.range.location == 0)
     }
 }
+
+/// cmark places what is on a paragraph's second and later lines at "where it is in the line's text + the paragraph's own start column", as if every
+/// line of the paragraph started where its first line does. A line indented more or less than the first, or one without its container's marks (a lazy
+/// line), had its colours that many columns out. The desktop (lezer, remark) has them where they are written.
+@Suite("The highlighter on a paragraph's later lines")
+struct HighlighterContinuationLineTests {
+    private func found(_ text: String) -> [String] {
+        let ns = text as NSString
+        return MarkdownHighlighter.spans(in: text).map { "\($0.kind): \(String(reflecting: ns.substring(with: $0.range)))" }
+    }
+
+    @Test("a later line indented more than the first, or less (a hanging indent), is coloured where it is written")
+    func indented() {
+        for text in [
+            "a\n   *b*\n",
+            "a\n\t*b*\n",
+            "  Some text\n*b* and more\n",
+            "Some text that runs\n    on with a *b* hanging indent\n",
+            "Title\n   *b*\n===\n",
+            "- a\n     *b*\n",
+            "- [x] a\n  *b*\n",
+        ] {
+            #expect(found(text).contains("emphasis: \"*b*\""), "\(String(reflecting: text)): \(found(text))")
+        }
+    }
+
+    @Test("a lazy line, without its quote's or list item's marks, is coloured where it is written")
+    func lazy() {
+        for text in [
+            "> a\n*b*\n",
+            "- a\n*b*\n",
+            "> > a\n> *b*\n",
+            "- > a\n  *b*\n",
+            // A lazy line keeps the spaces before its text in what cmark reads, so they are not where a line of the item would start.
+            "1. a\n  *b*\n",
+            "- a\n *b*\n",
+            "> a\n  *b*\n",
+            "10. a\n   *b*\n",
+        ] {
+            #expect(found(text).contains("emphasis: \"*b*\""), "\(String(reflecting: text)): \(found(text))")
+        }
+    }
+
+    @Test("each line of a paragraph in a list in a quote is placed by the marks it has")
+    func nested() {
+        let spans = found("> - a\n>   *b*\n> **c**\n`d`\n")
+        #expect(spans.contains("emphasis: \"*b*\"") && spans.contains("strong: \"**c**\"") && spans.contains("inlineCode: \"`d`\""), "\(spans)")
+    }
+
+    @Test("a `>` that is the text of an indented later line stays text")
+    func quoteMarkAsText() {
+        #expect(found("a\n    >*b*\n").contains("emphasis: \"*b*\""))
+    }
+
+    @Test("what runs over lines ends where it is written: emphasis, a link, code and HTML")
+    func overLines() {
+        let emphasis = found("*a\n   b*\n")
+        #expect(emphasis.contains("emphasis: \"*a\\n   b*\""), "\(emphasis)")
+        let link = found("- see [a\n  b](https://x.test) *c*\n")
+        #expect(link.contains("mark: \"](https://x.test)\"") && link.contains("emphasis: \"*c*\""), "\(link)")
+        // cmark ends code and HTML that run onto a later line by where they are in that line's text alone, without the paragraph's start column.
+        let code = found("> a `b\n>    c` *d*\n")
+        #expect(code.contains("inlineCode: \"`b\\n>    c`\"") && code.filter { $0 == "mark: \"`\"" }.count == 2 && code.contains("emphasis: \"*d*\""), "\(code)")
+        let html = found("- a <span\n   x> *d*\n")
+        #expect(html.contains("tag: \"<span\\n   x>\"") && html.contains("emphasis: \"*d*\""), "\(html)")
+        let unindented = found("a <span\nx> *d*\n")
+        #expect(unindented.contains("tag: \"<span\\nx>\"") && unindented.contains("emphasis: \"*d*\""), "\(unindented)")
+    }
+
+    @Test("after a link reference definition, every line of what follows is placed by its own indent")
+    func afterDefinition() {
+        let spans = found("[a]: https://x.test\nSome *em*\n   more `c` and **b**\n")
+        #expect(spans.contains("emphasis: \"*em*\"") && spans.contains("inlineCode: \"`c`\"") && spans.contains("strong: \"**b**\""), "\(spans)")
+    }
+
+    @Test("the incremental model colours such lines as a full read does")
+    func model() {
+        let text = "> a\n*b*\n\n1. a\n  `c`\n\nx\n    **d**\n"
+        #expect(HighlightModel(text: text).spans(in: NSRange(location: 0, length: (text as NSString).length)) == MarkdownHighlighter.spans(in: text))
+        #expect(found(text).contains("emphasis: \"*b*\"") && found(text).contains("inlineCode: \"`c`\"") && found(text).contains("strong: \"**d**\""))
+    }
+}
