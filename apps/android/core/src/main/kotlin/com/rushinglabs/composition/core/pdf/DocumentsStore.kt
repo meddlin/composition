@@ -98,11 +98,13 @@ fun CompositionDatabase.setViewState(id: Long, state: PdfViewState) {
     file.write { it.execute("UPDATE documents SET view_state = ? WHERE id = ?", state.normalized().json.serialized(), id) }
 }
 
-/** Drops a PDF's row, its marks and its bookmarks in one transaction, and returns the row so the caller can delete the file. */
+/** Drops a PDF's row, its marks, its bookmarks and a scan's pages and lines in one transaction, and returns the row so the caller can delete the file. */
 fun CompositionDatabase.deleteDocument(id: Long): StoredDocument? = file.write { db ->
     val document = fetchDocument(db, id) ?: return@write null
     db.execute("DELETE FROM pdf_annotations WHERE document_id = ?", id)
     db.execute("DELETE FROM pdf_bookmarks WHERE document_id = ?", id)
+    db.execute("DELETE FROM scan_lines WHERE document_id = ?", id)
+    db.execute("DELETE FROM scan_pages WHERE document_id = ?", id)
     db.execute("DELETE FROM documents WHERE id = ?", id)
     document
 }
@@ -123,10 +125,14 @@ fun CompositionDatabase.deleteOrphanedDocuments(): List<StoredDocument> = file.w
     for (orphan in orphans) {
         db.execute("DELETE FROM pdf_annotations WHERE document_id = ?", orphan.id)
         db.execute("DELETE FROM pdf_bookmarks WHERE document_id = ?", orphan.id)
+        db.execute("DELETE FROM scan_lines WHERE document_id = ?", orphan.id)
+        db.execute("DELETE FROM scan_pages WHERE document_id = ?", orphan.id)
         db.execute("DELETE FROM documents WHERE id = ?", orphan.id)
     }
     db.execute("DELETE FROM pdf_annotations WHERE document_id NOT IN (SELECT id FROM documents)")
     db.execute("DELETE FROM pdf_bookmarks WHERE document_id NOT IN (SELECT id FROM documents)")
+    db.execute("DELETE FROM scan_lines WHERE document_id NOT IN (SELECT id FROM documents)")
+    db.execute("DELETE FROM scan_pages WHERE document_id NOT IN (SELECT id FROM documents)")
     orphans
 }
 

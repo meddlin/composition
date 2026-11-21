@@ -14,6 +14,7 @@ internal object SchemaPass {
             db.execute(Schema.trash)
             db.execute(Schema.attachments)
             db.execute(Schema.documents)
+            db.execute(Schema.scans)
             db.execute(Schema.todos)
             db.execute(Schema.readingList)
             db.execute(Schema.feeds)
