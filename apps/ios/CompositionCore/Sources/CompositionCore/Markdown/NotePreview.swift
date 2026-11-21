@@ -105,6 +105,10 @@ public struct NotePreview: Sendable {
     /// order written, numbered as the list numbers them: what the Live tab draws in place of them (docs/ipad-live-default-plan.md, Step 7). At the end of a
     /// note, where definitions are usually written, a run reads as the list the Preview adds there. Only definitions that are cited.
     public var footnoteDefinitions: [LocatedBlock] = []
+    /// Where each of `blocks` is among `located`: one entry per block, and in it one index per part the Preview draws (one for a component, one per Markdown
+    /// block for a run of Markdown), nil for a part that is written nowhere it can be found (the footnotes listed at the end). What the Split tab's halves are
+    /// kept together by (`ScrollSync`): the Preview says where it draws each located block.
+    public var locatedIndex: [[Int?]] = []
 
     /// The preview of a note's stored text, frontmatter and all. The located blocks' ranges are in `content`.
     public static func make(content: String) -> NotePreview {
@@ -115,10 +119,13 @@ public struct NotePreview: Sendable {
 
     public static func make(scanned: ScannedNote) -> NotePreview {
         var builder = Builder(scanned: scanned)
-        var (blocks, located) = builder.buildTop()
+        var (blocks, located, locatedIndex) = builder.buildTop()
         // A note with footnotes and no `<Footnotes />` lists them at the end, as the desktop does.
-        if !builder.placedFootnotes, !scanned.footnotes.isEmpty { blocks.append(.footnotes(builder.footnoteEntries())) }
-        var preview = NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings, located: located)
+        if !builder.placedFootnotes, !scanned.footnotes.isEmpty {
+            blocks.append(.footnotes(builder.footnoteEntries()))
+            locatedIndex.append([nil])
+        }
+        var preview = NotePreview(blocks: blocks, error: scanned.error, headings: scanned.headings, located: located, locatedIndex: locatedIndex)
         if !scanned.footnoteDefinitions.isEmpty {
             let entries = builder.footnoteEntries()
             preview.footnoteDefinitions = scanned.footnoteDefinitions.compactMap { run in
@@ -146,37 +153,48 @@ public struct NotePreview: Sendable {
 
         /// The note's own blocks, as `build` makes them, and the same blocks located in the note: each run of Markdown is parsed once, and its blocks are converted
         /// one by one (what `MarkdownConverter.blocks` does) so that each keeps where swift-markdown found it.
-        mutating func buildTop() -> (blocks: [PreviewBlock], located: [LocatedBlock]) {
+        mutating func buildTop() -> (blocks: [PreviewBlock], located: [LocatedBlock], locatedIndex: [[Int?]]) {
             var blocks: [PreviewBlock] = []
             var located: [LocatedBlock] = []
+            var locatedIndex: [[Int?]] = []
             for (index, block) in scanned.blocks.enumerated() {
                 switch block {
                 case .markdown(let source):
-                    let document = Document(parsing: source)
+                    let document = Document(note: source)
                     let map = SourceMap(text: source)
                     let locator = scanned.locator(ofRun: index, text: source)
                     var all: [MdBlock] = []
+                    var parts: [Int?] = []
                     for child in document.children {
                         guard let converted = converter.block(child) else { continue }
                         all.append(converted)
                         if let written = map.range(of: child), let range = locator?.noteRange(written) {
                             located.append(LocatedBlock(range: range, block: .markdown([converted])))
+                            parts.append(located.count - 1)
+                        } else {
+                            parts.append(nil)
                         }
                     }
                     blocks.append(.markdown(all))
+                    locatedIndex.append(parts)
                 case .element(let name, let props, let children):
                     let made = element(name, props, children)
                     blocks += made
-                    if made.count == 1, index < scanned.blockRanges.count { located.append(LocatedBlock(range: scanned.blockRanges[index], block: made[0])) }
+                    if made.count == 1, index < scanned.blockRanges.count {
+                        located.append(LocatedBlock(range: scanned.blockRanges[index], block: made[0]))
+                        locatedIndex.append([located.count - 1])
+                    } else {
+                        locatedIndex += made.map { _ in [nil] }
+                    }
                 }
             }
-            return (blocks, located)
+            return (blocks, located, locatedIndex)
         }
 
         mutating func build(_ blocks: [NoteBlock]) -> [PreviewBlock] {
             blocks.flatMap { block -> [PreviewBlock] in
                 switch block {
-                case .markdown(let source): return [.markdown(converter.blocks(Document(parsing: source)))]
+                case .markdown(let source): return [.markdown(converter.blocks(Document(note: source)))]
                 case .element(let name, let props, let children): return element(name, props, children)
                 }
             }
@@ -231,7 +249,7 @@ public struct NotePreview: Sendable {
         private func csv(in blocks: [NoteBlock]) -> String {
             blocks.map { block -> String in
                 switch block {
-                case .markdown(let source): NotePreview.codeAndText(Document(parsing: source))
+                case .markdown(let source): NotePreview.codeAndText(Document(note: source))
                 case .element(_, _, let children): csv(in: children)
                 }
             }.joined(separator: "\n")
@@ -255,7 +273,7 @@ public struct NotePreview: Sendable {
         func footnoteEntries() -> [FootnoteEntry] {
             scanned.footnotes.enumerated().map { index, label in
                 var plain = MarkdownConverter(countsHeadings: false, footnoteNumbers: footnoteNumbers)
-                return FootnoteEntry(number: index + 1, blocks: plain.blocks(Document(parsing: scanned.footnoteBodies[label] ?? "")))
+                return FootnoteEntry(number: index + 1, blocks: plain.blocks(Document(note: scanned.footnoteBodies[label] ?? "")))
             }
         }
     }
@@ -276,6 +294,8 @@ struct MarkdownConverter {
     /// Footnote numbers by label: a `[^label]` in the text becomes its number in superscript digits (as in the terminal app).
     var footnoteNumbers: [String: Int] = [:]
     private var headings = 0
+    /// How many links the inlines being read are inside: a bare address in a link's own text is not made a link of its own.
+    private var linkDepth = 0
 
     init(countsHeadings: Bool = true, footnoteNumbers: [String: Int] = [:]) {
         self.countsHeadings = countsHeadings
@@ -380,6 +400,38 @@ struct MarkdownConverter {
             }
             if let inline = inline(node) { out.append(inline) }
         }
+        return joined(out)
+    }
+
+    /// Neighbouring text as one, as the desktop has it (cmark leaves a run of text in pieces where it tried a `_` or a `[` and did not use it), with the
+    /// bare addresses in it made links (`PreviewAutolinks`) unless it is a link's own text. A soft line break is read as the `\n` it stands for.
+    private func joined(_ inlines: [MdInline]) -> [MdInline] {
+        var out: [MdInline] = []
+        var run: String?
+        func flush() {
+            guard let text = run else { return }
+            run = nil
+            for piece in linkDepth == 0 ? PreviewAutolinks.pieces(text) : [.text(text)] {
+                switch piece {
+                case .link(let url, let text): out.append(.link(destination: url, [.text(text)]))
+                case .text(let text):
+                    for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                        if index > 0 { out.append(.softBreak) }
+                        if !line.isEmpty { out.append(.text(String(line))) }
+                    }
+                }
+            }
+        }
+        for inline in inlines {
+            switch inline {
+            case .text(let text): run = (run ?? "") + text
+            case .softBreak: run = (run ?? "") + "\n"
+            default:
+                flush()
+                out.append(inline)
+            }
+        }
+        flush()
         return out
     }
 
@@ -390,7 +442,10 @@ struct MarkdownConverter {
         case let emphasis as Emphasis: return .emphasis(inlines(emphasis.children))
         case let strong as Strong: return .strong(inlines(strong.children))
         case let strike as Strikethrough: return .strikethrough(inlines(strike.children))
-        case let link as Link: return .link(destination: link.destination, inlines(link.children))
+        case let link as Link:
+            linkDepth += 1
+            defer { linkDepth -= 1 }
+            return .link(destination: link.destination, inlines(link.children))
         case let image as Image: return .image(source: image.source ?? "", alt: NoteScanner.plainText(image), title: image.title, width: nil)
         case is SoftBreak: return .softBreak
         case is LineBreak: return .lineBreak

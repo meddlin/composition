@@ -41,7 +41,7 @@ struct NotePreviewView: View {
             if let error = preview.error {
                 NoticeView(text: "Couldn’t render this note’s components: \(error) Showing it as plain Markdown.", tone: .warning)
             }
-            PreviewBlocksView(blocks: preview.blocks)
+            PreviewBlocksView(blocks: preview.blocks, located: preview.locatedIndex)
         }
         .overlay(alignment: .topLeading) { PreviewBlocksProbe(blocks: preview.blocks) }
     }
@@ -92,10 +92,20 @@ private struct PreviewBlocksProbe: View {
 
 struct PreviewBlocksView: View {
     let blocks: [PreviewBlock]
+    /// For the note's own top-level blocks: where each part is among the located blocks (`NotePreview.locatedIndex`), so that each says where it is drawn
+    /// (`previewAnchor`) for the Split tab's halves to be kept together. Empty for blocks inside a component.
+    var located: [[Int?]] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            ForEach(blocks.indices, id: \.self) { PreviewBlockView(block: blocks[$0]) }
+            ForEach(blocks.indices, id: \.self) { index in
+                let parts = index < located.count ? located[index] : []
+                if case .markdown(let inner) = blocks[index], !parts.isEmpty {
+                    MarkdownView(blocks: inner, anchors: parts)
+                } else {
+                    PreviewBlockView(block: blocks[index]).previewAnchor(parts.first ?? nil)
+                }
+            }
         }
     }
 }

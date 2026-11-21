@@ -182,6 +182,7 @@ one carried onto a second line), a definition nothing cites, and `<Footnotes />`
 - [ ] Type in Live, then pick another note in the sidebar so it opens in the same pane: Cmd/Ctrl+Z does nothing, and the other note's text is never brought back.
 - [ ] Settings → Writing → **Open notes in**: choose Live and go back to your notes. Pick a note in an empty panel and open one to the side: both start on Live. A panel you switched to Preview stays on Preview when you pick another note into it. Choose Split again: a note opened to the side starts on Markdown.
 - [ ] A note deleted while it is open is read only: you can select and copy but not type.
+- [ ] Split keeps both halves at the same place: in a long note with pictures, a table, a code block and a component, scroll the Markdown half with the wheel or trackpad and the Preview keeps the same part of the note at its top (passing through a tall picture while the editor passes its tag); scroll the Preview and the Markdown half follows; drag either scrollbar; at the very top or bottom of one, the other is at its top or bottom too. Type at the bottom of the editor so it scrolls, and use find's **Next**: the Preview follows. Nothing jumps back or fights while you scroll.
 
 ## 7. Layout and accessibility
 

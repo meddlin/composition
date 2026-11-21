@@ -106,6 +106,35 @@ struct NotePreviewTests {
         guard preview.blocks.count == 1, case .markdown = preview.blocks[0] else { Issue.record("not one block of Markdown"); return }
     }
 
+    @Test("the paragraph after a link reference definition is located from its own first line")
+    func locatedAfterDefinition() {
+        let note = "Intro\n\n[a]: https://x.test\nSome *em* text\n"
+        #expect(NotePreview.make(content: note).located.map { (note as NSString).substring(with: $0.range) } == ["Intro", "Some *em* text"])
+    }
+
+    @Test("quotes, dashes and dots stay as they are written, as the desktop's preview has them (no smart punctuation)")
+    func punctuation() {
+        let preview = NotePreview.make(content: "# Don't \"quote\" -- me...\n\nShe said \"hi\" -- then 'left' --- fast...\n")
+        #expect(preview.headings.map(\.text) == ["Don't \"quote\" -- me..."])
+        #expect(preview.blocks == [.markdown([
+            .heading(level: 1, ordinal: 0, [.text("Don't \"quote\" -- me...")]),
+            .paragraph([.text("She said \"hi\" -- then 'left' --- fast...")]),
+        ])])
+    }
+
+    @Test("bare web and e-mail addresses are links, as the desktop's preview makes them, but not in a link's text or in code")
+    func bareAddresses() {
+        let preview = NotePreview.make(content: "See https://example.com/a_b. Or www.x.test, mail me@x.test!\n\n[www.x.test](https://y.test) `www.x.test`\n")
+        #expect(preview.blocks == [.markdown([
+            .paragraph([
+                .text("See "), .link(destination: "https://example.com/a_b", [.text("https://example.com/a_b")]),
+                .text(". Or "), .link(destination: "http://www.x.test", [.text("www.x.test")]),
+                .text(", mail "), .link(destination: "mailto:me@x.test", [.text("me@x.test")]), .text("!"),
+            ]),
+            .paragraph([.link(destination: "https://y.test", [.text("www.x.test")]), .text(" "), .code("www.x.test")]),
+        ])])
+    }
+
     @Test("lists, tasks, tables, quotes and code come through")
     func markdownBlocks() {
         let preview = NotePreview.make(content: "- [x] done\n- [ ] todo\n\n1. one\n2. two\n\n> quoted\n\n| a | b |\n|:--|--:|\n| 1 | 2 |\n\n```swift\nlet x = 1\n```\n\n---\n")

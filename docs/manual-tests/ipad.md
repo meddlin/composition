@@ -132,7 +132,7 @@ The note screen has **Markdown** (the editor), **Preview** and **Split**. **Use 
 28. **Colours while typing fast,** on a hardware keyboard and on the on-screen one, in a long note of yours. Nothing should lag, and no text should flicker to a wrong colour for more than a moment. Type three backticks on a line of their
     own in the middle of a note: the text below should turn into code within about half a second, without a freeze.
 29. **Preview and Split.** Type in *Split*: the preview follows about a quarter of a second after you stop. Turn the iPad: the halves should stack when the note's pane is narrower than 800 points and sit side by side when it is wider, without losing the keyboard or your place.
-30. **Find** (the magnifying glass, or ⌘F with a hardware keyboard). It marks every match in the colours' place, and the next and previous buttons move between them.
+30. **Find** (the magnifying glass, or ⌘F with a hardware keyboard: also before you have tapped into the text, or with the focus in the lists). It marks every match in the colours' place, and the next and previous buttons move between them.
 31. **Search for what you typed.** Type an unusual word into a note, wait a second, then search for it in the list: the note is found, with no relaunch. Then trash the note from its own screen (the trash button, top right) and
     restore it from the Trash Can: it is back, and still found.
 32. **Undo and redo** (⌘Z, ⇧⌘Z, or the shake and the three-finger swipe) after typing and after a paste. The colours should be right afterwards.
@@ -361,11 +361,21 @@ From [ipad-live-default-plan.md](../ipad-live-default-plan.md), Step 0. The Appe
 344. **A drawing and a diagram in Live (Gate LD1).** In a note in the Live tab, make a drawing with the Pencil (*Image ▸ Drawing…*: a few words of handwriting and a shape, in black and in one colour), and tap *Done*. Then:
     - It is drawn where its tag was, at the size the Preview draws it, and the tag is gone. Switch to Preview and back: the same size, the same place.
     - Black ink is the scheme's text colour: white on Dark, Forest and Wine, dark on Light and Cream (change the scheme in the Appearance sheet with the note open). A coloured stroke keeps its colour as in the Preview.
-    - Tap the drawing: its `<Ink … />` tag shows, and the drawing is drawn below it; tap away and it is drawn in its place again. Tapping does not open the canvas in Live (it does in the Preview; editing from Live is decision I6's ↗, a later step).
+    - Tap the drawing with a finger: its `<Ink … />` tag shows, and the drawing is drawn below it; tap away and it is drawn in its place again. A finger's tap does not open the canvas in Live; the Pencil's does (item 372).
     - Add `width="50%"` to the tag: it is drawn half as wide as the text.
     - A `<Drawio src="app_data/…" />` (a diagram from the desktop, or the Preview showcase's) is drawn at half the size of its picture, as in the Preview, and with a `width` at that width.
     - A drawing whose file is gone (change a letter of its name) says `Image not found: …`, as a picture does.
     - Tell me if a drawing ever flashes black on a dark scheme before it turns the right colour, or comes in late when you scroll to it.
+
+    **Failed 2026-11-18, fixed 2026-11-19: retest with the Pencil.** Drawing an "x" with the Pencil over a drawing in Live started Scribble, which wrote " X" after the `<Ink … />` tag; the drawing was then a picture inside a line of text, which Live leaves as its tag (item 122), so it vanished. Scribble now may not begin over anything Live draws in place of its source (drawings, diagrams, pictures, tables, components, the header), across the whole width of its line, and still writes everywhere else, the lines just above and below included (`LiveScribble` in `apps/ios/Composition/LiveScribble.swift`). A Pencil touch on a drawing now opens its canvas, as a tap in the Preview does (your choice). In the Simulator, `LiveScribbleUITests` checks what the Scribble delegate answers over a diagram, a table and the lines around them, and that a stand-in for the Pencil opens a drawing's canvas; the real Pencil is item 372.
+
+372. **The Pencil on a drawing in Live (Gate LD1's fix).** In a note in Live with a drawing (`<Ink>`), a diagram (`<Drawio>`) or a picture, and a table, each with a line of text above and below:
+    - Draw an "x" with the Pencil on the drawing: its canvas opens on that drawing, and nothing is written in the note (the Markdown tab shows the tag as it was). Draw a stroke, tap *Done*: the drawing in Live is the new one. Draw on it and tap *Cancel*: nothing changed.
+    - Draw an "x" on the diagram, on the picture and on the table, and beside each one (to the right of a narrow drawing, and in the margin at the side of the page): no text appears, the item stays drawn, and nothing opens (only a drawing has a canvas). Tap them with the Pencil: as a finger's tap, the caret goes to the source, which shows.
+    - Write a word with the Pencil on the line just above each one and on the line just below: the word goes there, and the item stays drawn. Tap a drawing with a finger: its tag shows, as before; the canvas does not open.
+    - With the caret in a drawing's tag (the tag shown, the drawing below it), Scribble a word at the end of the tag's line: it goes in the tag, which you can see. Draw on the drawing below the tag: its canvas opens.
+    - In the Markdown tab, Scribble works on every line, a tag's too.
+    - Tell me if Scribble ever refused a place you meant to write, or if opening the canvas from a stroke (rather than a tap) felt wrong.
 
 ## Links in the Live tab (Live default plan, Step 2; Gate LD2)
 
@@ -405,7 +415,7 @@ A table in the Live tab ([ipad-live-default-plan.md](../ipad-live-default-plan.m
 
 359. **The showcase in Live beside the Preview, in every scheme.** Import the preview showcase (`fixtures/conformance/preview-showcase/note.md`) or any note with panels, charts and cards, and open it in Live beside the same note in the Preview (Split, then Preview on one side). In each of the five schemes (and System, light and dark), say where a component in Live looks different from the Preview: its width, its tint, its corners, its text size, the space above and below it. Scroll the note top to bottom and back: a component that comes into view late is a faint box for a moment, then its picture; say if one never arrives or flickers.
 360. **A chart at the largest text size, and turned.** Settings, Accessibility, Display & Text Size, Larger Text, to the largest: open a note with a line chart, a bar chart and a pie in Live. Each is drawn as the Preview draws it at that size (labels and legend not cut off), and no wider than the text. Turn the iPad: a moment later each fits the new width. Put the caret in a chart's CSV and change a number: when you stop typing, the picture under the source changes.
-361. **The actions.** Tap a panel, a chart, a card and a notice in Live with a finger and with the Pencil: each time the caret goes to the start of its source, which shows, and the keyboard comes up; nothing opens. With the caret in a `<YouTube>` tag, tap the ↗ after it: the video opens in Safari (or the YouTube app) at the time the tag gives; in a `<Repo>` tag, the repository opens. With ⌘ held, a tap on a card does **not** open it (only links follow on ⌘-tap); say if you expected it to. Tap a drawing (`<Ink>`) in Live: the caret goes to its tag and the canvas does not open; open the Preview and tap it there to edit it.
+361. **The actions.** Tap a panel, a chart, a card and a notice in Live with a finger and with the Pencil: each time the caret goes to the start of its source, which shows, and the keyboard comes up; nothing opens. With the caret in a `<YouTube>` tag, tap the ↗ after it: the video opens in Safari (or the YouTube app) at the time the tag gives; in a `<Repo>` tag, the repository opens. With ⌘ held, a tap on a card does **not** open it (only links follow on ⌘-tap); say if you expected it to. Tap a drawing (`<Ink>`) in Live with a finger: the caret goes to its tag and the canvas does not open; with the Pencil, its canvas opens (item 372).
 362. **Typing a component, and VoiceOver.** In Live, type `<Info>`, a blank line, some words, a blank line and `</Info>`, then tap below: the panel is drawn. While the tag was half written the other components in the note stayed drawn and no notice appeared in Live (open the Preview meanwhile: it says it couldn't render the components). Then with VoiceOver on, read a note with a panel, a chart and a card in Live: say what is read for each (its words, its props such as `url="…"`, the punctuation of its tags) and whether that is acceptable; the picture adds no element of its own.
 
 ## Setext headings, footnotes, `<Toc />` and the header in the Live tab (Live default plan, Step 7)
@@ -539,31 +549,31 @@ fonts, and with `swift test` on a Mac; never with real handwriting, never on you
 note that owns them as a PDF, and Vision reads them in the background so Search finds their words. [How it works](../architecture/scans.md);
 [why it is shaped this way](../scanned-notes-ocr-research.md).
 
-372. **Import from Files.** Put 3 to 5 photos or scans of your pages in a folder in Files, named in order (`page 1.jpg` … `page 12.jpg`). In
+374. **Import from Files.** Put 3 to 5 photos or scans of your pages in a folder in Files, named in order (`page 1.jpg` … `page 12.jpg`). In
      the notes list's toolbar (or its ••• menu), *Import Scans* ▸ *Add from Files*, pick them all: they are listed in name order (`page 2`
      before `page 12`) with a picture of each, and the title is what their names share (*page* is not taken: you get *Scanned notes*).
-373. **Put them right.** Drag a page by its handle to another place; tap the turn button on a sideways page until it stands up; swipe one
+375. **Put them right.** Drag a page by its handle to another place; tap the turn button on a sideways page until it stands up; swipe one
      away. Type a title. *Import*: a note with that title opens with the PDF, the pages in the order and the way up you left them.
-374. **From Photos and the camera.** Again with *Add from Photos* (the order you tapped them in) and *Scan with the Camera* (a few pages
+376. **From Photos and the camera.** Again with *Add from Photos* (the order you tapped them in) and *Scan with the Camera* (a few pages
      with the document camera). *Tell me whether the camera's pages come out straight and cropped.*
-375. **Reading in the background.** Right after an import, open the list button at the left of the PDF's strip: *Contents* says *Reading
+377. **Reading in the background.** Right after an import, open the list button at the left of the PDF's strip: *Contents* says *Reading
      the handwriting: 1 of 5 pages read* and counts up. Use the app meanwhile. *Tell me how long a page took and whether the app felt slow.*
-376. **Search finds your words.** When it is done, search for a word you wrote on page 3 (one you would really look for): the note is found
+378. **Search finds your words.** When it is done, search for a word you wrote on page 3 (one you would really look for): the note is found
      with *In the scan, p. 3*. Tap it: the PDF opens at page 3 and the lines with the word are framed in yellow for a few seconds, with
      *Found on 1 line of page 3.* **This is the real test of your handwriting: tell me, for ten words you would search for, how many were
      found**, and which of your pages read worst (cursive, pencil, a crowded page).
-377. **What is kept out.** *Contents* says how many lines are *kept out of Search*: the reader was unsure of them. A word only on such a
+379. **What is kept out.** *Contents* says how many lines are *kept out of Search*: the reader was unsure of them. A word only on such a
      line is not found; that is by design until there is a way to check lines (the next step). *Tell me if many of your lines are kept out.*
-378. **Confidently wrong.** If you find a word that Search finds on a page where you did not write it (Vision read something else as it),
+380. **Confidently wrong.** If you find a word that Search finds on a page where you did not write it (Vision read something else as it),
      tell me the word and what you wrote: a confident misreading is the risk this feature carries (my drawn test page had "Tc" read as
      "To", sure of it).
-379. **Quit while it reads.** Import a scan of 20 or more pages and, while *Contents* says it is reading, end the app (swipe it away). Open it
+381. **Quit while it reads.** Import a scan of 20 or more pages and, while *Contents* says it is reading, end the app (swipe it away). Open it
      again: reading goes on from where it stopped, not from page 1 (*Contents* counts on from the pages already read).
-380. **A scan is a PDF.** On a scan: draw with the Pencil, add a typed note, bookmark a page, *Cite this page* into a note, export the
+382. **A scan is a PDF.** On a scan: draw with the Pencil, add a typed note, bookmark a page, *Cite this page* into a note, export the
      annotated PDF. All as on any PDF. Selecting or highlighting the handwriting itself is not there yet.
-381. **Trash and backup.** Move the scan's note to the Trash Can: its words are no longer found; restore it: they are again. Make a backup
+383. **Trash and backup.** Move the scan's note to the Trash Can: its words are no longer found; restore it: they are again. Make a backup
      and restore it: the scan's words are found again without being read again (*Contents* says all pages read at once).
-382. **Nothing leaves the iPad.** With Airplane Mode on, import a scan: it is made and read exactly the same.
+384. **Nothing leaves the iPad.** With Airplane Mode on, import a scan: it is made and read exactly the same.
 
 ## The Reading List (plugin, ahead of M3)
 
@@ -711,7 +721,24 @@ To try them, open a note in Live and type a block between two lines of ```` ``` 
      and once at the largest text size. **Tell me if Live and the Preview differ anywhere else, and whether the fences' coming and going is
      comfortable with a finger and with a hardware keyboard's arrows.**
 
+## Split keeps both halves at the same place
+
+Scrolling either half of the *Split* tab scrolls the other to the same place in the note, matched by where each half's top is in the
+text (not by how far down each is scrolled, since pictures, tables and components are much taller in the Preview than in the editor).
+Use a long note with pictures, a table, a code block and a component or two.
+
+373. **Scrolling together in Split.** Open the note in *Split*. Scroll the editor slowly with a finger: the Preview keeps the same part of
+     the note at its top, passing through a tall picture while the editor passes its one line of tag. Fling the editor, and the Preview
+     glides with it. Now scroll the Preview: the editor follows. Put a finger on one half while the other is still gliding: the one under
+     your finger leads, and nothing jumps back. Scroll to the very end of either: both are at their ends; to the very top: both at the top.
+     Type at the bottom of the screen so the editor scrolls to keep the caret in sight: the Preview follows a quarter of a second later.
+     Jump with the Outline to a heading near the end: both halves go to it. Do it once side by side (the list hidden, landscape) and once
+     one above the other (the list open), and with a trackpad's two-finger scroll if you have one. **Tell me if the halves ever drift apart,
+     fight each other, or lag behind enough to bother you.**
+
 ## What is not yet verified
+
+- **Split's halves scrolling together on a real iPad** (item 373): a finger, a fling, a trackpad and the Outline; only the Simulator's UI test (a drag on each half) has been used.
 
 - **Live as the default, for a week on a real iPad** (item 367): only the Simulator's UI tests have opened notes in Live by default. **Gate LD8 is not passed.**
 - **Return and Backspace in lists on a real iPad** (items 368 to 371): the software keyboard, undo, Scribble, dictation and input methods; the UI tests type on a hardware keyboard only.

@@ -9,6 +9,8 @@ import { remarkHeadings } from "./mdx/remarkHeadings";
 import { remarkRestrictMdx } from "./mdx/remarkRestrictMdx";
 import { markdownComponents as imageComponents } from "./NoteImage";
 import { NoteAnchor, noteUrlTransform } from "./NoteLink";
+import { rehypeCodeFence, rehypeCodeLines } from "./rehypeCodeLines";
+import { rehypeBlockSources } from "./rehypeBlockSources";
 import { rehypeSourceSpans } from "./rehypeSourceSpans";
 
 type Props = {
@@ -51,9 +53,17 @@ const mdxRehypeOptions = (idPrefix: string): NonNullable<Options["remarkRehypeOp
  * alone (a note switch does it twice). Whatever the preview reads from context still updates it.
  */
 export const NoteMarkdown = memo(function NoteMarkdown({ body, rehypePlugins: extraRehypePlugins }: Props) {
-  // Every piece of text is wrapped to say where in the note it came from; that has to see the tree first.
-  const rehypePlugins = useMemo(() => [rehypeSourceSpans, ...extraRehypePlugins], [extraRehypePlugins]);
-  const mdxRehypePlugins = useMemo(() => [rehypeSourceSpans, rehypeFootnotes, ...extraRehypePlugins], [extraRehypePlugins]);
+  // Every piece of text is wrapped to say where in the note it came from; that has to see the tree first. A code
+  // fence's options are read before the colours (`extraRehypePlugins`), and its lines are cut after them.
+  // Each top-level block says where it is written too, for Split's halves to be kept at the same place (`useSplitScrollSync`).
+  const rehypePlugins = useMemo(
+    () => [rehypeBlockSources, rehypeSourceSpans, rehypeCodeFence, ...extraRehypePlugins, rehypeCodeLines],
+    [extraRehypePlugins],
+  );
+  const mdxRehypePlugins = useMemo(
+    () => [rehypeBlockSources, rehypeSourceSpans, rehypeFootnotes, rehypeCodeFence, ...extraRehypePlugins, rehypeCodeLines],
+    [extraRehypePlugins],
+  );
   // Heading ids are unique per preview, so a table of contents never scrolls a neighbouring pane.
   const idPrefix = `${useId()}-`;
   const remarkPlugins = useMemo(() => mdxRemarkPlugins(idPrefix), [idPrefix]);

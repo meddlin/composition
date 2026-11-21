@@ -47,7 +47,7 @@ struct NoteDetailView: View {
     @State private var showingStored = false
     @State private var storedWords = ""
     @State private var pickedStored: StoredImageInfo?
-    /// The drawing canvas, open on a blank page (Image menu, *Drawing…*).
+    /// The drawing canvas, open on a blank page (Image menu, *Drawing…*), or on a stored drawing the Pencil touched in the Live tab (`LivePencilOpen`).
     @State private var drawing: InkEditing?
     /// The sheet that picks the picture above the note's title (HeaderImage.swift).
     @State private var showingHeaderImage = false
@@ -55,6 +55,8 @@ struct NoteDetailView: View {
     @State private var showingOutline = false
     @State private var outline: [OutlineHeading]?
     @State private var outlineJump = OutlineJump()
+    /// Keeps the Split tab's two halves at the same place in the note.
+    @State private var scrollSync = SplitScrollSync()
 
     var body: some View {
         Group {
@@ -106,6 +108,7 @@ struct NoteDetailView: View {
                     if mode != .preview {
                         Menu {
                             Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                                .keyboardShortcut("f", modifiers: .command)
                             Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                             Menu("Image", systemImage: "photo.badge.plus") { imageItems }
                         } label: {
@@ -113,7 +116,10 @@ struct NoteDetailView: View {
                         }
                     }
                 } else if mode != .preview {
+                    // ⌘F as well, from wherever the focus is (the lists, or a note not yet tapped into), not only from inside the text.
                     Button("Find", systemImage: "magnifyingglass") { handle.presentFind() }
+                        .keyboardShortcut("f", modifiers: .command)
+                        .accessibilityIdentifier("find-button")
                     Button("Link to Note", systemImage: "link") { handle.linkToNote() }
                     Menu { imageItems } label: { Label("Image", systemImage: "photo.badge.plus") }
                 }
@@ -165,7 +171,11 @@ struct NoteDetailView: View {
         .fullScreenCover(item: $drawing) { editing in
             InkCanvasScreen(editing: editing, look: look) { saved in
                 drawing = nil
-                handle.insertInk(png: saved.png, alt: saved.transcript)
+                if editing.stored != nil {
+                    if let session { InkEditing.storeEdited(editing, saved: saved, model: model, session: session) }
+                } else {
+                    handle.insertInk(png: saved.png, alt: saved.transcript)
+                }
             } cancelled: {
                 drawing = nil
             }
@@ -213,8 +223,19 @@ struct NoteDetailView: View {
         SplitLayout(showing: mode == .split ? .both : mode == .preview ? .trailing : .leading) {
             editor(session, live: mode == .live, hidden: mode == .preview)
         } trailing: {
-            NoteReader(model: model, session: session, jump: outlineJump)
+            NoteReader(model: model, session: session, jump: outlineJump, sync: scrollSync)
         }
+        .onChange(of: mode, initial: true) { scrollSync.isOn = mode == .split }
+        #if DEBUG || EDITOR_TEST_HOOKS
+        .overlay(alignment: .bottomTrailing) {
+            if scrollSync.reporting {
+                Text(".").font(.system(size: 2)).opacity(0.05)
+                    .accessibilityElement()
+                    .accessibilityIdentifier("split-sync")
+                    .accessibilityLabel(scrollSync.report)
+            }
+        }
+        #endif
     }
 
     private func editor(_ session: NoteSession, live: Bool = false, hidden: Bool = false) -> some View {
@@ -265,11 +286,18 @@ struct NoteDetailView: View {
         handle.problem = { [weak model] message in model?.errorMessage = message }
         handle.noteCandidates = { [weak model] in model?.linkCandidates ?? [] }
         handle.noteID = noteID
+        handle.scrollSync = scrollSync
         let shown = $mode
         handle.isShowing = { shown.wrappedValue != .preview }
         // The Live tab's links (its ↗ and ⌘-tap) follow as the Preview's do, and a `pdf:` link to a PDF not here is drawn as the Preview draws it.
         handle.followLink = { [weak model] href in model.map { LinkFollower(model: $0, noteId: noteID).follow(href) } ?? false }
         handle.isLinkHere = { [weak model] href in model.map { LinkFollower.isHere(href, model: $0) } ?? true }
+        // The Pencil on a drawing in the Live tab opens its canvas, as a tap on it in the Preview does.
+        let canvas = $drawing
+        handle.editInk = { [weak model] name in
+            guard let model, canvas.wrappedValue == nil, let editing = InkEditing.load(named: name, from: model.location.imagesURL) else { return }
+            canvas.wrappedValue = editing
+        }
         let words = $storedWords, showing = $showingStored
         handle.openStoredImages = { [weak handle] in
             words.wrappedValue = handle?.selectedWords ?? ""
@@ -443,30 +471,20 @@ struct NoteReader: View {
     @State private var editingInk: InkEditing?
     /// Where the outline asks the preview to scroll to.
     var jump: OutlineJump?
+    /// What keeps the Split tab's halves at the same place in the note (nil where the preview is shown on its own, beside a PDF's notes for one).
+    var sync: SplitScrollSync?
 
-    init(model: AppModel, session: NoteSession, jump: OutlineJump? = nil) {
+    init(model: AppModel, session: NoteSession, jump: OutlineJump? = nil, sync: SplitScrollSync? = nil) {
         self.model = model
         self.session = session
         self.jump = jump
+        self.sync = sync
         _live = State(initialValue: LivePreview(session: session))
     }
 
-    /// The edited drawing is stored under its own new name (the name carries a hash of the bytes), and the note's text names that one in place of the old. The `alt`
-    /// follows the words read from the drawing unless a person has changed it.
     private func saveEdited(_ editing: InkEditing, saved: InkSaved) {
         editingInk = nil
-        guard let old = editing.stored else { return }
-        let location = model.location
-        let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
-        Task {
-            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
-            switch outcome {
-            case .stored(let name):
-                let renamed = InkTag.replacing(old, with: name, in: session.text)
-                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
-            case .failed(let message): model.errorMessage = message
-            }
-        }
+        InkEditing.storeEdited(editing, saved: saved, model: model, session: session)
     }
 
     var body: some View {
@@ -480,7 +498,12 @@ struct NoteReader: View {
                 // In a wide window (landscape, with the list hidden) the text keeps to a readable width and sits in the middle.
                 .frame(maxWidth: NoteTextView.readableWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
+                // Where each block is drawn, and the scroll view under it all, for the Split tab's halves to be kept together.
+                .coordinateSpace(name: PreviewAnchors.space)
+                .background { if let sync { ScrollViewProbe { sync.attach(preview: $0) } } }
             }
+            .onPreferenceChange(PreviewAnchorsKey.self) { frames in MainActor.assumeIsolated { sync?.framesChanged(frames) } }
+            .onChange(of: live.revision, initial: true) { sync?.previewChanged(located: live.preview?.located.map(\.range) ?? [], textLength: live.textLength) }
             // The preview's type family, and its links in the scheme's link colour.
             .fontDesign(look.previewFont.design)
             .tint(look.link)
@@ -555,6 +578,9 @@ final class LivePreview {
     private(set) var updated = ""
     private(set) var tags = ""
     private(set) var headerImage: HeaderImage?
+    /// The length of the text `preview` was made from (UTF-16 units), and a count of the times it has been made.
+    private(set) var textLength = 0
+    private(set) var revision = 0
     private var observation: NoteSession.Observation?
     private var task: Task<Void, Never>?
 
@@ -573,10 +599,32 @@ final class LivePreview {
             let made = await Task.detached(priority: .userInitiated) { (NotePreview.make(content: text), NoteFrontmatter.parse(text).frontmatter) }.value
             guard !Task.isCancelled, let self else { return }
             preview = made.0
+            textLength = (text as NSString).length
+            revision += 1
             title = made.1?.title ?? ""
             updated = made.1?.updatedAt ?? ""
             tags = made.1.map { NoteFrontmatter.tagsToString($0.tags).tagLine } ?? ""
             headerImage = made.1?.headerImage
+        }
+    }
+}
+
+extension InkEditing {
+    /// An edited drawing (opened from the Preview, or by the Pencil in the Live tab) is stored under its own new name (the name carries a hash of the bytes), and the
+    /// note's text names that one in place of the old. The `alt` follows the words read from the drawing unless a person has changed it.
+    @MainActor
+    static func storeEdited(_ editing: InkEditing, saved: InkSaved, model: AppModel, session: NoteSession) {
+        guard let old = editing.stored else { return }
+        let location = model.location
+        let title = NoteFrontmatter.parse(session.text).frontmatter?.title ?? ""
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) { StoredImages.store(noteTitle: title, fileName: "drawing.png", data: saved.png, in: location) }.value
+            switch outcome {
+            case .stored(let name):
+                let renamed = InkTag.replacing(old, with: name, in: session.text)
+                session.edit(InkTag.refreshingAlt(ofDrawing: name, previous: editing.transcript, to: saved.transcript, in: renamed))
+            case .failed(let message): model.errorMessage = message
+            }
         }
     }
 }

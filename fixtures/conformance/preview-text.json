@@ -1,0 +1,331 @@
+{
+  "about": "What the desktop's preview (remark-gfm, as NoteMarkdown draws a note with no component) makes of the text of each note: bare addresses become links, quotes, dashes and dots stay as written. Made by apps/web/src/components/notes/previewTextConformance.test.ts.",
+  "cases": [
+    {
+      "markdown": "https://example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com","children":[{"text":"https://example.com"}]}]}]
+    },
+    {
+      "markdown": "Go to https://example.com/path?q=1&r=2#frag now.",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"text":"Go to "},
+            {"link":"https://example.com/path?q=1&r=2#frag","children":[{"text":"https://example.com/path?q=1&r=2#frag"}]},
+            {"text":" now."}
+          ]
+        }
+      ]
+    },
+    {
+      "markdown": "http://localhost:3000/x has no dot in its host",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [{"link":"http://localhost:3000/x","children":[{"text":"http://localhost:3000/x"}]},{"text":" has no dot in its host"}]
+        }
+      ]
+    },
+    {
+      "markdown": "HTTPS://EXAMPLE.COM/UPPER",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"HTTPS://EXAMPLE.COM/UPPER","children":[{"text":"HTTPS://EXAMPLE.COM/UPPER"}]}]}]
+    },
+    {
+      "markdown": "Read (https://en.wikipedia.org/wiki/Foo_(bar)) first.",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"text":"Read ("},
+            {"link":"https://en.wikipedia.org/wiki/Foo_(bar)","children":[{"text":"https://en.wikipedia.org/wiki/Foo_(bar)"}]},
+            {"text":") first."}
+          ]
+        }
+      ]
+    },
+    {
+      "markdown": "An unbalanced one: https://example.com/path) here",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [{"text":"An unbalanced one: "},{"link":"https://example.com/path","children":[{"text":"https://example.com/path"}]},{"text":") here"}]
+        }
+      ]
+    },
+    {
+      "markdown": "https://example.com/a_b_c_",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/a_b_c","children":[{"text":"https://example.com/a_b_c"}]},{"text":"_"}]}]
+    },
+    {
+      "markdown": "https://example.com/foo.",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":"."}]}]
+    },
+    {
+      "markdown": "https://example.com/foo, then",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":", then"}]}]
+    },
+    {
+      "markdown": "https://example.com/foo!?",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":"!?"}]}]
+    },
+    {
+      "markdown": "https://example.com/foo: then",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":": then"}]}]
+    },
+    {
+      "markdown": "https://example.com/foo; then",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":"; then"}]}]
+    },
+    {
+      "markdown": "https://example.com/foo...",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/foo","children":[{"text":"https://example.com/foo"}]},{"text":"..."}]}]
+    },
+    {
+      "markdown": "https://example.com/~user/a~",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/~user/a","children":[{"text":"https://example.com/~user/a"}]},{"text":"~"}]}]
+    },
+    {
+      "markdown": "https://example.com/~user",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/~user","children":[{"text":"https://example.com/~user"}]}]}]
+    },
+    {
+      "markdown": "https://example.com/a~",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/a","children":[{"text":"https://example.com/a"}]},{"text":"~"}]}]
+    },
+    {
+      "markdown": "https://example.com/'quoted'",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/'quoted","children":[{"text":"https://example.com/'quoted"}]},{"text":"'"}]}]
+    },
+    {
+      "markdown": "https://example.com/path]",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/path","children":[{"text":"https://example.com/path"}]},{"text":"]"}]}]
+    },
+    {
+      "markdown": "https://example.com/path]x",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/path]x","children":[{"text":"https://example.com/path]x"}]}]}]
+    },
+    {
+      "markdown": "https://example.com/a*",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com/a","children":[{"text":"https://example.com/a"}]},{"text":"*"}]}]
+    },
+    {"markdown":"https://a","blocks":[{"block":"paragraph","inlines":[{"link":"https://a","children":[{"text":"https://a"}]}]}]},
+    {"markdown":"https://a.b_c","blocks":[{"block":"paragraph","inlines":[{"text":"https://a.b_c"}]}]},
+    {"markdown":"https://a_b.c.d","blocks":[{"block":"paragraph","inlines":[{"link":"https://a_b.c.d","children":[{"text":"https://a_b.c.d"}]}]}]},
+    {
+      "markdown": "https://日本.example/パス",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://日本.example/パス","children":[{"text":"https://日本.example/パス"}]}]}]
+    },
+    {"markdown":"ftp://example.com is not one","blocks":[{"block":"paragraph","inlines":[{"text":"ftp://example.com is not one"}]}]},
+    {"markdown":"xhttp://example.com is not one","blocks":[{"block":"paragraph","inlines":[{"text":"xhttp://example.com is not one"}]}]},
+    {"markdown":"http:// alone","blocks":[{"block":"paragraph","inlines":[{"text":"http:// alone"}]}]},
+    {
+      "markdown": "http://.example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"http://.example.com","children":[{"text":"http://.example.com"}]}]}]
+    },
+    {
+      "markdown": "https://-example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://-example.com","children":[{"text":"https://-example.com"}]}]}]
+    },
+    {
+      "markdown": "Two: https://a.example and https://b.example.",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"text":"Two: "},
+            {"link":"https://a.example","children":[{"text":"https://a.example"}]},
+            {"text":" and "},
+            {"link":"https://b.example","children":[{"text":"https://b.example"}]},
+            {"text":"."}
+          ]
+        }
+      ]
+    },
+    {
+      "markdown": "Visit https://example.com/a\nand more on the next line",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [{"text":"Visit "},{"link":"https://example.com/a","children":[{"text":"https://example.com/a"}]},{"text":"\nand more on the next line"}]
+        }
+      ]
+    },
+    {
+      "markdown": "https://example.com/a  \nafter a hard break",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [{"link":"https://example.com/a","children":[{"text":"https://example.com/a"}]},{"break":true},{"text":"after a hard break"}]
+        }
+      ]
+    },
+    {
+      "markdown": "www.example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]
+    },
+    {
+      "markdown": "Visit www.example.com.",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"Visit "},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]},{"text":"."}]}]
+    },
+    {
+      "markdown": "WWW.EXAMPLE.COM",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"http://WWW.EXAMPLE.COM","children":[{"text":"WWW.EXAMPLE.COM"}]}]}]
+    },
+    {"markdown":"www.example","blocks":[{"block":"paragraph","inlines":[{"link":"http://www.example","children":[{"text":"www.example"}]}]}]},
+    {"markdown":"www.","blocks":[{"block":"paragraph","inlines":[{"link":"http://www","children":[{"text":"www"}]},{"text":"."}]}]},
+    {"markdown":"www.x","blocks":[{"block":"paragraph","inlines":[{"link":"http://www.x","children":[{"text":"www.x"}]}]}]},
+    {"markdown":"xwww.example.com","blocks":[{"block":"paragraph","inlines":[{"text":"xwww.example.com"}]}]},
+    {
+      "markdown": "(www.example.com)",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"("},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]},{"text":")"}]}]
+    },
+    {
+      "markdown": "x:www.example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"x:"},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]
+    },
+    {
+      "markdown": "a.www.example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"a."},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]
+    },
+    {
+      "markdown": "www.example.com/a_b and www.example.com/c_",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"link":"http://www.example.com/a_b","children":[{"text":"www.example.com/a_b"}]},
+            {"text":" and "},
+            {"link":"http://www.example.com/c","children":[{"text":"www.example.com/c"}]},
+            {"text":"_"}
+          ]
+        }
+      ]
+    },
+    {"markdown":"www.ex_ample.com","blocks":[{"block":"paragraph","inlines":[{"text":"www.ex_ample.com"}]}]},
+    {"markdown":"www.example.c_m","blocks":[{"block":"paragraph","inlines":[{"text":"www.example.c_m"}]}]},
+    {
+      "markdown": "www.example.com/path?x=(1)",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"http://www.example.com/path?x=(1)","children":[{"text":"www.example.com/path?x=(1)"}]}]}]
+    },
+    {"markdown":"me@example.com","blocks":[{"block":"paragraph","inlines":[{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]}]}]},
+    {
+      "markdown": "Mail me@example.com.",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"Mail "},{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]},{"text":"."}]}]
+    },
+    {
+      "markdown": "first.last+tag@sub.example.co.uk",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"mailto:first.last+tag@sub.example.co.uk","children":[{"text":"first.last+tag@sub.example.co.uk"}]}]}]
+    },
+    {"markdown":"me@example","blocks":[{"block":"paragraph","inlines":[{"text":"me@example"}]}]},
+    {"markdown":"me@example.com_","blocks":[{"block":"paragraph","inlines":[{"text":"me@example.com_"}]}]},
+    {"markdown":"me@example.co1","blocks":[{"block":"paragraph","inlines":[{"text":"me@example.co1"}]}]},
+    {"markdown":"me@example.com-","blocks":[{"block":"paragraph","inlines":[{"text":"me@example.com-"}]}]},
+    {"markdown":"a/me@example.com","blocks":[{"block":"paragraph","inlines":[{"text":"a/me@example.com"}]}]},
+    {
+      "markdown": "mailto:me@example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"mailto:"},{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]}]}]
+    },
+    {"markdown":"a@b.c","blocks":[{"block":"paragraph","inlines":[{"link":"mailto:a@b.c","children":[{"text":"a@b.c"}]}]}]},
+    {"markdown":"@example.com","blocks":[{"block":"paragraph","inlines":[{"text":"@example.com"}]}]},
+    {
+      "markdown": "me@-example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"mailto:me@-example.com","children":[{"text":"me@-example.com"}]}]}]
+    },
+    {
+      "markdown": "x.y-z_w+v@example.org!",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"mailto:x.y-z_w+v@example.org","children":[{"text":"x.y-z_w+v@example.org"}]},{"text":"!"}]}]
+    },
+    {
+      "markdown": "Write to me@example.com or you@example.org, please.",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"text":"Write to "},
+            {"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]},
+            {"text":" or "},
+            {"link":"mailto:you@example.org","children":[{"text":"you@example.org"}]},
+            {"text":", please."}
+          ]
+        }
+      ]
+    },
+    {
+      "markdown": "<https://example.com>",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://example.com","children":[{"text":"https://example.com"}]}]}]
+    },
+    {
+      "markdown": "[https://example.com](https://other.example)",
+      "blocks": [{"block":"paragraph","inlines":[{"link":"https://other.example","children":[{"text":"https://example.com"}]}]}]
+    },
+    {
+      "markdown": "[a link](https://example.com) then www.example.com",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [
+            {"link":"https://example.com","children":[{"text":"a link"}]},
+            {"text":" then "},
+            {"link":"http://www.example.com","children":[{"text":"www.example.com"}]}
+          ]
+        }
+      ]
+    },
+    {"markdown":"`https://example.com`","blocks":[{"block":"paragraph","inlines":[{"code":"https://example.com"}]}]},
+    {
+      "markdown": "**https://example.com**",
+      "blocks": [{"block":"paragraph","inlines":[{"strong":[{"link":"https://example.com","children":[{"text":"https://example.com"}]}]}]}]
+    },
+    {
+      "markdown": "*see https://example.com*",
+      "blocks": [{"block":"paragraph","inlines":[{"emphasis":[{"text":"see "},{"link":"https://example.com","children":[{"text":"https://example.com"}]}]}]}]
+    },
+    {
+      "markdown": "_me@example.com_",
+      "blocks": [{"block":"paragraph","inlines":[{"emphasis":[{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]}]}]}]
+    },
+    {
+      "markdown": "~~www.example.com~~",
+      "blocks": [{"block":"paragraph","inlines":[{"strikethrough":[{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]}]
+    },
+    {
+      "markdown": "- see https://example.com\n- mail me@example.com",
+      "blocks": [
+        {"block":"paragraph","inlines":[{"text":"see "},{"link":"https://example.com","children":[{"text":"https://example.com"}]}]},
+        {"block":"paragraph","inlines":[{"text":"mail "},{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]}]}
+      ]
+    },
+    {
+      "markdown": "> quoted www.example.com",
+      "blocks": [{"block":"paragraph","inlines":[{"text":"quoted "},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]
+    },
+    {
+      "markdown": "## Heading www.example.com",
+      "blocks": [{"block":"heading","inlines":[{"text":"Heading "},{"link":"http://www.example.com","children":[{"text":"www.example.com"}]}]}]
+    },
+    {
+      "markdown": "| a | b |\n|---|---|\n| https://example.com | me@example.com |",
+      "blocks": [
+        {"block":"cell","inlines":[{"text":"a"}]},
+        {"block":"cell","inlines":[{"text":"b"}]},
+        {"block":"cell","inlines":[{"link":"https://example.com","children":[{"text":"https://example.com"}]}]},
+        {"block":"cell","inlines":[{"link":"mailto:me@example.com","children":[{"text":"me@example.com"}]}]}
+      ]
+    },
+    {"markdown":"\"Double\" and 'single' quotes","blocks":[{"block":"paragraph","inlines":[{"text":"\"Double\" and 'single' quotes"}]}]},
+    {"markdown":"en -- dash, em --- dash","blocks":[{"block":"paragraph","inlines":[{"text":"en -- dash, em --- dash"}]}]},
+    {"markdown":"Wait...","blocks":[{"block":"paragraph","inlines":[{"text":"Wait..."}]}]},
+    {"markdown":"It's 5 o'clock","blocks":[{"block":"paragraph","inlines":[{"text":"It's 5 o'clock"}]}]},
+    {"markdown":"# Don't -- stop...","blocks":[{"block":"heading","inlines":[{"text":"Don't -- stop..."}]}]},
+    {
+      "markdown": "He said \"https://example.com\" -- twice.",
+      "blocks": [
+        {
+          "block": "paragraph",
+          "inlines": [{"text":"He said \""},{"link":"https://example.com","children":[{"text":"https://example.com"}]},{"text":"\" -- twice."}]
+        }
+      ]
+    }
+  ]
+}

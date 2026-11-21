@@ -1,6 +1,7 @@
-import { CodeRenderable, type MarkdownOptions, type SyntaxStyle } from "@opentui/core";
+import { CodeRenderable, LineNumberRenderable, type LineColorConfig, type MarkdownOptions, type SyntaxStyle } from "@opentui/core";
 import { useMemo } from "react";
 import type { Api } from "../api";
+import { codeLines, hasLineOptions, parseCodeFence } from "../../../web/src/lib/composition/codeFence";
 import { highlightCode } from "../codeHighlight";
 import { parsePreview, type Block, type FootnoteEntry, type TocEntry } from "../mdx";
 import { mix, type Palette } from "../theme";
@@ -11,21 +12,44 @@ type Look = { palette: Palette; syntax: SyntaxStyle; api: Pick<Api, "readImage">
 /** How much of a panel's color tints its background: enough to read as a callout, not to fight the text. */
 export const PANEL_TINT = 0.14;
 
+/** How much of the accent tints a highlighted line of code, and its line number (`{109}`, docs/ui/code-blocks.md). */
+export const CODE_LINE_TINT = 0.2;
+export const CODE_GUTTER_TINT = 0.45;
+
 /**
  * Draws a fenced code block as OpenTUI would, but colors it with highlight.js, as web does
  * (see codeHighlight.ts). Only blocks are routed here (`codeBlockOnly`); everything else in
- * the note is still drawn by OpenTUI as before.
+ * the note is still drawn by OpenTUI as before. A fence's options (`showLineNumbers=107 {109}`)
+ * put the block in OpenTUI's line-number gutter, numbered from the start line, with the
+ * highlighted lines tinted in the accent; with highlights alone the gutter is hidden and only
+ * the tint shows. `background` is what the block is drawn on (a panel's tint, or the pane).
  */
-const renderNode: NonNullable<MarkdownOptions["renderNode"]> = Object.assign(
-  (token: { type: string; lang?: string }, context: { defaultRender: () => unknown }) => {
+function codeBlockRenderer(palette: Palette, background: string): NonNullable<MarkdownOptions["renderNode"]> {
+  const render = (token: { type: string; lang?: string; text?: string }, context: { defaultRender: () => unknown }) => {
     const block = token.type === "code" ? context.defaultRender() : null;
-    if (block instanceof CodeRenderable) {
-      block.onHighlight = (_treeSitter, { content }) => highlightCode(content, token.lang);
-    }
-    return block as ReturnType<NonNullable<MarkdownOptions["renderNode"]>>;
-  },
-  { codeBlockOnly: true },
-);
+    if (!(block instanceof CodeRenderable)) return block as ReturnType<NonNullable<MarkdownOptions["renderNode"]>>;
+    block.onHighlight = (_treeSitter, { content }) => highlightCode(content, token.lang);
+    const fence = parseCodeFence(token.lang ?? "");
+    if (!hasLineOptions(fence)) return block;
+    const lineColors = new Map<number, LineColorConfig>();
+    codeLines(fence, (token.text ?? "").split("\n").length).forEach((line, index) => {
+      if (line.highlighted) {
+        lineColors.set(index, { gutter: mix(background, palette.accent, CODE_GUTTER_TINT), content: mix(background, palette.accent, CODE_LINE_TINT) });
+      }
+    });
+    const numbered = new LineNumberRenderable(block.ctx, {
+      target: block,
+      fg: palette.muted,
+      bg: "transparent",
+      paddingRight: 2,
+      lineNumberOffset: fence.start - 1,
+      lineColors,
+    });
+    numbered.showLineNumbers = fence.lineNumbers;
+    return numbered;
+  };
+  return Object.assign(render, { codeBlockOnly: true }) as NonNullable<MarkdownOptions["renderNode"]>;
+}
 
 /**
  * A note's rendered preview: its Markdown, drawn by OpenTUI, with the MDX components the web
@@ -53,6 +77,7 @@ const sentence = (message: string) => (/[.!?]$/.test(message) ? message : `${mes
 
 /** `background` is set inside a panel, whose tint the Markdown must be drawn over. */
 function Blocks({ blocks, palette, syntax, api, background }: Look & { blocks: Block[]; background?: string }) {
+  const renderNode = useMemo(() => codeBlockRenderer(palette, background ?? palette.background), [palette, background]);
   return (
     <>
       {blocks.map((block, index) => {

@@ -16,9 +16,10 @@
 # scripts/pdf-refs-oracle.mjs, scripts/pdf-text-oracle.mjs), and step 2 replays them (PdfConformanceTests, DocumentNamesConformanceTests,
 # PdfRefsConformanceTests, PdfTextConformanceTests, PdfTextExtractionTests, PdfTextSearchConformanceTests).
 #
-# Follow the sun (fixtures/conformance/sun.json), reflow (fixtures/conformance/reflow.json) and the Reading List (fixtures/conformance/reading-list.json)
-# are committed the same way: the TypeScript test that writes each (sunConformance.test.ts, reflowConformance.test.ts, readingListConformance.test.ts)
-# fails when it no longer makes the committed file, and step 2 replays them (SunConformanceTests, ReflowConformanceTests, ReadingListConformanceTests).
+# Follow the sun (fixtures/conformance/sun.json), reflow (fixtures/conformance/reflow.json), the Reading List (fixtures/conformance/reading-list.json)
+# and the preview's text (fixtures/conformance/preview-text.json) are committed the same way: the TypeScript test that writes each
+# (sunConformance.test.ts, reflowConformance.test.ts, readingListConformance.test.ts, previewTextConformance.test.ts) fails when it no longer makes the
+# committed file, and step 2 replays them (SunConformanceTests, ReflowConformanceTests, ReadingListConformanceTests, PreviewTextConformanceTests).
 #
 # Needs the web dependencies (cd apps/web && pnpm install --frozen-lockfile) and Xcode's Swift.
 # Usage: apps/ios/scripts/conformance.sh [directory-for-the-fixtures]   (a temporary one by default)
@@ -41,22 +42,23 @@ pdf_corpus() {
   node --no-warnings "$root/apps/ios/scripts/document-names-oracle.mjs" --check
   node --no-warnings "$root/apps/ios/scripts/pdf-refs-oracle.mjs" --check
   node --no-warnings "$root/apps/ios/scripts/pdf-text-oracle.mjs" --check
-  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/sunConformance.test.ts src/components/notes/reflowConformance.test.ts src/lib/composition/readingListConformance.test.ts)
+  (cd "$root/apps/web" && node node_modules/vitest/vitest.mjs run src/lib/composition/sunConformance.test.ts src/components/notes/reflowConformance.test.ts src/lib/composition/readingListConformance.test.ts src/components/notes/previewTextConformance.test.ts)
 }
 
 echo "== fixtures in $dir"
 echo "== 1/3 desktop writes databases, backups, the Trash Can script and the search notes"
 vitest -t "writes "
-echo "== 1/3 desktop still makes the committed PDF corpus, file names, Follow the sun, reflow and Reading List fixtures"
+echo "== 1/3 desktop still makes the committed PDF corpus, file names, Follow the sun, reflow, Reading List and preview text fixtures"
 pdf_corpus
 echo "== 2/3 Swift restores them, runs the Trash Can script, searches, replays the PDF corpus and the committed fixtures, and writes its own backups"
 # PencilKit's own code traps ("CFEqual() called with NULL first argument", in PKReplicaManager) the first time a PKDrawing is built in a
 # process with no bundle identifier, and `swift test` runs every test in swiftpm-testing-helper, which has none (seen on macOS 27, locally
 # and on the xcode-27 runner). So the PencilKit bridge's tests (InkPencilKitTests, the only ones that build a PKDrawing) are skipped there and
-# run in xcodebuild's test host, which has an identifier. The rest of the core stays on `swift test`.
-(cd "$root/apps/ios/CompositionCore" && swift test --skip InkPencilKitTests)
+# run in xcodebuild's test host, which has an identifier. The rest of the core stays on `swift test`. InkPencilKitRecognizerTests (PencilKit's handwriting reader)
+# builds one too; its reading is checked by spikes/ink-readers, since handwritingd will not read for a test host.
+(cd "$root/apps/ios/CompositionCore" && swift test --skip InkPencilKit)
 echo "== 2/3 the PencilKit bridge, in xcodebuild's test host"
-(cd "$root/apps/ios/CompositionCore" && xcodebuild test -scheme CompositionCore-Package -destination 'platform=macOS' -only-testing:CompositionInkTests/InkPencilKitTests)
+(cd "$root/apps/ios/CompositionCore" && xcodebuild test -scheme CompositionCore-Package -destination 'platform=macOS' -only-testing:CompositionInkTests/InkPencilKitTests -only-testing:CompositionInkTests/InkPencilKitRecognizerTests)
 echo "== 3/3 desktop restores what Swift wrote"
 vitest -t "reads what the Swift core wrote"
 echo "== conformance passed"

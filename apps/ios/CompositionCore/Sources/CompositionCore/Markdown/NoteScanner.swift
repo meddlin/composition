@@ -262,7 +262,7 @@ public enum NoteScanner {
     /// Headings in document order, as the desktop lists them for `<Toc />`.
     static func headings(of runs: [String]) -> [NoteHeading] {
         var collector = HeadingCollector()
-        for run in runs { collector.visit(Document(parsing: run)) }
+        for run in runs { collector.visit(Document(note: run)) }
         return collector.headings
     }
 

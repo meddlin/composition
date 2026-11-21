@@ -1,0 +1,80 @@
+name: Android core
+
+# Keeps the Android app's Kotlin core (apps/android/core) in step with the desktop's TypeScript (docs/android-app-design.md,
+# "Keeping the implementations honest"), as ios-core.yml does for the iPad's Swift core. apps/android/scripts/conformance.sh has
+# the desktop write its fixtures, the Kotlin core replay them on a JVM and write backups of its own, and the desktop restore
+# those. The same suites on Android's own runtime (scripts/test-on-device.sh) need an emulator, and are run on a Mac by hand.
+#
+# It runs only when something that can break that agreement changes.
+on:
+  pull_request:
+    paths:
+      - "apps/android/**"
+      # The shared corpus that the Kotlin core is checked against.
+      - "fixtures/conformance/**"
+      - "apps/web/src/lib/composition/**"
+      - "apps/web/src/components/notes/mdx/**"
+      # The rest of what the desktop's fixtures are made by (the same list as ios-core.yml).
+      - "apps/web/src/components/notes/liveMarkdown.ts"
+      - "apps/web/src/components/notes/liveImages.ts"
+      - "apps/web/src/components/notes/markTints.ts"
+      - "apps/web/src/components/notes/markdownTokens.ts"
+      # The rest of the Live view the fixtures are drawn by (lists, code blocks, links, setext headings, footnotes, ink), which the Kotlin Live model ports.
+      - "apps/web/src/components/notes/live*.ts"
+      - "apps/web/src/components/notes/reflowText.ts"
+      - "apps/web/src/components/notes/liveReflow.ts"
+      - "apps/web/src/components/notes/reflowConformance.test.ts"
+      - "apps/web/src/app/globals.css"
+      - "apps/web/scripts/conformance-fixtures.test.ts"
+      - "apps/cli/src/tools/dummyNotes.ts"
+      - "apps/web/package.json"
+      - "apps/web/pnpm-lock.yaml"
+      - ".github/workflows/android-core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conformance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # Leaves out the module that runs the suites on a device (apps/android/settings.gradle.kts), which needs the Android SDK.
+      COMPOSITION_JVM_ONLY: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Version comes from "packageManager" in the root package.json.
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+
+      # JDK 21, as the core's Gradle build asks for (jvmToolchain(21)); Gradle itself comes from the checked-in wrapper.
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+          cache-dependency-path: |
+            apps/android/**/*.gradle.kts
+            apps/android/gradle/libs.versions.toml
+            apps/android/gradle/wrapper/gradle-wrapper.properties
+
+      # The desktop's own code (db.ts, backup.ts, the preview pipeline, the editor's helpers) is what Kotlin is checked against.
+      - name: Install web dependencies
+        run: pnpm --dir apps/web install --frozen-lockfile
+
+      - name: No invisible characters in the Kotlin sources
+        run: python3 apps/android/scripts/escape-invisible-characters.py --check
+
+      - name: Conformance, desktop to Kotlin and back
+        run: apps/android/scripts/conformance.sh

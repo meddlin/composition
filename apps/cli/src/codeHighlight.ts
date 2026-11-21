@@ -12,6 +12,7 @@
  */
 
 /** The few fields of lowlight's syntax tree (hast) this reads. */
+import { fenceLanguage } from "../../web/src/lib/composition/codeFence";
 type Node = { type: string; value?: string; properties?: { className?: unknown }; children?: Node[] };
 
 /** Offsets into the code, then the name of a style in `syntaxStyleFor`. The shape OpenTUI draws. */
@@ -107,9 +108,10 @@ async function load() {
 
 /**
  * The first word of a fence's info string (```` ```ts title="x" ````), lowercased, which is the
- * language the author named. Nothing for a fence with none: web does not guess one either.
+ * language the author named, unless that word is one of the fence's options (```` ``` {3} ````,
+ * docs/ui/code-blocks.md). Nothing for a fence with none: web does not guess one either.
  */
-export const languageOf = (info: string | undefined): string | undefined => info?.trim().split(/\s+/, 1)[0]?.toLowerCase() || undefined;
+export const languageOf = (info: string | undefined): string | undefined => fenceLanguage(info ?? "").toLowerCase() || undefined;
 
 /**
  * Highlights for `code` in the language an info string names. Undefined when there is no
