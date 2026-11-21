@@ -3,7 +3,7 @@
 Files the TypeScript core (the desktop's data layer) and the native cores (the Swift core of the iPad app; any later one) **all
 read**, so that the rules that exist more than once cannot drift apart without a test failing. This is the shared guard that
 [ipad-app-design.md](../../docs/ipad-app-design.md#keeping-two-implementations-honest) describes. This folder is its one home: the
-cases and scripts below, and the PDF tables in `pdf/` and the ink stroke format in `ink/`.
+cases and scripts below, and the PDF tables in `pdf/`, scanned pages' tables and rules in `scan/` and the ink stroke format in `ink/`.
 
 Two kinds of file meet in a run:
 
@@ -97,6 +97,29 @@ Reading the files:
 - **JSON columns are compared as values, not as text.** `rects`, `body` and `view_state` hold JSON; compare them parsed.
   Coordinates are stored rounded to a thousandth of a point (`pdfMarkup.ts`), which both sides must do before storing.
 - **Ids** come from `AUTOINCREMENT` and are never reused, which the last script checks.
+
+## `scan/`
+
+Scanned pages and the text read from them ([architecture/scans.md](../../docs/architecture/scans.md)): the tables `scan_pages` and
+`scan_lines`, and the rules for a read line (`scanText.ts`).
+
+| File | What it pins | How the Swift side uses it |
+|---|---|---|
+| `text.json` | Written by hand. `guard`: a line's status from its text and confidence (held under 0.5 or with a never-guessed word, Gate C's lesson). `lines`: a read line as it is stored (box rounded, text on one line, confidence brought inside 0 to 1 and rounded), not kept (no text), or refused. `pages`: a page's search text from its lines. `covered`: when a newly read line is left out because a line a person has checked is under it. | Run each through `ScanText`; compare. |
+| `schema.json` | The two tables, their indexes and their uuid triggers, as `pdf/schema.json` does for the PDF tables. | Create the schema and compare. |
+| `scripts.json` | Operation scripts over `scansRepo.ts` and `documentsRepo.ts`, each with what every step returned and the rows of `scan_pages` and `scan_lines` at the end. | Replay against a fresh database with `ScansStore`; compare. A refused step changes nothing. |
+
+```bash
+cd apps/web
+UPDATE_FIXTURES=1 pnpm exec vitest run src/lib/composition/scanConformance.test.ts   # rewrites schema.json and scripts.json; checks text.json
+```
+
+The Swift side is `ScanConformanceTests` (`swift test` in `apps/ios/CompositionCore`). The ops in `scripts.json` are `setNotes`,
+`addDocument`, `deleteDocument`, `deleteOrphanedDocuments`, and the scan repository's functions by name: `addScanPages`, `isScan`,
+`listScanPages`, `pendingScanPages`, `storeRecognition`, `listScanLines`, `checkScanLine`, `correctScanLine`, `scanSummary`,
+`scanPageTexts`. Placeholders are as in `pdf/` (`"<uuid>"`; `"<time>"` also for `recognizedAt`). **Unlike `pdf/`, `rect` in the
+rows is compared as the text it is stored as**, so both sides must write the same JSON for a box. What no fixture can pin is what an
+engine reads: it differs by device and OS, so the tests feed both sides recorded lines.
 
 ## `ink/`
 

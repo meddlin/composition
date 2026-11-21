@@ -13,6 +13,7 @@ enum SchemaPass {
             try db.execute(sql: Schema.trash)
             try db.execute(sql: Schema.attachments)
             try db.execute(sql: Schema.documents)
+            try db.execute(sql: Schema.scans)
             try db.execute(sql: Schema.todos)
             try db.execute(sql: Schema.readingList)
             try db.execute(sql: Schema.feeds)

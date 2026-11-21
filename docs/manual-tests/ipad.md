@@ -542,6 +542,39 @@ Built 2026-11-12 after your reader pass ("Search finds words in my notes, but no
 321. **A restored backup.** Restore a desktop backup that has PDFs: after a little while their words are found, as in 311.
 322. **Speed.** With your real library, the line under the results (*3 results · 12 ms*) for a few searches that reach your books. *Tell me the numbers, the biggest book's pages, and Debug or Release.*
 
+## Scanned handwritten notes (OCR, research slices 1 and 2)
+
+Built 2026-11-19 at your request ("let's build this"). **Checked in the iPad Simulator (iOS 26.4) with three pages drawn in handwriting
+fonts, and with `swift test` on a Mac; never with real handwriting, never on your iPad; nothing here is ticked.** Pictures of pages become a
+note that owns them as a PDF, and Vision reads them in the background so Search finds their words. [How it works](../architecture/scans.md);
+[why it is shaped this way](../scanned-notes-ocr-research.md).
+
+374. **Import from Files.** Put 3 to 5 photos or scans of your pages in a folder in Files, named in order (`page 1.jpg` … `page 12.jpg`). In
+     the notes list's toolbar (or its ••• menu), *Import Scans* ▸ *Add from Files*, pick them all: they are listed in name order (`page 2`
+     before `page 12`) with a picture of each, and the title is what their names share (*page* is not taken: you get *Scanned notes*).
+375. **Put them right.** Drag a page by its handle to another place; tap the turn button on a sideways page until it stands up; swipe one
+     away. Type a title. *Import*: a note with that title opens with the PDF, the pages in the order and the way up you left them.
+376. **From Photos and the camera.** Again with *Add from Photos* (the order you tapped them in) and *Scan with the Camera* (a few pages
+     with the document camera). *Tell me whether the camera's pages come out straight and cropped.*
+377. **Reading in the background.** Right after an import, open the list button at the left of the PDF's strip: *Contents* says *Reading
+     the handwriting: 1 of 5 pages read* and counts up. Use the app meanwhile. *Tell me how long a page took and whether the app felt slow.*
+378. **Search finds your words.** When it is done, search for a word you wrote on page 3 (one you would really look for): the note is found
+     with *In the scan, p. 3*. Tap it: the PDF opens at page 3 and the lines with the word are framed in yellow for a few seconds, with
+     *Found on 1 line of page 3.* **This is the real test of your handwriting: tell me, for ten words you would search for, how many were
+     found**, and which of your pages read worst (cursive, pencil, a crowded page).
+379. **What is kept out.** *Contents* says how many lines are *kept out of Search*: the reader was unsure of them. A word only on such a
+     line is not found; that is by design until there is a way to check lines (the next step). *Tell me if many of your lines are kept out.*
+380. **Confidently wrong.** If you find a word that Search finds on a page where you did not write it (Vision read something else as it),
+     tell me the word and what you wrote: a confident misreading is the risk this feature carries (my drawn test page had "Tc" read as
+     "To", sure of it).
+381. **Quit while it reads.** Import a scan of 20 or more pages and, while *Contents* says it is reading, end the app (swipe it away). Open it
+     again: reading goes on from where it stopped, not from page 1 (*Contents* counts on from the pages already read).
+382. **A scan is a PDF.** On a scan: draw with the Pencil, add a typed note, bookmark a page, *Cite this page* into a note, export the
+     annotated PDF. All as on any PDF. Selecting or highlighting the handwriting itself is not there yet.
+383. **Trash and backup.** Move the scan's note to the Trash Can: its words are no longer found; restore it: they are again. Make a backup
+     and restore it: the scan's words are found again without being read again (*Contents* says all pages read at once).
+384. **Nothing leaves the iPad.** With Airplane Mode on, import a scan: it is made and read exactly the same.
+
 ## The Reading List (plugin, ahead of M3)
 
 Built 2026-11-13 at your request. **Checked in the iPad Simulator only (two UI tests against a local page); nothing here is ticked.** The

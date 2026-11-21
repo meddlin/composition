@@ -116,6 +116,36 @@ public struct DocumentLibrary: Sendable {
         }
     }
 
+    /// Makes a note titled `title` for a scan: the image-only PDF at `pdf` (made by `ScanPdf.write` from the pages' pictures, `pageCount` pages) is
+    /// copied in as the note's PDF and marked a scan, every page waiting to be read. The PDF was made a moment ago, so it is never a duplicate
+    /// question. Nothing is left behind when the file is refused.
+    public func importScan(from pdf: URL, title: String, pageCount: Int, groupId: Int64? = nil, notebookId: Int64? = nil, now: Date = Date()) throws -> ImportPdfOutcome {
+        let name = JavaScriptText.trim(title).isEmpty ? "Scanned notes" : JavaScriptText.trim(title)
+        let note = try store.createNote(title: name, groupId: groupId, notebookId: notebookId, now: now)
+        do {
+            switch try importDocument(noteId: note.id, from: pdf, pageCount: pageCount, allowDuplicate: true, now: now) {
+            case .added(let document):
+                try database.addScanPages(documentId: document.id, pageCount: pageCount, now: now)
+                return .added(note: note, document: document)
+            case .refused(let message):
+                try discard(note.id)
+                return .refused(message)
+            case .duplicate:
+                try discard(note.id)
+                return .refused("The scan could not be imported.")
+            }
+        } catch {
+            try? removeOrphanAfterFailedScan(noteId: note.id)
+            throw error
+        }
+    }
+
+    /// A scan whose note was made and whose pages could not be marked: the note goes, and its PDF with it.
+    private func removeOrphanAfterFailedScan(noteId: Int64) throws {
+        if let document = try database.documentForNote(noteId) { try removeDocument(id: document.id) }
+        try discard(noteId)
+    }
+
     // MARK: Files
 
     /// Where a PDF's bytes are, or nil when the row is gone or the file has been deleted behind the app's back. The path is built from the stored

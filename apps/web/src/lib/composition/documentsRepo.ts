@@ -100,7 +100,7 @@ export function setViewState(id: number, state: PdfViewState): void {
   getDb().prepare("UPDATE documents SET view_state = ? WHERE id = ?").run(JSON.stringify(normalizeViewState(state)), id);
 }
 
-/** Drops a PDF's row, its marks and its bookmarks in one transaction, and returns the row so the caller can delete the file. */
+/** Drops a PDF's row, its marks, its bookmarks and (a scan's) pages and lines in one transaction, and returns the row so the caller can delete the file. */
 export function deleteDocument(id: number): StoredDocument | null {
   const db = getDb();
   return db.transaction(() => {
@@ -108,6 +108,8 @@ export function deleteDocument(id: number): StoredDocument | null {
     if (!document) return null;
     db.prepare("DELETE FROM pdf_annotations WHERE document_id = ?").run(id);
     db.prepare("DELETE FROM pdf_bookmarks WHERE document_id = ?").run(id);
+    db.prepare("DELETE FROM scan_lines WHERE document_id = ?").run(id);
+    db.prepare("DELETE FROM scan_pages WHERE document_id = ?").run(id);
     db.prepare("DELETE FROM documents WHERE id = ?").run(id);
     return document;
   })();
@@ -132,10 +134,14 @@ export function deleteOrphanedDocuments(): StoredDocument[] {
     for (const row of rows) {
       db.prepare("DELETE FROM pdf_annotations WHERE document_id = ?").run(row.id);
       db.prepare("DELETE FROM pdf_bookmarks WHERE document_id = ?").run(row.id);
+      db.prepare("DELETE FROM scan_lines WHERE document_id = ?").run(row.id);
+      db.prepare("DELETE FROM scan_pages WHERE document_id = ?").run(row.id);
       db.prepare("DELETE FROM documents WHERE id = ?").run(row.id);
     }
     db.prepare("DELETE FROM pdf_annotations WHERE document_id NOT IN (SELECT id FROM documents)").run();
     db.prepare("DELETE FROM pdf_bookmarks WHERE document_id NOT IN (SELECT id FROM documents)").run();
+    db.prepare("DELETE FROM scan_lines WHERE document_id NOT IN (SELECT id FROM documents)").run();
+    db.prepare("DELETE FROM scan_pages WHERE document_id NOT IN (SELECT id FROM documents)").run();
     return rows.map(fromRow);
   })();
 }

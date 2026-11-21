@@ -127,6 +127,42 @@ CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document
 `;
 
 /**
+ * Scanned pages and the text read from them (docs/scanned-notes-ocr-research.md). A scan is an image-only PDF in
+ * `documents`, made from page images at import; it is a scan because it has `scan_pages` rows, one per page, which also
+ * say whether the page has been read yet (`recognized_at`) and by which engine. `scan_lines` holds what was read, a row
+ * per line with its box in raw PDF user space (as marks are kept), the engine's confidence and a review status
+ * (scanText.ts). The text is kept here, not in the file (which is never written after import) and not only in the search
+ * index, because it is slow to make, differs by device, and carries a person's corrections. Deleting a PDF deletes these
+ * rows too (documentsRepo.ts). The CLI shares this file and ignores the tables.
+ */
+const SCANS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS scan_pages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    engine TEXT,
+    recognized_at TEXT,
+    created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_pages_page ON scan_pages (document_id, page);
+CREATE TABLE IF NOT EXISTS scan_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    line INTEGER NOT NULL,
+    rect TEXT NOT NULL,
+    text TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    engine TEXT NOT NULL,
+    status TEXT NOT NULL,
+    corrected TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_scan_lines_page ON scan_lines (document_id, page, line);
+`;
+
+/**
  * The to-do panel's items. `parent_id` makes a tree; deleting an item deletes its sub-items too (todosRepo.ts does
  * that, so no foreign key is declared). The CLI shares this file and ignores the table.
  */
@@ -299,6 +335,8 @@ const UUID_TABLES = [
   "documents",
   "pdf_annotations",
   "pdf_bookmarks",
+  "scan_pages",
+  "scan_lines",
 ] as const;
 
 /** Built-in SQL only: an older build opening this file has no user-defined functions, and its inserts must still work. */
@@ -373,6 +411,7 @@ function openConnection(dbPath: string): Database.Database {
   db.exec(TRASH_SCHEMA);
   db.exec(ATTACHMENTS_SCHEMA);
   db.exec(DOCUMENTS_SCHEMA);
+  db.exec(SCANS_SCHEMA);
   db.exec(TODOS_SCHEMA);
   db.exec(READING_LIST_SCHEMA);
   db.exec(FEEDS_SCHEMA);
