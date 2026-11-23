@@ -314,6 +314,20 @@ feel, VoiceOver, speed on the device).
   `ListContinuationTests` has hand cases. It is the desktop's behaviour, quirks included: Return on the empty second item of a tight two-item list adds a
   blank line first (the list becomes loose), and Backspace after any item's `- ` (not only an empty one) turns it into spaces. Not ported: GFM tables
   and link reference definitions (leaf blocks either way). **Simulator:** see the UI tests in the PR; items 368 to 371 are yours (first numbered 359 to 362, which Step 6 had; renumbered 2026-11-18).
+- **Gate LD4 failed on the Pencil and Scribble, fixed (2026-11-23).** Items 350, 368 to 370 passed and 353 reads well; 351, 352 and 371 failed.
+  (1) A Pencil tap on a drawn box ticked it only sometimes: Scribble could begin there and took the tap as writing (a dot, a period in the item) or as a tap
+  of its own (the caret in the item), and the box's own tap, which waits to be a tap, lost the Pencil's touch to the text view. `LiveScribble` now refuses
+  Scribble on a box's 44-point target (it ends where the item's words begin, so Scribble still writes on them), and `LiveTaskTap` gives the Pencil a
+  recogniser of its own that takes the touch as it lands and ticks when the Pencil lifts on the same box. (2) A scratch-out in an item deleted nothing.
+  Not the hidden marks skewing Scribble's geometry: a probe found `firstRect(for:)`, `selectionRects(for:)`, `closestPosition(to:)` and the tokenizer exact
+  for every word of an item, marks hidden or shown. The cause is that Scribble moves the selection as it works: it focuses the text with the caret under the
+  Pencil, and it previews a scratch-out by selecting the words, then deletes them with `setSelectedTextRange` and `deleteBackward` (PencilKit's
+  `PKTextInputUITextInputInterface`, read from the iOS 26.4 Simulator runtime). In Live a selection in an item shows its `- [ ] ` and moves its words
+  sideways, under a stroke Scribble was still reading. Writing a word was spared only because Scribble writes it as marked text, which the styler already
+  waits for. Now `MarkdownStyler` holds the Live look while Scribble writes (from `scribbleInteraction(_:shouldBeginAt:)` or `WillBeginWriting` to
+  `DidFinishWriting`, which UIKit calls on our interaction's delegate), and a deletion made while Scribble writes spares the marks hidden at an item's
+  start (a stroke over an item's first word reaches the hidden space after `[ ]`). UI tests: two more in `LiveListsUITests`; the scratch-out one drives
+  the text view as PencilKit does (⌃⌥S, ⌃⌥D with `-liveCompose 1`), since the Simulator has no Scribble. Retest: items 351, 352, 371 and 385.
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 
