@@ -39,9 +39,9 @@ public enum InkTranscript {
     /// The most characters of a transcript. It goes into a tag in the note, and into the label VoiceOver reads for the drawing.
     public static let maxLength = 300
 
-    /// The least confidence (0 to 1) a line needs to be written down. Vision gives 0.3 to a reading it is guessing at ("Sugarfrom", from some scribbles) and 1.0 to one it
-    /// trusts; this is anywhere between, and a reading under it is left out.
-    public static let minimumConfidence: Float = 0.5
+    /// The least confidence (0 to 1) a line needs to be written down: `ScanText.floor`, shared with the text read from scanned pages. Vision gives 0.3 to a
+    /// reading it is guessing at ("Sugarfrom", from some scribbles) and 1.0 to one it trusts; this is anywhere between, and a reading under it is left out.
+    public static let minimumConfidence = Float(ScanText.floor)
 
     /// The words in `drawing`, on one line (no quotes or angle brackets, which a tag's attribute cannot hold), or an empty text when there are none or the reading
     /// failed: a drawing is saved either way, and its `alt` then stays "Drawing".
@@ -53,30 +53,18 @@ public enum InkTranscript {
 
     /// The lines worth writing into a note. **Confidence is not enough:** with language correction on, Vision read a cursive signature as "Drien fucking" and was *sure*
     /// of it (1.0), because it had snapped the marks to a common word (Gate C item 263). So a line is also left out whole when a word in it is one a program should never
-    /// put into a person's note on a guess. A person who really wrote one can type it into `alt` themselves, and what they type stays. A reader that gives no confidence
-    /// (PencilKit's) has only the second test applied: there is no floor to hold it to.
+    /// put into a person's note on a guess. A person who really wrote one can type it into `alt` themselves, and what they type stays. The rule is `ScanText`'s, which
+    /// scanned pages share (a line it holds is left out here). A reader that gives no confidence (PencilKit's) has only the second test applied: there is no floor
+    /// to hold it to.
     static func trusted(_ lines: [InkRecognizedLine]) -> [String] {
-        lines.filter { ($0.confidence.map { $0 >= minimumConfidence } ?? true) && !neverGuessed($0.text) }.map(\.text)
+        lines.filter { line in
+            guard let confidence = line.confidence else { return !neverGuessed(line.text) }
+            return ScanText.recognizedStatus(text: line.text, confidence: Double(confidence)) == .unchecked
+        }.map(\.text)
     }
 
-    /// Whether `line` holds a word from the short list that is never written from a guess. The words are compared whole, with case, accents and punctuation ignored;
-    /// only the roots below also match as part of a longer word.
-    static func neverGuessed(_ line: String) -> Bool {
-        let folded = line.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-        return folded.split(whereSeparator: { !$0.isLetter }).contains { word in
-            neverGuessedWords.contains(String(word)) || neverGuessedAnywhere.contains { word.contains($0) }
-                || neverGuessedAtEitherEnd.contains { word.hasPrefix($0) || word.hasSuffix($0) }
-        }
-    }
-
-    /// Roots that are blocked anywhere in a word ("motherfucker"): no word or name holds them innocently.
-    private static let neverGuessedAnywhere = ["fuck"]
-    /// Roots that are blocked at the start or the end of a word ("shitty", "bullshit") but not in the middle, where names hold them ("Matsushita", "Yoshitaka").
-    private static let neverGuessedAtEitherEnd = ["shit"]
-    /// Words that are blocked only as a whole word ("Scunthorpe" holds the first, and is fine). Short on purpose, and meant to be added to.
-    private static let neverGuessedWords: Set<String> = [
-        "cunt", "cunts", "bitch", "bitches", "asshole", "assholes", "nigger", "niggers", "nigga", "niggas", "faggot", "faggots",
-    ]
+    /// Whether `line` holds a word from the short list that is never written from a guess (`ScanText.neverGuessed`).
+    static func neverGuessed(_ line: String) -> Bool { ScanText.neverGuessed(line) }
 
     /// What a recognizer is given: the drawing with every stroke in ink (a yellow pen would vanish from a picture), and the marker and the watercolour left out, as a
     /// highlighter over writing only makes it harder to read. Empty when there is nothing to read.

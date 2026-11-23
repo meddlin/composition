@@ -68,6 +68,7 @@ struct NotesColumnView: View {
             case .failure(let error): model.errorMessage = error.localizedDescription
             }
         }
+        .sheet(isPresented: $model.importingScans) { ScanImportSheet(model: model) }
         .navigationTitle(searching ? "Search" : model.title(of: item))
         .searchable(text: $model.query, prompt: "Search notes")
         .onChange(of: model.query) { model.queryChanged() }
@@ -93,6 +94,9 @@ struct NotesColumnView: View {
                 }
                 Button("Import PDF", systemImage: "doc.badge.plus") { choosingPdf = true }
                     .accessibilityIdentifier("import-pdf")
+                // Pictures of handwritten pages become a note that owns them as a PDF, and their words are read for Search (AppModel+Scans.swift).
+                Button("Import Scans", systemImage: "doc.viewfinder") { model.importingScans = true }
+                    .accessibilityIdentifier("import-scans")
                 Button("New Note", systemImage: "square.and.pencil") { Task { await model.createNote() } }
             }
         }

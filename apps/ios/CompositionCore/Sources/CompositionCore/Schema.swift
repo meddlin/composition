@@ -163,6 +163,35 @@ enum Schema {
     CREATE INDEX IF NOT EXISTS idx_pdf_bookmarks_document ON pdf_bookmarks (document_id, page);
     """
 
+    /// Scanned pages and the lines read from them (the desktop's `SCANS_SCHEMA`; docs/architecture/scans.md). A scan is an image-only PDF in
+    /// `documents` with a `scan_pages` row per page; `scan_lines` holds what was read, with its box, the engine's confidence and a review status.
+    static let scans = """
+    CREATE TABLE IF NOT EXISTS scan_pages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL,
+        page INTEGER NOT NULL,
+        engine TEXT,
+        recognized_at TEXT,
+        created_at TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_scan_pages_page ON scan_pages (document_id, page);
+    CREATE TABLE IF NOT EXISTS scan_lines (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        document_id INTEGER NOT NULL,
+        page INTEGER NOT NULL,
+        line INTEGER NOT NULL,
+        rect TEXT NOT NULL,
+        text TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        engine TEXT NOT NULL,
+        status TEXT NOT NULL,
+        corrected TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_scan_lines_page ON scan_lines (document_id, page, line);
+    """
+
     /// The Contacts plugin's rolodex (the desktop's `CONTACTS_SCHEMA`).
     static let contacts = """
     CREATE TABLE IF NOT EXISTS contacts (
@@ -233,7 +262,10 @@ enum Schema {
     ]
 
     /// Every row of these tables carries a `uuid` (docs/architecture/data-model.md#identity-the-uuid-column).
-    static let uuidTables = ["notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments", "documents", "pdf_annotations", "pdf_bookmarks"]
+    static let uuidTables = [
+        "notes", "groups", "notebooks", "trashed_notes", "trashed_groups", "attachments", "documents", "pdf_annotations", "pdf_bookmarks", "scan_pages",
+        "scan_lines",
+    ]
 
     /// Built-in SQL only: an older desktop build opening this file has no user-defined functions, and its inserts must
     /// still work. So Swift never generates a uuid itself either.

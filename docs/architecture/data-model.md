@@ -280,6 +280,43 @@ Source: [`documentsRepo.ts`](../../apps/web/src/lib/composition/documentsRepo.ts
 [`documents.ts`](../../apps/web/src/lib/composition/documents.ts),
 [`pdfMarkup.ts`](../../apps/web/src/lib/composition/pdfMarkup.ts).
 
+### The scan tables
+
+A **scan** is an image-only PDF made from pictures of pages at import, owned by a note like any PDF
+([scans.md](scans.md)). It is a scan because it has `scan_pages` rows; what was read from its pages is
+in `scan_lines`. Both carry a `uuid` like the PDF tables; deleting a PDF deletes them with its marks.
+
+```sql
+CREATE TABLE scan_pages (         -- one per page of a scan
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,        -- 0-based; unique with document_id
+    engine TEXT,                  -- what read it; null until it has been read
+    recognized_at TEXT,           -- null until it has been read: where reading picks up after a quit
+    created_at TEXT NOT NULL,
+    uuid TEXT
+);
+CREATE TABLE scan_lines (         -- one line read from a page
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    document_id INTEGER NOT NULL,
+    page INTEGER NOT NULL,
+    line INTEGER NOT NULL,        -- reading order on the page
+    rect TEXT NOT NULL,           -- JSON [x0, y0, x1, y1] in raw PDF user space, as marks
+    text TEXT NOT NULL,           -- what the engine read
+    confidence REAL NOT NULL,     -- 0 to 1, to a thousandth
+    engine TEXT NOT NULL,         -- e.g. apple-vision/text/3/accurate/lc/iOS 27.1.0
+    status TEXT NOT NULL,         -- unchecked | held | checked | corrected
+    corrected TEXT,               -- the person's words, when corrected
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    uuid TEXT
+);
+```
+
+A `held` line (under 0.5 confidence, or a word never written on a guess) is never searched; reading
+a page again never replaces a `checked` or `corrected` line. The rules are `scanText.ts`, pinned for the
+Swift core by [`fixtures/conformance/scan`](../../fixtures/conformance/README.md#scan).
+
 Favorites are not in the database. They are a list in the settings file, so a new column could not
 break an app that builds its models straight from `SELECT *` (see [groups.md](groups.md)).
 

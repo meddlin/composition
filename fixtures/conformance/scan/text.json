@@ -1,0 +1,131 @@
+{
+  "floor": 0.5,
+  "guard": [
+    { "name": "a sure line", "text": "Shopping list", "confidence": 1, "status": "unchecked" },
+    { "name": "a guess", "text": "Sugarfrom", "confidence": 0.3, "status": "held" },
+    { "name": "exactly at the floor", "text": "kept", "confidence": 0.5, "status": "unchecked" },
+    { "name": "just under the floor", "text": "dropped", "confidence": 0.49, "status": "held" },
+    { "name": "Gate C's signature, read with confidence 1", "text": "Drien fucking", "confidence": 1, "status": "held" },
+    { "name": "a root at the end of a word", "text": "BULLSHIT!", "confidence": 1, "status": "held" },
+    { "name": "a whole word with a question mark", "text": "what the shit?", "confidence": 1, "status": "held" },
+    { "name": "mixed case with spaces round it", "text": "   FuCkEr  ", "confidence": 1, "status": "held" },
+    { "name": "a listed whole word", "text": "a Cunt", "confidence": 1, "status": "held" },
+    { "name": "a listed plural", "text": "two bitches", "confidence": 1, "status": "held" },
+    { "name": "a root at the start of a word", "text": "a shitty day", "confidence": 1, "status": "held" },
+    { "name": "a root at the end of a longer word", "text": "horseshit", "confidence": 1, "status": "held" },
+    { "name": "a root inside a word", "text": "motherfuckers", "confidence": 1, "status": "held" },
+    { "name": "an accent does not hide a word", "text": "Fück", "confidence": 1, "status": "held" },
+    { "name": "digits split words", "text": "fuck2day", "confidence": 1, "status": "held" },
+    { "name": "a town that holds a listed word", "text": "Scunthorpe", "confidence": 1, "status": "unchecked" },
+    { "name": "a mushroom", "text": "shiitake mushrooms", "confidence": 1, "status": "unchecked" },
+    { "name": "a surname", "text": "Rushing", "confidence": 1, "status": "unchecked" },
+    { "name": "an ordinary verb", "text": "pushing the class", "confidence": 1, "status": "unchecked" },
+    { "name": "a word that starts like one", "text": "assistant", "confidence": 1, "status": "unchecked" },
+    { "name": "a novelist", "text": "Dickens", "confidence": 1, "status": "unchecked" },
+    { "name": "a root in the middle of a name", "text": "Matsushita", "confidence": 1, "status": "unchecked" },
+    { "name": "two names", "text": "Yoshitaka Nishitani", "confidence": 1, "status": "unchecked" },
+    { "name": "punctuation only", "text": "Hello, world", "confidence": 1, "status": "unchecked" },
+    { "name": "nothing", "text": "", "confidence": 1, "status": "unchecked" }
+  ],
+  "lines": [
+    {
+      "name": "a line is kept rounded, on one line",
+      "input": { "rect": [10, 700.12345, 200.0004, 720], "text": "  Meeting   notes ", "confidence": 0.87654 },
+      "stored": { "rect": [10, 700.123, 200, 720], "text": "Meeting notes", "confidence": 0.877, "status": "unchecked" }
+    },
+    {
+      "name": "a box given corner to corner the other way",
+      "input": { "rect": [200, 720, 10, 700], "text": "turned", "confidence": 0.9 },
+      "stored": { "rect": [10, 700, 200, 720], "text": "turned", "confidence": 0.9, "status": "unchecked" }
+    },
+    {
+      "name": "a line break inside a line",
+      "input": { "rect": [0, 0, 1, 1], "text": "two\nparts\r\nhere\ttoo", "confidence": 0.8 },
+      "stored": { "rect": [0, 0, 1, 1], "text": "two parts here too", "confidence": 0.8, "status": "unchecked" }
+    },
+    {
+      "name": "a confidence over one",
+      "input": { "rect": [0, 0, 1, 1], "text": "over", "confidence": 1.2 },
+      "stored": { "rect": [0, 0, 1, 1], "text": "over", "confidence": 1, "status": "unchecked" }
+    },
+    {
+      "name": "a confidence under nothing",
+      "input": { "rect": [0, 0, 1, 1], "text": "under", "confidence": -0.3 },
+      "stored": { "rect": [0, 0, 1, 1], "text": "under", "confidence": 0, "status": "held" }
+    },
+    {
+      "name": "the status comes from the rounded confidence",
+      "input": { "rect": [0, 0, 1, 1], "text": "rounded up", "confidence": 0.4996 },
+      "stored": { "rect": [0, 0, 1, 1], "text": "rounded up", "confidence": 0.5, "status": "unchecked" }
+    },
+    {
+      "name": "a never-guessed word at full confidence",
+      "input": { "rect": [0, 0, 1, 1], "text": "Drien fucking", "confidence": 1 },
+      "stored": { "rect": [0, 0, 1, 1], "text": "Drien fucking", "confidence": 1, "status": "held" }
+    },
+    { "name": "a line with no text is not kept", "input": { "rect": [0, 0, 1, 1], "text": " \n\t ", "confidence": 0.9 }, "stored": null },
+    { "name": "an empty line is not kept", "input": { "rect": [0, 0, 1, 1], "text": "", "confidence": 0.9 }, "stored": null },
+    { "name": "a box of three numbers", "input": { "rect": [0, 0, 1], "text": "x", "confidence": 0.9 }, "invalid": true },
+    { "name": "a box with no area", "input": { "rect": [5, 5, 5, 9], "text": "x", "confidence": 0.9 }, "invalid": true },
+    { "name": "a box of text", "input": { "rect": ["0", 0, 1, 1], "text": "x", "confidence": 0.9 }, "invalid": true },
+    { "name": "a box too far out", "input": { "rect": [0, 0, 100000000, 1], "text": "x", "confidence": 0.9 }, "invalid": true },
+    { "name": "a confidence that is text", "input": { "rect": [0, 0, 1, 1], "text": "x", "confidence": "high" }, "invalid": true },
+    { "name": "a text that is a number", "input": { "rect": [0, 0, 1, 1], "text": 7, "confidence": 0.9 }, "invalid": true }
+  ],
+  "pages": [
+    {
+      "name": "lines in reading order, whatever order they come in",
+      "lines": [
+        { "line": 2, "text": "third", "status": "unchecked", "corrected": null },
+        { "line": 0, "text": "first", "status": "unchecked", "corrected": null },
+        { "line": 1, "text": "second", "status": "checked", "corrected": null }
+      ],
+      "text": "first\nsecond\nthird"
+    },
+    {
+      "name": "a held line is never searched, a correction is",
+      "lines": [
+        { "line": 0, "text": "Lecture 4", "status": "unchecked", "corrected": null },
+        { "line": 1, "text": "Sugarfrom", "status": "held", "corrected": null },
+        { "line": 2, "text": "entrapy", "status": "corrected", "corrected": "entropy" },
+        { "line": 3, "text": "Drien fucking", "status": "held", "corrected": null }
+      ],
+      "text": "Lecture 4\nentropy"
+    },
+    {
+      "name": "a line corrected to nothing says nothing",
+      "lines": [
+        { "line": 0, "text": "smudge", "status": "corrected", "corrected": "" },
+        { "line": 1, "text": "kept", "status": "checked", "corrected": null }
+      ],
+      "text": "kept"
+    },
+    {
+      "name": "a page of held lines has no text",
+      "lines": [
+        { "line": 0, "text": "a", "status": "held", "corrected": null },
+        { "line": 1, "text": "b", "status": "held", "corrected": null }
+      ],
+      "text": ""
+    },
+    {
+      "name": "two lines with one number keep the order given",
+      "lines": [
+        { "line": 1, "text": "later", "status": "unchecked", "corrected": null },
+        { "line": 0, "text": "one", "status": "unchecked", "corrected": null },
+        { "line": 0, "text": "two", "status": "unchecked", "corrected": null }
+      ],
+      "text": "one\ntwo\nlater"
+    },
+    { "name": "no lines", "lines": [], "text": "" }
+  ],
+  "covered": [
+    { "name": "the same box", "rect": [0, 0, 10, 10], "kept": [[0, 0, 10, 10]], "covered": true },
+    { "name": "half exactly is not more than half", "rect": [0, 0, 10, 10], "kept": [[5, 0, 20, 10]], "covered": false },
+    { "name": "more than half", "rect": [0, 0, 10, 10], "kept": [[4, 0, 20, 10]], "covered": true },
+    { "name": "touching edges", "rect": [0, 0, 10, 10], "kept": [[10, 0, 20, 10]], "covered": false },
+    { "name": "a small kept line inside a big new one", "rect": [0, 0, 100, 10], "kept": [[10, 2, 20, 8]], "covered": false },
+    { "name": "any of several", "rect": [0, 0, 10, 10], "kept": [[50, 50, 60, 60], [0, 0, 9, 9]], "covered": true },
+    { "name": "none kept", "rect": [0, 0, 10, 10], "kept": [], "covered": false }
+  ]
+}

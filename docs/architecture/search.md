@@ -132,7 +132,7 @@ hold them to it.
     (`PdfTextConformanceTests`), PDFKit must find the same words on every page as pdf.js (`PdfTextExtractionTests`), and every one of those words
     must find the note at the first page it is on. `conformance.sh` checks the file is still what the desktop makes.
   - *The answers:* `fixtures/conformance/pdf-text-search.json` holds six notes (one in the Trash Can), four PDFs (the fixture, a small book with
-    roman-numeral labels, a scan, the trashed note's) and 47 queries, with what a real Meilisearch answered through the desktop's `searchIndex.ts`
+    roman-numeral labels, a scan imported as a PDF, the trashed note's) and 47 queries, with what a real Meilisearch answered through the desktop's `searchIndex.ts`
     (`apps/web/src/lib/composition/pdfTextSearch.test.ts`: runs when a Meilisearch binary is on the `PATH` or in `COMPOSITION_MEILI_BIN`, and
     `UPDATE_FIXTURES=1` rewrites the file). The iPad's FTS5 search replays it and must find the same notes, in the same order, at the same pages
     (`PdfTextSearchConformanceTests`).
@@ -185,6 +185,9 @@ hold them to it.
   (`Ζεύς` would not be found by `Ζεύς` otherwise; a note's own Greek or Cyrillic text has that problem today, which is a separate fix). Its words
   are kept out of the vocabulary the typo search reads on every keystroke, which a library of books would make hundreds of thousands of words long.
 - **Searching.** `searchHits` returns the page; `search` still returns ids, so the conformance tests against Meilisearch are unchanged.
+- **Scans.** A scan's pages are pictures, so PDFKit finds no text in them; instead the lines Vision read from them (`scan_lines`, less any
+  line held back) are a scan's pages' text in these same tables, made from the database rather than the file, and a hit says *In the scan,
+  p. 3* ([scans.md](scans.md#search)). The desktop does not search scan text yet.
 - **What it costs.** The same 600-page book was read in 0.68 s and indexed in 0.19 s on a Mac, and grew the index by 387 KB; filler has a small
   vocabulary, so a real book's index is larger (more distinct words). Not yet measured on an iPad. A query that reaches the PDFs' text costs one
   more FTS5 query.

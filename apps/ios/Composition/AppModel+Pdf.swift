@@ -162,7 +162,7 @@ extension AppModel {
         }
     }
 
-    private func finishImport(opened: Int64?, group: Int64?, notebook: Int64?, problems: [String]) async {
+    func finishImport(opened: Int64?, group: Int64?, notebook: Int64?, problems: [String]) async {
         await reload()
         indexPdfText()
         if let opened {

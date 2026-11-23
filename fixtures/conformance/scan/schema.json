@@ -1,0 +1,198 @@
+{
+  "columns": {
+    "scan_pages": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": false,
+        "default": null,
+        "primaryKey": true
+      },
+      {
+        "name": "document_id",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "page",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "engine",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "recognized_at",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      }
+    ],
+    "scan_lines": [
+      {
+        "name": "id",
+        "type": "INTEGER",
+        "notnull": false,
+        "default": null,
+        "primaryKey": true
+      },
+      {
+        "name": "document_id",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "page",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "line",
+        "type": "INTEGER",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "rect",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "text",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "confidence",
+        "type": "REAL",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "engine",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "corrected",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "notnull": true,
+        "default": null,
+        "primaryKey": false
+      },
+      {
+        "name": "uuid",
+        "type": "TEXT",
+        "notnull": false,
+        "default": null,
+        "primaryKey": false
+      }
+    ]
+  },
+  "objects": [
+    {
+      "type": "table",
+      "name": "scan_lines",
+      "table": "scan_lines",
+      "sql": "CREATE TABLE scan_lines ( id INTEGER PRIMARY KEY AUTOINCREMENT, document_id INTEGER NOT NULL, page INTEGER NOT NULL, line INTEGER NOT NULL, rect TEXT NOT NULL, text TEXT NOT NULL, confidence REAL NOT NULL, engine TEXT NOT NULL, status TEXT NOT NULL, corrected TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL , uuid TEXT)"
+    },
+    {
+      "type": "table",
+      "name": "scan_pages",
+      "table": "scan_pages",
+      "sql": "CREATE TABLE scan_pages ( id INTEGER PRIMARY KEY AUTOINCREMENT, document_id INTEGER NOT NULL, page INTEGER NOT NULL, engine TEXT, recognized_at TEXT, created_at TEXT NOT NULL , uuid TEXT)"
+    },
+    {
+      "type": "index",
+      "name": "idx_scan_lines_page",
+      "table": "scan_lines",
+      "sql": "CREATE INDEX idx_scan_lines_page ON scan_lines (document_id, page, line)"
+    },
+    {
+      "type": "index",
+      "name": "idx_scan_lines_uuid",
+      "table": "scan_lines",
+      "sql": "CREATE UNIQUE INDEX idx_scan_lines_uuid ON scan_lines (uuid)"
+    },
+    {
+      "type": "index",
+      "name": "idx_scan_pages_page",
+      "table": "scan_pages",
+      "sql": "CREATE UNIQUE INDEX idx_scan_pages_page ON scan_pages (document_id, page)"
+    },
+    {
+      "type": "index",
+      "name": "idx_scan_pages_uuid",
+      "table": "scan_pages",
+      "sql": "CREATE UNIQUE INDEX idx_scan_pages_uuid ON scan_pages (uuid)"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_scan_lines_fill_uuid",
+      "table": "scan_lines",
+      "sql": "CREATE TRIGGER trg_scan_lines_fill_uuid AFTER INSERT ON scan_lines WHEN NEW.uuid IS NULL BEGIN UPDATE scan_lines SET uuid = lower(hex(randomblob(16))) WHERE rowid = NEW.rowid; END"
+    },
+    {
+      "type": "trigger",
+      "name": "trg_scan_pages_fill_uuid",
+      "table": "scan_pages",
+      "sql": "CREATE TRIGGER trg_scan_pages_fill_uuid AFTER INSERT ON scan_pages WHEN NEW.uuid IS NULL BEGIN UPDATE scan_pages SET uuid = lower(hex(randomblob(16))) WHERE rowid = NEW.rowid; END"
+    }
+  ]
+}

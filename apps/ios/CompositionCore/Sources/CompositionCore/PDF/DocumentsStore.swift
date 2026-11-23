@@ -111,13 +111,15 @@ extension CompositionDatabase {
         try pool.write { try $0.execute(sql: "UPDATE documents SET view_state = ? WHERE id = ?", arguments: [state.normalized().json.serialized(), id]) }
     }
 
-    /// Drops a PDF's row, its marks and its bookmarks in one transaction, and returns the row so the caller can delete the file.
+    /// Drops a PDF's row, its marks, its bookmarks and (a scan's) pages and lines in one transaction, and returns the row so the caller can delete the file.
     @discardableResult
     public func deleteDocument(id: Int64) throws -> StoredDocument? {
         try pool.write { db in
             guard let document = try Self.fetchDocument(db, id) else { return nil }
             try db.execute(sql: "DELETE FROM pdf_annotations WHERE document_id = ?", arguments: [id])
             try db.execute(sql: "DELETE FROM pdf_bookmarks WHERE document_id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM scan_lines WHERE document_id = ?", arguments: [id])
+            try db.execute(sql: "DELETE FROM scan_pages WHERE document_id = ?", arguments: [id])
             try db.execute(sql: "DELETE FROM documents WHERE id = ?", arguments: [id])
             return document
         }
@@ -139,10 +141,14 @@ extension CompositionDatabase {
             for orphan in orphans {
                 try db.execute(sql: "DELETE FROM pdf_annotations WHERE document_id = ?", arguments: [orphan.id])
                 try db.execute(sql: "DELETE FROM pdf_bookmarks WHERE document_id = ?", arguments: [orphan.id])
+                try db.execute(sql: "DELETE FROM scan_lines WHERE document_id = ?", arguments: [orphan.id])
+                try db.execute(sql: "DELETE FROM scan_pages WHERE document_id = ?", arguments: [orphan.id])
                 try db.execute(sql: "DELETE FROM documents WHERE id = ?", arguments: [orphan.id])
             }
             try db.execute(sql: "DELETE FROM pdf_annotations WHERE document_id NOT IN (SELECT id FROM documents)")
             try db.execute(sql: "DELETE FROM pdf_bookmarks WHERE document_id NOT IN (SELECT id FROM documents)")
+            try db.execute(sql: "DELETE FROM scan_lines WHERE document_id NOT IN (SELECT id FROM documents)")
+            try db.execute(sql: "DELETE FROM scan_pages WHERE document_id NOT IN (SELECT id FROM documents)")
             return orphans
         }
     }
