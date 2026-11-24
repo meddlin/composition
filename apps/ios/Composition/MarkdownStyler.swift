@@ -49,6 +49,12 @@ final class MarkdownStyler {
     private var live: LiveModel?
     /// Where the selection was when the text was last drawn: what it has left is what has to be drawn again.
     private var drawnSelection: NSRange?
+    /// While Scribble is writing (Gate LD4, items 352 and 371), the selection the text is drawn for: the one drawn when it began, moved along by the edits since.
+    /// Scribble moves the selection under the Pencil as it works: it puts the caret where the Pencil came down when it focuses the text, and it shows the words a
+    /// scratch-out will delete by selecting them (PencilKit's `PKTextInputUITextInputInterface`, read in the iOS 26.4 Simulator runtime). In a list item that selection
+    /// showed the item's `- [ ] ` and moved its words sideways (a level out, by the marks' width less the indent), under a stroke Scribble was still reading, and the
+    /// scratch-out deleted nothing. So the look stays as it was until Scribble has finished, as it does while a composition is under way.
+    private var scribbleSelection: NSRange?
     /// Called after text has been coloured (the UI tests' view of what the screen shows).
     var didApply: (() -> Void)?
     /// Where the notes' pictures are kept: asked when the Live tab draws one.
@@ -183,14 +189,40 @@ final class MarkdownStyler {
         version += 1
         stepGeneration += 1  // a full pass that is putting colours on stops: the text moved under it
         recolourAfterEdit()
-        drawnSelection = textView?.selectedRange
+        drawnSelection = selectionInForce
         scheduleFullPass(after: Self.pause)
         measurements.editMilliseconds.append(Self.milliseconds(clock.now - started))
     }
 
+    /// The selection the Live look is drawn for: the text view's, or while Scribble is writing the one it began with.
+    private var selectionInForce: NSRange { scribbleSelection ?? textView?.selectedRange ?? NSRange(location: 0, length: 0) }
+
+    /// Scribble is about to write (or may: the Pencil came down where it may begin): the look stays as it is drawn now until `scribbleFinished`.
+    func scribbleBegan() {
+        guard isLive, scribbleSelection == nil, let textView else { return }
+        scribbleSelection = drawnSelection ?? textView.selectedRange
+    }
+
+    /// Scribble has finished: the look catches up with the selection.
+    func scribbleFinished() {
+        guard scribbleSelection != nil else { return }
+        scribbleSelection = nil
+        selectionChanged()
+    }
+
+    /// Whether Scribble is writing (the look is held).
+    var isScribbling: Bool { scribbleSelection != nil }
+
+    /// The marks hidden at the start of the list and quote lines that `range` reaches, as they are drawn now: what Scribble may not delete.
+    func hiddenListMarks(touching range: NSRange) -> [NSRange] {
+        guard isLive, let live, let textView, live.length == textView.textStorage.length else { return [] }
+        let paragraphs = (textView.textStorage.string as NSString).paragraphRange(for: range)
+        return live.decorations(in: paragraphs, selection: selectionInForce).lists.flatMap { [$0.hidden, $0.task?.range].compactMap { $0 } }
+    }
+
     /// The text view's selection moved. In the Live tab, the constructs it left and the ones it entered change how they look: their marks show or hide.
     func selectionChanged() {
-        guard isLive, let textView else { return }
+        guard isLive, let textView, scribbleSelection == nil else { return }
         #if DEBUG || EDITOR_TEST_HOOKS
         let started = clock.now
         defer { measurements.selectionMilliseconds.append(Self.milliseconds(clock.now - started)) }
@@ -222,7 +254,7 @@ final class MarkdownStyler {
     /// The task box drawn at `position` for the selection in force, when there is one (what a tap on a box ticks; `LiveTaskTap`).
     func drawnTask(at position: Int) -> LiveDecorations.ListLine.Task? {
         guard isLive, let live, let textView, live.length == textView.textStorage.length, textView.markedTextRange == nil else { return nil }
-        return live.task(at: position, selection: textView.selectedRange)
+        return live.task(at: position, selection: selectionInForce)
     }
 
     /// The link the selection is in, in the Live tab, when it can be followed (a `pdf:` link to a PDF not here cannot): what the ↗ beside it follows.
@@ -263,6 +295,7 @@ final class MarkdownStyler {
         }
         pendingEdits = EditAccumulator()
         measurements.quickEdits += 1
+        if let held = scribbleSelection { scribbleSelection = Self.moved(held, byReplacing: merged.range, withLength: merged.newLength) }
         let window = model!.edited(replacing: merged.range, withLength: merged.newLength, in: storage.mutableString)
         live?.edited(replacing: merged.range, withLength: merged.newLength, rereading: window, in: storage.mutableString)
         if isLive { blocks.edited(replacing: merged.range, withLength: merged.newLength) }
@@ -290,7 +323,7 @@ final class MarkdownStyler {
             if clipped.length > 0 { storage.addAttributes(palette.attributes(for: span.kind), range: clipped) }
         }
         if isLive, let live, live.length == storage.length {
-            let selection = textView?.selectedRange ?? NSRange(location: 0, length: 0)
+            let selection = selectionInForce
             LiveOverlay.apply(live.decorations(in: range, selection: selection), to: range, in: storage,
                               context: .init(look: look, imageFolder: imageFolder(), textWidth: textWidth, isLinkHere: isLinkHere, blocks: touched, selection: selection,
                                              editing: textView?.isFirstResponder ?? false))
@@ -370,7 +403,7 @@ final class MarkdownStyler {
         }
         model = fresh
         live = freshLive
-        drawnSelection = textView?.selectedRange
+        drawnSelection = selectionInForce
         stepGeneration += 1
         putOn(steps, from: 0, using: fresh, generation: stepGeneration)
     }
@@ -429,6 +462,14 @@ final class MarkdownStyler {
         let reach = max(3_000, end - start)
         let low = max(0, start - reach), high = min(all.length, end + reach)
         return NSRange(location: low, length: max(0, high - low))
+    }
+
+    /// Where `selection` is once `range` has been replaced by `length` characters: moved along with the text after the edit, and to the edit's end when the edit reached it.
+    static func moved(_ selection: NSRange, byReplacing range: NSRange, withLength length: Int) -> NSRange {
+        let delta = length - range.length
+        if NSMaxRange(range) <= selection.location { return NSRange(location: selection.location + delta, length: selection.length) }
+        if range.location >= NSMaxRange(selection) { return selection }
+        return NSRange(location: range.location + length, length: 0)
     }
 
     /// In order, with ranges that overlap or touch made into one.

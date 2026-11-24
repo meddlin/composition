@@ -259,8 +259,14 @@ final class NoteTextView: UITextView {
             command.wantsPriorityOverSystemBehavior = true
             return command
         }
-        return [key("c", #selector(composeMore)), key("e", #selector(endComposition))]
+        return [key("c", #selector(composeMore)), key("e", #selector(endComposition)), key("s", #selector(scratchOutPreview)), key("d", #selector(scratchOutDelete))]
     }()
+
+    /// ⌃⌥S and ⌃⌥D, with `-liveCompose 1`: a Scribble scratch-out, as PencilKit drives the text view (see `Coordinator.simulateScratchOut`), in its two steps: the words it will delete
+    /// shown selected while the stroke is read, then deleted.
+    var simulateScratchOut: ((_ delete: Bool) -> Void)?
+    @objc private func scratchOutPreview() { simulateScratchOut?(false) }
+    @objc private func scratchOutDelete() { simulateScratchOut?(true) }
 
     @objc private func composeMore() {
         let word = (markedTextRange.flatMap { text(in: $0) } ?? "") + "ni"
@@ -537,7 +543,18 @@ struct NoteEditorView: UIViewRepresentable {
             taskTap = LiveTaskTap(textView: view, isLive: { [weak styler] in styler?.isLive ?? false }, drawnTask: { [weak styler] in styler?.drawnTask(at: $0) })
             // Scribble never begins over a picture or a block the Live tab draws (Gate LD1, item 344), and the Pencil on a drawing opens its canvas.
             if let editor = view as? NoteTextView {
-                scribble = LiveScribble(textView: editor)
+                let scribble = LiveScribble(textView: editor)
+                scribble.isTaskBox = { [weak self] point in self?.taskTap?.box(at: point) != nil }
+                // While Scribble writes, the Live look holds still under the Pencil (Gate LD4, item 352).
+                scribble.began = { [weak styler] in styler?.scribbleBegan() }
+                scribble.finished = { [weak styler] in styler?.scribbleFinished() }
+                self.scribble = scribble
+                #if DEBUG || EDITOR_TEST_HOOKS
+                editor.simulateScratchOut = { [weak self, weak editor] delete in
+                    guard let self, let editor else { return }
+                    self.simulateScratchOut(in: editor, delete: delete)
+                }
+                #endif
                 let pencil = LivePencilOpen(textView: editor)
                 pencil.open = { [weak self] name in self?.handle?.editInk(name) }
                 pencilOpen = pencil
@@ -699,10 +716,66 @@ struct NoteEditorView: UIViewRepresentable {
         /// Markdown keys do (`ListContinuation`, Step 4 of docs/ipad-live-default-plan.md): in both tabs, since the text is the same Markdown in each.
         func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
             if text == "\n" && assist?.accept() == true { return false }
+            if text.isEmpty, let spared = scribbleDeletion(range, in: textView) {
+                if spared.length > 0 {
+                    textView.selectedRange = spared
+                    textView.deleteBackward()
+                }
+                return false
+            }
             guard let view = textView as? NoteTextView, let edit = listEdit(view, range: range, replacement: text) else { return true }
             view.apply(edit)
             return false
         }
+
+        /// A deletion Scribble makes (a scratch-out) that would take some of the marks the Live tab hides at the start of a list item or a quote's line, less those marks: what
+        /// is deleted instead. Nil for any other change. Scribble works out the words to delete from where the stroke crossed them, and a mark hidden just before an item's first
+        /// word (the space after `[ ]`, drawn half a point wide) is within a stroke over that word; deleting it would turn the item into text (item 352). When a space was
+        /// spared before the word, the one after it goes instead, as it would have with the word in the middle of the line.
+        private func scribbleDeletion(_ range: NSRange, in textView: UITextView) -> NSRange? {
+            guard range.length > 0, let styler, styler.isScribbling else { return nil }
+            let hidden = styler.hiddenListMarks(touching: range).filter { NSIntersectionRange($0, range).length > 0 }
+            guard !hidden.isEmpty else { return nil }
+            let text = textView.textStorage.string as NSString
+            var kept = IndexSet(integersIn: range.location..<NSMaxRange(range))
+            for mark in hidden { kept.subtract(IndexSet(integersIn: mark.location..<NSMaxRange(mark))) }
+            // What is left of the range: its longest stretch, the words (a scratch-out is a few words of one line; a line break before the marks is not what was meant).
+            guard let words = kept.rangeView.max(by: { $0.count < $1.count }) else { return NSRange(location: range.location, length: 0) }
+            var spared = NSRange(location: words.lowerBound, length: words.count)
+            let sparedSpace = hidden.contains { NSLocationInRange(spared.location - 1, $0) } && spared.location > 0 && text.character(at: spared.location - 1) == 0x20
+                && NSLocationInRange(spared.location - 1, range)
+            if sparedSpace, NSMaxRange(spared) < text.length, text.character(at: NSMaxRange(spared)) == 0x20 { spared.length += 1 }
+            return spared == range ? nil : spared
+        }
+
+        #if DEBUG || EDITOR_TEST_HOOKS
+        /// What Scribble's scratch-out does to the text view, step by step, as PencilKit's `PKTextInputUITextInputInterface` does it (read in the iOS 26.4 Simulator runtime):
+        /// Scribble begins writing; it selects the words it will delete, through the input delegate (`selectTextInRange:`, its deletion preview); then it asks the delegate
+        /// whether the words may be replaced with nothing, selects them and calls `deleteBackward` (`deleteTextInRange:`); and writing ends. The words are those of
+        /// `-scratchOut <text>` (its first occurrence), which may include the hidden space before an item's first word, as a stroke over that word can.
+        private var scratchRange: NSRange?
+        fileprivate func simulateScratchOut(in editor: NoteTextView, delete: Bool) {
+            guard let scribble else { return }
+            if !delete {
+                let target = UserDefaults.standard.string(forKey: "scratchOut") ?? ""
+                let found = (editor.textStorage.string as NSString).range(of: target)
+                guard !target.isEmpty, found.location != NSNotFound else { return }
+                scratchRange = found
+                scribble.simulateWriting(true)
+                editor.inputDelegate?.selectionWillChange(editor)
+                editor.selectedRange = found
+                editor.inputDelegate?.selectionDidChange(editor)
+            } else {
+                guard let range = scratchRange else { return }
+                scratchRange = nil
+                if textView(editor, shouldChangeTextIn: range, replacementText: "") {
+                    editor.selectedRange = range
+                    editor.deleteBackward()
+                }
+                scribble.simulateWriting(false)
+            }
+        }
+        #endif
 
         /// What Return or Backspace does to a list or a quote at the caret, or nil when the key should do what it always does: not over a selection, not
         /// while an input method is composing (its text is not settled), and for Backspace only when it takes the one character before the caret (not a

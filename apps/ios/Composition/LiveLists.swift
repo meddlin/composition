@@ -205,13 +205,22 @@ final class LiveListFragment: NSTextLayoutFragment {
 /// A tap on a drawn task box ticks or unticks it (decision D4): its `x` is written or taken out through the text view, as one step of undo, and the caret stays
 /// where it was. The target is 44 points round the box, as far right as the start of the item's text, so that a tap on the words still edits them. Only in the Live
 /// tab; the Preview's boxes stay read-only.
+///
+/// The Pencil has a recogniser of its own (Gate LD4, items 351 and 371): a tap, which waits to be one, lost the Pencil's touch now and then to the text view's own
+/// handling of the Pencil, and the caret went into the item instead. `pencil` takes a Pencil touch on a box as it lands, as `LivePencilOpen` does on a drawing, so
+/// nothing else has it, and ticks when the Pencil lifts still on that box; a stroke that moves off the box does nothing. (Scribble may not begin there: `LiveScribble`.)
 @MainActor
 final class LiveTaskTap: NSObject, UIGestureRecognizerDelegate {
     private weak var textView: UITextView?
     private let isLive: () -> Bool
     /// The task drawn at a place in the text, for the selection in force (`MarkdownStyler.drawnTask`): nil when none is.
     private let drawnTask: (Int) -> LiveDecorations.ListLine.Task?
+    /// A finger's (or a pointer's) tap.
     private(set) var recognizer: UITapGestureRecognizer!
+    /// The Pencil's touch, taken as it lands on a box.
+    private(set) var pencil: UILongPressGestureRecognizer!
+    /// The box the Pencil landed on, and where.
+    private var pencilBox: (offset: Int, at: CGPoint)?
     /// Half the side of the square a finger may land in.
     static let reach: CGFloat = 22
 
@@ -220,9 +229,21 @@ final class LiveTaskTap: NSObject, UIGestureRecognizerDelegate {
         self.isLive = isLive
         self.drawnTask = drawnTask
         super.init()
+        var pencilTypes = [UITouch.TouchType.pencil]
+        #if DEBUG || EDITOR_TEST_HOOKS
+        // `-fingerIsPencil 1`: a finger counts as the Pencil here, for the UI tests, which have no Pencil.
+        if UserDefaults.standard.bool(forKey: "fingerIsPencil") { pencilTypes.append(.direct) }
+        #endif
         recognizer = UITapGestureRecognizer(target: self, action: #selector(tapped(_:)))
+        recognizer.allowedTouchTypes = [UITouch.TouchType.direct, .indirect, .indirectPointer].filter { !pencilTypes.contains($0) }.map { NSNumber(value: $0.rawValue) }
         recognizer.delegate = self
         textView.addGestureRecognizer(recognizer)
+        pencil = UILongPressGestureRecognizer(target: self, action: #selector(pencilPressed(_:)))
+        pencil.minimumPressDuration = 0
+        pencil.allowableMovement = .greatestFiniteMagnitude
+        pencil.allowedTouchTypes = pencilTypes.map { NSNumber(value: $0.rawValue) }
+        pencil.delegate = self
+        textView.addGestureRecognizer(pencil)
     }
 
     /// The box nearest `point` (in the text view) whose target holds it, as the offset of its `[` in the text.
@@ -277,12 +298,32 @@ final class LiveTaskTap: NSObject, UIGestureRecognizerDelegate {
 
     /// The text view's own taps (which would move the caret onto the line, where no box is drawn) wait until this one has failed.
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldBeRequiredToFailBy other: UIGestureRecognizer) -> Bool {
-        other is UITapGestureRecognizer && other !== recognizer
+        gestureRecognizer === recognizer && other is UITapGestureRecognizer && other !== recognizer
     }
 
     @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
         guard recognizer.state == .ended, let textView, let at = box(at: recognizer.location(in: textView)), let task = drawnTask(at) else { return }
         Self.toggle(task, in: textView)
+    }
+
+    @objc private func pencilPressed(_ recognizer: UILongPressGestureRecognizer) {
+        guard let textView else { return }
+        let point = recognizer.location(in: textView)
+        switch recognizer.state {
+        case .began:
+            pencilBox = box(at: point).map { ($0, point) }
+        case .ended:
+            defer { pencilBox = nil }
+            // A tap: the Pencil lifted on the box it landed on, not far from where it landed.
+            guard let landed = pencilBox, hypot(point.x - landed.at.x, point.y - landed.at.y) <= Self.reach, box(at: point) == landed.offset,
+                let task = drawnTask(landed.offset)
+            else { return }
+            Self.toggle(task, in: textView)
+        case .cancelled, .failed:
+            pencilBox = nil
+        default:
+            break
+        }
     }
 
     /// Ticks or unticks `task` through the text view (so that it is typed text to undo, autosave and the colours), as an undo step of its own, leaving the selection as it was.
