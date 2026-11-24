@@ -9,6 +9,11 @@ import UIKit
 // Following (owner decisions I1 and I2): a plain tap edits, as in any text. While the selection is in a link a small ↗ sits just after it (`LiveFollowButton`,
 // 44 points to hit), and a tap on it follows; with a hardware keyboard or a trackpad, ⌘-tap (and ⌘⇧-tap, there being no "beside" on the iPad) follows at once
 // (`LiveLinkTap`). Both call the screen's `LinkFollower`, as the Preview does.
+//
+// Gate LD7 (owner's choices, docs/manual-tests/ipad.md items 364 and 365): a footnote citation follows like a link, to its definition (the desktop's `#fn-label`),
+// with the ↗ while the selection is on it and ⌘-tap; a drawn `<Toc />`'s entries and a drawn footnote list's ↩s follow on ⌘-tap, and while the selection is in the
+// tag (or the definitions) each of them has a ↗ of its own (`live-follow-entry`). A plain tap still edits. They go to a place in the note (`jump`), not through
+// `LinkFollower`.
 
 extension NSAttributedString.Key {
     /// On a link's drawn words: the address it follows (a `String`). Not `.link`, which would make the text view draw and follow it its own way.
@@ -113,8 +118,16 @@ final class LiveFollowButton: UIButton {
     /// The address it follows.
     private(set) var href = ""
     var onFollow: ((String) -> Void)?
+    /// What a tap does instead, for the ↗ of a `<Toc />`'s entry or a footnote's ↩ (Gate LD7).
+    var onTap: (() -> Void)?
     private let disc = UIView()
     private let arrow = UIImageView(image: UIImage(systemName: "arrow.up.right", withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .bold)))
+
+    convenience init(identifier: String, label: String) {
+        self.init(frame: .zero)
+        accessibilityIdentifier = identifier
+        accessibilityLabel = label
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -129,6 +142,7 @@ final class LiveFollowButton: UIButton {
         isPointerInteractionEnabled = true
         addAction(UIAction { [weak self] _ in
             guard let self else { return }
+            if let onTap = self.onTap { return onTap() }
             self.onFollow?(self.href)
         }, for: .touchUpInside)
     }
@@ -148,11 +162,15 @@ final class LiveFollowButton: UIButton {
     func show(href: String, after rect: CGRect, in textView: UITextView, tint: UIColor) {
         self.href = href
         accessibilityValue = href
+        show(after: rect, in: textView, tint: tint)
+    }
+
+    /// Its badge just after `rect`'s end, on its line, kept inside the text view's width; `height` is what it takes taps over (less than 44 where rows are closer).
+    func show(after rect: CGRect, in textView: UITextView, tint: UIColor, height: CGFloat = LiveFollowButton.size) {
         disc.backgroundColor = tint
         let side = Self.size
-        // Its badge just after the link's end, on its line; kept inside the text view's width.
         let x = min(rect.maxX + 2 - (side - Self.badge) / 2, textView.bounds.width - side)
-        frame = CGRect(x: x, y: rect.midY - side / 2, width: side, height: side)
+        frame = CGRect(x: x, y: rect.midY - height / 2, width: side, height: height)
         if superview !== textView { textView.addSubview(self) }
         textView.bringSubviewToFront(self)
     }
@@ -168,6 +186,14 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
     var activeLink: () -> LiveDecorations.Link? = { nil }
     var follow: (String) -> Bool = { _ in false }
     var tint: () -> UIColor = { .link }
+    /// The address a ⌘-tap on the character at an index follows when it is not a link's: a footnote citation's, to its definition (Gate LD7).
+    var footnoteHref: (Int) -> String? = { _ in nil }
+    /// The `<Toc />` or footnote list the selection is in, showing its source with its picture under it: its rows get ↗s (Gate LD7).
+    var followableBlock: () -> NSRange? = { nil }
+    /// Goes to a row's place in the note (a heading, a footnote's citation). False when there is none.
+    var jump: (LiveBlockRow.Target) -> Bool = { _ in false }
+    /// The ↗s of the rows of the block the selection is in, one per row, made as needed and kept.
+    private var rowButtons: [LiveFollowButton] = []
     private var pending = false
 
     init(textView: UITextView) {
@@ -208,11 +234,42 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
     }
 
     private func place() {
+        placeRows()
         guard let textView, let link = activeLink(), let rect = lastRect(of: link.node, in: textView) else {
             button.removeFromSuperview()
             return
         }
         button.show(href: link.href, after: rect, in: textView, tint: tint())
+    }
+
+    /// A ↗ after each row of the `<Toc />` or footnote list the selection is in (its entry's words, or its ↩), over the picture drawn under its source.
+    private func placeRows() {
+        guard let editor = textView as? NoteTextView, let block = followableBlock(), let item = LiveDrawn.item(ofBlock: block, in: editor),
+            let picture = item.drawing.block?.picture
+        else {
+            for button in rowButtons { button.removeFromSuperview() }
+            return
+        }
+        let rows = picture.rows(drawnIn: item.picture)
+        // Rows closer than 44 points share the height between them, so that one ↗ never covers the next.
+        let centres = rows.map(\.frame.midY).sorted()
+        let pitch = zip(centres, centres.dropFirst()).map { $1 - $0 }.filter { $0 > 1 }.min() ?? LiveFollowButton.size
+        let height = min(LiveFollowButton.size, max(pitch, 24))
+        while rowButtons.count < rows.count { rowButtons.append(LiveFollowButton(identifier: "live-follow-entry", label: "")) }
+        for (index, button) in rowButtons.enumerated() {
+            guard index < rows.count else {
+                button.removeFromSuperview()
+                continue
+            }
+            let row = rows[index]
+            switch row.target {
+            case .heading: button.accessibilityLabel = "Go to heading"
+            case .citation: button.accessibilityLabel = "Back to citation"
+            }
+            button.accessibilityValue = row.label
+            button.onTap = { [weak self] in _ = self?.jump(row.target) }
+            button.show(after: row.frame, in: editor, tint: tint(), height: height)
+        }
     }
 
     /// The last rect of `range` on the screen, in the text view's coordinates: where the link ends.
@@ -226,21 +283,41 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
         return rects.filter { abs($0.midY - bottom) < 1 }.max { $0.maxX < $1.maxX }
     }
 
-    /// The address of the link drawn at `point`, if any.
+    /// The address of the link drawn at `point`, if any, or of the footnote citation there (Gate LD7).
     private func href(at point: CGPoint) -> String? {
-        guard let textView, let position = textView.closestPosition(to: point) else { return nil }
+        // Not on a drawn picture: its hidden source is under it, links and all, and what a ⌘-tap there follows is its rows (`row(at:)`).
+        guard let textView, (textView as? NoteTextView).map({ LiveDrawn.item(at: point, in: $0) == nil }) ?? true, let position = textView.closestPosition(to: point) else { return nil }
         let offset = textView.offset(from: textView.beginningOfDocument, to: position)
         let storage = textView.textStorage
         for index in [offset, offset - 1] where index >= 0 && index < storage.length {
             if let href = storage.attribute(.liveLink, at: index, effectiveRange: nil) as? String { return href }
         }
+        for index in [offset, offset - 1] where index >= 0 && index < storage.length {
+            if let href = footnoteHref(index) { return href }
+        }
         return nil
+    }
+
+    /// The row of a drawn `<Toc />` or footnote list at `point` (Gate LD7): an entry's line, from the picture's left edge to just past its words; a ↩ and a little
+    /// round it.
+    func row(at point: CGPoint) -> LiveBlockRow? {
+        guard let editor = textView as? NoteTextView, let item = LiveDrawn.item(at: point, in: editor), let picture = item.drawing.block?.picture else { return nil }
+        return picture.rows(drawnIn: item.picture).first { row in
+            switch row.target {
+            case .heading:
+                return CGRect(x: item.picture.minX, y: row.frame.minY - 3, width: row.frame.maxX + 12 - item.picture.minX, height: row.frame.height + 6).contains(point)
+            case .citation:
+                return row.frame.insetBy(dx: -14, dy: -8).contains(point)
+            }
+        }
     }
 
     @objc private func tapped(_ recognizer: UITapGestureRecognizer) {
         trace("tapped")
-        guard recognizer.state == .ended, let href = href(at: recognizer.location(in: textView)) else { return }
-        trace("follow=\(follow(href))")
+        guard recognizer.state == .ended else { return }
+        let point = recognizer.location(in: textView)
+        if let href = href(at: point) { return trace("follow=\(follow(href))") }
+        if let row = row(at: point) { trace("jump=\(jump(row.target))") }
     }
 
     // MARK: ⌘-tap
@@ -263,7 +340,8 @@ final class LiveLinks: NSObject, UIGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         guard let textView else { return false }
-        let on = href(at: touch.location(in: textView)) != nil
+        let point = touch.location(in: textView)
+        let on = href(at: point) != nil || row(at: point) != nil
         trace("touch:\(on)")
         return on
     }

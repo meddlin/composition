@@ -559,6 +559,12 @@ public struct LiveModel: Sendable {
         return found
     }
 
+    /// The footnote citations `range` touches (ends included), drawn as their numbers or showing their source: what the Live tab's ↗ and ⌘-tap follow to the
+    /// footnote's definition (Gate LD7, docs/manual-tests/ipad.md item 364).
+    public func footnoteRefs(touching range: NSRange) -> [LiveDecorations.FootnoteRef] {
+        footnoteRefs.filter { $0.range.location <= NSMaxRange(range) && NSMaxRange($0.range) >= range.location }
+    }
+
     /// The places of the constructs `selection` touches (ends included): the text whose look changes when the selection moves in or out of them.
     public func constructRanges(touching selection: NSRange) -> [NSRange] {
         var found: [NSRange] = []

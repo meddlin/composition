@@ -220,6 +220,9 @@ final class NoteTextView: UITextView {
         return found
     }
 
+    /// The caret was put somewhere on purpose (a ↗ or ⌘-tap went to a heading or a footnote, Gate LD7): the touch that asked for it is not a tap on a block.
+    func forgetRecentTouch() { lastTouch = nil }
+
     /// The start of the block drawn as a picture that a touch a moment ago put the caret in; nil otherwise. The touch is used once.
     func blockStartForRecentTouch() -> Int? {
         guard isLive, let touched = lastTouch, CACurrentMediaTime() - touched < 0.8, selectedRange.length == 0 else { return nil }
@@ -533,8 +536,16 @@ struct NoteEditorView: UIViewRepresentable {
             styler.isLinkHere = { [weak self] in self?.handle?.isLinkHere($0) ?? true }
             let links = LiveLinks(textView: view)
             links.activeLink = { [weak styler] in styler?.activeLink() }
-            links.follow = { [weak self] in self?.handle?.followLink($0) ?? false }
+            links.follow = { [weak self, weak view] href in
+                // An address in this note (`#fn-label`, `#fnref-label`: a footnote citation's ↗ and ⌘-tap, Gate LD7) goes there; anything else to the screen's follower.
+                if href.hasPrefix("#") { return (view as? NoteTextView).map { Self.go(toFragment: String(href.dropFirst()), in: $0) } ?? false }
+                return self?.handle?.followLink(href) ?? false
+            }
             links.tint = { [weak view] in ((view as? NoteTextView)?.look ?? .standard).uiLink }
+            // Gate LD7: a drawn `<Toc />`'s entries and a footnote list's ↩s, on ⌘-tap and with their ↗s while the selection is in the block.
+            links.footnoteHref = { [weak styler] in styler?.footnoteHref(at: $0) }
+            links.followableBlock = { [weak styler] in styler?.followableBlock() }
+            links.jump = { [weak view] target in (view as? NoteTextView).map { Self.go(to: target, in: $0) } ?? false }
             styler.afterApply = { [weak links] in links?.update() }
             liveLinks = links
             (view as? NoteTextView)?.onWidthChange = { [weak styler] in styler?.widthChanged() }
@@ -608,6 +619,46 @@ struct NoteEditorView: UIViewRepresentable {
                     }.joined(separator: ";")
                 }
                 view.addSubview(drawnItems)
+                // `live-rows`: the rows a drawn `<Toc />` or footnote list can follow (Gate LD7), `heading2 x,y,w,h;citation1 x,y,w,h`, in the window, in the order drawn,
+                // from the picture each block is drawn with now (a stale one included): a test sees what the picture shows.
+                let rowItems = LiveProbe(frame: CGRect(x: 0, y: 12, width: 2, height: 2))
+                rowItems.isAccessibilityElement = true
+                rowItems.accessibilityIdentifier = "live-rows"
+                rowItems.alpha = 0.02
+                rowItems.describe = { [weak view] in
+                    guard let editor = view as? NoteTextView else { return "" }
+                    return LiveDrawn.all(in: editor).flatMap { item -> [String] in
+                        guard let picture = item.drawing.block?.picture else { return [] }
+                        return picture.rows(drawnIn: item.picture).map { row in
+                            let name: String
+                            switch row.target {
+                            case .heading(let ordinal): name = "heading\(ordinal)"
+                            case .citation(let number): name = "citation\(number)"
+                            }
+                            let frame = editor.convert(row.frame, to: nil)
+                            return String(format: "%@ %.0f,%.0f,%.0f,%.0f", name, frame.minX, frame.minY, frame.width, frame.height)
+                        }
+                    }.joined(separator: ";")
+                }
+                view.addSubview(rowItems)
+                // `live-citations`: where each footnote citation drawn as its number is, `1 x,y,w,h;2 x,y,w,h`, in the window (Gate LD7: a test ⌘-taps one).
+                let citations = LiveProbe(frame: CGRect(x: 0, y: 14, width: 2, height: 2))
+                citations.isAccessibilityElement = true
+                citations.accessibilityIdentifier = "live-citations"
+                citations.alpha = 0.02
+                citations.describe = { [weak view] in
+                    guard let view else { return "" }
+                    var out: [String] = []
+                    view.textStorage.enumerateAttribute(.liveFootnoteRef, in: NSRange(location: 0, length: view.textStorage.length)) { value, run, _ in
+                        guard let number = value as? LiveFootnoteNumber, let start = view.position(from: view.beginningOfDocument, offset: run.location) else { return }
+                        let caret = view.caretRect(for: start)
+                        let frame = view.convert(CGRect(x: caret.minX, y: caret.minY, width: max(number.width, 6), height: caret.height), to: nil)
+                        let digits = String(number.text.unicodeScalars.map { Array("0123456789")[Array("⁰¹²³⁴⁵⁶⁷⁸⁹".unicodeScalars).firstIndex(of: $0) ?? 0] })
+                        out.append(String(format: "%@ %.0f,%.0f,%.0f,%.0f", digits, frame.minX, frame.minY, frame.width, frame.height))
+                    }
+                    return out.joined(separator: ";")
+                }
+                view.addSubview(citations)
                 // `live-scribble`: whether Scribble could have begun where the last touch began, as the real delegate answers (`n=3 x,y yes`): the UI tests cannot write with a Pencil.
                 let scribbleProbe = UILabel(frame: CGRect(x: 0, y: 10, width: 2, height: 2))
                 scribbleProbe.isAccessibilityElement = true
@@ -890,6 +941,28 @@ struct NoteEditorView: UIViewRepresentable {
         private var delegateMilliseconds: [Double] = []
         private var partMilliseconds: [(text: Double, session: Double, styler: Double)] = []
         #endif
+
+        /// Goes to `id`'s place in the note (`fn-label`, `fnref-label`, as the desktop's `fragmentOffset` finds them): the caret at the start of its line, scrolled to the
+        /// top, as the Outline goes to a heading. False when nothing in the note has it (a heading's slug: not followed on the iPad yet).
+        static func go(toFragment id: String, in editor: NoteTextView) -> Bool {
+            guard let offset = NoteFragments.offset(of: id, in: editor.nativeText) else { return false }
+            editor.reveal(offset: offset)
+            return true
+        }
+
+        /// Goes to a row's place: a `<Toc />` entry's heading (by its number, as the Outline finds it), or a footnote's first citation (`#fnref-label`).
+        static func go(to target: LiveBlockRow.Target, in editor: NoteTextView) -> Bool {
+            let text = editor.nativeText
+            switch target {
+            case .heading(let ordinal):
+                guard let offset = NoteOutline.make(content: text).first(where: { $0.ordinal == ordinal })?.offset else { return false }
+                editor.reveal(offset: offset)
+                return true
+            case .citation(let number):
+                guard let label = NoteFragments.footnoteLabel(number: number, in: text) else { return false }
+                return go(toFragment: NoteFragments.referenceID(label), in: editor)
+            }
+        }
 
         func scrollViewDidScroll(_ scrollView: UIScrollView) {
             styler?.scrolled()
