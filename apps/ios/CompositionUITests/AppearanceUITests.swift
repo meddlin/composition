@@ -296,9 +296,14 @@ final class AppearanceUITests: XCTestCase {
     func testFollowTheSunSettingsFitPortraitToo() throws {
         try launch(["-theme", "auto", "-sunLevel", "0.5"])
         XCUIDevice.shared.orientation = .portrait
-        // In portrait the note has the whole screen: bring the lists back, and the way in is where it always is.
-        app.buttons["focus-toggle"].tap()
-        openAppearance()
+        // The 13-inch iPad keeps all three columns in portrait (`BrowserView.threeColumnWidth`), but narrower: the system folds the notebooks' toolbar,
+        // More menu and all, into its own overflow button, which is also called "More". The way in that stays in plain sight is the Appearance button at
+        // the foot of the notebooks column. On a smaller iPad that column is out of sight in portrait: bring it in. (Not with the lists' focus toggle:
+        // where the lists show, it hides them.)
+        let appearance = app.buttons["sidebar-appearance"]
+        if !appearance.waitForExistence(timeout: 5) { app.buttons["Show Sidebar"].tap() }
+        appearance.tap()
+        XCTAssertTrue(app.buttons["scheme-forest"].waitForExistence(timeout: 10), "the sheet lists the schemes")
         let first = app.datePickers["sun-hour-lightenFrom"]
         scrollSheet(until: first)
         keepScreenshot("appearance sheet, Follow the sun, portrait")
