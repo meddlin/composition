@@ -25,7 +25,7 @@
     "@expo-google-fonts/noto-sans": "0.4.2",
     "@expo-google-fonts/noto-sans-math": "0.4.2",
     "@tailwindcss/typography": "^0.5.20",
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.2.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.2",
     "fontkit": "2.0.4",
