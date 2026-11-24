@@ -23,6 +23,22 @@ enum LiveDrawn {
         return found
     }
 
+    /// The picture of the block whose source is `source`, where it is laid out now: after its last line while it shows its source, in its first paragraph while it does
+    /// not. What the ↗s of a `<Toc />`'s entries and a footnote list's ↩s are placed by (Gate LD7).
+    static func item(ofBlock source: NSRange, in textView: NoteTextView) -> Item? {
+        guard textView.isLive, source.length > 0, let layout = textView.textLayoutManager, let content = layout.textContentManager else { return nil }
+        for offset in [NSMaxRange(source) - 1, source.location] {
+            guard let location = content.location(content.documentRange.location, offsetBy: offset) else { continue }
+            layout.ensureLayout(for: NSTextRange(location: location))
+            if let fragment = layout.textLayoutFragment(for: location) as? LiveDrawingFragment, let block = fragment.drawing?.block,
+                NSIntersectionRange(block.source, source).length > 0, let found = item(of: fragment, in: textView)
+            {
+                return found
+            }
+        }
+        return nil
+    }
+
     private static func item(of fragment: LiveDrawingFragment, in textView: UITextView) -> Item? {
         guard let drawing = fragment.drawing, let room = fragment.drawnRoom, let picture = fragment.drawnRect else { return nil }
         let inset = textView.textContainerInset

@@ -567,6 +567,31 @@ finding: at that size the drawn header's title and date are "potentially inacces
 element (Step 5's rule) and its words are the YAML's, read from the value; whether the header should be an element of its own is the
 owner's (item 366). The plan branch alone passes that audit; Step 7 on `main` did too, so it is the two together.
 
+**Gate LD7 (2026-11-24): 364 and 365 failed, fixed; retest is item 387.** A heading added to the note never reached the drawn
+`<Toc />`, and a new citation was not numbered in the drawn footnote list. Both are drawn from the whole note, but `LiveBlocks`
+cached a picture, and decided whether a block had changed, by the block's own source (`<Toc />`, the definitions), which had not
+changed. A block drawn from more than its own text (`<Toc />`, a footnote list, any block citing a footnote) is now cached and
+compared by what it is drawn from too (`LiveBlock.identity`), so the pause pass draws it again when the headings or the footnotes
+change, with the same timing as any block. And the owner's choices for following (I6, amended):
+
+- **`<Toc />`:** a plain tap edits; **⌘-tap** on an entry puts the caret on its heading (by its number among the note's headings,
+  as the Outline finds it) and scrolls it to the top; while the caret is in the tag, each entry of the picture under it has a **↗**
+  (`live-follow-entry`, "Go to heading", the heading's words as its value), placed after the entry's words.
+- **Footnotes:** a citation follows **like a link**, to its definition: the ↗ after it while the caret is on it (`live-follow-link`,
+  value `#fn-label`) and ⌘-tap on its number. The Live tab's picture of the list ends each footnote with a **↩** (the Preview's list
+  has none yet), which follows back to the footnote's first citation on ⌘-tap, and with a ↗ ("Back to citation") while the caret is in
+  the definitions. The targets are the desktop's, `#fn-label` and `#fnref-label`, found as its `fragmentOffset` finds them
+  (`NoteFragments`, with its test's note in `NoteFragmentsTests`). A `#heading` link written in a note is still not followed (no slug
+  port yet).
+- **Where the rows are:** the picture is the Preview's own view, so the rows' places come from it: while `LiveBlockRenderer` renders,
+  `TocView` and `FootnotesView` report each entry's and ↩'s frame (`PreviewRowFrames`, a `GeometryReader` behind each, read in the
+  picture's coordinate space), and the picture carries them (`LiveBlockPicture.rows`).
+
+`LiveNavigationUITests` (Simulator, `-liveCommandHeld 1` standing in for ⌘): a heading added and deleted changes the drawn Toc's
+entries; a new citation renumbers the citations and the list, and a new footnote joins both; ⌘-tap on an entry, a citation's number
+and a ↩; a plain tap on an entry and on a citation still edits; the entries' ↗s, the citation's ↗ and the ↩s' ↗s. Probes:
+`live-rows` (each row of the pictures drawn now) and `live-citations` (where each number is drawn).
+
 ### Step 8: Live by default (S)
 
 - The setting's default becomes **Live** (D1). A choice already made stays.
@@ -630,7 +655,7 @@ The iPad's own questions:
 | I3 | Where the setting lives and what it changes | Appearance sheet › Writing › "Open notes in", **kept on this iPad** (not in `settings.json`, so a restored desktop backup does not bring the desktop's choice); **every note opens in it**, and changing the tab lasts until another note opens | **As recommended**: kept on this iPad, and every note opens in it |
 | I4 | The default until Step 8 (desktop: Split) | **Preview**, as today (Split is cramped on a portrait iPad) | **Preview** |
 | I5 | A new note (today: Markdown, keyboard up) | Opens in the setting's view when it is a writing view (Live, Markdown, Split); when it is Preview, in **Markdown until Step 8 and Live after** | **As recommended** |
-| I6 | How blocks are drawn, and what a touch on one does | **Pictures of the Preview's own views** in the existing fragment layer; a tap edits; a component's action (a card's address, editing a drawing) is the same **↗** as a link's, while the caret is in it; a `<Toc />` entry is reached through the Outline button | **As recommended**; amended 2026-11-19 (Gate LD1): a **Pencil** touch on a drawn `<Ink>` opens its canvas, a finger still edits |
+| I6 | How blocks are drawn, and what a touch on one does | **Pictures of the Preview's own views** in the existing fragment layer; a tap edits; a component's action (a card's address, editing a drawing) is the same **↗** as a link's, while the caret is in it; a `<Toc />` entry is reached through the Outline button | **As recommended**; amended 2026-11-19 (Gate LD1): a **Pencil** touch on a drawn `<Ink>` opens its canvas, a finger still edits; amended 2026-11-24 (Gate LD7): a `<Toc />` entry follows on **⌘-tap**, and with a **↗** per entry while the caret is in the tag; a footnote citation and a footnote's ↩ follow **like links** (⌘-tap, and the ↗ while the caret is on them); a plain tap still edits |
 | I7 | Code-block colours (the iPad's Preview has none by language) | **Match the Preview**: one fill, the code font, no language colours; language colours for both tabs is a separate later item | **Match the Preview** |
 
 ## Out of scope

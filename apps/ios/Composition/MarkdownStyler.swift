@@ -263,6 +263,8 @@ final class MarkdownStyler {
         let selection = textView.selectedRange
         let around = NSIntersectionRange(NSRange(location: max(0, selection.location - 1), length: selection.length + 2), NSRange(location: 0, length: live.length))
         if let link = live.decorations(in: around, selection: selection).links.first(where: { $0.active && isLinkHere($0.href) }) { return link }
+        // Gate LD7 (owner's choice "like links"): a footnote citation the selection is on has the same ↗, to its definition (the desktop's `#fn-label`).
+        if let citation = footnoteHref(touching: selection) { return citation }
         // Step 6 (owner decision I6): a `<YouTube>` or `<Repo>` block the selection is in shows its source, and the same ↗ opens its address, after its tag.
         guard LiveOverlay.revealsBlocks else { return nil }
         for entry in blocks.entries(touching: selection) {
@@ -271,6 +273,31 @@ final class MarkdownStyler {
             }
         }
         return nil
+    }
+
+    /// The citation `selection` is on (ends included), as a link to its definition.
+    private func footnoteHref(touching selection: NSRange) -> LiveDecorations.Link? {
+        guard let live, let textView else { return nil }
+        let text = textView.textStorage.string as NSString
+        for ref in live.footnoteRefs(touching: selection) where NSMaxRange(ref.range) <= text.length {
+            if let label = NoteFragments.citationLabel(text.substring(with: ref.range)) {
+                return LiveDecorations.Link(range: ref.range, node: ref.range, href: "#" + NoteFragments.definitionID(label), active: true)
+            }
+        }
+        return nil
+    }
+
+    /// The address a ⌘-tap on the character at `index` follows when it is in a footnote citation, drawn as its number or showing its source: its definition's (Gate LD7).
+    func footnoteHref(at index: Int) -> String? {
+        guard isLive, let live, let textView, live.length == textView.textStorage.length, index >= 0, index < live.length else { return nil }
+        guard let link = footnoteHref(touching: NSRange(location: index, length: 0)), NSLocationInRange(index, link.range) else { return nil }
+        return link.href
+    }
+
+    /// The `<Toc />` or footnote list the selection is in, while it shows its source with its picture under it: each of its rows then has a ↗ (Gate LD7).
+    func followableBlock() -> NSRange? {
+        guard isLive, LiveOverlay.revealsBlocks, let textView else { return nil }
+        return blocks.entries(touching: textView.selectedRange).first { $0.picture?.rows.isEmpty == false }?.block.range
     }
 
     // MARK: Quick reads

@@ -62,7 +62,7 @@ enum LiveBlockKinds {
     static func picturedWhileEditing(_ kind: String) -> Bool { kind != frontmatter }
 }
 
-/// A block the Live tab draws: where its source is, what it is, and the text of that source (what its picture is cached by).
+/// A block the Live tab draws: where its source is, what it is, and the text of that source.
 struct LiveBlock: Sendable {
     var range: NSRange
     var block: PreviewBlock
@@ -70,6 +70,25 @@ struct LiveBlock: Sendable {
     var source: String
     /// The frontmatter's header (Step 7): what `NoteReader` shows above the body, drawn in place of the YAML. `block` is then an empty `.markdown([])`.
     var header: LiveHeader? = nil
+    /// What its picture is cached and compared by: its source, and, for a block drawn from more of the note than its own text, what it is drawn from. Gate LD7
+    /// (docs/manual-tests/ipad.md items 364 and 365) found `<Toc />` never gaining a heading added above it, and a footnote list keeping its old numbers after a
+    /// citation was added: their source had not changed, so the picture cached by it was drawn again, and the block was not seen to change.
+    let identity: String
+
+    init(range: NSRange, block: PreviewBlock, kind: String, source: String, header: LiveHeader? = nil) {
+        self.range = range
+        self.block = block
+        self.kind = kind
+        self.source = source
+        self.header = header
+        identity = Self.drawnFromTheWholeNote(kind: kind, source: source) ? source + "\u{1F}" + String(describing: block) : source
+    }
+
+    /// Whether what a block draws depends on the rest of the note: `<Toc />` (the headings), a footnote list (the numbers and the footnotes' text), and any block
+    /// that cites a footnote (its number).
+    static func drawnFromTheWholeNote(kind: String, source: String) -> Bool {
+        kind == "toc" || kind == "footnotes" || source.contains("[^")
+    }
 
     /// The blocks of a note that are drawn, from its preview (`NotePreview.located`); made off the main thread, in the pause pass. Nil while the note is not valid MDX
     /// (Step 6): the Preview then draws it as plain Markdown under its notice, and the Live tab keeps the pictures it last drew, with no notice of its own, until the
@@ -120,10 +139,42 @@ struct LiveHeader: Sendable, Equatable {
     }
 }
 
+/// A row of a drawn list that can be followed (Gate LD7, docs/manual-tests/ipad.md items 364 and 365): a `<Toc />` entry, or the ↩ after a footnote. Where it is
+/// drawn in the picture (in the picture's points, as rendered) and where it goes. ⌘-tap on it follows it, and while the block shows its source each row has a ↗
+/// (`LiveLinks`), as a link does.
+struct LiveBlockRow: Sendable, Equatable {
+    enum Target: Sendable, Equatable {
+        /// A heading, by its number among the note's headings (`TocEntry.ordinal`, which is `OutlineHeading.ordinal`).
+        case heading(Int)
+        /// The first citation of the footnote of this number (the desktop's `#fnref-label`).
+        case citation(Int)
+    }
+
+    var frame: CGRect
+    var target: Target
+    /// What VoiceOver calls its ↗.
+    var label: String
+}
+
 /// The picture of a block, and how big it is drawn.
 final class LiveBlockPicture: @unchecked Sendable {
     let image: UIImage
-    init(image: UIImage) { self.image = image }
+    /// The rows in it that can be followed (a `<Toc />`'s entries, a footnote list's ↩s), where the renderer drew them.
+    let rows: [LiveBlockRow]
+    init(image: UIImage, rows: [LiveBlockRow] = []) {
+        self.image = image
+        self.rows = rows
+    }
+
+    /// The rows as drawn in `rect` (the picture scaled to it), in the same coordinates as `rect`.
+    func rows(drawnIn rect: CGRect) -> [LiveBlockRow] {
+        let scale = image.size.width > 0 ? rect.width / image.size.width : 1
+        return rows.map { row in
+            var moved = row
+            moved.frame = CGRect(x: rect.minX + row.frame.minX * scale, y: rect.minY + row.frame.minY * scale, width: row.frame.width * scale, height: row.frame.height * scale)
+            return moved
+        }
+    }
 
     /// The size it is drawn at in a line `available` points wide: its own size, or scaled down to fit (a table whose columns cannot wrap any narrower).
     func size(available: CGFloat) -> CGSize {
@@ -186,7 +237,7 @@ final class LiveBlocks {
         }
         // What changes: every block that is new, gone, moved or drawn with another picture.
         func signature(_ entry: Entry) -> String {
-            "\(NSStringFromRange(entry.block.range))|\(entry.block.source.hashValue)|\(entry.picture.map { ObjectIdentifier($0).hashValue } ?? 0)"
+            "\(NSStringFromRange(entry.block.range))|\(entry.block.identity.hashValue)|\(entry.picture.map { ObjectIdentifier($0).hashValue } ?? 0)"
         }
         let before = Set(old.map(signature)), after = Set(next.map(signature))
         for entry in next where !before.contains(signature(entry)) { changed.append(entry.block.range) }
@@ -223,7 +274,7 @@ final class LiveBlocks {
         }) else { return nil }
         let block = entries[index].block
         let key = Self.key(block, width: width)
-        let picture = cache.object(forKey: key) ?? LiveBlockRenderer.render(block, width: width, look: look, traits: traits, imageFolder: imageFolder).map { LiveBlockPicture(image: $0) }
+        let picture = cache.object(forKey: key) ?? LiveBlockRenderer.picture(of: block, width: width, look: look, traits: traits, imageFolder: imageFolder)
         if let picture { cache.setObject(picture, forKey: key) }
         entries[index].picture = picture ?? entries[index].picture
         entries[index].stale = false
@@ -231,7 +282,7 @@ final class LiveBlocks {
         return block.range
     }
 
-    private static func key(_ block: LiveBlock, width: CGFloat) -> NSString { "\(Int(width.rounded()))|\(block.source)" as NSString }
+    private static func key(_ block: LiveBlock, width: CGFloat) -> NSString { "\(Int(width.rounded()))|\(block.identity)" as NSString }
 }
 
 /// The Preview's own view of a block, rendered to a picture (one renderer: nothing here draws a block itself).
@@ -241,9 +292,10 @@ enum LiveBlockRenderer {
     /// (`previewScrolls`): `ImageRenderer` does not draw a `ScrollView`'s content. A table (`sizesToContent`) is drawn at its own width, as in the Preview; one wider than
     /// the text is offered the text's width, so its cells wrap, and one still wider (columns that cannot wrap) comes back wider and is drawn scaled down to fit
     /// (`LiveBlockPicture.size`). It is never clipped.
-    /// A Live block: the Preview's view of its `PreviewBlock`, or for the frontmatter the Preview's header (`NoteReaderHeader`).
-    static func render(_ block: LiveBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
-        guard let header = block.header else { return render(block.block, width: width, look: look, traits: traits, imageFolder: imageFolder) }
+    /// A Live block: the Preview's view of its `PreviewBlock`, or for the frontmatter the Preview's header (`NoteReaderHeader`), with where the rows that can be
+    /// followed were drawn in it (Gate LD7).
+    static func picture(of block: LiveBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> LiveBlockPicture? {
+        guard let header = block.header else { return picture(of: block.block, width: width, look: look, traits: traits, imageFolder: imageFolder) }
         // The header image is read here, at once: `ImageRenderer` draws a view as it first is, before any task of its own has run.
         var picture: (image: UIImage, pixels: CGSize)?
         if let headerImage = header.headerImage, let folder = imageFolder, case .stored(let name)? = HeaderImageSource.resolve(headerImage.image) {
@@ -254,18 +306,26 @@ enum LiveBlockRenderer {
     }
 
     static func render(_ block: PreviewBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
-        if LiveBlockKinds.sizesToContent(block), let own = render(block, proposing: nil, look: look, traits: traits, imageFolder: imageFolder), own.size.width <= width {
-            return own
-        }
-        return render(block, proposing: max(width, 100), look: look, traits: traits, imageFolder: imageFolder)
+        picture(of: block, width: width, look: look, traits: traits, imageFolder: imageFolder)?.image
     }
 
-    private static func render(_ block: PreviewBlock, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
+    static func picture(of block: PreviewBlock, width: CGFloat, look: Look, traits: UITraitCollection, imageFolder: URL?) -> LiveBlockPicture? {
+        if LiveBlockKinds.sizesToContent(block), let own = picture(of: block, proposing: nil, look: look, traits: traits, imageFolder: imageFolder), own.image.size.width <= width {
+            return own
+        }
+        return picture(of: block, proposing: max(width, 100), look: look, traits: traits, imageFolder: imageFolder)
+    }
+
+    private static func picture(of block: PreviewBlock, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> LiveBlockPicture? {
         draw(PreviewBlockView(block: block), proposing: width, look: look, traits: traits, imageFolder: imageFolder)
     }
 
-    private static func draw(_ view: some View, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> UIImage? {
+    private static func draw(_ view: some View, proposing width: CGFloat?, look: Look, traits: UITraitCollection, imageFolder: URL?) -> LiveBlockPicture? {
+        // Where the rows that can be followed are drawn (a `<Toc />`'s entries, a footnote's ↩): the views report their frames as they are laid out (`PreviewRowFrames`).
+        let rows = PreviewRowFrames()
         let content = view
+            .environment(\.previewRowFrames, rows)
+            .coordinateSpace(.named(PreviewRowFrames.space))
             .environment(\.previewScrolls, false)
             .environment(\.horizontalSizeClass, UserInterfaceSizeClass(traits.horizontalSizeClass))
             .environment(\.look, look)
@@ -279,6 +339,8 @@ enum LiveBlockRenderer {
         renderer.proposedSize = ProposedViewSize(width: width, height: nil)
         renderer.scale = traits.displayScale > 0 ? traits.displayScale : 2
         renderer.isOpaque = false
-        return renderer.uiImage
+        guard let image = renderer.uiImage else { return nil }
+        // In the order drawn, top to bottom (SwiftUI lays the rows out in no set order).
+        return LiveBlockPicture(image: image, rows: rows.rows.sorted { ($0.frame.minY, $0.frame.minX) < ($1.frame.minY, $1.frame.minX) })
     }
 }

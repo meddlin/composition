@@ -20,7 +20,29 @@ private struct ImageFolderKey: EnvironmentKey {
     static let defaultValue: URL? = nil
 }
 
+/// Where the rows a reader follows are drawn in a block's picture, while the Live tab renders it (`LiveBlockRenderer`, Gate LD7): a `<Toc />`'s entries and the ↩
+/// after each footnote report their frames here as they are laid out, in the picture's coordinates (`space`). Nil in the Preview, whose entries are buttons.
+final class PreviewRowFrames: @unchecked Sendable {
+    static let space = "live-block-picture"
+    private(set) var rows: [LiveBlockRow] = []
+
+    /// A row's frame, once per target (layout may run more than once: the last frame is the one drawn).
+    func record(_ row: LiveBlockRow) {
+        if let index = rows.firstIndex(where: { $0.target == row.target }) { rows[index] = row } else { rows.append(row) }
+    }
+}
+
+private struct PreviewRowFramesKey: EnvironmentKey {
+    static let defaultValue: PreviewRowFrames? = nil
+}
+
 extension EnvironmentValues {
+    /// Set while the Live tab renders a block's picture: where its rows are drawn (`PreviewRowFrames`).
+    var previewRowFrames: PreviewRowFrames? {
+        get { self[PreviewRowFramesKey.self] }
+        set { self[PreviewRowFramesKey.self] = newValue }
+    }
+
     var scrollToHeading: @MainActor (Int) -> Void {
         get { self[ScrollToHeadingKey.self] }
         set { self[ScrollToHeadingKey.self] = newValue }
@@ -188,6 +210,7 @@ private struct TocView: View {
                 Button(entry.text) { scrollToHeading(entry.ordinal) }
                     .buttonStyle(.plain)
                     .foregroundStyle(look.link)
+                    .background { RowFrameProbe { LiveBlockRow(frame: $0, target: .heading(entry.ordinal), label: entry.text) } }
                     .padding(.leading, CGFloat(entry.level) * 16)
             }
         }
@@ -200,6 +223,8 @@ private struct TocView: View {
 private struct FootnotesView: View {
     let entries: [FootnoteEntry]
     @Environment(\.look) private var look
+    /// In the Live tab's picture of the list, each footnote ends with a ↩ back to its citation, as on the desktop (Gate LD7); the Preview has none yet.
+    @Environment(\.previewRowFrames) private var rowFrames
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -210,7 +235,27 @@ private struct FootnotesView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(entries[index].number).").monospacedDigit().foregroundStyle(look.mutedText)
                     MarkdownView(blocks: entries[index].blocks).font(.callout)
+                    if rowFrames != nil {
+                        let number = entries[index].number
+                        Text("↩").font(.callout).foregroundStyle(look.link).fixedSize()
+                            .background { RowFrameProbe { LiveBlockRow(frame: $0, target: .citation(number), label: "\(number)") } }
+                    }
                 }
+            }
+        }
+    }
+}
+
+/// Reports where the view it is behind is drawn, while the Live tab renders a picture (`PreviewRowFrames`); nothing in the Preview.
+private struct RowFrameProbe: View {
+    let row: (CGRect) -> LiveBlockRow
+    @Environment(\.previewRowFrames) private var frames
+
+    var body: some View {
+        if let frames {
+            GeometryReader { proxy in
+                let _ = frames.record(row(proxy.frame(in: .named(PreviewRowFrames.space))))
+                Color.clear
             }
         }
     }

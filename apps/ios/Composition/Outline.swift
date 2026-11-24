@@ -23,6 +23,7 @@ final class OutlineJump {
 extension NoteTextView {
     /// Puts the caret at the start of the line at `offset` and scrolls the text so that the line is at the top.
     func reveal(offset: Int) {
+        forgetRecentTouch()
         let at = min(max(offset, 0), textStorage.length)
         selectedRange = NSRange(location: at, length: 0)
         layoutIfNeeded()
