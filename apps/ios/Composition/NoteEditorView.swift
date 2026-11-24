@@ -186,8 +186,11 @@ final class NoteTextView: UITextView {
     private var rulerView: UIView?
     /// True while the system's paste runs, so that what it types is not taken for typing (reflow leaves a paste as it is).
     private(set) var isPasting = false
-    /// The Live tab is the one showing (set by `MarkdownStyler.setLive`): what the text view tells VoiceOver then leaves out what the look hides (`LiveAccessibility`).
-    var isLive = false
+    /// The Live tab is the one showing (set by `MarkdownStyler.setLive`): what the text view tells VoiceOver then leaves out what the look hides (`LiveAccessibility`),
+    /// and the text is in the Preview font (`Look.textFont`), which the ruler measures its column in.
+    var isLive = false {
+        didSet { if isLive != oldValue { setNeedsLayout() } }
+    }
 
     override var accessibilityAttributedValue: NSAttributedString? {
         get { (isLive ? LiveAccessibility.value(of: textStorage, mode: LiveAccessibility.mode) : nil) ?? super.accessibilityAttributedValue }
@@ -367,8 +370,8 @@ final class NoteTextView: UITextView {
         updateRuler()
     }
 
-    /// The ruler (the desktop's `rulerColumn` characters from the text's left edge): the width of a "0" in the editor's face, as CSS's `ch` is, times the
-    /// column, from where the text starts. Off by default; when it is off there is no view at all.
+    /// The ruler (the desktop's `rulerColumn` characters from the text's left edge): the width of a "0" in the text's face (the Editor font, or the Preview
+    /// font on the Live tab), as CSS's `ch` is, times the column, from where the text starts. Off by default; when it is off there is no view at all.
     private func updateRuler() {
         guard writing.rulerEnabled else {
             rulerView?.removeFromSuperview()
@@ -386,7 +389,7 @@ final class NoteTextView: UITextView {
             insertSubview(line, at: 0)
             rulerView = line
         }
-        let advance = ("0" as NSString).size(withAttributes: [.font: look.editorFont.uiFont(size: 16)]).width
+        let advance = ("0" as NSString).size(withAttributes: [.font: look.textFont(live: isLive).uiFont(size: 16)]).width
         let x = textContainerInset.left + textContainer.lineFragmentPadding + CGFloat(writing.rulerColumn) * advance
         let thickness = 1 / max(traitCollection.displayScale, 1)
         line.frame = CGRect(x: x, y: 0, width: thickness, height: max(contentSize.height, bounds.height))
@@ -433,7 +436,7 @@ struct NoteEditorView: UIViewRepresentable {
         let look = context.environment.look
         view.look = look
         view.backgroundColor = look.uiBackground
-        view.font = look.editorFont.uiFont(size: 16)
+        view.font = look.textFont(live: live).uiFont(size: 16)
         view.textColor = look.uiForeground
         view.tintColor = look.uiBrand
         view.accessibilityIdentifier = "note-editor"
@@ -471,8 +474,13 @@ struct NoteEditorView: UIViewRepresentable {
 
     func updateUIView(_ view: UITextView, context: Context) {
         context.coordinator.caretMoved = caretMoved
-        // The Live tab came to the front, or left it: the same text view, drawn the other way (the caret, the keyboard and the text stay).
-        context.coordinator.styler?.setLive(live)
+        // The Live tab came to the front, or left it: the same text view, drawn the other way (the caret, the keyboard and the text stay), and in the other
+        // tab's family (the Preview font in Live, the Editor font in Markdown: `Look.textFont`). The styler puts the family on the text; an empty note has
+        // none, so the view's own font, which its caret and first letters are in, follows too.
+        if let styler = context.coordinator.styler, styler.isLive != live {
+            styler.setLive(live)
+            if view.textStorage.length == 0 { view.font = context.environment.look.textFont(live: live).uiFont(size: 16) }
+        }
         // Hidden under the Preview (out of the touches' and VoiceOver's reach; `accessibilityHidden` and `isAccessibilityElement` do not reach a representable's view),
         // on the next turn of the run loop and never inside SwiftUI's update: giving the keyboard up there (which hiding the view does too) makes the keyboard's
         // tracking ask SwiftUI to render inside that same update, a cycle that held the main thread (found by sampling the app while a UI test stalled).
@@ -483,14 +491,14 @@ struct NoteEditorView: UIViewRepresentable {
                 view.isHidden = hidden
             }
         }
-        // The colour scheme or the editor's font was changed in Settings: the view and every colour on the text are made again.
+        // The colour scheme or a font was changed in Settings: the view and every colour on the text are made again.
         let look = context.environment.look
         if let editor = view as? NoteTextView { editor.writing = context.environment.writing }
         context.coordinator.writing = context.environment.writing
         if let editor = view as? NoteTextView, editor.look != look {
             editor.look = look
             view.backgroundColor = look.uiBackground
-            view.font = look.editorFont.uiFont(size: 16)
+            view.font = look.textFont(live: live).uiFont(size: 16)
             view.textColor = look.uiForeground
             view.tintColor = look.uiBrand
             context.coordinator.styler?.apply(look)
@@ -568,6 +576,13 @@ struct NoteEditorView: UIViewRepresentable {
                 label.alpha = 0.02
                 view.addSubview(label)
                 reportLabel = label
+                // `editor-faces`: which family each run of the text is in, in either tab (`LiveReport.faces`): the Editor font on the Markdown tab, the Preview font on the Live tab.
+                let faces = UILabel(frame: CGRect(x: 0, y: 2, width: 2, height: 2))
+                faces.isAccessibilityElement = true
+                faces.accessibilityIdentifier = "editor-faces"
+                faces.alpha = 0.02
+                view.addSubview(faces)
+                facesLabel = faces
                 // `live-selection`: where the selection is and what surrounds it, and where the caret is drawn (see `selectionSummary`).
                 let selection = UILabel(frame: CGRect(x: 0, y: 4, width: 2, height: 2))
                 selection.isAccessibilityElement = true
@@ -624,7 +639,8 @@ struct NoteEditorView: UIViewRepresentable {
                 }
                 styler.didApply = { [weak self, weak styler, weak view] in
                     guard let self, let styler, let view else { return }
-                    self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: look.editorFont.uiFont(size: 16).pointSize) : "markdown"
+                    self.facesLabel?.accessibilityLabel = LiveReport.faces(in: view.textStorage)
+                    self.reportLabel?.accessibilityLabel = styler.isLive ? LiveReport.make(from: view.textStorage, bodySize: ((view as? NoteTextView)?.look ?? look).textFont(live: true).uiFont(size: 16).pointSize) : "markdown"
                     self.updateGeometryLabel()
                 }
             }
@@ -850,6 +866,7 @@ struct NoteEditorView: UIViewRepresentable {
 
         #if DEBUG || EDITOR_TEST_HOOKS
         fileprivate var reportLabel: UILabel?
+        fileprivate var facesLabel: UILabel?
         fileprivate var selectionLabel: UILabel?
         fileprivate var geometryLabel: UILabel?
 

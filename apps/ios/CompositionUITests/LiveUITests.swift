@@ -135,6 +135,75 @@ final class LiveUITests: XCTestCase {
         XCTAssertTrue(eventually { text().contains("Some Z**bold**") }, "the caret was kept across the tabs: \(text().suffix(60))")
     }
 
+    // MARK: The fonts
+
+    /// Which family each run of the text is drawn in (`editor-faces`: `LiveReport.faces`), as `family → ranges`, in either tab.
+    private func faces() -> [String: String] {
+        LiveReportReading.parse(app.descendants(matching: .any)["editor-faces"].label, keepingFrontmatter: true)
+    }
+
+    /// Whether one of the ranges in `ranges` (`a-b,c-d`) holds all of `from` to `to`.
+    private func covers(_ ranges: String?, _ from: Int, _ to: Int) -> Bool {
+        (ranges ?? "").split(separator: ",").contains { range in
+            let ends = range.split(separator: "-").compactMap { Int($0) }
+            return ends.count == 2 && ends[0] <= from && ends[1] >= to
+        }
+    }
+
+    /// Chooses the Preview font in the Appearance sheet, as a person does.
+    private func choosePreviewFont(_ label: String) {
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Appearance…"].tap()
+        XCTAssertTrue(app.buttons["scheme-forest"].waitForExistence(timeout: 10), "the Appearance sheet opened")
+        let picker = app.buttons["preview-font"]
+        // The fonts are below the schemes: in landscape the sheet is scrolled to them.
+        for _ in 0..<8 where !(picker.exists && picker.isHittable) { app.swipeUp(velocity: .slow) }
+        XCTAssertTrue(picker.exists && picker.isHittable, "the sheet has the Preview font")
+        picker.tap()
+        app.buttons[label].firstMatch.tap()
+        app.buttons["Done"].tap()
+    }
+
+    /// Gate LD4, item 353: the Live tab is in the **Preview** font, as the desktop's Live tab is (`--preview-font`), and the Markdown tab in the Editor font; code
+    /// is monospaced in both. A Preview font chosen in Appearance shows in Live at once, and the tabs switch family as they switch.
+    func testLiveIsInThePreviewFontAndTheMarkdownTabInTheEditorFont() throws {
+        try launch(["-editorFont", "sans"])
+        choosePreviewFont("Serif")
+        // "Plain words and " is 0 to 16, the backticks 16 and 21, `code` 17 to 21 and " here." 22 to 28.
+        write("# Head\n\nPlain words and `code` here.")
+        let body = origin + 8
+        XCTAssertTrue(eventually { self.covers(self.faces()["serif"], body, body + 16) && self.covers(self.faces()["serif"], body + 22, body + 28) },
+                      "Live's words are in the Preview font (serif): \(faces())")
+        XCTAssertTrue(covers(faces()["serif"], origin + 2, origin + 6), "and so is the heading: \(faces())")
+        XCTAssertTrue(covers(faces()["mono"], body + 17, body + 21), "the code stays monospaced: \(faces())")
+        XCTAssertNil(faces()["sans"].flatMap { ranges in covers(ranges, body, body + 1) ? ranges : nil }, "nothing typed is in the Editor font (sans): \(faces())")
+
+        app.buttons["Markdown"].tap()
+        XCTAssertTrue(eventually { self.report.label == "markdown" && self.covers(self.faces()["sans"], body, body + 16) },
+                      "the Markdown tab is in the Editor font (sans): \(faces())")
+        XCTAssertTrue(covers(faces()["mono"], body + 17, body + 21), "with its code monospaced: \(faces())")
+        XCTAssertFalse(covers(faces()["serif"], body, body + 1), "and nothing in the Preview font: \(faces())")
+
+        app.buttons["Live"].tap()
+        XCTAssertTrue(eventually { self.covers(self.faces()["serif"], body, body + 16) }, "back in Live, the Preview font again: \(faces())")
+        keepScreenshot("live in the preview font (serif)")
+
+        // A Preview font chosen while the note is open in Live shows at once.
+        choosePreviewFont("Monospaced")
+        // (The hidden backticks are left out of the faces, so the line is three runs.)
+        XCTAssertTrue(eventually { self.covers(self.faces()["mono"], body, body + 16) && self.covers(self.faces()["mono"], body + 22, body + 28) && self.faces()["serif"] == nil },
+                      "Live follows the Preview font chosen (monospaced): \(faces())")
+        choosePreviewFont("Sans serif")  // the default, left as it was found
+        XCTAssertTrue(eventually { self.covers(self.faces()["sans"], body, body + 16) }, "and again (sans serif): \(faces())")
+    }
+
+    private func keepScreenshot(_ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
+    }
+
     func testTypingAMarkedWordHidesItsMarksWhenTheCaretMovesOn() throws {
         try launch()
         write("one **two**")

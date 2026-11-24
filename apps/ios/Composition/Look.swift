@@ -13,6 +13,10 @@ struct Look: Equatable {
 
     static let standard = Look(theme: .default, editorFont: .editorDefault, previewFont: .previewDefault)
 
+    /// The family a note's text is in: the Editor font on the Markdown tab, and the **Preview** font on the Live tab, as the desktop's Live tab reads in
+    /// `--preview-font` (Gate LD4, item 353: Live read monospaced where the Preview did not). Code is monospaced in both.
+    func textFont(live: Bool) -> FontFamily { live ? previewFont : editorFont }
+
     // MARK: SwiftUI
 
     var background: Color { theme.background.color }

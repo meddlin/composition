@@ -328,6 +328,15 @@ feel, VoiceOver, speed on the device).
   `DidFinishWriting`, which UIKit calls on our interaction's delegate), and a deletion made while Scribble writes spares the marks hidden at an item's
   start (a stroke over an item's first word reaches the hidden space after `[ ]`). UI tests: two more in `LiveListsUITests`; the scratch-out one drives
   the text view as PencilKit does (⌃⌥S, ⌃⌥D with `-liveCompose 1`), since the Simulator has no Scribble. Retest: items 351, 352, 371 and 385.
+- **Live reads in the Preview font (2026-11-24, from item 353).** The owner found Live monospaced where the Preview was not, and decided "Use Preview
+  font". The Live tab's text is now in the Appearance **Preview** font, as the desktop's Live tab is (`.cm-scroller` is `var(--preview-font)` in
+  `LiveEditor.tsx`); the Markdown tab keeps the **Editor** font. `Look.textFont(live:)` names the family; `MarkdownStyler.Palette` (body, bold, the
+  frontmatter), `LiveLists` (the indent and the drawn markers) and the text view's own font (an empty note's caret and first letters) and ruler use it.
+  Sizes are unchanged (16 points grown by Dynamic Type, headings at the desktop's 2, 1.5 and 1.25 times), as on the desktop, where only the family
+  changes. Code stays monospaced: inline in the system monospaced face, blocks in the Preview's code font (Step 3). A font chosen in Appearance and a
+  switch of tab both restyle the shared text view at once (`MarkdownStyler.apply`, `setLive`). The hidden marks keep their half-point font, bold and
+  italic are built from whatever face the text has (a slant where a face has no italic, as before), and VoiceOver's value is unchanged. UI test:
+  `LiveUITests.testLiveIsInThePreviewFontAndTheMarkdownTabInTheEditorFont`, reading a Debug-only `editor-faces` element (`LiveReport.faces`). Item 386.
 
 ### Step 5: the block layer, and tables (L, starts with a spike)
 
