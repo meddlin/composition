@@ -14,6 +14,29 @@ enum LiveReport {
         Array("⁰¹²³⁴⁵⁶⁷⁸⁹".unicodeScalars).firstIndex(of: scalar) ?? -1
     }
 
+    /// The family a font is in, as `FontFamily` names them: `mono`, `serif` (the system's New York) or `sans`.
+    static func face(of font: UIFont) -> String {
+        if font.fontDescriptor.symbolicTraits.contains(.traitMonoSpace) { return "mono" }
+        let name = (font.familyName + " " + font.fontName).lowercased()
+        return name.contains("newyork") || name.contains("new york") || name.contains("serif") ? "serif" : "sans"
+    }
+
+    /// Which family each run of the text is drawn in, in either tab (`editor-faces`, with `-liveReport 1`): `mono:0-40;sans:40-90`. Hidden marks are left out.
+    /// The Markdown tab is in the Editor font, the Live tab in the Preview font, and code in both is monospaced (`Look.textFont`).
+    static func faces(in storage: NSTextStorage) -> String {
+        var classes: [String: [NSRange]] = [:]
+        storage.enumerateAttributes(in: NSRange(location: 0, length: storage.length)) { attributes, run, _ in
+            guard let font = attributes[.font] as? UIFont, !LiveOverlay.isHidden(attributes) else { return }
+            let name = face(of: font)
+            if let last = classes[name]?.last, NSMaxRange(last) == run.location {
+                classes[name]![classes[name]!.count - 1] = NSUnionRange(last, run)
+            } else {
+                classes[name, default: []].append(run)
+            }
+        }
+        return classes.keys.sorted().map { name in name + ":" + classes[name]!.map { "\($0.location)-\(NSMaxRange($0))" }.joined(separator: ",") }.joined(separator: ";")
+    }
+
     static func make(from storage: NSTextStorage, bodySize: CGFloat) -> String {
         var classes: [String: [NSRange]] = [:]
         func note(_ name: String, _ range: NSRange) {

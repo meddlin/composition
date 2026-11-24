@@ -23,7 +23,7 @@ enum LiveLists {
     /// Puts the look of the list and quote lines on `range` of `storage` (whole paragraphs, as `LiveOverlay.apply` is given).
     static func apply(_ lines: [LiveDecorations.ListLine], to range: NSRange, in storage: NSTextStorage, look: Look) {
         let text = storage.mutableString
-        let body = look.editorFont.uiFont(size: 16)
+        let body = look.textFont(live: true).uiFont(size: 16)
         let level = listIndent(body)
         for line in lines {
             let paragraph = text.paragraphRange(for: NSRange(location: line.range.location, length: 0))

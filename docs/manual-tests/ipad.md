@@ -408,6 +408,15 @@ Away from the caret a link is drawn as its words in the link colour, underlined,
     - Undo (⌘Z, or the keyboard's undo) after a scratch-out: the word comes back.
     - Tell me if a box ever failed to tick, if a scratch-out ever deleted nothing or more than the word, and whether the look holding still while you write felt odd.
 
+    **353's note: Live read monospaced where the Preview did not. Changed 2026-11-24 (your call, "Use Preview font"):** the Live tab is now drawn in the Appearance **Preview** font, as the desktop's Live tab is; the Markdown tab keeps the **Editor** font; code, inline and in blocks, stays monospaced in both. Retest with item 386.
+
+386. **Live in the Preview font.** Open a note with a heading, a paragraph with **bold**, *italic*, a link and `` `code` ``, a bullet list, a task list, a quote, a code block and a footnote, in Live.
+    - With the fonts as they come (Editor Monospaced, Preview Sans serif): everything in Live but the code is in the sans serif face, the same face the Preview tab uses; the inline code and the code block are monospaced. Switch to Markdown: the whole note is monospaced, as before. Back to Live: sans serif again, at once, with the caret and the keyboard where they were.
+    - With the note open in Live, open *Appearance…* and set the Preview to Serif, then Monospaced, then back to Sans serif: Live changes each time, at once, and the Markdown tab does not. Set the Editor to Serif: the Markdown tab changes and Live does not.
+    - In Live, type at the end of a heading, a list item and a quote line, and in a new empty note: the caret is the height of the words beside it, the letters you type are in the Preview font straight away, bold and italic still look bold and italic (in Monospaced too, where italic is a slant), and the hidden marks stay hidden.
+    - Check it in each of the five schemes, at the largest text size (Settings ▸ Accessibility ▸ Display & Text Size ▸ Larger Text), and with VoiceOver reading a line in Live (it reads the same words as before).
+    - Tell me if anything in Live is still monospaced that the Preview shows in its own font, or if the list bullets, boxes or quote bars sit wrongly against the new face.
+
 ## Tables in the Live tab (Live default plan, Step 5)
 
 A table in the Live tab ([ipad-live-default-plan.md](../ipad-live-default-plan.md), Step 5) is drawn as a picture of the Preview's own table: away from the caret every character of it is hidden and the picture stands where its first line was; with the caret in it, its Markdown shows with the picture under it, and the picture is drawn again a moment after you stop typing. A tap on the picture puts the caret at the start of the table's Markdown. The text never changes: the Markdown tab shows exactly what was typed. To try them, put a table in a note (the preview showcase's, or `| a | b |` / `|---|---|` / `| 1 | 2 |`) and open it in Live. **Gate LD5** is these five.
@@ -761,6 +770,7 @@ Use a long note with pictures, a table, a code block and a component or two.
 - **`<Toc />` and footnotes in the Live tab on a real iPad** (items 364, 365 and 387): drawn again as the note changes, and followed with ⌘-tap, a trackpad, the ↗s and VoiceOver. 364 and 365 failed and were fixed 2026-11-24 (retest with item 387); the UI tests stand in for ⌘. **Gate LD7 is not passed.**
 - **Live as the default, for a week on a real iPad** (item 367): only the Simulator's UI tests have opened notes in Live by default. **Gate LD8 is not passed.**
 - **Return and Backspace in lists on a real iPad** (items 368 to 371): the software keyboard, undo, Scribble, dictation and input methods; the UI tests type on a hardware keyboard only.
+- **Live in the Preview font on a real iPad** (item 386): only the Simulator's UI test and screenshots have been used.
 - **Lists, task lists and quotes in the Live tab on a real iPad** (items 350 to 353 and 385): a finger and the Pencil on a checkbox, Scribble in a list, and how the lists read beside the Preview and with VoiceOver. 351, 352 and 371 failed on the Pencil and Scribble and were fixed 2026-11-23 (retest with item 385). **Gate LD4 is not passed.**
 - **The PDF ink lab on a real iPad** (items 200 to 215): the Pencil, the latency, the memory and whether the finger and the Pencil can share the page. Only the Simulator, with a finger, has been used.
 - **The preview on a real iPad,** and with Dynamic Type or VoiceOver. (Importing a backup through the system picker was not

@@ -176,7 +176,7 @@ final class MarkdownStyler {
         restyleAll()
     }
 
-    /// The colour scheme or the editor's font changed: every colour is made again.
+    /// The colour scheme or a font (the Editor's, or the Preview's, which the Live tab is in) changed: every colour is made again.
     func apply(_ new: Look) {
         guard new != look else { return }
         look = new
@@ -520,9 +520,10 @@ final class MarkdownStyler {
         private let heading, strong, emphasis, strikethrough, inlineCode, codeBlock, linkText, quote, listMarker, rule, tag, mark, frontmatter: [NSAttributedString.Key: Any]
 
         /// The editor's colours are the desktop's (`.md-heading` is `--syntax-function`, `.md-code` is `--syntax-string`, `.md-marker` is `--syntax-number`, and so on in
-        /// `globals.css`), in the scheme in force; the fonts are the family chosen, with code kept monospaced.
+        /// `globals.css`), in the scheme in force; the fonts are the family chosen (the Editor font on the Markdown tab, the Preview font on the Live tab:
+        /// `Look.textFont`), with code kept monospaced.
         init(look: Look, live: Bool = false) {
-            let family = look.editorFont
+            let family = look.textFont(live: live)
             let regular = family.uiFont(size: 16)
             let bold = family.uiFont(size: 16, weight: .bold)
             let code = FontFamily.mono.uiFont(size: 16)
