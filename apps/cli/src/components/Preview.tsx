@@ -18,21 +18,23 @@ export const CODE_GUTTER_TINT = 0.45;
 
 /**
  * Draws a fenced code block as OpenTUI would, but colors it with highlight.js, as web does
- * (see codeHighlight.ts). Only blocks are routed here (`codeBlockOnly`); everything else in
- * the note is still drawn by OpenTUI as before. A fence's options (`showLineNumbers=107 {109}`)
- * put the block in OpenTUI's line-number gutter, numbered from the start line, with the
+ * (see codeHighlight.ts). Only code blocks are replaced here; every other block gets OpenTUI's
+ * default rendering. A fence's options (`showLineNumbers=107 {109}`), read from its whole info
+ * string, put the block in OpenTUI's line-number gutter, numbered from the start line, with the
  * highlighted lines tinted in the accent; with highlights alone the gutter is hidden and only
  * the tint shows. `background` is what the block is drawn on (a panel's tint, or the pane).
  */
-function codeBlockRenderer(palette: Palette, background: string): NonNullable<MarkdownOptions["renderNode"]> {
-  const render = (token: { type: string; lang?: string; text?: string }, context: { defaultRender: () => unknown }) => {
-    const block = token.type === "code" ? context.defaultRender() : null;
-    if (!(block instanceof CodeRenderable)) return block as ReturnType<NonNullable<MarkdownOptions["renderNode"]>>;
-    block.onHighlight = (_treeSitter, { content }) => highlightCode(content, token.lang);
-    const fence = parseCodeFence(token.lang ?? "");
+function codeBlockRenderer(palette: Palette, background: string): NonNullable<MarkdownOptions["renderBlock"]> {
+  return (markdownBlock, context) => {
+    if (markdownBlock.kind !== "code") return null;
+    const block = context.defaultRender();
+    if (!(block instanceof CodeRenderable)) return block;
+    const info = markdownBlock.info ?? markdownBlock.lang;
+    block.onHighlight = (_treeSitter, { content }) => highlightCode(content, info);
+    const fence = parseCodeFence(info ?? "");
     if (!hasLineOptions(fence)) return block;
     const lineColors = new Map<number, LineColorConfig>();
-    codeLines(fence, (token.text ?? "").split("\n").length).forEach((line, index) => {
+    codeLines(fence, markdownBlock.text.split("\n").length).forEach((line, index) => {
       if (line.highlighted) {
         lineColors.set(index, { gutter: mix(background, palette.accent, CODE_GUTTER_TINT), content: mix(background, palette.accent, CODE_LINE_TINT) });
       }
@@ -48,7 +50,6 @@ function codeBlockRenderer(palette: Palette, background: string): NonNullable<Ma
     numbered.showLineNumbers = fence.lineNumbers;
     return numbered;
   };
-  return Object.assign(render, { codeBlockOnly: true }) as NonNullable<MarkdownOptions["renderNode"]>;
 }
 
 /**
@@ -77,7 +78,7 @@ const sentence = (message: string) => (/[.!?]$/.test(message) ? message : `${mes
 
 /** `background` is set inside a panel, whose tint the Markdown must be drawn over. */
 function Blocks({ blocks, palette, syntax, api, background }: Look & { blocks: Block[]; background?: string }) {
-  const renderNode = useMemo(() => codeBlockRenderer(palette, background ?? palette.background), [palette, background]);
+  const renderBlock = useMemo(() => codeBlockRenderer(palette, background ?? palette.background), [palette, background]);
   return (
     <>
       {blocks.map((block, index) => {
@@ -90,7 +91,7 @@ function Blocks({ blocks, palette, syntax, api, background }: Look & { blocks: B
                 content={block.source}
                 syntaxStyle={syntax}
                 fg={palette.foreground}
-                renderNode={renderNode}
+                renderBlock={renderBlock}
                 bg={background}
                 marginTop={marginTop}
               />;
