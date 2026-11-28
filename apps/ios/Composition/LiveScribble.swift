@@ -1,3 +1,4 @@
+import CompositionCore
 import UIKit
 
 /// What the Live tab draws in place of text, found by where it is on the screen: a picture (an image, an `<Ink />` drawing, a `<Drawio />` diagram) or a block drawn as a
@@ -66,6 +67,9 @@ enum LiveDrawn {
 /// how a text view says where Scribble may not begin (WWDC20, "Meet Scribble for iPad"). Everywhere else, the lines just above and below a picture included, it writes
 /// as always. The Markdown tab shows every tag as text, so there it is never stopped.
 ///
+/// While Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)" is off (`PencilScribble`, off until switched on), it begins nowhere in the note's text, in the Live
+/// tab or the Markdown tab; while it is on, the rules here and below hold.
+///
 /// Nor may it begin on a task box the Live tab draws (Gate LD4, items 351 and 371): there Scribble took a Pencil tap meant for the box as writing (a dot, which became
 /// a period in the item) or as a tap of its own (the caret in the item), and the box ticked only when the tap reached `LiveTaskTap` first. Refused there, the Pencil's
 /// touch is an ordinary touch, which `LiveTaskTap` takes. The box's target ends where the item's words begin, so Scribble writes on the words as always.
@@ -81,8 +85,11 @@ final class LiveScribble: NSObject, UIScribbleInteractionDelegate {
         textView.addInteraction(UIScribbleInteraction(delegate: self))
     }
 
-    /// Whether Scribble may begin at `location` (in the text view's coordinates): not on a drawn item's room, nor on a drawn task box.
+    /// Whether Scribble may begin at `location` (in the text view's coordinates): nowhere while Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)" is off
+    /// (`PencilScribble`), in either tab; while it is on, not on a drawn item's room, nor on a drawn task box. Refused, the Pencil's touch is an ordinary touch: it
+    /// selects and scrolls as a finger does, and `LiveTaskTap` and `LivePencilOpen` still take it on a box and on a drawing.
     func allows(at location: CGPoint) -> Bool {
+        guard PencilScribble.isOn() else { return false }
         guard let textView else { return true }
         return LiveDrawn.item(at: location, in: textView) == nil && !isTaskBox(location)
     }

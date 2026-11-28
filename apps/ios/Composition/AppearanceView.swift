@@ -13,6 +13,8 @@ struct AppearanceView: View {
     @State private var hoursRefusal: String?
     /// The view every note opens in (docs/ipad-live-default-plan.md, D9 and I3): kept on this iPad, unlike the rest of this sheet.
     @AppStorage(NoteDetailView.Mode.openNotesInKey) private var openNotesIn = NoteDetailView.Mode.openNotesInDefault
+    /// Whether Scribble may begin in the app's text (`PencilScribble`): kept on this iPad too, and off until switched on.
+    @AppStorage(PencilScribble.key) private var pencilScribble = PencilScribble.defaultOn
 
     var body: some View {
         NavigationStack {
@@ -71,6 +73,7 @@ struct AppearanceView: View {
                 ForEach(NoteDetailView.Mode.allCases, id: \.self) { Text($0.rawValue) }
             }
             .accessibilityIdentifier("open-notes-in")
+            Toggle("Write with the Pencil (Scribble)", isOn: $pencilScribble).accessibilityIdentifier("scribble-toggle")
             Toggle("Ruler", isOn: writingBinding(\.rulerEnabled)).accessibilityIdentifier("ruler-toggle")
             if model.writing.rulerEnabled {
                 Stepper(value: writingBinding(\.rulerColumn), in: WritingSettings.minColumn...WritingSettings.maxColumn) {
@@ -89,7 +92,7 @@ struct AppearanceView: View {
         } header: {
             Text("Writing").foregroundStyle(look.mutedText)
         } footer: {
-            Text("Every note opens in the view chosen here; a tab you switch to lasts until you open another note. A new note opens ready to type: in Markdown when this is Preview. This choice is kept on this iPad only.\n\nThe ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
+            Text("Every note opens in the view chosen here; a tab you switch to lasts until you open another note. A new note opens ready to type: in Markdown when this is Preview. This choice is kept on this iPad only.\n\nWith Write with the Pencil off, handwriting never turns into text anywhere in the app: in notes, search and every other field. The Pencil still draws, ticks a task box, opens a drawing, and selects and scrolls as a finger does. It is kept on this iPad only; Settings ▸ Apple Pencil ▸ Scribble is the switch for the whole iPad.\n\nThe ruler is a guide: a line at a column of the text. Breaking acts on the text: as you type, a line that grows past its column is broken at the last space before it. Headings, code, front matter and HTML are never broken; a table row stays whole while Keep tables whole is on. Pasting, deleting and undoing leave the text as it is.")
                 .foregroundStyle(look.mutedText)
         }
         .listRowBackground(look.surface)

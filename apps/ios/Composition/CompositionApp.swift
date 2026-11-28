@@ -4,6 +4,11 @@ import SwiftUI
 struct CompositionApp: App {
     @State private var model = AppModel()
 
+    init() {
+        // Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)" for every text field and text view the app makes (the note's has its own, `LiveScribble`).
+        ScribbleGate.installEverywhere()
+    }
+
     var body: some Scene {
         WindowGroup {
             ThemedRoot(model: model)
