@@ -5,17 +5,21 @@ import XCTest
 /// Pencil touch on a drawing opens its canvas (`LivePencilOpen`). The UI tests have neither a Pencil nor Scribble, so:
 /// - `live-scribble` says, for where each touch began, what the real Scribble delegate answers there (`n=3 x,y yes`), and `live-drawn` where the drawn items are;
 /// - `-fingerIsPencil 1` lets a finger stand in for the Pencil on a drawing.
-/// What the real Pencil does is manual-test item 372. apps/ios/scripts/ui-test.sh passes the backup in.
+/// What the real Pencil does is manual-test item 372. Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)" (`PencilScribble`) is off until switched on, and off
+/// Scribble begins nowhere: these tests launch with it on (`-pencilScribble 1`) unless they say otherwise, and `testScribbleFollowsTheSetting` checks the switch.
+/// apps/ios/scripts/ui-test.sh passes the backup in.
 @MainActor
 final class LiveScribbleUITests: XCTestCase {
     private let app = XCUIApplication()
 
-    /// Launches on note 25 of the organization backup, or with `note` nil on what `extra` opens (`-importText`), in the Live tab.
+    /// Launches on note 25 of the organization backup, or with `note` nil on what `extra` opens (`-importText`), in the Live tab, with Scribble switched on unless
+    /// `extra` says otherwise (`-pencilScribble` or `-resetPencilScribble`).
     private func launch(note: String? = "25", _ extra: [String] = []) throws {
         continueAfterFailure = false
         let backup = try XCTUnwrap(ProcessInfo.processInfo.environment["COMPOSITION_UI_BACKUP"], "Run apps/ios/scripts/ui-test.sh: it makes the backup and passes its path.")
         XCUIDevice.shared.orientation = .landscapeLeft
-        app.launchArguments = ["-importBackup", backup] + (note.map { ["-openNote", $0] } ?? []) + ["-openMode", "Live", "-liveReport", "1"] + extra
+        app.launchArguments = ["-importBackup", backup] + (note.map { ["-openNote", $0] } ?? []) + ["-openMode", "Live", "-liveReport", "1"]
+            + (extra.contains { $0.hasSuffix("encilScribble") } ? [] : ["-pencilScribble", "1"]) + extra
         app.launch()
         let done = app.alerts["Done"].buttons["OK"]
         XCTAssertTrue(done.waitForExistence(timeout: 90), "the backup did not restore")
@@ -154,6 +158,66 @@ final class LiveScribbleUITests: XCTestCase {
         leaveTheCaretAtTheTop()
     }
 
+    // MARK: The setting
+
+    /// Opens the Appearance sheet and scrolls to Writing's "Write with the Pencil (Scribble)".
+    private func scribbleToggle() -> XCUIElement {
+        let appearance = app.buttons["sidebar-appearance"]
+        if !(appearance.exists && appearance.isHittable) { app.buttons["focus-toggle"].tap() }  // the lists, whose foot has the Appearance button
+        XCTAssertTrue(appearance.waitForExistence(timeout: 10))
+        appearance.tap()
+        XCTAssertTrue(app.buttons["scheme-forest"].waitForExistence(timeout: 20), "the sheet is open")
+        let toggle = app.switches["scribble-toggle"]
+        for _ in 0..<6 where !(toggle.exists && toggle.isHittable) { app.buttons["scheme-forest"].swipeUp() }
+        XCTAssertTrue(toggle.waitForExistence(timeout: 10), "the Writing section has the Scribble switch")
+        return toggle
+    }
+
+    /// Goes to the Markdown tab, or back to Live.
+    private func choose(_ tab: String) {
+        for _ in 0..<3 where (report.label == "markdown") != (tab == "Markdown") {
+            app.buttons[tab].tap()
+            _ = eventually(10) { (report.label == "markdown") == (tab == "Markdown") }
+        }
+        XCTAssertEqual(report.label == "markdown", tab == "Markdown", "the \(tab) tab is showing: \(report.label.prefix(40))")
+    }
+
+    /// Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)": off when never chosen, and then Scribble may begin nowhere in the note's text, in the Live tab or the
+    /// Markdown tab; switched on in the sheet, it may again, in both.
+    func testScribbleFollowsTheSetting() throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("scribble-setting-note.md")
+        try "Words to write beside.\n\nMore words to write beside.\n\nAnd a last line of words.\n".write(to: file, atomically: true, encoding: .utf8)
+        try launch(note: nil, ["-importText", file.path, "-resetPencilScribble", "1"])
+        addTeardownBlock { @MainActor in
+            let reset = XCUIApplication()
+            reset.launchArguments = ["-resetPencilScribble", "1"]
+            reset.launch()
+            reset.terminate()
+        }
+        XCTAssertTrue(eventually { text().contains("Words to write beside.") }, "the imported note is open: \(text().prefix(80))")
+        func onTheText() -> CGPoint { CGPoint(x: editor.frame.midX, y: editor.frame.minY + editor.frame.height * 0.3) }
+
+        try checkScribble(at: onTheText(), allowed: false, "the Live tab, with nothing chosen")
+        choose("Markdown")
+        try checkScribble(at: onTheText(), allowed: false, "the Markdown tab, with nothing chosen")
+
+        let toggle = scribbleToggle()
+        XCTAssertEqual(toggle.value as? String, "0", "the switch is off until switched on")
+        keepScreenshot("Write with the Pencil (Scribble), off")
+        for _ in 0..<3 where (toggle.value as? String) != "1" {
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            _ = eventually(5) { (toggle.value as? String) == "1" }
+        }
+        XCTAssertEqual(toggle.value as? String, "1", "the switch is on")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(eventually { !app.buttons["scheme-forest"].exists }, "the sheet is closed")
+
+        try checkScribble(at: onTheText(), allowed: true, "the Markdown tab, switched on")
+        choose("Live")
+        try checkScribble(at: onTheText(), allowed: true, "the Live tab, switched on")
+        leaveTheCaretAtTheTop()
+    }
+
     /// The app restores the caret of the note that was open (per scene), and a later test's imported note can take this one's id: the caret goes to the top of the note,
     /// where a note that was never open has it, so that it does not reopen in a tag and show it (found running `LiveDrawingsUITests` after this class).
     private func leaveTheCaretAtTheTop() {
@@ -198,7 +262,8 @@ final class LiveScribbleUITests: XCTestCase {
     /// A drawing made with Image › Drawing…, drawn in the Live tab: the Pencil (a finger, with `-fingerIsPencil 1`) on it opens its canvas, as a tap does in the
     /// Preview, rather than putting the caret in its tag; what is drawn there is stored under a new name, which the tag then names, and nothing is written in the text.
     func testThePencilOnADrawingOpensItsCanvas() throws {
-        try launch(["-fingerIsPencil", "1"])
+        // With Scribble off: the Pencil on a drawing opens its canvas either way.
+        try launch(["-fingerIsPencil", "1", "-pencilScribble", "0"])
         write("Above the drawing.")
         let canvas = app.descendants(matching: .any)["ink-canvas"]
         for _ in 0..<3 where inkSources.isEmpty {

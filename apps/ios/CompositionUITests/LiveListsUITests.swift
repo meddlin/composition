@@ -205,7 +205,8 @@ final class LiveListsUITests: XCTestCase {
     /// beside it, ticks it, the caret stays, and Scribble may not begin there; on the item's words Scribble may, and a tap there edits; a stroke that starts on a box
     /// and moves off it ticks nothing.
     func testThePencilOnABoxAlwaysTicksItAndScribbleCannotBeginThere() throws {
-        try launch(["-fingerIsPencil", "1"])
+        // With Appearance ▸ Writing ▸ "Write with the Pencil (Scribble)" on: off, Scribble begins nowhere (the next test).
+        try launch(["-fingerIsPencil", "1", "-pencilScribble", "1"])
         // 0-10 "- [ ] open", 11-21 "- [x] done", 23-26 "end".
         write("- [ ] open\n- [x] done\n\nend")
         XCTAssertTrue(eventually { boxCentres().count == 2 }, "two boxes are drawn: \(boxes.label)")
@@ -243,6 +244,25 @@ final class LiveListsUITests: XCTestCase {
         XCTAssertEqual(scribbleAnswer(touching: words) { tapScreen(words) }, "yes", "Scribble may write on the item's words")
         XCTAssertTrue(eventually { (caret() ?? -1) >= 6 && (caret() ?? 99) <= 10 }, "the caret goes into the words: \(selection.label)")
         XCTAssertTrue(text().hasSuffix("- [x] open\n- [ ] done\n\nend"), "and nothing is ticked")
+        app.typeKey(.upArrow, modifierFlags: .command)  // the caret back at the note's top, for the next test (see LiveScribbleUITests)
+    }
+
+    /// With "Write with the Pencil (Scribble)" off (`PencilScribble`, the default), Scribble may begin neither on a box nor on the item's words, and the Pencil still
+    /// works as without Scribble: its tap on a box ticks it, and on the words puts the caret there, as a finger's does.
+    func testWithScribbleOffThePencilStillTicksABoxAndPutsTheCaretInTheWords() throws {
+        try launch(["-fingerIsPencil", "1", "-pencilScribble", "0"])
+        // 0-10 "- [ ] open", 11-21 "- [x] done", 23-26 "end".
+        write("- [ ] open\n- [x] done\n\nend")
+        XCTAssertTrue(eventually { boxCentres().count == 2 }, "two boxes are drawn: \(boxes.label)")
+        let caretBefore = caret()
+        let first = boxCentres()[0]
+        XCTAssertEqual(scribbleAnswer(touching: first) { tapScreen(first) }, "no", "Scribble may not begin on the box")
+        XCTAssertTrue(eventually { text().hasSuffix("- [x] open\n- [x] done\n\nend") }, "the Pencil's tap ticks the box: \(text().suffix(30).debugDescription)")
+        XCTAssertEqual(caret(), caretBefore, "and the caret stays where it was")
+        let words = CGPoint(x: boxCentres()[0].x + 45, y: boxCentres()[0].y)
+        XCTAssertEqual(scribbleAnswer(touching: words) { tapScreen(words) }, "no", "nor on the item's words, with Scribble off")
+        XCTAssertTrue(eventually { (caret() ?? -1) >= 6 && (caret() ?? 99) <= 10 }, "the Pencil's tap puts the caret in the words: \(selection.label)")
+        XCTAssertTrue(text().hasSuffix("- [x] open\n- [x] done\n\nend"), "and nothing else changed")
         app.typeKey(.upArrow, modifierFlags: .command)  // the caret back at the note's top, for the next test (see LiveScribbleUITests)
     }
 
