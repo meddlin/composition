@@ -265,7 +265,8 @@ final class NoteTextView: UITextView {
             command.wantsPriorityOverSystemBehavior = true
             return command
         }
-        return [key("c", #selector(composeMore)), key("e", #selector(endComposition)), key("s", #selector(scratchOutPreview)), key("d", #selector(scratchOutDelete))]
+        return [key("c", #selector(composeMore)), key("e", #selector(endComposition)), key("s", #selector(scratchOutPreview)), key("d", #selector(scratchOutDelete)),
+                key("h", #selector(pencilHovers))]
     }()
 
     /// ⌃⌥S and ⌃⌥D, with `-liveCompose 1`: a Scribble scratch-out, as PencilKit drives the text view (see `Coordinator.simulateScratchOut`), in its two steps: the words it will delete
@@ -273,6 +274,9 @@ final class NoteTextView: UITextView {
     var simulateScratchOut: ((_ delete: Bool) -> Void)?
     @objc private func scratchOutPreview() { simulateScratchOut?(false) }
     @objc private func scratchOutDelete() { simulateScratchOut?(true) }
+    /// ⌃⌥H, with `-liveCompose 1`: the Pencil hovers over the text from now on (`LiveScribble.simulateHovering`, item 372).
+    var simulatePencilHover: (() -> Void)?
+    @objc private func pencilHovers() { simulatePencilHover?() }
 
     @objc private func composeMore() {
         let word = (markedTextRange.flatMap { text(in: $0) } ?? "") + "ni"
@@ -573,6 +577,7 @@ struct NoteEditorView: UIViewRepresentable {
                     guard let self, let editor else { return }
                     self.simulateScratchOut(in: editor, delete: delete)
                 }
+                editor.simulatePencilHover = { [weak scribble] in scribble?.simulateHovering() }
                 #endif
                 let pencil = LivePencilOpen(textView: editor)
                 pencil.open = { [weak self] name in self?.handle?.editInk(name) }

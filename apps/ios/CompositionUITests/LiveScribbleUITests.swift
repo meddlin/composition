@@ -259,13 +259,9 @@ final class LiveScribbleUITests: XCTestCase {
         XCTAssertTrue(eventually { text().hasSuffix(content) }, "the text is what was typed: \(text().suffix(80))")
     }
 
-    /// A drawing made with Image › Drawing…, drawn in the Live tab: the Pencil (a finger, with `-fingerIsPencil 1`) on it opens its canvas, as a tap does in the
-    /// Preview, rather than putting the caret in its tag; what is drawn there is stored under a new name, which the tag then names, and nothing is written in the text.
-    func testThePencilOnADrawingOpensItsCanvas() throws {
-        // With Scribble off: the Pencil on a drawing opens its canvas either way.
-        try launch(["-fingerIsPencil", "1", "-pencilScribble", "0"])
+    /// Makes a drawing with Image › Drawing… after a line of text, and a line of text after it; comes back with the drawing's stored name.
+    private func makeADrawing(_ canvas: XCUIElement) throws -> String {
         write("Above the drawing.")
-        let canvas = app.descendants(matching: .any)["ink-canvas"]
         for _ in 0..<3 where inkSources.isEmpty {
             let item = app.buttons["new-drawing"]
             for _ in 0..<3 where !item.exists {
@@ -277,9 +273,49 @@ final class LiveScribbleUITests: XCTestCase {
             drawALine(onto: canvas)
             _ = eventually(30) { !inkSources.isEmpty }
         }
-        let first = try XCTUnwrap(inkSources.first, "the drawing's tag is in the note: \(text().suffix(160))")
+        let name = try XCTUnwrap(inkSources.first, "the drawing's tag is in the note: \(text().suffix(160))")
         write("Below the drawing.")
         XCTAssertTrue(eventually(30) { item("picture-ink") != nil }, "the drawing is drawn in place of its tag: \(drawnProbe.label)")
+        return name
+    }
+
+    /// Item 372, steps 4 and 5 (decision I6): a finger's tap on a drawing puts the caret in its tag, which then shows, with the drawing under it, as on a picture.
+    /// No `-fingerIsPencil` here: the finger is a finger.
+    func testAFingerTapOnADrawingShowsItsTag() throws { try checkAFingerTapShowsTheTag(whileThePencilHovers: false) }
+
+    /// The same while the Pencil hovers over the text, as it does in the hand that holds it (⌃⌥H with `-liveCompose 1` stands in for it: Scribble's questions, ten a
+    /// second, and the hover). On the owner's iPad (main at 1add2d7) the tap did nothing: each of PencilKit's hover questions held the Live look still for Scribble.
+    func testAFingerTapOnADrawingShowsItsTagWhileThePencilHovers() throws { try checkAFingerTapShowsTheTag(whileThePencilHovers: true) }
+
+    private func checkAFingerTapShowsTheTag(whileThePencilHovers hovers: Bool) throws {
+        // Scribble on, as `launch` has it (with Scribble off, `LiveScribble` refuses every question and so never holds the look).
+        try launch(hovers ? ["-liveCompose", "1"] : [])
+        let canvas = app.descendants(matching: .any)["ink-canvas"]
+        _ = try makeADrawing(canvas)
+        // The caret off the drawing first, at the top, so that the tap is what moves it there.
+        leaveTheCaretAtTheTop()
+        if hovers { app.typeKey("h", modifierFlags: [.control, .option]) }
+        XCTAssertTrue(eventually(30) { item("picture-ink") != nil }, "the drawing is drawn in place of its tag: \(drawnProbe.label)")
+        let textBefore = text()
+        let picture = try XCTUnwrap(item("picture-ink")).picture
+        keepScreenshot("the drawing, before the tap")
+
+        tapWindow(CGPoint(x: picture.midX, y: picture.midY))
+        XCTAssertTrue(eventually(hovers ? 5 : 10) { item("pictureAfter-ink") != nil },
+                      "one tap showed the drawing's tag, with the drawing after it: \(drawnProbe.label); selection: \(app.descendants(matching: .any)["live-selection"].label)")
+        XCTAssertFalse(canvas.exists, "a finger's tap does not open the canvas")
+        XCTAssertEqual(text(), textBefore, "nothing was written in the note")
+        keepScreenshot("the drawing's tag, shown by a finger's tap")
+        leaveTheCaretAtTheTop()
+    }
+
+    /// A drawing made with Image › Drawing…, drawn in the Live tab: the Pencil (a finger, with `-fingerIsPencil 1`) on it opens its canvas, as a tap does in the
+    /// Preview, rather than putting the caret in its tag; what is drawn there is stored under a new name, which the tag then names, and nothing is written in the text.
+    func testThePencilOnADrawingOpensItsCanvas() throws {
+        // With Scribble off: the Pencil on a drawing opens its canvas either way.
+        try launch(["-fingerIsPencil", "1", "-pencilScribble", "0"])
+        let canvas = app.descendants(matching: .any)["ink-canvas"]
+        let first = try makeADrawing(canvas)
         let textBefore = text()
         let picture = try XCTUnwrap(item("picture-ink")).picture
 
@@ -294,6 +330,106 @@ final class LiveScribbleUITests: XCTestCase {
         XCTAssertTrue(eventually(30) { inkSources.count == 1 && inkSources.first != first }, "the tag names the edited drawing: \(inkSources), was \(first)")
         XCTAssertTrue(text().hasSuffix("Below the drawing."), "the rest of the note is as it was: \(text().suffix(120))")
         XCTAssertTrue(eventually(30) { item("picture-ink") != nil }, "the edited drawing is drawn: \(drawnProbe.label)")
+        leaveTheCaretAtTheTop()
+    }
+
+    // MARK: What says the Pencil opens a drawing (the owner's ask after item 372)
+
+    /// A scheme and its rule colour (the text colour at 35% over the page, as `LiveUITests` has them): the colour of the border round a drawing.
+    private struct Scheme {
+        let name: String
+        let rule: (r: Int, g: Int, b: Int)
+    }
+
+    private static let schemes = [
+        Scheme(name: "dark", rule: (0x5a, 0x5a, 0x5a)),
+        Scheme(name: "light", rule: (0xad, 0xaf, 0xaf)),
+        Scheme(name: "forest", rule: (0x52, 0x5e, 0x57)),
+        Scheme(name: "wine", rule: (0x61, 0x54, 0x57)),
+        Scheme(name: "cream", rule: (0xb5, 0xae, 0xa0)),
+    ]
+
+    /// The longest straight run of pixels within `tolerance` of `color`, along a row or down a column (the window's image comes turned a quarter in landscape), and
+    /// how many pixels the image has to a point.
+    private func longestRun(of color: (r: Int, g: Int, b: Int), tolerance: Int = 4) throws -> (run: Int, scale: CGFloat) {
+        let image = try XCTUnwrap(app.windows.firstMatch.screenshot().image.cgImage)
+        var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
+        let space = try XCTUnwrap(CGColorSpace(name: CGColorSpace.sRGB))
+        let context = try XCTUnwrap(CGContext(data: &data, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4, space: space,
+                                              bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        func near(_ x: Int, _ y: Int) -> Bool {
+            let i = (y * image.width + x) * 4
+            return abs(Int(data[i]) - color.r) <= tolerance && abs(Int(data[i + 1]) - color.g) <= tolerance && abs(Int(data[i + 2]) - color.b) <= tolerance
+        }
+        var longest = 0
+        for y in 0..<image.height {
+            var run = 0
+            for x in 0..<image.width { if near(x, y) { run += 1; longest = max(longest, run) } else { run = 0 } }
+        }
+        for x in 0..<image.width {
+            var run = 0
+            for y in 0..<image.height { if near(x, y) { run += 1; longest = max(longest, run) } else { run = 0 } }
+        }
+        let window = app.windows.firstMatch.frame
+        return (longest, CGFloat(max(image.width, image.height)) / max(window.width, window.height))
+    }
+
+    /// In `scheme`: a drawing is drawn with a border round it in the scheme's rule colour, a line of it as long as the drawing is wide, while a diagram in the same note
+    /// (which has no canvas) has none; and the border takes no room: the drawing's band is the picture and its margins, as without it (item 344's size rule).
+    private func checkTheBorder(in scheme: Scheme) throws {
+        let file = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("live-border-note.md")
+        try "# Border\n\n<Drawio src=\"app_data/demo-diagram-0123456789ab.png\" alt=\"Request flow\" width=\"240\" />\n".write(to: file, atomically: true, encoding: .utf8)
+        try launch(note: nil, ["-importText", file.path, "-theme", scheme.name])
+        XCTAssertTrue(eventually { text().contains("<Drawio") }, "the imported note is open: \(text().prefix(80))")
+        XCTAssertTrue(eventually(30) { item("picture-drawio") != nil }, "the diagram is drawn: \(drawnProbe.label)")
+        let diagram = try XCTUnwrap(item("picture-drawio")).picture
+        let bare = try longestRun(of: scheme.rule)
+        XCTAssertLessThan(CGFloat(bare.run), diagram.width * bare.scale * 0.8, "\(scheme.name): no border round the diagram (a run of \(bare.run) pixels of the rule colour)")
+
+        let canvas = app.descendants(matching: .any)["ink-canvas"]
+        _ = try makeADrawing(canvas)
+        let drawing = try XCTUnwrap(item("picture-ink"))
+        XCTAssertEqual(drawing.bottom - drawing.top, drawing.picture.height + 8, accuracy: 1.5,
+                       "\(scheme.name): the drawing's band is the picture and its two 4-point margins, as before the border: \(drawnProbe.label)")
+        // Its top and bottom edges are straight between the rounded corners (6 points each): as long as the drawing is wide, less those.
+        let straight = (drawing.picture.width - 12) * bare.scale
+        _ = eventually(3) { ((try? longestRun(of: scheme.rule).run).map { CGFloat($0) } ?? 0) >= straight }
+        keepScreenshot("the border round a drawing, \(scheme.name)")
+        XCTAssertTrue(eventually(10) { ((try? longestRun(of: scheme.rule).run).map { CGFloat($0) } ?? 0) >= straight },
+                      "\(scheme.name): a border round the drawing, as wide as it, in the rule colour (the longest run is \((try? longestRun(of: scheme.rule).run) ?? 0) pixels; the drawing is \(drawing.picture.width) points wide)")
+        leaveTheCaretAtTheTop()
+    }
+
+    func testADrawingHasABorderInTheDarkScheme() throws { try checkTheBorder(in: Self.schemes[0]) }
+    func testADrawingHasABorderInTheLightScheme() throws { try checkTheBorder(in: Self.schemes[1]) }
+    func testADrawingHasABorderInTheForestScheme() throws { try checkTheBorder(in: Self.schemes[2]) }
+    func testADrawingHasABorderInTheWineScheme() throws { try checkTheBorder(in: Self.schemes[3]) }
+    func testADrawingHasABorderInTheCreamScheme() throws { try checkTheBorder(in: Self.schemes[4]) }
+
+    /// The moment the Pencil (a finger, with `-fingerIsPencil 1`) lands on a drawing it looks pressed, over the drawing and its border, before the canvas opens; the
+    /// look goes once it has. `-livePressBeat 3` holds the pressed look for three seconds, so that it can be seen (in the app it is 0.12).
+    func testThePencilOnADrawingLooksPressedBeforeItsCanvasOpens() throws {
+        try launch(["-fingerIsPencil", "1", "-livePressBeat", "3"])
+        let canvas = app.descendants(matching: .any)["ink-canvas"]
+        _ = try makeADrawing(canvas)
+        let picture = try XCTUnwrap(item("picture-ink")).picture
+        let pressed = app.descendants(matching: .any)["live-drawing-pressed"]
+        XCTAssertFalse(pressed.exists, "nothing looks pressed before the Pencil lands")
+
+        tapWindow(CGPoint(x: picture.midX, y: picture.midY))
+        XCTAssertTrue(pressed.waitForExistence(timeout: 2), "the drawing looks pressed as the Pencil lands")
+        XCTAssertFalse(canvas.exists, "and the canvas is not open yet")
+        let outset = picture.insetBy(dx: -3, dy: -3)
+        XCTAssertEqual(pressed.frame.minX, outset.minX, accuracy: 1.5, "the pressed look is over the drawing and its border: \(pressed.frame), drawing \(picture)")
+        XCTAssertEqual(pressed.frame.minY, outset.minY, accuracy: 1.5, "the pressed look is over the drawing and its border: \(pressed.frame), drawing \(picture)")
+        XCTAssertEqual(pressed.frame.width, outset.width, accuracy: 1.5, "the pressed look is over the drawing and its border: \(pressed.frame), drawing \(picture)")
+        XCTAssertEqual(pressed.frame.height, outset.height, accuracy: 1.5, "the pressed look is over the drawing and its border: \(pressed.frame), drawing \(picture)")
+        keepScreenshot("the drawing pressed by the Pencil")
+        XCTAssertTrue(canvas.waitForExistence(timeout: 20), "then the canvas opens")
+        app.buttons["ink-cancel"].tap()
+        XCTAssertTrue(eventually(10) { !canvas.exists }, "the canvas is closed")
+        XCTAssertTrue(eventually(5) { !pressed.exists }, "nothing looks pressed once the canvas has opened")
         leaveTheCaretAtTheTop()
     }
 }

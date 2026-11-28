@@ -261,6 +261,7 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
                 } else {
                     drawStandIn(rect)
                 }
+                Self.drawCanvasBorder(round: rect, color: drawing.ruleColor)
                 return
             case .some: break
             case .none: return drawStandIn(rect)
@@ -271,6 +272,23 @@ final class LiveDrawingFragment: NSTextLayoutFragment {
         } else {
             drawStandIn(rect)
         }
+    }
+
+    /// How far outside the picture the border round a drawing is drawn (its line's middle), and how thick it is, and its corners' radius. Its outer edge, at
+    /// `borderOutset + borderWidth / 2` (3 points), stays inside the picture's margin (`LiveDrawing.margin`, 4 points) above and below it and the line's padding
+    /// at its sides, so the border takes no room: the drawing is the size it was and sits where it sat (item 344's size rule).
+    static let borderOutset: CGFloat = 2.5
+    static let borderWidth: CGFloat = 1
+    static let borderRadius: CGFloat = 6
+
+    /// The border round an `<Ink />` drawing whose canvas the Pencil opens (`LivePencilOpen`; the owner asked for it after item 372): a thin rounded line in the
+    /// scheme's rule colour, the colour of a horizontal rule, so it is as quiet as one in every scheme and stronger with Increase Contrast. Only drawings get it:
+    /// a picture or a diagram has no canvas.
+    static func drawCanvasBorder(round rect: CGRect, color: UIColor) {
+        let path = UIBezierPath(roundedRect: rect.insetBy(dx: -borderOutset, dy: -borderOutset), cornerRadius: borderRadius)
+        path.lineWidth = borderWidth
+        color.setStroke()
+        path.stroke()
     }
 
     /// Not in yet: a faint stand-in of the right size, and the text is drawn again when it is.
