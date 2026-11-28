@@ -206,6 +206,8 @@ final class AppModel {
             if forced != 0 { selection = Int64(forced) }
             // `-resetOpenNotesIn 1` forgets the "Open notes in" choice (a UI test that sets it through the sheet starts and ends with it unset).
             if UserDefaults.standard.bool(forKey: "resetOpenNotesIn") { UserDefaults.standard.removeObject(forKey: NoteDetailView.Mode.openNotesInKey) }
+            // `-resetPencilScribble 1` forgets the "Write with the Pencil (Scribble)" choice, likewise.
+            if UserDefaults.standard.bool(forKey: "resetPencilScribble") { UserDefaults.standard.removeObject(forKey: PencilScribble.key) }
             // `-trashNote 3` and `-restoreNote 3` do what the buttons do, for the script that checks the rows (apps/ios/scripts/editor-flow-test.sh);
             // `-newNote 1` makes a note as the + button does.
             if UserDefaults.standard.bool(forKey: "newNote") { await createNote() }
